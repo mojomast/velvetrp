@@ -520,6 +520,97 @@ test("campaign administration lifecycle and settings API smoke", async ({ reques
   expect(remainsUnarchived.campaign.status).not.toBe("archived");
 });
 
+test("campaign membership and stopped-room administration API smoke", async ({ request }) => {
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-Membership-Campaign`,
+  });
+  const campaignId = campaign.campaign.id;
+  const principalId = "e2e-membership-principal";
+
+  const initial = await json<{ memberships: Array<{ principalId: string; role: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/memberships`,
+  );
+  expect(initial.memberships).toContainEqual(expect.objectContaining({ principalId: "local-owner", role: "owner" }));
+
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  const added = await json<{
+    membership: { principalId: string; role: string; createdAt: string };
+    receipt: { campaignId: string; type: string; revisionBefore: number; revisionAfter: number };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/memberships`, {
+    principalId, role: "player", expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-membership-add`,
+  }, 200);
+  expect(added).toEqual({
+    membership: expect.objectContaining({ principalId, role: "player", createdAt: expect.any(String) }),
+    receipt: expect.objectContaining({ campaignId, type: "membership_added", revisionBefore: administration.campaign.revision,
+      revisionAfter: administration.campaign.revision + 1 }),
+  });
+
+  const changed = await json<{
+    membership: { principalId: string; role: string };
+    receipt: { campaignId: string; type: string; revisionBefore: number; revisionAfter: number };
+  }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/memberships/${principalId}`, {
+    role: "gm", expectedRevision: added.receipt.revisionAfter, idempotencyKey: `${runId}-membership-change`,
+  });
+  expect(changed).toEqual({
+    membership: expect.objectContaining({ principalId, role: "gm" }),
+    receipt: expect.objectContaining({ campaignId, type: "membership_role_changed", revisionBefore: added.receipt.revisionAfter,
+      revisionAfter: added.receipt.revisionAfter + 1 }),
+  });
+
+  const removed = await json<{
+    membership: { principalId: string; role: string };
+    receipt: { campaignId: string; type: string; revisionBefore: number; revisionAfter: number };
+  }>(request, "DELETE", `/rpg/v1/campaigns/${campaignId}/memberships/${principalId}`, {
+    expectedRevision: changed.receipt.revisionAfter, idempotencyKey: `${runId}-membership-remove`,
+  });
+  expect(removed).toEqual({
+    membership: expect.objectContaining({ principalId, role: "gm" }),
+    receipt: expect.objectContaining({ campaignId, type: "membership_removed", revisionBefore: changed.receipt.revisionAfter,
+      revisionAfter: changed.receipt.revisionAfter + 1 }),
+  });
+  const listedAfterRemoval = await json<{ memberships: Array<{ principalId: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/memberships`,
+  );
+  expect(listedAfterRemoval.memberships.map((membership) => membership.principalId)).not.toContain(principalId);
+
+  let characterId: string | undefined;
+  let sessionId: string | undefined;
+  try {
+    const character = await json<{ id: string }>(request, "POST", "/characters", {
+      name: `${runId}-Detach-Persona`, age: 30, archetype: "Deterministic room owner",
+      boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+    });
+    characterId = character.id;
+    const session = await json<{ id: string }>(request, "POST", "/sessions", {
+      characterId, title: `${runId}-Stopped-Detach-Room`,
+    });
+    sessionId = session.id;
+    await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId });
+    await json(request, "POST", `/sessions/${sessionId}/stop`, undefined, 200);
+
+    const beforeDetach = await json<{ campaign: { revision: number } }>(
+      request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+    );
+    const detached = await json<{
+      attachment: { sessionId: string; attachedAt: string };
+      receipt: { campaignId: string; type: string; revisionBefore: number; revisionAfter: number };
+    }>(request, "DELETE", `/rpg/v1/campaigns/${campaignId}/rooms/${sessionId}`, {
+      expectedRevision: beforeDetach.campaign.revision, idempotencyKey: `${runId}-stopped-room-detach`,
+    });
+    expect(detached).toEqual({
+      attachment: expect.objectContaining({ sessionId, attachedAt: expect.any(String) }),
+      receipt: expect.objectContaining({ campaignId, type: "room_detached", revisionBefore: beforeDetach.campaign.revision,
+        revisionAfter: beforeDetach.campaign.revision + 1 }),
+    });
+  } finally {
+    if (sessionId) await request.delete(`/api/sessions/${sessionId}`).catch(() => undefined);
+    if (characterId) await request.delete(`/api/characters/${characterId}`).catch(() => undefined);
+  }
+});
+
 test("quest workflow creates and resolves campaign state", async ({ request }) => {
   let characterId: string | undefined;
   try {

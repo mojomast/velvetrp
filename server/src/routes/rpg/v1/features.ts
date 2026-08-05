@@ -83,6 +83,7 @@ import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
 import { characterBuilderHttpRoutes } from "./characterBuilder.js";
 import { characterProgressionRoutes } from "./characterProgression.js";
 import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
+import { campaignMembershipHttpRoutes } from "./campaignMemberships.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
@@ -95,9 +96,12 @@ export interface CampaignListRepository extends
   Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">>,
   Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression">>,
   Partial<Pick<CampaignAdministrationRepository,
-    "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">>,
+    "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
+    | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
+    | "detachAuditedCampaignRoom">>,
   Partial<QuestRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
+  listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -160,6 +164,11 @@ type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
+type CampaignMembershipLaneRepository = Pick<CampaignAdministrationRepository,
+  "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
+  | "detachAuditedCampaignRoom"> & {
+  listCampaignMemberships(actorPrincipalId: string, campaignId: string): unknown[];
+};
 type QuestLaneRepository = Pick<QuestRepository,
   "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
   | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
@@ -199,6 +208,16 @@ function assertCampaignAdministrationRepository(
     || typeof repository.archiveCampaignWithConfirmation !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
+}
+
+function assertCampaignMembershipRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignMembershipLaneRepository {
+  if (typeof repository.addAuditedCampaignMembership !== "function"
+    || typeof repository.changeAuditedCampaignMembershipRole !== "function"
+    || typeof repository.removeAuditedCampaignMembership !== "function"
+    || typeof repository.detachAuditedCampaignRoom !== "function"
+    || typeof repository.listCampaignMemberships !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
@@ -256,6 +275,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCampaignAdministrationRepository(repository);
     return repository;
   };
+  const campaignMembershipRepositoryAccessor = (): CampaignMembershipLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignMembershipRepository(repository);
+    return repository;
+  };
   const questRepositoryAccessor = (): QuestLaneRepository => {
     const repository = getCampaignRepository();
     assertQuestRepository(repository);
@@ -270,6 +294,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,
   });
+  await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });
 
   app.get<{

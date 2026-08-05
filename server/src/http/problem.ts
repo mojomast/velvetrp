@@ -38,11 +38,18 @@ function safeProblemInstance(requestTarget: string): string {
     || suffix === "/characters"
     || suffix === "/characters/creation-options"
     || suffix === "/rooms"
+    || suffix === "/memberships"
     || suffix === "/dice-rolls") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (suffix === "/administration" || suffix === "/character-drafts") {
     return `${campaignPrefix}:campaignId${suffix}`;
+  }
+  if (/^\/memberships\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/memberships/:principalId`;
+  }
+  if (/^\/rooms\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/rooms/:sessionId`;
   }
   if (suffix === "/storylines" || suffix === "/quests") {
     return `${campaignPrefix}:campaignId${suffix}`;
