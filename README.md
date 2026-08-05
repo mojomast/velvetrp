@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v29 revision 2 (v29r2)**. Schema v29 removes the retired character field from persistence while retaining character identities and references; v29r2 adds quests, storylines, clues, rewards, and objective completions. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.9 adds no HTTP routes or client/UI.
+Current persistence is schema **v29 revision 2 (v29r2)**. Schema v29 removes the retired character field from persistence while retaining character identities and references; v29r2 adds quests, storylines, clues, rewards, and objective completions. The feature-gated trusted-local RPG boundary now includes the M2.1 quest route group alongside the historical 21 operations.
 
-The fixed canonical v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`; the retained v28 world-layout digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.9 repository/shared-contract work is complete. M1.9 provides storylines, ordered quests, clues, rewards, and objective completion records. M2 HTTP routes are next.
+The fixed canonical v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`; the retained v28 world-layout digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.9 repository/shared-contract work is complete. M2.1 exposes campaign-scoped storyline, quest, clue, reward, and objective operations through the trusted-local HTTP boundary.
 
 ---
 
@@ -231,8 +231,8 @@ M0  █████████████████████████�
 M1  ████████████████████████████████  COMPLETE
      Repository/shared-contract complete through quests and storylines; M1.9 adds no HTTP routes or UI
 
-M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
-    API surface: 11 route groups covering all M1 domains
+M2  ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  STARTED (M2.1 quest routes complete)
+     API surface: quest routes complete; 10 route groups remain
 
 M3  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     Client UI: character builder, combat tracker,

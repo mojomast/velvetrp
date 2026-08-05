@@ -44,6 +44,36 @@ function safeProblemInstance(requestTarget: string): string {
   if (suffix === "/administration" || suffix === "/character-drafts") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
+  if (suffix === "/storylines" || suffix === "/quests") {
+    return `${campaignPrefix}:campaignId${suffix}`;
+  }
+  if (/^\/storylines\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/storylines/:storylineId`;
+  }
+  if (/^\/storylines\/[^/]+\/status$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/storylines/:storylineId/status`;
+  }
+  if (/^\/quests\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId`;
+  }
+  if (/^\/quests\/[^/]+\/status$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/status`;
+  }
+  if (/^\/quests\/[^/]+\/clues$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/clues`;
+  }
+  if (/^\/quests\/[^/]+\/clues\/[^/]+\/discover$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/clues/:clueId/discover`;
+  }
+  if (/^\/quests\/[^/]+\/rewards$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/rewards`;
+  }
+  if (/^\/quests\/[^/]+\/rewards\/[^/]+\/grant$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/rewards/:rewardId/grant`;
+  }
+  if (/^\/quests\/[^/]+\/objectives$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/quests/:questId/objectives`;
+  }
   if (/^\/character-drafts\/[^/]+$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/character-drafts/:draftId`;
   }

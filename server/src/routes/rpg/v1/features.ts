@@ -86,13 +86,16 @@ import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
+import { questHttpRoutes } from "./questRoutes.js";
+import type { QuestRepository } from "../../../repo/questRepo.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
   Partial<CampaignDiceRepository>,
   Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">>,
   Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression">>,
-  Partial<Pick<CampaignAdministrationRepository, "getCampaignAdministration" | "updateCampaignAdministration">> {
+  Partial<Pick<CampaignAdministrationRepository, "getCampaignAdministration" | "updateCampaignAdministration">>,
+  Partial<QuestRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
@@ -156,6 +159,10 @@ type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration">;
+type QuestLaneRepository = Pick<QuestRepository,
+  "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
+  | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
+  | "completeObjective">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -190,6 +197,15 @@ function assertCampaignAdministrationRepository(
     || typeof repository.updateCampaignAdministration !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
+}
+
+function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
+  const methods: Array<keyof QuestLaneRepository> = [
+    "listStorylines", "createStoryline", "getStoryline", "updateStoryline", "listQuests", "createQuest",
+    "getQuestDetail", "updateQuest", "createClue", "markClueDiscovered", "createReward", "grantReward",
+    "completeObjective",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
@@ -238,6 +254,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCampaignAdministrationRepository(repository);
     return repository;
   };
+  const questRepositoryAccessor = (): QuestLaneRepository => {
+    const repository = getCampaignRepository();
+    assertQuestRepository(repository);
+    return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -247,6 +268,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,
   });
+  await app.register(questHttpRoutes, { questRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };
