@@ -196,7 +196,7 @@ describe("schema v2 to v3 migration", () => {
     closeRepo();
     const verify = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
-    expect(version.value).toBe("24");
+    expect(version.value).toBe("25");
     verify.close();
   });
 });

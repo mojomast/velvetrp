@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. The feature-gated trusted-local RPG boundary now has exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. No client/UI exists for these seven new routes.
+Current persistence is schema **v25 revision 1 (v25r1)**. Schema v25 completes the M1.5 repository/shared-contract layer for actor resources, inventory/equipment, economy, and rest without rewriting historical ledgers. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.5 adds no HTTP routes or client/UI.
 
-The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1–M1.4 repository/contracts work is complete, with selected server-only HTTP exposure; client/UI work for the new lanes remains absent. M1.5 remains the next repository-only roadmap milestone.
+The fixed canonical v25 DDL digest is `a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.5 repository/contracts work is complete. M1.5 provides actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops/finite stock/quotes/purchases, bilateral trade, and short/long rest; exact retries, revisions, and immutable receipts are factory-only. M1.6 checks, powers, and deterministic effects is next.
 
 ---
 
@@ -101,12 +101,12 @@ POST /api/interaction
 
 ### Repository Layer
 
-The repo layer is split into focused roleplay domains and factory-composed RPG facades at schema v24r1:
+The repo layer is split into focused roleplay domains and factory-composed RPG facades at schema v25r1:
 
 ```
 server/src/repo/
-├── index.ts          ← public barrel (74 named exports, stable API surface)
-├── db.ts             ← schema v24r1, migrations v1→v24, connection lifecycle
+├── index.ts          ← public barrel (stable API surface)
+├── db.ts             ← schema v25r1, migrations v1→v25, connection lifecycle
 ├── shared.ts         ← LOCAL_OWNER_PRINCIPAL_ID constant
 ├── repoContext.ts    ← provider-pattern DB singleton (configureRepositoryDatabase)
 ├── characterRepo.ts  ← characters CRUD, lore repair on delete
@@ -124,7 +124,7 @@ server/src/repo/
 └── characterProgressionRepo.ts    ← XP/milestones, previews, level application
 ```
 
-### Selected Schema Foundations (v24r1)
+### Selected Schema Foundations (v25r1)
 
 ```
 characters          sessions            messages
@@ -228,9 +228,8 @@ The full 40-item roadmap lives in [`docs/ROADMAP.md`](docs/ROADMAP.md). High-lev
 M0  ████████████████████████████████  COMPLETE (98 slices, schema v14r1)
     Core roleplay, campaigns, dice, character workspace
 
-M1  █████████████░░░░░░░░░░░░░░░░░░░  M1.1–M1.4 COMPLETE
-     Repository/contracts complete; selected server-only HTTP lanes
-     for drafts, progression read/preview, and administration (no UI)
+M1  █████████████████░░░░░░░░░░░░░░░  M1.1-M1.5 COMPLETE
+     Repository/contracts complete; M1.5 adds no HTTP routes or UI
 
 M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     API surface: 11 route groups covering all M1 domains
@@ -290,7 +289,7 @@ npm run dev:server   # server only
 npm run dev:client   # client only
 npm run typecheck    # typecheck contracts, server, client, and E2E
 npm run build        # production build (contracts → server → client)
-npm test             # contracts + server + client tests (2,141 passing, 1 skipped)
+npm test             # contracts + server + client tests (2,199 passing, 1 skipped)
 npm run test:e2e     # deterministic browser/API E2E (no paid provider calls)
 npm run ci           # install → typecheck → build → test
 ```
@@ -334,10 +333,10 @@ docs/                   API reference, architecture, roadmap, streaming protocol
 Data lives in `server/data/velvet.sqlite`. Override with `VELVET_DATA_DIR`.
 
 - WAL mode, foreign keys enabled
-- Schema **v24, revision 1** (current)
+- Schema **v25, revision 1** (current)
 - Auto-migrates from v2 onward at startup
 - v9–v14 add campaign, content, sheet, actor, command, resource, and dice foundations
-- v15–v24 add administration, immutable catalogs, character building, progression, and integrity repairs
+- v15–v25 add administration, immutable catalogs, character building, progression, resources, inventory, economy, rest, and integrity repairs
 
 ---
 

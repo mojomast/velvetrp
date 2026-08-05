@@ -857,7 +857,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema v24 revision 1. The implemented migration sequence is:
+Velvet currently uses schema v25 revision 1. The implemented migration sequence is:
 
 | Version | Scope |
 |---|---|
@@ -872,12 +872,13 @@ Velvet currently uses schema v24 revision 1. The implemented migration sequence 
 | v19-v22 | M1.3 character drafts, derived sheets, immutable command/revision provenance, and integrity repairs |
 | v23 | M1.4 single-class progression, XP/milestone ledgers, advancements, pending choices, powers, and receipts |
 | v24 | M1.4 provenance/integrity repair for bootstrap, pending snapshots, proposals, advancements, and power sources |
+| v25 | M1.5 actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops/finite stock/quotes/purchases, bilateral trade, and short/long rest |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- Existing databases migrate sequentially to schema v24 revision 1, including explicit same-version corrective revisions where supported.
+- Existing databases migrate sequentially to schema v25 revision 1, including explicit same-version corrective revisions where supported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
@@ -892,11 +893,17 @@ Migration requirements:
 
 ## Implementation Progress
 
+### 2026-08-05: Schema v25 M1.5 Resources, Inventory, Economy, and Rest
+
+Current persistence is v25r1. M1.5 completes the repository/shared-contract layer for actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops with finite stock, quotes and purchases, bilateral trade, and short/long rest. Exact retries, revisions, and immutable receipts are factory-only behavior. V25 preserves historical v14 and later ledgers; its fixed canonical DDL digest is `a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7`.
+
+M1.1-M1.5 are complete repository/shared-contract capabilities. The fixed-principal trusted-local boundary remains exactly 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. M1.5 adds no HTTP routes or client/UI. M1.6 checks, powers, and deterministic effects is next.
+
 ### 2026-08-05: Schema v24 M1.4 Progression Integrity Repair
 
-Current persistence is v24r1. V23 introduced M1.4 progression at the repository/shared-contract boundary; v24 preserves historical ledgers while repairing exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructs pending revisions from immutable command results. The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
+Historical v24r1 introduced M1.4 progression at the repository/shared-contract boundary and repaired exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructed pending revisions from immutable command results. Its fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
 
-M1.1-M1.4 remain repository/shared-contract capabilities. The current fixed-principal trusted-local boundary has 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content; M1.5 remains the next repository-only roadmap milestone. No client/UI exists for the new lanes.
+At that point M1.1-M1.4 were complete repository/shared-contract capabilities. The current fixed-principal trusted-local boundary remains at 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content. No client/UI exists for these routes.
 
 ### Historical 2026-08-05 M0 Slice 98 Deterministic Closeout
 

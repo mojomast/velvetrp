@@ -49,12 +49,12 @@ const characterInput = {
 };
 
 describe("schema", () => {
-  it("records schemaVersion 24 revision 1 and enables WAL", async () => {
+  it("records schemaVersion 25 revision 1 and enables WAL", async () => {
     const dir = process.env.VELVET_DATA_DIR as string;
     await listCharacters();
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = raw.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
-    expect(version.value).toBe("24");
+    expect(version.value).toBe("25");
     expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
     raw.close();
   });

@@ -92,6 +92,7 @@ export function removeFutureCharacterProgressionSchema(db:import("better-sqlite3
 
 /** Remove only additive v24 progression-integrity artifacts. */
 export function removeFutureCharacterProgressionIntegrityV24(db:import("better-sqlite3").Database):void{
+  removeFutureResourcesInventoryEconomyRestV25(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v24' OR name GLOB '*_v24_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
   db.exec(`DROP TABLE IF EXISTS character_progression_events_v24;
@@ -100,6 +101,14 @@ export function removeFutureCharacterProgressionIntegrityV24(db:import("better-s
     DROP TABLE IF EXISTS character_known_power_sources_v24;
     DROP TABLE IF EXISTS character_progression_bootstrap_v24;
     DROP TABLE IF EXISTS character_progression_layout_attestation_v24;`);
+}
+
+/** Remove additive v25 artifacts before exercising a genuine historical marker. */
+export function removeFutureResourcesInventoryEconomyRestV25(db:import("better-sqlite3").Database):void{
+  const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
+  for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
 }
 
 /** Registers the hostile legacy name for non-campaign deletion corruption fixtures. */

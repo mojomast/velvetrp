@@ -138,7 +138,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     const db = new DatabaseDriver(path.join(dir, "velvet.sqlite"));
     db.pragma("foreign_keys = ON");
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("25");
     expect(db.prepare("SELECT * FROM principals").all()).toEqual([{
       id: "local-owner",
       display_name: "Local owner",
@@ -252,7 +252,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(snapshotV8(dbPath)).toEqual(before);
     const db = new DatabaseDriver(dbPath, { readonly: true });
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("25");
     expect(db.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([]);
@@ -310,7 +310,7 @@ describe("schema v9 campaign foundation", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("25");
     expect(migrated.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     migrated.close();
   });

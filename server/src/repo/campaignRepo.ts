@@ -94,6 +94,10 @@ import {
   type CharacterBuilderRepository,
 } from "./characterBuilderRepo.js";
 import { createCharacterProgressionRepository, type CharacterProgressionRepository } from "./characterProgressionRepo.js";
+import { createActorResourceRepository, type ActorResourceRepository } from "./actorResourceRepo.js";
+import { createInventoryRepository, type InventoryRepository } from "./inventoryRepo.js";
+import { createEconomyRepository, type EconomyRepository } from "./economyRepo.js";
+import { createRestRepository, type RestRepository } from "./restRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -424,7 +428,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: {
@@ -6979,11 +6983,20 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   });
   const characterProgressionRepository=new Proxy(rawCharacterProgressionRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
     if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as CharacterProgressionRepository;
+  const m15Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.5 mutation cannot run inside a repository transaction");};
+  const actorResourceRepository=createActorResourceRepository(db,dependencies,m15Guard);
+  const inventoryRepository=createInventoryRepository(db,dependencies,m15Guard);
+  const economyRepository=createEconomyRepository(db,dependencies,m15Guard);
+  const restRepository=createRestRepository(db,dependencies,m15Guard);
   return {
     ...administrationRepository,
     ...contentCatalogRepository,
     ...characterBuilderRepository,
     ...characterProgressionRepository,
+    ...actorResourceRepository,
+    ...inventoryRepository,
+    ...economyRepository,
+    ...restRepository,
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>

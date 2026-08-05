@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. The seven newly integrated lanes are server-only; no client/UI slice exists yet.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v25 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.5 adds no HTTP routes or client/UI.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.4 remain complete repository/shared-contract capabilities. The trusted-local HTTP boundary now has exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. These seven routes have no client/UI; M1.5 remains the next repository-only milestone.
+M1.1-M1.5 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.5 is repository-only and adds no routes or client/UI; M1.6 is next.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -66,7 +66,7 @@ Persist XP or milestone advancement, previews, pending choices, and atomic singl
 
 ### M1.5 Resources, inventory, equipment, economy, and rest
 
-**Status: Next repository-only milestone**
+**Status: Complete (schema v25r1; repository/shared-contract only; no HTTP routes or client/UI)**
 
 Expand minimal actor resources into transactional inventory, equipment, wallets, shops, trades, and profile-defined recovery.
 
@@ -76,7 +76,7 @@ Expand minimal actor resources into transactional inventory, equipment, wallets,
   - Additive schema and contracts cover stackable and instanced items, slots, charges, ammunition, binding, wallets in integer minor units, currency ledgers, shops, finite stock, quotes, bilateral trades, and rest usage.
   - Repository commands prevent negative resources, balances, and stock; enforce capacity, slot conflicts, transfer restrictions, quote expiry, and actor control; and settle each purchase or trade atomically.
   - Short and long rests calculate recovery from the pinned rules profile, reject illegal rest state, and emit a receipt listing every changed resource and effect.
-  - Retries converge through idempotency, while unknown write delivery is reconciled from authoritative inventory, wallet, stock, and receipt reads without automatic replay.
+   - Exact retries, revisions, and immutable receipts are factory-only behavior; unknown write delivery is reconciled from authoritative inventory, wallet, stock, and receipt reads without automatic replay.
 
 ### M1.6 Checks, powers, and deterministic effects
 

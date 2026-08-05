@@ -42,6 +42,10 @@ export {
   MECHANICS_STARTER_RULES_PROFILE_ID,
 } from "../content/mechanicsStarterCatalog.js";
 export { calculateCharacterProgression } from "../characterProgressionCalculator.js";
+export { ActorResourceAuthorizationError, ActorResourceConflictError, ActorResourceNegativeError, ActorResourceStaleError, type ActorResourceRepository } from "./actorResourceRepo.js";
+export { InventoryAuthorizationError, InventoryBindingError, InventoryCapacityError, InventorySlotConflictError, InventoryStaleError, type InventoryRepository } from "./inventoryRepo.js";
+export { EconomyAuthorizationError, EconomyConflictError, QuoteExpiredError, ShopStockExhaustedError, TradeStaleError, type EconomyRepository } from "./economyRepo.js";
+export { RestAuthorizationError, RestIllegalStateError, RestStaleError, type RestRepository } from "./restRepo.js";
 export {
   createCharacter,
   deleteCharacter,
