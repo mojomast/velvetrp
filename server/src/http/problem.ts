@@ -34,6 +34,7 @@ function safeProblemInstance(requestTarget: string): string {
 
   const suffix = remainder.slice(suffixIndex);
   if (suffix === "/starter-setup"
+    || suffix === "/mechanics-starter-setup"
     || suffix === "/characters"
     || suffix === "/characters/creation-options"
     || suffix === "/rooms"

@@ -22,6 +22,7 @@ export type { CampaignMemberRole, CampaignRole, ResourceId, UtcIsoTimestamp } fr
 export * from "./campaign-administration.js";
 export * from "./character-builder.js";
 export * from "./character-progression.js";
+export * from "./mechanics-starter.js";
 
 export {
   addCampaignMembershipInputSchema,
@@ -33,6 +34,8 @@ export {
   campaignDetailResponseSchema,
   campaignDetailSchema,
   campaignListResponseSchema,
+  campaignMechanicsStarterSetupRequestSchema,
+  campaignMechanicsStarterSetupResponseSchema,
   campaignNameSchema,
   campaignMembershipReadSchema,
   campaignMembershipSchema,
@@ -76,6 +79,8 @@ export type {
   CampaignDetailContent,
   CampaignDetailResponse,
   CampaignListResponse,
+  CampaignMechanicsStarterSetupRequest,
+  CampaignMechanicsStarterSetupResponse,
   CampaignMembership,
   CampaignMembershipRead,
   CampaignRenameRequest,

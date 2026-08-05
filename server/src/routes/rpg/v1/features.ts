@@ -11,6 +11,8 @@ import {
   campaignDiceRollRequestSchema,
   campaignDiceRollResponseSchema,
   campaignListResponseSchema,
+  campaignMechanicsStarterSetupRequestSchema,
+  campaignMechanicsStarterSetupResponseSchema,
   campaignRenameRequestSchema,
   campaignRenameResponseSchema,
   campaignRoomAttachRequestSchema,
@@ -42,6 +44,10 @@ import {
   CampaignSessionAttachmentUnavailableError,
 } from "../../../repo/index.js";
 import type { OriginalStarterSetupRepository } from "../../../content/originalStarterSetup.js";
+import type {
+  MechanicsStarterSetupRepository,
+  MechanicsStarterSetupSnapshotRepository,
+} from "../../../content/mechanicsStarterSetup.js";
 import type { CampaignCharacterRosterSnapshot } from "../../../repo/index.js";
 import type { CampaignCharacterWorkspaceSnapshot } from "../../../repo/index.js";
 import type { CampaignRoomLinkingSnapshot } from "../../../repo/index.js";
@@ -57,6 +63,11 @@ import {
   OriginalStarterSetupUnavailableError,
 } from "../../../content/originalStarterSetup.js";
 import {
+  createMechanicsStarterSetupService,
+  MechanicsStarterSetupConflictError,
+  MechanicsStarterSetupUnavailableError,
+} from "../../../content/mechanicsStarterSetup.js";
+import {
   createOriginalStarterCharacterCreationService,
   OriginalStarterCharacterCreationConflictError,
   OriginalStarterCharacterCreationUnavailableError,
@@ -68,6 +79,7 @@ import {
   ORIGINAL_STARTER_PACK_VERSION,
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../../../content/originalStarterManifest.js";
+import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
 
 export interface CampaignListRepository extends Partial<OriginalStarterSetupRepository>, Partial<CampaignDiceRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
@@ -87,6 +99,10 @@ export interface CampaignListRepository extends Partial<OriginalStarterSetupRepo
     campaignCharacterId: string,
   ): CampaignCharacterWorkspaceSnapshot | null;
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
+  getCampaignAdministration?: MechanicsStarterSetupSnapshotRepository["getCampaignAdministration"];
+  resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
+  installMechanicsStarterCatalog?: MechanicsStarterSetupRepository["installMechanicsStarterCatalog"];
+  configureMechanicsStarterCatalog?: MechanicsStarterSetupRepository["configureMechanicsStarterCatalog"];
   renameCampaignIfUnchanged(
     actorPrincipalId: string,
     campaignId: string,
@@ -607,6 +623,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     Params: { campaignId: string };
     Querystring: Record<string, unknown>;
   }>("/campaigns/:campaignId", { exposeHeadRoute: false }, async (request, reply) => {
+    reply.header("cache-control", "no-store");
     if (!readRpgFeatureFlags().campaign) {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
     }
@@ -824,6 +841,99 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       }
       logCampaignOperationFailure(request, "campaign-starter-setup");
       return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign starter setup could not be completed");
+    }
+  });
+
+  app.put<{
+    Params: { campaignId: string };
+    Querystring: Record<string, unknown>;
+    Body: unknown;
+  }>("/campaigns/:campaignId/mechanics-starter-setup", {
+    exposeHeadRoute: false,
+    onRequest: async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      // Both flags precede every caller-controlled query/path/media/body check
+      // and repository lifecycle touch.
+      const flags = readRpgFeatureFlags();
+      if (!flags.campaign || !flags.mechanics) {
+        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+        return;
+      }
+      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+        await sendApiProblem(
+          request, reply, 400, "RPG_INVALID_REQUEST",
+          "Mechanics starter setup does not accept query parameters",
+        );
+        return;
+      }
+      if (!resourceIdSchema.safeParse(request.params.campaignId).success) {
+        await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+        return;
+      }
+      const contentType = request.headers["content-type"];
+      if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+        await sendApiProblem(
+          request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE",
+          "Mechanics starter setup requires application/json",
+        );
+      }
+    },
+    errorHandler: (_error, request, reply) => {
+      logCampaignOperationFailure(request, "campaign-mechanics-starter-setup-body", "info");
+      return sendApiProblem(
+        request, reply, 400, "RPG_INVALID_REQUEST", "Mechanics starter setup request is invalid",
+      );
+    },
+  }, async (request, reply) => {
+    const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+    if (!campaignId.success) {
+      return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+    }
+    const body = campaignMechanicsStarterSetupRequestSchema.safeParse(request.body);
+    if (!body.success) {
+      return sendApiProblem(
+        request, reply, 400, "RPG_INVALID_REQUEST", "Mechanics starter setup request is invalid",
+        { issues: body.error.issues.map((issue) => ({
+          path: issue.path.join("."), code: issue.code, message: issue.message,
+        })) },
+      );
+    }
+
+    try {
+      const repository = getCampaignRepository();
+      if (typeof repository.transaction !== "function"
+        || typeof repository.installMechanicsStarterCatalog !== "function"
+        || typeof repository.configureMechanicsStarterCatalog !== "function") {
+        throw new Error("campaign repository does not support mechanics starter setup");
+      }
+      const campaign = createMechanicsStarterSetupService(repository as unknown as MechanicsStarterSetupRepository)
+        .setup(campaignId.data);
+      const response = campaignMechanicsStarterSetupResponseSchema.parse({ campaign });
+      const content = response.campaign.content;
+      if (response.campaign.id !== campaignId.data || response.campaign.actorRole !== "owner"
+        || content.status !== "configured"
+        || content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId
+        || content.contentPacks.length !== 1
+        || content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId
+        || content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion) {
+        throw new Error("mechanics starter setup output does not prove the exact setup");
+      }
+      return reply.code(200).send(response);
+    } catch (error) {
+      if (error instanceof MechanicsStarterSetupUnavailableError) {
+        return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      }
+      if (error instanceof MechanicsStarterSetupConflictError) {
+        return sendApiProblem(
+          request, reply, 409, "RPG_CAMPAIGN_MECHANICS_STARTER_SETUP_CONFLICT",
+          "Mechanics starter setup conflicts with current campaign state",
+        );
+      }
+      logCampaignOperationFailure(request, "campaign-mechanics-starter-setup");
+      return sendApiProblem(
+        request, reply, 500, "RPG_INTERNAL_ERROR",
+        "Campaign mechanics starter setup status is unknown; reconcile with campaign detail before trying again; never retry automatically",
+      );
     }
   });
 

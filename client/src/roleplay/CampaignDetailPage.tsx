@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, ORIGINAL_STARTER_PRESENTATION } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupOriginalStarter, type CampaignDetail } from "../api";
-import type { CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
+import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION } from "@velvet/contracts";
+import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, type CampaignDetail } from "../api";
+import type { CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
 
 export interface CampaignDetailPageProps {
   campaignId: string;
@@ -26,6 +26,7 @@ export interface CampaignDetailPageProps {
 
 type RenamePhase = "idle" | "writing" | "reconciling";
 type SetupPhase = "idle" | "writing" | "reconciling";
+type SetupChoice = "original" | "mechanics";
 type RosterPhase = "loading" | "ready" | "failed" | "unsupported";
 type OptionsPhase = "loading" | "ready" | "failed" | "unsupported";
 type CreatePhase = "idle" | "writing" | "reconciling";
@@ -56,6 +57,12 @@ interface CampaignMutation {
   createReconciliation?: CreateReconciliation;
   diceReconciliation?: DiceReconciliation;
   roomReconciliation?: RoomReconciliation;
+  setupReconciliation?: SetupReconciliation;
+}
+interface SetupReconciliation {
+  choice: SetupChoice;
+  put: PromiseSettledResult<CampaignDetailResponse>;
+  detail: PromiseSettledResult<CampaignDetailResponse>;
 }
 interface RoomReconciliation {
   sessionId: string;
@@ -215,6 +222,14 @@ function isOriginalStarterConfigured(campaign: CampaignDetail): boolean {
     && campaign.content.contentPacks[0]?.packVersion === ORIGINAL_STARTER_PRESENTATION.pack.version;
 }
 
+function isMechanicsStarterConfigured(campaign: CampaignDetail): boolean {
+  return campaign.content.status === "configured"
+    && campaign.content.rulesProfileId === MECHANICS_STARTER_IDENTITY.rulesProfileId
+    && campaign.content.contentPacks.length === 1
+    && campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId
+    && campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion;
+}
+
 function reconciledPresence(reconciliation: CreateReconciliation): { present: boolean; used: boolean; complete: boolean } {
   if (reconciliation.roster.status !== "fulfilled" || reconciliation.options.status !== "fulfilled") {
     return { present: false, used: false, complete: false };
@@ -361,6 +376,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const [renamePhase, setRenamePhase] = useState<RenamePhase>("idle");
   const [renameError, setRenameError] = useState("");
   const [setupPhase, setSetupPhase] = useState<SetupPhase>("idle");
+  const [setupChoice, setSetupChoice] = useState<SetupChoice | null>(null);
   const [setupConfirmed, setSetupConfirmed] = useState(false);
   const [setupError, setSetupError] = useState("");
   const [announcement, setAnnouncement] = useState("");
@@ -510,6 +526,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setRenameError("");
     setSetupError("");
     setSetupConfirmed(false);
+    setSetupChoice(null);
     setAnnouncement("");
     try {
       const response = await (reuseInitialInFlight
@@ -518,6 +535,8 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       if (!mountedRef.current || generation !== generationRef.current) return null;
       setCampaign(response.campaign);
       setDraft(response.campaign.name);
+      setSetupChoice(response.campaign.actorRole === "owner" && response.campaign.content.status === "unconfigured"
+        ? "original" : null);
       setLoading(false);
       return generation;
     } catch (error) {
@@ -731,6 +750,72 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     return true;
   }, []);
 
+  const applySetupReconciliation = useCallback((
+    reconciliation: SetupReconciliation,
+    requestedCampaignId: string,
+    generation: number,
+  ): boolean => {
+    if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
+      || generationRef.current !== generation) return false;
+    setSetupConfirmed(false);
+    if (reconciliation.detail.status === "rejected" || !reconciliation.detail.value?.campaign) {
+      setSetupChoice(reconciliation.choice);
+      const detailReason = reconciliation.detail.status === "rejected" ? reconciliation.detail.reason : null;
+      const putReason = reconciliation.put.status === "rejected" ? reconciliation.put.reason : null;
+      if ((detailReason instanceof ApiError && detailReason.status === 404)
+        || (putReason instanceof ApiError && putReason.status === 404)) {
+        markCampaignUnavailable(requestedCampaignId);
+        return true;
+      }
+      const putConflict = reconciliation.put.status === "rejected"
+        && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
+      if (reconciliation.put.status === "fulfilled") {
+        setSetupError(`${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration; the PUT was not repeated.`);
+      } else setSetupError(putConflict
+        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated.`
+        : "Setup outcome is uncertain and latest details could not be loaded. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published). Refresh before deciding whether to try again; the PUT was not repeated.");
+      return true;
+    }
+
+    // This successful authoritative post-PUT GET supersedes every detail read
+    // started before it, including a StrictMode cache or same-campaign
+    // reopen/peer read. Failed reconciliation has no state to supersede.
+    initialDetailReads.delete(requestedCampaignId);
+    const authoritativeGeneration = ++generationRef.current;
+    const refreshed = reconciliation.detail.value.campaign;
+    setCampaign(refreshed);
+    setDraft(refreshed.name);
+    setLoading(false);
+    setFailed(false);
+    setSetupChoice(refreshed.content.status === "unconfigured" ? reconciliation.choice : null);
+    const exact = reconciliation.choice === "original"
+      ? isOriginalStarterConfigured(refreshed)
+      : isMechanicsStarterConfigured(refreshed);
+    if (exact) {
+      if (reconciliation.choice === "original") requirePostSetupOptionsRefresh(requestedCampaignId);
+      else {
+        setupOptionsRefreshCampaigns.delete(requestedCampaignId);
+        hideOptionsForSetupReconciliation(requestedCampaignId);
+      }
+      setSetupError("");
+      setAnnouncement(reconciliation.put.status === "fulfilled"
+        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup is complete. The configured identifiers are now read-only.`
+        : `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter is currently active. The write response was not authoritative, so campaign detail was reconciled; the PUT was not repeated.`);
+    } else if (refreshed.content.status === "configured") {
+      setAnnouncement("");
+      setSetupError("This campaign has a different content configuration. Latest identifiers are shown read-only; setup was not repeated.");
+    } else {
+      const conflict = reconciliation.put.status === "rejected"
+        && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
+      setAnnouncement("");
+      setSetupError(conflict
+        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup conflicts with reserved starter state or another configuration. The campaign remains unconfigured; setup was not repeated. The PUT was not repeated.`
+        : "Setup could not be confirmed complete. The campaign remains unconfigured. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published) after failure. The PUT was not repeated.");
+    }
+    mutationFocusAfterReconciliationRef.current = { kind: "setup", generation: authoritativeGeneration };
+    return true;
+  }, [hideOptionsForSetupReconciliation, markCampaignUnavailable, requirePostSetupOptionsRefresh]);
+
   const applyDiceReconciliation = useCallback((completed: CompletedDiceReconciliation, generation: number): boolean => {
     if (!mountedRef.current || activeCampaignRef.current !== completed.campaignId
         || campaignRef.current?.id !== completed.campaignId
@@ -839,6 +924,8 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     diceManualReadLockRef.current = null;
     setRenamePhase("idle");
     setSetupPhase("idle");
+    setSetupChoice(null);
+    setSetupConfirmed(false);
     setCreatePhase("idle");
     setCreateResult(null);
     setCharacterStatusActivity("idle");
@@ -1056,6 +1143,15 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             const completed = completedRoomReconciliations.get(campaignId);
             if (completed?.token === mutation.token) applyRoomReconciliation(completed, generationRef.current);
             roomLockedRef.current = false;
+          } else if (mutation.kind === "setup" && mutation.setupReconciliation) {
+            // The issuing action already performed the operation's one fresh
+            // authoritative detail GET. Every mounted peer consumes that same
+            // reconciliation instead of issuing a competing second GET.
+            setupLockedRef.current = true;
+            setSetupPhase("reconciling");
+            applySetupReconciliation(mutation.setupReconciliation, campaignId, generationRef.current);
+            setupLockedRef.current = false;
+            setSetupPhase("idle");
           } else {
             if (mutation.kind === "rename") {
               renameLockedRef.current = true;
@@ -1092,7 +1188,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     };
     mutationListeners.add(listener);
     return () => { mutationListeners.delete(listener); };
-  }, [applyCreateReconciliation, applyDiceReconciliation, applyRoomReconciliation, campaignId, load, requirePostSetupOptionsRefresh]);
+  }, [applyCreateReconciliation, applyDiceReconciliation, applyRoomReconciliation, applySetupReconciliation, campaignId, load, requirePostSetupOptionsRefresh]);
 
   useEffect(() => {
     const pending = pendingPeerDiceRef.current;
@@ -1359,92 +1455,70 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   async function setupStarter() {
     // React state cannot synchronously serialize clicks, so the ref owns the lock.
     if (!campaign || campaign.actorRole !== "owner" || campaign.content.status !== "unconfigured"
+      || !setupChoice || (setupChoice === "mechanics" && !mechanicsEnabled)
       || !setupConfirmed || setupLockedRef.current || renameLockedRef.current || createLockedRef.current || diceLockedRef.current
       || inFlightCampaignMutations.has(campaignId)) return;
 
+    const operationCampaignId = campaignId;
+    const choice = setupChoice;
     setupLockedRef.current = true;
     const generation = ++generationRef.current;
-    const mutation = beginCampaignMutation(campaignId, "setup");
+    const mutation = beginCampaignMutation(operationCampaignId, "setup");
     if (!mutation) {
       setupLockedRef.current = false;
       return;
     }
-    ownedMutationsRef.current.set(mutation.token, { campaignId, generation });
+    ownedMutationsRef.current.set(mutation.token, { campaignId: operationCampaignId, generation });
     setSetupPhase("writing");
     setSetupError("");
     setAnnouncement("");
 
+    let put: PromiseSettledResult<CampaignDetailResponse>;
     try {
-      await setupOriginalStarter(campaignId);
-      requirePostSetupOptionsRefresh(campaignId);
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      put = { status: "fulfilled", value: choice === "mechanics"
+        ? await setupMechanicsStarter(operationCampaignId)
+        : await setupOriginalStarter(operationCampaignId) };
+    } catch (reason) {
+      put = { status: "rejected", reason };
+    }
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && generationRef.current === generation) {
       setSetupPhase("reconciling");
-
-      try {
-        const refreshed = await getCampaignDetail(campaignId);
-        if (!mountedRef.current || generation !== generationRef.current) return;
-        setCampaign(refreshed.campaign);
-        setDraft(refreshed.campaign.name);
-        if (isOriginalStarterConfigured(refreshed.campaign)) {
-          setAnnouncement("Original starter setup is complete. The configured identifiers are now read-only.");
-        } else {
-          setSetupError("Setup returned successfully, but the latest campaign configuration changed. Latest read-only details are shown.");
-        }
-      } catch (refreshError) {
-        if (!mountedRef.current || generation !== generationRef.current) return;
-        if (refreshError instanceof ApiError && refreshError.status === 404) {
-          markCampaignUnavailable(campaignId);
-          return;
-        }
-        setAnnouncement("Original starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration.");
-      }
-    } catch (error) {
-      requirePostSetupOptionsRefresh(campaignId);
-      if (!mountedRef.current || generation !== generationRef.current) return;
-      if (error instanceof ApiError && error.status === 404) {
-        markCampaignUnavailable(campaignId);
-        return;
-      }
-
-      const conflict = error instanceof ApiError && error.status === 409;
-      setSetupPhase("reconciling");
-      try {
-        const refreshed = await getCampaignDetail(campaignId);
-        if (!mountedRef.current || generation !== generationRef.current) return;
-        setCampaign(refreshed.campaign);
-        setDraft(refreshed.campaign.name);
-        if (isOriginalStarterConfigured(refreshed.campaign)) {
-          setAnnouncement("Original starter setup is complete. The write response was not authoritative, so the campaign was reconciled.");
-        } else if (refreshed.campaign.content.status === "configured") {
-          setSetupError("This campaign has a different content configuration. Latest identifiers are shown read-only; original starter setup was not repeated.");
-        } else if (conflict) {
-          setSetupError("Original starter setup conflicts with reserved starter metadata or a different configuration. The campaign remains unconfigured; setup was not repeated.");
-        } else {
-          setSetupError("Setup could not be confirmed complete. The campaign remains unconfigured. Setup uses two transactions, so the content pack may remain installed after failure. The PUT was not repeated.");
-        }
-      } catch (refreshError) {
-        if (!mountedRef.current || generation !== generationRef.current) return;
-        if (refreshError instanceof ApiError && refreshError.status === 404) {
-          markCampaignUnavailable(campaignId);
-          return;
-        }
-        setSetupError(conflict
-          ? "Original starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated."
-          : "Setup outcome is uncertain and latest details could not be loaded. Setup uses two transactions, so the content pack may remain installed after failure. Refresh before deciding whether to try again; the PUT was not repeated.");
-      }
-    } finally {
-      finishCampaignMutation(campaignId, mutation);
-      ownedMutationsRef.current.delete(mutation.token);
-      if (mountedRef.current && generation === generationRef.current) {
-        setupLockedRef.current = false;
-        setSetupPhase("idle");
-        setSetupConfirmed(false);
-        queueMicrotask(() => {
-          if (!mountedRef.current || generation !== generationRef.current) return;
-          if (configuredStatusRef.current) configuredStatusRef.current.focus();
-          else setupConfirmationRef.current?.focus();
+    }
+    // Every issued PUT, including every HTTP/network/schema outcome, owns one
+    // and only one fresh campaign detail GET. No branch repeats the PUT.
+    let detail: PromiseSettledResult<CampaignDetailResponse>;
+    try {
+      detail = { status: "fulfilled", value: await getCampaignDetail(operationCampaignId) };
+    } catch (reason) {
+      detail = { status: "rejected", reason };
+    }
+    const reconciliation = { choice, put, detail } satisfies SetupReconciliation;
+    mutation.setupReconciliation = reconciliation;
+    let settledGeneration = generation;
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && generationRef.current === generation) {
+      if (applySetupReconciliation(reconciliation, operationCampaignId, generation)) {
+        settledGeneration = generationRef.current;
+        // finish() broadcasts synchronously. Mark this owner as current so its
+        // listener does not consume and apply the same reconciliation twice.
+        ownedMutationsRef.current.set(mutation.token, {
+          campaignId: operationCampaignId,
+          generation: settledGeneration,
         });
       }
+    }
+    finishCampaignMutation(operationCampaignId, mutation);
+    ownedMutationsRef.current.delete(mutation.token);
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && settledGeneration === generationRef.current) {
+      setupLockedRef.current = false;
+      setSetupPhase("idle");
+      queueMicrotask(() => {
+        if (!mountedRef.current || settledGeneration !== generationRef.current) return;
+        if (configuredStatusRef.current) configuredStatusRef.current.focus();
+        else setupConfirmationRef.current?.focus();
+      });
     }
   }
 
@@ -1871,19 +1945,38 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
           </div>}
         </section>}
         {campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <section className="starter-setup" aria-labelledby="starter-setup-heading" aria-busy={setupBusy}>
-          <div className="starter-heading"><div><p className="eyebrow">FIXED ORIGINAL STARTER</p><h2 id="starter-setup-heading">Set up campaign metadata</h2></div><code>{ORIGINAL_STARTER_PRESENTATION.starterId}</code></div>
-          <p className="starter-warning"><strong>Metadata scaffolding only.</strong> This starter adds no playable mechanics, gameplay, or character creation. Setup is final and has no reset, change, or add controls.</p>
-          <p className="starter-warning"><strong>Internal local material.</strong> Names are not claimed to be unique; similarity review was limited, and no distribution license is granted. The concepts and wording were originally authored for Velvet.</p>
-          <div className="starter-identities">
-            <article><span>Rules profile</span><h3>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.id}</code></article>
-            <article><span>Content pack</span><h3>{ORIGINAL_STARTER_PRESENTATION.pack.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.pack.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.pack.id}@{ORIGINAL_STARTER_PRESENTATION.pack.version}</code></article>
-          </div>
-          <div className="starter-definitions">
-            {[{ label: "Race", item: ORIGINAL_STARTER_PRESENTATION.races[0] }, { label: "Background", item: ORIGINAL_STARTER_PRESENTATION.backgrounds[0] }, { label: "Class", item: ORIGINAL_STARTER_PRESENTATION.classes[0] }].map(({ label, item }) => <article key={label}><span>{label}</span><h3>{item.name}</h3><p>{item.description}</p></article>)}
-          </div>
-          <p className="starter-warning"><strong>Two-transaction setup:</strong> the pack is installed first and the campaign is configured second. If setup fails between them, the pack may remain installed.</p>
-          <label className="checkbox starter-confirm"><input ref={setupConfirmationRef} type="checkbox" checked={setupConfirmed} onChange={(event) => setSetupConfirmed(event.target.checked)} disabled={pageBusy} /><span>I understand this metadata-only setup is final and may leave the pack installed if the second transaction fails.</span></label>
-          <button className="primary starter-submit" type="button" disabled={pageBusy || !setupConfirmed} onClick={() => void setupStarter()}>{setupPhase === "writing" ? "Setting up…" : setupPhase === "reconciling" ? "Checking latest details…" : "Set up original starter"}</button>
+          <div className="starter-heading"><div><p className="eyebrow">FIXED STARTER ACTIVATION</p><h2 id="starter-setup-heading">Set up campaign metadata</h2></div></div>
+          <p className="starter-warning"><strong>Choose once.</strong> Starter setup is available only while this campaign is unconfigured. Neither choice can replace, migrate, reset, or add to configured content.</p>
+          <fieldset className="persona-options starter-choice-options" disabled={pageBusy}>
+            <legend>Select one mutually exclusive starter</legend>
+            <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "original"} onChange={() => { setSetupChoice("original"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Original metadata starter</strong><small> Narrative identities only; no playable mechanics.</small></span></label>
+            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "mechanics"} onChange={() => { setSetupChoice("mechanics"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Mechanics starter</strong><small> Enables the fixed catalog for future character builder and progression workflows.</small></span></label>}
+          </fieldset>
+          {setupChoice === "original" && <>
+            <div className="starter-heading"><div><p className="eyebrow">FIXED ORIGINAL STARTER</p><h3>Original metadata starter</h3></div><code>{ORIGINAL_STARTER_PRESENTATION.starterId}</code></div>
+            <p className="starter-warning"><strong>Metadata scaffolding only.</strong> This starter adds no playable mechanics, gameplay, or character creation. Setup is final and has no reset, change, or add controls.</p>
+            <p className="starter-warning"><strong>Internal local material.</strong> Names are not claimed to be unique; similarity review was limited, and no distribution license is granted. The concepts and wording were originally authored for Velvet.</p>
+            <div className="starter-identities">
+              <article><span>Rules profile</span><h3>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.rulesProfile.id}</code></article>
+              <article><span>Content pack</span><h3>{ORIGINAL_STARTER_PRESENTATION.pack.name}</h3><p>{ORIGINAL_STARTER_PRESENTATION.pack.description}</p><code>{ORIGINAL_STARTER_PRESENTATION.pack.id}@{ORIGINAL_STARTER_PRESENTATION.pack.version}</code></article>
+            </div>
+            <div className="starter-definitions">
+              {[{ label: "Race", item: ORIGINAL_STARTER_PRESENTATION.races[0] }, { label: "Background", item: ORIGINAL_STARTER_PRESENTATION.backgrounds[0] }, { label: "Class", item: ORIGINAL_STARTER_PRESENTATION.classes[0] }].map(({ label, item }) => <article key={label}><span>{label}</span><h3>{item.name}</h3><p>{item.description}</p></article>)}
+            </div>
+          </>}
+          {setupChoice === "mechanics" && <>
+            <div className="starter-heading"><div><p className="eyebrow">FIXED MECHANICS STARTER</p><h3>Velvet Mechanics Starter</h3></div><code>{MECHANICS_STARTER_IDENTITY.starterId}</code></div>
+            <p className="starter-warning"><strong>Future mechanics foundation.</strong> This activates the reviewed fixed catalog for future builder and progression UI. It does not add builder, finalization, progression, or arbitrary content controls in this slice, and it cannot replace any configured content.</p>
+            <div className="starter-identities">
+              <article><span>Rules profile</span><h3>Velvet Starter Rules</h3><p>Closed deterministic mechanics profile for the built-in catalog.</p><code>{MECHANICS_STARTER_IDENTITY.rulesProfileId}</code></article>
+              <article><span>Content catalog</span><h3>Velvet Mechanics Starter</h3><p>Fixed original races, backgrounds, classes, abilities, spells, items, resources, and encounter metadata.</p><code>{MECHANICS_STARTER_IDENTITY.packId}@{MECHANICS_STARTER_IDENTITY.packVersion}</code></article>
+            </div>
+          </>}
+          {setupChoice && <>
+            <p className="starter-warning"><strong>Two-transaction setup:</strong> the {setupChoice === "mechanics" ? "catalog is published" : "pack is installed"} first and the campaign is configured second. If setup fails between them, {setupChoice === "mechanics" ? "the catalog may remain published" : "the pack may remain installed"} without changing this campaign.</p>
+            <label className="checkbox starter-confirm"><input ref={setupConfirmationRef} type="checkbox" checked={setupConfirmed} onChange={(event) => setSetupConfirmed(event.target.checked)} disabled={pageBusy} /><span>{setupChoice === "mechanics" ? "I explicitly confirm mechanics starter activation for future builder and progression, knowing it cannot replace configured content" : "I understand this metadata-only setup is final"} and understand the two-transaction outcome.</span></label>
+          </>}
+          <button className="primary starter-submit" type="button" disabled={pageBusy || !setupChoice || !setupConfirmed} onClick={() => void setupStarter()}>{setupPhase === "writing" ? "Setting up once…" : setupPhase === "reconciling" ? "Checking latest details…" : setupChoice === "mechanics" ? "Activate mechanics starter" : setupChoice === "original" ? "Set up original starter" : "Select a starter"}</button>
         </section>}
         {campaign.content.status === "configured" && <div className="configured-readonly" ref={configuredStatusRef} tabIndex={-1}><strong>Content configuration is read-only.</strong> There are no reset, change, or add controls.</div>}
         {setupError && <p className="form-error setup-result" role="alert">{setupError}</p>}

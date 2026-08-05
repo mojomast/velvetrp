@@ -1,4 +1,11 @@
-import { publishContentCatalogInputSchema, type PublishContentCatalogInput } from "@velvet/contracts";
+import {
+  MECHANICS_STARTER_ID,
+  MECHANICS_STARTER_PACK_ID,
+  MECHANICS_STARTER_PACK_VERSION,
+  MECHANICS_STARTER_RULES_PROFILE_ID,
+  publishContentCatalogInputSchema,
+  type PublishContentCatalogInput,
+} from "@velvet/contracts";
 import { calculateCatalogDigest } from "../repo/contentCatalogRepo.js";
 
 type DeepReadonly<T> = T extends (...args: never[]) => unknown ? T
@@ -13,8 +20,12 @@ function deepFreeze<T>(value: T): DeepReadonly<T> {
   return value as DeepReadonly<T>;
 }
 
-export const MECHANICS_STARTER_PACK_ID = "velvet:mechanics-starter" as const;
-export const MECHANICS_STARTER_RULES_PROFILE_ID = "velvet:rules:starter-v1" as const;
+export {
+  MECHANICS_STARTER_ID,
+  MECHANICS_STARTER_PACK_ID,
+  MECHANICS_STARTER_PACK_VERSION,
+  MECHANICS_STARTER_RULES_PROFILE_ID,
+} from "@velvet/contracts";
 
 const ref = (version: string, kind: string, definitionId: string) => ({
   packId: MECHANICS_STARTER_PACK_ID, packVersion: version, kind, definitionId,
@@ -92,6 +103,8 @@ export const MECHANICS_STARTER_PRIOR_PACK_VERSION = `1.0.0+${priorDigest.slice(0
 export const MECHANICS_STARTER_PRIOR_CATALOG = deepFreeze(literal(MECHANICS_STARTER_PRIOR_PACK_VERSION, priorDigest));
 const draft = literal("1.1.0+000000000000", "0".repeat(64), true);
 const digest = calculateCatalogDigest(draft);
-export const MECHANICS_STARTER_PACK_VERSION = `1.1.0+${digest.slice(0, 12)}` as const;
+const calculatedPackVersion = `1.1.0+${digest.slice(0, 12)}`;
+if (calculatedPackVersion !== MECHANICS_STARTER_PACK_VERSION) {
+  throw new Error("mechanics starter contract identity does not match its canonical catalog");
+}
 export const MECHANICS_STARTER_CATALOG = deepFreeze(literal(MECHANICS_STARTER_PACK_VERSION, digest, true));
-export const MECHANICS_STARTER_ID = `${MECHANICS_STARTER_PACK_ID}@${MECHANICS_STARTER_PACK_VERSION}` as const;

@@ -233,9 +233,45 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
     const campaigns = await json<{ campaigns: Array<{ name: string; actorRole: string }> }>(request, "GET", "/rpg/v1/campaigns");
     expect(campaigns.campaigns).toContainEqual(expect.objectContaining({ name: renamedCampaignName, actorRole: "owner" }));
+    const mechanicsCampaignName = `${runId}-Mechanics-Campaign`;
+    const mechanicsCampaign = await json<{ campaign: { id: string } }>(
+      request, "POST", "/rpg/v1/campaigns", { name: mechanicsCampaignName },
+    );
     await page.getByRole("button", { name: "← Campaigns" }).click();
     await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
     await expect(page.getByRole("button", { name: `Open campaign ${renamedCampaignName}` })).toBeVisible();
+    await page.getByRole("button", { name: `Open campaign ${mechanicsCampaignName}` }).click();
+    await expect(page.getByRole("heading", { name: mechanicsCampaignName })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Original metadata starter/i })).toBeChecked();
+    await page.getByRole("radio", { name: /Mechanics starter/i }).check();
+    await expect(page.getByText(/future builder and progression UI/i)).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const mechanicsSetupRequests: string[] = [];
+    page.on("request", (browserRequest) => {
+      if (browserRequest.url().endsWith(`/api/rpg/v1/campaigns/${mechanicsCampaign.campaign.id}/mechanics-starter-setup`)) {
+        mechanicsSetupRequests.push(browserRequest.method());
+      } else if (browserRequest.url().endsWith(`/api/rpg/v1/campaigns/${mechanicsCampaign.campaign.id}`)) {
+        mechanicsSetupRequests.push(browserRequest.method());
+      }
+    });
+    await page.getByRole("checkbox", { name: /explicitly confirm mechanics starter activation/i }).check();
+    await page.getByRole("button", { name: "Activate mechanics starter" }).click();
+    await expect(page.getByText(/Mechanics starter setup is complete/i)).toBeAttached();
+    expect(mechanicsSetupRequests).toEqual(["PUT", "GET"]);
+    await expect(page.getByText("velvet:rules:starter-v1")).toBeVisible();
+    await expect(page.getByText(/Content configuration is read-only/i)).toBeVisible();
+    const mechanicsDetail = await json<{ campaign: { content: unknown } }>(
+      request, "GET", `/rpg/v1/campaigns/${mechanicsCampaign.campaign.id}`,
+    );
+    expect(mechanicsDetail.campaign.content).toEqual({
+      status: "configured",
+      rulesProfileId: "velvet:rules:starter-v1",
+      contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }],
+    });
+    await page.getByRole("button", { name: "← Campaigns" }).click();
+    await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
     await page.getByRole("button", { name: "← Character library" }).click();
     await expect(page.getByRole("heading", { name: "Characters" })).toBeVisible();
 

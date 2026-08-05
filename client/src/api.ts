@@ -1,4 +1,4 @@
-import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema } from "@velvet/contracts";
+import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema } from "@velvet/contracts";
 import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
 
 export type FeatureFlags = RoleplayFeatureFlags;
@@ -658,7 +658,10 @@ export async function listCampaigns(): Promise<CampaignListResponse> {
 export async function getCampaignDetail(campaignId: string): Promise<CampaignDetailResponse> {
   // Validate before interpolation; IDs are opaque and are never normalized or trimmed.
   const validCampaignId = resourceIdSchema.parse(campaignId);
-  const response = campaignDetailResponseSchema.parse(await request<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`));
+  const response = campaignDetailResponseSchema.parse(await request<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`,
+    { cache: "no-store" },
+  ));
   if (response.campaign.id !== validCampaignId) throw new Error("Campaign detail response did not match the request");
   return response;
 }
@@ -821,6 +824,31 @@ export async function setupOriginalStarter(campaignId: string): Promise<Campaign
     || content.contentPacks[0]?.packVersion !== ORIGINAL_STARTER_PRESENTATION.pack.version
   ) {
     throw new Error("Campaign starter setup response did not match the request");
+  }
+  return response;
+}
+
+/** Issues exactly one fixed mechanics setup PUT and never retries it. */
+export async function setupMechanicsStarter(campaignId: string): Promise<CampaignDetailResponse> {
+  const validCampaignId = resourceIdSchema.parse(campaignId);
+  const body = campaignMechanicsStarterSetupRequestSchema.parse({ starterId: MECHANICS_STARTER_ID });
+  const result = await fetch(
+    `/api/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
+    { method: "PUT", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  );
+  if (!result.ok) throw await errorFromResponse(result);
+  // Check the operation status before attempting to parse any success body.
+  if (result.status !== 200) throw new Error("Campaign mechanics starter setup response did not use the committed status");
+  const response = campaignMechanicsStarterSetupResponseSchema.parse(await result.json() as unknown);
+  const content = response.campaign.content;
+  if (response.campaign.id !== validCampaignId
+    || response.campaign.actorRole !== "owner"
+    || content.status !== "configured"
+    || content.rulesProfileId !== MECHANICS_STARTER_IDENTITY.rulesProfileId
+    || content.contentPacks.length !== 1
+    || content.contentPacks[0]?.packId !== MECHANICS_STARTER_IDENTITY.packId
+    || content.contentPacks[0]?.packVersion !== MECHANICS_STARTER_IDENTITY.packVersion) {
+    throw new Error("Campaign mechanics starter setup response did not match the request");
   }
   return response;
 }

@@ -115,7 +115,7 @@ The repository boundary is not automatically the public API boundary. Internal s
 
 The RPG HTTP adapters always supply fixed `local-owner`. `LOCAL_OWNER_PRINCIPAL_ID` documents that repository-side trusted-local identity, but it is local single-user convenience—not authentication, remote authorization, or proof that a request header identifies a principal. New remote or multi-user behavior requires a separate authenticated principal boundary; do not generalize `local-owner` or accept spoofable identity headers.
 
-M1.1-M1.4 are repository/shared-contract capabilities only. They add no route or client workflow; the trusted-local boundary remains exactly 13 M0 operations. The mechanics starter catalog is separate from the original metadata-only starter and its existing HTTP flow.
+M1.1-M1.4 remain repository/shared-contract capabilities. One narrow HTTP/UI adapter now reuses the existing fixed catalog publication/configuration methods to activate the mechanics starter, bringing the trusted-local boundary to 14 operations without exposing generic catalog, builder, or progression methods. `mechanicsStarterSetup.ts` owns observed administration revision, fixed idempotency, two-transaction orchestration, and authoritative final-state classification; the repository methods remain unchanged. The mechanics starter stays separate from the original metadata-only starter.
 
 ## Where to add behavior
 

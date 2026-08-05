@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. M1.1-M1.4 remain repository/shared-contract capabilities only: no route or client workflow was added, and the feature-gated trusted-local campaign boundary remains exactly **13** M0 HTTP operations.
+Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. The feature-gated trusted-local campaign boundary now has exactly **14** HTTP operations: the newest bounded slice explicitly activates the fixed mechanics starter for a previously unconfigured campaign, without exposing builder or progression HTTP.
 
-The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter` and its existing setup/create flow. A recommended next implementation slice is a bounded mechanics catalog plus character builder/progression HTTP/UI vertical slice; M1.5 remains the next repository-only roadmap milestone.
+The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. Mechanics activation enables the fixed catalog for future builder/progression work but does not expose those workflows. M1.5 remains the next repository-only roadmap milestone.
 
 ---
 
@@ -192,7 +192,7 @@ Priority  Layer                     Source
 
 ## Campaign RPG Surface
 
-The RPG layer is feature-gated and uses a fixed trusted-local `local-owner` principal. All 13 current operations run on loopback only and are **not safe for remote or multi-user deployment**.
+The RPG layer is feature-gated and uses a fixed trusted-local `local-owner` principal. All 14 current operations run on loopback only and are **not safe for remote or multi-user deployment**.
 
 ### Current Campaign Operations
 
@@ -202,6 +202,7 @@ POST /api/rpg/v1/campaigns                                        create campaig
 GET  /api/rpg/v1/campaigns/:id                                    campaign detail
 PATCH /api/rpg/v1/campaigns/:id                                   rename campaign
 PUT  /api/rpg/v1/campaigns/:id/starter-setup                      install starter content
+PUT  /api/rpg/v1/campaigns/:id/mechanics-starter-setup            activate fixed mechanics catalog
 GET  /api/rpg/v1/campaigns/:id/characters/creation-options        character creation options
 GET  /api/rpg/v1/campaigns/:id/characters                         character roster
 POST /api/rpg/v1/campaigns/:id/characters                         create campaign character
@@ -302,7 +303,7 @@ packages/contracts/     shared Zod schemas and inferred API types (@velvet/contr
 server/src/
   app.ts                Fastify composition root, global hooks, route registration
   routes/roleplay/      interaction, generation, session, memory, lore, settings routes
-  routes/rpg/v1/        feature-gated RPG HTTP boundary (13 operations)
+  routes/rpg/v1/        feature-gated RPG HTTP boundary (14 operations)
   repo/                 roleplay repositories, RPG facades, schema/migrations
   content/              original starter content pack and setup services
   context.ts            context basket assembly

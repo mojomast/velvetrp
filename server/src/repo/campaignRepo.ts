@@ -292,6 +292,8 @@ export type OriginalStarterSetupInspection =
   | { status: "exact"; campaign: CampaignDetail };
 
 export interface RepositoryUnitOfWork {
+  /** Read-only administration projection available inside one shared snapshot. */
+  getCampaignAdministration: CampaignAdministrationRepository["getCampaignAdministration"];
   validateContentCatalog(input: unknown): import("@velvet/contracts").CatalogValidationReport;
   listContentCatalogPublications(actorPrincipalId: string): import("@velvet/contracts").PublicationSummary[];
   getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): import("@velvet/contracts").OwnerCatalogProjection | null;
@@ -6734,7 +6736,14 @@ function runTransaction<T>(
   const contentCatalogRepository = createContentCatalogRepository(db, dependencies.clock, () => {
     throw new Error("content catalog mutation cannot run inside a repository transaction");
   });
+  const administrationRepository = createCampaignAdministrationRepository(db, dependencies, () => {
+    throw new Error("campaign administration mutation cannot run inside a repository transaction");
+  });
   const unitOfWork: RepositoryUnitOfWork = {
+    getCampaignAdministration: (actorPrincipalId, campaignId) => {
+      assertActive();
+      return administrationRepository.getCampaignAdministration(actorPrincipalId, campaignId);
+    },
     validateContentCatalog: (input) => {
       assertActive();
       return validateContentCatalog(input);

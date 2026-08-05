@@ -251,11 +251,13 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       method: "GET", url: "/api/rpg/v1/campaigns/campaign-one", headers: { "x-request-id": "detail-disabled" },
     });
     expect(disabled.statusCode).toBe(404);
+    expect(disabled.headers["cache-control"]).toBe("no-store");
     expect(disabled.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", requestId: "detail-disabled" });
     const disabledMalformed = await app.inject({
       method: "GET", url: "/api/rpg/v1/campaigns/%zz", headers: { "x-request-id": "detail-disabled-malformed" },
     });
     expect(disabledMalformed.statusCode).toBe(404);
+    expect(disabledMalformed.headers["cache-control"]).toBe("no-store");
     expect(disabledMalformed.headers["content-type"]).toContain("application/problem+json");
     expect(disabledMalformed.headers["x-request-id"]).toBe("detail-disabled-malformed");
     expect(disabledMalformed.json()).toMatchObject({
@@ -266,6 +268,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     for (const url of ["/api/rpg/v1/campaigns/invalid%20campaign"]) {
       const response = await app.inject({ method: "GET", url, headers: { "x-request-id": "detail-invalid-path" } });
       expect(response.statusCode).toBe(404);
+      expect(response.headers["cache-control"]).toBe("no-store");
       expect(response.json()).toMatchObject({ code: "RPG_CAMPAIGN_NOT_FOUND", requestId: "detail-invalid-path" });
     }
     const invalidRouterPaths = [
@@ -275,6 +278,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     for (const [url, requestId] of invalidRouterPaths) {
       const response = await app.inject({ method: "GET", url, headers: { "x-request-id": requestId } });
       expect(response.statusCode).toBe(404);
+      expect(response.headers["cache-control"]).toBe("no-store");
       expect(response.headers["content-type"]).toContain("application/problem+json");
       expect(response.headers["x-request-id"]).toBe(requestId);
       expect(response.json()).toMatchObject({
@@ -481,6 +485,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["x-request-id"]).toBe("detail-success");
     expect(response.json()).toEqual({
       campaign: {
@@ -532,6 +537,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       headers: { "x-request-id": "detail-query" },
     });
     expect(queried.statusCode).toBe(400);
+    expect(queried.headers["cache-control"]).toBe("no-store");
     expect(queried.json()).toMatchObject({
       code: "RPG_INVALID_REQUEST",
       requestId: "detail-query",
@@ -550,6 +556,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
       method: "GET", url: "/api/rpg/v1/campaigns/campaign-missing", headers: { "x-request-id": "detail-missing" },
     });
     expect(response.statusCode).toBe(404);
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.headers["content-type"]).toContain("application/problem+json");
     expect(response.json()).toMatchObject({
       code: "RPG_CAMPAIGN_NOT_FOUND", requestId: "detail-missing", error: "Campaign not found",
@@ -578,6 +585,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId", () => {
         method: "GET", url: "/api/rpg/v1/campaigns/campaign-detail", headers: { "x-request-id": `detail-${kind}` },
       });
       expect(response.statusCode).toBe(500);
+      expect(response.headers["cache-control"]).toBe("no-store");
       expect(response.headers["content-type"]).toContain("application/problem+json");
       expect(response.json()).toMatchObject({
         code: "RPG_INTERNAL_ERROR", requestId: `detail-${kind}`, error: "Campaign could not be loaded",

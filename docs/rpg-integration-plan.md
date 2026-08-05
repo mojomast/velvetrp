@@ -894,7 +894,7 @@ Migration requirements:
 
 Current persistence is v24r1. V23 introduced M1.4 progression at the repository/shared-contract boundary; v24 preserves historical ledgers while repairing exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructs pending revisions from immutable command results. The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
 
-M1.1-M1.4 remain repository/shared-contract only. No route or client workflow was added, and the fixed-principal trusted-local boundary remains exactly 13 M0 operations. The mechanics starter is distinct from the metadata-only original starter and its existing HTTP setup/create flow. A bounded mechanics catalog plus character builder/progression HTTP/UI vertical slice is the recommended next implementation task; M1.5 remains the next repository-only roadmap milestone.
+M1.1-M1.4 remain repository/shared-contract capabilities. A bounded fixed mechanics-starter activation route/UI now brings the fixed-principal trusted-local boundary to exactly 14 operations while leaving builder/finalization/progression HTTP absent. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content; M1.5 remains the next repository-only roadmap milestone.
 
 ### Historical 2026-08-05 M0 Slice 98 Deterministic Closeout
 

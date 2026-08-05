@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, activateMessage, attachCampaignRoom, branchMessage, cancelGeneration, continueRoom, continueSession, createCampaign, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignDetail, getCampaignDiceHistory, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignRooms, listCampaigns, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateSessionContext } from "./api";
+import { ApiError, activateMessage, attachCampaignRoom, branchMessage, cancelGeneration, continueRoom, continueSession, createCampaign, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignDetail, getCampaignDiceHistory, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignRooms, listCampaigns, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateSessionContext } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -198,7 +198,10 @@ describe("HTTP runtime contracts", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(detail), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     await expect(getCampaignDetail("campaign-one")).resolves.toEqual(detail);
-    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign-one", expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rpg/v1/campaigns/campaign-one",
+      expect.objectContaining({ cache: "no-store" }),
+    );
 
     for (const invalid of ["", " campaign-one", "campaign one", "x".repeat(129)]) {
       await expect(getCampaignDetail(invalid)).rejects.toThrow();
@@ -421,6 +424,41 @@ describe("HTTP runtime contracts", () => {
       await expect(setupOriginalStarter("campaign-one")).rejects.toThrow();
     }
     expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("sends one fixed mechanics starter PUT and path-binds strict exact output", async () => {
+    const detail = { campaign: {
+      id: "campaign-one", name: "Road", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z",
+      updatedAt: "2030-01-02T00:00:00.000Z", content: { status: "configured", rulesProfileId: "velvet:rules:starter-v1",
+        contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] },
+    } };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(detail), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(setupMechanicsStarter("campaign:one")).rejects.toThrow(/did not match/);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/rpg/v1/campaigns/campaign%3Aone/mechanics-starter-setup",
+      expect.objectContaining({
+        method: "PUT", cache: "no-store",
+        body: JSON.stringify({ starterId: "velvet:mechanics-starter@1.1.0+2f9199b5696d" }),
+      }),
+    );
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(detail), { status: 200 }));
+    await expect(setupMechanicsStarter("campaign-one")).resolves.toEqual(detail);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...detail, commandId: "private" }), { status: 200 }));
+    await expect(setupMechanicsStarter("campaign-one")).rejects.toThrow();
+    await expect(setupMechanicsStarter(" campaign-one")).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([201, 202, 204])("rejects mechanics setup HTTP %s before parsing a success body", async (status) => {
+    const body = status === 204 ? null : JSON.stringify({ private: "must-not-be-accepted" });
+    const response = new Response(body, { status });
+    const jsonSpy = vi.spyOn(response, "json");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+    await expect(setupMechanicsStarter("campaign-one")).rejects.toThrow(/committed status/);
+    expect(jsonSpy).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledOnce();
   });
 
   it("decodes structured API problems without breaking legacy fields", async () => {

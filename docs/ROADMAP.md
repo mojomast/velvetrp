@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, the 13 trusted-local operations in `server/src/routes/rpg/v1/features.ts`, and the current campaign pages under `client/src/roleplay/`. Items describe future work, not functionality delivered by this document.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, the 14 trusted-local operations in `server/src/routes/rpg/v1/features.ts`, and the current campaign pages under `client/src/roleplay/`. Items describe future work, not functionality delivered by this document.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.4 are complete only at the repository/shared-contract boundary. V23 introduced M1.4 progression and v24 repaired its provenance/integrity graph; neither added a route or client workflow, so the trusted-local HTTP boundary remains exactly 13 M0 operations. M1.5 is the next repository-only milestone. Separately, the recommended next user-facing implementation is a bounded M2.5/M2.6 mechanics catalog plus character builder/progression HTTP/UI vertical slice.
+M1.1-M1.4 remain complete repository/shared-contract capabilities. The trusted-local HTTP boundary now has exactly 14 operations because one bounded route/UI slice activates the fixed M1.2 mechanics starter for an unconfigured campaign. It does not expose arbitrary catalogs, character drafts/finalization, or progression. M1.5 is the next repository-only milestone; bounded builder/progression HTTP/UI remains future work.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -140,7 +140,7 @@ Persist the durable coordination state needed for player declarations, proposed 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
+All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
 ### M2.1 Campaign lifecycle and settings routes
 

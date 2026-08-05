@@ -100,6 +100,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       queryDetail: method === "PUT" ? "Starter setup does not accept query parameters" : null,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/mechanics-starter-setup$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "PUT" ? "Mechanics starter setup does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+$/.test(instance)) {
     return {
       instance,
@@ -109,6 +118,7 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
         : method === "PATCH"
           ? "Campaign rename does not accept query parameters"
           : null,
+      noStore: method === "GET",
     };
   }
   return null;

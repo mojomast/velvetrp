@@ -20,6 +20,7 @@ import {
   ORIGINAL_STARTER_RACE,
   ORIGINAL_STARTER_RULES_PROFILE,
 } from "./original-starter.js";
+import { MECHANICS_STARTER_ID } from "./mechanics-starter.js";
 
 export {
   ORIGINAL_STARTER_BACKGROUND,
@@ -200,6 +201,12 @@ export const campaignStarterSetupRequestSchema = z.object({
 // starter metadata is not a second source of campaign truth.
 export const campaignStarterSetupResponseSchema = campaignDetailResponseSchema;
 
+/** A distinct fixed operation: callers can select no catalog or command data. */
+export const campaignMechanicsStarterSetupRequestSchema = z.object({
+  starterId: z.literal(MECHANICS_STARTER_ID),
+}).strict();
+export const campaignMechanicsStarterSetupResponseSchema = campaignDetailResponseSchema;
+
 // The HTTP create boundary intentionally shares the repository input contract.
 export const campaignCreateRequestSchema = createCampaignInputSchema;
 
@@ -352,6 +359,8 @@ export type CampaignDetail = z.infer<typeof campaignDetailSchema>;
 export type CampaignDetailResponse = z.infer<typeof campaignDetailResponseSchema>;
 export type CampaignStarterSetupRequest = z.infer<typeof campaignStarterSetupRequestSchema>;
 export type CampaignStarterSetupResponse = z.infer<typeof campaignStarterSetupResponseSchema>;
+export type CampaignMechanicsStarterSetupRequest = z.infer<typeof campaignMechanicsStarterSetupRequestSchema>;
+export type CampaignMechanicsStarterSetupResponse = z.infer<typeof campaignMechanicsStarterSetupResponseSchema>;
 export type CampaignCreateRequest = z.infer<typeof campaignCreateRequestSchema>;
 export type CampaignCreateResponse = z.infer<typeof campaignCreateResponseSchema>;
 export type AddCampaignMembershipInput = z.infer<typeof addCampaignMembershipInputSchema>;
