@@ -31,12 +31,16 @@ export {
   addMessage,
   getActiveLeaf,
   getMessage,
+  getUsageSummary,
   listBranchChildren,
   listBranchMessages,
   listMessages,
   nextSwipeIndex,
+  recordUsageEvent,
   setActiveBranch,
 } from "./messageRepo.js";
+export * from "./campaignRepo.js";
+export { createDiceRepository, type DiceRepository } from "./diceRepo.js";
 export {
   addMemoryFacts,
   forgetMemory,

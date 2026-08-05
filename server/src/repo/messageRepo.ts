@@ -1,7 +1,15 @@
 import type DatabaseDriver from "better-sqlite3";
 import { randomUUID } from "node:crypto";
-import { now } from "../defaults.js";
-import type { AddMessageOptions, Message, MessageRole, Session } from "../types.js";
+import { clampText, now } from "../defaults.js";
+import type {
+  AddMessageOptions,
+  Message,
+  MessageRole,
+  ProviderPricing,
+  Session,
+  TokenUsage,
+  UsageSummary,
+} from "../types.js";
 import { getRepositoryDatabase } from "./repoContext.js";
 import { getSession } from "./sessionRepo.js";
 
@@ -196,4 +204,64 @@ export async function addMessage(
   });
   run();
   return message;
+}
+
+export async function recordUsageEvent(sessionId: string, kind: string, usage: TokenUsage): Promise<void> {
+  getRepositoryDatabase().prepare(`INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
+    VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`).run(
+      randomUUID(), sessionId, clampText(kind, 80), usage.promptTokens, usage.completionTokens,
+      usage.totalTokens, usage.source, usage.model, now(),
+    );
+}
+
+interface UsageEventRow {
+  session_id: string;
+  kind: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  usage_source: string;
+  usage_model: string;
+}
+
+export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSummary> {
+  const db = getRepositoryDatabase();
+  const rows = db.prepare("SELECT session_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model FROM usage_events ORDER BY created_at").all() as UsageEventRow[];
+  const titles = new Map((db.prepare("SELECT id, title FROM sessions").all() as Array<{ id: string; title: string }>).map((row) => [row.id, row.title]));
+  const cost = (promptTokens: number, completionTokens: number) =>
+    pricing.promptPerMillion === null || pricing.completionPerMillion === null
+      ? null
+      : (promptTokens * pricing.promptPerMillion + completionTokens * pricing.completionPerMillion) / 1_000_000;
+  const group = (key: (row: UsageEventRow) => string) => {
+    const groups = new Map<string, { calls: number; promptTokens: number; completionTokens: number; totalTokens: number }>();
+    for (const row of rows) {
+      const id = key(row);
+      const value = groups.get(id) ?? { calls: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      value.calls += 1;
+      value.promptTokens += row.prompt_tokens;
+      value.completionTokens += row.completion_tokens;
+      value.totalTokens += row.total_tokens;
+      groups.set(id, value);
+    }
+    return groups;
+  };
+  const totals = rows.reduce((value, row) => ({
+    promptTokens: value.promptTokens + row.prompt_tokens,
+    completionTokens: value.completionTokens + row.completion_tokens,
+    totalTokens: value.totalTokens + row.total_tokens,
+  }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 });
+  const byKind = [...group((row) => row.kind)].map(([kind, value]) => ({ kind, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
+  const byModel = [...group((row) => row.usage_model)].map(([model, value]) => ({ model, ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
+  const bySession = [...group((row) => row.session_id)].map(([sessionId, value]) => ({ sessionId, title: titles.get(sessionId) || "Deleted session", ...value, estimatedCostUsd: cost(value.promptTokens, value.completionTokens) })).sort((a, b) => b.totalTokens - a.totalTokens);
+  return {
+    calls: rows.length,
+    ...totals,
+    providerMeasuredTokens: rows.filter((row) => row.usage_source === "provider").reduce((sum, row) => sum + row.total_tokens, 0),
+    estimatedTokens: rows.filter((row) => row.usage_source !== "provider").reduce((sum, row) => sum + row.total_tokens, 0),
+    estimatedCostUsd: cost(totals.promptTokens, totals.completionTokens),
+    pricing,
+    byKind,
+    byModel,
+    bySession,
+  };
 }
