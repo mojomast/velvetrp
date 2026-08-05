@@ -15,7 +15,7 @@ import { assertPowerDefinitionExists, calculateAuthoritativeProgressionPreview, 
   type ProgressionRootRow } from "./characterProgressionPersistence.js";
 
 
-const SCHEMA_VERSION = "27";
+const SCHEMA_VERSION = "28";
 const SCHEMA_REVISION = "1";
 const SQLITE_FILENAME = "velvet.sqlite";
 
@@ -99,7 +99,8 @@ function ensureSchema(db: DatabaseDriver.Database): void {
       createCharacterProgressionIntegrityV24(db);
        createResourcesInventoryEconomyRestV25(db);
        createChecksPowersEffectsV26(db);
-       createCombatFoundationV27(db);
+        createCombatFoundationV27(db);
+        createWorldTravelNpcFactionV28(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -109,11 +110,13 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     assertResourcesInventoryEconomyRestLayoutV25(db);
     assertChecksPowersEffectsLayoutV26(db);
     assertCombatFoundationLayoutV27(db);
+    assertWorldTravelNpcFactionLayoutV28(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
     validateM16PersistenceV26(db);
     validateCombatFoundationV27(db);
+    validateWorldTravelNpcFactionV28(db);
     return;
   }
   let version = row.value;
@@ -149,6 +152,9 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   const futureCombatArtifact = Number(version) < 27 && db.prepare(`SELECT type,name FROM sqlite_master
     WHERE name IN ('encounter','combatant','combat_log','reward_bundle') OR name GLOB '*_v27' OR name GLOB '*_v27_*' LIMIT 1`).get() as { type: string; name: string } | undefined;
   if (futureCombatArtifact) throw new Error(`schema marker ${version} cannot contain future v27 artifact ${futureCombatArtifact.name}`);
+  const futureWorldArtifact = Number(version) < 28 && db.prepare(`SELECT type,name FROM sqlite_master
+    WHERE name GLOB '*_v28' OR name GLOB '*_v28_*' LIMIT 1`).get() as { type: string; name: string } | undefined;
+  if (futureWorldArtifact) throw new Error(`schema marker ${version} cannot contain future v28 artifact ${futureWorldArtifact.name}`);
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
     // pre-v18 database can never contain this future-derived sidecar.
@@ -304,6 +310,10 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     migrate26to27(db);
     version = "27";
   }
+  if (version === "27") {
+    migrate27to28(db);
+    version = "28";
+  }
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -314,12 +324,14 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   assertResourcesInventoryEconomyRestLayoutV25(db);
   assertChecksPowersEffectsLayoutV26(db);
   assertCombatFoundationLayoutV27(db);
+  assertWorldTravelNpcFactionLayoutV28(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);
   validateM15PersistenceV25(db);
   validateM16PersistenceV26(db);
   validateCombatFoundationV27(db);
+  validateWorldTravelNpcFactionV28(db);
 }
 
 function assertCurrentSchemaRevision(db: DatabaseDriver.Database): void {
@@ -5312,6 +5324,128 @@ function combatFoundationLayoutDigestV27(db:DatabaseDriver.Database):string{cons
 function assertCombatFoundationLayoutV27(db:DatabaseDriver.Database):void{const row=db.prepare("SELECT prior_layout_digest,current_layout_digest FROM combat_foundation_layout_attestation_v27 WHERE singleton=1").get() as any;const actual=combatFoundationLayoutDigestV27(db);if(!row||row.prior_layout_digest!==V26_CHECKS_POWERS_EFFECTS_LAYOUT_DIGEST||row.current_layout_digest!==actual||actual!==V27_COMBAT_FOUNDATION_LAYOUT_DIGEST)throw new Error(`schema v27 combat foundation canonical SQL is incompatible (${actual})`);}
 function validateCombatFoundationV27(db:DatabaseDriver.Database):void{const commands=db.prepare(`SELECT c.*,r.resulting_revision receipt_revision,r.occurred_at FROM combat_commands_v27 c LEFT JOIN combat_receipts_v27 r ON r.encounter_id=c.encounter_id AND r.command_id=c.command_id`).all() as Array<any>;if(commands.length!==(db.prepare("SELECT count(*) count FROM combat_receipts_v27").get() as {count:number}).count)throw new Error("M1.7 command receipt graph is incomplete");for(const c of commands){let request:any;try{request=JSON.parse(c.canonical_request_json);}catch{throw new Error("M1.7 command provenance is malformed");}if(c.canonical_request_json!==canonicalV17(request)||c.request_digest!==createHash("sha256").update(canonicalV17(request)).digest("hex")||c.receipt_revision!==c.resulting_revision||c.occurred_at!==c.created_at)throw new Error("M1.7 command receipt provenance is inconsistent");}for(const root of db.prepare("SELECT * FROM combat_mutation_revisions_v27").all() as Array<any>){const history=db.prepare("SELECT expected_revision,resulting_revision,created_at FROM combat_commands_v27 WHERE encounter_id=? ORDER BY resulting_revision").all(root.encounter_id) as Array<any>;if(history.length!==root.revision||history.some((r,i)=>r.expected_revision!==i||r.resulting_revision!==i+1)||(history.length>0&&root.updated_at!==history.at(-1)!.created_at))throw new Error("M1.7 revision root history is inconsistent");}const invalidReward=db.prepare(`SELECT 1 FROM reward_bundle bundle LEFT JOIN encounter encounter ON encounter.encounter_id=bundle.encounter_id AND encounter.campaign_id=bundle.campaign_id LEFT JOIN combat_events_v27 event ON event.encounter_id=bundle.encounter_id AND event.event_id=bundle.source_event_id LEFT JOIN combat_commands_v27 command ON command.encounter_id=event.encounter_id AND command.command_id=event.command_id WHERE encounter.encounter_id IS NULL OR event.event_type<>'rewards_granted' OR command.command_type<>'grant_rewards' OR event.occurred_at<>bundle.created_at UNION ALL SELECT 1 FROM reward_claim_v27 claim JOIN reward_bundle bundle ON bundle.campaign_id=claim.campaign_id AND bundle.reward_bundle_id=claim.reward_bundle_id LEFT JOIN combat_commands_v27 command ON command.encounter_id=claim.encounter_id AND command.command_id=claim.command_id WHERE bundle.encounter_id<>claim.encounter_id OR command.command_type<>'grant_rewards' OR command.created_at<>claim.claimed_at OR json_extract(command.canonical_request_json,'$.type')<>'claim_reward_bundle' OR json_extract(command.canonical_request_json,'$.rewardClaimId')<>claim.reward_claim_id OR json_extract(command.canonical_request_json,'$.rewardBundleId')<>claim.reward_bundle_id OR json_extract(command.canonical_request_json,'$.recipientActorId')<>bundle.recipient_actor_id LIMIT 1`).get();if(invalidReward)throw new Error("M1.7 reward provenance graph is inconsistent");}
 function migrate26to27(db:DatabaseDriver.Database):void{db.transaction(()=>{assertChecksPowersEffectsLayoutV26(db);validateM16PersistenceV26(db);createCombatFoundationV27(db);db.prepare("UPDATE meta SET value='27' WHERE key='schemaVersion'").run();})();}
+
+/** Additive v28r1 persistence for the campaign world graph and its state. */
+function createWorldTravelNpcFactionV28(db: DatabaseDriver.Database): void {
+  db.exec(`
+    CREATE TABLE campaign_locations_v28 (
+      location_id TEXT PRIMARY KEY CHECK(length(location_id) BETWEEN 1 AND 128 AND location_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL,
+      parent_location_id TEXT, public_name TEXT NOT NULL CHECK(length(trim(public_name)) BETWEEN 1 AND 200 AND public_name=trim(public_name)),
+      public_description TEXT NOT NULL DEFAULT '' CHECK(length(public_description)<=4000), visibility TEXT NOT NULL CHECK(visibility IN ('public','discovered','gm')),
+      created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,location_id), FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,parent_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      CHECK(parent_location_id IS NULL OR parent_location_id<>location_id)
+    );
+    CREATE INDEX idx_campaign_locations_v28_hierarchy ON campaign_locations_v28(campaign_id,parent_location_id,location_id);
+    -- GM-only text is intentionally separate from the player-safe location row.
+    CREATE TABLE campaign_location_private_state_v28 (
+      campaign_id TEXT NOT NULL, location_id TEXT NOT NULL, gm_notes TEXT NOT NULL CHECK(length(gm_notes)<=8000),
+      PRIMARY KEY(campaign_id,location_id), FOREIGN KEY(campaign_id,location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_location_connections_v28 (
+      connection_id TEXT PRIMARY KEY CHECK(length(connection_id) BETWEEN 1 AND 128 AND connection_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL,
+      from_location_id TEXT NOT NULL, to_location_id TEXT NOT NULL, visibility TEXT NOT NULL CHECK(visibility IN ('public','discovered','gm')),
+      route_state TEXT NOT NULL CHECK(route_state IN ('open','closed')), requirement_kind TEXT NOT NULL CHECK(requirement_kind IN ('none','discovery','faction_reputation')),
+      required_faction_id TEXT, minimum_reputation INTEGER,
+      created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,connection_id), UNIQUE(campaign_id,from_location_id,to_location_id),
+      FOREIGN KEY(campaign_id,from_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,to_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,required_faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      CHECK(from_location_id<>to_location_id), CHECK((requirement_kind IN ('none','discovery') AND required_faction_id IS NULL AND minimum_reputation IS NULL) OR (requirement_kind='faction_reputation' AND required_faction_id IS NOT NULL AND minimum_reputation BETWEEN -1000000 AND 1000000))
+    );
+    CREATE INDEX idx_campaign_location_connections_v28_route ON campaign_location_connections_v28(campaign_id,from_location_id,route_state,to_location_id);
+    CREATE TABLE campaign_location_discoveries_v28 (
+      campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, location_id TEXT NOT NULL, discovered_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',discovered_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',discovered_at)=discovered_at AND substr(discovered_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,actor_id,location_id), FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_npcs_v28 (
+      npc_id TEXT PRIMARY KEY CHECK(length(npc_id) BETWEEN 1 AND 128 AND npc_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, persona_id TEXT NOT NULL,
+      speech_control TEXT NOT NULL CHECK(speech_control IN ('manual','automated')), public_name TEXT NOT NULL CHECK(length(trim(public_name)) BETWEEN 1 AND 200 AND public_name=trim(public_name)),
+      created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,npc_id), UNIQUE(campaign_id,persona_id), FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(persona_id) REFERENCES characters(id) ON DELETE RESTRICT
+    );
+    CREATE TABLE campaign_npc_private_state_v28 (
+      campaign_id TEXT NOT NULL, npc_id TEXT NOT NULL, private_goals TEXT NOT NULL CHECK(length(private_goals)<=8000), gm_notes TEXT NOT NULL CHECK(length(gm_notes)<=8000), merchant_state_json TEXT CHECK(merchant_state_json IS NULL OR (json_valid(merchant_state_json) AND json_type(merchant_state_json)='object' AND length(merchant_state_json)<=16000)),
+      PRIMARY KEY(campaign_id,npc_id), FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_factions_v28 (
+      faction_id TEXT PRIMARY KEY CHECK(length(faction_id) BETWEEN 1 AND 128 AND faction_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL,
+      public_name TEXT NOT NULL CHECK(length(trim(public_name)) BETWEEN 1 AND 200 AND public_name=trim(public_name)), visibility TEXT NOT NULL CHECK(visibility IN ('public','discovered','gm')),
+      created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,faction_id), FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_faction_private_state_v28 (
+      campaign_id TEXT NOT NULL, faction_id TEXT NOT NULL, gm_notes TEXT NOT NULL CHECK(length(gm_notes)<=8000), PRIMARY KEY(campaign_id,faction_id),
+      FOREIGN KEY(campaign_id,faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_actor_faction_memberships_v28 (
+      campaign_id TEXT NOT NULL, faction_id TEXT NOT NULL, actor_id TEXT NOT NULL, membership_role TEXT NOT NULL CHECK(membership_role IN ('member','leader','ally','enemy')),
+      joined_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',joined_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',joined_at)=joined_at AND substr(joined_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,faction_id,actor_id), FOREIGN KEY(campaign_id,faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_npc_faction_memberships_v28 (
+      campaign_id TEXT NOT NULL, faction_id TEXT NOT NULL, npc_id TEXT NOT NULL, membership_role TEXT NOT NULL CHECK(membership_role IN ('member','leader','ally','enemy')),
+      joined_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',joined_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',joined_at)=joined_at AND substr(joined_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,faction_id,npc_id), FOREIGN KEY(campaign_id,faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_faction_relations_v28 (
+      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, from_faction_id TEXT NOT NULL, to_faction_id TEXT NOT NULL, relation TEXT NOT NULL CHECK(relation IN ('allied','neutral','hostile')), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,from_faction_id,to_faction_id), FOREIGN KEY(campaign_id,from_faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,to_faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, CHECK(from_faction_id<>to_faction_id)
+    );
+    CREATE TABLE campaign_npc_relationships_v28 (
+      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, actor_id TEXT NOT NULL, npc_id TEXT NOT NULL, disposition INTEGER NOT NULL CHECK(typeof(disposition)='integer' AND disposition BETWEEN -1000 AND 1000), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,actor_id,npc_id), FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE campaign_reputation_ledger_v28 (
+      entry_id TEXT PRIMARY KEY CHECK(length(entry_id) BETWEEN 1 AND 128 AND entry_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, actor_id TEXT NOT NULL, faction_id TEXT NOT NULL, delta INTEGER NOT NULL CHECK(typeof(delta)='integer' AND delta BETWEEN -1000000 AND 1000000), reason TEXT NOT NULL CHECK(length(trim(reason)) BETWEEN 1 AND 500 AND reason=trim(reason)), command_id TEXT NOT NULL,
+      occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), UNIQUE(campaign_id,session_id,command_id,entry_id), FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,faction_id) REFERENCES campaign_factions_v28(campaign_id,faction_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE world_mutation_revisions_v28 (
+      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 0 AND 9007199254740991), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,session_id), FOREIGN KEY(session_id) REFERENCES campaign_sessions(session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE world_commands_v28 (
+      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL CHECK(length(command_id) BETWEEN 1 AND 128 AND command_id NOT GLOB '*[^A-Za-z0-9._:-]*'), actor_id TEXT NOT NULL, command_type TEXT NOT NULL CHECK(command_type IN ('travel','discover_location','set_npc_relationship','change_reputation','set_faction_relation','set_actor_location')), idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'), canonical_request_json TEXT NOT NULL CHECK(length(canonical_request_json) BETWEEN 2 AND 32768 AND json_valid(canonical_request_json) AND json_type(canonical_request_json)='object'), request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest GLOB '[0-9a-f]*'), expected_revision INTEGER NOT NULL CHECK(typeof(expected_revision)='integer' AND expected_revision BETWEEN 0 AND 9007199254740990), resulting_revision INTEGER NOT NULL CHECK(resulting_revision=expected_revision+1), created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,session_id,command_id), UNIQUE(campaign_id,session_id,idempotency_key), UNIQUE(campaign_id,session_id,resulting_revision), UNIQUE(campaign_id,session_id,command_id,resulting_revision), FOREIGN KEY(campaign_id,session_id) REFERENCES world_mutation_revisions_v28(campaign_id,session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE world_receipts_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL CHECK(typeof(resulting_revision)='integer' AND resulting_revision BETWEEN 1 AND 9007199254740991), canonical_result_json TEXT NOT NULL CHECK(length(canonical_result_json) BETWEEN 2 AND 32768 AND json_valid(canonical_result_json) AND json_type(canonical_result_json)='object'), result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest GLOB '[0-9a-f]*'), occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), PRIMARY KEY(campaign_id,session_id,command_id), UNIQUE(campaign_id,session_id,resulting_revision), UNIQUE(campaign_id,session_id,command_id,resulting_revision), FOREIGN KEY(campaign_id,session_id,command_id,resulting_revision) REFERENCES world_commands_v28(campaign_id,session_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE world_events_v28 (event_id TEXT PRIMARY KEY CHECK(length(event_id) BETWEEN 1 AND 128 AND event_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL, event_type TEXT NOT NULL CHECK(event_type IN ('travelled','location_discovered','actor_location_set','npc_relationship_changed','reputation_changed','faction_relation_changed')), event_json TEXT NOT NULL CHECK(length(event_json) BETWEEN 2 AND 32768 AND json_valid(event_json) AND json_type(event_json)='object'), occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), UNIQUE(campaign_id,session_id,event_id), UNIQUE(campaign_id,session_id,command_id,event_type), FOREIGN KEY(campaign_id,session_id,command_id,resulting_revision) REFERENCES world_receipts_v28(campaign_id,session_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE campaign_actor_locations_v28 (campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, location_id TEXT NOT NULL, session_id TEXT NOT NULL, state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'), PRIMARY KEY(campaign_id,actor_id,session_id), FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(session_id) REFERENCES campaign_sessions(session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE world_travel_party_members_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, actor_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id,actor_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE world_travel_destinations_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, connection_id TEXT NOT NULL, destination_location_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,connection_id) REFERENCES campaign_location_connections_v28(campaign_id,connection_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,destination_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE world_travel_npc_party_members_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, npc_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id,npc_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE world_travel_layout_attestation_v28 (singleton INTEGER PRIMARY KEY CHECK(singleton=1), prior_layout_digest TEXT NOT NULL CHECK(length(prior_layout_digest)=64), current_layout_digest TEXT NOT NULL CHECK(length(current_layout_digest)=64));
+    CREATE TRIGGER world_mutation_revisions_v28_campaign_session_ancestry BEFORE INSERT ON world_mutation_revisions_v28 WHEN NOT EXISTS(SELECT 1 FROM campaign_sessions WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id) BEGIN SELECT RAISE(ABORT,'world session must belong to campaign'); END;
+    CREATE TRIGGER world_commands_v28_campaign_session_ancestry BEFORE INSERT ON world_commands_v28 WHEN NOT EXISTS(SELECT 1 FROM campaign_sessions WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id) BEGIN SELECT RAISE(ABORT,'world command session must belong to campaign'); END;
+    CREATE TRIGGER world_mutation_revisions_v28_guard BEFORE UPDATE ON world_mutation_revisions_v28 WHEN NEW.campaign_id<>OLD.campaign_id OR NEW.session_id<>OLD.session_id OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at BEGIN SELECT RAISE(ABORT,'world mutation revision must advance exactly once'); END;
+    CREATE TRIGGER world_commands_v28_immutable_update BEFORE UPDATE ON world_commands_v28 BEGIN SELECT RAISE(ABORT,'world commands are immutable'); END; CREATE TRIGGER world_commands_v28_immutable_delete BEFORE DELETE ON world_commands_v28 BEGIN SELECT RAISE(ABORT,'world commands are immutable'); END;
+    CREATE TRIGGER world_receipts_v28_immutable_update BEFORE UPDATE ON world_receipts_v28 BEGIN SELECT RAISE(ABORT,'world receipts are immutable'); END; CREATE TRIGGER world_receipts_v28_immutable_delete BEFORE DELETE ON world_receipts_v28 BEGIN SELECT RAISE(ABORT,'world receipts are immutable'); END;
+    CREATE TRIGGER world_events_v28_immutable_update BEFORE UPDATE ON world_events_v28 BEGIN SELECT RAISE(ABORT,'world events are immutable'); END; CREATE TRIGGER world_events_v28_immutable_delete BEFORE DELETE ON world_events_v28 BEGIN SELECT RAISE(ABORT,'world events are immutable'); END;
+    CREATE TRIGGER campaign_reputation_ledger_v28_immutable_update BEFORE UPDATE ON campaign_reputation_ledger_v28 BEGIN SELECT RAISE(ABORT,'reputation ledger is immutable'); END; CREATE TRIGGER campaign_reputation_ledger_v28_immutable_delete BEFORE DELETE ON campaign_reputation_ledger_v28 BEGIN SELECT RAISE(ABORT,'reputation ledger is immutable'); END;
+    CREATE TRIGGER campaign_actor_locations_v28_ancestry BEFORE INSERT ON campaign_actor_locations_v28 WHEN NOT EXISTS(SELECT 1 FROM campaign_sessions WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id) BEGIN SELECT RAISE(ABORT,'actor location session must belong to campaign'); END;
+    -- A persona is exclusively either a manually controlled campaign actor or an NPC.
+    CREATE TRIGGER campaign_npcs_v28_persona_not_campaign_character BEFORE INSERT ON campaign_npcs_v28 WHEN EXISTS(SELECT 1 FROM campaign_actors a JOIN campaign_characters cc ON cc.id=a.campaign_character_id AND cc.campaign_id=a.campaign_id WHERE a.campaign_id=NEW.campaign_id AND cc.character_id=NEW.persona_id) BEGIN SELECT RAISE(ABORT,'campaign character persona cannot become NPC'); END;
+    CREATE TRIGGER campaign_actors_v28_persona_not_npc BEFORE INSERT ON campaign_actors WHEN EXISTS(SELECT 1 FROM campaign_characters cc JOIN campaign_npcs_v28 n ON n.campaign_id=NEW.campaign_id AND n.persona_id=cc.character_id WHERE cc.id=NEW.campaign_character_id AND cc.campaign_id=NEW.campaign_id) BEGIN SELECT RAISE(ABORT,'NPC persona cannot become campaign character'); END;
+    CREATE TRIGGER campaign_actor_locations_v28_guard BEFORE UPDATE ON campaign_actor_locations_v28 WHEN NEW.campaign_id<>OLD.campaign_id OR NEW.actor_id<>OLD.actor_id OR NEW.session_id<>OLD.session_id OR NEW.state_revision<>OLD.state_revision+1 OR NEW.updated_at<OLD.updated_at OR NOT EXISTS(SELECT 1 FROM world_events_v28 WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id AND event_type IN ('travelled','actor_location_set') AND occurred_at=NEW.updated_at) BEGIN SELECT RAISE(ABORT,'actor location requires immutable world event'); END;
+    CREATE TRIGGER world_travel_party_members_v28_command_type BEFORE INSERT ON world_travel_party_members_v28 WHEN NOT EXISTS(SELECT 1 FROM world_commands_v28 WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id AND command_id=NEW.command_id AND command_type='travel') BEGIN SELECT RAISE(ABORT,'travel party member requires travel command'); END;
+    CREATE TRIGGER world_travel_destinations_v28_command_type BEFORE INSERT ON world_travel_destinations_v28 WHEN NOT EXISTS(SELECT 1 FROM world_commands_v28 WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id AND command_id=NEW.command_id AND command_type='travel') BEGIN SELECT RAISE(ABORT,'travel destination requires travel command'); END;
+    CREATE TRIGGER world_travel_layout_attestation_v28_immutable_update BEFORE UPDATE ON world_travel_layout_attestation_v28 BEGIN SELECT RAISE(ABORT,'v28 layout attestation is immutable'); END; CREATE TRIGGER world_travel_layout_attestation_v28_immutable_delete BEFORE DELETE ON world_travel_layout_attestation_v28 BEGIN SELECT RAISE(ABORT,'v28 layout attestation is immutable'); END;
+  `);
+  const current=worldTravelNpcFactionLayoutDigestV28(db);
+  db.prepare("INSERT INTO world_travel_layout_attestation_v28(singleton,prior_layout_digest,current_layout_digest) VALUES(1,?,?)").run(V27_COMBAT_FOUNDATION_LAYOUT_DIGEST,current);
+}
+const V28_WORLD_TRAVEL_NPC_FACTION_LAYOUT_DIGEST = "2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7";
+function worldTravelNpcFactionLayoutRowsV28(db:DatabaseDriver.Database):unknown[]{return db.prepare(`SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND (name GLOB '*_v28' OR name GLOB '*_v28_*' OR tbl_name GLOB '*_v28' OR tbl_name GLOB '*_v28_*') ORDER BY type,name`).all();}
+function worldTravelNpcFactionLayoutDigestV28(db:DatabaseDriver.Database):string{const rows=(worldTravelNpcFactionLayoutRowsV28(db) as Array<any>).map((row)=>({...row,sql:row.sql?.replace(/\s+/g," ").trim()}));return createHash("sha256").update(canonicalV17(rows)).digest("hex");}
+function assertWorldTravelNpcFactionLayoutV28(db:DatabaseDriver.Database):void{const row=db.prepare("SELECT prior_layout_digest,current_layout_digest FROM world_travel_layout_attestation_v28 WHERE singleton=1").get() as any;const actual=worldTravelNpcFactionLayoutDigestV28(db);if(!row||row.prior_layout_digest!==V27_COMBAT_FOUNDATION_LAYOUT_DIGEST||row.current_layout_digest!==actual||actual!==V28_WORLD_TRAVEL_NPC_FACTION_LAYOUT_DIGEST)throw new Error(`schema v28 world/travel canonical SQL is incompatible (${actual})`);}
+function validateWorldTravelNpcFactionV28(db:DatabaseDriver.Database):void{const commands=db.prepare(`SELECT c.*,r.resulting_revision receipt_revision,r.occurred_at FROM world_commands_v28 c LEFT JOIN world_receipts_v28 r ON r.campaign_id=c.campaign_id AND r.session_id=c.session_id AND r.command_id=c.command_id`).all() as Array<any>;if(commands.length!==(db.prepare("SELECT count(*) count FROM world_receipts_v28").get() as {count:number}).count)throw new Error("M1.8 command receipt graph is incomplete");for(const c of commands){let request:any;try{request=JSON.parse(c.canonical_request_json);}catch{throw new Error("M1.8 command provenance is malformed");}if(c.canonical_request_json!==canonicalV17(request)||c.request_digest!==createHash("sha256").update(canonicalV17(request)).digest("hex")||c.receipt_revision!==c.resulting_revision||c.occurred_at!==c.created_at)throw new Error("M1.8 command receipt provenance is inconsistent");}for(const root of db.prepare("SELECT * FROM world_mutation_revisions_v28").all() as Array<any>){const history=db.prepare("SELECT expected_revision,resulting_revision,created_at FROM world_commands_v28 WHERE campaign_id=? AND session_id=? ORDER BY resulting_revision").all(root.campaign_id,root.session_id) as Array<any>;if(history.length!==root.revision||history.some((r,i)=>r.expected_revision!==i||r.resulting_revision!==i+1)||(history.length>0&&root.updated_at!==history.at(-1)!.created_at))throw new Error("M1.8 revision root history is inconsistent");}}
+function migrate27to28(db:DatabaseDriver.Database):void{db.transaction(()=>{assertCombatFoundationLayoutV27(db);validateCombatFoundationV27(db);createWorldTravelNpcFactionV28(db);db.prepare("UPDATE meta SET value='28' WHERE key='schemaVersion'").run();})();}
 
 function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, dependencies: RuntimeDependencies): void {
   const legacy = loadLegacyDatabase(dir, dependencies);

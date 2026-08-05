@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v27 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.7 adds no HTTP routes or client/UI.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v28 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.8 adds no HTTP routes or client/UI.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.7 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.7 is repository-only and adds no routes or client/UI; M1.8 is next. The fixed v27r1 DDL digest is `5ff782cab830d8c7e934edbae69fde1398b7482531d6b77c7ced8696798737be`.
+M1.1-M1.8 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 is repository-only and adds no routes or client/UI; M1.9 is next. The fixed v28r1 DDL digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -109,6 +109,8 @@ Prepared and improvised encounters provide stable initiative, legal-action calcu
 
 ### M1.8 World, travel, NPCs, and factions
 
+**Status: Complete (schema v28r1; repository/shared-contract only; no HTTP routes or client/UI)**
+
 Persist a visibility-aware location graph plus campaign NPC personas, private goals, relationships, factions, and reputation.
 
 - **Complexity:** L
@@ -116,8 +118,8 @@ Persist a visibility-aware location graph plus campaign NPC personas, private go
 - **Acceptance criteria:**
   - Additive schema and contracts cover location hierarchy and connections, discoveries, actor location, campaign NPC links, private NPC state, relationships, faction membership/relations, and reputation ledgers.
   - Travel validates campaign ancestry, adjacency, route state, discovery, requirements, and selected party membership before one atomic location event.
-  - Player projections exclude hidden routes, undiscovered locations, NPC secrets, unrelated private state, and GM-only notes at query time.
-  - Speaking NPCs use one authoritative Velvet persona, relationship and reputation changes require deterministic commands, and an AI never voices a manually controlled player character.
+  - Player projections structurally exclude hidden routes, undiscovered locations, NPC secrets/private goals, unrelated private location state, and GM-only notes at query time. GM projections own those fields.
+  - Location and route management, discovery, actor placement, and reputation changes are owner/GM-only. Speaking NPCs use one fictional confirmed Velvet persona that cannot also be a campaign character; speech is manual only, with no AI NPC speech and no path for AI to voice a manually controlled player character.
 
 ### M1.9 Quests, storylines, clues, and rewards
 

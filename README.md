@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v27 revision 1 (v27r1)**. Schema v27 completes M1.7 encounters and turn-based combat at the repository/shared-contract layer without rewriting historical ledgers. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.7 adds no HTTP routes or client/UI.
+Current persistence is schema **v28 revision 1 (v28r1)**. Schema v28 completes M1.8 world, travel, NPCs, and factions at the repository/shared-contract layer without rewriting historical ledgers. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 adds no HTTP routes or client/UI.
 
-The fixed canonical v27 DDL digest is `5ff782cab830d8c7e934edbae69fde1398b7482531d6b77c7ced8696798737be`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.7 repository/shared-contract work is complete. M1.7 provides prepared and improvised session-bound encounters, catalog-pinned enemies, server-derived initiative, deterministic fallback enemy turns, revision-bound legal actions, immutable combat logs, and exactly-once recorded reward claims. Powers and items reject in combat when atomic settlement with their resource or inventory streams is unavailable. Rewards are currency-only, server-generated recorded claims, not generic caller input; recorded claims do not settle wallets. M1.8 world, travel, NPCs, and factions is next.
+The fixed canonical v28 DDL digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.8 repository/shared-contract work is complete. M1.8 provides a campaign location graph, discoveries, session-bound actor locations, atomic revisioned travel, NPC persona links and private state, factions, relationships, and immutable reputation ledgers. Player world projections exclude hidden/undiscovered locations and routes, GM notes, NPC secrets, and unrelated private location state. Owner/GM authority is required for location management and discovery. NPC speech is manual only: no AI NPC speech is implemented, and AI cannot voice manually controlled player characters. M1.9 quests, storylines, clues, and rewards is next.
 
 ---
 
@@ -101,12 +101,12 @@ POST /api/interaction
 
 ### Repository Layer
 
-The repo layer is split into focused roleplay domains and factory-composed RPG facades at schema v27r1:
+The repo layer is split into focused roleplay domains and factory-composed RPG facades at schema v28r1:
 
 ```
 server/src/repo/
 ├── index.ts          ← public barrel (stable API surface)
-├── db.ts             ← schema v27r1, migrations v1→v27, connection lifecycle
+├── db.ts             ← schema v28r1, migrations v1→v28, connection lifecycle
 ├── shared.ts         ← LOCAL_OWNER_PRINCIPAL_ID constant
 ├── repoContext.ts    ← provider-pattern DB singleton (configureRepositoryDatabase)
 ├── characterRepo.ts  ← characters CRUD, lore repair on delete
@@ -122,10 +122,11 @@ server/src/repo/
 ├── contentCatalogRepo.ts          ← immutable catalogs and campaign pins
 ├── characterBuilderRepo.ts        ← drafts, derived sheets, finalization
 ├── characterProgressionRepo.ts    ← XP/milestones, previews, level application
-└── encounterRepo.ts               ← encounter lifecycle, combat turns, logs, recorded claims
+├── encounterRepo.ts               ← encounter lifecycle, combat turns, logs, recorded claims
+└── worldRepo.ts                   ← world graph, travel, NPC personas, factions, reputation
 ```
 
-### Selected Schema Foundations (v27r1)
+### Selected Schema Foundations (v28r1)
 
 ```
 characters          sessions            messages
@@ -229,8 +230,8 @@ The full 40-item roadmap lives in [`docs/ROADMAP.md`](docs/ROADMAP.md). High-lev
 M0  ████████████████████████████████  COMPLETE (98 slices, schema v14r1)
     Core roleplay, campaigns, dice, character workspace
 
-M1  ████████████████████████░░░░░░░░  M1.1-M1.7 COMPLETE
-     Repository/shared-contract complete through combat; M1.7 adds no HTTP routes or UI
+M1  █████████████████████████░░░░░░░  M1.1-M1.8 COMPLETE
+     Repository/shared-contract complete through world/factions; M1.8 adds no HTTP routes or UI
 
 M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     API surface: 11 route groups covering all M1 domains
@@ -290,7 +291,7 @@ npm run dev:server   # server only
 npm run dev:client   # client only
 npm run typecheck    # typecheck contracts, server, client, and E2E
 npm run build        # production build (contracts → server → client)
-npm test             # contracts + server + client tests (2,227 passing, 1 skipped)
+npm test             # contracts + server + client tests (2,241 passing, 1 skipped)
 npm run test:e2e     # deterministic browser/API E2E (no paid provider calls)
 npm run ci           # install → typecheck → build → test
 ```
@@ -334,10 +335,10 @@ docs/                   API reference, architecture, roadmap, streaming protocol
 Data lives in `server/data/velvet.sqlite`. Override with `VELVET_DATA_DIR`.
 
 - WAL mode, foreign keys enabled
-- Schema **v27, revision 1** (current)
+- Schema **v28, revision 1** (current)
 - Auto-migrates from v2 onward at startup
 - v9–v14 add campaign, content, sheet, actor, command, resource, and dice foundations
-- v15–v27 add administration, immutable catalogs, character building, progression, resources, inventory, economy, rest, checks, powers, deterministic effects, encounters, and combat integrity repairs
+- v15–v28 add administration, immutable catalogs, character building, progression, resources, inventory, economy, rest, checks, powers, deterministic effects, encounters, combat integrity repairs, world/travel state, NPCs, factions, and reputation
 
 ---
 
