@@ -2,6 +2,7 @@ import type DatabaseDriver from "better-sqlite3";
 import { systemRuntime } from "../runtime.js";
 import type { Clock, IdGenerator } from "../runtime.js";
 import type { Character, CreateCharacterInput } from "../types.js";
+import { repairLoreForCharacterDeletionSync } from "./loreRepo.js";
 import { getRepositoryDatabase } from "./repoContext.js";
 
 interface CharacterRow {
@@ -103,14 +104,7 @@ export async function deleteCharacter(id: string): Promise<"deleted" | "in-use" 
       UNION ALL SELECT 1 FROM campaign_characters WHERE character_id = ? LIMIT 1`).get(id, id, id);
     if (used) return "in-use" as const;
 
-    // Keep the legacy primary lore pointer coherent before character cascades
-    // remove its many-to-many association.
-    db.prepare(`UPDATE lore SET character_id = (
-      SELECT lc.character_id FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id <> ? LIMIT 1
-    ) WHERE character_id = ? AND EXISTS (
-      SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id <> ?
-    )`).run(id, id, id);
-    db.prepare("DELETE FROM lore WHERE character_id = ? AND NOT EXISTS (SELECT 1 FROM lore_characters WHERE lore_id = lore.id AND character_id <> ?)").run(id, id);
+    repairLoreForCharacterDeletionSync(db, id);
     db.prepare("DELETE FROM characters WHERE id = ?").run(id);
     return "deleted" as const;
   });

@@ -78,6 +78,7 @@ import {
 } from "../content/originalStarterManifest.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import { createCharacterSync } from "./characterRepo.js";
+import { createLoreEntrySync } from "./loreRepo.js";
 import { configureRepositoryDatabase } from "./repoContext.js";
 import { updateHarnessSettingsSync } from "./settingsRepo.js";
 import {
@@ -122,13 +123,9 @@ import type {
   RulesProfile,
   RulesProfileIdentifier,
   Database,
-  EpisodeSummary,
   HarnessSettings,
   LoreEntry,
-  MemoryFact,
-  MemoryKind,
   NewLoreEntry,
-  NewMemoryFact,
   PrivilegedCampaignCharacterProjection,
   ProviderPricing,
   SceneState,
@@ -2170,90 +2167,6 @@ function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, depend
   });
   run(legacy);
   markLegacyMigrated(dir);
-}
-
-interface MemoryRow {
-  id: string;
-  character_id: string;
-  kind: string;
-  content: string;
-  source_turn_id: string;
-  created_at: string;
-  user_approved: number;
-  forgotten_at: string | null;
-}
-
-interface SummaryRow {
-  session_id: string;
-  summary: string;
-  key_events: string;
-  emotional_beat: string;
-  updated_at: string;
-}
-
-interface LoreRow {
-  id: string;
-  character_id: string | null;
-  keys: string;
-  content: string;
-  enabled: number;
-  insertion_order: number;
-  created_at: string;
-}
-
-function toMemory(row: MemoryRow): MemoryFact {
-  return {
-    id: row.id,
-    characterId: row.character_id,
-    kind: row.kind as MemoryKind,
-    content: row.content,
-    sourceTurnId: row.source_turn_id,
-    createdAt: row.created_at,
-    userApproved: row.user_approved === 1,
-    forgottenAt: row.forgotten_at,
-  };
-}
-
-function toSummary(row: SummaryRow): EpisodeSummary {
-  let keyEvents: string[] = [];
-  try {
-    const parsed = JSON.parse(row.key_events) as unknown;
-    if (Array.isArray(parsed)) keyEvents = parsed.filter((item): item is string => typeof item === "string");
-  } catch {
-    keyEvents = [];
-  }
-  return {
-    sessionId: row.session_id,
-    summary: row.summary,
-    keyEvents,
-    emotionalBeat: row.emotional_beat,
-    updatedAt: row.updated_at,
-  };
-}
-
-function loreCharacterIds(db: DatabaseDriver.Database, loreId: string): string[] {
-  const rows = db.prepare("SELECT character_id FROM lore_characters WHERE lore_id = ? ORDER BY rowid ASC").all(loreId) as Array<{ character_id: string }>;
-  return rows.map((row) => row.character_id);
-}
-
-function toLore(row: LoreRow, characterIds: string[] = row.character_id ? [row.character_id] : []): LoreEntry {
-  let keys: string[] = [];
-  try {
-    const parsed = JSON.parse(row.keys) as unknown;
-    if (Array.isArray(parsed)) keys = parsed.filter((item): item is string => typeof item === "string");
-  } catch {
-    keys = [];
-  }
-  return {
-    id: row.id,
-    characterId: row.character_id,
-    characterIds,
-    keys,
-    content: row.content,
-    enabled: row.enabled === 1,
-    insertionOrder: row.insertion_order,
-    createdAt: row.created_at,
-  };
 }
 
 export interface RepositoryDependencies {
@@ -8673,37 +8586,6 @@ function getCampaignContentPackDefinitionSync(
   return row ? toRpgDefinition(row) : null;
 }
 
-function createLoreEntrySync(
-  db: DatabaseDriver.Database,
-  dependencies: RepositoryDependencies,
-  input: NewLoreEntry,
-): LoreEntry {
-  const characterIds = input.characterIds ?? (input.characterId ? [input.characterId] : []);
-  const entry: LoreEntry = {
-    id: dependencies.ids.nextId(),
-    characterId: characterIds[0] ?? null,
-    characterIds,
-    keys: input.keys
-      .map((key) => key.trim())
-      .filter((key) => key.length > 0)
-      .slice(0, 8),
-    content: input.content.trim().slice(0, 1200),
-    enabled: input.enabled,
-    insertionOrder: Number.isFinite(input.insertionOrder) ? input.insertionOrder : 100,
-    createdAt: dependencies.clock.now().toISOString(),
-  };
-  const run = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO lore (id, character_id, keys, content, enabled, insertion_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(entry.id, entry.characterId, JSON.stringify(entry.keys), entry.content, entry.enabled ? 1 : 0, entry.insertionOrder, entry.createdAt);
-    const insert = db.prepare("INSERT INTO lore_characters (lore_id, character_id) VALUES (?, ?)");
-    entry.characterIds.forEach((id) => insert.run(entry.id, id));
-  });
-  run();
-  return entry;
-}
-
 function runTransaction<T>(
   db: DatabaseDriver.Database,
   dependencies: RepositoryDependencies,
@@ -9229,191 +9111,4 @@ export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSu
     byModel,
     bySession,
   };
-}
-
-export async function addMemoryFacts(characterId: string, facts: NewMemoryFact[]): Promise<MemoryFact[]> {
-  const db = getDb();
-  const seen = new Set<string>();
-  const existing = db.prepare(
-    "SELECT 1 FROM memories WHERE character_id = ? AND forgotten_at IS NULL AND lower(trim(content)) = lower(trim(?)) LIMIT 1",
-  );
-  const uniqueFacts = facts.filter((fact) => {
-    const key = fact.content.trim().toLocaleLowerCase();
-    if (!key || seen.has(key) || existing.get(characterId, fact.content)) return false;
-    seen.add(key);
-    return true;
-  });
-  const created: MemoryFact[] = uniqueFacts.map((fact) => ({
-    id: randomUUID(),
-    characterId,
-    kind: fact.kind,
-    content: fact.content,
-    sourceTurnId: fact.sourceTurnId,
-    createdAt: now(),
-    userApproved: fact.userApproved,
-    forgottenAt: null,
-  }));
-  if (created.length === 0) return created;
-  const insert = db.prepare(
-    `INSERT INTO memories (id, character_id, kind, content, source_turn_id, created_at, user_approved, forgotten_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const run = db.transaction((rows: MemoryFact[]) => {
-    for (const row of rows) {
-      insert.run(
-        row.id,
-        row.characterId,
-        row.kind,
-        row.content,
-        row.sourceTurnId,
-        row.createdAt,
-        row.userApproved ? 1 : 0,
-        row.forgottenAt,
-      );
-    }
-  });
-  run(created);
-  return created;
-}
-
-export async function listApprovedMemories(characterId: string, limit = 8): Promise<MemoryFact[]> {
-  const rows = getDb()
-    .prepare(
-      `SELECT * FROM memories
-       WHERE character_id = ? AND user_approved = 1 AND forgotten_at IS NULL
-       ORDER BY created_at DESC, rowid DESC
-       LIMIT ?`,
-    )
-    .all(characterId, limit) as MemoryRow[];
-  return rows.map(toMemory);
-}
-
-export async function listAllMemories(characterId: string): Promise<MemoryFact[]> {
-  const rows = getDb()
-    .prepare(
-      `SELECT * FROM memories
-       WHERE character_id = ?
-       ORDER BY created_at DESC, rowid DESC`,
-    )
-    .all(characterId) as MemoryRow[];
-  return rows.map(toMemory);
-}
-
-export async function setMemoryApproval(id: string, userApproved: boolean): Promise<MemoryFact | null> {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as MemoryRow | undefined;
-  if (!row) return null;
-  db.prepare("UPDATE memories SET user_approved = ? WHERE id = ?").run(userApproved ? 1 : 0, id);
-  return toMemory({ ...row, user_approved: userApproved ? 1 : 0 });
-}
-
-export async function getMemory(id: string): Promise<MemoryFact | null> {
-  const row = getDb().prepare("SELECT * FROM memories WHERE id = ?").get(id) as MemoryRow | undefined;
-  return row ? toMemory(row) : null;
-}
-
-export async function updateMemory(
-  id: string,
-  patch: Partial<Pick<MemoryFact, "content" | "kind" | "userApproved" | "forgottenAt">>,
-): Promise<MemoryFact | null> {
-  const current = await getMemory(id);
-  if (!current) return null;
-  const next = { ...current, ...patch };
-  getDb().prepare("UPDATE memories SET kind = ?, content = ?, user_approved = ?, forgotten_at = ? WHERE id = ?").run(
-    next.kind, next.content, next.userApproved ? 1 : 0, next.forgottenAt, id,
-  );
-  return getMemory(id);
-}
-
-export async function restoreMemory(id: string): Promise<MemoryFact | null> {
-  return updateMemory(id, { forgottenAt: null });
-}
-
-export async function forgetMemory(id: string): Promise<MemoryFact | null> {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM memories WHERE id = ? AND forgotten_at IS NULL").get(id) as MemoryRow | undefined;
-  if (!row) return null;
-  const forgottenAt = now();
-  db.prepare("UPDATE memories SET forgotten_at = ? WHERE id = ?").run(forgottenAt, id);
-  return toMemory({ ...row, forgotten_at: forgottenAt });
-}
-
-export async function getSummary(sessionId: string): Promise<EpisodeSummary | null> {
-  const row = getDb().prepare("SELECT * FROM summaries WHERE session_id = ?").get(sessionId) as SummaryRow | undefined;
-  return row ? toSummary(row) : null;
-}
-
-export async function upsertSummary(
-  sessionId: string,
-  summary: Omit<EpisodeSummary, "sessionId" | "updatedAt">,
-): Promise<EpisodeSummary> {
-  const next: EpisodeSummary = { sessionId, ...summary, updatedAt: now() };
-  getDb()
-    .prepare(
-      `INSERT INTO summaries (session_id, summary, key_events, emotional_beat, updated_at)
-       VALUES (@sessionId, @summary, @keyEvents, @emotionalBeat, @updatedAt)
-       ON CONFLICT(session_id) DO UPDATE SET
-         summary = excluded.summary,
-         key_events = excluded.key_events,
-         emotional_beat = excluded.emotional_beat,
-         updated_at = excluded.updated_at`,
-    )
-    .run({ ...next, keyEvents: JSON.stringify(next.keyEvents) });
-  return next;
-}
-
-export async function deleteSummary(sessionId: string): Promise<void> {
-  getDb().prepare("DELETE FROM summaries WHERE session_id = ?").run(sessionId);
-}
-
-export async function listLoreEntries(characterId?: string | string[]): Promise<LoreEntry[]> {
-  const db = getDb();
-  const ids = characterId === undefined ? null : Array.isArray(characterId) ? characterId : [characterId];
-  let rows: LoreRow[];
-  if (ids === null) {
-    rows = db.prepare("SELECT * FROM lore ORDER BY insertion_order ASC, rowid ASC").all() as LoreRow[];
-  } else if (ids.length === 0) {
-    rows = db.prepare("SELECT * FROM lore WHERE NOT EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id) ORDER BY insertion_order ASC, rowid ASC").all() as LoreRow[];
-  } else {
-    const placeholders = ids.map(() => "?").join(", ");
-    rows = db.prepare(`SELECT DISTINCT lore.* FROM lore WHERE
-      NOT EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id)
-      OR EXISTS (SELECT 1 FROM lore_characters lc WHERE lc.lore_id = lore.id AND lc.character_id IN (${placeholders}))
-      ORDER BY insertion_order ASC, rowid ASC`).all(...ids) as LoreRow[];
-  }
-  return rows.map((row) => toLore(row, loreCharacterIds(db, row.id)));
-}
-
-export async function createLoreEntry(input: NewLoreEntry): Promise<LoreEntry> {
-  return createLoreEntrySync(getDb(), systemRuntime, input);
-}
-
-export async function getLoreEntry(id: string): Promise<LoreEntry | null> {
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM lore WHERE id = ?").get(id) as LoreRow | undefined;
-  return row ? toLore(row, loreCharacterIds(db, id)) : null;
-}
-
-export async function updateLoreEntry(id: string, input: NewLoreEntry): Promise<LoreEntry | null> {
-  const db = getDb();
-  const existing = await getLoreEntry(id);
-  if (!existing) return null;
-  const ids = input.characterIds ?? (input.characterId ? [input.characterId] : []);
-  const keys = input.keys.map((key) => key.trim()).filter(Boolean).slice(0, 8);
-  const content = input.content.trim().slice(0, 1200);
-  const run = db.transaction(() => {
-    db.prepare("UPDATE lore SET character_id = ?, keys = ?, content = ?, enabled = ?, insertion_order = ? WHERE id = ?").run(
-      ids[0] ?? null, JSON.stringify(keys), content, input.enabled ? 1 : 0,
-      Number.isFinite(input.insertionOrder) ? input.insertionOrder : 100, id,
-    );
-    db.prepare("DELETE FROM lore_characters WHERE lore_id = ?").run(id);
-    const insert = db.prepare("INSERT INTO lore_characters (lore_id, character_id) VALUES (?, ?)");
-    ids.forEach((characterId) => insert.run(id, characterId));
-  });
-  run();
-  return getLoreEntry(id);
-}
-
-export async function deleteLoreEntry(id: string): Promise<boolean> {
-  return getDb().prepare("DELETE FROM lore WHERE id = ?").run(id).changes > 0;
 }

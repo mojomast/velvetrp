@@ -37,3 +37,25 @@ export {
   nextSwipeIndex,
   setActiveBranch,
 } from "./messageRepo.js";
+export {
+  addMemoryFacts,
+  forgetMemory,
+  getMemory,
+  listAllMemories,
+  listApprovedMemories,
+  restoreMemory,
+  setMemoryApproval,
+  updateMemory,
+} from "./memoryRepo.js";
+export {
+  createLoreEntry,
+  deleteLoreEntry,
+  getLoreEntry,
+  listLoreEntries,
+  updateLoreEntry,
+} from "./loreRepo.js";
+export {
+  deleteSummary,
+  getSummary,
+  upsertSummary,
+} from "./summaryRepo.js";
