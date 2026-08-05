@@ -721,8 +721,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
         }
         for (const portableActor of input.package.records.actors) {
           const mapped = actorIds.get(portableActor.sourceActorId)!;
-          db.prepare(`INSERT INTO characters (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-            VALUES (?,?,18,'Imported campaign actor','','',1,0,?)`).run(mapped.characterId, portableActor.name, at);
+          db.prepare(`INSERT INTO characters (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+            VALUES (?,?,18,'Imported campaign actor','',1,0,?)`).run(mapped.characterId, portableActor.name, at);
           db.prepare(`INSERT INTO campaign_characters (id,campaign_id,character_id,created_at,updated_at)
             VALUES (?,?,?,?,?)`).run(mapped.campaignCharacterId, campaignId, mapped.characterId, at, at);
           db.prepare(`INSERT INTO rpg_campaign_sheets

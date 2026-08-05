@@ -181,7 +181,7 @@ describe("campaign-character HTTP contracts", () => {
       personas: [...personas, { characterId: "overflow", name: "Overflow", alreadyUsed: false }],
       starter,
     }).success).toBe(false);
-    for (const privateField of ["age", "archetype", "boundaries", "safeWord", "isRealPerson", "createdAt"] as const) {
+    for (const privateField of ["age", "archetype", "boundaries", "isRealPerson", "createdAt"] as const) {
       expect(campaignCharacterCreationOptionsResponseSchema.safeParse({
         campaignId: "campaign-one",
         personas: [{ characterId: "persona-one", name: "Aster", alreadyUsed: false, [privateField]: "private" }],

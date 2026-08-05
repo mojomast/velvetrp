@@ -41,7 +41,6 @@ interface CharacterRow {
   age: number;
   archetype: string;
   boundaries: string;
-  safe_word: string;
   fictional_confirmed: number;
   is_real_person: number;
   created_at: string;

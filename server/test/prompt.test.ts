@@ -10,8 +10,7 @@ const character: Character = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "keep it fictional",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
   isRealPerson: false,
   createdAt: new Date().toISOString(),
 };
@@ -100,7 +99,6 @@ describe("buildOrchestratedMessages", () => {
     const joined = messages.map((m) => m.content).join("\n");
     expect(joined).toContain("Name: Aria");
     expect(joined).toContain("Age statement: 29");
-    expect(joined).toContain("Safe word: anchor");
     expect(joined).toContain("EDITABLE STYLE GUIDE");
     expect(joined).toContain("prefers slow pacing");
     expect(joined).toContain("do not ask the user to repeat information");
@@ -184,7 +182,7 @@ describe("buildOrchestratedMessages", () => {
   });
 
   it("includes participant cards, attributed history, and a target-speaker instruction", () => {
-    const second = { ...character, id: "c2", name: "Bex", safeWord: "harbor" };
+    const second = { ...character, id: "c2", name: "Bex" };
     const groupSession = { ...session, participants: [character, second] };
     const history = msg("character", "Bex speaks");
     history.speakerCharacterId = second.id;

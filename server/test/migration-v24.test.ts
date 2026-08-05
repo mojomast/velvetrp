@@ -24,7 +24,7 @@ function schema(dir: string): unknown[] {
 function populatedProgression(dir: string): { characterId: string; commandIds: string[] } {
   const repo = createRepository({ dataDir: dir, clock: { now: () => new Date("2034-01-01T00:00:00.000Z") } });
   const persona = repo.createCharacter({
-    name: "V24 progression", age: 30, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true,
+    name: "V24 progression", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true,
   });
   const campaign = repo.createCampaign("local-owner", { name: "V24" });
   repo.installMechanicsStarterCatalog("local-owner");
@@ -74,7 +74,7 @@ describe("additive schema v24r1 progression-integrity migration", () => {
     createRepository({ dataDir: migratedDir }).close();
 
     const db = new DatabaseDriver(databaseFile(migratedDir), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "28" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "29" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM character_progression_layout_attestation_v24").get()).toEqual({
       prior_layout_digest: "f68e713487a2e7a56f12781c30362bc710b14858b086bda543bd3184b0745a73",
       current_layout_digest: "e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8",

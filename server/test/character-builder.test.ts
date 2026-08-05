@@ -15,7 +15,7 @@ const scores = Object.fromEntries(["might", "agility", "resolve", "insight", "pr
 function setup(options: { now?: () => Date; rng?: { integer(min: number, max: number): number } } = {}) {
   const repo = createRepository({ dataDir: dataDir(), clock: { now: options.now ?? (() => new Date("2031-01-01T00:00:00.000Z")) },
     ...(options.rng ? { rng: options.rng } : {}) });
-  const persona = repo.createCharacter({ name: "Builder Persona", age: 25, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+  const persona = repo.createCharacter({ name: "Builder Persona", age: 25, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
   const campaign = repo.createCampaign("local-owner", { name: "Builder campaign" });
   repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "configure-builder" });

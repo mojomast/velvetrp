@@ -162,7 +162,7 @@ describe("GET /api/rpg/v1/campaigns/:campaignId/characters/creation-options", ()
     expect(repo.getCampaignCharacterCreationOptions).toHaveBeenCalledOnce();
     expect(repo.getCampaignCharacterCreationOptions).toHaveBeenCalledWith("local-owner", "campaign-one");
     for (const privateField of [
-      "age", "archetype", "boundaries", "safeWord", "fictionalConfirmed", "isRealPerson",
+      "age", "archetype", "boundaries", "fictionalConfirmed", "isRealPerson",
       "controllerPrincipalId", "privateNotes", "sheet", "actor", "ownerPrincipalId", "activeTimelineId",
     ]) expect(response.body).not.toContain(privateField);
     await app.close();

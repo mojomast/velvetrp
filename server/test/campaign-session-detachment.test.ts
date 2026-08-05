@@ -24,7 +24,7 @@ function seed(): void {
   const db = new DatabaseDriver(databasePath());
   db.pragma("foreign_keys = ON");
   db.prepare(`INSERT INTO characters VALUES
-    ('character-one', 'Character', 30, 'captain', 'fictional', 'anchor', 1, 0, ?)`)
+    ('character-one', 'Character', 30, 'captain', 'fictional', 1, 0, ?)`)
     .run(fixedAt);
   for (const [sessionId, state, stoppedAt, stopReason] of [
     ["session/attached", "active", null, null],

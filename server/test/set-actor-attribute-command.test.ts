@@ -49,9 +49,9 @@ function seed(): void {
       .run(BEFORE, BEFORE, BEFORE, BEFORE, BEFORE);
   })();
   db.prepare(`INSERT INTO characters VALUES
-    ('persona-one', 'One', 30, 'hero', '', 'stop', 1, 0, ?),
-    ('persona-two', 'Two', 30, 'hero', '', 'stop', 1, 0, ?),
-    ('persona-other', 'Other', 30, 'hero', '', 'stop', 1, 0, ?)`).run(BEFORE, BEFORE, BEFORE);
+    ('persona-one', 'One', 30, 'hero', '', 1, 0, ?),
+    ('persona-two', 'Two', 30, 'hero', '', 1, 0, ?),
+    ('persona-other', 'Other', 30, 'hero', '', 1, 0, ?)`).run(BEFORE, BEFORE, BEFORE);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
   db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1', 'race', 'human', 'Human', 'Description', '[]')").run();

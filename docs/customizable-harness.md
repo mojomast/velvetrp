@@ -22,7 +22,6 @@ All generation instructions are registered in `server/src/promptTemplates.ts` an
 
 The registry contains 20 layers covering character safety/persona/constraints/custom system/style/lore/memory/shared-context/post-history/final layers, provider start-reply instructions, room router system/user prompts, first and follow-up room turns, single and room continuation, and `scene.synthesizer.system`/`scene.synthesizer.user`. Dynamic participant cards, history, memory, lore, shared basket, speaker names, replies, manual canon, prior scene state, and recent synthesis input remain runtime placeholders rather than copied static text.
 
-Editing safety or final-contract templates can weaken prompt-level guidance. Deterministic safe-word closure, input sanitization, generation locking, and closed-session write rejection remain server behavior independent of these templates. The current content policy module remains permissive as documented elsewhere.
 
 Character history is sent with one server-added `[Name]` attribution. Repeated leading labels previously emitted by a model are removed from prompt history, and buffered generated replies are normalized before persistence. This prevents label multiplication such as `[Aria] [Aria]` while leaving ordinary bracketed prose intact. Streaming keeps emitted deltas and persisted text identical, so its primary protection is the final-turn contract.
 
@@ -30,7 +29,6 @@ Approved memory is inserted as durable known context with instructions to use it
 
 The shared-context layer is computed for every generation from highest-priority editable manual canon, synthesized current scene facts, all session participants, recent active-branch events, approved memories across the cast, triggered lore, and unresolved questions/goals. When a usable provider is configured, a completed generated turn or room round invokes the synthesizer with immutable manual canon, prior synthesized state, and recent active-branch messages. It rewrites categorized current facts without copying dialogue; manual canon wins conflicts. The final-turn contract also discourages consecutive “I” sentence openings, treats `*emotes*` as concise physical action beats rather than mandatory opening decorations, and requires awareness of other participants' positions, actions, moods, relationships, and open threads.
 
-This is prompt orchestration, not current server-side content enforcement. Deterministic safe-word handling remains active independently.
 
 ## Client
 

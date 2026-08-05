@@ -14,7 +14,7 @@ const canonical=(value:unknown):string=>JSON.stringify(value&&typeof value==="ob
 
 function seeded(){
   const repo=createRepository({dataDir:dataDir(),clock:{now:()=>new Date("2031-01-01T00:00:00.000Z")}});
-  const persona=repo.createCharacter({name:"Provenance",age:30,archetype:"Warden",boundaries:"",safeWord:"pause",fictionalConfirmed:true});
+  const persona=repo.createCharacter({name:"Provenance",age:30,archetype:"Warden",boundaries:"",fictionalConfirmed:true});
   const campaign=repo.createCampaign("local-owner",{name:"Provenance"});repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"prov-pins"});
   const values=Object.fromEntries(["might","agility","resolve","insight","presence","craft"].map((key,index)=>[key,CHARACTER_BUILDER_STANDARD_ARRAY[index]])) as any;

@@ -4,15 +4,15 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v28 revision 1 (v28r1)**. Schema v28 completes M1.8 world, travel, NPCs, and factions at the repository/shared-contract layer without rewriting historical ledgers. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 adds no HTTP routes or client/UI.
+Current persistence is schema **v29 revision 1 (v29r1)**. Schema v29 removes the retired character field from persistence while retaining character identities and references. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 adds no HTTP routes or client/UI.
 
-The fixed canonical v28 DDL digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.8 repository/shared-contract work is complete. M1.8 provides a campaign location graph, discoveries, session-bound actor locations, atomic revisioned travel, NPC persona links and private state, factions, relationships, and immutable reputation ledgers. Player world projections exclude hidden/undiscovered locations and routes, GM notes, NPC secrets, and unrelated private location state. Owner/GM authority is required for location management and discovery. NPC speech is manual only: no AI NPC speech is implemented, and AI cannot voice manually controlled player characters. M1.9 quests, storylines, clues, and rewards is next.
+The fixed canonical v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`; the retained v28 world-layout digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.8 repository/shared-contract work is complete. M1.8 provides a campaign location graph, discoveries, session-bound actor locations, atomic revisioned travel, NPC persona links and private state, factions, relationships, and immutable reputation ledgers. Player world projections exclude hidden/undiscovered locations and routes, GM notes, NPC secrets, and unrelated private location state. Owner/GM authority is required for location management and discovery. NPC speech is manual only: no AI NPC speech is implemented, and AI cannot voice manually controlled player characters. M1.9 quests, storylines, clues, and rewards is next.
 
 ---
 
 ## What Works Today
 
-- **Character library** — create, edit, import/export characters with archetypes, boundaries, and safe words
+- **Character library** — create, edit, import/export characters with archetypes and boundaries
 - **Multi-character sessions** — up to 12 participants, per-message speaker attribution, branching replies, swipes
 - **AI-driven room turns** — model selects pertinent speakers (1–6), generates sequential replies with streaming
 - **Auto follow-up** — 0–3 automatic follow-up rounds; stop control halts after the current turn
@@ -23,7 +23,6 @@ The fixed canonical v28 DDL digest is `2f6001699f45ecc90c426e05065d0ef004196c441
 - **Scene context basket** — manual canon, synthesized scene facts, participants, recent events, memories, lore, open threads
 - **Usage tracking** — lifetime token counts with operation/model/session breakdowns and USD cost estimates
 - **Campaigns** — create campaigns, attach chat rooms, manage a character roster, roll dice with character bindings
-- **Safe word detection** — built-in and custom per-character safe words close the session immediately
 
 ---
 
@@ -136,7 +135,6 @@ name                title               session_id
 age                 character_id        role
 archetype           status              speaker_character_id
 boundaries          active_leaf_id      content
-safe_word           created_at          parent_id
 fictional_confirmed                     swipe_group_id
 is_real_person      session_characters  swipe_index
 created_at          ────────────────    seq
@@ -344,7 +342,6 @@ Data lives in `server/data/velvet.sqlite`. Override with `VELVET_DATA_DIR`.
 
 ## End-to-End Tests
 
-`npm run test:e2e` runs a real Fastify + Vite stack on dedicated loopback ports against a temporary SQLite database with a local fake provider. No paid API calls. Covers: startup, health, campaign CRUD, room attach/detach, character create, sessions, buffered + SSE turns, routing, continuation, memories, lore, safe-word closure, deletion ordering, and deterministic dice (exact `1d2+3` → total 5 proof).
 
 Live provider tests (opt-in, paid):
 
@@ -356,7 +353,6 @@ VELVET_E2E_LIVE=1 npm run test:e2e:live
 
 ## Policy Status
 
-`server/src/policy.ts` is a **permissive stub** — all character, message, and output checks return allowed. Safe-word detection (built-in: `red`, `safeword`, `stop`, `halt` plus custom per-character words) remains active independently of the policy stub. Do not describe this deployment as content-policy enforced.
 
 ---
 

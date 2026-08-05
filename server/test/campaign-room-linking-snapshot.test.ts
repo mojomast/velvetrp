@@ -16,7 +16,7 @@ function seed(): void {
   const db = new DatabaseDriver(path.join(directory, "velvet.sqlite"));
   db.pragma("foreign_keys = ON");
   db.transaction(() => {
-    db.prepare("INSERT INTO characters VALUES ('persona', ?, 30, 'private', 'private', 'private', 1, 0, ?)")
+    db.prepare("INSERT INTO characters VALUES ('persona', ?, 30, 'private', 'private', 1, 0, ?)")
       .run(`${"A".repeat(199)}😀tail`, at);
     for (const [id, title, state, stopped] of [
       [" room/attached ", "  Attached  ", "closed", at],
@@ -78,7 +78,7 @@ describe("campaign room linking snapshot", () => {
     expect(prepare).toHaveBeenCalledOnce();
     const sql = prepare.mock.calls[0]![0] as string;
     expect(sql).not.toMatch(/SELECT\s+\*/i);
-    for (const privateField of ["boundaries", "safe_word", "messages", "session_context", "preset_id"]) {
+    for (const privateField of ["boundaries", "messages", "session_context", "preset_id"]) {
       expect(sql).not.toContain(privateField);
     }
     // Only a null/non-empty provenance classification is selected, never the reason value.
@@ -123,7 +123,7 @@ describe("campaign room linking snapshot", () => {
       CREATE VIEW sessions AS SELECT id, character_id, poison(title) AS title, state, preset_id, active_leaf_id,
         created_at, stopped_at, stop_reason FROM poisoned_sessions;
       ALTER TABLE characters RENAME TO poisoned_characters;
-      CREATE VIEW characters AS SELECT id, poison(name) AS name, age, archetype, boundaries, safe_word,
+      CREATE VIEW characters AS SELECT id, poison(name) AS name, age, archetype, boundaries,
         fictional_confirmed, is_real_person, created_at FROM poisoned_characters`);
     const poison = vi.fn(() => { throw new Error("private presentation evaluated"); });
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }))

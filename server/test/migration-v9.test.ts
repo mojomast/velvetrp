@@ -63,7 +63,7 @@ function createRepresentativeV8(dir: string): string {
     DELETE FROM meta WHERE key = 'schemaRevision';
 
     INSERT INTO characters VALUES (
-      'character/legacy', 'Legacy', 31, 'archivist', 'fictional only', 'anchor', 1, 0,
+      'character/legacy', 'Legacy', 31, 'archivist', 'fictional only', 1, 0,
       '2025-01-01T00:00:00.000Z'
     );
     INSERT INTO sessions VALUES (
@@ -138,7 +138,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     const db = new DatabaseDriver(path.join(dir, "velvet.sqlite"));
     db.pragma("foreign_keys = ON");
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(db.prepare("SELECT * FROM principals").all()).toEqual([{
       id: "local-owner",
       display_name: "Local owner",
@@ -216,7 +216,7 @@ describe("schema v9 campaign foundation", () => {
     ).run(at)).toThrow();
 
     db.prepare(`INSERT INTO characters VALUES (
-      'character-existing', 'Existing', 30, 'captain', 'fictional', 'anchor', 1, 0, ?
+      'character-existing', 'Existing', 30, 'captain', 'fictional', 1, 0, ?
     )`).run(at);
     db.prepare(`INSERT INTO sessions VALUES (
       'session-existing', 'character-existing', 'Existing session', 'setup', 'default', NULL, ?, NULL, NULL
@@ -252,7 +252,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(snapshotV8(dbPath)).toEqual(before);
     const db = new DatabaseDriver(dbPath, { readonly: true });
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(db.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([]);
@@ -310,7 +310,7 @@ describe("schema v9 campaign foundation", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(migrated.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     migrated.close();
   });

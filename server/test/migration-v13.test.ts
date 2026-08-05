@@ -23,8 +23,8 @@ function seedActor(db: DatabaseDriver.Database): void {
       VALUES ('campaign', 'local-owner', 'owner', ?)`).run(AT);
   })();
   db.prepare(`INSERT INTO characters
-    (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-    VALUES ('persona', 'Persona', 30, 'hero', '', 'stop', 1, 0, ?)`).run(AT);
+    (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+    VALUES ('persona', 'Persona', 30, 'hero', '', 1, 0, ?)`).run(AT);
   db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
     VALUES ('profile', 'Profile', 'Rules', '[]')`).run();
   db.prepare(`INSERT INTO rpg_content_packs
@@ -79,8 +79,8 @@ function seedActor(db: DatabaseDriver.Database): void {
 
 function seedSecondActor(db: DatabaseDriver.Database): void {
   db.prepare(`INSERT INTO characters
-    (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-    VALUES ('persona-two', 'Persona two', 30, 'hero', '', 'stop', 1, 0, ?)`).run(AT);
+    (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+    VALUES ('persona-two', 'Persona two', 30, 'hero', '', 1, 0, ?)`).run(AT);
   db.prepare(`INSERT INTO campaign_characters
     (id, campaign_id, character_id, created_at, updated_at)
     VALUES ('cc-two', 'campaign', 'persona-two', ?, ?)`).run(AT, AT);
@@ -212,7 +212,7 @@ describe("schema v13 actor resources and union audit", () => {
     expect(nextId).not.toHaveBeenCalled();
 
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(migrated.prepare("SELECT * FROM campaign_commands").get()).toEqual({
       ...(before.command as object), resource_name: null, resource_current: null, resource_max: null,
       dice_expression: null, dice_count: null, dice_sides: null, dice_selection_type: null,
@@ -490,7 +490,7 @@ describe("schema v13 actor resources and union audit", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(file, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(retried.prepare("SELECT COUNT(*) AS count FROM rpg_actor_resources").get()).toEqual({ count: 0 });
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();

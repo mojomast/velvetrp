@@ -41,14 +41,14 @@ test("configured provider completes bounded buffered and streamed turns", async 
   try {
     const characterResponse = await api.post("/api/characters", { data: {
       name: `${runId}-Guide`, age: 35, archetype: "terse test guide", boundaries: "Keep replies fictional and concise",
-      safeWord: `${runId}-anchor`, fictionalConfirmed: true,
+      fictionalConfirmed: true,
     } });
     expect(characterResponse.status()).toBe(201);
     const character = await characterResponse.json() as { id: string };
     characters.push(character.id);
     const secondCharacterResponse = await api.post("/api/characters", { data: {
       name: `${runId}-Analyst`, age: 36, archetype: "concise skeptical analyst", boundaries: "Keep replies fictional and concise",
-      safeWord: `${runId}-harbor`, fictionalConfirmed: true,
+      fictionalConfirmed: true,
     } });
     expect(secondCharacterResponse.status()).toBe(201);
     const secondCharacter = await secondCharacterResponse.json() as { id: string };

@@ -34,7 +34,7 @@ function seed(): void {
     }
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-other','local-owner','owner',?)").run(BEFORE);
   })();
-  db.prepare("INSERT INTO characters VALUES ('persona','Persona',20,'hero','','stop',1,0,?)").run(BEFORE);
+  db.prepare("INSERT INTO characters VALUES ('persona','Persona',20,'hero','',1,0,?)").run(BEFORE);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile','Profile','Description','[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core','1','profile','Core','Description','[]',0)").run();
   db.prepare("INSERT INTO rpg_definitions VALUES ('core','1','race','human','Human','Description','[]')").run();

@@ -9,4 +9,5 @@
 - [✅] M1.6 checks, powers, and deterministic effects
 - [✅] M1.7 encounters and turn-based combat (repository/shared-contract layer; schema v27r1)
 - [✅] M1.8 world, travel, NPCs, and factions (repository/shared-contract layer; schema v28r1; no HTTP/UI)
+- [✅] Remove the safe-word feature across model, API/UI, persistence, generation, policy, tests, and documentation (schema v29)
 - [ ] M1.9 quests, storylines, clues, and rewards

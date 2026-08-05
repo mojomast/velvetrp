@@ -29,7 +29,7 @@ async function fixture() {
   repo.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 1, idempotencyKey: "pins" });
 
   const actor = (name: string, controller = "local-owner") => {
-    const persona = repo.createCharacter({ name, age: 31, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const persona = repo.createCharacter({ name, age: 31, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
     const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: controller, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${name}-draft` });
     const definitions = MECHANICS_STARTER_CATALOG.definitions;
     const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: `${name}-select`, selections: {
@@ -43,7 +43,7 @@ async function fixture() {
   const owner = actor("Owner");
   const companion = actor("Companion");
   const player = actor("Player", "world-player");
-  const sessionPersona = repo.createCharacter({ name: "Session", age: 30, archetype: "Guide", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+  const sessionPersona = repo.createCharacter({ name: "Session", age: 30, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
   const session = await createSession({ characterId: sessionPersona.id, title: "World session" });
   repo.attachCampaignSession("local-owner", { campaignId: campaign.id, sessionId: session.id } as any);
 
@@ -113,7 +113,7 @@ describe("M1.8 world repository", () => {
     const f = await fixture();
     f.repo.executeWorldCommand("local-owner", f.sessionId, { type: "discover_location", campaignId: f.campaignId, actorId: f.player.actorId, locationId: "origin", expectedRevision: 0, idempotencyKey: "discover-origin" });
     f.db.prepare("INSERT INTO campaign_location_private_state_v28 VALUES(?,?,?)").run(f.campaignId, "origin", "GM route notes");
-    const npcPersona = f.repo.createCharacter({ name: "NPC persona", age: 40, archetype: "Merchant", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const npcPersona = f.repo.createCharacter({ name: "NPC persona", age: 40, archetype: "Merchant", boundaries: "", fictionalConfirmed: true });
     f.db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)").run("merchant", f.campaignId, npcPersona.id, "manual", "Merchant", at);
     f.db.prepare("INSERT INTO campaign_npc_private_state_v28 VALUES(?,?,?,?,NULL)").run(f.campaignId, "merchant", "Profit", "GM NPC notes");
     const projection: any = f.repo.getWorldProjection("world-player", f.campaignId, f.sessionId);
@@ -138,7 +138,7 @@ describe("M1.8 world repository", () => {
 
   it("binds NPCs only to unbound Velvet personas with manual speech", async () => {
     const f = await fixture();
-    const npcPersona = f.repo.createCharacter({ name: "Unbound persona", age: 42, archetype: "Bard", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const npcPersona = f.repo.createCharacter({ name: "Unbound persona", age: 42, archetype: "Bard", boundaries: "", fictionalConfirmed: true });
     expect(f.repo.createNpc("local-owner", { campaignId: f.campaignId, npcId: "npc", personaId: npcPersona.id, name: "NPC", speechControl: "manual" })).toEqual({ npcId: "npc", campaignId: f.campaignId });
     expect(() => f.repo.createNpc("local-owner", { campaignId: f.campaignId, npcId: "auto", personaId: npcPersona.id, name: "Auto", speechControl: "automated" })).toThrow(WorldUnavailableError);
     expect(() => f.repo.createNpc("local-owner", { campaignId: f.campaignId, npcId: "player-npc", personaId: f.owner.personaId, name: "Player", speechControl: "manual" })).toThrow(WorldConflictError);

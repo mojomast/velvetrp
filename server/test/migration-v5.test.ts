@@ -14,7 +14,7 @@ describe("schema v4 to v5 migration", () => {
       CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       INSERT INTO meta VALUES ('schemaVersion', '4');
       CREATE TABLE characters (id TEXT PRIMARY KEY, name TEXT NOT NULL, age INTEGER NOT NULL, archetype TEXT NOT NULL,
-        boundaries TEXT NOT NULL, safe_word TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL, is_real_person INTEGER NOT NULL, created_at TEXT NOT NULL);
+        boundaries TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL, is_real_person INTEGER NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE sessions (id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
         title TEXT NOT NULL, state TEXT NOT NULL, preset_id TEXT NOT NULL, active_leaf_id TEXT, created_at TEXT NOT NULL, stopped_at TEXT, stop_reason TEXT);
       CREATE TABLE consent_events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -25,7 +25,7 @@ describe("schema v4 to v5 migration", () => {
         usage_model TEXT, created_at TEXT NOT NULL);
       CREATE TABLE lore (id TEXT PRIMARY KEY, character_id TEXT, keys TEXT NOT NULL, content TEXT NOT NULL, enabled INTEGER NOT NULL,
         insertion_order REAL NOT NULL, created_at TEXT NOT NULL);
-      INSERT INTO characters VALUES ('c1', 'Legacy', 30, 'archivist', 'fictional', 'anchor', 1, 0, '2025-01-01');
+      INSERT INTO characters VALUES ('c1', 'Legacy', 30, 'archivist', 'fictional', 1, 0, '2025-01-01');
       INSERT INTO sessions VALUES ('s1', 'c1', 'kept', 'active', 'default', 'm2', '2025-01-01', NULL, NULL);
       INSERT INTO messages VALUES ('m1', 's1', 'user', 'hello', NULL, 'm1', 0, 0, 'final', NULL, NULL, NULL, NULL, NULL, '2025-01-01');
       INSERT INTO messages VALUES ('m2', 's1', 'character', 'reply', 'm1', 'm2', 0, 1, 'final', 10, 5, 15, 'provider', 'legacy-model', '2025-01-02');
@@ -42,7 +42,7 @@ describe("schema v4 to v5 migration", () => {
     expect((await listLoreEntries("c1"))[0]?.characterIds).toEqual(["c1"]);
 
     const verify = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
-    expect((verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(verify.prepare("SELECT name FROM sqlite_master WHERE name = 'session_context'").get()).toBeTruthy();
     const contextColumns = verify.pragma("table_info(session_context)") as Array<{ name: string }>;
     expect(contextColumns.some((column) => column.name === "synthesized_source")).toBe(true);
@@ -61,7 +61,7 @@ describe("schema v4 to v5 migration", () => {
       CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       INSERT INTO meta VALUES ('schemaVersion', '4');
       CREATE TABLE characters (id TEXT PRIMARY KEY, name TEXT NOT NULL, age INTEGER NOT NULL, archetype TEXT NOT NULL,
-        boundaries TEXT NOT NULL, safe_word TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL, is_real_person INTEGER NOT NULL, created_at TEXT NOT NULL);
+        boundaries TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL, is_real_person INTEGER NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE sessions (id TEXT PRIMARY KEY, character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
         title TEXT NOT NULL, state TEXT NOT NULL, preset_id TEXT NOT NULL, active_leaf_id TEXT, created_at TEXT NOT NULL, stopped_at TEXT, stop_reason TEXT);
       CREATE TABLE consent_events (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,

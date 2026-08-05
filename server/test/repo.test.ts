@@ -44,8 +44,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 describe("schema", () => {
@@ -54,7 +53,7 @@ describe("schema", () => {
     await listCharacters();
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = raw.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
-    expect(version.value).toBe("28");
+    expect(version.value).toBe("29");
     expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
     raw.close();
   });
@@ -252,7 +251,6 @@ describe("repository transactions", () => {
       age: characterInput.age,
       archetype: characterInput.archetype,
       boundaries: characterInput.boundaries,
-      safe_word: characterInput.safeWord,
       fictional_confirmed: 1,
       is_real_person: 0,
       created_at: "2030-04-05T06:07:08.009Z",
@@ -1062,8 +1060,7 @@ describe("legacy migration", () => {
           age: 31,
           archetype: "archivist",
           boundaries: "fictional only",
-          safeWord: "anchor",
-          fictionalConfirmed: true,
+                    fictionalConfirmed: true,
           isRealPerson: false,
           createdAt: "2025-01-01T00:00:00.000Z",
         },
@@ -1190,8 +1187,7 @@ describe("legacy migration", () => {
         age: 31,
         archetype: "archivist",
         boundaries: "fictional only",
-        safeWord: "anchor",
-        fictionalConfirmed: true,
+                fictionalConfirmed: true,
         isRealPerson: false,
         createdAt: "2025-01-01T00:00:00.000Z",
       }],
@@ -1233,8 +1229,7 @@ describe("legacy migration", () => {
         age: 31,
         archetype: "archivist",
         boundaries: "fictional only",
-        safeWord: "anchor",
-        fictionalConfirmed: true,
+                fictionalConfirmed: true,
         isRealPerson: false,
         createdAt: "2024-01-01T00:00:00.000Z",
       }],
@@ -1338,8 +1333,7 @@ describe("legacy migration", () => {
       age: 31,
       archetype: "archivist",
       boundaries: "fictional only",
-      safeWord: "anchor",
-      fictionalConfirmed: true,
+            fictionalConfirmed: true,
       isRealPerson: false,
       createdAt: "2025-01-01T00:00:00.000Z",
     };

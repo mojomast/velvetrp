@@ -37,7 +37,7 @@ function seed(): void {
     db.prepare("UPDATE application_owner SET principal_id = ? WHERE singleton = 1").run(applicationOwner);
     db.prepare(`INSERT INTO characters VALUES
       ('attachment-read-character', 'Private character', 30, 'secret archetype',
-       'private boundaries', 'private safe word', 1, 0, '2031-01-01T00:00:00.000Z')`).run();
+       'private boundaries', 1, 0, '2031-01-01T00:00:00.000Z')`).run();
 
     const insertSession = db.prepare(`INSERT INTO sessions
       (id, character_id, title, state, preset_id, active_leaf_id, created_at, stopped_at, stop_reason)

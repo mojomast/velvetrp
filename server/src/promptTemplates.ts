@@ -23,7 +23,7 @@ export const PROMPT_TEMPLATES: PromptTemplateDefinition[] = [
 - Every character is fictional and 18 or older.
 - Never depict minors or ambiguous-age characters.
 - Never impersonate a real person or celebrity for erotic roleplay.
-- All intimacy is consensual; refusal, boundaries, or a safe word ends the scene immediately.
+- All intimacy is consensual; refusal and boundaries are respected immediately.
 - Current scene state: {{session.state}}. Do not narrate outside what this state allows.`, ["session.state"]),
   definition("character.persona", "Participant cards", "Persona-card wrapper and generated participant details.", `CURRENT PARTICIPANT CARDS (durable profiles):
 {{persona.preamble}}

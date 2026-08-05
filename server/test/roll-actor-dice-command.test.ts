@@ -35,7 +35,7 @@ function seed(): void {
       ('campaign-one','player','player',?),('campaign-one','observer','observer',?),
       ('campaign-two','local-owner','owner',?)`).run(BEFORE,BEFORE,BEFORE,BEFORE,BEFORE);
   })();
-  db.prepare("INSERT INTO characters VALUES ('persona-one','One',30,'hero','','stop',1,0,?),('persona-other','Other',30,'hero','','stop',1,0,?),('persona-two','Two',30,'hero','','stop',1,0,?)")
+  db.prepare("INSERT INTO characters VALUES ('persona-one','One',30,'hero','',1,0,?),('persona-other','Other',30,'hero','',1,0,?),('persona-two','Two',30,'hero','',1,0,?)")
     .run(BEFORE,BEFORE,BEFORE);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile','Profile','Description','[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core','1','profile','Core','Description','[]',0)").run();
@@ -680,7 +680,7 @@ describe("roll actor dice command", () => {
       { sql: "UPDATE characters SET name='Renamed' WHERE id='persona-one'" },
     ]],
     ["earlier roster insertion", [
-      { sql: "INSERT INTO characters VALUES ('persona-earlier','Earlier',30,'hero','','stop',1,0,'2029-01-01T00:00:00.000Z')" },
+      { sql: "INSERT INTO characters VALUES ('persona-earlier','Earlier',30,'hero','',1,0,'2029-01-01T00:00:00.000Z')" },
       { sql: "INSERT INTO campaign_characters VALUES ('cc-earlier','campaign-one','persona-earlier','2029-01-01T00:00:00.000Z','2029-01-01T00:00:00.000Z')" },
       { sql: `INSERT INTO rpg_campaign_sheets VALUES
           ('sheet-earlier','campaign-one','cc-earlier','core','1','race','human','core','1','background','sage',

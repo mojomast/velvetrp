@@ -11,12 +11,12 @@ afterEach(async () => {
   provider = null;
 });
 
-const characterInput = (name: string, safeWord: string) => ({
-  name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", safeWord, fictionalConfirmed: true,
+const characterInput = (name: string) => ({
+  name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", fictionalConfirmed: true,
 });
 
-async function addCharacter(app: ReturnType<typeof buildApp>, name: string, safeWord = "anchor") {
-  const response = await app.inject({ method: "POST", url: "/api/characters", payload: characterInput(name, safeWord) });
+async function addCharacter(app: ReturnType<typeof buildApp>, name: string) {
+  const response = await app.inject({ method: "POST", url: "/api/characters", payload: characterInput(name) });
   expect(response.statusCode).toBe(201);
   return response.json() as { id: string; name: string };
 }
@@ -130,8 +130,8 @@ describe("management and group-session api", () => {
     provider = await startFakeProvider("A single attributed reply.");
     const app = buildApp();
     await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
-    const one = await addCharacter(app, "One", "oneword");
-    const two = await addCharacter(app, "Two", "twoword");
+    const one = await addCharacter(app, "One");
+    const two = await addCharacter(app, "Two");
     const created = await app.inject({
       method: "POST", url: "/api/sessions",
       payload: { characterIds: [one.id, two.id], primaryCharacterId: one.id, title: "Group" },
@@ -173,9 +173,9 @@ describe("management and group-session api", () => {
     ] });
     const app = buildApp();
     await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
-    const one = await addCharacter(app, "One", "oneword");
-    const two = await addCharacter(app, "Two", "twoword");
-    const three = await addCharacter(app, "Three", "threeword");
+    const one = await addCharacter(app, "One");
+    const two = await addCharacter(app, "Two");
+    const three = await addCharacter(app, "Three");
     const session = (await app.inject({
       method: "POST", url: "/api/sessions",
       payload: { characterIds: [one.id, two.id, three.id], primaryCharacterId: one.id },
@@ -243,23 +243,13 @@ describe("management and group-session api", () => {
 
   it("allows up to six pertinent room responders", async () => {
     const app = buildApp();
-    const participants = await Promise.all(["Alpha", "Beta", "Gamma", "Delta"].map((name) => addCharacter(app, name, `${name.toLowerCase()}word`)));
+    const participants = await Promise.all(["Alpha", "Beta", "Gamma", "Delta"].map((name) => addCharacter(app, name)));
     const session = (await app.inject({ method: "POST", url: "/api/sessions", payload: { characterIds: participants.map((entry) => entry.id) } })).json() as { id: string };
     const turn = await app.inject({ method: "POST", url: `/api/sessions/${session.id}/room-turn`, payload: { content: "Everyone respond and discuss this together.", maxSpeakers: 4 } });
     expect(turn.statusCode).toBe(200);
     expect(turn.json().selectedSpeakerIds).toHaveLength(4);
     expect(turn.json().replies).toHaveLength(4);
     expect(turn.json().replies.slice(1).every((entry: { parentId: string }, index: number) => entry.parentId === turn.json().replies[index].id)).toBe(true);
-    await app.close();
-  });
-
-  it("closes a group session on any participant custom safe word", async () => {
-    const app = buildApp();
-    const one = await addCharacter(app, "One", "alpha");
-    const two = await addCharacter(app, "Two", "bravo");
-    const session = (await app.inject({ method: "POST", url: "/api/sessions", payload: { characterIds: [one.id, two.id] } })).json();
-    const stopped = await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages`, payload: { content: "bravo" } });
-    expect(stopped.json().state).toBe("closed");
     await app.close();
   });
 

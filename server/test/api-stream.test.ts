@@ -21,8 +21,7 @@ const validCharacter = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 interface SseEvent {
@@ -247,45 +246,6 @@ describe("streaming api", () => {
     await app.close();
   });
 
-  it("aborts an in-flight stream when the safe word arrives on the buffered endpoint", async () => {
-    provider = await startFakeProvider({ replyText: "A slow reply that never lands.", delayMs: 800 });
-    const app = buildApp();
-    const base = await listen(app);
-    await fetch(`${base}/api/provider`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ baseUrl: provider.baseUrl }),
-    });
-    const { session } = await setupScene(base);
-
-    const res = await fetch(`${base}/api/sessions/${session.id}/stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "tell me a long story" }),
-    });
-    const reader = new SseReader(res);
-    await reader.waitFor((events) => events.some((entry) => entry.event === "user_message"));
-
-    const safe = await fetch(`${base}/api/sessions/${session.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "anchor" }),
-    });
-    expect(safe.status).toBe(200);
-    const safeBody = (await safe.json()) as { state: string };
-    expect(safeBody.state).toBe("closed");
-
-    await reader.finished;
-    expect(reader.eventNames()).toContain("aborted");
-    expect(reader.eventNames()).not.toContain("done");
-
-    const persisted = await getMessages(base, session.id);
-    expect(persisted.map((m) => m.role)).toEqual(["user", "user", "character"]);
-    expect(persisted[2]?.content).toMatch(/Safe word acknowledged/);
-    expect(persisted.some((m) => m.content.includes("never lands"))).toBe(false);
-    await app.close();
-  });
-
   it("aborts an in-flight stream when the session is stopped", async () => {
     provider = await startFakeProvider({ replyText: "A slow reply that never lands.", delayMs: 800 });
     const app = buildApp();
@@ -463,40 +423,6 @@ describe("streaming api", () => {
     await reader.finished;
     expect(reader.raw).toContain(": heartbeat");
     expect(reader.eventNames()).toContain("done");
-    await app.close();
-  });
-
-  it("short-circuits on the safe word and closes the session without calling the provider", async () => {
-    provider = await startFakeProvider();
-    const app = buildApp();
-    const base = await listen(app);
-    await fetch(`${base}/api/provider`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ baseUrl: provider.baseUrl }),
-    });
-    const { session } = await setupScene(base);
-
-    const res = await fetch(`${base}/api/sessions/${session.id}/stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "anchor" }),
-    });
-    const reader = new SseReader(res);
-    await reader.finished;
-
-    expect(reader.eventNames()).toEqual(["user_message", "state", "done"]);
-    const done = reader.events[2]!;
-    expect(done.data.state).toBe("closed");
-    expect((done.data.reply as { content: string }).content).toMatch(/Safe word acknowledged/);
-    expect(provider.requests).toHaveLength(0);
-
-    const after = await fetch(`${base}/api/sessions/${session.id}/stream`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "are you there?" }),
-    });
-    expect(after.status).toBe(409);
     await app.close();
   });
 

@@ -67,9 +67,9 @@ function seed(dir = process.env.VELVET_DATA_DIR as string): void {
       .run(AT, AT, AT, AT, AT, AT);
   })();
   db.prepare(`INSERT INTO characters VALUES
-    (?, 'Opaque', 30, 'hero', 'fictional', 'anchor', 1, 0, ?),
-    ('persona-two', 'Two', 31, 'hero', 'fictional', 'anchor', 1, 0, ?),
-    ('persona-three', 'Three', 32, 'hero', 'fictional', 'anchor', 1, 0, ?)`).run(input.characterId, AT, AT, AT);
+    (?, 'Opaque', 30, 'hero', 'fictional', 1, 0, ?),
+    ('persona-two', 'Two', 31, 'hero', 'fictional', 1, 0, ?),
+    ('persona-three', 'Three', 32, 'hero', 'fictional', 1, 0, ?)`).run(input.characterId, AT, AT, AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Profile description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1.0.0', 'profile', 'Core', 'Core description', '[]', 0)").run();
   const definition = db.prepare("INSERT INTO rpg_definitions VALUES ('core', '1.0.0', ?, ?, ?, 'Description', '[]')");

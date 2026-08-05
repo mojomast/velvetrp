@@ -276,7 +276,7 @@ describe("v11 campaign-character contracts", () => {
   });
 
   it("rejects persona editing and unrequested mechanics everywhere", () => {
-    for (const field of ["name", "archetype", "boundaries", "safeWord", "hp", "inventory", "xp", "resources", "draft", "allocationMode"] as const) {
+    for (const field of ["name", "archetype", "boundaries", "hp", "inventory", "xp", "resources", "draft", "allocationMode"] as const) {
       expect(createCampaignCharacterInputSchema.safeParse({ ...input, [field]: field }).success).toBe(false);
       expect(publicCampaignCharacterProjectionSchema.safeParse({
         campaignCharacter: { ...campaignCharacter, [field]: field }, sheet, actor: publicActor,

@@ -51,8 +51,8 @@ function seedActor(db: DatabaseDriver.Database): void {
       VALUES ('campaign', 'local-owner', 'owner', ?)`).run(AT);
   })();
   db.prepare(`INSERT INTO characters
-    (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-    VALUES ('persona', 'Persona', 30, 'hero', '', 'stop', 1, 0, ?)`).run(AT);
+    (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+    VALUES ('persona', 'Persona', 30, 'hero', '', 1, 0, ?)`).run(AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Rules', '[]')").run();
   db.prepare(`INSERT INTO rpg_content_packs
     (pack_id, pack_version, rules_profile_id, name, description, tags, sealed)
@@ -278,7 +278,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     expect(migrated.prepare("SELECT * FROM rpg_actor_resources").all()).toEqual(before.rpg_actor_resources);
     expect(migrated.prepare("SELECT * FROM campaign_events").all()).toEqual(before.campaign_events);
@@ -633,7 +633,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(() => db.prepare(`INSERT INTO rpg_dice_rolls
       (event_id, campaign_id, command_id, expression, dice_count, dice_sides,
         selection_type, selection_count, modifier, total)
-      VALUES ('dice-event', 'campaign', 'dice-command', '02d6kh1', 2, 6, 'keep_highest', 1, 0, 6)`).run()).toThrow();
+        VALUES ('dice-event', 'campaign', 'dice-command', '02d6kh1', 2, 6, 'keep_highest', 1, 0, 6)`).run()).toThrow();
     const incomplete = db.transaction(() => {
       db.prepare(`INSERT INTO rpg_dice_rolls
         (event_id, campaign_id, command_id, expression, dice_count, dice_sides,
@@ -880,7 +880,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const retried = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     for (const table of AUDIT_TABLES) {
       expect(retried.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({ count: 0 });
     }

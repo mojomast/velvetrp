@@ -11,7 +11,6 @@ interface CharacterRow {
   age: number;
   archetype: string;
   boundaries: string;
-  safe_word: string;
   fictional_confirmed: number;
   is_real_person: number;
   created_at: string;
@@ -24,7 +23,6 @@ export function characterFromRow(row: CharacterRow): Character {
     age: row.age,
     archetype: row.archetype,
     boundaries: row.boundaries,
-    safeWord: row.safe_word,
     fictionalConfirmed: row.fictional_confirmed === 1,
     isRealPerson: row.is_real_person === 1,
     createdAt: row.created_at,
@@ -43,21 +41,19 @@ export function createCharacterSync(
     age: input.age,
     archetype: input.archetype,
     boundaries: input.boundaries,
-    safeWord: input.safeWord,
     fictionalConfirmed: input.fictionalConfirmed,
     isRealPerson: false,
     createdAt: dependencies.clock.now().toISOString(),
   };
   db.prepare(
-    `INSERT INTO characters (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO characters (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     character.id,
     character.name,
     character.age,
     character.archetype,
     character.boundaries,
-    character.safeWord,
     character.fictionalConfirmed ? 1 : 0,
     character.isRealPerson ? 1 : 0,
     character.createdAt,
@@ -87,9 +83,9 @@ export async function updateCharacter(id: string, input: CreateCharacterInput): 
   const db = getRepositoryDatabase();
   const exists = db.prepare("SELECT id FROM characters WHERE id = ?").get(id);
   if (!exists) return null;
-  db.prepare(`UPDATE characters SET name = ?, age = ?, archetype = ?, boundaries = ?, safe_word = ?,
+  db.prepare(`UPDATE characters SET name = ?, age = ?, archetype = ?, boundaries = ?,
     fictional_confirmed = ?, is_real_person = 0 WHERE id = ?`).run(
-    input.name, input.age, input.archetype, input.boundaries, input.safeWord, input.fictionalConfirmed ? 1 : 0, id,
+    input.name, input.age, input.archetype, input.boundaries, input.fictionalConfirmed ? 1 : 0, id,
   );
   return getCharacter(id);
 }

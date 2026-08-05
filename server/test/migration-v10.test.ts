@@ -46,7 +46,7 @@ function createRepresentativeV9(dir: string): string {
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-v9', 'local-owner', 'owner', ?)").run(at);
     db.prepare("INSERT INTO campaign_memberships VALUES ('campaign-v9', 'principal-gm', 'gm', ?)").run(at);
     db.prepare(`INSERT INTO characters VALUES (
-      'character-v9', 'Preserved character', 30, 'guide', 'fictional', 'anchor', 1, 0, ?
+      'character-v9', 'Preserved character', 30, 'guide', 'fictional', 1, 0, ?
     )`).run(at);
     db.prepare(`INSERT INTO sessions VALUES (
       'session-v9', 'character-v9', 'Preserved session', 'active', 'default', NULL, ?, NULL, NULL
@@ -169,7 +169,7 @@ describe("schema v10 RPG rules and content", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
       for (const table of V10_TABLES) {
         expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
       }
@@ -430,7 +430,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(migrated.pragma("foreign_key_check")).toEqual([]);
     migrated.close();
   });
@@ -455,7 +455,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("28");
+    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
   });

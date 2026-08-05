@@ -11,8 +11,7 @@ const characterInput = {
   age: 29,
   archetype: "archivist",
   boundaries: "fictional only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 describe("usage api compatibility", () => {

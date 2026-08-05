@@ -53,8 +53,8 @@ function seed(options: { configure?: boolean; personas?: Array<[string, string, 
       ('campaign-one', 'observer', 'observer', '${AT}');
   `);
   const insertPersona = db.prepare(`INSERT INTO characters
-    (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-    VALUES (?, ?, 30, 'hero', 'fictional', 'anchor', 1, 0, ?)`);
+    (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+    VALUES (?, ?, 30, 'hero', 'fictional', 1, 0, ?)`);
   for (const persona of options.personas ?? [
     ["persona-z", "Zulu", "2035-01-02T00:00:00.000Z"],
     ["persona-A", "Alpha", "2035-01-01T00:00:00.000Z"],
@@ -233,8 +233,8 @@ describe("getCampaignCharacterCreationOptions", () => {
       expect(unit.getCampaignCharacterCreationOptions("gm", "campaign-one")!.personas).toHaveLength(3);
       const writer = new DatabaseDriver(dbPath());
       writer.prepare(`INSERT INTO characters
-        (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-        VALUES ('concurrent', 'Concurrent', 30, 'hero', 'fictional', 'anchor', 1, 0, ?)`)
+        (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+        VALUES ('concurrent', 'Concurrent', 30, 'hero', 'fictional', 1, 0, ?)`)
         .run(AT);
       writer.close();
       expect(unit.getCampaignCharacterCreationOptions("gm", "campaign-one")!.personas).toHaveLength(3);
@@ -258,8 +258,8 @@ describe("getCampaignCharacterCreationOptions", () => {
     seed({ personas: [] });
     const db = new DatabaseDriver(dbPath());
     const insert = db.prepare(`INSERT INTO characters
-      (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-      VALUES (?, ?, 20, 'hero', 'fictional', 'anchor', 1, 0, ?)`);
+      (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+      VALUES (?, ?, 20, 'hero', 'fictional', 1, 0, ?)`);
     db.transaction(() => {
       for (let index = 0; index <= MAX_CAMPAIGN_CHARACTER_PERSONAS; index += 1) {
         insert.run(`overflow-${String(index).padStart(4, "0")}`, `Persona ${index}`, AT);

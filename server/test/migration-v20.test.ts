@@ -30,7 +30,7 @@ function restoreV19DeleteTriggers(db:DatabaseDriver.Database):void{
 }
 function populatedV19(dir:string):{draftId:string;campaignId:string}{
   const repo=createRepository({dataDir:dir,clock:{now:()=>new Date("2031-01-01T00:00:00.000Z")}});
-  const persona=repo.createCharacter({name:"V19 persona",age:30,archetype:"Warden",boundaries:"",safeWord:"pause",fictionalConfirmed:true});
+  const persona=repo.createCharacter({name:"V19 persona",age:30,archetype:"Warden",boundaries:"",fictionalConfirmed:true});
   const campaign=repo.createCampaign("local-owner",{name:"V19 campaign"});repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"v19-pins"});
   const created=repo.createCharacterDraft("local-owner",campaign.id,{personaId:persona.id,controllerPrincipalId:"local-owner",durability:"durable",
@@ -63,14 +63,14 @@ describe("schema v19 to v20 draft provenance migration",()=>{
       receipts:before.prepare("SELECT * FROM character_draft_receipts_v19 ORDER BY command_id").all(),
       revisions:before.prepare("SELECT * FROM character_draft_revisions_v19 ORDER BY revision").all()};before.close();
     createRepository({dataDir:dir}).close();const migrated=new DatabaseDriver(file(dir),{readonly:true});
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"28"});
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"29"});
     expect({draft:migrated.prepare("SELECT * FROM character_drafts_v19 WHERE id=?").get(identity.draftId),
       commands:migrated.prepare("SELECT * FROM character_draft_commands_v19 ORDER BY command_id").all(),
       events:migrated.prepare("SELECT * FROM character_draft_events_v19 ORDER BY event_id").all(),
       receipts:migrated.prepare("SELECT * FROM character_draft_receipts_v19 ORDER BY command_id").all(),
       revisions:migrated.prepare("SELECT * FROM character_draft_revisions_v19 ORDER BY revision").all()}).toEqual(preserved);
     expect(migrated.prepare("SELECT COUNT(*) count FROM character_draft_command_provenance_v20").get()).toEqual({count:2});migrated.close();
-    expect(JSON.stringify(preserved)).not.toMatch(/privateNotes|safeWord|boundaries/);
+    expect(JSON.stringify(preserved)).not.toMatch(/privateNotes|boundaries/);
     const fresh=makeDir();createRepository({dataDir:fresh}).close();expect(schema(file(dir))).toEqual(schema(file(fresh)));
   });
 
@@ -141,7 +141,7 @@ describe("schema v19 to v20 draft provenance migration",()=>{
     const verify=new DatabaseDriver(file(dir),{readonly:true});
     expect(verify.prepare("SELECT created_by_principal_id FROM character_drafts_v19 WHERE id=?").get(identity.draftId))
       .toEqual({created_by_principal_id:"forged-creator"});
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:phase==="migration"?"19":"28"});
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:phase==="migration"?"19":"29"});
     verify.close();
   });
 

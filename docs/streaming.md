@@ -1,6 +1,5 @@
 # Streaming (SSE) transport
 
-Velvet supports real token streaming over server-sent events while keeping the exact same turn pipeline as the buffered endpoints: safe-word short-circuit, sanitize/policy gates, consent/state transition, memory extraction, lore/prompt assembly, and `checkAssistantOutput` on the **full** generated text before anything is persisted. After the reply is persisted, a configured provider may receive one bounded scene-synthesis request before the terminal response/event completes.
 
 ## Endpoints
 
@@ -27,9 +26,7 @@ Turn stream order: `user_message` → `state` → `delta`* → `done` | `boundar
 - `done` - `{ reply, providerError, preset, loreTriggered, session?, state?, messages?, swipeIndex?, swipeGroupId?, siblings? }`. Character replies include `speakerCharacterId`. `reply` is persisted after the final `checkAssistantOutput` call.
 - `boundary` - same payload as `done` plus `violations`. If the configured policy reports a violation, this terminal replacement event tells clients to discard streamed text and show `reply`. The current permissive policy stub does not produce boundary events.
 - `error` — `{ error, violations? }`. Pre-generation policy violations arrive here (nothing persisted), as do unexpected stream failures.
-- `aborted` — `{ generationId }`. Emitted when the generation is cancelled via the cancel endpoint, when the safe word lands on another endpoint mid-stream, or when the session is stopped mid-stream. The user message stays; **no character reply is persisted**. Before persisting, the route re-checks the abort signal and fresh session state, so a stop/safe word that lands during provider generation still results in `aborted`, not `done`.
 
-Safe-word turns stream `user_message` → `state` (closed) → `done` with the fixed acknowledgement reply and never touch the provider. Built-in words and every participant's custom safe word apply to the whole session. Safe-word and stop endpoints abort any in-flight regular token/swipe generation before closing it; they do not interrupt an already-started bounded room SSE round.
 
 Room streams use `user_message` → `state` → `room_reply`+ → `room_done`; continuation streams omit `user_message`. `room_reply` is emitted after each character reply is persisted and includes `{ reply, index, total }`, allowing the client to render one bubble before the next generation finishes. After the final reply, the server updates synthesized scene state before emitting `room_done`, which contains the complete result and message branch. A room round is bounded to routing, selected replies, and one synthesis request. JSON remains the default when `Accept: text/event-stream` is absent.
 

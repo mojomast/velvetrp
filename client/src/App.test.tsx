@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_PACK, ORIGINAL_STARTER_RACE, ORIGINAL_STARTER_RULES_PROFILE } from "@velvet/contracts";
 
-const aria = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", safeWord: "anchor", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
-const rowan = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger", safeWord: "harbor" };
+const aria = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
+const rowan = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger" };
 const baseSession = { id: "sess-1", characterId: aria.id, primaryCharacterId: aria.id, participants: [aria, rowan], title: "Night watch", state: "active" as "setup" | "active" | "paused" | "cooldown" | "closed", presetId: "default", consentLog: [], activeLeafId: null, createdAt: "2026-01-01T00:00:00.000Z", stoppedAt: null as string | null, stopReason: null as string | null };
 const harness = { id: "harness", systemPrompt: "", personaPreamble: "", styleGuide: "", postHistoryInstructions: "", recentTurns: 12, memoryChars: 1200, summaryChars: 800, loreChars: 800, temperature: null, promptOverrides: {}, updatedAt: "" };
 const provider = { id: "provider", providerType: "openai-compatible", baseUrl: "", model: "test-model", hasApiKey: false, streaming: false, httpReferer: "", appTitle: "Velvet", requireParameters: false, allowFallbacks: true, routingSort: "default", dataCollection: "default", zdr: false, requestTimeoutSeconds: 90, samplers: { maxTokens: null, topP: null, topK: null, minP: null, repetitionPenalty: null, frequencyPenalty: null, presencePenalty: null, seed: null, reasoningEffort: null, stopStrings: [], startReplyWith: "" }, updatedAt: "" };
@@ -931,7 +931,6 @@ describe("persistence and multi-character frontend", () => {
     fireEvent.change(screen.getByLabelText("Age (18+)"), { target: { value: "30" } });
     fireEvent.change(screen.getByLabelText("Archetype / vibe"), { target: { value: "Confidant" } });
     fireEvent.change(screen.getByLabelText("Boundaries & hard limits"), { target: { value: "Fiction only" } });
-    fireEvent.change(screen.getByLabelText("Safe word"), { target: { value: "anchor" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /entirely fictional/i }));
     fireEvent.click(screen.getByRole("button", { name: "Create character & start session" }));
 

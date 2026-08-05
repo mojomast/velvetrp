@@ -13,8 +13,7 @@ const character: Character = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "keep it fictional",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
   isRealPerson: false,
   createdAt: new Date().toISOString(),
 };

@@ -56,7 +56,7 @@ function populatedM15(dir: string): void {
   repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });
   const actor = (name:string, key:string) => {
-    const persona = repo.createCharacter({ name, age: 28, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const persona = repo.createCharacter({ name, age: 28, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
     const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${key}-draft` });
     const definitions = MECHANICS_STARTER_CATALOG.definitions;
     const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: `${key}-select`, selections: {
@@ -86,7 +86,7 @@ describe("additive schema v25r1 resources, inventory, economy, and rest migratio
     createRepository({ dataDir: migrated }).close();
 
     const db = new DatabaseDriver(file(migrated), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "28" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "29" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM rpg_resources_inventory_economy_layout_attestation_v25").get()).toEqual({
       prior_layout_digest: "e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8",
       current_layout_digest: "a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7",

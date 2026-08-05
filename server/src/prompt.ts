@@ -68,7 +68,6 @@ export function buildOrchestratedMessages(input: {
       `Age statement: ${participant.age}`,
       `Archetype/vibe: ${participant.archetype}`,
       `Boundaries and hard limits: ${participant.boundaries}`,
-      `Safe word: ${participant.safeWord}`,
     ].join("\n")).join("\n");
   const persona = resolvePromptTemplate("character.persona", overrides, {
     "persona.preamble": harness.personaPreamble.trim() ? `User persona preamble: ${clip(harness.personaPreamble.trim(), 500)}` : "",

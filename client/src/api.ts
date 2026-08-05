@@ -13,7 +13,6 @@ export interface CharacterSpec {
   age: number;
   archetype: string;
   boundaries: string;
-  safeWord: string;
   fictionalConfirmed: boolean;
 }
 

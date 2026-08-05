@@ -11,7 +11,7 @@ describe("M1.7 encounter repository",()=>{
     const campaign=repo.createCampaign("local-owner",{name:"Encounter fixture"});
     repo.installMechanicsStarterCatalog("local-owner");
     repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"pins"});
-    const character=repo.createCharacter({name:"Session character",age:30,archetype:"Scout",boundaries:"",safeWord:"pause",fictionalConfirmed:true});
+    const character=repo.createCharacter({name:"Session character",age:30,archetype:"Scout",boundaries:"",fictionalConfirmed:true});
     const session=await createSession({characterId:character.id,title:"Combat"});
     repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
     const command:any={type:"create_encounter",campaignId:campaign.id,encounterId:"encounter",sessionId:session.id,kind:"improvised",enemySpawns:[],expectedRevision:0,idempotencyKey:"create",createdAt:at};

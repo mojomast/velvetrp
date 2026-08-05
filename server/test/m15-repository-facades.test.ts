@@ -20,7 +20,7 @@ function fixture() {
   repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });
   const makeActor = (name: string, key: string) => {
-    const persona = repo.createCharacter({ name, age: 28, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const persona = repo.createCharacter({ name, age: 28, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
     const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${key}-draft` });
     const definitions = MECHANICS_STARTER_CATALOG.definitions;
     const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: `${key}-select`, selections: {

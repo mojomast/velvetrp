@@ -14,8 +14,7 @@ const characterInput = (name: string) => ({
   age: 30,
   archetype: `${name} archetype`,
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 });
 
 async function createCharacter(app: ReturnType<typeof buildApp>, name: string): Promise<Character> {

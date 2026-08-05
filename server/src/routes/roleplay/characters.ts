@@ -24,9 +24,6 @@ function parseCharacterInput(body: Partial<CreateCharacterInput> | null): Parsed
   if (typeof body.boundaries !== "string" || body.boundaries.trim() === "") {
     return { ok: false, error: "boundaries are required" };
   }
-  if (typeof body.safeWord !== "string" || body.safeWord.trim() === "") {
-    return { ok: false, error: "safeWord is required" };
-  }
   if (body.fictionalConfirmed !== true) {
     return { ok: false, error: "fictionalConfirmed must be true" };
   }
@@ -37,7 +34,6 @@ function parseCharacterInput(body: Partial<CreateCharacterInput> | null): Parsed
       age: body.age,
       archetype: body.archetype,
       boundaries: body.boundaries,
-      safeWord: body.safeWord,
       fictionalConfirmed: body.fictionalConfirmed,
     },
   };
@@ -50,7 +46,6 @@ function candidateFromInput(value: CreateCharacterInput): Character {
     age: value.age,
     archetype: value.archetype,
     boundaries: value.boundaries,
-    safeWord: value.safeWord,
     fictionalConfirmed: value.fictionalConfirmed,
     isRealPerson: false,
     createdAt: "",
@@ -90,7 +85,6 @@ export const roleplayCharacterRoutes: FastifyPluginAsync = async (app) => {
       age: body.age ?? existing.age,
       archetype: body.archetype ?? existing.archetype,
       boundaries: body.boundaries ?? existing.boundaries,
-      safeWord: body.safeWord ?? existing.safeWord,
       fictionalConfirmed: body.fictionalConfirmed ?? existing.fictionalConfirmed,
     });
     if (!parsed.ok) return reply.code(400).send({ error: parsed.error });
@@ -118,7 +112,6 @@ export const roleplayCharacterRoutes: FastifyPluginAsync = async (app) => {
         age: character.age,
         archetype: character.archetype,
         boundaries: character.boundaries,
-        safeWord: character.safeWord,
         fictionalConfirmed: character.fictionalConfirmed,
       },
     };

@@ -15,7 +15,7 @@ import { assertPowerDefinitionExists, calculateAuthoritativeProgressionPreview, 
   type ProgressionRootRow } from "./characterProgressionPersistence.js";
 
 
-const SCHEMA_VERSION = "28";
+const SCHEMA_VERSION = "29";
 const SCHEMA_REVISION = "1";
 const SQLITE_FILENAME = "velvet.sqlite";
 
@@ -99,8 +99,9 @@ function ensureSchema(db: DatabaseDriver.Database): void {
       createCharacterProgressionIntegrityV24(db);
        createResourcesInventoryEconomyRestV25(db);
        createChecksPowersEffectsV26(db);
-        createCombatFoundationV27(db);
-        createWorldTravelNpcFactionV28(db);
+         createCombatFoundationV27(db);
+         createWorldTravelNpcFactionV28(db);
+         createCharacterLayoutV29(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -111,6 +112,7 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     assertChecksPowersEffectsLayoutV26(db);
     assertCombatFoundationLayoutV27(db);
     assertWorldTravelNpcFactionLayoutV28(db);
+    assertCharacterLayoutV29(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -155,6 +157,8 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   const futureWorldArtifact = Number(version) < 28 && db.prepare(`SELECT type,name FROM sqlite_master
     WHERE name GLOB '*_v28' OR name GLOB '*_v28_*' LIMIT 1`).get() as { type: string; name: string } | undefined;
   if (futureWorldArtifact) throw new Error(`schema marker ${version} cannot contain future v28 artifact ${futureWorldArtifact.name}`);
+  const futureCharacterLayoutArtifact = Number(version) < 29 && db.prepare("SELECT type,name FROM sqlite_master WHERE name='character_layout_attestation_v29'").get() as { type: string; name: string } | undefined;
+  if (futureCharacterLayoutArtifact) throw new Error(`schema marker ${version} cannot contain future v29 artifact ${futureCharacterLayoutArtifact.name}`);
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
     // pre-v18 database can never contain this future-derived sidecar.
@@ -314,6 +318,10 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     migrate27to28(db);
     version = "28";
   }
+  if (version === "28") {
+    migrate28to29(db);
+    version = "29";
+  }
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -325,6 +333,7 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   assertChecksPowersEffectsLayoutV26(db);
   assertCombatFoundationLayoutV27(db);
   assertWorldTravelNpcFactionLayoutV28(db);
+  assertCharacterLayoutV29(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);
@@ -385,7 +394,6 @@ function createSchemaV11(db: DatabaseDriver.Database): void {
       age INTEGER NOT NULL,
       archetype TEXT NOT NULL,
       boundaries TEXT NOT NULL,
-      safe_word TEXT NOT NULL,
       fictional_confirmed INTEGER NOT NULL,
       is_real_person INTEGER NOT NULL,
       created_at TEXT NOT NULL
@@ -5447,6 +5455,43 @@ function assertWorldTravelNpcFactionLayoutV28(db:DatabaseDriver.Database):void{c
 function validateWorldTravelNpcFactionV28(db:DatabaseDriver.Database):void{const commands=db.prepare(`SELECT c.*,r.resulting_revision receipt_revision,r.occurred_at FROM world_commands_v28 c LEFT JOIN world_receipts_v28 r ON r.campaign_id=c.campaign_id AND r.session_id=c.session_id AND r.command_id=c.command_id`).all() as Array<any>;if(commands.length!==(db.prepare("SELECT count(*) count FROM world_receipts_v28").get() as {count:number}).count)throw new Error("M1.8 command receipt graph is incomplete");for(const c of commands){let request:any;try{request=JSON.parse(c.canonical_request_json);}catch{throw new Error("M1.8 command provenance is malformed");}if(c.canonical_request_json!==canonicalV17(request)||c.request_digest!==createHash("sha256").update(canonicalV17(request)).digest("hex")||c.receipt_revision!==c.resulting_revision||c.occurred_at!==c.created_at)throw new Error("M1.8 command receipt provenance is inconsistent");}for(const root of db.prepare("SELECT * FROM world_mutation_revisions_v28").all() as Array<any>){const history=db.prepare("SELECT expected_revision,resulting_revision,created_at FROM world_commands_v28 WHERE campaign_id=? AND session_id=? ORDER BY resulting_revision").all(root.campaign_id,root.session_id) as Array<any>;if(history.length!==root.revision||history.some((r,i)=>r.expected_revision!==i||r.resulting_revision!==i+1)||(history.length>0&&root.updated_at!==history.at(-1)!.created_at))throw new Error("M1.8 revision root history is inconsistent");}}
 function migrate27to28(db:DatabaseDriver.Database):void{db.transaction(()=>{assertCombatFoundationLayoutV27(db);validateCombatFoundationV27(db);createWorldTravelNpcFactionV28(db);db.prepare("UPDATE meta SET value='28' WHERE key='schemaVersion'").run();})();}
 
+const V29_CHARACTER_COLUMNS = ["id", "name", "age", "archetype", "boundaries", "fictional_confirmed", "is_real_person", "created_at"];
+const V29_CHARACTER_LAYOUT_DIGEST = "bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d";
+
+function characterLayoutDigestV29(db: DatabaseDriver.Database): string {
+  const columns = (db.prepare("PRAGMA table_info(characters)").all() as Array<{ name: string }>).map((column) => column.name);
+  return createHash("sha256").update(JSON.stringify(columns)).digest("hex");
+}
+
+function createCharacterLayoutV29(db: DatabaseDriver.Database): void {
+  db.exec(`CREATE TABLE character_layout_attestation_v29 (
+    singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+    layout_digest TEXT NOT NULL CHECK(length(layout_digest)=64)
+  );
+  CREATE TRIGGER character_layout_attestation_v29_immutable_update BEFORE UPDATE ON character_layout_attestation_v29 BEGIN SELECT RAISE(ABORT,'v29 character layout attestation is immutable'); END;
+  CREATE TRIGGER character_layout_attestation_v29_immutable_delete BEFORE DELETE ON character_layout_attestation_v29 BEGIN SELECT RAISE(ABORT,'v29 character layout attestation is immutable'); END;`);
+  db.prepare("INSERT INTO character_layout_attestation_v29(singleton,layout_digest) VALUES(1,?)").run(characterLayoutDigestV29(db));
+}
+
+function assertCharacterLayoutV29(db: DatabaseDriver.Database): void {
+  const columns = (db.prepare("PRAGMA table_info(characters)").all() as Array<{ name: string }>).map((column) => column.name);
+  const row = db.prepare("SELECT layout_digest FROM character_layout_attestation_v29 WHERE singleton=1").get() as { layout_digest: string } | undefined;
+  const actual = characterLayoutDigestV29(db);
+  if (JSON.stringify(columns) !== JSON.stringify(V29_CHARACTER_COLUMNS) || !row || row.layout_digest !== actual || actual !== V29_CHARACTER_LAYOUT_DIGEST) {
+    throw new Error(`schema v29 character layout is incompatible (${actual})`);
+  }
+}
+
+function migrate28to29(db: DatabaseDriver.Database): void {
+  db.transaction(() => {
+    assertWorldTravelNpcFactionLayoutV28(db);
+    const columns = (db.prepare("PRAGMA table_info(characters)").all() as Array<{ name: string }>).map((column) => column.name);
+    if (columns.includes("safe_word")) db.exec("ALTER TABLE characters DROP COLUMN safe_word");
+    createCharacterLayoutV29(db);
+    db.prepare("UPDATE meta SET value='29' WHERE key='schemaVersion'").run();
+  })();
+}
+
 function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, dependencies: RuntimeDependencies): void {
   const legacy = loadLegacyDatabase(dir, dependencies);
   if (!legacy) return;
@@ -5467,8 +5512,8 @@ function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, depend
   }
   const run = db.transaction((data: Database) => {
     const insertCharacter = db.prepare(
-      `INSERT INTO characters (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-       VALUES (@id, @name, @age, @archetype, @boundaries, @safeWord, @fictionalConfirmed, @isRealPerson, @createdAt)`,
+      `INSERT INTO characters (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+       VALUES (@id, @name, @age, @archetype, @boundaries, @fictionalConfirmed, @isRealPerson, @createdAt)`,
     );
     for (const c of data.characters) {
       insertCharacter.run({

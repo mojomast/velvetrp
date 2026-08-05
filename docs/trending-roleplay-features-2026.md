@@ -26,7 +26,3 @@ Non-explicit product/engineering trends adapted for Velvet MVP.
 - Unbounded autonomous director loops; implemented room automation remains explicitly bounded, and single-character continuation is one explicit buffered turn.
 - Participant changes after session creation.
 - TTS/images: feature flags only; keep providers external and optional.
-
-## Policy note
-
-Write paths still call the shared policy interface, but `server/src/policy.ts` is currently an intentionally permissive stub. Safe words and sanitization remain active. The previous restrictive backup implementation is no longer retained in the repository.

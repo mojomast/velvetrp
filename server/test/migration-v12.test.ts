@@ -68,8 +68,8 @@ function seedAggregate(db: DatabaseDriver.Database, suffix: string): void {
       VALUES (?, 'local-owner', 'owner', ?)`).run(campaignId, AT);
   })();
   db.prepare(`INSERT INTO characters
-    (id, name, age, archetype, boundaries, safe_word, fictional_confirmed, is_real_person, created_at)
-    VALUES (?, ?, 30, 'guide', 'fictional', 'anchor', 1, 0, ?)`).run(personaId, `Persona ${suffix}`, AT);
+    (id, name, age, archetype, boundaries, fictional_confirmed, is_real_person, created_at)
+    VALUES (?, ?, 30, 'guide', 'fictional', 1, 0, ?)`).run(personaId, `Persona ${suffix}`, AT);
   db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
     VALUES (?, ?, 'Rules', '[]')`).run(`profile-${suffix}`, `Profile ${suffix}`);
   db.prepare(`INSERT INTO rpg_content_packs
@@ -250,7 +250,7 @@ describe("schema v12 command audit persistence", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect(db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+      expect(db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
       expect(db.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
       expect((db.pragma("table_info(campaign_timelines)") as Array<{ name: string; dflt_value: string | null }>).at(-1))
         .toEqual(expect.objectContaining({ name: "revision", dflt_value: "0" }));
@@ -519,7 +519,7 @@ describe("schema v12 command audit persistence", () => {
     failed.close();
     createRepository({ dataDir: dir }).close();
     const repaired = new DatabaseDriver(dbPath, { readonly: true });
-    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     repaired.close();
   });
@@ -553,7 +553,7 @@ describe("schema v12 command audit persistence", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     for (const table of V12_TABLES) {
       expect(retried.prepare("SELECT name FROM sqlite_master WHERE name = ?").get(table)).toEqual({ name: table });
@@ -582,7 +582,7 @@ describe("schema v12 command audit persistence", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
   });
@@ -607,7 +607,7 @@ describe("schema v12 command audit persistence", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "29" });
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
   });

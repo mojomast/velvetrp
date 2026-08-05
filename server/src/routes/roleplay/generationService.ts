@@ -29,8 +29,6 @@ const SAFE_FALLBACK_REPLY =
   "I'm having trouble reaching the story engine right now, so I'm holding the scene right here. Your message is saved — try again in a moment and we'll continue, within the agreed boundaries.";
 const BOUNDARY_REPLACEMENT_REPLY =
   "I’m keeping this within the agreed boundaries and the current scene state. Tell me what direction you want, within those limits.";
-export const SAFE_WORD_REPLY =
-  "Safe word acknowledged. Stepping out of the scene and stopping here. Take your time.";
 
 export interface GenerationOutcome {
   text: string;
@@ -247,7 +245,7 @@ export async function runSseGeneration(input: {
       return;
     }
     const outcome = result.outcome;
-    // A safe word or stop may have closed the session while the provider ran.
+    // A stop may have closed the session while the provider ran.
     const freshSession = await getSession(session.id);
     const externallyAborted = result.kind === "completed" && controller.signal.aborted;
     if (externallyAborted || !freshSession || freshSession.stoppedAt || freshSession.state === "closed") {
@@ -329,8 +327,4 @@ export async function maybeUpdateSummary(sessionId: string, force = false): Prom
 export function targetCharacter(session: Session, requestedId?: string): Character | null {
   const id = requestedId ?? session.primaryCharacterId;
   return session.participants.find((participant) => participant.id === id) ?? null;
-}
-
-export function safeWords(session: Session): string[] {
-  return session.participants.map((participant) => participant.safeWord);
 }

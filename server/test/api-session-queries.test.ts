@@ -13,12 +13,11 @@ afterEach(async () => {
   provider = null;
 });
 
-const characterInput = (name: string, safeWord = "anchor") => ({
+const characterInput = (name: string) => ({
   name,
   age: 30,
   archetype: `${name} archetype`,
   boundaries: "fictional adults only",
-  safeWord,
   fictionalConfirmed: true,
 });
 

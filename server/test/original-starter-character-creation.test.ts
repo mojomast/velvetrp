@@ -177,8 +177,8 @@ describe("original starter campaign-character creation service", () => {
     repository.configureOriginalStarterContent("local-owner", "campaign");
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
 
     const created = createOriginalStarterCharacterCreationService(repository)
@@ -197,8 +197,8 @@ describe("original starter campaign-character creation service", () => {
     const databasePath = path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite");
     const db = new DatabaseDriver(databasePath);
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Preflight Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Preflight Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
 
     const getOptions = vi.fn(repository.getCampaignCharacterCreationOptions);
@@ -241,8 +241,8 @@ describe("original starter campaign-character creation service", () => {
     const databasePath = path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite");
     const db = new DatabaseDriver(databasePath);
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Preflight Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Preflight Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
     const baseline = { ids: nextId.mock.calls.length, clocks: now.mock.calls.length };
     const lockedCreate = vi.fn((actor: string,
@@ -293,8 +293,8 @@ describe("original starter campaign-character creation service", () => {
       db.prepare("UPDATE campaigns SET owner_principal_id = 'campaign-owner' WHERE id = 'campaign'").run();
     })();
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
 
     expect(createOriginalStarterCharacterCreationService(repository)
@@ -371,8 +371,8 @@ describe("original starter campaign-character creation service", () => {
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
     db.prepare("DELETE FROM campaign_content_packs WHERE campaign_id = 'campaign'").run();
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
     const baseline = { ids: nextId.mock.calls.length, clocks: now.mock.calls.length };
 
@@ -420,8 +420,8 @@ describe("original starter campaign-character creation service", () => {
     repository.configureOriginalStarterContent("local-owner", "campaign");
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
     const dependencyBaseline = { ids: nextId.mock.calls.length, clocks: now.mock.calls.length };
     const lockedCreate = vi.fn((actor: string, input: Parameters<typeof repository.createOriginalStarterCampaignCharacter>[1]) => {
@@ -457,8 +457,8 @@ describe("original starter campaign-character creation service", () => {
     repository.configureOriginalStarterContent("local-owner", "campaign");
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
     const dependencyBaseline = { ids: nextId.mock.calls.length, clocks: now.mock.calls.length };
     const lockedCreate = vi.fn((actor: string, input: Parameters<typeof repository.createOriginalStarterCampaignCharacter>[1]) => {

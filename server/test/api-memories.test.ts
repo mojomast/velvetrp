@@ -11,8 +11,7 @@ const characterInput = (name = "Memory Keeper") => ({
   age: 30,
   archetype: "careful archivist",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 });
 
 async function addCharacter(app: ReturnType<typeof buildApp>, name?: string) {

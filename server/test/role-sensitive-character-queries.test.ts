@@ -59,7 +59,7 @@ function seed() {
     }
     db.prepare("INSERT INTO campaign_memberships VALUES ('other-campaign', 'local-owner', 'owner', ?)").run(AT);
   })();
-  db.prepare("INSERT INTO characters VALUES ('persona-a', 'A', 20, 'hero', '', 'stop', 1, 0, ?), ('persona-b', 'B', 20, 'hero', '', 'stop', 1, 0, ?)")
+  db.prepare("INSERT INTO characters VALUES ('persona-a', 'A', 20, 'hero', '', 1, 0, ?), ('persona-b', 'B', 20, 'hero', '', 1, 0, ?)")
     .run(AT, AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile', 'Profile', 'Description', '[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('core', '1', 'profile', 'Core', 'Description', '[]', 0)").run();
@@ -479,7 +479,7 @@ describe("role-sensitive campaign-character queries", () => {
     expect(sql).toContain(`LIMIT 129`);
     expect(sql).toMatch(/ORDER BY child\.position ASC/);
     expect(sql).toMatch(/ORDER BY resource\.name COLLATE BINARY ASC/);
-    expect(sql).not.toMatch(/private_notes|boundaries|safe_word|campaign_commands|campaign_events|command_receipts/i);
+    expect(sql).not.toMatch(/private_notes|boundaries|campaign_commands|campaign_events|command_receipts/i);
     expect(sql.match(/controller_principal_id/gi)).toHaveLength(1);
     expect(sql).toMatch(/controller_membership\.principal_id\s*=\s*child\.controller_principal_id/);
     expect(sql).not.toMatch(/(?:AS|'controllerPrincipalId',)\s*\w*\.?controller_principal_id/i);

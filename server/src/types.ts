@@ -4,7 +4,6 @@ export interface Character {
   age: number;
   archetype: string;
   boundaries: string;
-  safeWord: string;
   fictionalConfirmed: boolean;
   isRealPerson: boolean;
   createdAt: string;
@@ -15,7 +14,6 @@ export interface CreateCharacterInput {
   age: number;
   archetype: string;
   boundaries: string;
-  safeWord: string;
   fictionalConfirmed: boolean;
 }
 

@@ -12,8 +12,7 @@ const characterInput = {
   age: 30,
   archetype: "guide",
   boundaries: "fictional",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 function databasePath(): string {

@@ -16,7 +16,7 @@ describe("integrated RPG HTTP lanes", () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";
     const repository = createRepository();
-    const persona = repository.createCharacter({ name: "HTTP Persona", age: 30, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+    const persona = repository.createCharacter({ name: "HTTP Persona", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
     const campaign = repository.createCampaign("local-owner", { name: "HTTP RPG" });
     repository.installMechanicsStarterCatalog("local-owner");
     repository.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "http-configure" });

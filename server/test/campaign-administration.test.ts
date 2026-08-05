@@ -75,7 +75,7 @@ describe("campaign administration repository", () => {
     const campaign = repo.createCampaign("local-owner", { name: "Transfer campaign" });
     const exported = repo.createCampaignExport("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "export-key" });
     const serialized = JSON.stringify(exported.value.package);
-    expect(serialized).not.toMatch(/apiKey|baseUrl|usage_events|safe_word|private_notes|VELVET_DATA_DIR/);
+    expect(serialized).not.toMatch(/apiKey|baseUrl|usage_events|private_notes|VELVET_DATA_DIR/);
     expect(exported.value.package.excluded).toEqual(["credentials", "localPaths", "usageHistory", "privateActorState"]);
     const db = new DatabaseDriver(dbPath());
     const campaignCount = () => (db.prepare("SELECT COUNT(*) count FROM campaigns").get() as { count: number }).count;
@@ -152,7 +152,7 @@ describe("campaign administration repository", () => {
     repo.removeAuditedCampaignMembership("local-owner", campaign.id, "member-one", {
       expectedRevision: 2, idempotencyKey: "member-remove" });
     const db = new DatabaseDriver(dbPath());
-    db.exec(`INSERT INTO characters VALUES ('room-character','Room',21,'hero','','safe',1,0,'${at}');
+    db.exec(`INSERT INTO characters VALUES ('room-character','Room',21,'hero','',1,0,'${at}');
       INSERT INTO sessions (id,character_id,title,state,preset_id,created_at) VALUES ('portable-room','room-character','Room','active','default','${at}');
       INSERT INTO session_characters VALUES ('portable-room','room-character',0);`);
     db.close();
@@ -176,7 +176,7 @@ describe("campaign administration repository", () => {
     repo.configureOriginalStarterContent("local-owner", campaign.id);
     addPrincipal("portable-gm");
     const persona = repo.createCharacter({ name: "Portable", age: 21, archetype: "hero", boundaries: "",
-      safeWord: "safe", fictionalConfirmed: true });
+      fictionalConfirmed: true });
     const portableActor = repo.createOriginalStarterCampaignCharacter("local-owner", { campaignId: campaign.id,
       characterId: persona.id, controllerPrincipalId: "local-owner", race: ORIGINAL_STARTER_RACE.reference,
       background: ORIGINAL_STARTER_BACKGROUND.reference, classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }],
@@ -250,7 +250,7 @@ describe("campaign administration repository", () => {
     expect(exported.value.package.timelines[0]!.revision).toBe(1);
     expect(exported.value.package.records.recaps[0]!.selectedSessionIds).toEqual(["portable-session"]);
     expect(exported.value.package.content.status).toBe("configured");
-    expect(JSON.stringify(exported.value.package)).not.toMatch(/idempotencyKey|round-export|safe_word|private_notes/);
+    expect(JSON.stringify(exported.value.package)).not.toMatch(/idempotencyKey|round-export|private_notes/);
     repo.detachAuditedCampaignRoom("local-owner", campaign.id, { sessionId: "portable-session", expectedRevision: 5, idempotencyKey: "free-portable-room" });
     const dry = repo.dryRunCampaignImport("local-owner", exported.value.package);
     const applied = repo.applyCampaignImport("local-owner", { dryRun: dry, package: exported.value.package, idempotencyKey: "round-import" });
@@ -350,8 +350,8 @@ describe("campaign administration repository", () => {
     }).value.package;
     const roomDb = new DatabaseDriver(dbPath());
     for (const suffix of ["stopped", "malformed", "running"]) roomDb.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES (?,?,21,'hero','','safe',1,0,?)`).run(`room-${suffix}-character`, suffix, at);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES (?,?,21,'hero','',1,0,?)`).run(`room-${suffix}-character`, suffix, at);
     roomDb.prepare(`INSERT INTO sessions
       (id,character_id,title,state,preset_id,created_at,stopped_at,stop_reason)
       VALUES ('stopped-room','room-stopped-character','Stopped','closed','default',?,?, 'user-stop')`).run(at, at);
@@ -393,7 +393,7 @@ describe("campaign administration repository", () => {
     const repo = repository(); const campaign = repo.createCampaign("local-owner", { name: "State fork" });
     repo.installOriginalStarterContent("local-owner", campaign.id); repo.configureOriginalStarterContent("local-owner", campaign.id);
     const persona = repo.createCharacter({ name: "Hero", age: 25, archetype: "hero", boundaries: "",
-      safeWord: "safe", fictionalConfirmed: true });
+      fictionalConfirmed: true });
     const created = repo.createOriginalStarterCampaignCharacter("local-owner", { campaignId: campaign.id,
       characterId: persona.id, controllerPrincipalId: "local-owner", race: ORIGINAL_STARTER_RACE.reference,
       background: ORIGINAL_STARTER_BACKGROUND.reference, classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }],

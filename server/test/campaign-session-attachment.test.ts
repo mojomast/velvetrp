@@ -24,7 +24,7 @@ function seed(options: { sessionId?: string; state?: string; stoppedAt?: string 
   db.pragma("foreign_keys = ON");
   const sessionId = options.sessionId ?? "session/legacy value";
   db.prepare(`INSERT INTO characters VALUES
-    ('character-one', 'Character', 30, 'captain', 'fictional', 'anchor', 1, 0, ?)`).run(fixedAt);
+    ('character-one', 'Character', 30, 'captain', 'fictional', 1, 0, ?)`).run(fixedAt);
   db.prepare(`INSERT INTO sessions VALUES (?, 'character-one', 'Session', ?, 'default', NULL, ?, ?, ?)`)
     .run(sessionId, options.state ?? "setup", fixedAt,
       options.stoppedAt !== undefined ? options.stoppedAt : options.state === "closed" ? fixedAt : null,

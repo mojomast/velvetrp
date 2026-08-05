@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildSessionContextBasket, contextBasketText } from "../src/context.js";
 import type { Character, LoreEntry, MemoryFact, Message, Session } from "../src/types.js";
 
-const character = (id: string, name: string): Character => ({ id, name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", safeWord: `${name}-safe`, fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" });
+const character = (id: string, name: string): Character => ({ id, name, age: 30, archetype: `${name} archetype`, boundaries: "fictional", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" });
 const one = character("c1", "Aria"); const two = character("c2", "Bex");
 const session: Session = { id: "s1", characterId: one.id, primaryCharacterId: one.id, participants: [one, two], title: "", state: "active", presetId: "default", consentLog: [], activeLeafId: null, createdAt: "", stoppedAt: null, stopReason: null };
 const message = (id: string, role: Message["role"], content: string, speakerCharacterId: string | null): Message => ({ id, sessionId: session.id, role, speakerCharacterId, content, parentId: null, swipeGroupId: id, swipeIndex: 0, seq: Number(id.slice(1)), status: "final", createdAt: "" });

@@ -11,8 +11,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 describe("character api compatibility", () => {
@@ -59,7 +58,6 @@ describe("character api compatibility", () => {
         age: 30,
         archetype: characterInput.archetype,
         boundaries: characterInput.boundaries,
-        safeWord: characterInput.safeWord,
         fictionalConfirmed: true,
       },
     });
@@ -77,7 +75,6 @@ describe("character api compatibility", () => {
       age: 30,
       archetype: characterInput.archetype,
       boundaries: characterInput.boundaries,
-      safeWord: characterInput.safeWord,
       fictionalConfirmed: true,
       isRealPerson: false,
       createdAt: expect.any(String),
@@ -109,7 +106,6 @@ describe("character api compatibility", () => {
     [{ ...characterInput, age: 29.5 }, "age must be an integer"],
     [{ ...characterInput, archetype: "" }, "archetype is required"],
     [{ ...characterInput, boundaries: "" }, "boundaries are required"],
-    [{ ...characterInput, safeWord: "" }, "safeWord is required"],
     [{ ...characterInput, fictionalConfirmed: false }, "fictionalConfirmed must be true"],
   ])("preserves create validation for %#", async (payload, message) => {
     const app = buildApp();
@@ -131,9 +127,6 @@ describe("character api compatibility", () => {
     expect(invalidPatch.statusCode).toBe(400);
     expect(invalidPatch.json()).toEqual({ error: "age must be an integer" });
 
-    const invalidImport = await app.inject({ method: "POST", url: "/api/characters/import", payload: { character: { ...characterInput, safeWord: null } } });
-    expect(invalidImport.statusCode).toBe(400);
-    expect(invalidImport.json()).toEqual({ error: "safeWord is required" });
     await app.close();
   });
 

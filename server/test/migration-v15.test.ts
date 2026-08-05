@@ -23,7 +23,7 @@ function genuineV14(dir: string): void {
   const campaign = repo.createCampaign("local-owner", { name: "Preserved v14" });
   repo.installOriginalStarterContent("local-owner", campaign.id); repo.configureOriginalStarterContent("local-owner", campaign.id);
   const persona = repo.createCharacter({ name: "V14 Hero", age: 22, archetype: "hero", boundaries: "",
-    safeWord: "safe", fictionalConfirmed: true });
+    fictionalConfirmed: true });
   const actor = repo.createOriginalStarterCampaignCharacter("local-owner", { campaignId: campaign.id,
     characterId: persona.id, controllerPrincipalId: "local-owner", race: ORIGINAL_STARTER_RACE.reference,
     background: ORIGINAL_STARTER_BACKGROUND.reference, classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }],
@@ -97,7 +97,7 @@ describe("genuine additive v14 to v15 migration", () => {
       (SELECT COUNT(*) FROM campaign_content_packs) pins`).get()).toEqual(closedAudit);
     expect(migrated.prepare("SELECT revision,event_id,inherited FROM campaign_timeline_events").all())
       .toEqual([{ revision: 1, event_id: "v14-id-7", inherited: 0 }]);
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "28" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "29" });
     migrated.close();
     const freshDir = makeDir(); createRepository({ dataDir: freshDir }).close();
     expect(schema(file(migratedDir))).toEqual(schema(file(freshDir)));
@@ -115,7 +115,7 @@ describe("genuine additive v14 to v15 migration", () => {
     failed.exec("DROP TABLE campaign_administration_commands"); failed.close();
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(file(dir), { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "28" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "29" });
     retried.close();
   });
 });

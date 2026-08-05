@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Character, ProviderSettings, Session } from "../api";
 import { CharacterLibraryPage, type CharacterLibraryPageProps } from "./CharacterLibraryPage";
 
-const aria: Character = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", safeWord: "anchor", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
-const rowan: Character = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger", safeWord: "harbor" };
+const aria: Character = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
+const rowan: Character = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger" };
 const session: Session = { id: "sess-1", characterId: aria.id, primaryCharacterId: aria.id, participants: [aria, rowan], title: "Night watch", state: "active", presetId: "default", activeLeafId: null, createdAt: "2026-01-01T00:00:00.000Z", stoppedAt: null, stopReason: null };
 const provider = { id: "provider", providerType: "openai-compatible", model: "test-model", streaming: false } as ProviderSettings;
 

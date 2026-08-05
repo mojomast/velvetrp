@@ -27,8 +27,7 @@ const validCharacter = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 async function createCharacter(app: ReturnType<typeof buildApp>) {
@@ -284,24 +283,4 @@ describe("api", () => {
     await app.close();
   });
 
-  it("honors the safe word and closes the scene", async () => {
-    provider = await startFakeProvider();
-    const app = buildApp();
-    await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
-    const character = await createCharacter(app);
-    const sessionRes = await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } });
-    const session = sessionRes.json() as { id: string };
-
-    const res = await app.inject({
-      method: "POST",
-      url: `/api/sessions/${session.id}/messages`,
-      payload: { content: "anchor" },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { state: string; reply: { content: string } };
-    expect(body.state).toBe("closed");
-    expect(body.reply.content).toMatch(/Safe word acknowledged/);
-    expect(provider.requests).toHaveLength(0);
-    await app.close();
-  });
 });

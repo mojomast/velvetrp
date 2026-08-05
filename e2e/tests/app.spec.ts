@@ -30,7 +30,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     const starterPersonaName = `${runId}-Starter-Persona`;
     const starterPersona = await json<{ id: string }>(request, "POST", "/characters", {
       name: starterPersonaName, age: 30, archetype: "Quiet pathfinder", boundaries: "Fictional deterministic test only",
-      safeWord: `${runId}-starter-anchor`, fictionalConfirmed: true,
+      fictionalConfirmed: true,
     });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Velvet" })).toBeVisible();
@@ -292,7 +292,6 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.getByLabel("Age (18+)").fill("31");
     await page.getByLabel("Archetype / vibe").selectOption({ label: "Warm conversationalist" });
     await page.getByLabel("Boundaries & hard limits").fill("Keep the test concise and fictional.");
-    await page.getByLabel("Safe word").fill(`${runId}-anchor`);
     await page.getByText("I confirm this character is entirely fictional").click();
     await page.getByRole("button", { name: "Save to library" }).click();
     await expect(page.getByText(firstName, { exact: true })).toBeVisible();
@@ -310,7 +309,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     characterIds.push(first.id);
     const second = await json<{ id: string }>(request, "POST", "/characters", {
       name: `${runId}-Noor`, age: 32, archetype: "Concise navigator", boundaries: "Fictional test only",
-      safeWord: `${runId}-harbor`, fictionalConfirmed: true,
+      fictionalConfirmed: true,
     });
     characterIds.push(second.id);
 
@@ -425,13 +424,6 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     expect(sharedContext.context.participants).toHaveLength(2);
     expect(sharedContext.context.recentEvents.length).toBeGreaterThan(0);
     expect(sharedContext.context.rememberedFacts.length).toBeGreaterThan(0);
-
-    const safeSession = await json<{ id: string }>(request, "POST", "/sessions", { characterId: first.id, title: `${runId}-safe` });
-    sessionIds.push(safeSession.id);
-    const closed = await json<{ state: string }>(request, "POST", `/sessions/${safeSession.id}/messages`, { content: `${runId}-anchor` }, 200);
-    expect(closed.state).toBe("closed");
-    const rejected = await request.post(`/api/sessions/${safeSession.id}/messages`, { data: { content: "still there?" } });
-    expect(rejected.status()).toBe(409);
 
     for (const id of [...sessionIds]) {
       await json(request, "DELETE", `/sessions/${id}`);

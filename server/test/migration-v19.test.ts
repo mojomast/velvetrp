@@ -23,7 +23,7 @@ function schema(name: string): unknown[] {
 }
 function rewindToPopulatedV18(dir: string): { campaignId: string; characterId: string } {
   const repo = createRepository({ dataDir: dir, clock: { now: () => new Date("2031-01-01T00:00:00.000Z") } });
-  const persona = repo.createCharacter({ name: "Preserved", age: 30, archetype: "Warden", boundaries: "", safeWord: "pause", fictionalConfirmed: true });
+  const persona = repo.createCharacter({ name: "Preserved", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
   const campaign = repo.createCampaign("local-owner", { name: "Preserved v18" });
   repo.installMechanicsStarterCatalog("local-owner");
   repo.configureMechanicsStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "v18-pin" });
@@ -63,7 +63,7 @@ describe("additive schema v19r1 migration", () => {
     }; before.close();
     createRepository({ dataDir: migratedDir }).close();
     const migrated = new DatabaseDriver(file(migratedDir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "28" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "29" });
     expect({
       character: migrated.prepare("SELECT * FROM campaign_characters WHERE id=?").get(identity.characterId),
       sheet: migrated.prepare("SELECT * FROM rpg_campaign_sheets WHERE campaign_character_id=?").get(identity.characterId),

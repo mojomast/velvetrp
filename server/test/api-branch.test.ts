@@ -20,8 +20,7 @@ const validCharacter = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 interface MessageShape {
@@ -206,57 +205,6 @@ describe("branching api", () => {
       payload: { content: "third message" },
     });
     expect(third.statusCode).toBe(200);
-    await app.close();
-  });
-
-  it("parents a branch safe-word turn at the branch point, never at another user message", async () => {
-    provider = await startFakeProvider();
-    const app = buildApp();
-    await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
-    const { session } = await setupScene(app);
-    const first = await postUserMessage(app, session.id, "we walk the promenade");
-    const second = await postUserMessage(app, session.id, "the stars are bright tonight");
-
-    const res = await app.inject({
-      method: "POST",
-      url: `/api/sessions/${session.id}/branch`,
-      payload: { messageId: second.reply.id, content: "anchor" },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { state: string; userMessage: MessageShape; reply: MessageShape };
-    expect(body.state).toBe("closed");
-    // the safe-word user message branches from the replaced user turn's parent,
-    // not from the user message itself
-    expect(body.userMessage.parentId).toBe(second.userMessage.parentId);
-    expect(body.userMessage.parentId).toBe(first.reply.id);
-    expect(body.reply.parentId).toBe(body.userMessage.id);
-    expect(body.reply.content).toMatch(/Safe word acknowledged/);
-    await app.close();
-  });
-
-  it("closes the session on safe word even from a branch", async () => {
-    provider = await startFakeProvider();
-    const app = buildApp();
-    await app.inject({ method: "PUT", url: "/api/provider", payload: { baseUrl: provider.baseUrl } });
-    const { session } = await setupScene(app);
-    const first = await postUserMessage(app, session.id, "we walk the promenade");
-    await app.inject({ method: "POST", url: `/api/sessions/${session.id}/messages/${first.reply.id}/swipe` });
-
-    const res = await app.inject({
-      method: "POST",
-      url: `/api/sessions/${session.id}/branch`,
-      payload: { messageId: first.reply.id, content: "anchor" },
-    });
-    expect(res.statusCode).toBe(200);
-    const body = res.json() as { state: string; reply: MessageShape };
-    expect(body.state).toBe("closed");
-    expect(body.reply.content).toMatch(/Safe word acknowledged/);
-
-    const after = await app.inject({
-      method: "POST",
-      url: `/api/sessions/${session.id}/messages/${first.reply.id}/swipe`,
-    });
-    expect(after.statusCode).toBe(409);
     await app.close();
   });
 });

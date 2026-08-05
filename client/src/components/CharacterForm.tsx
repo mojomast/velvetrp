@@ -22,7 +22,6 @@ export function CharacterForm({ character, busy, error, onCancel, onSave }: Prop
   const [archetype, setArchetype] = useState("");
   const [custom, setCustom] = useState("");
   const [boundaries, setBoundaries] = useState("");
-  const [safeWord, setSafeWord] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [validation, setValidation] = useState<string | null>(null);
 
@@ -33,7 +32,6 @@ export function CharacterForm({ character, busy, error, onCancel, onSave }: Prop
     setArchetype(known ? character.archetype : character ? CUSTOM : "");
     setCustom(character && !known ? character.archetype : "");
     setBoundaries(character?.boundaries ?? "");
-    setSafeWord(character?.safeWord ?? "");
     setConfirmed(character?.fictionalConfirmed ?? false);
     setValidation(null);
   }, [character]);
@@ -46,11 +44,10 @@ export function CharacterForm({ character, busy, error, onCancel, onSave }: Prop
     if (!Number.isInteger(ageNumber) || ageNumber < 18) return setValidation("Character age must be a whole number of 18 or older.");
     if (!finalArchetype) return setValidation("Please choose or describe an archetype/vibe.");
     if (!boundaries.trim()) return setValidation("Please list boundaries and hard limits.");
-    if (!safeWord.trim()) return setValidation("Please set a safe word.");
     if (!confirmed) return setValidation("Please confirm the character is fictional and not a real person.");
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     setValidation(null);
-    await onSave({ name: name.trim(), age: ageNumber, archetype: finalArchetype, boundaries: boundaries.trim(), safeWord: safeWord.trim(), fictionalConfirmed: true }, submitter?.value === "start");
+    await onSave({ name: name.trim(), age: ageNumber, archetype: finalArchetype, boundaries: boundaries.trim(), fictionalConfirmed: true }, submitter?.value === "start");
   }
 
   return (
@@ -66,7 +63,6 @@ export function CharacterForm({ character, busy, error, onCancel, onSave }: Prop
         <label className="field"><span>Archetype / vibe</span><select value={archetype} onChange={(e) => setArchetype(e.target.value)}><option value="">Select a vibe…</option>{ARCHETYPES.map((item) => <option key={item}>{item}</option>)}</select></label>
         {archetype === CUSTOM && <label className="field"><span>Describe the vibe</span><input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="A few words about personality and tone" maxLength={200} /></label>}
         <label className="field"><span>Boundaries &amp; hard limits</span><textarea value={boundaries} onChange={(e) => setBoundaries(e.target.value)} placeholder="Topics and behaviors the character must avoid" rows={3} maxLength={500} /></label>
-        <label className="field"><span>Safe word</span><input value={safeWord} onChange={(e) => setSafeWord(e.target.value)} placeholder="A word that immediately pauses the scene" maxLength={40} /></label>
         <label className="checkbox"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} /><span>I confirm this character is entirely fictional, is 18 or older, and is not based on a real person.</span></label>
         {(validation || error) && <p className="error" role="alert">{validation ?? error}</p>}
         <div className="button-row">

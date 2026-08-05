@@ -3,7 +3,6 @@ import {
   checkAssistantOutput,
   checkCharacter,
   checkUserMessage,
-  isSafeWord,
   normalizeForPolicy,
   sanitizeInjectionText,
   sanitizeUserContent,
@@ -12,7 +11,7 @@ import type { Character } from "../src/types.js";
 
 const character: Character = {
   id: "c1", name: "Aria", age: 29, archetype: "captain", boundaries: "none",
-  safeWord: "anchor", fictionalConfirmed: true, isRealPerson: false, createdAt: new Date().toISOString(),
+  fictionalConfirmed: true, isRealPerson: false, createdAt: new Date().toISOString(),
 };
 
 describe("deliberately permissive policy", () => {
@@ -28,9 +27,4 @@ describe("deliberately permissive policy", () => {
     expect(sanitizeUserContent("x".repeat(5000))).toHaveLength(1000);
   });
 
-  it("recognizes built-in and custom safe words with boundaries", () => {
-    expect(isSafeWord("please STOP the scene")).toBe(true);
-    expect(isSafeWord("anchor now", ["anchor"])).toBe(true);
-    expect(isSafeWord("anchorage", ["anchor"])).toBe(false);
-  });
 });

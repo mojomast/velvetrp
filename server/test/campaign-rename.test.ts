@@ -33,7 +33,7 @@ function seed(): void {
     db.prepare("INSERT INTO principals (id, display_name, is_local) VALUES (?, ?, 0)").run(id, name);
   }
   db.prepare(`INSERT INTO characters VALUES
-    ('character-one', 'Character', 30, 'captain', 'fictional', 'anchor', 1, 0, ?)`).run(createdAt);
+    ('character-one', 'Character', 30, 'captain', 'fictional', 1, 0, ?)`).run(createdAt);
   db.prepare(`INSERT INTO sessions VALUES
     ('session-one', 'character-one', 'Session', 'setup', 'default', NULL, ?, NULL, NULL)`).run(createdAt);
   db.prepare("INSERT INTO session_characters VALUES ('session-one', 'character-one', 0)").run();

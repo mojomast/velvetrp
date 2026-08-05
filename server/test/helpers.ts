@@ -138,6 +138,7 @@ export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Data
 
 /** Remove every v28 world/travel artifact before constructing a historical fixture. */
 export function removeFutureWorldTravelNpcFactionV28(db:import("better-sqlite3").Database):void{
+  removeFutureCharacterLayoutV29(db);
   const artifacts = "(name GLOB '*_v28' OR name GLOB '*_v28_*' OR tbl_name GLOB '*_v28' OR tbl_name GLOB '*_v28_*')";
   const triggers=db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND ${artifacts}`).all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
@@ -147,6 +148,13 @@ export function removeFutureWorldTravelNpcFactionV28(db:import("better-sqlite3")
   for(const index of indexes)db.exec(`DROP INDEX ${index.name}`);
   const tables=db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND ${artifacts}`).all() as Array<{name:string}>;
   for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
+}
+
+/** Remove v29 character-layout artifacts when constructing historical fixtures. */
+export function removeFutureCharacterLayoutV29(db: import("better-sqlite3").Database): void {
+  db.exec(`DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_update;
+    DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_delete;
+    DROP TABLE IF EXISTS character_layout_attestation_v29;`);
 }
 
 /** Registers the hostile legacy name for non-campaign deletion corruption fixtures. */

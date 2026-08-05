@@ -428,8 +428,8 @@ describe("POST /api/rpg/v1/campaigns/:campaignId/characters", () => {
     real.configureOriginalStarterContent("local-owner", "campaign-one");
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
     db.prepare(`INSERT INTO characters
-      (id,name,age,archetype,boundaries,safe_word,fictional_confirmed,is_real_person,created_at)
-      VALUES ('persona-opaque','Persona',30,'hero','fictional','anchor',1,0,?)`).run(AT);
+      (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+      VALUES ('persona-opaque','Persona',30,'hero','fictional',1,0,?)`).run(AT);
     db.close();
     const committedCreate = vi.fn((actor: string, input: CreateCampaignCharacterInput) => {
       const committed = real.createOriginalStarterCampaignCharacter(actor, input);

@@ -35,8 +35,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional adults only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 async function createCharacter(app: ReturnType<typeof buildApp>, name = "Aria") {

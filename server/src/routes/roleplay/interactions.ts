@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyPluginAsync } from "fastify";
 import { buildTurnMemories } from "../../memory.js";
-import { checkUserMessage, isSafeWord, sanitizeUserContent } from "../../policy.js";
+import { checkUserMessage, sanitizeUserContent } from "../../policy.js";
 import { getPromptPreset } from "../../presets.js";
 import { resolvePromptTemplate } from "../../promptTemplates.js";
 import {
@@ -27,8 +27,6 @@ import {
   openSse,
   runCharacterPipeline,
   runSseGeneration,
-  SAFE_WORD_REPLY,
-  safeWords,
   selectRoomSpeakers,
   targetCharacter,
 } from "./generationService.js";
@@ -56,23 +54,6 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
     const rawContent = body.content;
     const character = targetCharacter(session, body.speakerCharacterId);
     if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
-
-    if (isSafeWord(rawContent, safeWords(session))) {
-      generationRegistry.abort(session.id);
-      const userMessage = await addMessage(session.id, "user", rawContent);
-      await addConsentEvent(session.id, "safe-word", false, "Safe word used; scene closed.");
-      const stopped = await transitionSession(session.id, "closed", "safe-word");
-      const replyMessage = await addMessage(session.id, "character", SAFE_WORD_REPLY, {
-        speakerCharacterId: character.id,
-      });
-      return {
-        userMessage,
-        reply: replyMessage,
-        session: stopped,
-        state: stopped?.state ?? "closed",
-        messages: await listMessages(session.id),
-      };
-    }
 
     const content = sanitizeUserContent(rawContent);
     const policy = checkUserMessage(content);
@@ -137,15 +118,6 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
     if (session.stoppedAt || session.state === "closed") return reply.code(409).send({ error: "session is stopped", session });
 
     const rawContent = body.content;
-    if (isSafeWord(rawContent, safeWords(session))) {
-      generationRegistry.abort(session.id);
-      const userMessage = await addMessage(session.id, "user", rawContent);
-      await addConsentEvent(session.id, "safe-word", false, "Safe word used; scene closed.");
-      const stopped = await transitionSession(session.id, "closed", "safe-word");
-      const acknowledgement = await addMessage(session.id, "character", SAFE_WORD_REPLY, { speakerCharacterId: session.primaryCharacterId });
-      return { userMessage, replies: [acknowledgement], selectedSpeakerIds: [session.primaryCharacterId], routing: "fallback", session: stopped, state: "closed", messages: await listMessages(session.id) };
-    }
-
     const content = sanitizeUserContent(rawContent);
     const policy = checkUserMessage(content);
     if (!policy.allowed) return reply.code(422).send({ error: "policy violation", violations: policy.violations });
@@ -367,28 +339,6 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       const rawContent = body.content;
       const character = targetCharacter(session, body.speakerCharacterId);
       if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
-
-      if (isSafeWord(rawContent, safeWords(session))) {
-        generationRegistry.abort(session.id);
-        const userMessage = await addMessage(session.id, "user", rawContent);
-        await addConsentEvent(session.id, "safe-word", false, "Safe word used; scene closed.");
-        const stopped = await transitionSession(session.id, "closed", "safe-word");
-        const replyMessage = await addMessage(session.id, "character", SAFE_WORD_REPLY, { speakerCharacterId: character.id });
-        const sse = openSse(reply);
-        sse.send("user_message", { message: userMessage });
-        sse.send("state", { session: stopped, state: stopped?.state ?? "closed" });
-        sse.send("done", {
-          reply: replyMessage,
-          providerError: false,
-          preset: session.presetId,
-          loreTriggered: 0,
-          session: stopped,
-          state: stopped?.state ?? "closed",
-          messages: await listMessages(session.id),
-        });
-        sse.end();
-        return;
-      }
 
       const content = sanitizeUserContent(rawContent);
       const policy = checkUserMessage(content);
@@ -658,30 +608,6 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       }
       const character = targetCharacter(session, body.speakerCharacterId);
       if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
-
-      if (isSafeWord(body.content, safeWords(session))) {
-        generationRegistry.abort(session.id);
-        // Branch parenting mirrors the normal branch path: anchoring on a
-        // character reply branches from that reply's user turn parent.
-        const anchorUserTurn =
-          anchor.role === "user" ? anchor : anchor.parentId ? await getMessage(session.id, anchor.parentId) : null;
-        const safeParentId =
-          anchor.role === "character" && anchorUserTurn?.role === "user" ? anchorUserTurn.parentId : anchor.parentId;
-        const userMessage = await addMessage(session.id, "user", body.content, { parentId: safeParentId });
-        await addConsentEvent(session.id, "safe-word", false, "Safe word used; scene closed.");
-        const stopped = await transitionSession(session.id, "closed", "safe-word");
-        const replyMessage = await addMessage(session.id, "character", SAFE_WORD_REPLY, {
-          parentId: userMessage.id,
-          speakerCharacterId: character.id,
-        });
-        return {
-          userMessage,
-          reply: replyMessage,
-          session: stopped,
-          state: stopped?.state ?? "closed",
-          messages: await listMessages(session.id),
-        };
-      }
 
       const content = sanitizeUserContent(body.content);
       const policy = checkUserMessage(content);

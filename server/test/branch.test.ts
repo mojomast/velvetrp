@@ -23,8 +23,7 @@ const characterInput = {
   age: 29,
   archetype: "confident space captain",
   boundaries: "fictional only",
-  safeWord: "anchor",
-  fictionalConfirmed: true,
+    fictionalConfirmed: true,
 };
 
 async function seedSession() {
@@ -145,7 +144,7 @@ describe("schema v2 to v3 migration", () => {
       CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE characters (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, age INTEGER NOT NULL, archetype TEXT NOT NULL,
-        boundaries TEXT NOT NULL, safe_word TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL,
+        boundaries TEXT NOT NULL, fictional_confirmed INTEGER NOT NULL,
         is_real_person INTEGER NOT NULL, created_at TEXT NOT NULL
       );
       CREATE TABLE sessions (
@@ -162,7 +161,7 @@ describe("schema v2 to v3 migration", () => {
         role TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL
       );
       INSERT INTO meta (key, value) VALUES ('schemaVersion', '2');
-      INSERT INTO characters VALUES ('c1', 'Aria', 29, 'captain', 'fictional only', 'anchor', 1, 0, '2025-01-01T00:00:00.000Z');
+      INSERT INTO characters VALUES ('c1', 'Aria', 29, 'captain', 'fictional only', 1, 0, '2025-01-01T00:00:00.000Z');
       INSERT INTO sessions VALUES ('s1', 'c1', '', 'active', 'default', '2025-01-01T00:01:00.000Z', NULL, NULL);
       INSERT INTO messages VALUES ('m1', 's1', 'user', 'hello', '2025-01-01T00:02:00.000Z');
       INSERT INTO messages VALUES ('m2', 's1', 'character', 'greetings', '2025-01-01T00:03:00.000Z');
@@ -196,7 +195,7 @@ describe("schema v2 to v3 migration", () => {
     closeRepo();
     const verify = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
-    expect(version.value).toBe("28");
+    expect(version.value).toBe("29");
     verify.close();
   });
 });
