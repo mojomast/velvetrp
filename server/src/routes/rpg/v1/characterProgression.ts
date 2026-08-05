@@ -92,7 +92,7 @@ export const characterProgressionRoutes: FastifyPluginAsync<CharacterProgression
         const repository = options.characterProgressionRepositoryAccessor();
         const state = repository.getCharacterProgression(LOCAL_OWNER, characterId.data);
         if (!state || state.campaignId !== campaignId.data || state.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
-        return characterProgressionHttpStateResponseSchema.parse({ progression: stateProjection(state) });
+        return reply.code(200).send(characterProgressionHttpStateResponseSchema.parse({ progression: stateProjection(state) }));
       } catch (error) { return mapFailure(request, reply, error); }
     });
 
@@ -101,10 +101,6 @@ export const characterProgressionRoutes: FastifyPluginAsync<CharacterProgression
       exposeHeadRoute: false,
       onRequest: async (request, reply) => {
         if (!(await guard(request, reply))) return;
-        const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
-        const characterId = resourceIdSchema.safeParse(request.params.campaignCharacterId);
-        if (!campaignId.success) { await sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found"); return; }
-        if (!characterId.success) { await sendApiProblem(request, reply, 404, "RPG_CHARACTER_NOT_FOUND", "Character not found"); return; }
         const contentType = request.headers["content-type"];
         if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
           await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Progression preview requires application/json");
@@ -127,7 +123,7 @@ export const characterProgressionRoutes: FastifyPluginAsync<CharacterProgression
         if (!state || state.campaignId !== campaignId.data || state.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
         const preview = repository.previewCharacterProgression(LOCAL_OWNER, characterId.data, body.data.selections as ProgressionSelection[]);
         if (!preview || preview.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
-        return characterProgressionHttpPreviewResponseSchema.parse({ preview: previewProjection(preview, campaignId.data) });
+        return reply.code(200).send(characterProgressionHttpPreviewResponseSchema.parse({ preview: previewProjection(preview, campaignId.data) }));
       } catch (error) { return mapFailure(request, reply, error); }
     });
 };

@@ -87,7 +87,12 @@ import type { CharacterBuilderRepository } from "../../../repo/characterBuilderR
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
 
-export interface CampaignListRepository extends Partial<OriginalStarterSetupRepository>, Partial<CampaignDiceRepository> {
+export interface CampaignListRepository extends
+  Partial<OriginalStarterSetupRepository>,
+  Partial<CampaignDiceRepository>,
+  Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">>,
+  Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression">>,
+  Partial<Pick<CampaignAdministrationRepository, "getCampaignAdministration" | "updateCampaignAdministration">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
@@ -105,7 +110,6 @@ export interface CampaignListRepository extends Partial<OriginalStarterSetupRepo
     campaignCharacterId: string,
   ): CampaignCharacterWorkspaceSnapshot | null;
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
-  getCampaignAdministration?: MechanicsStarterSetupSnapshotRepository["getCampaignAdministration"];
   resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
   installMechanicsStarterCatalog?: MechanicsStarterSetupRepository["installMechanicsStarterCatalog"];
   configureMechanicsStarterCatalog?: MechanicsStarterSetupRepository["configureMechanicsStarterCatalog"];
@@ -146,6 +150,48 @@ function logCampaignOperationFailure(
   request.log[level]({ operation, method: request.method, route: request.routeOptions.url }, "RPG campaign operation failed");
 }
 
+type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
+  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">;
+type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
+  "getCharacterProgression" | "previewCharacterProgression">;
+type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
+  "getCampaignAdministration" | "updateCampaignAdministration">;
+
+class UnsupportedCampaignRepositoryError extends Error {
+  constructor() {
+    super("campaign repository does not support this route");
+    this.name = "UnsupportedCampaignRepositoryError";
+  }
+}
+
+function assertCharacterBuilderRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CharacterBuilderLaneRepository {
+  if (typeof repository.createCharacterDraft !== "function"
+    || typeof repository.getCharacterDraft !== "function"
+    || typeof repository.updateCharacterDraft !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
+
+function assertCharacterProgressionRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CharacterProgressionLaneRepository {
+  if (typeof repository.getCharacterProgression !== "function"
+    || typeof repository.previewCharacterProgression !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
+
+function assertCampaignAdministrationRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignAdministrationLaneRepository {
+  if (typeof repository.getCampaignAdministration !== "function"
+    || typeof repository.updateCampaignAdministration !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
+
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
   let repositoryState:
@@ -177,18 +223,29 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
 
   // Child lanes share this exact lazy repository and its single onClose hook.
   // They are registered with relative paths because this plugin owns /api/rpg/v1.
-  const sharedRepository = () => getCampaignRepository();
+  const characterBuilderRepositoryAccessor = (): CharacterBuilderLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCharacterBuilderRepository(repository);
+    return repository;
+  };
+  const characterProgressionRepositoryAccessor = (): CharacterProgressionLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCharacterProgressionRepository(repository);
+    return repository;
+  };
+  const campaignAdministrationRepositoryAccessor = (): CampaignAdministrationLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignAdministrationRepository(repository);
+    return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
-    characterBuilderRepositoryAccessor: sharedRepository as unknown as () => Pick<CharacterBuilderRepository,
-      "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">,
+    characterBuilderRepositoryAccessor,
   });
   await app.register(characterProgressionRoutes, {
-    characterProgressionRepositoryAccessor: sharedRepository as unknown as () => Pick<CharacterProgressionRepository,
-      "getCharacterProgression" | "previewCharacterProgression">,
+    characterProgressionRepositoryAccessor,
   });
   await app.register(campaignAdministrationHttpRoutes, {
-    campaignAdministrationRepositoryAccessor: sharedRepository as unknown as () => Pick<CampaignAdministrationRepository,
-      "getCampaignAdministration" | "updateCampaignAdministration">,
+    campaignAdministrationRepositoryAccessor,
   });
 
   app.get<{

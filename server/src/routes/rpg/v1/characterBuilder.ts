@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import {
@@ -27,7 +27,7 @@ const DETAIL = `${BASE}/:draftId`;
 function queryPresent(request: FastifyRequest): boolean {
   return (request.raw.url ?? request.url).includes("?");
 }
-function noStore(reply: { header(name: string, value: string): unknown }): void { reply.header("cache-control", "no-store"); }
+function noStore(reply: FastifyReply): void { reply.header("cache-control", "no-store"); }
 function flags(options: CharacterBuilderHttpRoutesOptions): boolean {
   const value = (options.featureFlags ?? (() => readRpgFeatureFlags()))();
   return value.campaign !== false && value.mechanics;
@@ -47,10 +47,10 @@ function receiptProjection(receipt: Record<string, unknown>) {
   const { commandId: _commandId, draft: _draft, ...safe } = receipt;
   return safe;
 }
-function problem(request: FastifyRequest, reply: any, status: number, code: string, detail: string) {
+function problem(request: FastifyRequest, reply: FastifyReply, status: number, code: string, detail: string) {
   return sendApiProblem(request, reply, status, code, detail);
 }
-function mapFailure(request: FastifyRequest, reply: any, error: unknown) {
+function mapFailure(request: FastifyRequest, reply: FastifyReply, error: unknown) {
   if (error instanceof CharacterBuilderAuthorizationError) return problem(request, reply, 404, "CHARACTER_DRAFT_NOT_FOUND", "Character draft not found");
   if (error instanceof CharacterBuilderStaleError) return problem(request, reply, 409, "CHARACTER_DRAFT_STALE", "Character draft revision is stale");
   if (error instanceof CharacterBuilderExpiredError) return problem(request, reply, 409, "CHARACTER_DRAFT_EXPIRED", "Character draft has expired");
@@ -62,7 +62,7 @@ function mapFailure(request: FastifyRequest, reply: any, error: unknown) {
 }
 
 export const characterBuilderHttpRoutes: FastifyPluginAsync<CharacterBuilderHttpRoutesOptions> = async (app, options) => {
-  const before = async (request: FastifyRequest, reply: any, mutation: boolean) => {
+  const before = async (request: FastifyRequest, reply: FastifyReply, mutation: boolean) => {
     noStore(reply);
     if (!flags(options)) { await problem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return false; }
     if (queryPresent(request)) { await problem(request, reply, 400, "RPG_INVALID_REQUEST", "Character draft does not accept query parameters"); return false; }
