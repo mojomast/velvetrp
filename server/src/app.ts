@@ -82,6 +82,13 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+$/.test(instance)) {
+    return { instance, hasQuery, queryDetail: method === "DELETE" ? "Campaign room detachment does not accept query parameters" : null, noStore: true };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/memberships(?:\/[^/]+)?$/.test(instance)) {
+    return { instance, hasQuery, queryDetail: method === "GET" || method === "POST" || method === "PATCH" || method === "DELETE"
+      ? "Campaign memberships do not accept query parameters" : null, noStore: true };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters$/.test(instance)) {
     return {
       instance,
