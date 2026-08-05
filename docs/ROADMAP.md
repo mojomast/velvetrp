@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v25 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.5 adds no HTTP routes or client/UI.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v27 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.7 adds no HTTP routes or client/UI.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.5 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.5 is repository-only and adds no routes or client/UI; M1.6 is next.
+M1.1-M1.7 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.7 is repository-only and adds no routes or client/UI; M1.8 is next. The fixed v27r1 DDL digest is `5ff782cab830d8c7e934edbae69fde1398b7482531d6b77c7ced8696798737be`.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -80,6 +80,8 @@ Expand minimal actor resources into transactional inventory, equipment, wallets,
 
 ### M1.6 Checks, powers, and deterministic effects
 
+**Status: Complete (schema v26r1; repository/shared-contract only)**
+
 Build server-calculated checks and power execution on the existing bounded dice evaluator, with a deliberately typed first effect vocabulary.
 
 - **Complexity:** L
@@ -92,7 +94,9 @@ Build server-calculated checks and power execution on the existing bounded dice 
 
 ### M1.7 Encounters and turn-based combat
 
-Add prepared and improvised encounters, stable initiative, legal-action calculation, enemy instances, combat logs, and exactly-once rewards.
+**Status: Complete (schema v27r1; repository/shared-contract only; no HTTP routes or client/UI)**
+
+Prepared and improvised encounters provide stable initiative, legal-action calculation, enemy instances, combat logs, and exactly-once recorded reward claims.
 
 - **Complexity:** L
 - **Dependencies:** M1.5-M1.6; campaign events and actor ancestry from M1.1 and M1.3.
@@ -100,7 +104,8 @@ Add prepared and improvised encounters, stable initiative, legal-action calculat
   - Additive tables and contracts cover encounters, combatants, enemy instances, initiative, rounds, actions, damage, defeat state, and reward bundles.
   - One active encounter is allowed per campaign session; only the current combatant may take normal actions; dead, fled, and removed actors leave turn rotation deterministically.
   - The repository returns a server-computed allowlist for attacks, powers, items, defend, flee, and end-turn, and rejects every action not in that revision-bound list.
-  - Action, HP/resource/effect changes, turn advance, log entry, and reward state commit in one idempotent transaction; deterministic fallback tactics can always finish an enemy turn.
+  - Action, HP state, turn advance, combat-log entry, and recorded reward-claim state commit in one idempotent transaction; deterministic fallback tactics can always finish an enemy turn.
+  - Powers and items reject when their independent resource or inventory streams cannot be atomically settled in the combat transaction. Rewards are currency-only, server-generated recorded claims, not generic caller input; recorded claims do not settle wallets.
 
 ### M1.8 World, travel, NPCs, and factions
 

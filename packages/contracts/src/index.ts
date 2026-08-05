@@ -33,6 +33,7 @@ export * from "./rest.js";
 export * from "./checks.js";
 export * from "./powers.js";
 export * from "./effects.js";
+export * from "./encounters.js";
 
 export {
   addCampaignMembershipInputSchema,

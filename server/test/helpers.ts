@@ -114,9 +114,24 @@ export function removeFutureResourcesInventoryEconomyRestV25(db:import("better-s
 
 /** Remove additive v26 artifacts before exercising a genuine historical marker. */
 export function removeFutureChecksPowersEffectsV26(db:import("better-sqlite3").Database):void{
+  removeFutureCombatFoundationV27(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
   const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{name:string}>;
+  for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
+}
+
+/** Remove every v27 combat artifact before constructing a historical fixture. */
+export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Database):void{
+  const combatTables = "('encounter','combatant','combat_log','reward_bundle','reward_entry_v27','reward_claim_v27')";
+  const artifacts = `(name IN ${combatTables} OR name GLOB '*_v27' OR name GLOB '*_v27_*' OR tbl_name IN ${combatTables} OR tbl_name GLOB '*_v27' OR tbl_name GLOB '*_v27_*')`;
+  const triggers=db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND ${artifacts}`).all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  // Constraint-backed SQLite autoindexes have no SQL and are removed with
+  // their table; explicitly drop only standalone v27 indexes first.
+  const indexes=db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND ${artifacts}`).all() as Array<{name:string}>;
+  for(const index of indexes)db.exec(`DROP INDEX ${index.name}`);
+  const tables=db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND ${artifacts}`).all() as Array<{name:string}>;
   for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
 }
 

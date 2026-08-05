@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { removeFutureCombatFoundationV27 } from "./helpers.js";
 
 const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v26-"));
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
@@ -18,6 +19,7 @@ function layout(dir: string): unknown[] {
 /** Deliberately remove only the additive v26 fixture artifacts. */
 function rewindToV25(dir: string): void {
   const db = new DatabaseDriver(file(dir));
+  removeFutureCombatFoundationV27(db);
   const triggers = db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{ name: string }>;
   for (const { name } of triggers) db.exec(`DROP TRIGGER ${name}`);
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{ name: string }>;
@@ -33,7 +35,7 @@ describe("additive schema v26r1 checks, powers, and deterministic effects migrat
     rewindToV25(migrated);
     createRepository({ dataDir: migrated }).close();
     const db = new DatabaseDriver(file(migrated), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "26" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "27" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM rpg_checks_powers_effects_layout_attestation_v26").get()).toEqual({
       prior_layout_digest: "a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7",
       current_layout_digest: "7e3fe64f425173022d119f156f60eb36b26af2c97f29d40975f5579caa660f6a",

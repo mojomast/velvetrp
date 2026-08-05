@@ -7,4 +7,5 @@
 - [✅] Correct typed progression errors and restrict administration HTTP methods
 - [✅] M1.5 resources, inventory, equipment, economy, and rest (repository/shared-contract layer)
 - [✅] M1.6 checks, powers, and deterministic effects
-- [ ] M1.7 encounters and turn-based combat
+- [✅] M1.7 encounters and turn-based combat (repository/shared-contract layer; schema v27r1)
+- [ ] M1.8 world, travel, NPCs, and factions
