@@ -80,6 +80,12 @@ import {
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../../../content/originalStarterManifest.js";
 import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
+import { characterBuilderHttpRoutes } from "./characterBuilder.js";
+import { characterProgressionRoutes } from "./characterProgression.js";
+import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
+import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
+import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
+import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
 
 export interface CampaignListRepository extends Partial<OriginalStarterSetupRepository>, Partial<CampaignDiceRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
@@ -168,6 +174,22 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   }
 
   app.get("/features", async () => readRpgFeatureFlags());
+
+  // Child lanes share this exact lazy repository and its single onClose hook.
+  // They are registered with relative paths because this plugin owns /api/rpg/v1.
+  const sharedRepository = () => getCampaignRepository();
+  await app.register(characterBuilderHttpRoutes, {
+    characterBuilderRepositoryAccessor: sharedRepository as unknown as () => Pick<CharacterBuilderRepository,
+      "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">,
+  });
+  await app.register(characterProgressionRoutes, {
+    characterProgressionRepositoryAccessor: sharedRepository as unknown as () => Pick<CharacterProgressionRepository,
+      "getCharacterProgression" | "previewCharacterProgression">,
+  });
+  await app.register(campaignAdministrationHttpRoutes, {
+    campaignAdministrationRepositoryAccessor: sharedRepository as unknown as () => Pick<CampaignAdministrationRepository,
+      "getCampaignAdministration" | "updateCampaignAdministration">,
+  });
 
   app.get<{
     Params: { campaignId: string };

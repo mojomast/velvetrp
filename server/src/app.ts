@@ -109,6 +109,35 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/character-drafts(?:\/[^/]+)?$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "POST" || method === "PATCH"
+        ? "Character draft does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/progression(?:\/preview)?$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "POST"
+        ? "Character progression does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/administration$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "PATCH"
+        ? "Campaign administration does not accept query parameters" : null,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+$/.test(instance)) {
     return {
       instance,

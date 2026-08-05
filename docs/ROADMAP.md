@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, the 14 trusted-local operations in `server/src/routes/rpg/v1/features.ts`, and the current campaign pages under `client/src/roleplay/`. Items describe future work, not functionality delivered by this document.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. The seven newly integrated lanes are server-only; no client/UI slice exists yet.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.4 remain complete repository/shared-contract capabilities. The trusted-local HTTP boundary now has exactly 14 operations because one bounded route/UI slice activates the fixed M1.2 mechanics starter for an unconfigured campaign. It does not expose arbitrary catalogs, character drafts/finalization, or progression. M1.5 is the next repository-only milestone; bounded builder/progression HTTP/UI remains future work.
+M1.1-M1.4 remain complete repository/shared-contract capabilities. The trusted-local HTTP boundary now has exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. These seven routes have no client/UI; M1.5 remains the next repository-only milestone.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 

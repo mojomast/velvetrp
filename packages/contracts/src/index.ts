@@ -23,6 +23,9 @@ export * from "./campaign-administration.js";
 export * from "./character-builder.js";
 export * from "./character-progression.js";
 export * from "./mechanics-starter.js";
+export * from "./character-builder-http.js";
+export * from "./character-progression-http.js";
+export * from "./campaign-administration-http.js";
 
 export {
   addCampaignMembershipInputSchema,

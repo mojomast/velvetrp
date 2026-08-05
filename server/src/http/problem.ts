@@ -41,6 +41,18 @@ function safeProblemInstance(requestTarget: string): string {
     || suffix === "/dice-rolls") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
+  if (suffix === "/administration" || suffix === "/character-drafts") {
+    return `${campaignPrefix}:campaignId${suffix}`;
+  }
+  if (/^\/character-drafts\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/character-drafts/:draftId`;
+  }
+  if (/^\/characters\/[^/]+\/progression$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/progression`;
+  }
+  if (/^\/characters\/[^/]+\/progression\/preview$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/progression/preview`;
+  }
   if (/^\/characters\/[^/]+\/workspace$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/workspace`;
   }

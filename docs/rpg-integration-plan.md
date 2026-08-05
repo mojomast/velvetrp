@@ -2,6 +2,8 @@
 
 ## Purpose
 
+Current boundary note: the historical 13/14-operation ledgers in this plan remain historical checkpoints. The integrated server boundary is now 21 trusted-local operations, including character-draft create/read/update, progression read/preview, and campaign administration GET/PATCH. These lanes share the parent lazy repository lifecycle, use `local-owner`, and have no client/UI yet.
+
 This plan adds the useful gameplay functionality of `mojomast/rpg-dm-bot` to Velvet while preserving Velvet's stronger chat, memory, lore, branching, streaming, prompt, provider, and persistence architecture.
 
 The intended product is a local-first AI roleplaying and gaming application with:
@@ -894,7 +896,7 @@ Migration requirements:
 
 Current persistence is v24r1. V23 introduced M1.4 progression at the repository/shared-contract boundary; v24 preserves historical ledgers while repairing exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructs pending revisions from immutable command results. The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
 
-M1.1-M1.4 remain repository/shared-contract capabilities. A bounded fixed mechanics-starter activation route/UI now brings the fixed-principal trusted-local boundary to exactly 14 operations while leaving builder/finalization/progression HTTP absent. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content; M1.5 remains the next repository-only roadmap milestone.
+M1.1-M1.4 remain repository/shared-contract capabilities. The current fixed-principal trusted-local boundary has 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content; M1.5 remains the next repository-only roadmap milestone. No client/UI exists for the new lanes.
 
 ### Historical 2026-08-05 M0 Slice 98 Deterministic Closeout
 

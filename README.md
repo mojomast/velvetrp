@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. The feature-gated trusted-local campaign boundary now has exactly **14** HTTP operations: the newest bounded slice explicitly activates the fixed mechanics starter for a previously unconfigured campaign, without exposing builder or progression HTTP.
+Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. The feature-gated trusted-local RPG boundary now has exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. No client/UI exists for these seven new routes.
 
-The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. Mechanics activation enables the fixed catalog for future builder/progression work but does not expose those workflows. M1.5 remains the next repository-only roadmap milestone.
+The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1–M1.4 repository/contracts work is complete, with selected server-only HTTP exposure; client/UI work for the new lanes remains absent. M1.5 remains the next repository-only roadmap milestone.
 
 ---
 
@@ -192,7 +192,7 @@ Priority  Layer                     Source
 
 ## Campaign RPG Surface
 
-The RPG layer is feature-gated and uses a fixed trusted-local `local-owner` principal. All 14 current operations run on loopback only and are **not safe for remote or multi-user deployment**.
+The RPG layer is feature-gated and uses a fixed trusted-local `local-owner` principal. All 21 current operations run on loopback only and are **not safe for remote or multi-user deployment**.
 
 ### Current Campaign Operations
 
@@ -211,6 +211,13 @@ GET  /api/rpg/v1/campaigns/:id/rooms                              list attached 
 PUT  /api/rpg/v1/campaigns/:id/rooms                              attach room to campaign
 GET  /api/rpg/v1/campaigns/:id/dice-rolls                         dice history
 POST /api/rpg/v1/campaigns/:id/dice-rolls                         roll dice
+POST /api/rpg/v1/campaigns/:id/character-drafts                   create character draft
+GET  /api/rpg/v1/campaigns/:id/character-drafts/:draftId          read character draft
+PATCH /api/rpg/v1/campaigns/:id/character-drafts/:draftId         update character draft
+GET  /api/rpg/v1/campaigns/:id/characters/:charId/progression     read progression
+POST /api/rpg/v1/campaigns/:id/characters/:charId/progression/preview  preview progression
+GET  /api/rpg/v1/campaigns/:id/administration                     read administration
+PATCH /api/rpg/v1/campaigns/:id/administration                   update administration
 ```
 
 ### RPG Roadmap (M1–M4)
@@ -222,8 +229,8 @@ M0  █████████████████████████�
     Core roleplay, campaigns, dice, character workspace
 
 M1  █████████████░░░░░░░░░░░░░░░░░░░  M1.1–M1.4 COMPLETE
-    Repository/contracts: administration, catalogs, character
-    builder/derived sheets, and progression (HTTP/UI not exposed)
+     Repository/contracts complete; selected server-only HTTP lanes
+     for drafts, progression read/preview, and administration (no UI)
 
 M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     API surface: 11 route groups covering all M1 domains
@@ -303,7 +310,7 @@ packages/contracts/     shared Zod schemas and inferred API types (@velvet/contr
 server/src/
   app.ts                Fastify composition root, global hooks, route registration
   routes/roleplay/      interaction, generation, session, memory, lore, settings routes
-  routes/rpg/v1/        feature-gated RPG HTTP boundary (14 operations)
+  routes/rpg/v1/        feature-gated RPG HTTP boundary (21 operations; new lanes server-only)
   repo/                 roleplay repositories, RPG facades, schema/migrations
   content/              original starter content pack and setup services
   context.ts            context basket assembly
