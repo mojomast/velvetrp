@@ -115,6 +115,21 @@ Install the Playwright browser once after dependency installation:
 npx playwright install chromium
 ```
 
+## Project Structure
+
+```text
+packages/contracts/        shared runtime schemas and inferred API types
+server/src/app.ts          Fastify composition, global hooks, and route registration
+server/src/routes/         roleplay route plugins and the versioned RPG HTTP boundary
+server/src/repo/           persistence domains, schema/migrations, and repository composition
+server/src/content/        fixed original starter content and setup services
+client/src/                React application, API adapters, roleplay, and RPG features
+e2e/                       deterministic and opt-in live end-to-end workflows
+docs/                      API, architecture, operations, and product planning notes
+```
+
+`server/src/app.ts` is a composition root rather than a handler monolith. Legacy interaction/generation handlers live in `server/src/routes/roleplay/interactions.ts`; shared generation/SSE orchestration lives in `generationService.ts`; and process-local lock/abort state lives in `generationRegistry.ts`. Repository consumers use the public `server/src/repo/index.ts` barrel. See [Repository architecture](docs/repo-architecture.md) and [Roleplay architecture](docs/roleplay-architecture-2026.md).
+
 ## End-to-End Tests
 
 `npm run test:e2e` starts the real Fastify and Vite development processes on dedicated loopback ports. It uses a temporary SQLite directory and a local OpenAI-compatible fake provider, then removes the directory when the processes stop. The committed-response-loss inventory includes a real room PUT committed through Fastify/SQLite with only browser response delivery aborted, followed by exactly one reconciliation GET, attached state, and no repeated PUT. The suite also covers startup and health, provider API redaction, campaign create/open/rename/confirmed starter setup, exact room GET counts after ordinary attach and both campaign returns (including chat reload), one-PUT/one-GET foreign-attachment conflict reconciliation with no retry, stopped-candidate 409, attached-room deletion cascade, one finalized campaign-character create with reload/no-duplicate proof, browser character create/edit/reload, single- and multi-character sessions, buffered and SSE turns, targeted turns, room-turn routing with deterministic fallback, character-to-character reply chaining, continuation, prompt-template override/reset, combined manual/synthesized context, persisted resume state, memories, global and scoped lore, safe-word closure, closed-session rejection, and deletion ordering. The linked starter persona is intentionally left to temporary-database disposal because the campaign-character reference correctly guards legacy deletion.
@@ -168,7 +183,7 @@ Session participants are fixed after creation. With a usable provider, each room
 
 ## Policy Status
 
-`server/src/policy.ts` currently contains an intentionally permissive compatibility stub: character, user-message, and assistant-output checks always return allowed. The previous restrictive implementation is preserved at `server/src/policy.ts.backup`.
+`server/src/policy.ts` currently contains an intentionally permissive compatibility stub: character, user-message, and assistant-output checks always return allowed. The previous restrictive backup implementation is no longer retained in the repository.
 
 Safe-word detection remains active for built-in words (`red`, `safeword`, `stop`, `halt`) and every participant's custom safe word. Input sanitization, control-character removal, and the 1,000-character user-message cap also remain active. Do not describe the current deployment as content-policy enforced unless the restrictive implementation or another enforcement layer is restored.
 
@@ -177,6 +192,7 @@ Safe-word detection remains active for built-in words (`red`, `safeword`, `stop`
 - [RPG integration plan](docs/rpg-integration-plan.md)
 - [API reference](docs/api.md)
 - [Architecture](docs/roleplay-architecture-2026.md)
+- [Repository architecture](docs/repo-architecture.md)
 - [Streaming protocol](docs/streaming.md)
 - [Provider configuration](docs/provider-configuration.md)
 - [Customizable harness](docs/customizable-harness.md)

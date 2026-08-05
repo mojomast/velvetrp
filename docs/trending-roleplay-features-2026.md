@@ -29,4 +29,4 @@ Non-explicit product/engineering trends adapted for Velvet MVP.
 
 ## Policy note
 
-Write paths still call the shared policy interface, but `server/src/policy.ts` is currently an intentionally permissive stub. Safe words and sanitization remain active. The previous restrictive implementation is available at `server/src/policy.ts.backup`.
+Write paths still call the shared policy interface, but `server/src/policy.ts` is currently an intentionally permissive stub. Safe words and sanitization remain active. The previous restrictive backup implementation is no longer retained in the repository.

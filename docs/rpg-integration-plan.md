@@ -25,8 +25,9 @@ The plan was built from parallel reviews of:
 
 Primary Velvet integration points:
 
-- `server/src/repo.ts`
-- `server/src/app.ts`
+- `server/src/repo/index.ts` (public persistence barrel)
+- `server/src/repo/` domain modules; see [Repository architecture](repo-architecture.md)
+- `server/src/app.ts` (Fastify composition and plugin registration)
 - `server/src/types.ts`
 - `server/src/context.ts`
 - `server/src/prompt.ts`
@@ -39,6 +40,9 @@ Primary Velvet integration points:
 - `server/src/routes/roleplay/harness.ts`
 - `server/src/routes/roleplay/sessions.ts`
 - `server/src/routes/roleplay/sessionLifecycle.ts`
+- `server/src/routes/roleplay/interactions.ts`
+- `server/src/routes/roleplay/generationService.ts`
+- `server/src/routes/roleplay/generationRegistry.ts`
 - `server/src/legacy.ts`
 - `server/src/memory.ts`
 - `client/src/App.tsx`
@@ -191,6 +195,8 @@ The remote README claims MIT, but the repository has no detected `LICENSE` file 
 
 ## Prerequisite Refactors
 
+The list below records the plan's prerequisite targets. Contracts, server route modules, repository/UoW boundaries, injectable runtime ports, request IDs/problems, and the local principal/campaign-role foundation now exist in the current implementation. Client decomposition remains incremental. This status note does not imply that the aspirational domain/agent layout or later RPG capabilities below are implemented.
+
 Complete these without changing current behavior:
 
 1. Create `packages/contracts` for runtime schemas and inferred server/client types.
@@ -204,6 +210,8 @@ Complete these without changing current behavior:
 9. Preserve current deterministic and live E2E workflows as regression gates.
 
 Proposed top-level server layout:
+
+The following remains an aspirational target layout, not a description of the current tree. Current roleplay routes are under `server/src/routes/roleplay/`, current RPG routes are under `server/src/routes/rpg/v1/`, and current persistence is under `server/src/repo/`.
 
 ```text
 server/src/
@@ -2322,7 +2330,7 @@ Results: 46 focused repository and character-API tests passed; 59 representative
 Completed:
 
 - Added `server/src/routes/roleplay/sessionLifecycle.ts` and moved only legacy `DELETE /api/sessions/:id` and `POST /api/sessions/:id/stop` into it under `/api`.
-- Injected the existing synchronous generation-abort callback into the plugin while keeping generation maps private to `app.ts`. Preserved lookup-before-abort-before-operation ordering, including no callback for a missing session, and kept abort outside the atomic stop transaction.
+- At this historical Slice 15 checkpoint, the plugin received the existing synchronous generation-abort callback while generation maps still remained private to `app.ts`. Current process-local lock/abort ownership is `server/src/routes/roleplay/generationRegistry.ts`, shared by lifecycle and interaction routes. The checkpoint's lookup-before-abort-before-operation ordering, including no callback for a missing session and abort outside the atomic stop transaction, remains preserved.
 - Preserved delete cascades, append-only usage retention and deleted-session labeling, and release of formerly referenced characters. Preserved stop's bare Session response, exact consent event, stable stop time and reason on repeated calls with an additional event, rejection of later writes, request IDs, and active regular SSE stop/delete abort behavior without a reply.
 - Kept mutations other than delete/stop, context and sibling reads, branching, summaries, generation, and SSE orchestration unchanged. No UI, schema, RPG table, navigation, campaign, or gameplay changed; SQLite remains at schema v8.
 
@@ -2590,7 +2598,7 @@ Completed:
 - Preserved create defaults (`enabled: true`, `insertionOrder: 100`), patch retention of omitted fields and `createdAt`, all-entry listing, character-filtered listing that includes global plus matching scoped entries regardless of enabled state, and ordering by ascending `insertionOrder` then repository insertion sequence (`rowid`).
 - Preserved `400` validation bodies with the exact errors `keys must be an array of strings`, `content is required`, `characterId must be a string or null` on create, `characterIds must be an array of strings` (including an invalid singular patch), `enabled must be a boolean`, `insertionOrder must be a finite number`, and `lore patch is required`. Missing referenced scope IDs remain `404 { error: "character not found: <id>" }`; existing policy failure remains `422 { error: "policy violation", violations }`.
 - Preserved system-tag/control-character sanitization, key truncation to 60 characters before repository trimming/filtering, repository caps of eight non-empty keys and 1,200 content characters, and validated `X-Request-Id` response headers without adding request IDs to legacy JSON bodies.
-- Kept lore trigger selection in `server/src/lore.ts`, prompt assembly in existing prompt modules, and generation/SSE orchestration in `server/src/app.ts`. No public behavior, client UI, schema, RPG table, navigation, or gameplay changed; SQLite remains at schema v8.
+- At this historical Slice 6 checkpoint, lore trigger selection stayed in `server/src/lore.ts`, prompt assembly stayed in existing prompt modules, and generation/SSE orchestration still lived in `server/src/app.ts`. Current ownership is `server/src/routes/roleplay/interactions.ts` plus `generationService.ts`; the historical no-behavior-change and schema-v8 facts for that checkpoint are unchanged.
 
 Focused verification completed:
 
@@ -2708,7 +2716,7 @@ Completed:
 
 - Added exact API characterization for all seven existing character endpoints: list, create, get, update, delete, export, and import.
 - Moved those handlers and their character-only parsing/policy-candidate helpers from `server/src/app.ts` into the focused `server/src/routes/roleplay/characters.ts` Fastify plugin.
-- Registered the plugin under the existing `/api` prefix. Character memory routes remain in `app.ts` because memory management is outside this extraction slice.
+- Registered the plugin under the existing `/api` prefix. At this historical Slice 3 checkpoint, character memory routes still remained in `app.ts` because memory management was outside that extraction slice; they now live in `server/src/routes/roleplay/memories.ts`.
 - Preserved every characterized status and JSON body, validation message, permissive `checkCharacter` call site, `isRealPerson: false`, repository-generated UUID/timestamp behavior, direct and wrapped import forms, `velvet-character@1` export shape, missing-character responses, and guarded deletion `409` text.
 - Preserved validated `X-Request-Id` response headers without adding request IDs to legacy character JSON bodies.
 - Kept all existing repository named exports and callers unchanged. Routes continue to use repository functions and receive no raw database handles.
