@@ -103,6 +103,7 @@ import { createPowerRepository, type PowerRepository } from "./powerRepo.js";
 import { createEffectRepository, type EffectRepository } from "./effectRepo.js";
 import { createEncounterRepository, type EncounterRepository } from "./encounterRepo.js";
 import { createWorldRepository, type WorldRepository } from "./worldRepo.js";
+import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -433,7 +434,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: {
@@ -6999,6 +7000,16 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const effectRepository=createEffectRepository(db,dependencies,m16Guard);
   const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
   const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.8 mutation cannot run inside a repository transaction");});
+  const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
+    assertOpen(); if (transactionDepth > 0) throw new Error("M2.1 mutation cannot run inside a repository transaction");
+  });
+  const questRepository = new Proxy(rawQuestRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+    },
+  }) as QuestRepository;
   return {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -7013,6 +7024,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     ...effectRepository,
     ...encounterRepository,
     ...worldRepository,
+    ...questRepository,
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>

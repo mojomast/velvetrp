@@ -448,3 +448,79 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     for (const id of characterIds) await request.delete(`/api/characters/${id}`).catch(() => undefined);
   }
 });
+
+test("quest workflow creates and resolves campaign state", async ({ request }) => {
+  let characterId: string | undefined;
+  try {
+    const character = await json<{ id: string }>(request, "POST", "/characters", {
+      name: `${runId}-Quest-Scout`, age: 29, archetype: "Observant scout", boundaries: "Fictional deterministic test only",
+      fictionalConfirmed: true,
+    });
+    characterId = character.id;
+    expect(characterId).toBeTruthy();
+
+    const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+      name: `${runId}-Quest-Campaign`,
+    });
+    const campaignId = campaign.campaign.id;
+    expect(campaignId).toBeTruthy();
+
+    const storyline = await json<{
+      storyline: { id: string; campaignId: string; title: string; description: string | null; status: string };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/storylines`, {
+      title: "The missing star", description: "Follow the observatory chart.",
+    });
+    expect(storyline.storyline).toMatchObject({
+      campaignId, title: "The missing star", description: "Follow the observatory chart.", status: "active",
+    });
+    expect(storyline.storyline.id).toBeTruthy();
+
+    const quest = await json<{
+      quest: { id: string; campaignId: string; storylineId: string; title: string; description: string | null; status: string };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests`, {
+      storylineId: storyline.storyline.id, title: "Decode the chart", description: "Identify its moon seal.",
+    });
+    expect(quest.quest).toMatchObject({
+      campaignId, storylineId: storyline.storyline.id, title: "Decode the chart", description: "Identify its moon seal.", status: "open",
+    });
+    expect(quest.quest.id).toBeTruthy();
+
+    const clue = await json<{
+      clue: { id: string; campaignId: string; questId: string; content: string; discoveredByCharacterId: string | null; discoveredAt: string | null };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/clues`, {
+      content: "The chart bears a moon seal.",
+    });
+    expect(clue.clue).toMatchObject({
+      campaignId, questId: quest.quest.id, content: "The chart bears a moon seal.", discoveredByCharacterId: null, discoveredAt: null,
+    });
+    expect(clue.clue.id).toBeTruthy();
+
+    const discovered = await json<{
+      clue: { id: string; discoveredByCharacterId: string | null; discoveredAt: string | null };
+    }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/clues/${clue.clue.id}/discover`, {
+      characterId,
+    }, 200);
+    expect(discovered.clue).toMatchObject({ id: clue.clue.id, discoveredByCharacterId: characterId });
+    expect(discovered.clue.discoveredAt).toBeTruthy();
+
+    const reward = await json<{
+      reward: { id: string; campaignId: string; questId: string; kind: string; amount: number | null; label: string; grantedToCharacterId: string | null; grantedAt: string | null };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/rewards`, {
+      kind: "xp", amount: 100, label: "Observatory XP",
+    });
+    expect(reward.reward).toMatchObject({
+      campaignId, questId: quest.quest.id, kind: "xp", amount: 100, label: "Observatory XP", grantedToCharacterId: null, grantedAt: null,
+    });
+    expect(reward.reward.id).toBeTruthy();
+
+    const granted = await json<{
+      reward: { id: string; grantedToCharacterId: string | null; grantedAt: string | null };
+    }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/rewards/${reward.reward.id}/grant`, {
+      characterId,
+    }, 200);
+    expect(granted.reward).toMatchObject({ id: reward.reward.id, grantedToCharacterId: characterId });
+    expect(granted.reward.grantedAt).toBeTruthy();
+  } finally {
+    if (characterId) await request.delete(`/api/characters/${characterId}`).catch(() => undefined);
+  }
+});

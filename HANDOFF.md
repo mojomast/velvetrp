@@ -2,20 +2,19 @@
 
 ## Completed: Safe-word feature removal (schema v29)
 
-## Next Task: M2.1 quest routes
+## Next Task: M2 remaining route groups
 
 ## Context
 
 Schema v29 removes the retired character field from model/API/UI, exports, prompts, generation/session-close handling, policy detection, persistence, tests, and documentation. Consent events, boundaries, sanitization, the permissive policy stub, and normal stop/close behavior remain. The migration drops `characters.safe_word` transactionally, preserves character IDs and references, and uses `character_layout_attestation_v29` for startup drift validation. Historical fixture cleanup now removes v29 artifacts before replaying prior migrations.
 
-The v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`. M1.9 quests, storylines, clues, rewards, and objective completions is complete in schema v29r2; M2.1 quest routes is next after this change merges.
+The v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`. M1.9 quests, storylines, clues, rewards, and objective completions is complete in schema v29r2. M2.1 exposes the quest route group and includes an E2E smoke workflow; the remaining M2 route groups are next.
 
 ## Final Verification
 
 - `npm run typecheck` passed.
-- `npm run build` passed: 150 Vite modules.
-- `npm test` passed: contracts 189, server 1,814 + 1 skipped, client 232; 2,235 passing + 1 skipped across 135 test files.
-- `npm run test:e2e` passed: 1 passed.
+- `npm test` in `server/` passed: 1,827 passing + 1 skipped.
+- `npm run test:e2e -- --grep "quest workflow"` passed.
 - `git diff --check` passed.
 
 ## Major Relevant Changed Files
