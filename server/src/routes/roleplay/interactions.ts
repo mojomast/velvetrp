@@ -88,7 +88,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         usage: outcome.usage,
       });
 
-      await maybeUpdateSummary(session.id);
+      await maybeUpdateSummary(session.id, false, request.log);
       const finalSession = (await getSession(session.id)) ?? workingSession;
       return {
         userMessage,
@@ -189,7 +189,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         roomSse?.send("room_reply", { reply: message, index: speakerIndex, total: selection.speakerIds.length });
         parentId = message.id;
       }
-      await maybeUpdateSummary(session.id);
+      await maybeUpdateSummary(session.id, false, request.log);
       const finalSession = (await getSession(session.id)) ?? workingSession;
       const result = {
         userMessage,
@@ -293,7 +293,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         roomSse?.send("room_reply", { reply: message, index: replies.length - 1, total: selectedSpeakerIds.length });
         parentId = message.id;
       }
-      await maybeUpdateSummary(session.id);
+      await maybeUpdateSummary(session.id, false, request.log);
       const finalSession = (await getSession(session.id)) ?? session;
       const result = {
         replies,
@@ -469,7 +469,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         speakerCharacterId: character.id,
         usage: outcome.usage,
       });
-      await maybeUpdateSummary(session.id);
+      await maybeUpdateSummary(session.id, false, request.log);
       return {
         reply: replyMessage,
         swipeIndex,
@@ -576,7 +576,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: "message not found" });
     }
     await setActiveBranch(session.id, message.id);
-    await maybeUpdateSummary(session.id, true);
+    await maybeUpdateSummary(session.id, true, request.log);
     return { activeLeafId: message.id, messages: await listMessages(session.id) };
   });
 
@@ -648,7 +648,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         });
         const replyMessage = await addMessage(session.id, "character", outcome.text, { parentId: userMessage.id, speakerCharacterId: character.id, usage: outcome.usage });
 
-        await maybeUpdateSummary(session.id, true);
+        await maybeUpdateSummary(session.id, true, request.log);
         const finalSession = (await getSession(session.id)) ?? workingSession;
         return {
           userMessage,
@@ -695,7 +695,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         const replyMessage = await addMessage(session.id, "character", outcome.text, {
           parentId, speakerCharacterId: character.id, usage: outcome.usage,
         });
-        await maybeUpdateSummary(session.id);
+        await maybeUpdateSummary(session.id, false, request.log);
         return {
           reply: replyMessage, session: (await getSession(session.id)) ?? workingSession,
           preset: outcome.presetId, loreTriggered: outcome.loreTriggered, providerError: outcome.providerError,
