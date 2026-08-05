@@ -15,3 +15,25 @@ export {
   updateHarnessSettings,
   updateProviderSettings,
 } from "./settingsRepo.js";
+export {
+  addConsentEvent,
+  createSession,
+  deleteSession,
+  getSession,
+  getSessionContextSource,
+  listSessions,
+  stopSession,
+  transitionSession,
+  updateSessionContextSource,
+  updateSessionSynthesizedSource,
+} from "./sessionRepo.js";
+export {
+  addMessage,
+  getActiveLeaf,
+  getMessage,
+  listBranchChildren,
+  listBranchMessages,
+  listMessages,
+  nextSwipeIndex,
+  setActiveBranch,
+} from "./messageRepo.js";

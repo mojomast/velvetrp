@@ -77,14 +77,20 @@ import {
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../content/originalStarterManifest.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
-import { characterFromRow, createCharacterSync } from "./characterRepo.js";
+import { createCharacterSync } from "./characterRepo.js";
 import { configureRepositoryDatabase } from "./repoContext.js";
 import { updateHarnessSettingsSync } from "./settingsRepo.js";
+import {
+  addConsentEventSync,
+  getSessionSync,
+  stopSessionSync,
+  transitionSessionSync,
+  updateSessionContextSourceSync,
+} from "./sessionRepo.js";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
-  AddMessageOptions,
   AttachCampaignSessionInput,
   Character,
   Campaign,
@@ -115,15 +121,12 @@ import type {
   RpgDefinition,
   RulesProfile,
   RulesProfileIdentifier,
-  CreateSessionInput,
   Database,
   EpisodeSummary,
   HarnessSettings,
   LoreEntry,
   MemoryFact,
   MemoryKind,
-  Message,
-  MessageRole,
   NewLoreEntry,
   NewMemoryFact,
   PrivilegedCampaignCharacterProjection,
@@ -2169,59 +2172,6 @@ function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, depend
   markLegacyMigrated(dir);
 }
 
-interface CharacterRow {
-  id: string;
-  name: string;
-  age: number;
-  archetype: string;
-  boundaries: string;
-  safe_word: string;
-  fictional_confirmed: number;
-  is_real_person: number;
-  created_at: string;
-}
-
-interface SessionRow {
-  id: string;
-  character_id: string;
-  title: string;
-  state: string;
-  preset_id: string;
-  active_leaf_id: string | null;
-  created_at: string;
-  stopped_at: string | null;
-  stop_reason: string | null;
-}
-
-interface ConsentRow {
-  id: string;
-  session_id: string;
-  seq: number;
-  at: string;
-  scope: string;
-  granted: number;
-  note: string;
-}
-
-interface MessageRow {
-  id: string;
-  session_id: string;
-  role: string;
-  speaker_character_id: string | null;
-  content: string;
-  parent_id: string | null;
-  swipe_group_id: string | null;
-  swipe_index: number;
-  seq: number;
-  status: string;
-  prompt_tokens: number | null;
-  completion_tokens: number | null;
-  total_tokens: number | null;
-  usage_source: string | null;
-  usage_model: string | null;
-  created_at: string;
-}
-
 interface MemoryRow {
   id: string;
   character_id: string;
@@ -2249,60 +2199,6 @@ interface LoreRow {
   enabled: number;
   insertion_order: number;
   created_at: string;
-}
-
-function toConsentEvent(row: ConsentRow): ConsentEvent {
-  return { id: row.id, at: row.at, scope: row.scope, granted: row.granted === 1, note: row.note };
-}
-
-function participantsFor(db: DatabaseDriver.Database, sessionId: string): Character[] {
-  const rows = db.prepare(`SELECT c.* FROM characters c
-    JOIN session_characters sc ON sc.character_id = c.id
-    WHERE sc.session_id = ? ORDER BY sc.position ASC, sc.rowid ASC`).all(sessionId) as CharacterRow[];
-  return rows.map(characterFromRow);
-}
-
-function toSession(row: SessionRow, consentLog: ConsentEvent[], participants: Character[]): Session {
-  return {
-    id: row.id,
-    characterId: row.character_id,
-    primaryCharacterId: row.character_id,
-    participants,
-    title: row.title,
-    state: row.state as SceneState,
-    presetId: row.preset_id,
-    consentLog,
-    activeLeafId: row.active_leaf_id,
-    createdAt: row.created_at,
-    stoppedAt: row.stopped_at,
-    stopReason: row.stop_reason,
-  };
-}
-
-function toMessage(row: MessageRow): Message {
-  return {
-    id: row.id,
-    sessionId: row.session_id,
-    role: row.role as MessageRole,
-    speakerCharacterId: row.speaker_character_id,
-    content: row.content,
-    parentId: row.parent_id,
-    swipeGroupId: row.swipe_group_id,
-    swipeIndex: row.swipe_index,
-    seq: row.seq,
-    status: row.status === "aborted" ? "aborted" : "final",
-    createdAt: row.created_at,
-    usage:
-      row.prompt_tokens !== null && row.completion_tokens !== null && row.total_tokens !== null && row.usage_model
-        ? {
-            promptTokens: row.prompt_tokens,
-            completionTokens: row.completion_tokens,
-            totalTokens: row.total_tokens,
-            source: row.usage_source === "provider" ? "provider" : "estimated",
-            model: row.usage_model,
-          }
-        : null,
-  };
 }
 
 function toMemory(row: MemoryRow): MemoryFact {
@@ -2358,17 +2254,6 @@ function toLore(row: LoreRow, characterIds: string[] = row.character_id ? [row.c
     insertionOrder: row.insertion_order,
     createdAt: row.created_at,
   };
-}
-
-function consentLogFor(db: DatabaseDriver.Database, sessionId: string): ConsentEvent[] {
-  const rows = db
-    .prepare("SELECT * FROM consent_events WHERE session_id = ? ORDER BY seq ASC, rowid ASC")
-    .all(sessionId) as ConsentRow[];
-  return rows.map(toConsentEvent);
-}
-
-function sessionFromRow(db: DatabaseDriver.Database, row: SessionRow): Session {
-  return toSession(row, consentLogFor(db, row.id), participantsFor(db, row.id));
 }
 
 export interface RepositoryDependencies {
@@ -8819,76 +8704,6 @@ function createLoreEntrySync(
   return entry;
 }
 
-function getSessionSync(db: DatabaseDriver.Database, id: string): Session | null {
-  const row = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
-  return row ? sessionFromRow(db, row) : null;
-}
-
-function updateSessionContextSourceSync(
-  db: DatabaseDriver.Database,
-  clock: Clock,
-  sessionId: string,
-  sourceOfTruth: string,
-): { sourceOfTruth: string; updatedAt: string } {
-  const updatedAt = clock.now().toISOString();
-  db.prepare(`INSERT INTO session_context (session_id, source_of_truth, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(session_id) DO UPDATE SET source_of_truth = excluded.source_of_truth, updated_at = excluded.updated_at`)
-    .run(sessionId, sourceOfTruth, updatedAt);
-  return { sourceOfTruth, updatedAt };
-}
-
-function transitionSessionSync(
-  db: DatabaseDriver.Database,
-  clock: Clock,
-  id: string,
-  state: SceneState,
-  reason: string,
-): Session | null {
-  const existing = db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
-  if (!existing) return null;
-  const stoppedAt = state === "closed" && !existing.stopped_at ? clock.now().toISOString() : existing.stopped_at;
-  const stopReason = state === "closed" && !existing.stopped_at ? reason : existing.stop_reason;
-  db.prepare("UPDATE sessions SET state = ?, stopped_at = ?, stop_reason = ? WHERE id = ?").run(
-    state,
-    stoppedAt,
-    stopReason,
-    id,
-  );
-  return getSessionSync(db, id);
-}
-
-function addConsentEventSync(
-  db: DatabaseDriver.Database,
-  dependencies: RepositoryDependencies,
-  sessionId: string,
-  scope: string,
-  granted: boolean,
-  note: string,
-): ConsentEvent | null {
-  const existing = db.prepare("SELECT id FROM sessions WHERE id = ?").get(sessionId) as { id: string } | undefined;
-  if (!existing) return null;
-  const event: ConsentEvent = {
-    id: dependencies.ids.nextId(),
-    at: dependencies.clock.now().toISOString(),
-    scope,
-    granted,
-    note,
-  };
-  const maxSeq = db.prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM consent_events WHERE session_id = ?").get(sessionId) as {
-    maxSeq: number;
-  };
-  db.prepare("INSERT INTO consent_events (id, session_id, seq, at, scope, granted, note) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-    event.id,
-    sessionId,
-    maxSeq.maxSeq + 1,
-    event.at,
-    event.scope,
-    event.granted ? 1 : 0,
-    event.note,
-  );
-  return event;
-}
-
 function runTransaction<T>(
   db: DatabaseDriver.Database,
   dependencies: RepositoryDependencies,
@@ -9054,15 +8869,6 @@ function runTransaction<T>(
   } finally {
     active = false;
   }
-}
-
-function stopSessionSync(
-  repository: Pick<RepositoryUnitOfWork, "addConsentEvent" | "transitionSession">,
-  id: string,
-  reason: string,
-): Session | null {
-  repository.addConsentEvent(id, "user-stop", false, "User pressed stop; scene closed.");
-  return repository.transitionSession(id, "closed", reason);
 }
 
 export function createRepository(options: CreateRepositoryOptions = {}): Repository {
@@ -9365,257 +9171,6 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       closed = true;
     },
   };
-}
-
-export async function listSessions(characterId?: string): Promise<Session[]> {
-  const db = getDb();
-  const rows = (characterId
-    ? db.prepare(`SELECT s.* FROM sessions s JOIN session_characters sc ON sc.session_id = s.id
-        WHERE sc.character_id = ? ORDER BY s.created_at ASC, s.rowid ASC`).all(characterId)
-    : db.prepare("SELECT * FROM sessions ORDER BY created_at ASC, rowid ASC").all()) as SessionRow[];
-  return rows.map((row) => sessionFromRow(db, row));
-}
-
-export async function getSession(id: string): Promise<Session | null> {
-  return getSessionSync(getDb(), id);
-}
-
-export async function getSessionContextSource(sessionId: string): Promise<{ sourceOfTruth: string; updatedAt: string | null; synthesizedSource: string; synthesizedUpdatedAt: string | null }> {
-  const row = getDb().prepare("SELECT source_of_truth, updated_at, synthesized_source, synthesized_updated_at FROM session_context WHERE session_id = ?").get(sessionId) as
-    { source_of_truth: string; updated_at: string; synthesized_source: string; synthesized_updated_at: string | null } | undefined;
-  return { sourceOfTruth: row?.source_of_truth ?? "", updatedAt: row?.updated_at ?? null, synthesizedSource: row?.synthesized_source ?? "", synthesizedUpdatedAt: row?.synthesized_updated_at ?? null };
-}
-
-export async function updateSessionContextSource(sessionId: string, sourceOfTruth: string): Promise<{ sourceOfTruth: string; updatedAt: string }> {
-  return updateSessionContextSourceSync(getDb(), systemRuntime.clock, sessionId, sourceOfTruth);
-}
-
-export async function updateSessionSynthesizedSource(sessionId: string, synthesizedSource: string): Promise<{ synthesizedSource: string; updatedAt: string }> {
-  const updatedAt = now();
-  getDb().prepare(`INSERT INTO session_context (session_id, source_of_truth, updated_at, synthesized_source, synthesized_updated_at)
-    VALUES (?, '', ?, ?, ?)
-    ON CONFLICT(session_id) DO UPDATE SET synthesized_source = excluded.synthesized_source, synthesized_updated_at = excluded.synthesized_updated_at`)
-    .run(sessionId, updatedAt, synthesizedSource, updatedAt);
-  return { synthesizedSource, updatedAt };
-}
-
-export async function createSession(input: CreateSessionInput): Promise<Session> {
-  const db = getDb();
-  const ids = input.characterIds ?? (input.characterId ? [input.characterId] : []);
-  const primaryCharacterId = input.primaryCharacterId ?? input.characterId ?? ids[0]!;
-  const session: Session = {
-    id: randomUUID(),
-    characterId: primaryCharacterId,
-    primaryCharacterId,
-    participants: ids.map((id) => ({ id }) as Character),
-    title: input.title ?? "",
-    state: "setup",
-    presetId: input.presetId ?? "default",
-    consentLog: [
-      {
-        id: randomUUID(),
-        at: now(),
-        scope: "scene-created",
-        granted: true,
-        note: "Fictional adult character confirmed at creation.",
-      },
-    ],
-    activeLeafId: null,
-    createdAt: now(),
-    stoppedAt: null,
-    stopReason: null,
-  };
-  const run = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO sessions (id, character_id, title, state, preset_id, active_leaf_id, created_at, stopped_at, stop_reason)
-       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
-    ).run(session.id, session.characterId, session.title, session.state, session.presetId, session.createdAt, null, null);
-    const insertParticipant = db.prepare("INSERT INTO session_characters (session_id, character_id, position) VALUES (?, ?, ?)");
-    ids.forEach((characterId, position) => insertParticipant.run(session.id, characterId, position));
-    const event = session.consentLog[0] as ConsentEvent;
-    db.prepare(
-      `INSERT INTO consent_events (id, session_id, seq, at, scope, granted, note) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(event.id, session.id, 0, event.at, event.scope, event.granted ? 1 : 0, event.note);
-  });
-  run();
-  return (await getSession(session.id))!;
-}
-
-export async function deleteSession(id: string): Promise<boolean> {
-  const db = getDb();
-  return db.transaction(() => {
-    // session_characters, messages, summaries, and consent_events all use
-    // ON DELETE CASCADE from sessions. The transaction also accommodates the
-    // deferred active_leaf_id relationship between sessions and messages.
-    return db.prepare("DELETE FROM sessions WHERE id = ?").run(id).changes > 0;
-  })();
-}
-
-export async function transitionSession(id: string, state: SceneState, reason: string): Promise<Session | null> {
-  return transitionSessionSync(getDb(), systemRuntime.clock, id, state, reason);
-}
-
-export async function addConsentEvent(
-  sessionId: string,
-  scope: string,
-  granted: boolean,
-  note: string,
-): Promise<ConsentEvent | null> {
-  return addConsentEventSync(getDb(), systemRuntime, sessionId, scope, granted, note);
-}
-
-export async function stopSession(id: string, reason: string): Promise<Session | null> {
-  const db = getDb();
-  return runTransaction(db, systemRuntime, (repository) => stopSessionSync(repository, id, reason));
-}
-
-function messageRowsForSession(db: DatabaseDriver.Database, sessionId: string): MessageRow[] {
-  return db
-    .prepare("SELECT * FROM messages WHERE session_id = ? ORDER BY seq ASC, created_at ASC, rowid ASC")
-    .all(sessionId) as MessageRow[];
-}
-
-export async function getMessage(sessionId: string, messageId: string): Promise<Message | null> {
-  const row = getDb().prepare("SELECT * FROM messages WHERE session_id = ? AND id = ?").get(sessionId, messageId) as
-    | MessageRow
-    | undefined;
-  return row ? toMessage(row) : null;
-}
-
-export async function getActiveLeaf(sessionId: string): Promise<Message | null> {
-  const db = getDb();
-  const session = db.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?").get(sessionId) as
-    | { active_leaf_id: string | null }
-    | undefined;
-  if (!session) return null;
-  if (session.active_leaf_id) {
-    const row = db.prepare("SELECT * FROM messages WHERE id = ? AND session_id = ?").get(session.active_leaf_id, sessionId) as
-      | MessageRow
-      | undefined;
-    if (row) return toMessage(row);
-  }
-  const fallback = db
-    .prepare("SELECT * FROM messages WHERE session_id = ? AND status = 'final' ORDER BY seq DESC, rowid DESC LIMIT 1")
-    .get(sessionId) as MessageRow | undefined;
-  return fallback ? toMessage(fallback) : null;
-}
-
-export async function listBranchMessages(sessionId: string, leafId: string): Promise<Message[]> {
-  const rows = messageRowsForSession(getDb(), sessionId);
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const path: MessageRow[] = [];
-  const seen = new Set<string>();
-  let cursor: MessageRow | undefined = byId.get(leafId);
-  while (cursor && !seen.has(cursor.id)) {
-    seen.add(cursor.id);
-    path.push(cursor);
-    cursor = cursor.parent_id ? byId.get(cursor.parent_id) : undefined;
-  }
-  path.reverse();
-  return path.map(toMessage);
-}
-
-export async function listMessages(sessionId: string): Promise<Message[]> {
-  const db = getDb();
-  const session = db.prepare("SELECT active_leaf_id FROM sessions WHERE id = ?").get(sessionId) as
-    | { active_leaf_id: string | null }
-    | undefined;
-  if (session?.active_leaf_id) {
-    return listBranchMessages(sessionId, session.active_leaf_id);
-  }
-  return messageRowsForSession(db, sessionId).map(toMessage);
-}
-
-export async function listBranchChildren(sessionId: string, parentId: string | null): Promise<Message[]> {
-  const rows = getDb()
-    .prepare(
-      `SELECT * FROM messages
-       WHERE session_id = ? AND parent_id IS ?
-       ORDER BY swipe_index ASC, seq ASC, rowid ASC`,
-    )
-    .all(sessionId, parentId) as MessageRow[];
-  return rows.map(toMessage);
-}
-
-export async function nextSwipeIndex(sessionId: string, swipeGroupId: string): Promise<number> {
-  const row = getDb()
-    .prepare("SELECT COALESCE(MAX(swipe_index), -1) AS maxIndex FROM messages WHERE session_id = ? AND swipe_group_id = ?")
-    .get(sessionId, swipeGroupId) as { maxIndex: number };
-  return row.maxIndex + 1;
-}
-
-export async function setActiveBranch(sessionId: string, leafId: string): Promise<Session | null> {
-  const db = getDb();
-  const message = db.prepare("SELECT id FROM messages WHERE id = ? AND session_id = ?").get(leafId, sessionId) as
-    | { id: string }
-    | undefined;
-  if (!message) return null;
-  db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run(leafId, sessionId);
-  return getSession(sessionId);
-}
-
-export async function addMessage(
-  sessionId: string,
-  role: MessageRole,
-  content: string,
-  opts: AddMessageOptions = {},
-): Promise<Message> {
-  const db = getDb();
-  const status = opts.status ?? "final";
-  const parentId =
-    opts.parentId !== undefined ? opts.parentId : ((await getActiveLeaf(sessionId))?.id ?? null);
-  const maxSeq = db.prepare("SELECT COALESCE(MAX(seq), -1) AS maxSeq FROM messages WHERE session_id = ?").get(sessionId) as {
-    maxSeq: number;
-  };
-  const message: Message = {
-    id: randomUUID(),
-    sessionId,
-    role,
-    speakerCharacterId: role === "character" ? (opts.speakerCharacterId ?? null) : null,
-    content,
-    parentId,
-    swipeGroupId: opts.swipeGroupId ?? null,
-    swipeIndex: opts.swipeIndex ?? 0,
-    seq: maxSeq.maxSeq + 1,
-    status,
-    createdAt: now(),
-    usage: opts.usage ?? null,
-  };
-  if (!message.swipeGroupId) message.swipeGroupId = message.id;
-  const run = db.transaction(() => {
-    db.prepare(
-       `INSERT INTO messages (id, session_id, role, speaker_character_id, content, parent_id, swipe_group_id, swipe_index, seq, status,
-          prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      message.id,
-      message.sessionId,
-      message.role,
-      message.speakerCharacterId,
-      message.content,
-      message.parentId,
-      message.swipeGroupId,
-      message.swipeIndex,
-      message.seq,
-      message.status,
-      message.usage?.promptTokens ?? null,
-      message.usage?.completionTokens ?? null,
-      message.usage?.totalTokens ?? null,
-      message.usage?.source ?? null,
-      message.usage?.model ?? null,
-      message.createdAt,
-    );
-    if (status === "final") {
-      db.prepare("UPDATE sessions SET active_leaf_id = ? WHERE id = ?").run(message.id, sessionId);
-    }
-    if (message.usage) {
-      db.prepare(`INSERT INTO usage_events (id, session_id, source_message_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model, created_at)
-        VALUES (?, ?, ?, 'character_reply', ?, ?, ?, ?, ?, ?)`)
-        .run(randomUUID(), sessionId, message.id, message.usage.promptTokens, message.usage.completionTokens, message.usage.totalTokens, message.usage.source, message.usage.model, message.createdAt);
-    }
-  });
-  run();
-  return message;
 }
 
 export async function recordUsageEvent(sessionId: string, kind: string, usage: TokenUsage): Promise<void> {
