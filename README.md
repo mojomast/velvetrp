@@ -283,7 +283,7 @@ npm run dev:server   # server only
 npm run dev:client   # client only
 npm run typecheck    # typecheck contracts, server, client, and E2E
 npm run build        # production build (contracts → server → client)
-npm test             # contracts + server + client tests (2,123 passing, 1 skipped)
+npm test             # contracts + server + client tests (2,141 passing, 1 skipped)
 npm run test:e2e     # deterministic browser/API E2E (no paid provider calls)
 npm run ci           # install → typecheck → build → test
 ```
