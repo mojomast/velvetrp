@@ -1,0 +1,124 @@
+import type { Character, PolicyResult } from "./types.js";
+
+const MINOR_PATTERNS: RegExp[] = [
+  /\b(minor|underage|under\s*18|jailbait|loli|shota)\b/i,
+  /\b(child|children|kid|kids|preteen|tween)\b/i,
+  /\b(high\s*school|middle\s*school|elementary\s*school)\b/i,
+  /\b(1[0-7]|[0-9])\s*(years?|yrs?|y\.?\s*o\.?)\s*old\b/i,
+  /\bunder\s*(?:18|eighteen)\b/i,
+  /\b(?:ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)(?:\s*(?:years?|yrs?|y\.?\s*o\.?)\s*old|\s+old)?\b/i,
+  /\bteen(ager)?\b/i,
+  /\bschool\s*girl\b/i,
+  /\bschool\s*boy\b/i,
+];
+
+const NONCONSENT_PATTERNS: RegExp[] = [
+  /\b(rape|raping|raped)\b/i,
+  /\bnon[-\s]?con(sensual)?\b/i,
+  /\b(force[sd]?\s+(?:her|him|them|me))\b/i,
+  /\bagainst\s+(?:her|his|their|my)\s+will\b/i,
+  /\b(blackmail|coerc\w+|drugged|unconscious|passed\s*out|asleep)\b/i,
+  /\b(no\s+means\s+yes|can'?t\s+say\s+no|unable\s+to\s+consent)\b/i,
+];
+
+const REAL_PERSON_PATTERNS: RegExp[] = [
+  /\b(celebrity|celebrities|famous\s+(?:actress|actor|singer|model))\b/i,
+  /\b(real\s+(?:person|life)\s+(?:version|person))\b/i,
+  /\bdeepfake\b/i,
+  /\bimpersonat\w+\s+(?:a\s+)?real\b/i,
+];
+
+const LEETSPEAK_MAP: Record<string, string> = {
+  "0": "o",
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "5": "s",
+  "7": "t",
+  "@": "a",
+  $: "s",
+  "!": "i",
+};
+
+export function normalizeForPolicy(text: string): string {
+  return text
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .toLowerCase()
+    .replace(/[013457@$!]/g, (ch) => LEETSPEAK_MAP[ch] ?? ch)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function collectMatches(text: string, patterns: RegExp[], label: string): string[] {
+  const hits: string[] = [];
+  for (const pattern of patterns) {
+    if (pattern.test(text)) hits.push(label);
+  }
+  return hits;
+}
+
+function checkText(text: string): PolicyResult {
+  const normalized = normalizeForPolicy(text);
+  const targets = normalized === text ? [text] : [text, normalized];
+  const violations = new Set<string>();
+  for (const target of targets) {
+    collectMatches(target, MINOR_PATTERNS, "references minors").forEach((v) => violations.add(v));
+    collectMatches(target, NONCONSENT_PATTERNS, "contains non-consensual framing").forEach((v) => violations.add(v));
+    collectMatches(target, REAL_PERSON_PATTERNS, "references real-person/celebrity impersonation").forEach((v) =>
+      violations.add(v),
+    );
+  }
+  return { allowed: violations.size === 0, violations: [...violations] };
+}
+
+export function sanitizeInjectionText(content: string): string {
+  return content
+    .replace(/\[\s*system\s*\]/gi, "[user-text]")
+    .replace(/<\s*system\s*>/gi, "<user-text>")
+    .replace(/```\s*system/gi, "```user-text")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\uFEFF]/g, "")
+    .trim();
+}
+
+export function sanitizeUserContent(content: string): string {
+  return sanitizeInjectionText(content).slice(0, 1000).trim();
+}
+
+export function checkCharacter(character: Character): PolicyResult {
+  const violations: string[] = [];
+  if (!Number.isInteger(character.age) || character.age < 18) {
+    violations.push("character.age must be an integer >= 18");
+  }
+  if (character.fictionalConfirmed !== true || character.isRealPerson !== false) {
+    violations.push("character must be confirmed fictional and not a real person");
+  }
+  const combined = `${character.name}\n${character.archetype}\n${character.boundaries}`;
+  const textCheck = checkText(combined);
+  violations.push(...textCheck.violations.map((v) => `character profile ${v}`));
+  return { allowed: violations.length === 0, violations };
+}
+
+export function checkUserMessage(content: string): PolicyResult {
+  return checkText(content);
+}
+
+export function checkAssistantOutput(content: string): PolicyResult {
+  return checkText(content);
+}
+
+export const SAFE_WORDS = ["red", "safeword", "stop", "halt"] as const;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function isSafeWord(content: string, extraWords: Array<string | null | undefined> = []): boolean {
+  const normalized = content.toLowerCase().replace(/\s+/g, " ").trim();
+  const custom = extraWords
+    .filter((word): word is string => typeof word === "string" && word.trim() !== "")
+    .map((word) => word.trim().toLowerCase().replace(/\s+/g, " "));
+  const words = [...SAFE_WORDS, ...custom];
+  return words.some((word) => new RegExp(`\\b${escapeRegExp(word)}\\b`, "i").test(normalized));
+}

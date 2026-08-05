@@ -1,0 +1,31 @@
+{
+  "name": "velvet-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/contracts",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces --include-workspace-root",
+    "dev": "npm run build --workspace @velvet/contracts && (npm --workspace velvet-mvp-server run dev & npm --workspace velvet-mvp-client run dev & wait)",
+    "dev:server": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-server run dev",
+    "dev:client": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-client run dev",
+    "build": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-server run build && npm --workspace velvet-mvp-client run build",
+    "typecheck": "npm run build --workspace @velvet/contracts && npm run typecheck --workspace @velvet/contracts && npm --workspace velvet-mvp-server run typecheck && npm --workspace velvet-mvp-client run typecheck && npm run typecheck:e2e",
+    "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
+    "pretest": "npm run build --workspace @velvet/contracts",
+    "test": "npm run test --workspace @velvet/contracts && npm --workspace velvet-mvp-server run test && npm --workspace velvet-mvp-client run test",
+    "pretest:e2e": "npm run build --workspace @velvet/contracts",
+    "test:e2e": "playwright test",
+    "pretest:e2e:live": "npm run build --workspace @velvet/contracts",
+    "test:e2e:live": "playwright test --config=playwright.live.config.ts",
+    "ci": "npm ci && npm run typecheck && npm run build && npm run test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
