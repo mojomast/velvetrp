@@ -35,6 +35,7 @@ export * from "./powers.js";
 export * from "./effects.js";
 export * from "./encounters.js";
 export * from "./world.js";
+export * from "./quest.js";
 
 export {
   addCampaignMembershipInputSchema,

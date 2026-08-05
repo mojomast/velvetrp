@@ -100,8 +100,9 @@ function ensureSchema(db: DatabaseDriver.Database): void {
        createResourcesInventoryEconomyRestV25(db);
        createChecksPowersEffectsV26(db);
          createCombatFoundationV27(db);
-         createWorldTravelNpcFactionV28(db);
-         createCharacterLayoutV29(db);
+          createWorldTravelNpcFactionV28(db);
+          createCharacterLayoutV29(db);
+          createQuestsV29r2(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -325,6 +326,7 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
+  ensureSchemaRevisionV29(db);
   assertCurrentSchemaRevision(db);
   assertCharacterBuilderLayoutV22(db);
   assertCharacterProgressionLayoutV23(db);
@@ -352,15 +354,20 @@ function assertCurrentSchemaRevision(db: DatabaseDriver.Database): void {
 
 function ensureSchemaRevisionV11(db: DatabaseDriver.Database): void {
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string } | undefined;
-  if (row?.value === SCHEMA_REVISION) return;
+  if (row?.value === "1") return;
   if (row) {
-    throw new Error(`unsupported schemaRevision ${row.value}; expected ${SCHEMA_REVISION}`);
+    throw new Error(`unsupported schemaRevision ${row.value}; expected 1`);
   }
   db.transaction(() => {
     assertCampaignContentPacksHaveExactSealedPacks(db);
     createCampaignContentPackSealedPinTriggers(db);
-    db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
+    db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', '1')").run();
   })();
+}
+
+function ensureSchemaRevisionV29(db: DatabaseDriver.Database): void {
+  const hasQuestTables = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='quest_storylines'").get());
+  if (!hasQuestTables) db.transaction(() => createQuestsV29r2(db))();
 }
 
 function assertCampaignContentPacksHaveExactSealedPacks(db: DatabaseDriver.Database): void {
@@ -5490,6 +5497,61 @@ function migrate28to29(db: DatabaseDriver.Database): void {
     createCharacterLayoutV29(db);
     db.prepare("UPDATE meta SET value='29' WHERE key='schemaVersion'").run();
   })();
+}
+
+function createQuestsV29r2(db: DatabaseDriver.Database): void {
+  db.exec(`
+    CREATE TABLE quest_storylines (
+      id TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE quests (
+      id TEXT PRIMARY KEY,
+      storyline_id TEXT NOT NULL REFERENCES quest_storylines(id) ON DELETE CASCADE,
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'open',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE quest_clues (
+      id TEXT PRIMARY KEY,
+      quest_id TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      discovered_by_character_id TEXT REFERENCES characters(id),
+      discovered_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE quest_rewards (
+      id TEXT PRIMARY KEY,
+      quest_id TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+      campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      amount INTEGER,
+      label TEXT NOT NULL,
+      granted_to_character_id TEXT REFERENCES characters(id),
+      granted_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE quest_objective_completions (
+      id TEXT PRIMARY KEY,
+      quest_id TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE,
+      description TEXT NOT NULL,
+      completed_by_character_id TEXT REFERENCES characters(id),
+      completed_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_quests_campaign ON quests(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_quest_clues_quest ON quest_clues(quest_id);
+    CREATE INDEX IF NOT EXISTS idx_quest_rewards_quest ON quest_rewards(quest_id);
+    CREATE INDEX IF NOT EXISTS idx_storylines_campaign ON quest_storylines(campaign_id);
+  `);
 }
 
 function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, dependencies: RuntimeDependencies): void {

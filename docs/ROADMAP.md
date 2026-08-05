@@ -123,6 +123,8 @@ Persist a visibility-aware location graph plus campaign NPC personas, private go
 
 ### M1.9 Quests, storylines, clues, and rewards
 
+**Status: Complete (schema v29r2; repository/shared-contract only; no HTTP routes or client/UI)**
+
 Add explicit quest and story graphs whose state advances through commands rather than narration parsing.
 
 - **Complexity:** L

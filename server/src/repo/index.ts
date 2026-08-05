@@ -52,6 +52,13 @@ export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailab
 export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
 export {
+  addClue, addReward, completeObjective, createQuest, createStoryline, getQuest, getStoryline,
+  grantReward, listClues, listObjectiveCompletions, listQuests, listRewards, listStorylines,
+  markClueDiscovered, reorderQuests, updateQuestStatus, updateStorylineStatus,
+  type CreateQuestInput, type CreateRewardInput, type CreateStorylineInput,
+  type Quest, type QuestClue, type QuestObjectiveCompletion, type QuestReward, type Storyline,
+} from "./questRepo.js";
+export {
   createCharacter,
   deleteCharacter,
   getCharacter,
