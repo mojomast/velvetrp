@@ -61,6 +61,7 @@ import {
   type CampaignRoomLinkingResponse,
 } from "@velvet/contracts";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { evaluateDiceExpression, parseDiceExpression } from "../dice.js";
 import {
   ORIGINAL_STARTER_MANIFEST,
@@ -68,11 +69,31 @@ import {
   ORIGINAL_STARTER_PACK_VERSION,
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../content/originalStarterManifest.js";
+import {
+  MECHANICS_STARTER_CATALOG,
+  MECHANICS_STARTER_RULES_PROFILE_ID,
+} from "../content/mechanicsStarterCatalog.js";
 import { systemRuntime } from "../runtime.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import { createCharacterSync } from "./characterRepo.js";
 import { createLoreEntrySync } from "./loreRepo.js";
 import { openRepositoryDatabase, resolveDataDir } from "./db.js";
+import {
+  createCampaignAdministrationRepository,
+  type CampaignAdministrationRepository,
+} from "./campaignAdministrationRepo.js";
+import {
+  createContentCatalogRepository,
+  verifyCatalogVisibilityProjection,
+  validateContentCatalog,
+  type PersistedCatalogVisibilityRow,
+  type ContentCatalogRepository,
+} from "./contentCatalogRepo.js";
+import {
+  createCharacterBuilderRepository,
+  type CharacterBuilderRepository,
+} from "./characterBuilderRepo.js";
+import { createCharacterProgressionRepository, type CharacterProgressionRepository } from "./characterProgressionRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -271,6 +292,13 @@ export type OriginalStarterSetupInspection =
   | { status: "exact"; campaign: CampaignDetail };
 
 export interface RepositoryUnitOfWork {
+  validateContentCatalog(input: unknown): import("@velvet/contracts").CatalogValidationReport;
+  listContentCatalogPublications(actorPrincipalId: string): import("@velvet/contracts").PublicationSummary[];
+  getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): import("@velvet/contracts").OwnerCatalogProjection | null;
+  getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string):
+    import("@velvet/contracts").GmCatalogProjection | import("@velvet/contracts").PlayerCatalogProjection | import("@velvet/contracts").ObserverCatalogProjection | null;
+  resolveCampaignCatalog(actorPrincipalId: string, campaignId: string): import("@velvet/contracts").CampaignCatalogResolutionReport | null;
+  getCampaignCatalogReceipt(actorPrincipalId: string, campaignId: string, commandId: string): import("@velvet/contracts").CampaignCatalogReceipt | null;
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   getCampaign(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
@@ -394,7 +422,12 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository {
+  /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
+  installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
+  configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: {
+    expectedRevision: number; idempotencyKey: string;
+  }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
   /** Specialized trusted-local snapshot; it accepts no caller-supplied content identities. */
   inspectOriginalStarterSetup(actorPrincipalId: string, campaignId: string): OriginalStarterSetupInspection;
   /** Specialized setup write; manifest identity and content are fixed by the repository. */
@@ -655,9 +688,11 @@ function executeSetActorAttributeSync(
       const retry = db.prepare(`SELECT command.*,
           retry_timeline.id AS retry_timeline_presence,
           retry_timeline.revision AS retry_timeline_revision,
-          (SELECT COUNT(*) FROM campaign_events timeline_event
+          ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
             WHERE timeline_event.campaign_id = command.campaign_id
-              AND timeline_event.timeline_id = command.timeline_id) AS retry_timeline_event_count,
+              AND timeline_event.timeline_id = command.timeline_id)
+            + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+              WHERE imported.campaign_id=command.campaign_id AND imported.timeline_id=command.timeline_id)) AS retry_timeline_event_count,
           retry_actor.id AS retry_actor_presence,
           receipt.revision_before, receipt.revision_after, receipt.event_id AS receipt_event_id,
           event.event_id, event.campaign_id AS event_campaign_id, event.command_id AS event_command_id,
@@ -953,9 +988,11 @@ function executeInitializeActorResourceSync(
       const retry = db.prepare(`SELECT command.*,
           retry_timeline.id AS retry_timeline_presence,
           retry_timeline.revision AS retry_timeline_revision,
-          (SELECT COUNT(*) FROM campaign_events timeline_event
+          ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
             WHERE timeline_event.campaign_id = command.campaign_id
-              AND timeline_event.timeline_id = command.timeline_id) AS retry_timeline_event_count,
+              AND timeline_event.timeline_id = command.timeline_id)
+            + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+              WHERE imported.campaign_id=command.campaign_id AND imported.timeline_id=command.timeline_id)) AS retry_timeline_event_count,
           retry_actor.id AS retry_actor_presence,
           receipt.revision_before, receipt.revision_after, receipt.event_id AS receipt_event_id,
           event.event_id, event.campaign_id AS event_campaign_id, event.command_id AS event_command_id,
@@ -1341,10 +1378,23 @@ function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: R
       }
       const retry = db.prepare(`SELECT command.*,
         timeline.id retry_timeline_presence, timeline.revision retry_timeline_revision,
-        (SELECT COUNT(*) FROM campaign_events h WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id) retry_timeline_event_count,
-        (SELECT MIN(revision) FROM campaign_events h WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id) retry_timeline_min_revision,
-        (SELECT MAX(revision) FROM campaign_events h WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id) retry_timeline_max_revision,
-        ${DICE_RETRY_INVALID_HISTORY_COUNT} retry_timeline_invalid_event_count,
+        ((SELECT COUNT(*) FROM campaign_timeline_events h WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id)
+          + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+            WHERE imported.campaign_id=command.campaign_id AND imported.timeline_id=command.timeline_id)) retry_timeline_event_count,
+        (SELECT MIN(revision) FROM (SELECT revision FROM campaign_timeline_events h
+            WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id
+          UNION ALL SELECT revision FROM campaign_imported_timeline_events imported
+            WHERE imported.campaign_id=command.campaign_id AND imported.timeline_id=command.timeline_id)) retry_timeline_min_revision,
+        (SELECT MAX(revision) FROM (SELECT revision FROM campaign_timeline_events h
+            WHERE h.campaign_id=command.campaign_id AND h.timeline_id=command.timeline_id
+          UNION ALL SELECT revision FROM campaign_imported_timeline_events imported
+            WHERE imported.campaign_id=command.campaign_id AND imported.timeline_id=command.timeline_id)) retry_timeline_max_revision,
+        (${DICE_RETRY_INVALID_HISTORY_COUNT} + (SELECT COUNT(*) FROM campaign_timeline_events link
+          LEFT JOIN campaign_events linked_event ON linked_event.event_id=link.event_id
+          WHERE link.campaign_id=command.campaign_id AND link.timeline_id=command.timeline_id
+            AND (linked_event.event_id IS NULL OR linked_event.campaign_id<>link.campaign_id
+              OR linked_event.revision<>link.revision
+              OR (link.inherited=0 AND linked_event.timeline_id<>link.timeline_id)))) retry_timeline_invalid_event_count,
         actor.id retry_actor_presence, receipt.revision_before, receipt.revision_after, receipt.event_id receipt_event_id,
         campaign_character.id retry_campaign_character_presence,
         character.id retry_character_presence, sheet.id retry_sheet_presence,
@@ -1860,6 +1910,9 @@ function createCampaignSync(
       .run(campaign.id, campaign.name, campaign.activeTimelineId, campaign.ownerPrincipalId, campaign.createdAt, campaign.updatedAt);
     db.prepare("INSERT INTO campaign_timelines (id, campaign_id, created_at) VALUES (?, ?, ?)")
       .run(campaign.activeTimelineId, campaign.id, campaign.createdAt);
+    db.prepare(`INSERT INTO campaign_timeline_history
+      (campaign_id, timeline_id, source_timeline_id, parent_timeline_id, created_by_command_id, forked_from_revision) VALUES (?, ?, NULL, NULL, NULL, NULL)`)
+      .run(campaign.id, campaign.activeTimelineId);
     db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
       VALUES (?, ?, 'owner', ?)`)
       .run(campaign.id, campaign.ownerPrincipalId, campaign.createdAt);
@@ -1886,6 +1939,27 @@ function toCampaign(row: CampaignRow): Campaign {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
+}
+
+function recordCompatibilityAdministrationAudit(db: DatabaseDriver.Database, campaignId: string,
+  actorPrincipalId: string, type: "campaign_renamed" | "membership_added" | "room_attached" | "room_detached",
+  payload: object, result: object, occurredAt: string): void {
+  const row = db.prepare("SELECT administration_revision FROM campaigns WHERE id=?").get(campaignId) as { administration_revision: number };
+  const before = revisionSchema.parse(row.administration_revision), after = before + 1;
+  const identity = createHash("sha256").update(`${campaignId}:${type}:${before}:${JSON.stringify(payload)}`).digest("hex");
+  const commandId = `compat-command-${identity.slice(0, 32)}`, eventId = `compat-event-${identity.slice(32)}`;
+  const key = `compat-${identity.slice(0, 40)}`, data = JSON.stringify(payload);
+  db.prepare(`INSERT INTO campaign_administration_commands
+    (command_id,campaign_id,idempotency_key,actor_principal_id,expected_revision,type,payload,created_at)
+    VALUES (?,?,?,?,?,?,?,?)`).run(commandId, campaignId, key, actorPrincipalId, before, type, data, occurredAt);
+  db.prepare("UPDATE campaigns SET administration_revision=? WHERE id=? AND administration_revision=?")
+    .run(after, campaignId, before);
+  db.prepare(`INSERT INTO campaign_administration_events
+    (event_id,campaign_id,command_id,revision_before,revision,type,public_data,private_data,occurred_at)
+    VALUES (?,?,?,?,?,?,?,?,?)`).run(eventId, campaignId, commandId, before, after, type, data, data, occurredAt);
+  db.prepare(`INSERT INTO campaign_administration_receipts
+    (command_id,campaign_id,event_id,type,revision_before,revision_after,result_data) VALUES (?,?,?,?,?,?,?)`)
+    .run(commandId, campaignId, eventId, type, before, after, JSON.stringify(result));
 }
 
 function renameCampaignSync(
@@ -2672,19 +2746,30 @@ const CAMPAIGN_TIMELINE_READ_SELECT = `SELECT
   active_timeline.campaign_id AS active_timeline_campaign_id,
   timeline.id AS timeline_id, timeline.campaign_id AS timeline_campaign_id,
   timeline.revision AS timeline_revision, timeline.created_at AS timeline_created_at,
-  (SELECT COUNT(*) FROM campaign_events event
-    WHERE event.campaign_id = campaign.id AND event.timeline_id = timeline.id) AS event_count,
-  (SELECT COUNT(*) FROM campaign_commands command
-    WHERE command.campaign_id = campaign.id AND command.timeline_id = timeline.id) AS command_count,
-  (SELECT COUNT(*) FROM command_receipts receipt JOIN campaign_commands command
-    ON command.campaign_id = receipt.campaign_id AND command.command_id = receipt.command_id
-    WHERE command.campaign_id = campaign.id AND command.timeline_id = timeline.id) AS receipt_count,
-  (SELECT MIN(event.revision) FROM campaign_events event
-    WHERE event.campaign_id = campaign.id AND event.timeline_id = timeline.id) AS minimum_revision,
-  (SELECT MAX(event.revision) FROM campaign_events event
-    WHERE event.campaign_id = campaign.id AND event.timeline_id = timeline.id) AS maximum_revision,
-  (SELECT COUNT(DISTINCT event.revision) FROM campaign_events event
-    WHERE event.campaign_id = campaign.id AND event.timeline_id = timeline.id) AS distinct_revision_count,
+  ((SELECT COUNT(*) FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)
+    + (SELECT COUNT(*) FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS event_count,
+  ((SELECT COUNT(*) FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)
+    + (SELECT COUNT(*) FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS command_count,
+  ((SELECT COUNT(*) FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)
+    + (SELECT COUNT(*) FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS receipt_count,
+  (SELECT MIN(revision) FROM (SELECT revision FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id UNION ALL
+      SELECT revision FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS minimum_revision,
+  (SELECT MAX(revision) FROM (SELECT revision FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id UNION ALL
+      SELECT revision FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS maximum_revision,
+  (SELECT COUNT(DISTINCT revision) FROM (SELECT revision FROM campaign_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id UNION ALL
+      SELECT revision FROM campaign_imported_timeline_events event
+      WHERE event.campaign_id=campaign.id AND event.timeline_id=timeline.id)) AS distinct_revision_count,
   ((SELECT COUNT(*) FROM campaign_commands command WHERE command.campaign_id = campaign.id
       AND COALESCE((${VALID_AUDIT_COMMAND}), 0) <> 1)
     + (SELECT COUNT(*) FROM campaign_events event WHERE event.campaign_id = campaign.id
@@ -4797,6 +4882,34 @@ function listCampaignEventsSync(
   const principalId = resourceIdSchema.parse(actorPrincipalId);
   const normalizedCampaignId = resourceIdSchema.parse(campaignId);
   const normalizedTimelineId = resourceIdSchema.parse(timelineId);
+  const derived = db.prepare(`SELECT h.parent_timeline_id,
+      (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+        WHERE imported.campaign_id=h.campaign_id AND imported.timeline_id=h.timeline_id) AS imported_count
+    FROM campaign_timeline_history h WHERE h.campaign_id=? AND h.timeline_id=?`)
+    .get(normalizedCampaignId, normalizedTimelineId) as { parent_timeline_id: string | null; imported_count: number } | undefined;
+  if (derived && (derived.parent_timeline_id !== null || derived.imported_count > 0)) {
+    const timelineState = getCampaignTimelineSync(db, principalId, normalizedCampaignId, normalizedTimelineId);
+    if (!timelineState) return [];
+    const linked = db.prepare(`SELECT link.revision,event.command_id FROM campaign_timeline_events link
+      JOIN campaign_events event ON event.event_id=link.event_id
+      WHERE link.campaign_id=? AND link.timeline_id=? ORDER BY link.revision`).all(normalizedCampaignId, normalizedTimelineId) as
+      Array<{ revision: number; command_id: string }>;
+    const events: RpgEvent[] = linked.map((link) => {
+      const receipt = getCommandReceiptSync(db, principalId, normalizedCampaignId, link.command_id);
+      if (!receipt || receipt.events.length !== 1) throw new Error("campaign inherited event is incomplete");
+      return rpgEventSchema.parse({ ...receipt.events[0], timelineId: normalizedTimelineId, revision: link.revision });
+    });
+    const imported = db.prepare(`SELECT * FROM campaign_imported_timeline_events
+      WHERE campaign_id=? AND timeline_id=? ORDER BY revision`).all(normalizedCampaignId, normalizedTimelineId) as any[];
+    for (const row of imported) events.push(rpgEventSchema.parse({ eventId: row.source_event_id,
+      commandId: row.source_command_id, campaignId: normalizedCampaignId, timelineId: normalizedTimelineId,
+      actorId: row.actor_id, sourceTurnId: row.source_turn_id, type: row.type, revision: row.revision,
+      occurredAt: row.occurred_at, data: JSON.parse(row.public_data) }));
+    events.sort((left, right) => left.revision - right.revision);
+    if (events.length !== timelineState.revision || events.some((event, index) => event.revision !== index + 1))
+      throw new Error("campaign inherited event history is incomplete");
+    return recentDiceOnly ? events.filter((event) => event.type === "actor_dice_rolled").slice(-20).reverse() : events;
+  }
   const auditIdentitySql = recentDiceOnly ? `
       SELECT campaign_id, command_id, timeline_id FROM campaign_events
       WHERE campaign_id = ? AND timeline_id = ? AND type = 'actor_dice_rolled'
@@ -4830,9 +4943,11 @@ function listCampaignEventsSync(
       requested_timeline.id AS requested_timeline_presence,
       event_timeline.id AS event_timeline_presence,
       event_timeline.revision AS event_timeline_revision,
-      (SELECT COUNT(*) FROM campaign_events timeline_event
+      ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = event.campaign_id
-          AND timeline_event.timeline_id = event.timeline_id) AS event_timeline_event_count,
+          AND timeline_event.timeline_id = event.timeline_id)
+        + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+          WHERE imported.campaign_id=event.campaign_id AND imported.timeline_id=event.timeline_id)) AS event_timeline_event_count,
       requested_timeline.revision AS requested_timeline_revision,
       ((SELECT COUNT(*) FROM campaign_commands invalid_command
           WHERE invalid_command.campaign_id=membership.campaign_id AND NOT EXISTS (
@@ -4860,13 +4975,13 @@ function listCampaignEventsSync(
                 AND event.event_id=term.event_id)
               OR EXISTS (SELECT 1 FROM command_receipts receipt WHERE receipt.campaign_id=membership.campaign_id
                 AND receipt.event_id=term.event_id)))) AS invalid_audit_count,
-      (SELECT COUNT(*) FROM campaign_events timeline_event
+      (SELECT COUNT(*) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = membership.campaign_id
           AND timeline_event.timeline_id = ?) AS requested_timeline_event_count,
-      (SELECT MIN(timeline_event.revision) FROM campaign_events timeline_event
+      (SELECT MIN(timeline_event.revision) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = membership.campaign_id
           AND timeline_event.timeline_id = ?) AS requested_timeline_min_revision,
-      (SELECT MAX(timeline_event.revision) FROM campaign_events timeline_event
+      (SELECT MAX(timeline_event.revision) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = membership.campaign_id
           AND timeline_event.timeline_id = ?) AS requested_timeline_max_revision,
       event_actor.id AS event_actor_presence,
@@ -5022,19 +5137,25 @@ export function getCommandReceiptSync(
       requested_timeline.id AS requested_timeline_presence,
       event_timeline.id AS event_timeline_presence,
       event_timeline.revision AS event_timeline_revision,
-      (SELECT COUNT(*) FROM campaign_events timeline_event
+      ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = event.campaign_id
-          AND timeline_event.timeline_id = event.timeline_id) AS event_timeline_event_count,
+          AND timeline_event.timeline_id = event.timeline_id)
+        + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+          WHERE imported.campaign_id=event.campaign_id AND imported.timeline_id=event.timeline_id)) AS event_timeline_event_count,
       requested_timeline.revision AS requested_timeline_revision,
-      (SELECT COUNT(*) FROM campaign_events timeline_event
+      ((SELECT COUNT(*) FROM campaign_timeline_events timeline_event
         WHERE timeline_event.campaign_id = event.campaign_id
-          AND timeline_event.timeline_id = event.timeline_id) AS requested_timeline_event_count,
-      (SELECT MIN(timeline_event.revision) FROM campaign_events timeline_event
-        WHERE timeline_event.campaign_id = event.campaign_id
-          AND timeline_event.timeline_id = event.timeline_id) AS requested_timeline_min_revision,
-      (SELECT MAX(timeline_event.revision) FROM campaign_events timeline_event
-        WHERE timeline_event.campaign_id = event.campaign_id
-          AND timeline_event.timeline_id = event.timeline_id) AS requested_timeline_max_revision,
+          AND timeline_event.timeline_id = event.timeline_id)
+        + (SELECT COUNT(*) FROM campaign_imported_timeline_events imported
+          WHERE imported.campaign_id=event.campaign_id AND imported.timeline_id=event.timeline_id)) AS requested_timeline_event_count,
+      (SELECT MIN(revision) FROM (SELECT revision FROM campaign_timeline_events timeline_event
+          WHERE timeline_event.campaign_id=event.campaign_id AND timeline_event.timeline_id=event.timeline_id
+        UNION ALL SELECT revision FROM campaign_imported_timeline_events imported
+          WHERE imported.campaign_id=event.campaign_id AND imported.timeline_id=event.timeline_id)) AS requested_timeline_min_revision,
+      (SELECT MAX(revision) FROM (SELECT revision FROM campaign_timeline_events timeline_event
+          WHERE timeline_event.campaign_id=event.campaign_id AND timeline_event.timeline_id=event.timeline_id
+        UNION ALL SELECT revision FROM campaign_imported_timeline_events imported
+          WHERE imported.campaign_id=event.campaign_id AND imported.timeline_id=event.timeline_id)) AS requested_timeline_max_revision,
       event_actor.id AS event_actor_presence,
       (SELECT COUNT(*) FROM rpg_dice_terms attributable_term
         WHERE attributable_term.event_id = event.event_id) AS attributable_term_count,
@@ -5358,6 +5479,11 @@ function installContentPackSync(
     }
     db.prepare(`UPDATE rpg_content_packs SET sealed = 1
       WHERE pack_id = ? AND pack_version = ? AND sealed = 0`)
+      .run(contentPack.packId, contentPack.packVersion);
+    db.prepare(`INSERT INTO rpg_content_pack_publications
+      (pack_id,pack_version,validation_level,rules_engine,manifest_digest,manifest_json,provenance_json,
+       validation_report_json,published_by_principal_id,published_at)
+      VALUES (?,?,'legacy-v10',NULL,NULL,NULL,NULL,NULL,NULL,NULL)`)
       .run(contentPack.packId, contentPack.packVersion);
     return contentPack;
   }).immediate();
@@ -6495,20 +6621,51 @@ function listCampaignContentPackDefinitionsSync(
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
   const normalized = contentPackIdentifierSchema.parse(identifier);
-  const rows = db.prepare(`SELECT ${DEFINITION_PROJECTION}
+  const rows = db.prepare(`SELECT ${DEFINITION_PROJECTION},cm.role access_role,publication.validation_level,
+      publication.manifest_digest legacy_manifest_digest,attestation.definition_count,attestation.publication_digest,
+      attestation.public_projection_digest,
+      (SELECT json_group_array(json_object('kind',ordered.kind,'definition_id',ordered.definition_id,
+        'public_definition_json',ordered.public_definition_json,'public_dependencies_json',ordered.public_dependencies_json,
+        'private_dependencies_json',ordered.private_dependencies_json,'row_digest',ordered.row_digest,
+        'publicly_reachable',ordered.publicly_reachable)) FROM
+        (SELECT kind,definition_id,public_definition_json,public_dependencies_json,private_dependencies_json,row_digest,publicly_reachable
+          FROM rpg_catalog_definition_visibility visibility WHERE visibility.pack_id=? AND visibility.pack_version=?
+          ORDER BY visibility.kind COLLATE BINARY,visibility.definition_id COLLATE BINARY) ordered) visibility_rows_json
     FROM campaign_memberships cm
     JOIN campaign_content_packs cp ON cp.campaign_id = cm.campaign_id
       AND cp.pack_id = ? AND cp.pack_version = ?
     JOIN rpg_definitions d ON d.pack_id = cp.pack_id AND d.pack_version = cp.pack_version
     JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
+    LEFT JOIN rpg_content_pack_publications publication ON publication.pack_id=d.pack_id AND publication.pack_version=d.pack_version
+    LEFT JOIN rpg_catalog_publication_attestations attestation ON attestation.pack_id=publication.pack_id
+      AND attestation.pack_version=publication.pack_version
     WHERE cm.principal_id = ? AND cm.campaign_id = ?
     ORDER BY ${DEFINITION_ORDER}`).all(
       normalized.packId,
       normalized.packVersion,
+      normalized.packId,
+      normalized.packVersion,
       actorId,
       id,
-    ) as RpgDefinitionRow[];
-  return rows.map(toRpgDefinition);
+    ) as Array<RpgDefinitionRow&{access_role:"owner"|"gm"|"player"|"observer";validation_level:string|null;
+      legacy_manifest_digest:string|null;definition_count:number|null;publication_digest:string|null;
+      public_projection_digest:string|null;visibility_rows_json:string}>;
+  if(!rows.length)return[];
+  const authority=rows[0]!;
+  if (authority.validation_level !== "validated-v1") return rows.map(toRpgDefinition);
+  let visible: Set<string>;
+  try { visible=new Set(verifyCatalogVisibilityProjection({packId:normalized.packId,packVersion:normalized.packVersion,
+    expectedCount:authority.definition_count!,manifestDigest:authority.legacy_manifest_digest!,publicationDigest:authority.publication_digest!,
+    aggregateDigest:authority.public_projection_digest!,rows:JSON.parse(authority.visibility_rows_json) as PersistedCatalogVisibilityRow[]})
+    .map((value)=>{const reference=(value as {reference:{kind:string;definitionId:string}}).reference;
+      return `${reference.kind==="enemy-template"?"enemy":reference.kind}\0${reference.definitionId}`;})); }
+  catch (error) {
+    if (authority.access_role === "owner" || authority.access_role === "gm") throw error;
+    return [];
+  }
+  const projected=authority.access_role === "owner" || authority.access_role === "gm" ? rows
+    : rows.filter((row)=>visible.has(`${row.kind}\0${row.definition_id}`));
+  return projected.map(toRpgDefinition);
 }
 
 function getCampaignContentPackDefinitionSync(
@@ -6520,22 +6677,49 @@ function getCampaignContentPackDefinitionSync(
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
   const normalized = definitionReferenceSchema.parse(reference);
-  const row = db.prepare(`SELECT ${DEFINITION_PROJECTION}
+  const row = db.prepare(`SELECT ${DEFINITION_PROJECTION},cm.role access_role,publication.validation_level,
+      publication.manifest_digest legacy_manifest_digest,attestation.definition_count,attestation.publication_digest,
+      attestation.public_projection_digest,
+      (SELECT json_group_array(json_object('kind',ordered.kind,'definition_id',ordered.definition_id,
+        'public_definition_json',ordered.public_definition_json,'public_dependencies_json',ordered.public_dependencies_json,
+        'private_dependencies_json',ordered.private_dependencies_json,'row_digest',ordered.row_digest,
+        'publicly_reachable',ordered.publicly_reachable)) FROM
+        (SELECT kind,definition_id,public_definition_json,public_dependencies_json,private_dependencies_json,row_digest,publicly_reachable
+          FROM rpg_catalog_definition_visibility visibility WHERE visibility.pack_id=? AND visibility.pack_version=?
+          ORDER BY visibility.kind COLLATE BINARY,visibility.definition_id COLLATE BINARY) ordered) visibility_rows_json
     FROM campaign_memberships cm
     JOIN campaign_content_packs cp ON cp.campaign_id = cm.campaign_id
       AND cp.pack_id = ? AND cp.pack_version = ?
     JOIN rpg_definitions d ON d.pack_id = cp.pack_id AND d.pack_version = cp.pack_version
       AND d.kind = ? AND d.definition_id = ?
     JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
+    LEFT JOIN rpg_content_pack_publications publication ON publication.pack_id=d.pack_id AND publication.pack_version=d.pack_version
+    LEFT JOIN rpg_catalog_publication_attestations attestation ON attestation.pack_id=publication.pack_id
+      AND attestation.pack_version=publication.pack_version
     WHERE cm.principal_id = ? AND cm.campaign_id = ?`).get(
+      normalized.packId,
+      normalized.packVersion,
       normalized.packId,
       normalized.packVersion,
       normalized.kind,
       normalized.definitionId,
       actorId,
       id,
-    ) as RpgDefinitionRow | undefined;
-  return row ? toRpgDefinition(row) : null;
+    ) as (RpgDefinitionRow&{access_role:"owner"|"gm"|"player"|"observer";validation_level:string|null;
+      legacy_manifest_digest:string|null;definition_count:number|null;publication_digest:string|null;
+      public_projection_digest:string|null;visibility_rows_json:string})|undefined;
+  if(!row)return null;
+  if(row.validation_level==="validated-v1"){
+    let visible:Set<string>;
+    try{visible=new Set(verifyCatalogVisibilityProjection({packId:normalized.packId,packVersion:normalized.packVersion,
+      expectedCount:row.definition_count!,manifestDigest:row.legacy_manifest_digest!,publicationDigest:row.publication_digest!,
+      aggregateDigest:row.public_projection_digest!,rows:JSON.parse(row.visibility_rows_json) as PersistedCatalogVisibilityRow[]})
+      .map((value)=>{const reference=(value as {reference:{kind:string;definitionId:string}}).reference;
+        return `${reference.kind==="enemy-template"?"enemy":reference.kind}\0${reference.definitionId}`;}));}
+    catch(error){if(row.access_role==="owner"||row.access_role==="gm")throw error;return null;}
+    if(row.access_role!=="owner"&&row.access_role!=="gm"&&!visible.has(`${normalized.kind}\0${normalized.definitionId}`))return null;
+  }
+  return toRpgDefinition(row);
 }
 
 function runTransaction<T>(
@@ -6547,7 +6731,34 @@ function runTransaction<T>(
   const assertActive = () => {
     if (!active) throw new Error("transaction unit of work is no longer active");
   };
+  const contentCatalogRepository = createContentCatalogRepository(db, dependencies.clock, () => {
+    throw new Error("content catalog mutation cannot run inside a repository transaction");
+  });
   const unitOfWork: RepositoryUnitOfWork = {
+    validateContentCatalog: (input) => {
+      assertActive();
+      return validateContentCatalog(input);
+    },
+    listContentCatalogPublications: (actorPrincipalId) => {
+      assertActive();
+      return contentCatalogRepository.listContentCatalogPublications(actorPrincipalId);
+    },
+    getContentCatalogForOwner: (actorPrincipalId, packId, packVersion) => {
+      assertActive();
+      return contentCatalogRepository.getContentCatalogForOwner(actorPrincipalId, packId, packVersion);
+    },
+    getCampaignContentCatalog: (actorPrincipalId, campaignId, packId, packVersion) => {
+      assertActive();
+      return contentCatalogRepository.getCampaignContentCatalog(actorPrincipalId, campaignId, packId, packVersion);
+    },
+    resolveCampaignCatalog: (actorPrincipalId, campaignId) => {
+      assertActive();
+      return contentCatalogRepository.resolveCampaignCatalog(actorPrincipalId, campaignId);
+    },
+    getCampaignCatalogReceipt: (actorPrincipalId, campaignId, commandId) => {
+      assertActive();
+      return contentCatalogRepository.getCampaignCatalogReceipt(actorPrincipalId, campaignId, commandId);
+    },
     listCampaigns: (actorPrincipalId) => {
       assertActive();
       return listCampaignsSync(db, actorPrincipalId);
@@ -6718,7 +6929,64 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const assertOpen = () => {
     if (closed) throw new Error("repository is closed");
   };
+  const rawAdministrationRepository = createCampaignAdministrationRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("campaign administration mutation cannot run inside a repository transaction");
+  }, (sessionId) => {
+    const row = getCampaignRoomSessionIntegrityRow(db, sessionId);
+    return row ? validateCampaignRoomSessionIntegrity(row) : null;
+  });
+  const administrationRepository = new Proxy(rawAdministrationRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+    },
+  }) as CampaignAdministrationRepository;
+  const rawContentCatalogRepository = createContentCatalogRepository(db, dependencies.clock, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("content catalog mutation cannot run inside a repository transaction");
+  });
+  const contentCatalogRepository = new Proxy(rawContentCatalogRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+    },
+  }) as ContentCatalogRepository;
+  const rawCharacterBuilderRepository = createCharacterBuilderRepository(db, dependencies, () => {
+    assertOpen();
+    if (transactionDepth > 0) throw new Error("character builder mutation cannot run inside a repository transaction");
+  });
+  const characterBuilderRepository = new Proxy(rawCharacterBuilderRepository, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) => { assertOpen(); return value(...args); };
+    },
+  }) as CharacterBuilderRepository;
+  const rawCharacterProgressionRepository=createCharacterProgressionRepository(db,dependencies,()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("character progression mutation cannot run inside a repository transaction");
+  });
+  const characterProgressionRepository=new Proxy(rawCharacterProgressionRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
+    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as CharacterProgressionRepository;
   return {
+    ...administrationRepository,
+    ...contentCatalogRepository,
+    ...characterBuilderRepository,
+    ...characterProgressionRepository,
+    installMechanicsStarterCatalog: (actorPrincipalId) =>
+      contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
+    configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>
+      contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
+        rulesProfileId: MECHANICS_STARTER_RULES_PROFILE_ID,
+        contentPacks: [{
+          packId: MECHANICS_STARTER_CATALOG.manifest.packId,
+          packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
+        }],
+        expectedRevision: input.expectedRevision,
+        idempotencyKey: input.idempotencyKey,
+      }),
     inspectOriginalStarterSetup: (actorPrincipalId, campaignId) => {
       assertOpen();
       // One SQLite read transaction owns authority, campaign and content state.
@@ -6875,7 +7143,15 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     addCampaignMembership: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign membership addition cannot run inside a repository transaction");
-      return addCampaignMembershipSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
+      return db.transaction(() => {
+        const normalized = addCampaignMembershipInputSchema.parse(input);
+        const existed = db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+          .get(campaignId, normalized.principalId);
+        const value = addCampaignMembershipSync(db, dependencies.clock, actorPrincipalId, campaignId, normalized);
+        if (!existed) recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "membership_added",
+          { principalId: value.principalId, role: value.role }, value, value.createdAt);
+        return value;
+      }).immediate();
     },
     createCampaign: (actorPrincipalId, input) => {
       assertOpen();
@@ -6885,24 +7161,51 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     renameCampaign: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign rename cannot run inside a repository transaction");
-      return renameCampaignSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
+      return db.transaction(() => {
+        const value = renameCampaignSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
+        recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "campaign_renamed",
+          { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
+        return value;
+      }).immediate();
     },
     renameCampaignIfUnchanged: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) {
         throw new Error("stale-safe campaign rename cannot run inside a repository transaction");
       }
-      return renameCampaignIfUnchangedSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
+      return db.transaction(() => {
+        const value = renameCampaignIfUnchangedSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
+        recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "campaign_renamed",
+          { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
+        return value;
+      }).immediate();
     },
     attachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign session attachment cannot run inside a repository transaction");
-      return attachCampaignSessionSync(db, dependencies.clock, actorPrincipalId, input);
+      return db.transaction(() => {
+        const normalized = attachCampaignSessionInputSchema.parse(input);
+        const existed = db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?")
+          .get(normalized.campaignId, normalized.sessionId);
+        const value = attachCampaignSessionSync(db, dependencies.clock, actorPrincipalId, normalized);
+        if (!existed) recordCompatibilityAdministrationAudit(db, normalized.campaignId, actorPrincipalId, "room_attached",
+          { sessionId: value.sessionId }, value, value.attachedAt);
+        return value;
+      }).immediate();
     },
     detachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign session detachment cannot run inside a repository transaction");
-      return detachCampaignSessionSync(db, actorPrincipalId, input);
+      return db.transaction(() => {
+        const normalized = detachCampaignSessionInputSchema.parse(input);
+        const value = detachCampaignSessionSync(db, actorPrincipalId, normalized);
+        if (value) {
+          const campaign = db.prepare("SELECT updated_at FROM campaigns WHERE id=?").get(normalized.campaignId) as { updated_at: string };
+          recordCompatibilityAdministrationAudit(db, normalized.campaignId, actorPrincipalId, "room_detached",
+            { sessionId: value.sessionId }, value, campaign.updated_at);
+        }
+        return value;
+      }).immediate();
     },
     installContentPack: (actorPrincipalId, input) => {
       assertOpen();

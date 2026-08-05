@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -116,7 +116,7 @@ describe("role-sensitive actor resource queries", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.pragma("ignore_check_constraints = ON");
-    db.prepare(mutation).run();
+    if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
     db.close();
     expect(repository.listActorResources("observer", "campaign-one", "actor-one")).toEqual([]);
     expect(repository.getActorResource("observer", "campaign-one", "actor-one", "hp")).toBeNull();

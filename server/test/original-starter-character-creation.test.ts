@@ -23,7 +23,7 @@ import {
   OriginalStarterCharacterCreationUnavailableError,
   OriginalStarterCharacterPersonaUnavailableError,
 } from "../src/content/originalStarterCharacterCreation.js";
-import { useTmpDataDir } from "./helpers.js";
+import { authorizeCampaignDeletionForTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const AT = "2036-01-02T03:04:05.006Z";
@@ -426,6 +426,7 @@ describe("original starter campaign-character creation service", () => {
     const dependencyBaseline = { ids: nextId.mock.calls.length, clocks: now.mock.calls.length };
     const lockedCreate = vi.fn((actor: string, input: Parameters<typeof repository.createOriginalStarterCampaignCharacter>[1]) => {
       const drift = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
+      authorizeCampaignDeletionForTest(drift,"campaign");
       mutate(drift);
       drift.close();
       return repository.createOriginalStarterCampaignCharacter(actor, input);

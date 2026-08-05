@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -71,7 +71,10 @@ function createRepresentativeV10(dir: string): string {
   const dbPath = databasePath(dir);
   const db = new DatabaseDriver(dbPath);
   db.pragma("foreign_keys = OFF");
+  removeFutureCharacterBuilderSchema(db);
   db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE rpg_actor_resources;
@@ -126,7 +129,10 @@ function sealedPinTriggerSchema(dbPath: string): unknown[] {
 }
 
 function makeOldV11(db: DatabaseDriver.Database): void {
+  removeFutureCharacterBuilderSchema(db);
   db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE rpg_actor_resources;
@@ -211,7 +217,7 @@ describe("schema v11 campaign sheets and actors", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
       expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string }).value).toBe("1");
       for (const table of V11_TABLES) {
         expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
@@ -290,7 +296,7 @@ describe("schema v11 campaign sheets and actors", () => {
     expect(clockNow).not.toHaveBeenCalled();
     expect(nextId).not.toHaveBeenCalled();
     const repaired = new DatabaseDriver(dbPath, { readonly: true });
-    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "14" });
+    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "24" });
     expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     repaired.close();
     expect(v11Schema(dbPath)).not.toEqual(baselineV11Schema);
@@ -532,7 +538,7 @@ describe("schema v11 campaign sheets and actors", () => {
     }
     expect(db.prepare("SELECT id FROM characters WHERE id = 'persona-one'").get()).toEqual({ id: "persona-one" });
     insertCompleteAggregate(db);
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
+    deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
     for (const table of V11_TABLES) {
       expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
     }
@@ -566,7 +572,7 @@ describe("schema v11 campaign sheets and actors", () => {
     const retried = createRepository({ dataDir: dir });
     retried.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(migrated.pragma("foreign_key_check")).toEqual([]);
     migrated.close();
   });
@@ -592,7 +598,7 @@ describe("schema v11 campaign sheets and actors", () => {
     const retried = createRepository({ dataDir: dir });
     retried.close();
     const fresh = new DatabaseDriver(dbPath, { readonly: true });
-    expect((fresh.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((fresh.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(fresh.pragma("foreign_key_check")).toEqual([]);
     fresh.close();
   });

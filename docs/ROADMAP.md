@@ -1,12 +1,16 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v14 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, the 13 trusted-local operations in `server/src/routes/rpg/v1/features.ts`, and the current campaign pages under `client/src/roleplay/`. Items describe future work, not functionality delivered by this document.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v24 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, the 13 trusted-local operations in `server/src/routes/rpg/v1/features.ts`, and the current campaign pages under `client/src/roleplay/`. Items describe future work, not functionality delivered by this document.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
+
+M1.1-M1.4 are complete only at the repository/shared-contract boundary. V23 introduced M1.4 progression and v24 repaired its provenance/integrity graph; neither added a route or client workflow, so the trusted-local HTTP boundary remains exactly 13 M0 operations. M1.5 is the next repository-only milestone. Separately, the recommended next user-facing implementation is a bounded M2.5/M2.6 mechanics catalog plus character builder/progression HTTP/UI vertical slice.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
 ### M1.1 Campaign administration, membership, and timelines
+
+**Status: Complete (repository/shared-contract only)**
 
 Extend the existing campaign foundation with lifecycle state, settings, membership administration, canonical checkpoints, non-destructive timeline forks, recaps, command logs, and versioned import/export records.
 
@@ -20,6 +24,8 @@ Extend the existing campaign foundation with lifecycle state, settings, membersh
 
 ### M1.2 Immutable content catalog and campaign pinning
 
+**Status: Complete (repository/shared-contract only)**
+
 Complete repository support for rules profiles and versioned content definitions while retaining exact-version campaign pins and immutable publication.
 
 - **Complexity:** M
@@ -28,9 +34,11 @@ Complete repository support for rules profiles and versioned content definitions
   - Shared schemas cover validation reports, compatibility metadata, publication manifests, and role-filtered catalog projections for races, backgrounds, classes, levels, skills, abilities, spells, items, currencies, and enemy templates.
   - Repository operations validate a complete pack before sealing it, reject arbitrary paths and unsupported mechanics, and never mutate or replace a sealed version.
   - Campaign configuration accepts only compatible sealed versions and produces deterministic definition ordering and reference-resolution errors.
-  - An original, provenance-reviewed starter pack remains sufficient for deterministic integration tests; no third-party catalog is copied.
+  - The provenance-reviewed `velvet:mechanics-starter` remains sufficient for deterministic integration tests; it stays distinct from the metadata-only `velvet:original-starter`, and no third-party catalog is copied.
 
 ### M1.3 Character builder and derived sheet
+
+**Status: Complete (schema v22r1 integrity repair; repository/shared-contract only)**
 
 Add draft character construction, bounded attribute allocation, finalization, and one authoritative derived-stat calculator around the existing finalized campaign-character aggregate.
 
@@ -44,6 +52,8 @@ Add draft character construction, bounded attribute allocation, finalization, an
 
 ### M1.4 Progression and level application
 
+**Status: Complete (introduced in v23r1; provenance/integrity repaired in v24r1; repository/shared-contract only)**
+
 Persist XP or milestone advancement, previews, pending choices, and atomic single-class level application.
 
 - **Complexity:** L
@@ -55,6 +65,8 @@ Persist XP or milestone advancement, previews, pending choices, and atomic singl
   - GM corrections require a bounded reason and append compensating ledger and audit events rather than rewriting history.
 
 ### M1.5 Resources, inventory, equipment, economy, and rest
+
+**Status: Next repository-only milestone**
 
 Expand minimal actor resources into transactional inventory, equipment, wallets, shops, trades, and profile-defined recovery.
 

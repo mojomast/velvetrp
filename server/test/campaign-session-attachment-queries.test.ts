@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -222,7 +222,7 @@ describe("campaign session attachment queries", () => {
     const db = new DatabaseDriver(databasePath());
     db.pragma("foreign_keys = ON");
     db.transaction(() => {
-      db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignA);
+      deleteCampaignForCorruptionTest(db,campaignA);db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignA);
     }).immediate();
     expect(db.prepare("SELECT id FROM sessions WHERE id IN (?, ?, ?) ORDER BY id COLLATE BINARY")
       .all(firstSession, stoppedSession, laterSession)).toEqual([

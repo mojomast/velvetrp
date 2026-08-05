@@ -5,7 +5,7 @@ import type { CommandEnvelope } from "@velvet/contracts";
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -138,15 +138,15 @@ describe("role-sensitive command event and receipt queries", () => {
     const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare");
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     try {
-      for (const call of [
-        () => repository.listCampaignEvents("observer", campaignId, "timeline-old"),
-        () => repository.getCommandReceipt("player", campaignId, "command-b"),
-      ]) {
+      for (const [call, statementIndex] of [
+        [() => repository.listCampaignEvents("observer", campaignId, "timeline-old"), 1],
+        [() => repository.getCommandReceipt("player", campaignId, "command-b"), 0],
+      ] as const) {
         prepare.mockClear();
         transaction.mockClear();
         call();
-        expect(prepare).toHaveBeenCalledOnce();
-        const sql = prepare.mock.calls[0]![0] as string;
+        expect(prepare).toHaveBeenCalledTimes(statementIndex + 1);
+        const sql = prepare.mock.calls[statementIndex]![0] as string;
         expect(sql).toMatch(/^SELECT\s/i);
         expect(sql).not.toMatch(/SELECT\s+\*/i);
         expect(sql).toMatch(/FROM campaign_memberships/);
@@ -263,7 +263,7 @@ describe("role-sensitive command event and receipt queries", () => {
     const repository = seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
-    db.prepare(mutation).run();
+    if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-audit");db.prepare(mutation).run();
     db.close();
     expect(repository.listCampaignEvents("observer", campaignId, "timeline-old")).toEqual([]);
     expect(repository.getCommandReceipt("observer", campaignId, "command-b")).toBeNull();

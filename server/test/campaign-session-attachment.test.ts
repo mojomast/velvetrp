@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CampaignSessionAttachmentConflictError, createRepository } from "../src/repo/index.js";
 import type { AttachCampaignSessionInput } from "../src/types.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -183,7 +183,9 @@ describe("factory campaign-session attachment", () => {
     const initial = createRepository({ dataDir: dataDir(), clock: { now: () => new Date(fixedAt) } });
     initial.attachCampaignSession("local-owner", { campaignId: "campaign-one", sessionId: "session/legacy value" });
     initial.close();
-    if (mutation) corrupt(mutation);
+    if (mutation === "DELETE FROM campaigns WHERE id = 'campaign-one'") {
+      const damage=new DatabaseDriver(databasePath());damage.pragma("foreign_keys=OFF");deleteCampaignForCorruptionTest(damage,"campaign-one");damage.exec(mutation);damage.close();
+    } else if (mutation) corrupt(mutation);
     const clockNow = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
     const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow }, ids: { nextId } });
@@ -361,9 +363,10 @@ describe("factory campaign-session attachment", () => {
     repository.close();
     const db = new DatabaseDriver(databasePath());
     db.pragma("foreign_keys = ON");
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
+    deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
     expect(db.prepare("SELECT id FROM sessions").all()).toEqual([{ id: "session/legacy value" }]);
     expect(db.prepare("SELECT * FROM campaign_sessions").all()).toEqual([]);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM campaign_administration_receipts").get()).toEqual({ count: 0 });
     db.close();
   });
 });

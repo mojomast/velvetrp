@@ -118,8 +118,8 @@ describe("listCampaignEvents dice projection", () => {
       const recent = repository.listRecentCampaignDiceEvents("observer", "campaign", "timeline-old");
       expect(recent).toHaveLength(20);
       expect(recent.map((item) => item.revision)).toEqual(Array.from({ length: 20 }, (_, index) => 21 - index));
-      expect(prepare).toHaveBeenCalledOnce();
-      const sql = prepare.mock.calls[0]![0] as string;
+      expect(prepare).toHaveBeenCalledTimes(2);
+      const sql = prepare.mock.calls[1]![0] as string;
       expect(sql).toMatch(/type = 'actor_dice_rolled'[\s\S]*ORDER BY revision DESC[\s\S]*LIMIT 20[\s\S]*LEFT JOIN rpg_dice_terms/);
     } finally {
       prepare.mockRestore();
@@ -283,8 +283,8 @@ describe("listCampaignEvents dice projection", () => {
     try {
       const events = repository.listCampaignEvents("observer", "campaign", "timeline-old");
       expect(events).toHaveLength(1);
-      expect(prepare).toHaveBeenCalledOnce();
-      const sql = prepare.mock.calls[0]![0] as string;
+      expect(prepare).toHaveBeenCalledTimes(2);
+      const sql = prepare.mock.calls[1]![0] as string;
       expect(sql).toMatch(/^SELECT\s/i);
       expect(sql).toMatch(/FROM campaign_memberships membership/);
       expect(sql).not.toMatch(/SELECT\s+\*/i);

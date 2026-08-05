@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -221,7 +221,7 @@ describe("roll actor dice command", () => {
     ["missing GM membership","DELETE FROM campaign_memberships WHERE campaign_id='campaign-one' AND principal_id='gm'","gm"],
     ["owner disagreement","UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign-one'","local-owner"],
   ])("denies corrupt authorization: %s before every dependency", (_label,sql,principal) => {
-    seed(); const db=new DatabaseDriver(dbPath()); db.pragma("foreign_keys=OFF"); db.exec(sql); db.close();
+    seed(); const db=new DatabaseDriver(dbPath()); db.pragma("foreign_keys=OFF"); if(sql.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.exec(sql); db.close();
     const guarded=guardedFactory();
     expect(() => guarded.repository.executeRollActorDice(principal,base)).toThrow("command unavailable");
     expectNoDependencies(guarded); guarded.repository.close();

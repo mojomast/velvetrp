@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { CampaignRole } from "@velvet/contracts";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -296,7 +296,7 @@ describe("authorized campaign queries", () => {
     db.prepare("UPDATE campaign_memberships SET role = 'admin' WHERE campaign_id = 'campaign-c' AND principal_id = ?")
       .run(actorId);
     db.prepare("DELETE FROM principals WHERE id = ?").run(actorId);
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-c'").run();
+    deleteCampaignForCorruptionTest(db,"campaign-c");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-c'").run();
     db.close();
     const repository = createRepository({ dataDir: dataDir() });
 

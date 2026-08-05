@@ -34,6 +34,95 @@ export function useTmpDataDir(): void {
   });
 }
 
+/** Remove impossible future builder artifacts when constructing genuine historical fixtures. */
+export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").Database): void {
+  removeFutureCharacterProgressionSchema(db);
+  const v20Triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger'
+    AND (name GLOB '*_v20' OR name GLOB '*_v20_*' OR name GLOB '*_v21' OR name GLOB '*_v21_*'
+      OR name GLOB '*_v22' OR name GLOB '*_v22_*' OR name GLOB '*_v23' OR name GLOB '*_v23_*')`).all() as Array<{ name: string }>;
+  for (const trigger of v20Triggers) db.exec(`DROP TRIGGER ${trigger.name}`);
+  db.exec(`
+    DROP INDEX IF EXISTS uq_character_draft_commands_v21_revision;
+    DROP INDEX IF EXISTS uq_character_draft_events_v21_revision;
+    DROP INDEX IF EXISTS uq_character_draft_receipts_v21_revision;
+    DROP INDEX IF EXISTS uq_character_draft_proposals_v21_revision;
+    DROP TABLE IF EXISTS character_builder_layout_attestation_v21;
+    DROP TABLE IF EXISTS character_builder_layout_attestation_v22;
+    DROP TABLE IF EXISTS character_draft_command_provenance_v20;
+    DROP TABLE IF EXISTS character_draft_campaign_deletions_v20;
+    DROP TABLE IF EXISTS character_builder_layout_attestation_v20;
+    DROP TABLE IF EXISTS character_starting_grants_v19;
+    DROP TABLE IF EXISTS character_derived_snapshots_v19;
+    DROP TABLE IF EXISTS character_draft_revisions_v19;
+    DROP TABLE IF EXISTS character_draft_receipts_v19;
+    DROP TABLE IF EXISTS character_draft_events_v19;
+    DROP TABLE IF EXISTS character_draft_commands_v19;
+    DROP TABLE IF EXISTS character_draft_pins_v19;
+    DROP TABLE IF EXISTS character_drafts_v19;
+  `);
+  const catalogGuards = [
+    ["campaign_content_catalog_selections_immutable_delete", "campaign_content_catalog_selections", "campaign catalog selections are immutable"],
+    ["campaign_content_catalog_pins_immutable_delete", "campaign_content_catalog_pins", "campaign catalog pins are immutable"],
+    ["campaign_catalog_selection_bind_delete", "campaign_catalog_current_selections", "catalog selection delete requires one exact open command"],
+    ["campaign_catalog_pin_bind_delete", "campaign_catalog_current_pins", "catalog pin delete requires one exact open command"],
+    ["campaign_catalog_commands_immutable_delete", "campaign_catalog_commands", "campaign catalog commands are immutable"],
+    ["campaign_catalog_events_immutable_delete", "campaign_catalog_events", "campaign catalog events are immutable"],
+    ["campaign_catalog_receipts_immutable_delete", "campaign_catalog_receipts", "campaign catalog receipts are immutable"],
+    ["campaign_catalog_command_provenance_v18_immutable_delete", "campaign_catalog_command_provenance_v18", "catalog proposed provenance is immutable"],
+  ] as const;
+  for (const [trigger, table, message] of catalogGuards) {
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) continue;
+    db.exec(`DROP TRIGGER IF EXISTS ${trigger}; CREATE TRIGGER ${trigger} BEFORE DELETE ON ${table}
+      BEGIN SELECT RAISE(ABORT,'${message}'); END;`);
+  }
+}
+
+/** Remove only v23 artifacts when a test needs a genuine v19-v22 fixture. */
+export function removeFutureCharacterProgressionSchema(db:import("better-sqlite3").Database):void{
+  removeFutureCharacterProgressionIntegrityV24(db);
+  const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v23' OR name GLOB '*_v23_*')").all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  db.exec(`DROP TABLE IF EXISTS character_progression_receipts_v23;
+    DROP TABLE IF EXISTS character_level_advancements_v23; DROP TABLE IF EXISTS character_progression_ledger_v23;
+    DROP TABLE IF EXISTS character_known_powers_v23; DROP TABLE IF EXISTS character_progression_pending_choices_v23;
+    DROP TABLE IF EXISTS character_progression_snapshots_v23; DROP TABLE IF EXISTS character_progression_commands_v23;
+    DROP TABLE IF EXISTS character_progression_v23; DROP TABLE IF EXISTS rpg_progression_profiles_v23;
+    DROP TABLE IF EXISTS character_progression_layout_attestation_v23;`);
+}
+
+/** Remove only additive v24 progression-integrity artifacts. */
+export function removeFutureCharacterProgressionIntegrityV24(db:import("better-sqlite3").Database):void{
+  const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v24' OR name GLOB '*_v24_*')").all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  db.exec(`DROP TABLE IF EXISTS character_progression_events_v24;
+    DROP TABLE IF EXISTS character_progression_command_proposals_v24;
+    DROP TABLE IF EXISTS character_progression_pending_snapshots_v24;
+    DROP TABLE IF EXISTS character_known_power_sources_v24;
+    DROP TABLE IF EXISTS character_progression_bootstrap_v24;
+    DROP TABLE IF EXISTS character_progression_layout_attestation_v24;`);
+}
+
+/** Registers the hostile legacy name for non-campaign deletion corruption fixtures. */
+export function authorizeCampaignDeletionForTest(db: import("better-sqlite3").Database, campaignId: string): void {
+  db.function("velvet_campaign_delete_authorized", (candidate: unknown) => candidate === campaignId ? 1 : 0);
+}
+
+/** Removes a campaign only inside deliberate legacy/missing-parent fixtures, then restores exact v22 DDL. */
+export function deleteCampaignForCorruptionTest(db:import("better-sqlite3").Database,campaignId:string):void{
+  authorizeCampaignDeletionForTest(db,campaignId);
+  const names=["campaigns_prevent_physical_delete_v22","character_draft_campaign_deletions_v22_inert_insert",
+    "character_draft_campaign_deletions_v22_inert_update","character_draft_campaign_deletions_v22_inert_delete"];
+  const rows=db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(()=>"?").join(",")})`)
+    .all(...names) as Array<{name:string;sql:string}>;
+  if(rows.length!==0&&rows.length!==names.length)throw new Error("v22 archive guards are incomplete in the corruption fixture");
+  try{
+    for(const row of rows)db.exec(`DROP TRIGGER ${row.name}`);
+    db.prepare("DELETE FROM campaigns WHERE id=?").run(campaignId);
+  }finally{
+    for(const row of rows)db.exec(row.sql);
+  }
+}
+
 export interface FakeProvider {
   baseUrl: string;
   requests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string }>;

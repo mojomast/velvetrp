@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -28,7 +28,10 @@ function createRepresentativeV8(dir: string): string {
   const dbPath = path.join(dir, "velvet.sqlite");
   const db = new DatabaseDriver(dbPath);
     db.pragma("foreign_keys = OFF");
+    removeFutureCharacterBuilderSchema(db);
     db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE rpg_actor_resources;
@@ -135,7 +138,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     const db = new DatabaseDriver(path.join(dir, "velvet.sqlite"));
     db.pragma("foreign_keys = ON");
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(db.prepare("SELECT * FROM principals").all()).toEqual([{
       id: "local-owner",
       display_name: "Local owner",
@@ -224,7 +227,7 @@ describe("schema v9 campaign foundation", () => {
     expect(() => db.prepare("INSERT INTO campaign_sessions (session_id, campaign_id, attached_at) VALUES (?, ?, ?)")
       .run("session-existing", "campaign-two", at)).toThrow();
 
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
+    deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-one'").run();
     expect(db.prepare("SELECT id FROM sessions WHERE id = 'session-existing'").get()).toEqual({ id: "session-existing" });
     expect(db.prepare("SELECT * FROM campaign_sessions WHERE session_id = 'session-existing'").get()).toBeUndefined();
     db.prepare("INSERT INTO campaign_sessions (session_id, campaign_id, attached_at) VALUES (?, ?, ?)")
@@ -249,7 +252,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(snapshotV8(dbPath)).toEqual(before);
     const db = new DatabaseDriver(dbPath, { readonly: true });
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(db.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([]);
@@ -307,7 +310,7 @@ describe("schema v9 campaign foundation", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(migrated.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     migrated.close();
   });

@@ -87,6 +87,9 @@ describe("factory campaign membership addition", () => {
       owner_role: "owner",
       created_at: campaignAt,
       updated_at: memberAt,
+      lifecycle_status: "draft",
+      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+      administration_revision: 1,
     }]);
   });
 

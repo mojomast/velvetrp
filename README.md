@@ -4,6 +4,10 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
+Current persistence is schema **v24 revision 1 (v24r1)**. Schema v23 introduced the M1.4 single-class progression repository/shared contracts; v24 repaired progression provenance and integrity without rewriting historical ledgers. M1.1-M1.4 remain repository/shared-contract capabilities only: no route or client workflow was added, and the feature-gated trusted-local campaign boundary remains exactly **13** M0 HTTP operations.
+
+The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter` and its existing setup/create flow. A recommended next implementation slice is a bounded mechanics catalog plus character builder/progression HTTP/UI vertical slice; M1.5 remains the next repository-only roadmap milestone.
+
 ---
 
 ## What Works Today
@@ -97,12 +101,12 @@ POST /api/interaction
 
 ### Repository Layer
 
-The repo layer was decomposed from a monolith into 10 focused domain modules in schema v14r1:
+The repo layer is split into focused roleplay domains and factory-composed RPG facades at schema v24r1:
 
 ```
 server/src/repo/
 ├── index.ts          ← public barrel (74 named exports, stable API surface)
-├── db.ts             ← schema v14r1, migrations v1→v14, connection lifecycle
+├── db.ts             ← schema v24r1, migrations v1→v24, connection lifecycle
 ├── shared.ts         ← LOCAL_OWNER_PRINCIPAL_ID constant
 ├── repoContext.ts    ← provider-pattern DB singleton (configureRepositoryDatabase)
 ├── characterRepo.ts  ← characters CRUD, lore repair on delete
@@ -113,10 +117,14 @@ server/src/repo/
 ├── summaryRepo.ts    ← scene synthesis snapshots
 ├── settingsRepo.ts   ← harness and provider settings
 ├── diceRepo.ts       ← normalized dice audit, roll persistence
-└── campaignRepo.ts   ← campaigns, characters, content pins, rooms, actors
+├── campaignRepo.ts   ← repository factory, campaigns, rooms, actors
+├── campaignAdministrationRepo.ts ← lifecycle, membership, timelines, import/export
+├── contentCatalogRepo.ts          ← immutable catalogs and campaign pins
+├── characterBuilderRepo.ts        ← drafts, derived sheets, finalization
+└── characterProgressionRepo.ts    ← XP/milestones, previews, level application
 ```
 
-### Schema (v14r1)
+### Selected Schema Foundations (v24r1)
 
 ```
 characters          sessions            messages
@@ -212,9 +220,9 @@ The full 40-item roadmap lives in [`docs/ROADMAP.md`](docs/ROADMAP.md). High-lev
 M0  ████████████████████████████████  COMPLETE (98 slices, schema v14r1)
     Core roleplay, campaigns, dice, character workspace
 
-M1  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
-    Schema + repo: character sheets, combat, inventory,
-    progression, checks/powers, encounters, world, quests
+M1  █████████████░░░░░░░░░░░░░░░░░░░  M1.1–M1.4 COMPLETE
+    Repository/contracts: administration, catalogs, character
+    builder/derived sheets, and progression (HTTP/UI not exposed)
 
 M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     API surface: 11 route groups covering all M1 domains
@@ -274,7 +282,7 @@ npm run dev:server   # server only
 npm run dev:client   # client only
 npm run typecheck    # typecheck contracts, server, client, and E2E
 npm run build        # production build (contracts → server → client)
-npm test             # contracts + server + client tests (1,993 passing)
+npm test             # contracts + server + client tests (2,123 passing, 1 skipped)
 npm run test:e2e     # deterministic browser/API E2E (no paid provider calls)
 npm run ci           # install → typecheck → build → test
 ```
@@ -295,7 +303,7 @@ server/src/
   app.ts                Fastify composition root, global hooks, route registration
   routes/roleplay/      interaction, generation, session, memory, lore, settings routes
   routes/rpg/v1/        feature-gated RPG HTTP boundary (13 operations)
-  repo/                 10 domain repositories + schema/migrations (db.ts)
+  repo/                 roleplay repositories, RPG facades, schema/migrations
   content/              original starter content pack and setup services
   context.ts            context basket assembly
   prompt.ts             prompt builder
@@ -318,9 +326,10 @@ docs/                   API reference, architecture, roadmap, streaming protocol
 Data lives in `server/data/velvet.sqlite`. Override with `VELVET_DATA_DIR`.
 
 - WAL mode, foreign keys enabled
-- Schema **v14, revision 1** (current)
+- Schema **v24, revision 1** (current)
 - Auto-migrates from v2 onward at startup
-- v9–v14 add the RPG campaign, content, sheet, actor, command, audit, resource, and dice foundations
+- v9–v14 add campaign, content, sheet, actor, command, resource, and dice foundations
+- v15–v24 add administration, immutable catalogs, character building, progression, and integrity repairs
 
 ---
 

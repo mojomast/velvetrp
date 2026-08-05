@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -162,6 +162,7 @@ describe("RPG content queries", () => {
     repository.close();
 
     const db = new DatabaseDriver(dbPath());
+    deleteCampaignForCorruptionTest(db,campaignId);
     db.prepare("DELETE FROM campaign_content_packs WHERE campaign_id = ?").run(campaignId);
     db.prepare("DELETE FROM campaign_rules_profiles WHERE campaign_id = ?").run(campaignId);
     db.close();

@@ -103,6 +103,9 @@ describe("factory campaign rename", () => {
       owner_role: "owner",
       created_at: createdAt,
       updated_at: renamedAt,
+      lifecycle_status: "draft",
+      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+      administration_revision: 1,
     }]);
     expect(after.timelines).toEqual(before.timelines);
     expect(after.memberships).toEqual(before.memberships);

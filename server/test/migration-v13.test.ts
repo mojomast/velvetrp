@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -123,7 +123,10 @@ function makeV12(dir: string): DatabaseDriver.Database {
   createRepository({ dataDir: dir }).close();
   const db = new DatabaseDriver(dbPath(dir));
   db.pragma("foreign_keys = OFF");
+  removeFutureCharacterBuilderSchema(db);
   db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE rpg_actor_resources;
@@ -209,7 +212,7 @@ describe("schema v13 actor resources and union audit", () => {
     expect(nextId).not.toHaveBeenCalled();
 
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "14" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "24" });
     expect(migrated.prepare("SELECT * FROM campaign_commands").get()).toEqual({
       ...(before.command as object), resource_name: null, resource_current: null, resource_max: null,
       dice_expression: null, dice_count: null, dice_sides: null, dice_selection_type: null,
@@ -311,7 +314,7 @@ describe("schema v13 actor resources and union audit", () => {
     ["missing campaign parent", (db: DatabaseDriver.Database) => {
       seedV12Audit(db);
       db.pragma("foreign_keys = OFF");
-      db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
+      deleteCampaignForCorruptionTest(db,"campaign");db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
     }],
     ["event payload mismatch", (db: DatabaseDriver.Database) => {
       seedV12Audit(db);
@@ -380,7 +383,7 @@ describe("schema v13 actor resources and union audit", () => {
       (id, campaign_id, campaign_character_id, sheet_id, kind, control, created_at, updated_at)
       VALUES ('actor-two', 'campaign', 'cc-two', 'sheet-two', 'player-character', 'principal', ?, ?)`).run(AT, AT);
     insert.run("campaign", "actor-two", "campaign-cascade", 1, 1);
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
+    deleteCampaignForCorruptionTest(db,"campaign");db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
     expect(db.prepare("SELECT 1 FROM rpg_actor_resources").get()).toBeUndefined();
     expect(db.pragma("foreign_key_check")).toEqual([]);
     db.close();
@@ -487,7 +490,7 @@ describe("schema v13 actor resources and union audit", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(file, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "14" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "24" });
     expect(retried.prepare("SELECT COUNT(*) AS count FROM rpg_actor_resources").get()).toEqual({ count: 0 });
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();

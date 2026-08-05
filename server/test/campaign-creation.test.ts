@@ -68,9 +68,16 @@ describe("factory campaign creation", () => {
       owner_role: "owner",
       created_at: fixedAt,
       updated_at: fixedAt,
+      lifecycle_status: "draft",
+      settings: '{"maxPlayers":6,"allowPlayerDice":true,"safetyMode":"standard","recapVisibility":"members","gmNotes":""}',
+      administration_revision: 0,
     }]);
     expect(db.prepare("SELECT * FROM campaign_timelines").all()).toEqual([{
       id: "timeline-fixed", campaign_id: "campaign-fixed", created_at: fixedAt, revision: 0,
+    }]);
+    expect(db.prepare("SELECT * FROM campaign_timeline_history").all()).toEqual([{
+      campaign_id: "campaign-fixed", timeline_id: "timeline-fixed", parent_timeline_id: null,
+      source_timeline_id: null, created_by_command_id: null, forked_from_revision: null,
     }]);
     expect(db.prepare("SELECT * FROM campaign_memberships").all()).toEqual([{
       campaign_id: "campaign-fixed", principal_id: "local-owner", role: "owner", created_at: fixedAt,

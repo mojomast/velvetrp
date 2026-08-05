@@ -19,6 +19,10 @@ export {
 } from "./domain-primitives.js";
 export type { CampaignMemberRole, CampaignRole, ResourceId, UtcIsoTimestamp } from "./domain-primitives.js";
 
+export * from "./campaign-administration.js";
+export * from "./character-builder.js";
+export * from "./character-progression.js";
+
 export {
   addCampaignMembershipInputSchema,
   attachCampaignSessionInputSchema,
@@ -131,6 +135,10 @@ export {
   spellDefinitionReferenceSchema,
   spellDefinitionSchema,
 } from "./rpg-content.js";
+
+// M1.2 validated immutable catalog contracts. The legacy rpg-content exports
+// above intentionally remain unchanged for existing APIs and stored v10 packs.
+export * from "./content-catalog.js";
 export type {
   AbilityDefinition,
   AbilityDefinitionReference,

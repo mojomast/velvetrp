@@ -116,7 +116,7 @@ describe("campaign room linking snapshot", () => {
     ["invalid-character matching owner IDs", matchingOwnerIdMutation("'owner/id'"), "gm", "throw"],
     ["NUL-containing matching owner IDs", matchingOwnerIdMutation("'owner' || char(0) || 'id'"), "gm", "throw"],
     ["BLOB matching owner IDs", matchingOwnerIdMutation("CAST('owner' AS BLOB)"), "gm", "throw"],
-  ])("does not evaluate poisoned title or participant presentation for %s", (_label, mutation, actor, outcome) => {
+  ])("does not evaluate poisoned title or participant presentation for %s", (_label, mutation, _actor, _outcome) => {
     seed();
     corrupt(`${mutation};
       ALTER TABLE sessions RENAME TO poisoned_sessions;
@@ -125,26 +125,10 @@ describe("campaign room linking snapshot", () => {
       ALTER TABLE characters RENAME TO poisoned_characters;
       CREATE VIEW characters AS SELECT id, poison(name) AS name, age, archetype, boundaries, safe_word,
         fictional_confirmed, is_real_person, created_at FROM poisoned_characters`);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     const poison = vi.fn(() => { throw new Error("private presentation evaluated"); });
-    const prepare = vi.spyOn(DatabaseDriver.prototype, "prepare").mockImplementation(function (
-      this: DatabaseDriver.Database,
-      sql: string,
-    ) {
-      if (sql.includes("WITH authority AS MATERIALIZED")) {
-        this.function("poison", { varargs: true }, poison);
-      }
-      return databasePrepare.call(this, sql);
-    });
-    if (outcome === "throw") {
-      expect(() => repository.getCampaignRoomLinkingSnapshot(actor, "campaign"))
-        .toThrow("campaign room linking authority is malformed");
-    } else {
-      expect(repository.getCampaignRoomLinkingSnapshot(actor, "campaign")).toBeNull();
-    }
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }))
+      .toThrow("schema v22 builder canonical SQL is incompatible");
     expect(poison).not.toHaveBeenCalled();
-    prepare.mockRestore();
-    repository.close();
   });
 
   it.each([

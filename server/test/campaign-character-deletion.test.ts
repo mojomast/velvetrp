@@ -59,22 +59,19 @@ describe("campaign-linked legacy character deletion", () => {
     persisted.close();
   });
 
-  it("returns the repository in-use result and releases it after campaign deletion", async () => {
+  it("keeps returning in-use because campaigns and linked personas are retained", async () => {
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     const character = repository.createCharacter(characterInput);
     repository.close();
     linkToCampaign(character.id);
 
     await expect(deleteCharacter(character.id)).resolves.toBe("in-use");
-    const db = new DatabaseDriver(databasePath());
-    db.pragma("foreign_keys = ON");
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
-    db.close();
-    await expect(deleteCharacter(character.id)).resolves.toBe("deleted");
-    await expect(deleteCharacter(character.id)).resolves.toBe("not-found");
+    const db=new DatabaseDriver(databasePath());
+    expect(()=>db.prepare("DELETE FROM campaigns WHERE id='campaign'").run()).toThrow(/archived, not physically deleted|no such function/);db.close();
+    await expect(deleteCharacter(character.id)).resolves.toBe("in-use");
   });
 
-  it("preserves the API 409 body and permits deletion after campaign removal", async () => {
+  it("preserves the API 409 body while the retained campaign remains", async () => {
     const app = buildApp();
     const created = (await app.inject({ method: "POST", url: "/api/characters", payload: characterInput })).json() as { id: string };
     linkToCampaign(created.id);
@@ -83,13 +80,9 @@ describe("campaign-linked legacy character deletion", () => {
     expect(guarded.statusCode).toBe(409);
     expect(guarded.json()).toEqual({ error: "character is used by a session; delete the session history first" });
 
-    const db = new DatabaseDriver(databasePath());
-    db.pragma("foreign_keys = ON");
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign'").run();
-    db.close();
     const deleted = await app.inject({ method: "DELETE", url: `/api/characters/${created.id}` });
-    expect(deleted.statusCode).toBe(200);
-    expect(deleted.json()).toEqual({ ok: true });
+    expect(deleted.statusCode).toBe(409);
+    expect(deleted.json()).toEqual(guarded.json());
     await app.close();
   });
 });

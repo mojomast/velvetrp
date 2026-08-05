@@ -6,7 +6,7 @@ import { MAX_CAMPAIGN_CHARACTER_ROSTER, MAX_PRIVATE_NOTES_LENGTH } from "@velvet
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -838,7 +838,7 @@ describe("role-sensitive campaign-character queries", () => {
     expect(repository.getCampaignCharacterByActorId("observer", campaignId, "actor-a")).toBeNull();
     db.prepare("DELETE FROM principals WHERE id = 'gm'").run();
     expect(repository.getCampaignCharacterByActorId("gm", campaignId, "actor-a")).toBeNull();
-    db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignId);
+    deleteCampaignForCorruptionTest(db,campaignId);db.prepare("DELETE FROM campaigns WHERE id = ?").run(campaignId);
     db.close();
     expect(repository.getCampaignCharacterByActorId("player-one", campaignId, "actor-a")).toBeNull();
     repository.close();

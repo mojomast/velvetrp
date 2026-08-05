@@ -42,7 +42,7 @@ describe("schema v4 to v5 migration", () => {
     expect((await listLoreEntries("c1"))[0]?.characterIds).toEqual(["c1"]);
 
     const verify = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
-    expect((verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((verify.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(verify.prepare("SELECT name FROM sqlite_master WHERE name = 'session_context'").get()).toBeTruthy();
     const contextColumns = verify.pragma("table_info(session_context)") as Array<{ name: string }>;
     expect(contextColumns.some((column) => column.name === "synthesized_source")).toBe(true);

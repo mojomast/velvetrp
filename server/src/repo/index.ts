@@ -2,6 +2,47 @@
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";
 export {
+  CampaignAdministrationConflictError,
+  CampaignAdministrationForbiddenError,
+  CampaignAdministrationStaleError,
+  type CampaignAdministrationRepository,
+} from "./campaignAdministrationRepo.js";
+export {
+  calculateCatalogDigest,
+  canonicalCatalogJson,
+  ContentCatalogAuthorizationError,
+  ContentCatalogConflictError,
+  ContentCatalogStaleError,
+  ContentCatalogValidationError,
+  validateContentCatalog,
+  type ContentCatalogRepository,
+} from "./contentCatalogRepo.js";
+export {
+  CharacterBuilderAuthorizationError,
+  CharacterBuilderConflictError,
+  CharacterBuilderExpiredError,
+  CharacterBuilderIncompleteError,
+  CharacterBuilderStaleError,
+  CharacterBuilderUnavailableError,
+  rollCharacterBuilderAttributes,
+  type CharacterBuilderRepository,
+} from "./characterBuilderRepo.js";
+export {
+  CharacterProgressionAuthorizationError, CharacterProgressionConflictError, CharacterProgressionStaleError,
+  CharacterProgressionUnavailableError, type CharacterProgressionRepository,
+} from "./characterProgressionRepo.js";
+export { calculateCharacterDerivedStats } from "../characterBuilderCalculator.js";
+export {
+  MECHANICS_STARTER_CATALOG,
+  MECHANICS_STARTER_ID,
+  MECHANICS_STARTER_PACK_ID,
+  MECHANICS_STARTER_PACK_VERSION,
+  MECHANICS_STARTER_PRIOR_CATALOG,
+  MECHANICS_STARTER_PRIOR_PACK_VERSION,
+  MECHANICS_STARTER_RULES_PROFILE_ID,
+} from "../content/mechanicsStarterCatalog.js";
+export { calculateCharacterProgression } from "../characterProgressionCalculator.js";
+export {
   createCharacter,
   deleteCharacter,
   getCharacter,

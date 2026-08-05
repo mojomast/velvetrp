@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -55,7 +55,10 @@ function createRepresentativeV9(dir: string): string {
     db.prepare("INSERT INTO campaign_sessions VALUES ('session-v9', 'campaign-v9', ?)").run(at);
   })();
   db.pragma("foreign_keys = OFF");
+  removeFutureCharacterBuilderSchema(db);
   db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE rpg_actor_resources;
@@ -166,7 +169,7 @@ describe("schema v10 RPG rules and content", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
       for (const table of V10_TABLES) {
         expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
       }
@@ -344,7 +347,7 @@ describe("schema v10 RPG rules and content", () => {
       .toThrow("referenced RPG rules profiles are immutable");
     expect(() => db.prepare("DELETE FROM rpg_rules_profiles WHERE rules_profile_id = 'profile-main'").run()).toThrow();
 
-    db.prepare("DELETE FROM campaigns WHERE id = 'campaign-content'").run();
+    deleteCampaignForCorruptionTest(db,"campaign-content");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-content'").run();
     expect(db.prepare("SELECT * FROM campaign_rules_profiles").all()).toEqual([]);
     expect(db.prepare("SELECT * FROM campaign_content_packs").all()).toEqual([]);
     expect((db.prepare("SELECT COUNT(*) AS count FROM rpg_rules_profiles").get() as { count: number }).count).toBe(1);
@@ -427,7 +430,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(migrated.pragma("foreign_key_check")).toEqual([]);
     migrated.close();
   });
@@ -452,7 +455,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("14");
+    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("24");
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
   });

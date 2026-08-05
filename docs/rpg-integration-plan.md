@@ -855,7 +855,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema v14 revision 1. Exact future table grouping may change during implementation, but dependency order should remain:
+Velvet currently uses schema v24 revision 1. The implemented migration sequence is:
 
 | Version | Scope |
 |---|---|
@@ -865,22 +865,23 @@ Velvet currently uses schema v14 revision 1. Exact future table grouping may cha
 | v12 | Event ledger, command receipts, revisions, idempotency, audit foundation |
 | v13 | Minimal named actor resources only; inventory, equipment, currency, shops, stock, and trades remain deferred |
 | v14 | Minimal dice rolls only; checks, progression, level choices, rest, powers, and effects remain deferred |
-| v15 | Locations, connections, discoveries, NPCs, relationships, factions, and reputation |
-| v16 | Quests, objectives, rewards, storylines, plot points, and clues |
-| v17 | Encounters, combatants, combat actions, enemy instances, damage, and combat rewards |
-| v18 | Agent turns, tool calls, confirmations, provider-call metadata, generation drafts, nudges, checkpoints, imports |
+| v15 | M1.1 campaign administration, membership, timelines, checkpoints, recaps, and import/export repository foundation |
+| v16-v18 | M1.2 immutable mechanics catalog, role-safe visibility/integrity, campaign pinning, and exact command proposals |
+| v19-v22 | M1.3 character drafts, derived sheets, immutable command/revision provenance, and integrity repairs |
+| v23 | M1.4 single-class progression, XP/milestone ledgers, advancements, pending choices, powers, and receipts |
+| v24 | M1.4 provenance/integrity repair for bootstrap, pending snapshots, proposals, advancements, and power sources |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- Existing v2-v13 databases migrate sequentially to schema v14 revision 1, including explicit same-version corrective revisions where supported.
+- Existing databases migrate sequentially to schema v24 revision 1, including explicit same-version corrective revisions where supported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
 - Additive tables preserve prior data; binaries still enforce the exact supported schema version, and destructive down-migrations are not provided.
 
-### Production v13 to v14 SQLite rollout
+### Historical production v13 to v14 SQLite rollout
 
 1. Resolve the live database path (`$VELVET_DATA_DIR/velvet.sqlite`, otherwise `data/velvet.sqlite`), enable maintenance mode, block new writes, and drain in-flight writers. While the database remains open, take an online backup: `sqlite3 "$DB" ".timeout 10000" ".backup '$BACKUP'"`.
 2. Run `sqlite3 "$BACKUP" "PRAGMA quick_check; PRAGMA foreign_key_check; SELECT key,value FROM meta WHERE key IN ('schemaVersion','schemaRevision') ORDER BY key;"`; require `ok`, no FK rows, and expected v13 metadata. Stop every writer, never mix v13/v14 binaries, and repeat the backup if any later write occurred.
@@ -889,9 +890,15 @@ Migration requirements:
 
 ## Implementation Progress
 
-### 2026-08-05: M0 Slice 98 Deterministic Closeout Complete
+### 2026-08-05: Schema v24 M1.4 Progression Integrity Repair
 
-Exactly 98 M0 slices are complete at unchanged schema v14 revision 1 (v14r1), with exactly 13 trusted-local campaign HTTP operations. Slice 98 is documentation-only closeout and adds no feature, code, test, contract, route, operation, schema, migration, dependency, database backup, or commit. The final independent Slice 97 backend, client, and closeout reviews reported no findings after remediation.
+Current persistence is v24r1. V23 introduced M1.4 progression at the repository/shared-contract boundary; v24 preserves historical ledgers while repairing exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructs pending revisions from immutable command results. The fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
+
+M1.1-M1.4 remain repository/shared-contract only. No route or client workflow was added, and the fixed-principal trusted-local boundary remains exactly 13 M0 operations. The mechanics starter is distinct from the metadata-only original starter and its existing HTTP setup/create flow. A bounded mechanics catalog plus character builder/progression HTTP/UI vertical slice is the recommended next implementation task; M1.5 remains the next repository-only roadmap milestone.
+
+### Historical 2026-08-05 M0 Slice 98 Deterministic Closeout
+
+At this historical checkpoint, exactly 98 M0 slices were complete at schema v14 revision 1 (v14r1), with exactly 13 trusted-local campaign HTTP operations. Slice 98 was documentation-only closeout and added no feature, code, test, contract, route, operation, schema, migration, dependency, database backup, or commit. The final independent Slice 97 backend, client, and closeout reviews reported no findings after remediation.
 
 The delivered campaign surface includes the read-only campaign-character workspace; deterministic dice with bounded newest-first recent history; and room linking with exact campaign-to-chat opening, reload, and authoritative campaign return. All campaign operations remain fixed-principal trusted-local `local-owner` convenience: this is not authentication and is not safe for remote or multi-user exposure. Unexpected dice POST and room-linking PUT outcomes remain commit-ambiguous, require authoritative history/room GET reconciliation, and must never be retried automatically.
 

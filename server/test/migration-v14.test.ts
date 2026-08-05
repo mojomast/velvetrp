@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -15,7 +15,10 @@ function makeV13(dir: string): DatabaseDriver.Database {
   createRepository({ dataDir: dir }).close();
   const db = new DatabaseDriver(dbPath(dir));
   db.pragma("foreign_keys = OFF");
+  removeFutureCharacterBuilderSchema(db);
   db.exec(`
+    DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
+    DROP TRIGGER campaign_events_link_timeline; DROP TABLE campaign_timeline_events;
     DROP TABLE rpg_dice_terms;
     DROP TABLE rpg_dice_rolls;
     DROP TABLE command_receipts;
@@ -127,6 +130,9 @@ function completeSchema(db: DatabaseDriver.Database): unknown[] {
 const AUDIT_TABLES = [
   "rpg_actor_resources", "campaign_commands", "campaign_events", "command_receipts",
   "rpg_dice_rolls", "rpg_dice_terms",
+  "campaigns", "campaign_timeline_history", "campaign_administration_commands",
+  "campaign_administration_events", "campaign_administration_receipts", "campaign_checkpoints",
+  "campaign_recaps", "campaign_imports", "campaign_export_manifests",
 ] as const;
 
 function auditSchema(file: string): unknown[] {
@@ -272,7 +278,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "14" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "24" });
     expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     expect(migrated.prepare("SELECT * FROM rpg_actor_resources").all()).toEqual(before.rpg_actor_resources);
     expect(migrated.prepare("SELECT * FROM campaign_events").all()).toEqual(before.campaign_events);
@@ -874,7 +880,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const retried = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "14" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "24" });
     for (const table of AUDIT_TABLES) {
       expect(retried.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({ count: 0 });
     }

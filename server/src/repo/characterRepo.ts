@@ -101,7 +101,8 @@ export async function deleteCharacter(id: string): Promise<"deleted" | "in-use" 
     if (!db.prepare("SELECT id FROM characters WHERE id = ?").get(id)) return "not-found" as const;
     const used = db.prepare(`SELECT 1 FROM sessions WHERE character_id = ?
       UNION ALL SELECT 1 FROM session_characters WHERE character_id = ?
-      UNION ALL SELECT 1 FROM campaign_characters WHERE character_id = ? LIMIT 1`).get(id, id, id);
+      UNION ALL SELECT 1 FROM campaign_characters WHERE character_id = ?
+      UNION ALL SELECT 1 FROM character_drafts_v19 WHERE persona_id = ? LIMIT 1`).get(id, id, id, id);
     if (used) return "in-use" as const;
 
     repairLoreForCharacterDeletionSync(db, id);
