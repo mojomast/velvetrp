@@ -5,7 +5,7 @@ import {
   CampaignCreationAuthorizationError,
   CampaignCreationIdCollisionError,
   createRepository,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import type { CreateCampaignInput } from "../src/types.js";
 import { useTmpDataDir } from "./helpers.js";
 

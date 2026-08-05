@@ -6,7 +6,7 @@ import {
   getCharacter,
   listCharacters,
   updateCharacter,
-} from "../../repo.js";
+} from "../../repo/index.js";
 import type { Character, CreateCharacterInput } from "../../types.js";
 
 type ParsedCharacter = { ok: true; value: CreateCharacterInput } | { ok: false; error: string };

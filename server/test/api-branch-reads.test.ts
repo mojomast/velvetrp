@@ -7,7 +7,7 @@ import {
   createCharacter,
   createSession,
   stopSession,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import type { Message } from "../src/types.js";
 import { useTmpDataDir } from "./helpers.js";
 

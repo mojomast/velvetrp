@@ -11,7 +11,7 @@ import {
   ORIGINAL_STARTER_RACE,
   ORIGINAL_STARTER_RULES_PROFILE,
 } from "@velvet/contracts";
-import { createRepository, type RepositoryUnitOfWork } from "../src/repo.js";
+import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

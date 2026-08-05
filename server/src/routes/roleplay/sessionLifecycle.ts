@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { deleteSession, getSession, stopSession } from "../../repo.js";
+import { deleteSession, getSession, stopSession } from "../../repo/index.js";
 
 export interface RoleplaySessionLifecycleRoutesOptions {
   abortActiveGeneration: (sessionId: string) => void;

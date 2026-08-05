@@ -3,13 +3,13 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CreateCampaignCharacterInput } from "@velvet/contracts";
 import { MAX_PRIVATE_NOTES_LENGTH } from "@velvet/contracts";
-import * as repoModule from "../src/repo.js";
+import * as repoModule from "../src/repo/index.js";
 import {
   CampaignCharacterCreationConflictError,
   CampaignCharacterCreationUnavailableError,
   CampaignCharacterPersonaUnavailableError,
   createRepository,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 

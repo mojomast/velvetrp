@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { checkUserMessage, sanitizeInjectionText } from "../../policy.js";
-import { getHarnessSettings, updateHarnessSettings } from "../../repo.js";
+import { getHarnessSettings, updateHarnessSettings } from "../../repo/index.js";
 import type { UpdateHarnessInput } from "../../types.js";
 
 export const roleplayHarnessRoutes: FastifyPluginAsync = async (app) => {

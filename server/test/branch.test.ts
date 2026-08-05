@@ -14,7 +14,7 @@ import {
   listMessages,
   nextSwipeIndex,
   setActiveBranch,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 
 useTmpDataDir();
 

@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { validateProviderBaseUrl } from "../../llm.js";
 import { checkUserMessage, sanitizeInjectionText } from "../../policy.js";
-import { getPublicProviderSettings, updateProviderSettings } from "../../repo.js";
+import { getPublicProviderSettings, updateProviderSettings } from "../../repo/index.js";
 import type { UpdateProviderInput } from "../../types.js";
 
 export const roleplayProviderRoutes: FastifyPluginAsync = async (app) => {

@@ -15,11 +15,11 @@ import {
   ORIGINAL_STARTER_PACK_VERSION,
   ORIGINAL_STARTER_RULES_PROFILE_ID,
 } from "../src/content/originalStarterManifest.js";
-import { createRepository } from "../src/repo.js";
+import { createRepository } from "../src/repo/index.js";
 import {
   CampaignContentConfigurationAuthorizationError,
   CampaignContentConfigurationConflictError,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 

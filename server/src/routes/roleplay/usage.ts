@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { getProviderSettings, getUsageSummary } from "../../repo.js";
+import { getProviderSettings, getUsageSummary } from "../../repo/index.js";
 
 export const roleplayUsageRoutes: FastifyPluginAsync = async (app) => {
   app.get("/usage", async () => {

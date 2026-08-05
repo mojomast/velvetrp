@@ -5,7 +5,7 @@ import {
   CampaignRenameStaleError,
   CampaignRenameUnavailableError,
   createRepository,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

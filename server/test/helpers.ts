@@ -4,7 +4,7 @@ import path from "node:path";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach } from "vitest";
-import { closeRepo } from "../src/repo.js";
+import { closeRepo } from "../src/repo/index.js";
 
 const tmpDirs: string[] = [];
 

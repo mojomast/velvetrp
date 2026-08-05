@@ -32,8 +32,8 @@ import {
   updateSessionContextSource,
   updateSessionSynthesizedSource,
   upsertSummary,
-} from "../src/repo.js";
-import type { RepositoryUnitOfWork } from "../src/repo.js";
+} from "../src/repo/index.js";
+import type { RepositoryUnitOfWork } from "../src/repo/index.js";
 import { systemRuntime } from "../src/runtime.js";
 import type { Database, UpdateHarnessInput } from "../src/types.js";
 

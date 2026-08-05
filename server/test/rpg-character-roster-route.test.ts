@@ -3,7 +3,7 @@ import { request as httpRequest } from "node:http";
 import { Writable } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
-import type { CampaignCharacterRosterSnapshot } from "../src/repo.js";
+import type { CampaignCharacterRosterSnapshot } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";

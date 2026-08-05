@@ -22,7 +22,7 @@ import {
   CampaignCharacterCreationUnavailableError,
   CampaignCharacterPersonaUnavailableError,
   createRepository,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";

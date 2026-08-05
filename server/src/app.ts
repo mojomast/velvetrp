@@ -26,7 +26,7 @@ import {
   transitionSession,
   updateSessionSynthesizedSource,
   upsertSummary,
-} from "./repo.js";
+} from "./repo/index.js";
 import { fallbackRoomSpeakers, generateReply, selectRoomSpeakers, streamReply, synthesizeSceneState } from "./llm.js";
 import { selectLoreEntries } from "./lore.js";
 import { buildSessionContextBasket, contextBasketText } from "./context.js";

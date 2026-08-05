@@ -1,6 +1,6 @@
-// Public repository surface. Domain implementations are extracted gradually
-// while the compatibility barrel preserves the established API.
-export * from "./db.js";
+// Preserve the established repository API without exposing domain-internal
+// helpers from the split implementation modules.
+export { closeRepo } from "./db.js";
 export {
   createCharacter,
   deleteCharacter,
@@ -39,8 +39,35 @@ export {
   recordUsageEvent,
   setActiveBranch,
 } from "./messageRepo.js";
-export * from "./campaignRepo.js";
-export { createDiceRepository, type DiceRepository } from "./diceRepo.js";
+export {
+  CampaignCharacterCreationConflictError,
+  CampaignCharacterCreationUnavailableError,
+  CampaignCharacterPersonaUnavailableError,
+  CampaignContentConfigurationAuthorizationError,
+  CampaignContentConfigurationConflictError,
+  CampaignCreationAuthorizationError,
+  CampaignCreationIdCollisionError,
+  CampaignDiceCharacterConflict,
+  CampaignRenameStaleError,
+  CampaignRenameUnavailableError,
+  CampaignSessionAttachmentConflictError,
+  CampaignSessionAttachmentSessionMissingError,
+  CampaignSessionAttachmentUnavailableError,
+  ContentPackInstallationAuthorizationError,
+  ContentPackInstallationConflictError,
+  createRepository,
+  type CampaignCharacterRosterSnapshot,
+  type CampaignCharacterWorkspaceSnapshot,
+  type CampaignDiceEvent,
+  type CampaignDiceVisibleCharacterBinding,
+  type CampaignRoomLinkingSnapshot,
+  type CreateRepositoryOptions,
+  type OriginalStarterCampaignCharacterCreationResult,
+  type OriginalStarterSetupInspection,
+  type Repository,
+  type RepositoryDependencies,
+  type RepositoryUnitOfWork,
+} from "./campaignRepo.js";
 export {
   addMemoryFacts,
   forgetMemory,

@@ -40,11 +40,11 @@ import {
   CampaignSessionAttachmentConflictError,
   CampaignSessionAttachmentSessionMissingError,
   CampaignSessionAttachmentUnavailableError,
-} from "../../../repo.js";
+} from "../../../repo/index.js";
 import type { OriginalStarterSetupRepository } from "../../../content/originalStarterSetup.js";
-import type { CampaignCharacterRosterSnapshot } from "../../../repo.js";
-import type { CampaignCharacterWorkspaceSnapshot } from "../../../repo.js";
-import type { CampaignRoomLinkingSnapshot } from "../../../repo.js";
+import type { CampaignCharacterRosterSnapshot } from "../../../repo/index.js";
+import type { CampaignCharacterWorkspaceSnapshot } from "../../../repo/index.js";
+import type { CampaignRoomLinkingSnapshot } from "../../../repo/index.js";
 import {
   CampaignDiceUnavailableError,
   CampaignDiceVisibleBindingConflictError,

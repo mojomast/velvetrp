@@ -19,7 +19,7 @@ import {
   CampaignCharacterCreationUnavailableError,
   CampaignCharacterPersonaUnavailableError,
   type Repository,
-} from "../repo.js";
+} from "../repo/index.js";
 
 const LOCAL_OWNER = "local-owner";
 

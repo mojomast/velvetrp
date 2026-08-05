@@ -2,13 +2,13 @@ import type { CampaignDetail } from "@velvet/contracts";
 import type {
   OriginalStarterSetupInspection,
   Repository,
-} from "../repo.js";
+} from "../repo/index.js";
 import {
   CampaignContentConfigurationAuthorizationError,
   CampaignContentConfigurationConflictError,
   ContentPackInstallationAuthorizationError,
   ContentPackInstallationConflictError,
-} from "../repo.js";
+} from "../repo/index.js";
 
 export class OriginalStarterSetupUnavailableError extends Error {
   readonly code = "ORIGINAL_STARTER_SETUP_UNAVAILABLE";

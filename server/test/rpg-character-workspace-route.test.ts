@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { request as httpRequest } from "node:http";
 import { buildApp } from "../src/app.js";
-import type { CampaignCharacterWorkspaceSnapshot } from "../src/repo.js";
+import type { CampaignCharacterWorkspaceSnapshot } from "../src/repo/index.js";
 
 process.env.NODE_ENV = "test";
 

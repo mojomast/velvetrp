@@ -3,9 +3,9 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CreateCampaignCharacterInput } from "@velvet/contracts";
 import { MAX_CAMPAIGN_CHARACTER_ROSTER, MAX_PRIVATE_NOTES_LENGTH } from "@velvet/contracts";
-import * as repoModule from "../src/repo.js";
-import { createRepository } from "../src/repo.js";
-import type { RepositoryUnitOfWork } from "../src/repo.js";
+import * as repoModule from "../src/repo/index.js";
+import { createRepository } from "../src/repo/index.js";
+import type { RepositoryUnitOfWork } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

@@ -1,7 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { getSession, listLoreEntries, listMessages } from "../src/repo.js";
+import { getSession, listLoreEntries, listMessages } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

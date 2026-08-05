@@ -16,7 +16,7 @@ import {
   CampaignCharacterCreationUnavailableError,
   CampaignCharacterPersonaUnavailableError,
   createRepository,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import {
   createOriginalStarterCharacterCreationService,
   OriginalStarterCharacterCreationConflictError,

@@ -2,9 +2,9 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
-import * as repoModule from "../src/repo.js";
-import { createRepository } from "../src/repo.js";
-import type { RepositoryUnitOfWork } from "../src/repo.js";
+import * as repoModule from "../src/repo/index.js";
+import { createRepository } from "../src/repo/index.js";
+import type { RepositoryUnitOfWork } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

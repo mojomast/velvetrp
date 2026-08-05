@@ -16,7 +16,7 @@ import {
   listSessions,
   updateSessionContextSource,
   upsertSummary,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 import type { Session } from "../src/types.js";
 import { startFakeProvider, useTmpDataDir, type FakeProvider } from "./helpers.js";
 

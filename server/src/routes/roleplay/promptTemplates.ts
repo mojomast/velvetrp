@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { isPromptTemplateId, listPromptTemplates, validatePromptTemplate } from "../../promptTemplates.js";
-import { getHarnessSettings, updateHarnessSettings } from "../../repo.js";
+import { getHarnessSettings, updateHarnessSettings } from "../../repo/index.js";
 
 export const roleplayPromptTemplateRoutes: FastifyPluginAsync = async (app) => {
   app.get("/prompt-templates", async () => {

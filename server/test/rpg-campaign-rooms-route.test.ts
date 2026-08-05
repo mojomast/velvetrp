@@ -4,7 +4,7 @@ import {
   CampaignSessionAttachmentConflictError,
   CampaignSessionAttachmentSessionMissingError,
   CampaignSessionAttachmentUnavailableError,
-} from "../src/repo.js";
+} from "../src/repo/index.js";
 
 const at = "2030-01-01T00:00:00.000Z";
 afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; });

@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { createRepository, deleteCharacter } from "../src/repo.js";
+import { createRepository, deleteCharacter } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();

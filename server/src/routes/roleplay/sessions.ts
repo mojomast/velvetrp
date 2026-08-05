@@ -16,7 +16,7 @@ import {
   listMessages,
   listSessions,
   updateSessionContextSource,
-} from "../../repo.js";
+} from "../../repo/index.js";
 import type { CreateSessionInput } from "../../types.js";
 
 export const roleplaySessionRoutes: FastifyPluginAsync = async (app) => {

@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ConfigureCampaignContentInput } from "../src/types.js";
-import { createRepository } from "../src/repo.js";
+import { createRepository } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 

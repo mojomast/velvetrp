@@ -7,7 +7,7 @@ import {
   getLoreEntry,
   listLoreEntries,
   updateLoreEntry,
-} from "../../repo.js";
+} from "../../repo/index.js";
 import type { NewLoreEntry } from "../../types.js";
 
 export const roleplayLoreRoutes: FastifyPluginAsync = async (app) => {

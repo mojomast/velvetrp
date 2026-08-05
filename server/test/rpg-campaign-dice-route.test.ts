@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import { buildApp } from "../src/app.js";
-import type { CampaignDiceEvent } from "../src/repo.js";
+import type { CampaignDiceEvent } from "../src/repo/index.js";
 
 process.env.NODE_ENV = "test";
 const AT = "2030-01-02T03:04:05.006Z";

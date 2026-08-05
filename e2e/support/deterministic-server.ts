@@ -1,5 +1,5 @@
 import { buildApp } from "../../server/src/app.js";
-import { createRepository } from "../../server/src/repo.js";
+import { createRepository } from "../../server/src/repo/index.js";
 import type { RandomNumberGenerator } from "../../server/src/runtime.js";
 
 // This dependency exists only in the isolated disposable E2E server. Keep the

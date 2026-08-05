@@ -17,9 +17,9 @@ import {
   type CampaignDiceEvent,
   type Repository,
   type RepositoryUnitOfWork,
-} from "./repo.js";
+} from "./repo/index.js";
 /* Keep the route-facing name stable while using the repository's narrow type. */
-export { CampaignDiceCharacterConflict as CampaignDiceVisibleBindingConflictError } from "./repo.js";
+export { CampaignDiceCharacterConflict as CampaignDiceVisibleBindingConflictError } from "./repo/index.js";
 
 /** Safe, non-disclosing classification for absent or unauthorized campaigns. */
 export class CampaignDiceUnavailableError extends Error {

@@ -8,7 +8,7 @@ import {
   listAllMemories,
   restoreMemory,
   updateMemory,
-} from "../../repo.js";
+} from "../../repo/index.js";
 import type { MemoryKind } from "../../types.js";
 
 export const roleplayMemoryRoutes: FastifyPluginAsync = async (app) => {

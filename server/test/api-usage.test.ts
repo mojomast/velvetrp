@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { addMessage, createCharacter, createSession, recordUsageEvent } from "../src/repo.js";
+import { addMessage, createCharacter, createSession, recordUsageEvent } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
