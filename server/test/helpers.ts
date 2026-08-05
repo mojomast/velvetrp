@@ -105,9 +105,18 @@ export function removeFutureCharacterProgressionIntegrityV24(db:import("better-s
 
 /** Remove additive v25 artifacts before exercising a genuine historical marker. */
 export function removeFutureResourcesInventoryEconomyRestV25(db:import("better-sqlite3").Database):void{
+  removeFutureChecksPowersEffectsV26(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
   const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
+  for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
+}
+
+/** Remove additive v26 artifacts before exercising a genuine historical marker. */
+export function removeFutureChecksPowersEffectsV26(db:import("better-sqlite3").Database):void{
+  const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{name:string}>;
   for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
 }
 

@@ -15,7 +15,7 @@ import { assertPowerDefinitionExists, calculateAuthoritativeProgressionPreview, 
   type ProgressionRootRow } from "./characterProgressionPersistence.js";
 
 
-const SCHEMA_VERSION = "25";
+const SCHEMA_VERSION = "26";
 const SCHEMA_REVISION = "1";
 const SQLITE_FILENAME = "velvet.sqlite";
 
@@ -98,6 +98,7 @@ function ensureSchema(db: DatabaseDriver.Database): void {
       createCharacterProgressionV23(db);
       createCharacterProgressionIntegrityV24(db);
       createResourcesInventoryEconomyRestV25(db);
+      createChecksPowersEffectsV26(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -105,9 +106,11 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     assertCharacterProgressionLayoutV23(db);
     assertCharacterProgressionLayoutV24(db);
     assertResourcesInventoryEconomyRestLayoutV25(db);
+    assertChecksPowersEffectsLayoutV26(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
+    validateM16PersistenceV26(db);
     return;
   }
   let version = row.value;
@@ -137,6 +140,9 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   const futureResourcesArtifact = Number(version) < 25 && db.prepare(`SELECT type,name FROM sqlite_master
     WHERE name GLOB '*_v25' OR name GLOB '*_v25_*' LIMIT 1`).get() as { type: string; name: string } | undefined;
   if (futureResourcesArtifact) throw new Error(`schema marker ${version} cannot contain future v25 artifact ${futureResourcesArtifact.name}`);
+  const futureChecksPowersEffectsArtifact = Number(version) < 26 && db.prepare(`SELECT type,name FROM sqlite_master
+    WHERE name GLOB '*_v26' OR name GLOB '*_v26_*' LIMIT 1`).get() as { type: string; name: string } | undefined;
+  if (futureChecksPowersEffectsArtifact) throw new Error(`schema marker ${version} cannot contain future v26 artifact ${futureChecksPowersEffectsArtifact.name}`);
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
     // pre-v18 database can never contain this future-derived sidecar.
@@ -284,6 +290,10 @@ function ensureSchema(db: DatabaseDriver.Database): void {
     migrate24to25(db);
     version = "25";
   }
+  if (version === "25") {
+    migrate25to26(db);
+    version = "26";
+  }
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -292,10 +302,12 @@ function ensureSchema(db: DatabaseDriver.Database): void {
   assertCharacterProgressionLayoutV23(db);
   assertCharacterProgressionLayoutV24(db);
   assertResourcesInventoryEconomyRestLayoutV25(db);
+  assertChecksPowersEffectsLayoutV26(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);
   validateM15PersistenceV25(db);
+  validateM16PersistenceV26(db);
 }
 
 function assertCurrentSchemaRevision(db: DatabaseDriver.Database): void {
@@ -4979,6 +4991,154 @@ function validateM15PersistenceV25(db: DatabaseDriver.Database): void {
   if (orphanDomain) throw new Error("M1.5 domain receipt provenance is inconsistent");
 }
 function migrate24to25(db: DatabaseDriver.Database): void { db.transaction(() => { assertCharacterProgressionLayoutV24(db); validateCharacterProgressionV24(db); createResourcesInventoryEconomyRestV25(db); db.prepare("UPDATE meta SET value='25' WHERE key='schemaVersion'").run(); })(); }
+
+/** Additive v26r1 persistence for deterministic checks, powers, and typed effects. */
+function createChecksPowersEffectsV26(db: DatabaseDriver.Database): void {
+  db.exec(`
+    CREATE TABLE rpg_m16_mutation_revisions_v26 (
+      campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 0 AND 9007199254740991),
+      updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,actor_id),
+      FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_m16_commands_v26 (
+      campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL CHECK(length(command_id) BETWEEN 1 AND 128 AND command_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      command_family TEXT NOT NULL CHECK(command_family IN ('check','power','effect')), command_type TEXT NOT NULL CHECK(command_type IN ('resolve_check','use_power','apply_effect','remove_effect','advance_effect_duration')),
+      idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      canonical_request_json TEXT NOT NULL CHECK(length(canonical_request_json) BETWEEN 2 AND 32768 AND json_valid(canonical_request_json) AND json_type(canonical_request_json)='object'),
+      request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest GLOB '[0-9a-f]*'),
+      expected_revision INTEGER NOT NULL CHECK(typeof(expected_revision)='integer' AND expected_revision BETWEEN 0 AND 9007199254740990),
+      resulting_revision INTEGER NOT NULL CHECK(typeof(resulting_revision)='integer' AND resulting_revision=expected_revision+1),
+      created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,actor_id,command_id), UNIQUE(campaign_id,actor_id,idempotency_key), UNIQUE(campaign_id,actor_id,resulting_revision), UNIQUE(campaign_id,actor_id,command_id,resulting_revision),
+      FOREIGN KEY(campaign_id,actor_id) REFERENCES rpg_m16_mutation_revisions_v26(campaign_id,actor_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_m16_receipts_v26 (
+      campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL CHECK(typeof(resulting_revision)='integer' AND resulting_revision BETWEEN 1 AND 9007199254740991),
+      canonical_result_json TEXT NOT NULL CHECK(length(canonical_result_json) BETWEEN 2 AND 32768 AND json_valid(canonical_result_json) AND json_type(canonical_result_json)='object'),
+      result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest GLOB '[0-9a-f]*'),
+      occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'),
+      PRIMARY KEY(campaign_id,actor_id,command_id), UNIQUE(campaign_id,actor_id,resulting_revision), UNIQUE(campaign_id,actor_id,command_id,resulting_revision),
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_commands_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_m16_events_v26 (
+      event_id TEXT PRIMARY KEY CHECK(length(event_id) BETWEEN 1 AND 128 AND event_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+      event_type TEXT NOT NULL CHECK(event_type IN ('check_resolved','power_used','effect_applied','effect_removed','effect_duration_advanced')),
+      event_json TEXT NOT NULL CHECK(length(event_json) BETWEEN 2 AND 32768 AND json_valid(event_json) AND json_type(event_json)='object'),
+      occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,actor_id,command_id),
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_receipts_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_check_results_v26 (
+      check_id TEXT PRIMARY KEY CHECK(length(check_id) BETWEEN 1 AND 128 AND check_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+      check_kind TEXT NOT NULL CHECK(check_kind IN ('ability','skill','save','attack','opposed')), check_key TEXT NOT NULL CHECK(check_key IN ('might','agility','resolve','insight','presence','craft','melee','ranged','spell','defense')),
+      target_actor_id TEXT, difficulty INTEGER CHECK(typeof(difficulty)='integer' AND difficulty BETWEEN 0 AND 1000),
+      dice_json TEXT NOT NULL CHECK(length(dice_json) BETWEEN 2 AND 4096 AND json_valid(dice_json) AND json_type(dice_json)='array' AND json_array_length(dice_json) BETWEEN 1 AND 32),
+      result_json TEXT NOT NULL CHECK(length(result_json) BETWEEN 2 AND 8192 AND json_valid(result_json) AND json_type(result_json)='object'), total INTEGER NOT NULL CHECK(typeof(total)='integer' AND total BETWEEN -9007199254740991 AND 9007199254740991),
+      resolved_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',resolved_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',resolved_at)=resolved_at AND substr(resolved_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,actor_id,command_id),
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_receipts_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,target_actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_power_uses_v26 (
+      power_use_id TEXT PRIMARY KEY CHECK(length(power_use_id) BETWEEN 1 AND 128 AND power_use_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+      power_pack_id TEXT NOT NULL, power_pack_version TEXT NOT NULL, power_kind TEXT NOT NULL CHECK(power_kind IN ('ability','spell')), power_definition_id TEXT NOT NULL,
+      slot_kind TEXT NOT NULL CHECK(slot_kind IN ('none','slot','charge','resource')), slot_level INTEGER CHECK(typeof(slot_level)='integer' AND slot_level BETWEEN 0 AND 20),
+      target_actor_id TEXT, use_json TEXT NOT NULL CHECK(length(use_json) BETWEEN 2 AND 8192 AND json_valid(use_json) AND json_type(use_json)='object'),
+      used_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',used_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',used_at)=used_at AND substr(used_at,12,2) BETWEEN '00' AND '23'),
+      CHECK((slot_kind='slot' AND slot_level IS NOT NULL) OR (slot_kind<>'slot' AND slot_level IS NULL)), UNIQUE(campaign_id,actor_id,command_id),
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_receipts_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,target_actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,power_pack_id,power_pack_version,power_kind,power_definition_id) REFERENCES rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_power_use_costs_v26 (
+      power_use_id TEXT NOT NULL, cost_ordinal INTEGER NOT NULL CHECK(typeof(cost_ordinal)='integer' AND cost_ordinal BETWEEN 0 AND 31),
+      cost_kind TEXT NOT NULL CHECK(cost_kind IN ('slot','charge','resource')), resource_name TEXT NOT NULL CHECK(length(resource_name) BETWEEN 1 AND 128 AND resource_name=trim(resource_name)), amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount BETWEEN 1 AND 1000000),
+      PRIMARY KEY(power_use_id,cost_ordinal),
+      FOREIGN KEY(power_use_id) REFERENCES rpg_power_uses_v26(power_use_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_effect_modifier_vocabulary_v26 (
+      modifier_kind TEXT PRIMARY KEY CHECK(modifier_kind IN ('flat','proficiency','advantage','resistance','vulnerability','immunity'))
+    );
+    INSERT INTO rpg_effect_modifier_vocabulary_v26(modifier_kind) VALUES ('flat'),('proficiency'),('advantage'),('resistance'),('vulnerability'),('immunity');
+    CREATE TABLE rpg_active_effects_v26 (
+      effect_id TEXT PRIMARY KEY CHECK(length(effect_id) BETWEEN 1 AND 128 AND effect_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+      source_pack_id TEXT, source_pack_version TEXT, source_kind TEXT CHECK(source_kind IS NULL OR source_kind IN ('ability','spell')), source_definition_id TEXT,
+      status TEXT NOT NULL CHECK(status IN ('active','removed','expired')), concentration_key TEXT,
+      duration_kind TEXT NOT NULL CHECK(duration_kind IN ('until_removed','rounds','until_timestamp')), remaining_rounds INTEGER, expires_at TEXT,
+      recovery_kind TEXT NOT NULL CHECK(recovery_kind IN ('none','short_rest','long_rest')), state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991), last_lifecycle_event_id TEXT,
+      applied_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',applied_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',applied_at)=applied_at AND substr(applied_at,12,2) BETWEEN '00' AND '23'), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'), ended_at TEXT CHECK(ended_at IS NULL OR (strftime('%Y-%m-%dT%H:%M:%fZ',ended_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',ended_at)=ended_at AND substr(ended_at,12,2) BETWEEN '00' AND '23')),
+      CHECK((source_pack_id IS NULL AND source_pack_version IS NULL AND source_kind IS NULL AND source_definition_id IS NULL) OR (source_pack_id IS NOT NULL AND source_pack_version IS NOT NULL AND source_kind IS NOT NULL AND source_definition_id IS NOT NULL)),
+      CHECK((duration_kind='rounds' AND remaining_rounds BETWEEN 0 AND 100000 AND expires_at IS NULL) OR (duration_kind='until_timestamp' AND remaining_rounds IS NULL AND expires_at IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at)=expires_at AND substr(expires_at,12,2) BETWEEN '00' AND '23') OR (duration_kind='until_removed' AND remaining_rounds IS NULL AND expires_at IS NULL)),
+      CHECK((status='active' AND ended_at IS NULL) OR (status<>'active' AND ended_at IS NOT NULL)),
+      UNIQUE(campaign_id,actor_id,command_id),
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_receipts_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,source_pack_id,source_pack_version,source_kind,source_definition_id) REFERENCES rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE UNIQUE INDEX uq_rpg_active_effects_v26_concentration ON rpg_active_effects_v26(campaign_id,actor_id,concentration_key) WHERE status='active' AND concentration_key IS NOT NULL;
+    CREATE TABLE rpg_effect_lifecycle_events_v26 (
+      lifecycle_event_id TEXT PRIMARY KEY CHECK(length(lifecycle_event_id) BETWEEN 1 AND 128 AND lifecycle_event_id NOT GLOB '*[^A-Za-z0-9._:-]*'), effect_id TEXT NOT NULL, campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+      lifecycle_kind TEXT NOT NULL CHECK(lifecycle_kind IN ('applied','removed','concentration_replaced','duration_advanced')), remaining_rounds INTEGER CHECK(remaining_rounds IS NULL OR (typeof(remaining_rounds)='integer' AND remaining_rounds BETWEEN 0 AND 100000)),
+      occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'),
+      UNIQUE(campaign_id,actor_id,command_id,effect_id),
+      FOREIGN KEY(effect_id) REFERENCES rpg_active_effects_v26(effect_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m16_receipts_v26(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+    CREATE TABLE rpg_effect_modifiers_v26 (
+      effect_id TEXT NOT NULL, modifier_ordinal INTEGER NOT NULL CHECK(typeof(modifier_ordinal)='integer' AND modifier_ordinal BETWEEN 0 AND 127),
+      modifier_kind TEXT NOT NULL CHECK(modifier_kind IN ('flat','proficiency','advantage','resistance','vulnerability','immunity')), applies_to_id TEXT NOT NULL CHECK(length(applies_to_id) BETWEEN 1 AND 128 AND applies_to_id=trim(applies_to_id)),
+      amount INTEGER CHECK(typeof(amount)='integer' AND amount BETWEEN -10000 AND 10000),
+      PRIMARY KEY(effect_id,modifier_ordinal),
+      FOREIGN KEY(effect_id) REFERENCES rpg_active_effects_v26(effect_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(modifier_kind) REFERENCES rpg_effect_modifier_vocabulary_v26(modifier_kind) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      CHECK((modifier_kind='flat' AND amount IS NOT NULL) OR (modifier_kind='proficiency' AND amount BETWEEN 0 AND 10000) OR (modifier_kind IN ('advantage','resistance','vulnerability','immunity') AND amount IS NULL))
+    );
+    CREATE TABLE rpg_checks_powers_effects_layout_attestation_v26 (
+      singleton INTEGER PRIMARY KEY CHECK(singleton=1), prior_layout_digest TEXT NOT NULL CHECK(length(prior_layout_digest)=64), current_layout_digest TEXT NOT NULL CHECK(length(current_layout_digest)=64)
+    );
+    CREATE TRIGGER rpg_m16_mutation_revisions_v26_revision_guard BEFORE UPDATE ON rpg_m16_mutation_revisions_v26 WHEN NEW.campaign_id<>OLD.campaign_id OR NEW.actor_id<>OLD.actor_id OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at BEGIN SELECT RAISE(ABORT,'M1.6 mutation revision must advance exactly once'); END;
+    CREATE TRIGGER rpg_m16_mutation_revisions_v26_retain_delete BEFORE DELETE ON rpg_m16_mutation_revisions_v26 BEGIN SELECT RAISE(ABORT,'M1.6 mutation revisions are retained'); END;
+    CREATE TRIGGER rpg_m16_commands_v26_immutable_update BEFORE UPDATE ON rpg_m16_commands_v26 BEGIN SELECT RAISE(ABORT,'M1.6 commands are immutable'); END;
+    CREATE TRIGGER rpg_m16_commands_v26_immutable_delete BEFORE DELETE ON rpg_m16_commands_v26 BEGIN SELECT RAISE(ABORT,'M1.6 commands are immutable'); END;
+    CREATE TRIGGER rpg_m16_receipts_v26_immutable_update BEFORE UPDATE ON rpg_m16_receipts_v26 BEGIN SELECT RAISE(ABORT,'M1.6 receipts are immutable'); END;
+    CREATE TRIGGER rpg_m16_receipts_v26_immutable_delete BEFORE DELETE ON rpg_m16_receipts_v26 BEGIN SELECT RAISE(ABORT,'M1.6 receipts are immutable'); END;
+    CREATE TRIGGER rpg_m16_events_v26_immutable_update BEFORE UPDATE ON rpg_m16_events_v26 BEGIN SELECT RAISE(ABORT,'M1.6 events are immutable'); END;
+    CREATE TRIGGER rpg_m16_events_v26_immutable_delete BEFORE DELETE ON rpg_m16_events_v26 BEGIN SELECT RAISE(ABORT,'M1.6 events are immutable'); END;
+    CREATE TRIGGER rpg_check_results_v26_immutable_update BEFORE UPDATE ON rpg_check_results_v26 BEGIN SELECT RAISE(ABORT,'check results are immutable'); END;
+    CREATE TRIGGER rpg_check_results_v26_immutable_delete BEFORE DELETE ON rpg_check_results_v26 BEGIN SELECT RAISE(ABORT,'check results are immutable'); END;
+    CREATE TRIGGER rpg_power_uses_v26_immutable_update BEFORE UPDATE ON rpg_power_uses_v26 BEGIN SELECT RAISE(ABORT,'power uses are immutable'); END;
+    CREATE TRIGGER rpg_power_uses_v26_immutable_delete BEFORE DELETE ON rpg_power_uses_v26 BEGIN SELECT RAISE(ABORT,'power uses are immutable'); END;
+    CREATE TRIGGER rpg_power_use_costs_v26_immutable_update BEFORE UPDATE ON rpg_power_use_costs_v26 BEGIN SELECT RAISE(ABORT,'power use costs are immutable'); END;
+    CREATE TRIGGER rpg_power_use_costs_v26_immutable_delete BEFORE DELETE ON rpg_power_use_costs_v26 BEGIN SELECT RAISE(ABORT,'power use costs are immutable'); END;
+    CREATE TRIGGER rpg_effect_lifecycle_events_v26_immutable_update BEFORE UPDATE ON rpg_effect_lifecycle_events_v26 BEGIN SELECT RAISE(ABORT,'effect lifecycle events are immutable'); END;
+    CREATE TRIGGER rpg_effect_lifecycle_events_v26_immutable_delete BEFORE DELETE ON rpg_effect_lifecycle_events_v26 BEGIN SELECT RAISE(ABORT,'effect lifecycle events are immutable'); END;
+    CREATE TRIGGER rpg_effect_lifecycle_events_v26_require_command BEFORE INSERT ON rpg_effect_lifecycle_events_v26
+      WHEN NOT EXISTS(SELECT 1 FROM rpg_m16_commands_v26 command WHERE command.campaign_id=NEW.campaign_id AND command.actor_id=NEW.actor_id AND command.command_id=NEW.command_id AND command.resulting_revision=NEW.resulting_revision AND ((NEW.lifecycle_kind='applied' AND command.command_type='apply_effect') OR (NEW.lifecycle_kind='concentration_replaced' AND command.command_type='apply_effect') OR (NEW.lifecycle_kind='removed' AND command.command_type='remove_effect') OR (NEW.lifecycle_kind='duration_advanced' AND command.command_type='advance_effect_duration')))
+      BEGIN SELECT RAISE(ABORT,'effect lifecycle event must match its exact command'); END;
+    CREATE TRIGGER rpg_active_effects_v26_lifecycle_guard BEFORE UPDATE ON rpg_active_effects_v26
+      WHEN NEW.effect_id<>OLD.effect_id OR NEW.campaign_id<>OLD.campaign_id OR NEW.actor_id<>OLD.actor_id OR NEW.command_id<>OLD.command_id OR NEW.resulting_revision<>OLD.resulting_revision OR NEW.applied_at<>OLD.applied_at OR NEW.state_revision<>OLD.state_revision+1 OR NEW.updated_at<OLD.updated_at OR NEW.last_lifecycle_event_id IS NULL OR NOT EXISTS(SELECT 1 FROM rpg_effect_lifecycle_events_v26 event WHERE event.lifecycle_event_id=NEW.last_lifecycle_event_id AND event.effect_id=NEW.effect_id AND event.campaign_id=NEW.campaign_id AND event.actor_id=NEW.actor_id AND event.occurred_at=NEW.updated_at AND ((NOT (NEW.remaining_rounds IS OLD.remaining_rounds) AND event.lifecycle_kind='duration_advanced') OR (NEW.remaining_rounds IS OLD.remaining_rounds AND NEW.status<>OLD.status AND event.lifecycle_kind IN ('removed','concentration_replaced'))))
+      BEGIN SELECT RAISE(ABORT,'active effects advance only from an immutable lifecycle event'); END;
+    CREATE TRIGGER rpg_effect_modifiers_v26_immutable_update BEFORE UPDATE ON rpg_effect_modifiers_v26 BEGIN SELECT RAISE(ABORT,'effect modifiers are immutable'); END;
+    CREATE TRIGGER rpg_effect_modifiers_v26_immutable_delete BEFORE DELETE ON rpg_effect_modifiers_v26 BEGIN SELECT RAISE(ABORT,'effect modifiers are immutable'); END;
+    CREATE TRIGGER rpg_checks_powers_effects_layout_attestation_v26_immutable_update BEFORE UPDATE ON rpg_checks_powers_effects_layout_attestation_v26 BEGIN SELECT RAISE(ABORT,'v26 layout attestation is immutable'); END;
+    CREATE TRIGGER rpg_checks_powers_effects_layout_attestation_v26_immutable_delete BEFORE DELETE ON rpg_checks_powers_effects_layout_attestation_v26 BEGIN SELECT RAISE(ABORT,'v26 layout attestation is immutable'); END;
+  `);
+  const current = checksPowersEffectsLayoutDigestV26(db);
+  db.prepare("INSERT INTO rpg_checks_powers_effects_layout_attestation_v26(singleton,prior_layout_digest,current_layout_digest) VALUES(1,?,?)").run(V25_RESOURCES_INVENTORY_ECONOMY_LAYOUT_DIGEST, current);
+}
+const V26_CHECKS_POWERS_EFFECTS_LAYOUT_DIGEST = "7e3fe64f425173022d119f156f60eb36b26af2c97f29d40975f5579caa660f6a";
+function checksPowersEffectsLayoutRowsV26(db: DatabaseDriver.Database): unknown[] { return db.prepare(`SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' AND (name GLOB '*_v26' OR name GLOB '*_v26_*' OR tbl_name GLOB '*_v26' OR tbl_name GLOB '*_v26_*') ORDER BY type,name`).all(); }
+function checksPowersEffectsLayoutDigestV26(db: DatabaseDriver.Database): string { const rows = (checksPowersEffectsLayoutRowsV26(db) as Array<any>).map((row) => ({...row, sql: row.sql?.replace(/\s+/g, " ").trim()})); return createHash("sha256").update(canonicalV17(rows)).digest("hex"); }
+function assertChecksPowersEffectsLayoutV26(db: DatabaseDriver.Database): void { const row = db.prepare("SELECT prior_layout_digest,current_layout_digest FROM rpg_checks_powers_effects_layout_attestation_v26 WHERE singleton=1").get() as any; const actual = checksPowersEffectsLayoutDigestV26(db); if (!row || row.prior_layout_digest !== V25_RESOURCES_INVENTORY_ECONOMY_LAYOUT_DIGEST || row.current_layout_digest !== actual || actual !== V26_CHECKS_POWERS_EFFECTS_LAYOUT_DIGEST) throw new Error(`schema v26 checks/powers/effects canonical SQL is incompatible (${actual})`); }
+function validateM16PersistenceV26(db: DatabaseDriver.Database): void {
+  const commands = db.prepare(`SELECT command.*,receipt.resulting_revision receipt_revision,receipt.occurred_at FROM rpg_m16_commands_v26 command LEFT JOIN rpg_m16_receipts_v26 receipt ON receipt.campaign_id=command.campaign_id AND receipt.actor_id=command.actor_id AND receipt.command_id=command.command_id ORDER BY command.campaign_id,command.actor_id,command.resulting_revision`).all() as Array<any>;
+  if (commands.length !== (db.prepare("SELECT count(*) count FROM rpg_m16_receipts_v26").get() as {count:number}).count) throw new Error("M1.6 command receipt graph is incomplete");
+  for (const command of commands) { let request:any; try { request=JSON.parse(command.canonical_request_json); } catch { throw new Error("M1.6 command provenance is malformed"); } if (command.canonical_request_json!==canonicalV17(request) || command.request_digest!==createHash("sha256").update(canonicalV17(request)).digest("hex") || command.receipt_revision!==command.resulting_revision || command.occurred_at!==command.created_at) throw new Error("M1.6 command receipt provenance is inconsistent"); }
+  const roots=db.prepare("SELECT * FROM rpg_m16_mutation_revisions_v26 ORDER BY campaign_id,actor_id").all() as Array<any>;
+  for (const root of roots) { const history=db.prepare("SELECT expected_revision,resulting_revision,created_at FROM rpg_m16_commands_v26 WHERE campaign_id=? AND actor_id=? ORDER BY resulting_revision").all(root.campaign_id,root.actor_id) as Array<any>; if(history.length!==root.revision || history.some((row,index)=>row.expected_revision!==index || row.resulting_revision!==index+1) || (history.length>0 && root.updated_at!==history.at(-1)!.created_at)) throw new Error("M1.6 revision root history is inconsistent"); }
+}
+function migrate25to26(db: DatabaseDriver.Database): void { db.transaction(() => { assertResourcesInventoryEconomyRestLayoutV25(db); validateM15PersistenceV25(db); createChecksPowersEffectsV26(db); db.prepare("UPDATE meta SET value='26' WHERE key='schemaVersion'").run(); })(); }
 
 function migrateLegacyIfPresent(db: DatabaseDriver.Database, dir: string, dependencies: RuntimeDependencies): void {
   const legacy = loadLegacyDatabase(dir, dependencies);

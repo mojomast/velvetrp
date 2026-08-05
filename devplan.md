@@ -6,4 +6,5 @@
 - [✅] Correct character-draft PATCH campaign binding and current HTTP documentation
 - [✅] Correct typed progression errors and restrict administration HTTP methods
 - [✅] M1.5 resources, inventory, equipment, economy, and rest (repository/shared-contract layer)
-- [ ] M1.6 checks, powers, and deterministic effects
+- [✅] M1.6 checks, powers, and deterministic effects
+- [ ] M1.7 encounters and turn-based combat

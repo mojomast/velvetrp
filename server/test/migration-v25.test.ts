@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { removeFutureChecksPowersEffectsV26 } from "./helpers.js";
 
 const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v25-"));
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
@@ -39,6 +40,7 @@ function assertV25ForeignKeysReferenceParentKeys(db: DatabaseDriver.Database): v
 /** Deliberately rewind only the additive v25 fixture artifacts. */
 function rewindToV24(dir: string): void {
   const db = new DatabaseDriver(file(dir));
+  removeFutureChecksPowersEffectsV26(db);
   const triggers = db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
   for (const { name } of triggers) db.exec(`DROP TRIGGER ${name}`);
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
@@ -84,7 +86,7 @@ describe("additive schema v25r1 resources, inventory, economy, and rest migratio
     createRepository({ dataDir: migrated }).close();
 
     const db = new DatabaseDriver(file(migrated), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "25" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "26" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM rpg_resources_inventory_economy_layout_attestation_v25").get()).toEqual({
       prior_layout_digest: "e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8",
       current_layout_digest: "a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7",

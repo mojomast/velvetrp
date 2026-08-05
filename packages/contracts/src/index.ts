@@ -30,6 +30,9 @@ export * from "./actor-resources.js";
 export * from "./inventory.js";
 export * from "./economy.js";
 export * from "./rest.js";
+export * from "./checks.js";
+export * from "./powers.js";
+export * from "./effects.js";
 
 export {
   addCampaignMembershipInputSchema,

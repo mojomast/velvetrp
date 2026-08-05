@@ -98,6 +98,9 @@ import { createActorResourceRepository, type ActorResourceRepository } from "./a
 import { createInventoryRepository, type InventoryRepository } from "./inventoryRepo.js";
 import { createEconomyRepository, type EconomyRepository } from "./economyRepo.js";
 import { createRestRepository, type RestRepository } from "./restRepo.js";
+import { createCheckRepository, type CheckRepository } from "./checkRepo.js";
+import { createPowerRepository, type PowerRepository } from "./powerRepo.js";
+import { createEffectRepository, type EffectRepository } from "./effectRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -428,7 +431,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: {
@@ -6988,6 +6991,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const inventoryRepository=createInventoryRepository(db,dependencies,m15Guard);
   const economyRepository=createEconomyRepository(db,dependencies,m15Guard);
   const restRepository=createRestRepository(db,dependencies,m15Guard);
+  const m16Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.6 mutation cannot run inside a repository transaction");};
+  const checkRepository=createCheckRepository(db,dependencies,m16Guard);
+  const powerRepository=createPowerRepository(db,dependencies,m16Guard);
+  const effectRepository=createEffectRepository(db,dependencies,m16Guard);
   return {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -6997,6 +7004,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     ...inventoryRepository,
     ...economyRepository,
     ...restRepository,
+    ...checkRepository,
+    ...powerRepository,
+    ...effectRepository,
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>
