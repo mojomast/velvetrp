@@ -133,7 +133,7 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
     return {
       instance,
       hasQuery,
-      queryDetail: method === "GET" || method === "PATCH"
+      queryDetail: method === "GET" || method === "PATCH" || method === "DELETE"
         ? "Campaign administration does not accept query parameters" : null,
       noStore: true,
     };

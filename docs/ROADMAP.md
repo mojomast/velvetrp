@@ -149,11 +149,13 @@ Persist the durable coordination state needed for player declarations, proposed 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: Started. M2.1 quest routes are complete; the remaining route groups are pending.**
+**Progress: Started. Quest bootstrap routes and M2.1 lifecycle/settings are complete; the remaining route groups are pending.**
 
 All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
 ### M2.1 Campaign lifecycle and settings routes
+
+**Status: Complete (trusted-local HTTP routes)**
 
 Expose lifecycle and settings administration without overloading the current rename contract.
 

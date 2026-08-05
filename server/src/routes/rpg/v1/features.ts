@@ -94,7 +94,8 @@ export interface CampaignListRepository extends
   Partial<CampaignDiceRepository>,
   Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">>,
   Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression">>,
-  Partial<Pick<CampaignAdministrationRepository, "getCampaignAdministration" | "updateCampaignAdministration">>,
+  Partial<Pick<CampaignAdministrationRepository,
+    "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">>,
   Partial<QuestRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
@@ -158,7 +159,7 @@ type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
-  "getCampaignAdministration" | "updateCampaignAdministration">;
+  "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
 type QuestLaneRepository = Pick<QuestRepository,
   "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
   | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
@@ -194,7 +195,8 @@ function assertCampaignAdministrationRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignAdministrationLaneRepository {
   if (typeof repository.getCampaignAdministration !== "function"
-    || typeof repository.updateCampaignAdministration !== "function") {
+    || typeof repository.updateCampaignAdministration !== "function"
+    || typeof repository.archiveCampaignWithConfirmation !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
 }

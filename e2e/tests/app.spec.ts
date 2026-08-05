@@ -449,6 +449,77 @@ test("critical browser and public API workflows", async ({ page, request }) => {
   }
 });
 
+test("campaign administration lifecycle and settings API smoke", async ({ request }) => {
+  const campaignName = `${runId}-Administration-Campaign`;
+  const created = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: campaignName,
+  });
+  const campaignId = created.campaign.id;
+
+  const administration = await json<{
+    campaign: { id: string; status: string; revision: number; settings: { safetyMode: string } };
+  }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`);
+  expect(administration).toEqual({ campaign: expect.objectContaining({ id: campaignId, status: "draft" }) });
+
+  const patched = await json<{
+    campaign: { id: string; status: string; revision: number; settings: { safetyMode: string } };
+    receipt: { campaignId: string; revisionBefore: number; revisionAfter: number };
+  }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/administration`, {
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-administration-patch`,
+    status: "published",
+    settings: { safetyMode: "strict" },
+  });
+  expect(patched).toEqual({
+    campaign: expect.objectContaining({ id: campaignId, status: "published", settings: expect.objectContaining({ safetyMode: "strict" }) }),
+    receipt: expect.objectContaining({
+      campaignId,
+      revisionBefore: administration.campaign.revision,
+      revisionAfter: administration.campaign.revision + 1,
+    }),
+  });
+
+  const archive = {
+    expectedRevision: patched.campaign.revision,
+    idempotencyKey: `${runId}-administration-archive`,
+    confirmationName: campaignName,
+  };
+  const archived = await json<{
+    campaign: { id: string; status: string; revision: number };
+    receipt: { commandId: string; campaignId: string; revisionBefore: number; revisionAfter: number };
+  }>(request, "DELETE", `/rpg/v1/campaigns/${campaignId}/administration`, archive);
+  expect(archived).toEqual({
+    campaign: expect.objectContaining({ id: campaignId, status: "archived" }),
+    receipt: expect.objectContaining({
+      campaignId,
+      revisionBefore: patched.campaign.revision,
+      revisionAfter: patched.campaign.revision + 1,
+    }),
+  });
+  const archiveRetry = await json<typeof archived>(request, "DELETE", `/rpg/v1/campaigns/${campaignId}/administration`, archive);
+  expect(archiveRetry.receipt).toEqual(archived.receipt);
+
+  const confirmationCampaignName = `${runId}-Wrong-Confirmation-Campaign`;
+  const confirmationCampaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: confirmationCampaignName,
+  });
+  const confirmationAdministration = await json<{ campaign: { revision: number; status: string } }>(
+    request, "GET", `/rpg/v1/campaigns/${confirmationCampaign.campaign.id}/administration`,
+  );
+  const wrongConfirmation = await request.delete(`/api/rpg/v1/campaigns/${confirmationCampaign.campaign.id}/administration`, {
+    data: {
+      expectedRevision: confirmationAdministration.campaign.revision,
+      idempotencyKey: `${runId}-wrong-confirmation`,
+      confirmationName: `${confirmationCampaignName}-wrong`,
+    },
+  });
+  expect(wrongConfirmation.status()).toBe(409);
+  const remainsUnarchived = await json<{ campaign: { status: string } }>(
+    request, "GET", `/rpg/v1/campaigns/${confirmationCampaign.campaign.id}/administration`,
+  );
+  expect(remainsUnarchived.campaign.status).not.toBe("archived");
+});
+
 test("quest workflow creates and resolves campaign state", async ({ request }) => {
   let characterId: string | undefined;
   try {

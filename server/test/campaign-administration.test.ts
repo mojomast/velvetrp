@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_RACE } from "@velvet/contracts";
 import {
   CampaignAdministrationConflictError,
+  CampaignAdministrationForbiddenError,
   CampaignAdministrationStaleError,
   createRepository,
 } from "../src/repo/index.js";
@@ -48,6 +49,42 @@ describe("campaign administration repository", () => {
     expect(() => repo.removeAuditedCampaignMembership("local-owner", campaign.id, "local-owner", {
       expectedRevision: 2, idempotencyKey: "owner-key",
     })).toThrowError(/sole owner/);
+    repo.close();
+  });
+
+  it("archives only after an exact owner confirmation and replays by confirmation name", () => {
+    const repo = repository();
+    const campaign = repo.createCampaign("local-owner", { name: "Confirm Archive" });
+    addPrincipal("archive-player");
+    repo.addAuditedCampaignMembership("local-owner", campaign.id, {
+      principalId: "archive-player", role: "player", expectedRevision: 0, idempotencyKey: "archive-player-member",
+    });
+    const db = new DatabaseDriver(dbPath());
+    const commandCount = () => (db.prepare("SELECT COUNT(*) count FROM campaign_administration_commands").get() as { count: number }).count;
+    const before = commandCount();
+    expect(() => repo.archiveCampaignWithConfirmation("local-owner", campaign.id, {
+      confirmationName: "Wrong Name", expectedRevision: 1, idempotencyKey: "archive-wrong",
+    })).toThrow(CampaignAdministrationConflictError);
+    expect(commandCount()).toBe(before);
+    expect(repo.getCampaignAdministration("local-owner", campaign.id)!.status).toBe("draft");
+
+    const archived = repo.archiveCampaignWithConfirmation("local-owner", campaign.id, {
+      confirmationName: "Confirm Archive", expectedRevision: 1, idempotencyKey: "archive-confirmed",
+    });
+    expect(archived.value.status).toBe("archived");
+    expect(repo.archiveCampaignWithConfirmation("local-owner", campaign.id, {
+      confirmationName: "Confirm Archive", expectedRevision: 1, idempotencyKey: "archive-confirmed",
+    })).toEqual(archived);
+    expect(() => repo.archiveCampaignWithConfirmation("local-owner", campaign.id, {
+      confirmationName: "Different Name", expectedRevision: 1, idempotencyKey: "archive-confirmed",
+    })).toThrow(CampaignAdministrationConflictError);
+    expect(db.prepare("SELECT payload FROM campaign_administration_commands WHERE idempotency_key=?")
+      .get("archive-confirmed")).toMatchObject({ payload: JSON.stringify({ status: "archived", confirmationName: "Confirm Archive" }) });
+    db.close();
+
+    expect(() => repo.archiveCampaignWithConfirmation("archive-player", campaign.id, {
+      confirmationName: "Confirm Archive", expectedRevision: 2, idempotencyKey: "archive-not-owner",
+    })).toThrow(CampaignAdministrationForbiddenError);
     repo.close();
   });
 

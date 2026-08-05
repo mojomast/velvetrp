@@ -5,8 +5,15 @@ import { CampaignAdministrationConflictError, CampaignAdministrationStaleError }
 
 const value = { id: "campaign", actorRole: "owner" as const, status: "draft" as const, activeTimelineId: "timeline", revision: 2,
   updatedAt: "2030-01-01T00:00:00.000Z", settings: { maxPlayers: 4, allowPlayerDice: true, safetyMode: "standard" as const, recapVisibility: "members" as const, gmNotes: "secret" } };
+const receipt = { commandId: "command", campaignId: "campaign", type: "administration_updated" as const, revisionBefore: 1, revisionAfter: 2,
+  occurredAt: "2030-01-01T00:00:00.000Z", events: [{ eventId: "event", commandId: "command", campaignId: "campaign", type: "administration_updated" as const,
+    revision: 2, occurredAt: "2030-01-01T00:00:00.000Z", data: {} }] };
 function setup() {
-  const repo = { getCampaignAdministration: vi.fn(() => value), updateCampaignAdministration: vi.fn(() => ({ value, receipt: {} as never })) };
+  const repo = {
+    getCampaignAdministration: vi.fn(() => value),
+    updateCampaignAdministration: vi.fn((_actor, _campaign, input) => ({ value: { ...value, status: input.status ?? value.status }, receipt })),
+    archiveCampaignWithConfirmation: vi.fn(() => ({ value: { ...value, status: "archived" }, receipt })),
+  };
   const app = Fastify(); app.register(campaignAdministrationHttpRoutes, { prefix: "/api/rpg/v1", campaignAdministrationRepositoryAccessor: () => repo as never });
   return { app, repo };
 }
@@ -19,19 +26,29 @@ describe("isolated campaign administration HTTP lane", () => {
     expect(response.statusCode).toBe(404); expect(response.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND" });
     expect(repo.getCampaignAdministration).not.toHaveBeenCalled(); await app.close();
   });
-  it("reads and patches with fixed local ownership and no-store", async () => {
+  it("reads and patches envelopes with fixed local ownership and no-store", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true"; const { app, repo } = setup();
     const read = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/administration", headers: { authorization: "attacker" } });
     expect(read.statusCode).toBe(200); expect(read.headers["cache-control"]).toBe("no-store");
+    expect(read.json()).toEqual({ campaign: value });
     const patch = await app.inject({ method: "PATCH", url: "/api/rpg/v1/campaigns/campaign/administration", payload: { expectedRevision: 2, idempotencyKey: "key", status: "published" } });
-    expect(patch.statusCode).toBe(200); expect(repo.updateCampaignAdministration).toHaveBeenCalledWith("local-owner", "campaign", expect.anything()); await app.close();
+    expect(patch.statusCode).toBe(200); expect(patch.json()).toEqual({ campaign: { ...value, status: "published" }, receipt });
+    expect(repo.updateCampaignAdministration).toHaveBeenCalledWith("local-owner", "campaign", expect.anything()); await app.close();
+  });
+  it("archives through DELETE with a receipt", async () => {
+    process.env.FEATURE_RPG_CAMPAIGN = "true"; const { app, repo } = setup();
+    const response = await app.inject({ method: "DELETE", url: "/api/rpg/v1/campaigns/campaign/administration", payload: { expectedRevision: 2, idempotencyKey: "key", confirmationName: "campaign" } });
+    expect(response.statusCode).toBe(200); expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({ campaign: { ...value, status: "archived" }, receipt });
+    expect(repo.archiveCampaignWithConfirmation).toHaveBeenCalledWith("local-owner", "campaign", { expectedRevision: 2, idempotencyKey: "key", confirmationName: "campaign" }); await app.close();
   });
   it("rejects query, malformed paths, media, invalid bodies and unsupported methods", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true"; const { app, repo } = setup();
     expect((await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/administration?x=" })).statusCode).toBe(400);
     expect((await app.inject({ method: "PATCH", url: "/api/rpg/v1/campaigns/campaign/administration", headers: { "content-type": "text/plain" }, payload: "x" })).statusCode).toBe(415);
     expect((await app.inject({ method: "PATCH", url: "/api/rpg/v1/campaigns/campaign/administration", payload: {} })).statusCode).toBe(400);
-    for (const method of ["HEAD", "OPTIONS", "DELETE"] as const) {
+    expect((await app.inject({ method: "DELETE", url: "/api/rpg/v1/campaigns/campaign/administration", payload: {} })).statusCode).toBe(400);
+    for (const method of ["HEAD", "OPTIONS"] as const) {
       expect((await app.inject({ method, url: "/api/rpg/v1/campaigns/campaign/administration" })).statusCode).toBe(404);
     }
     expect(repo.getCampaignAdministration).not.toHaveBeenCalled(); await app.close();
