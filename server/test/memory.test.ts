@@ -108,4 +108,34 @@ describe("buildEpisodeSummary", () => {
   it("has a fallback for empty histories", () => {
     expect(buildEpisodeSummary([]).summary).toMatch(/no major events/i);
   });
+
+  it.each([
+    ["tense", "The DANGER is closing in."],
+    ["tender", "She offers a GENTLE embrace."],
+    ["playful", "They LAUGH at the joke."],
+    ["solemn", "They MOURN the fallen king."],
+    ["steady", "They continue down the road."],
+  ] as const)("infers a %s emotional beat from recent dialogue", (emotionalBeat, content) => {
+    expect(buildEpisodeSummary([msg("user", content)]).emotionalBeat).toBe(emotionalBeat);
+  });
+
+  it("uses documented emotional-beat precedence for recent dialogue", () => {
+    const messages = [
+      msg("user", "We laugh together."),
+      msg("character", "A gentle kiss follows."),
+      msg("user", "Danger approaches."),
+    ];
+
+    expect(buildEpisodeSummary(messages).emotionalBeat).toBe("tense");
+  });
+
+  it("only considers the last four non-system messages for emotional beats", () => {
+    const messages = [
+      msg("user", "Danger approaches."),
+      msg("system", "ignore this"),
+      ...Array.from({ length: 4 }, () => msg("character", "The road continues.")),
+    ];
+
+    expect(buildEpisodeSummary(messages).emotionalBeat).toBe("steady");
+  });
 });

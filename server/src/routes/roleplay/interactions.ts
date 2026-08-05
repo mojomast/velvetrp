@@ -55,7 +55,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
     const character = targetCharacter(session, body.speakerCharacterId);
     if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
 
-    const content = sanitizeUserContent(rawContent);
+    const { content, wasTruncated } = sanitizeUserContent(rawContent);
+    if (wasTruncated) request.log.warn({ sessionId: session.id, contentLength: content.length }, "user content truncated to policy limit");
     const policy = checkUserMessage(content);
     if (!policy.allowed) {
       return reply.code(422).send({ error: "policy violation", violations: policy.violations });
@@ -118,7 +119,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
     if (session.stoppedAt || session.state === "closed") return reply.code(409).send({ error: "session is stopped", session });
 
     const rawContent = body.content;
-    const content = sanitizeUserContent(rawContent);
+    const { content, wasTruncated } = sanitizeUserContent(rawContent);
+    if (wasTruncated) request.log.warn({ sessionId: session.id, contentLength: content.length }, "user content truncated to policy limit");
     const policy = checkUserMessage(content);
     if (!policy.allowed) return reply.code(422).send({ error: "policy violation", violations: policy.violations });
     const release = generationRegistry.tryAcquire(session.id);
@@ -340,7 +342,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       const character = targetCharacter(session, body.speakerCharacterId);
       if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
 
-      const content = sanitizeUserContent(rawContent);
+      const { content, wasTruncated } = sanitizeUserContent(rawContent);
+      if (wasTruncated) request.log.warn({ sessionId: session.id, contentLength: content.length }, "user content truncated to policy limit");
       const policy = checkUserMessage(content);
       if (!policy.allowed) {
         const sse = openSse(reply);
@@ -609,7 +612,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       const character = targetCharacter(session, body.speakerCharacterId);
       if (!character) return reply.code(400).send({ error: "speakerCharacterId must be a session participant" });
 
-      const content = sanitizeUserContent(body.content);
+      const { content, wasTruncated } = sanitizeUserContent(body.content);
+      if (wasTruncated) request.log.warn({ sessionId: session.id, contentLength: content.length }, "user content truncated to policy limit");
       const policy = checkUserMessage(content);
       if (!policy.allowed) {
         return reply.code(422).send({ error: "policy violation", violations: policy.violations });

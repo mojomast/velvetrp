@@ -4,7 +4,7 @@ import { fallbackRoomSpeakers, generateReply, selectRoomSpeakers, streamReply, s
 import { selectLoreEntries } from "../../lore.js";
 import { buildEpisodeSummary, shouldUpdateSummary } from "../../memory.js";
 import { checkAssistantOutput } from "../../policy.js";
-import { getPromptPreset } from "../../presets.js";
+import { getPromptPreset, type PromptPreset } from "../../presets.js";
 import { cleanCharacterReply } from "../../prompt.js";
 import {
   deleteSummary,
@@ -20,7 +20,17 @@ import {
   updateSessionSynthesizedSource,
   upsertSummary,
 } from "../../repo/index.js";
-import type { Character, Message, Session, TokenUsage } from "../../types.js";
+import type {
+  Character,
+  EpisodeSummary,
+  HarnessSettings,
+  LoreEntry,
+  MemoryFact,
+  Message,
+  ProviderSettings,
+  Session,
+  TokenUsage,
+} from "../../types.js";
 import { generationRegistry } from "./generationRegistry.js";
 
 export { fallbackRoomSpeakers, selectRoomSpeakers };
@@ -38,14 +48,23 @@ export interface GenerationOutcome {
   usage: TokenUsage | null;
 }
 
-export async function runCharacterPipeline(input: {
+export interface PipelineContext {
+  preset: PromptPreset;
+  harness: HarnessSettings;
+  provider: ProviderSettings;
+  memories: MemoryFact[];
+  summary: EpisodeSummary | null;
+  lore: LoreEntry[];
+  sharedContext: string;
+}
+
+export async function assemblePipelineContext(input: {
   session: Session;
   character: Character;
   history: Message[];
   userContent: string;
-  log: { error: (obj: object, msg: string) => void };
-}): Promise<GenerationOutcome> {
-  const { session, character, history, userContent, log } = input;
+}): Promise<PipelineContext> {
+  const { session, character, history, userContent } = input;
   const preset = getPromptPreset(session.presetId);
   const harness = await getHarnessSettings();
   const provider = await getProviderSettings();
@@ -58,6 +77,23 @@ export async function runCharacterPipeline(input: {
     (await listApprovedMemories(participant.id, 3)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
   const source = await getSessionContextSource(session.id);
   const sharedContext = contextBasketText(buildSessionContextBasket(session, history, sharedMemories, lore, source));
+  return { preset, harness, provider, memories, summary, lore, sharedContext };
+}
+
+export async function runCharacterPipeline(input: {
+  session: Session;
+  character: Character;
+  history: Message[];
+  userContent: string;
+  log: { error: (obj: object, msg: string) => void };
+}): Promise<GenerationOutcome> {
+  const { session, character, history, userContent, log } = input;
+  const { preset, harness, provider, memories, summary, lore, sharedContext } = await assemblePipelineContext({
+    session,
+    character,
+    history,
+    userContent,
+  });
   let providerError = false;
   let replyText: string;
   let usage: TokenUsage | null = null;
@@ -105,18 +141,12 @@ async function streamCharacterPipeline(input: {
 }): Promise<StreamPipelineResult> {
   const { session, character, history, userContent, controller, onDelta, log } = input;
   const signal = controller.signal;
-  const preset = getPromptPreset(session.presetId);
-  const harness = await getHarnessSettings();
-  const provider = await getProviderSettings();
-  const memories = await listApprovedMemories(character.id, 8);
-  const summary = await getSummary(session.id);
-  const contextText = [...history.map((message) => message.content), userContent].join("\n");
-  const participantIds = session.participants.map((participant) => participant.id);
-  const lore = selectLoreEntries(await listLoreEntries(participantIds), participantIds, contextText, harness.loreChars);
-  const sharedMemories = (await Promise.all(session.participants.map(async (participant) =>
-    (await listApprovedMemories(participant.id, 3)).map((memory) => ({ characterName: participant.name, memory }))))).flat();
-  const source = await getSessionContextSource(session.id);
-  const sharedContext = contextBasketText(buildSessionContextBasket(session, history, sharedMemories, lore, source));
+  const { preset, harness, provider, memories, summary, lore, sharedContext } = await assemblePipelineContext({
+    session,
+    character,
+    history,
+    userContent,
+  });
   let providerError = false;
   const boundaryOutcome = (violations: string[]): StreamPipelineResult => ({
     kind: "boundary",

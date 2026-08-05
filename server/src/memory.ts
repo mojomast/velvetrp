@@ -4,6 +4,15 @@ import { checkUserMessage } from "./policy.js";
 const MAX_FACTS_PER_TURN = 3;
 const MAX_FACT_CHARS = 160;
 
+// Episode mood is intentionally a small, deterministic heuristic. When several
+// moods match, the first category below wins: tense, tender, playful, solemn.
+const EMOTIONAL_BEAT_KEYWORDS: Array<{ beat: "tense" | "tender" | "playful" | "solemn"; keywords: string[] }> = [
+  { beat: "tense", keywords: ["danger", "afraid", "fear", "threat", "panic", "attack"] },
+  { beat: "tender", keywords: ["love", "gentle", "embrace", "kiss", "care"] },
+  { beat: "playful", keywords: ["laugh", "joke", "tease", "grin", "playful"] },
+  { beat: "solemn", keywords: ["death", "grief", "mourn", "vow", "funeral"] },
+];
+
 function cleanFact(text: string): string {
   return text.replace(/^[\s"']+|[\s"']+$/g, "").replace(/\s+/g, " ").trim().slice(0, MAX_FACT_CHARS);
 }
@@ -105,6 +114,12 @@ export function shouldUpdateSummary(messageCount: number): boolean {
   return messageCount > 0 && messageCount % 6 === 0;
 }
 
+function inferEmotionalBeat(messages: Message[]): "tense" | "tender" | "playful" | "solemn" | "steady" {
+  const recentDialogue = messages.filter((message) => message.role !== "system").slice(-4);
+  const content = recentDialogue.map((message) => message.content.toLowerCase()).join(" ");
+  return EMOTIONAL_BEAT_KEYWORDS.find(({ keywords }) => keywords.some((keyword) => content.includes(keyword)))?.beat ?? "steady";
+}
+
 export function buildEpisodeSummary(
   messages: Message[],
   maxChars = 1600,
@@ -119,6 +134,6 @@ export function buildEpisodeSummary(
   return {
     summary: summary || "Scene started; no major events yet.",
     keyEvents,
-    emotionalBeat: "steady",
+    emotionalBeat: inferEmotionalBeat(messages),
   };
 }

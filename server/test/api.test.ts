@@ -212,6 +212,36 @@ describe("api", () => {
     await app.close();
   });
 
+  it("logs a structured warning when a request message is truncated", async () => {
+    let logged = "";
+    const loggerStream = new Writable({
+      write(chunk, _encoding, callback) {
+        logged += chunk.toString();
+        callback();
+      },
+    });
+    process.env.NODE_ENV = "production";
+    const app = buildApp({ loggerStream });
+
+    try {
+      const character = await createCharacter(app);
+      const session = (await app.inject({ method: "POST", url: "/api/sessions", payload: { characterId: character.id } })).json() as { id: string };
+      const response = await app.inject({
+        method: "POST",
+        url: `/api/sessions/${session.id}/messages`,
+        payload: { content: "x".repeat(1001) },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().userMessage.content).toHaveLength(1000);
+    } finally {
+      await app.close();
+      process.env.NODE_ENV = "test";
+    }
+
+    expect(logged).toContain('"msg":"user content truncated to policy limit"');
+    expect(logged).toContain('"contentLength":1000');
+  });
+
   it("runs a full scene against a fake provider and stops cleanly", async () => {
     provider = await startFakeProvider("The captain smiles and pours two glasses of sparkling water.");
     const app = buildApp();
