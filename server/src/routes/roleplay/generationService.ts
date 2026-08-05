@@ -255,7 +255,7 @@ export async function runSseGeneration(input: {
       return;
     }
     const { replyMessage, extra } = await persist(outcome);
-    await maybeUpdateSummary(session.id);
+    await maybeUpdateSummary(session.id, false, request.log);
     finished = true;
     if (result.kind === "boundary") {
       sse.send("boundary", {
@@ -291,7 +291,11 @@ export async function runSseGeneration(input: {
   }
 }
 
-export async function maybeUpdateSummary(sessionId: string, force = false): Promise<void> {
+export async function maybeUpdateSummary(
+  sessionId: string,
+  force = false,
+  log: { warn: (obj: object, msg: string) => void } = { warn: () => {} },
+): Promise<void> {
   const activeBranch = await listMessages(sessionId);
   const harness = await getHarnessSettings();
   const session = await getSession(sessionId);
@@ -312,7 +316,7 @@ export async function maybeUpdateSummary(sessionId: string, force = false): Prom
         if (synthesized.usage) await recordUsageEvent(sessionId, "scene_synthesis", synthesized.usage);
       }
     } catch (error) {
-      console.warn(`[velvet] scene synthesis skipped for session ${sessionId}: ${error instanceof Error ? error.message : "unknown error"}`);
+      log.warn({ sessionId, error }, "scene synthesis skipped");
     }
   }
   if (activeBranch.length > harness.recentTurns && (force || shouldUpdateSummary(activeBranch.length))) {

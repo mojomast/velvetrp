@@ -83,6 +83,13 @@ describe("buildRequestBody", () => {
     expect(body).not.toHaveProperty("min_p");
     expect(body).not.toHaveProperty("repetition_penalty");
   });
+
+  it("does not enable OpenRouter routing for an invalid base URL", () => {
+    const provider = defaultProviderSettings();
+    provider.baseUrl = "not a URL";
+    const body = buildRequestBody(provider, defaultHarnessSettings(), getPromptPreset("default"), [{ role: "user", content: "hi" }], false);
+    expect(body).not.toHaveProperty("provider");
+  });
 });
 
 describe("fallbackRoomSpeakers", () => {

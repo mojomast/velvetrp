@@ -277,7 +277,12 @@ export function buildRequestBody(
 ): Record<string, unknown> {
   const model = provider.model.trim() || "gpt-4o-mini";
   const temperature = harness.temperature ?? preset.temperature;
-  const openRouter = /(?:^|\.)openrouter\.ai$/i.test(new URL(provider.baseUrl).hostname);
+  let openRouter = false;
+  try {
+    openRouter = /(?:^|\.)openrouter\.ai$/i.test(new URL(provider.baseUrl).hostname);
+  } catch {
+    openRouter = false;
+  }
   const routing = openRouter
     ? {
         provider: {
