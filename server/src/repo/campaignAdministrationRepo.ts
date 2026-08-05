@@ -37,10 +37,17 @@ export class CampaignAdministrationConflictError extends Error {
 }
 
 type MutationResult<T> = { value: T; receipt: CampaignAdministrationReceipt };
+export interface ConfirmedCampaignArchiveInput {
+  confirmationName: string;
+  expectedRevision: number;
+  idempotencyKey: string;
+}
 export interface CampaignAdministrationRepository {
   getCampaignAdministration(actor: string, campaignId: string): CampaignAdministration | null;
   renameCampaignCompatibility(actor: string, campaignId: string, name: string, expectedUpdatedAt?: string): CampaignAdministrationReceipt;
   updateCampaignAdministration(actor: string, campaignId: string, input: CampaignAdministrationPatch): MutationResult<CampaignAdministration>;
+  archiveCampaignWithConfirmation(actor: string, campaignId: string, input: ConfirmedCampaignArchiveInput):
+    MutationResult<CampaignAdministration>;
   addAuditedCampaignMembership(actor: string, campaignId: string, input: CampaignMembershipMutation): MutationResult<CampaignMembership>;
   changeAuditedCampaignMembershipRole(actor: string, campaignId: string, principalId: string, input: CampaignMembershipRoleMutation): MutationResult<CampaignMembershipRead>;
   removeAuditedCampaignMembership(actor: string, campaignId: string, principalId: string, input: CampaignRevisionMutation): MutationResult<CampaignMembershipRead>;
@@ -294,6 +301,24 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
             updatedAt: at, actorRole: auth.role });
         }, (_commandId, stored) => campaignAdministrationSchema.parse(stored));
       return result;
+    },
+    archiveCampaignWithConfirmation: (actor, campaignId, raw) => {
+      const confirmationName = campaignNameSchema.parse(raw.confirmationName);
+      const input = campaignRevisionMutationSchema.parse({
+        expectedRevision: raw.expectedRevision,
+        idempotencyKey: raw.idempotencyKey,
+      });
+      return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey,
+        "administration_updated", { status: "archived", confirmationName }, ({ auth, at }) => {
+          const current = db.prepare("SELECT name FROM campaigns WHERE id=?").get(campaignId) as { name: string } | undefined;
+          if (!current || current.name !== confirmationName)
+            throw new CampaignAdministrationConflictError("campaign name confirmation does not match");
+          if (auth.status !== "archived" && !transitions[auth.status]!.includes("archived"))
+            throw new CampaignAdministrationConflictError("illegal lifecycle transition");
+          db.prepare("UPDATE campaigns SET lifecycle_status=? WHERE id=?").run("archived", campaignId);
+          return campaignAdministrationSchema.parse({ id: campaignId, status: "archived", settings: auth.settings,
+            activeTimelineId: auth.activeTimelineId, revision: input.expectedRevision + 1, updatedAt: at, actorRole: auth.role });
+        }, (_commandId, stored) => campaignAdministrationSchema.parse(stored));
     },
     addAuditedCampaignMembership: (actor, campaignId, raw) => {
       const input = campaignMembershipMutationSchema.parse(raw), payload = { principalId: input.principalId, role: input.role };

@@ -1,6 +1,10 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import {
-  campaignAdministrationPatchSchema,
+  campaignAdministrationHttpArchiveRequestSchema,
+  campaignAdministrationHttpArchiveResponseSchema,
+  campaignAdministrationHttpGetResponseSchema,
+  campaignAdministrationHttpPatchRequestSchema,
+  campaignAdministrationHttpPatchResponseSchema,
   campaignAdministrationSchema,
   resourceIdSchema,
 } from "@velvet/contracts";
@@ -19,7 +23,7 @@ const PATH = "/campaigns/:campaignId/administration";
 
 export interface CampaignAdministrationHttpOptions {
   campaignAdministrationRepositoryAccessor: () => Pick<CampaignAdministrationRepository,
-    "getCampaignAdministration" | "updateCampaignAdministration">;
+    "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
 }
 
 function noStore(reply: FastifyReply): void { reply.header("cache-control", "no-store"); }
@@ -76,15 +80,39 @@ export const campaignAdministrationHttpRoutes: FastifyPluginAsync<CampaignAdmini
       if (typeof contentType !== "string" || !JSON_MEDIA_TYPE.test(contentType)) {
         return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign administration requires application/json");
       }
-      const body = campaignAdministrationPatchSchema.safeParse(request.body);
+      const body = campaignAdministrationHttpPatchRequestSchema.safeParse(request.body);
       if (!body.success) return invalid(request, reply);
       try {
-        const result = options.campaignAdministrationRepositoryAccessor()
-          .updateCampaignAdministration(LOCAL_OWNER, campaignId.data, body.data);
+        const repository = options.campaignAdministrationRepositoryAccessor();
+        const result = repository.updateCampaignAdministration(LOCAL_OWNER, campaignId.data, body.data);
         const value = safeProjection(result.value);
         const bound = campaignAdministrationSchema.parse(value);
         if (bound.id !== campaignId.data) throw new Error("response campaign does not match request");
-        return reply.code(200).send(bound);
+        if (result.receipt.campaignId !== campaignId.data) throw new Error("response receipt does not match request");
+        const response = { campaign: bound, receipt: result.receipt };
+        return reply.code(200).send(campaignAdministrationHttpPatchResponseSchema.parse(response));
+      } catch (error) {
+        return mapFailure(request, reply, error);
+      }
+    }
+    if (request.method === "DELETE") {
+      const contentType = request.headers["content-type"];
+      if (typeof contentType !== "string" || !JSON_MEDIA_TYPE.test(contentType)) {
+        return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Campaign administration requires application/json");
+      }
+      const body = campaignAdministrationHttpArchiveRequestSchema.safeParse(request.body);
+      if (!body.success) return invalid(request, reply);
+      try {
+        const result = options.campaignAdministrationRepositoryAccessor()
+          .archiveCampaignWithConfirmation(LOCAL_OWNER, campaignId.data, body.data);
+        const value = safeProjection(result.value);
+        const bound = campaignAdministrationSchema.parse(value);
+        if (bound.id !== campaignId.data) throw new Error("response campaign does not match request");
+        if (result.receipt.campaignId !== campaignId.data) throw new Error("response receipt does not match request");
+        return reply.code(200).send(campaignAdministrationHttpArchiveResponseSchema.parse({
+          campaign: bound,
+          receipt: result.receipt,
+        }));
       } catch (error) {
         return mapFailure(request, reply, error);
       }
@@ -94,7 +122,7 @@ export const campaignAdministrationHttpRoutes: FastifyPluginAsync<CampaignAdmini
         .getCampaignAdministration(LOCAL_OWNER, campaignId.data));
       const bound = campaignAdministrationSchema.parse(value);
       if (bound.id !== campaignId.data) throw new Error("response campaign does not match request");
-      return reply.code(200).send(bound);
+      return reply.code(200).send(campaignAdministrationHttpGetResponseSchema.parse({ campaign: bound }));
     } catch (error) {
       return mapFailure(request, reply, error);
     }
@@ -111,4 +139,12 @@ export const campaignAdministrationHttpRoutes: FastifyPluginAsync<CampaignAdmini
     Body: unknown;
   }>(PATH, { exposeHeadRoute: false, errorHandler: (_error, request, reply) =>
     invalid(request, reply) }, handle);
+  app.delete<{
+    Params: { campaignId: string };
+    Querystring: Record<string, unknown>;
+    Body: unknown;
+  }>(PATH, { exposeHeadRoute: false, errorHandler: (_error, request, reply) => {
+    noStore(reply);
+    return invalid(request, reply);
+  } }, handle);
 };
