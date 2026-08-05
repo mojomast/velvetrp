@@ -4,9 +4,9 @@
 
 > **Current status:** Core roleplay is fully playable today. The RPG mechanics layer (character sheets, combat, quests, world) is under active development — see the [Roadmap](#roadmap).
 
-Current persistence is schema **v29 revision 1 (v29r1)**. Schema v29 removes the retired character field from persistence while retaining character identities and references. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 adds no HTTP routes or client/UI.
+Current persistence is schema **v29 revision 2 (v29r2)**. Schema v29 removes the retired character field from persistence while retaining character identities and references; v29r2 adds quests, storylines, clues, rewards, and objective completions. The feature-gated trusted-local RPG boundary remains exactly **21** HTTP operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.9 adds no HTTP routes or client/UI.
 
-The fixed canonical v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`; the retained v28 world-layout digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.8 repository/shared-contract work is complete. M1.8 provides a campaign location graph, discoveries, session-bound actor locations, atomic revisioned travel, NPC persona links and private state, factions, relationships, and immutable reputation ledgers. Player world projections exclude hidden/undiscovered locations and routes, GM notes, NPC secrets, and unrelated private location state. Owner/GM authority is required for location management and discovery. NPC speech is manual only: no AI NPC speech is implemented, and AI cannot voice manually controlled player characters. M1.9 quests, storylines, clues, and rewards is next.
+The fixed canonical v29 character-layout digest is `bcca64e4206ed0db503cbea137334ae9f92fa6050537e3a950630b00b37bc25d`; the retained v28 world-layout digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`. The built-in `velvet:mechanics-starter` remains distinct from the metadata-only `velvet:original-starter`; owners of unconfigured campaigns may explicitly choose either one. M1.1-M1.9 repository/shared-contract work is complete. M1.9 provides storylines, ordered quests, clues, rewards, and objective completion records. M2 HTTP routes are next.
 
 ---
 
@@ -228,8 +228,8 @@ The full 40-item roadmap lives in [`docs/ROADMAP.md`](docs/ROADMAP.md). High-lev
 M0  ████████████████████████████████  COMPLETE (98 slices, schema v14r1)
     Core roleplay, campaigns, dice, character workspace
 
-M1  █████████████████████████░░░░░░░  M1.1-M1.8 COMPLETE
-     Repository/shared-contract complete through world/factions; M1.8 adds no HTTP routes or UI
+M1  ████████████████████████████████  COMPLETE
+     Repository/shared-contract complete through quests and storylines; M1.9 adds no HTTP routes or UI
 
 M2  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     API surface: 11 route groups covering all M1 domains
