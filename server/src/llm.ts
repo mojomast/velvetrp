@@ -398,39 +398,46 @@ export async function streamReply(args: GenerationArgs, onDelta: (delta: string)
   let full = "";
   let usage: TokenUsage | null = null;
   let finished = false;
+  const processLine = (rawLine: string) => {
+    const line = rawLine.trim();
+    if (!line.startsWith("data:")) return;
+    const data = line.slice("data:".length).trim();
+    if (data === "[DONE]") {
+      finished = true;
+      return;
+    }
+    if (data === "") return;
+    let chunk: StreamChunk;
+    try {
+      chunk = JSON.parse(data) as StreamChunk;
+    } catch {
+      return;
+    }
+    if (chunk.error) throw new Error(`LLM stream error: ${String(chunk.error.message ?? "unknown provider error")}`);
+    usage = normalizeUsage(chunk, args.provider.model.trim()) ?? usage;
+    const delta = chunk.choices?.[0]?.delta?.content;
+    if (typeof delta === "string" && delta !== "") {
+      full += delta;
+      onDelta(delta);
+    }
+  };
   try {
     while (!finished) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let newline = buffer.indexOf("\n");
-      while (newline !== -1) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        newline = buffer.indexOf("\n");
-        if (!line.startsWith("data:")) continue;
-        const data = line.slice("data:".length).trim();
-        if (data === "[DONE]") {
-          finished = true;
-          break;
-        }
-        if (data === "") continue;
-        let chunk: StreamChunk;
-        try {
-          chunk = JSON.parse(data) as StreamChunk;
-        } catch {
-          continue;
-        }
-        if (chunk.error) throw new Error(`LLM stream error: ${String(chunk.error.message ?? "unknown provider error")}`);
-        usage = normalizeUsage(chunk, args.provider.model.trim()) ?? usage;
-        const delta = chunk.choices?.[0]?.delta?.content;
-        if (typeof delta === "string" && delta !== "") {
-          full += delta;
-          onDelta(delta);
+        while (newline !== -1) {
+          const line = buffer.slice(0, newline);
+          buffer = buffer.slice(newline + 1);
+          newline = buffer.indexOf("\n");
+          processLine(line);
+          if (finished) break;
         }
       }
-    }
-  } finally {
+      buffer += decoder.decode();
+      if (!finished && buffer) processLine(buffer);
+    } finally {
     await reader.cancel().catch(() => undefined);
   }
   return {

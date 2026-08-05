@@ -115,6 +115,25 @@ describe("streamReply", () => {
     expect(deltas.join("")).toBe(result.text);
   });
 
+  it("emits an unterminated final SSE line after a split UTF-8 character", async () => {
+    rawServer = createServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      const body = new TextEncoder().encode('data: {"choices":[{"delta":{"content":"cafe ☕"}}]}');
+      const coffeeByte = body.indexOf(0xe2);
+      res.write(body.slice(0, coffeeByte + 1));
+      res.end(body.slice(coffeeByte + 1));
+    });
+    await new Promise<void>((resolve) => rawServer?.listen(0, "127.0.0.1", resolve));
+    const port = (rawServer.address() as AddressInfo).port;
+    const provider = { ...defaultProviderSettings(), baseUrl: `http://127.0.0.1:${port}/v1`, model: "test-model" };
+    const deltas: string[] = [];
+
+    const result = await streamReply(makeArgs(provider), (delta) => deltas.push(delta));
+
+    expect(result.text).toBe("cafe ☕");
+    expect(deltas).toEqual(["cafe ☕"]);
+  });
+
   it("rejects when the abort signal fires mid-stream", async () => {
     fake = await startFakeProvider({ replyText: "slow", delayMs: 2000 });
     const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model" };

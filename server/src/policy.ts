@@ -13,8 +13,12 @@ export function sanitizeInjectionText(content: string): string {
     .trim();
 }
 
-export function sanitizeUserContent(content: string): string {
-  return sanitizeInjectionText(content).slice(0, 1000).trim();
+export function sanitizeUserContent(content: string): { content: string; wasTruncated: boolean } {
+  const sanitized = sanitizeInjectionText(content);
+  return {
+    content: sanitized.slice(0, 1000).trim(),
+    wasTruncated: sanitized.length > 1000,
+  };
 }
 
 const ASSISTANT_OUTPUT_BLOCKLIST = [
