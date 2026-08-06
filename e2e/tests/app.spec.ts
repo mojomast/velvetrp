@@ -84,6 +84,67 @@ test("M2.5 content catalog API flow publishes, configures, and replays an exact 
   expect(replayed).toEqual(configured);
 });
 
+test("M2.6 durable standard-array draft finalizes a legacy persona and replays exactly", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M2.6-Legacy-Persona`, age: 30, archetype: "Disciplined scout",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-M2.6-Draft-Campaign`,
+  });
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/administration`,
+  );
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaign.campaign.id}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+    contentPacks: [pin],
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-m2.6-configure`,
+  });
+
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const created = await json<{
+    draft: { id: string; durability: string; revision: number; allocation: { method: string; scores: typeof scores } };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts`, {
+    personaId: persona.id,
+    durability: "durable",
+    allocation: { method: "standard-array", scores },
+    idempotencyKey: `${runId}-m2.6-create`,
+  });
+  expect(created.draft).toMatchObject({ durability: "durable", revision: 0, allocation: { method: "standard-array", scores } });
+
+  const reference = (kind: "race" | "background" | "class") =>
+    fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number; completion: { complete: boolean; issues: unknown[] }; derivedPreview: unknown } }>(
+    request, "PATCH", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}`, {
+      expectedRevision: created.draft.revision,
+      idempotencyKey: `${runId}-m2.6-select`,
+      selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+    },
+  );
+  expect(selected.draft).toMatchObject({ revision: 1, completion: { complete: true, issues: [] } });
+  expect(selected.draft.derivedPreview).not.toBeNull();
+
+  const finalization = { expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.6-finalize` };
+  const finalized = await json<{
+    draft: { id: string; status: string; revision: number; completion: { complete: boolean } };
+    receipt: { draftId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; campaignCharacterId: string; sheetId: string; actorId: string };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200);
+  expect(finalized).toMatchObject({
+    draft: { id: created.draft.id, status: "finalized", revision: 2, completion: { complete: true } },
+    receipt: { draftId: created.draft.id, idempotencyKey: finalization.idempotencyKey, revisionBefore: 1, revisionAfter: 2,
+      campaignCharacterId: expect.any(String), sheetId: expect.any(String), actorId: expect.any(String) },
+  });
+
+  const retried = await json<typeof finalized>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200,
+  );
+  expect(retried).toEqual(finalized);
+});
+
 test("critical browser and public API workflows", async ({ page, request }) => {
   const characterIds: string[] = [];
   const sessionIds: string[] = [];

@@ -7,15 +7,15 @@ import {
   type CharacterBuilderRepository,
 } from "../../../repo/characterBuilderRepo.js";
 import {
-  characterDraftHttpViewSchema, characterDraftHttpMutationResultSchema,
+  characterDraftFinalizationResultSchema, characterDraftHttpViewSchema, characterDraftHttpMutationResultSchema,
   createCharacterDraftHttpInputSchema, updateCharacterDraftHttpInputSchema,
-  createCharacterDraftInputSchema,
+  createCharacterDraftInputSchema, finalizeCharacterDraftInputSchema,
   resourceIdSchema,
 } from "@velvet/contracts";
 
 export interface CharacterBuilderHttpRoutesOptions {
   characterBuilderRepositoryAccessor: () => Pick<CharacterBuilderRepository,
-    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">;
+    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
   featureFlags?: () => { campaign?: boolean; mechanics: boolean };
 }
 
@@ -23,6 +23,7 @@ const LOCAL_OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 const BASE = "/campaigns/:campaignId/character-drafts";
 const DETAIL = `${BASE}/:draftId`;
+const FINALIZE = `${DETAIL}/finalize`;
 
 function queryPresent(request: FastifyRequest): boolean {
   return (request.raw.url ?? request.url).includes("?");
@@ -123,6 +124,26 @@ export const characterBuilderHttpRoutes: FastifyPluginAsync<CharacterBuilderHttp
       const projected = characterDraftHttpMutationResultSchema.safeParse({ draft, receipt: receiptProjection(result.receipt as unknown as Record<string, unknown>) });
       if (!draft || !projected.success) throw new Error("invalid character draft projection");
       return reply.send(projected.data);
+    } catch (error) { return mapFailure(request, reply, error); }
+  });
+
+  app.post<{ Params: { campaignId: string; draftId: string }; Body: unknown }>(FINALIZE, { exposeHeadRoute: false,
+    onRequest: async (req, rep) => { await before(req, rep, true); },
+    errorHandler: (_error, req, rep) => problem(req, rep, 400, "RPG_INVALID_REQUEST", "Character draft finalization request is invalid"),
+  }, async (request, reply) => {
+    const body = finalizeCharacterDraftInputSchema.safeParse(request.body);
+    if (!body.success) return problem(request, reply, 400, "RPG_INVALID_REQUEST", "Character draft finalization request is invalid");
+    try {
+      const repository = options.characterBuilderRepositoryAccessor();
+      const existing = safeDraft(repository.getCharacterDraft(LOCAL_OWNER, request.params.draftId),
+        request.params.campaignId, request.params.draftId);
+      if (!existing) return problem(request, reply, 404, "CHARACTER_DRAFT_NOT_FOUND", "Character draft not found");
+      const result = characterDraftFinalizationResultSchema.safeParse(
+        repository.finalizeCharacterDraft(LOCAL_OWNER, request.params.draftId, body.data),
+      );
+      if (!result.success || result.data.draft.campaignId !== request.params.campaignId || result.data.draft.id !== request.params.draftId
+        || result.data.receipt.draftId !== request.params.draftId) throw new Error("invalid character draft finalization projection");
+      return reply.send(result.data);
     } catch (error) { return mapFailure(request, reply, error); }
   });
 };
