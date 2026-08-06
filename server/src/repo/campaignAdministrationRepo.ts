@@ -25,6 +25,7 @@ import type { RepositoryDependencies } from "./campaign/repositoryDependencies.j
 import { createAdministrationCommandRepo } from "./campaignAdmin/administrationCommandRepo.js";
 import { createAdministrationEventRepo, publicAdministrationPayload } from "./campaignAdmin/administrationEventRepo.js";
 import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";
+import { createCampaignTimelineRepo } from "./campaignAdmin/campaignTimelineRepo.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
   readonly code = "CAMPAIGN_ADMINISTRATION_FORBIDDEN";
@@ -243,6 +244,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   const events = createAdministrationEventRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId) });
   const receipts = createAdministrationReceiptRepo({ db, event: campaignAdministrationEventSchema.parse,
     getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), receipt: campaignAdministrationReceiptSchema.parse });
+  const timelines = createCampaignTimelineRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), timeline });
   const api: CampaignAdministrationRepository = {
     getCampaignAdministration: get,
     renameCampaignCompatibility: commands.renameCampaignCompatibility,
@@ -254,8 +256,10 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     attachAuditedCampaignRoom: commands.attachAuditedCampaignRoom,
     detachAuditedCampaignRoom: commands.detachAuditedCampaignRoom,
     createCampaignCheckpoint: commands.createCampaignCheckpoint,
+    listCampaignCheckpoints: commands.listCampaignCheckpoints,
     forkCampaignTimeline: commands.forkCampaignTimeline,
     createCampaignRecap: commands.createCampaignRecap,
+    listCampaignRecaps: commands.listCampaignRecaps,
     /*
     renameCampaignCompatibility: (actor, campaignId, name, expectedUpdatedAt) => {
       const normalizedName = campaignNameSchema.parse(name);
@@ -363,12 +367,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           return detached;
         }, (_commandId, stored) => campaignSessionAttachmentSchema.parse(stored));
     },*/
-    listCampaignTimelineHistory: (actor, campaignId) => {
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId)); if (!auth) return [];
-      return (db.prepare(`SELECT t.*,h.parent_timeline_id,h.forked_from_revision FROM campaign_timelines t
-        JOIN campaign_timeline_history h ON h.campaign_id=t.campaign_id AND h.timeline_id=t.id
-        WHERE t.campaign_id=? ORDER BY t.created_at,t.id`).all(campaignId) as any[]).map((row) => timeline(row, auth.activeTimelineId));
-    },
+    listCampaignTimelineHistory: timelines.listCampaignTimelineHistory,
     /*
     createCampaignCheckpoint: (actor, campaignId, raw) => {
       const input = createCampaignCheckpointInputSchema.parse(raw);
@@ -391,8 +390,6 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
             timeline_revision: input.timelineRevision, label: input.label, created_at: at });
         }, (_commandId, stored) => campaignCheckpointSchema.parse(stored));
     },*/
-    listCampaignCheckpoints: (actor, campaignId) => getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId))
-      ? (db.prepare("SELECT * FROM campaign_checkpoints WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(checkpoint) : [],
     /*
     forkCampaignTimeline: (actor, campaignId, raw) => {
       const input = forkCampaignTimelineInputSchema.parse(raw);
@@ -449,11 +446,6 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
             selected_session_ids: JSON.stringify(input.selectedSessionIds), visibility: input.visibility, text: input.text, created_at: at });
         }, (_commandId, stored) => campaignRecapSchema.parse(stored));
     },*/
-    listCampaignRecaps: (actor, campaignId) => {
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId)); if (!auth) return [];
-      const roleFilter = auth.role === "player" || auth.role === "observer" ? " AND visibility='members'" : "";
-      return (db.prepare(`SELECT * FROM campaign_recaps WHERE campaign_id=?${roleFilter} ORDER BY created_at,id`).all(campaignId) as any[]).map(recap);
-    },
     dryRunCampaignImport: (actorRaw, raw) => {
       const actor = resourceIdSchema.parse(actorRaw), owner = db.prepare("SELECT principal_id FROM application_owner WHERE singleton=1").get() as any;
       if (!owner || owner.principal_id !== actor) throw new CampaignAdministrationForbiddenError();
