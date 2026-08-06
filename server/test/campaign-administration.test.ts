@@ -470,6 +470,26 @@ describe("campaign administration repository", () => {
       actorId, commandId: "strength-child", idempotencyKey: "strength-child-key", expectedRevision: 1,
       sourceTurnId: null, command: { type: "set_actor_attribute", payload: { attributeId: "strength", value: 13 } } });
     expect(repo.listCampaignEvents("local-owner", campaign.id, fork.value.id).map((event) => event.revision)).toEqual([1, 2]);
+    expect(repo.listPublicCampaignEvents("local-owner", campaign.id, fork.value.id, 0, 1)).toEqual({
+      events: [expect.objectContaining({ timelineId: fork.value.id, revision: 1 })], nextAfterRevision: 1,
+    });
+    expect(repo.listPublicCampaignEvents("local-owner", campaign.id, fork.value.id, 1, 1)).toEqual({
+      events: [expect.objectContaining({ timelineId: fork.value.id, revision: 2 })], nextAfterRevision: null,
+    });
+    expect(repo.listPublicCampaignEvents("local-owner", campaign.id, fork.value.id, 2, 1)).toEqual({
+      events: [], nextAfterRevision: null,
+    });
+    expect(() => repo.listPublicCampaignEvents("local-owner", campaign.id, fork.value.id, 0, 101)).toThrow(RangeError);
+    addPrincipal("event-member");
+    const membershipDb = new DatabaseDriver(dbPath());
+    membershipDb.prepare("INSERT INTO campaign_memberships (campaign_id,principal_id,role,created_at) VALUES (?,?,?,?)")
+      .run(campaign.id, "event-member", "player", at);
+    membershipDb.close();
+    expect(repo.listPublicCampaignEvents("event-member", campaign.id, fork.value.id, 0, 2).events)
+      .toHaveLength(2);
+    expect(repo.listPublicCampaignEvents("outsider", campaign.id, fork.value.id, 0, 2)).toEqual({
+      events: [], nextAfterRevision: null,
+    });
     repo.close();
   });
 

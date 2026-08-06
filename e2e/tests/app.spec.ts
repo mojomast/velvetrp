@@ -611,6 +611,115 @@ test("campaign membership and stopped-room administration API smoke", async ({ r
   }
 });
 
+test("campaign timeline, checkpoint, and recap API smoke", async ({ request }) => {
+  const campaignName = `${runId}-Timeline-Campaign`;
+  const created = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: campaignName,
+  });
+  const campaignId = created.campaign.id;
+
+  const administration = await json<{ campaign: { activeTimelineId: string; revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  const rootTimelineId = administration.campaign.activeTimelineId;
+  const initialTimelines = await json<{
+    activeTimelineId: string;
+    timelines: Array<{ id: string; parentTimelineId: string | null; forkedFromRevision: number | null; revision: number; active: boolean }>;
+  }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/timelines`);
+  expect(initialTimelines).toEqual({
+    activeTimelineId: rootTimelineId,
+    timelines: [expect.objectContaining({
+      id: rootTimelineId, parentTimelineId: null, forkedFromRevision: null, revision: 0, active: true,
+    })],
+  });
+
+  const emptyEvents = await json<{ events: unknown[]; nextAfterRevision: null }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/events?timelineId=${rootTimelineId}&afterRevision=0&limit=100`,
+  );
+  expect(emptyEvents).toEqual({ events: [], nextAfterRevision: null });
+
+  const checkpoint = await json<{
+    checkpoint: { id: string; timelineId: string; timelineRevision: number; label: string };
+    receipt: { type: string; revisionAfter: number };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/checkpoints`, {
+    timelineId: rootTimelineId,
+    timelineRevision: 0,
+    label: "Opening",
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-timeline-checkpoint`,
+  });
+  expect(checkpoint).toEqual({
+    checkpoint: expect.objectContaining({ timelineId: rootTimelineId, timelineRevision: 0, label: "Opening" }),
+    receipt: expect.objectContaining({ type: "checkpoint_created", revisionAfter: administration.campaign.revision + 1 }),
+  });
+
+  const checkpoints = await json<{ checkpoints: Array<{ id: string; timelineId: string; timelineRevision: number }> }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/checkpoints`,
+  );
+  expect(checkpoints.checkpoints).toContainEqual(expect.objectContaining({
+    id: checkpoint.checkpoint.id, timelineId: rootTimelineId, timelineRevision: 0,
+  }));
+
+  const fork = await json<{
+    timeline: { id: string; parentTimelineId: string; forkedFromRevision: number; revision: number; active: boolean };
+    receipt: { type: string; revisionAfter: number };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/timeline-forks`, {
+    checkpointId: checkpoint.checkpoint.id,
+    expectedRevision: checkpoint.receipt.revisionAfter,
+    idempotencyKey: `${runId}-timeline-fork`,
+  });
+  expect(fork).toEqual({
+    timeline: expect.objectContaining({ parentTimelineId: rootTimelineId, forkedFromRevision: 0, revision: 0, active: true }),
+    receipt: expect.objectContaining({ type: "timeline_forked", revisionAfter: checkpoint.receipt.revisionAfter + 1 }),
+  });
+
+  const forkedTimelines = await json<{ activeTimelineId: string; timelines: Array<{ id: string; active: boolean }> }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/timelines`,
+  );
+  expect(forkedTimelines.activeTimelineId).toBe(fork.timeline.id);
+  expect(forkedTimelines.timelines).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: rootTimelineId, active: false }),
+    expect.objectContaining({ id: fork.timeline.id, active: true }),
+  ]));
+
+  const recap = await json<{
+    recap: { id: string; timelineId: string; throughRevision: number; visibility: string; text: string };
+    receipt: { type: string; revisionAfter: number };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/recaps`, {
+    timelineId: fork.timeline.id,
+    throughRevision: fork.timeline.revision,
+    selectedSessionIds: [],
+    visibility: "members",
+    text: "The campaign begins.",
+    expectedRevision: fork.receipt.revisionAfter,
+    idempotencyKey: `${runId}-members-recap`,
+  });
+  expect(recap).toEqual({
+    recap: expect.objectContaining({ timelineId: fork.timeline.id, throughRevision: 0, visibility: "members", text: "The campaign begins." }),
+    receipt: expect.objectContaining({ type: "recap_created", revisionAfter: fork.receipt.revisionAfter + 1 }),
+  });
+
+  const recaps = await json<{ recaps: Array<{ id: string; visibility: string; text: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/recaps`,
+  );
+  expect(recaps.recaps).toContainEqual(expect.objectContaining({
+    id: recap.recap.id, visibility: "members", text: "The campaign begins.",
+  }));
+
+  const archived = await json<{
+    campaign: { id: string; status: string };
+    receipt: { type: string; revisionAfter: number };
+  }>(request, "DELETE", `/rpg/v1/campaigns/${campaignId}/administration`, {
+    expectedRevision: recap.receipt.revisionAfter,
+    idempotencyKey: `${runId}-timeline-archive`,
+    confirmationName: campaignName,
+  });
+  expect(archived).toEqual({
+    campaign: expect.objectContaining({ id: campaignId, status: "archived" }),
+    receipt: expect.objectContaining({ type: "administration_updated", revisionAfter: recap.receipt.revisionAfter + 1 }),
+  });
+});
+
 test("quest workflow creates and resolves campaign state", async ({ request }) => {
   let characterId: string | undefined;
   try {
