@@ -144,19 +144,60 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   );
   expect(retried).toEqual(finalized);
 
-  const progression = await json<{ progression: { campaignId: string; campaignCharacterId: string; level: number; revision: number } }>(
+  const progression = await json<{ progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; revision: number } }>(
     request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
   );
+  const xpCommand = {
+    amount: 300,
+    reason: "Completed the observatory expedition",
+    expectedRevision: progression.progression.revision,
+    idempotencyKey: `${runId}-m2.6-grant-xp`,
+  };
+  const granted = await json<{
+    progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; revision: number };
+    receipt: { campaignCharacterId: string; idempotencyKey: string; type: string; revisionBefore: number; revisionAfter: number; occurredAt: string; appliedLevels: unknown[] };
+  }>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/xp-commands`, xpCommand, 200,
+  );
+  expect(granted).toMatchObject({
+    progression: {
+      campaignId: campaign.campaign.id,
+      campaignCharacterId: finalized.receipt.campaignCharacterId,
+      level: progression.progression.level,
+      totalXp: progression.progression.totalXp + xpCommand.amount,
+      revision: progression.progression.revision + 1,
+    },
+    receipt: {
+      campaignCharacterId: finalized.receipt.campaignCharacterId,
+      idempotencyKey: xpCommand.idempotencyKey,
+      type: "grant-xp",
+      revisionBefore: progression.progression.revision,
+      revisionAfter: progression.progression.revision + 1,
+      occurredAt: expect.any(String),
+      appliedLevels: [],
+    },
+  });
+  expect(granted.progression).not.toHaveProperty("sheetId");
+  expect(granted.progression).not.toHaveProperty("actorId");
+  const grantRetried = await json<typeof granted>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/xp-commands`, xpCommand, 200,
+  );
+  expect(grantRetried).toEqual(granted);
+
+  const persisted = await json<typeof progression>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
+  );
+  expect(persisted).toEqual({ progression: granted.progression });
   const preview = await json<{ preview: { campaignId: string; campaignCharacterId: string; currentLevel: number; eligibleLevel: number; levels: unknown[] } }>(
     request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression/preview`, { selections: [] }, 200,
   );
   expect(preview.preview).toMatchObject({
     campaignId: campaign.campaign.id,
     campaignCharacterId: finalized.receipt.campaignCharacterId,
-    currentLevel: progression.progression.level,
-    eligibleLevel: progression.progression.level,
-    levels: [],
+    currentLevel: granted.progression.level,
+    eligibleLevel: granted.progression.level + 1,
   });
+  expect(preview.preview.levels).toHaveLength(1);
   expect(preview.preview).toHaveProperty("previewRevision");
   expect(preview.preview).toHaveProperty("previewToken");
 });

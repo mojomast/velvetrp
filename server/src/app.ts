@@ -135,7 +135,7 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
-  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/progression(?:\/(?:preview|apply))?$/.test(instance)) {
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/(?:xp-commands|progression(?:\/(?:preview|apply))?)$/.test(instance)) {
     return {
       instance,
       hasQuery,

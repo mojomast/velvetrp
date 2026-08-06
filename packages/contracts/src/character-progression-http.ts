@@ -2,6 +2,7 @@ import { z } from "zod";
 import { resourceIdSchema } from "./domain-primitives.js";
 import {
   applyCharacterProgressionInputSchema,
+  grantCharacterXpInputSchema,
   progressionLevelChangeSchema,
   progressionPendingChoiceSchema,
   progressionProfileSchema,
@@ -71,9 +72,31 @@ export const characterProgressionHttpApplyResponseSchema = z.object({
   receipt: characterProgressionHttpApplyReceiptSchema,
 }).strict();
 
+/** Grant XP accepts the authoritative command input without exposing derived state. */
+export const characterProgressionHttpGrantXpRequestSchema = grantCharacterXpInputSchema;
+
+/** Grant receipts omit command and repository-state identities; the response carries public state. */
+export const characterProgressionHttpGrantXpReceiptSchema = z.object({
+  campaignCharacterId: progressionReceiptSchema.shape.campaignCharacterId,
+  idempotencyKey: progressionReceiptSchema.shape.idempotencyKey,
+  type: z.literal("grant-xp"),
+  revisionBefore: progressionReceiptSchema.shape.revisionBefore,
+  revisionAfter: progressionReceiptSchema.shape.revisionAfter,
+  occurredAt: progressionReceiptSchema.shape.occurredAt,
+  appliedLevels: progressionReceiptSchema.shape.appliedLevels,
+}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1,
+  "progression XP grant advances exactly one revision");
+export const characterProgressionHttpGrantXpResponseSchema = z.object({
+  progression: characterProgressionHttpStateSchema,
+  receipt: characterProgressionHttpGrantXpReceiptSchema,
+}).strict();
+
 export type CharacterProgressionHttpState = z.infer<typeof characterProgressionHttpStateSchema>;
 export type CharacterProgressionHttpPreview = z.infer<typeof characterProgressionHttpPreviewSchema>;
 export type CharacterProgressionHttpPreviewRequest = z.infer<typeof characterProgressionHttpPreviewRequestSchema>;
 export type CharacterProgressionHttpApplyRequest = z.infer<typeof characterProgressionHttpApplyRequestSchema>;
 export type CharacterProgressionHttpApplyReceipt = z.infer<typeof characterProgressionHttpApplyReceiptSchema>;
 export type CharacterProgressionHttpApplyResponse = z.infer<typeof characterProgressionHttpApplyResponseSchema>;
+export type CharacterProgressionHttpGrantXpRequest = z.infer<typeof characterProgressionHttpGrantXpRequestSchema>;
+export type CharacterProgressionHttpGrantXpReceipt = z.infer<typeof characterProgressionHttpGrantXpReceiptSchema>;
+export type CharacterProgressionHttpGrantXpResponse = z.infer<typeof characterProgressionHttpGrantXpResponseSchema>;

@@ -99,7 +99,7 @@ export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
   Partial<CampaignDiceRepository>,
   Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">>,
-  Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression" | "applyCharacterProgression">>,
+  Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">>,
   Partial<Pick<CampaignAdministrationRepository,
     "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
     | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
@@ -171,7 +171,7 @@ function logCampaignOperationFailure(
 type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
   "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
-  "getCharacterProgression" | "previewCharacterProgression" | "applyCharacterProgression">;
+  "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
 type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository, "dryRunCampaignImport">;
@@ -218,6 +218,7 @@ function assertCharacterProgressionRepository(
 ): asserts repository is CampaignListRepository & CharacterProgressionLaneRepository {
   if (typeof repository.getCharacterProgression !== "function"
     || typeof repository.previewCharacterProgression !== "function"
+    || typeof repository.grantCharacterXp !== "function"
     || typeof repository.applyCharacterProgression !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }

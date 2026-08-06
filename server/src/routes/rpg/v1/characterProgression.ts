@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
-import { applyCharacterProgressionInputSchema, resourceIdSchema, type ProgressionSelection, type ProgressionState, type ProgressionPreview } from "@velvet/contracts";
+import { applyCharacterProgressionInputSchema, characterProgressionHttpGrantXpRequestSchema, characterProgressionHttpGrantXpResponseSchema, resourceIdSchema, type ProgressionSelection, type ProgressionState, type ProgressionPreview } from "@velvet/contracts";
 import {
   characterProgressionHttpPreviewRequestSchema,
   characterProgressionHttpStateResponseSchema,
@@ -20,7 +20,7 @@ const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+
 export interface CharacterProgressionHttpOptions {
   /** Supplied by the application; this plugin never opens or constructs a repository. */
   characterProgressionRepositoryAccessor: () => Pick<CharacterProgressionRepository,
-    "getCharacterProgression" | "previewCharacterProgression" | "applyCharacterProgression">;
+    "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
 }
 
 function invalidQuery(request: FastifyRequest): boolean {
@@ -134,6 +134,36 @@ export const characterProgressionRoutes: FastifyPluginAsync<CharacterProgression
         const preview = repository.previewCharacterProgression(LOCAL_OWNER, characterId.data, body.data.selections as ProgressionSelection[]);
         if (!preview || preview.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
         return reply.code(200).send({ preview: previewProjection(preview, campaignId.data) });
+      } catch (error) { return mapFailure(request, reply, error); }
+    });
+
+  app.post<{ Params: { campaignId: string; campaignCharacterId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/campaigns/:campaignId/characters/:campaignCharacterId/xp-commands", {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        if (!(await guard(request, reply))) return;
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "XP command requires application/json");
+        }
+      },
+      errorHandler: (_error, request, reply) => sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "XP command request is invalid"),
+    }, async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const characterId = resourceIdSchema.safeParse(request.params.campaignCharacterId);
+      if (!campaignId.success) return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      if (!characterId.success) return sendApiProblem(request, reply, 404, "RPG_CHARACTER_NOT_FOUND", "Character not found");
+      const body = characterProgressionHttpGrantXpRequestSchema.safeParse(request.body);
+      if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "XP command request is invalid");
+      try {
+        const repository = options.characterProgressionRepositoryAccessor();
+        const state = repository.getCharacterProgression(LOCAL_OWNER, characterId.data);
+        if (!state || state.campaignId !== campaignId.data || state.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
+        const result = repository.grantCharacterXp(LOCAL_OWNER, characterId.data, body.data);
+        if (result.progression.campaignId !== campaignId.data || result.progression.campaignCharacterId !== characterId.data) {
+          return failure(request, reply, 404);
+        }
+        return reply.code(200).send(characterProgressionHttpGrantXpResponseSchema.parse(applyProjection(result)));
       } catch (error) { return mapFailure(request, reply, error); }
     });
 

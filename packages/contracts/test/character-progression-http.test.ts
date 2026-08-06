@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   characterProgressionHttpApplyReceiptSchema,
   characterProgressionHttpApplyRequestSchema,
+  characterProgressionHttpGrantXpReceiptSchema,
+  characterProgressionHttpGrantXpRequestSchema,
   characterProgressionHttpPreviewSchema,
   characterProgressionHttpPreviewRequestSchema,
   characterProgressionHttpStateResponseSchema,
@@ -36,5 +38,18 @@ describe("character progression HTTP contracts", () => {
     expect(characterProgressionHttpApplyReceiptSchema.parse(receipt)).toEqual(receipt);
     expect(() => characterProgressionHttpApplyReceiptSchema.parse({ ...receipt, commandId: "private" })).toThrow();
     expect(() => characterProgressionHttpApplyReceiptSchema.parse({ ...receipt, state: {} })).toThrow();
+  });
+  it("accepts only the domain XP grant input and public receipt", () => {
+    const request = { amount: 900, reason: "Completed journey", expectedRevision: 0, idempotencyKey: "xp-grant" };
+    expect(characterProgressionHttpGrantXpRequestSchema.parse(request)).toEqual(request);
+    expect(() => characterProgressionHttpGrantXpRequestSchema.parse({ ...request, totalXp: 900 })).toThrow();
+
+    const receipt = {
+      campaignCharacterId: "character", idempotencyKey: "xp-grant", type: "grant-xp",
+      revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z", appliedLevels: [],
+    };
+    expect(characterProgressionHttpGrantXpReceiptSchema.parse(receipt)).toEqual(receipt);
+    expect(() => characterProgressionHttpGrantXpReceiptSchema.parse({ ...receipt, commandId: "private" })).toThrow();
+    expect(() => characterProgressionHttpGrantXpReceiptSchema.parse({ ...receipt, state: {} })).toThrow();
   });
 });
