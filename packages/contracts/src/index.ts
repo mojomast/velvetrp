@@ -25,6 +25,7 @@ export * from "./character-progression.js";
 export * from "./mechanics-starter.js";
 export * from "./character-builder-http.js";
 export * from "./character-progression-http.js";
+export * from "./character-sheet-http.js";
 export * from "./campaign-administration-http.js";
 export * from "./campaign-history-http.js";
 export * from "./campaign-transfer-http.js";

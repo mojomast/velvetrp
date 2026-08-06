@@ -82,6 +82,7 @@ import {
 import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
 import { characterBuilderHttpRoutes } from "./characterBuilder.js";
 import { characterProgressionRoutes } from "./characterProgression.js";
+import { characterSheetHttpRoutes } from "./characterSheet.js";
 import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
 import { campaignMembershipHttpRoutes } from "./campaignMemberships.js";
 import { campaignHistoryHttpRoutes } from "./campaignHistory.js";
@@ -127,6 +128,11 @@ export interface CampaignListRepository extends
     campaignId: string,
     campaignCharacterId: string,
   ): CampaignCharacterWorkspaceSnapshot | null;
+  getCampaignCharacterSheetSnapshot?(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): import("../../../repo/index.js").CampaignCharacterSheetSnapshot | null;
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
   resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
   installMechanicsStarterCatalog?: MechanicsStarterSetupRepository["installMechanicsStarterCatalog"];
@@ -172,6 +178,7 @@ type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
   "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
+type CharacterSheetLaneRepository = Required<Pick<CampaignListRepository, "getCampaignCharacterSheetSnapshot">>;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
 type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository, "dryRunCampaignImport">;
@@ -220,6 +227,14 @@ function assertCharacterProgressionRepository(
     || typeof repository.previewCharacterProgression !== "function"
     || typeof repository.grantCharacterXp !== "function"
     || typeof repository.applyCharacterProgression !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
+
+function assertCharacterSheetRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CharacterSheetLaneRepository {
+  if (typeof repository.getCampaignCharacterSheetSnapshot !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
@@ -318,6 +333,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCharacterProgressionRepository(repository);
     return repository;
   };
+  const characterSheetRepositoryAccessor = (): CharacterSheetLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCharacterSheetRepository(repository);
+    return repository;
+  };
   const campaignAdministrationRepositoryAccessor = (): CampaignAdministrationLaneRepository => {
     const repository = getCampaignRepository();
     assertCampaignAdministrationRepository(repository);
@@ -353,6 +373,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   });
   await app.register(characterProgressionRoutes, {
     characterProgressionRepositoryAccessor,
+  });
+  await app.register(characterSheetHttpRoutes, {
+    characterSheetRepositoryAccessor,
   });
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,

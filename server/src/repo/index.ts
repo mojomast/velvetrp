@@ -114,6 +114,7 @@ export {
   ContentPackInstallationConflictError,
   createRepository,
   type CampaignCharacterRosterSnapshot,
+  type CampaignCharacterSheetSnapshot,
   type CampaignCharacterWorkspaceSnapshot,
   type CampaignDiceEvent,
   type CampaignDiceVisibleCharacterBinding,

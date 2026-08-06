@@ -44,6 +44,29 @@ describe("character progression",()=>{
     expect(db.prepare("SELECT COUNT(*) count FROM character_level_advancements_v23 WHERE campaign_character_id=?").get(id)).toEqual({count:2});
     expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='focus'").get(actorId)).toEqual({current:2,max:2});db.close();repo.close();
   });
+  it("returns an atomic public sheet with authoritative progression only to owner, GM, or controller",()=>{
+    const {repo,id,campaign,actorId}=finalized();
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    for(const [principal,role] of [["sheet-gm","gm"],["sheet-controller","player"],["sheet-other","player"],["sheet-observer","observer"]] as const){
+      db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,principal);
+      db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,'2032-01-01T00:00:00.000Z')").run(campaign.id,principal,role);
+    }
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
+      .run("sheet-controller",campaign.id,actorId);
+    db.close();
+
+    const expectedProgression=repo.getCharacterProgression("local-owner",id)!;
+    for(const principal of ["local-owner","sheet-gm","sheet-controller"]){
+      const snapshot=repo.getCampaignCharacterSheetSnapshot(principal,campaign.id,id)!;
+      expect(snapshot).toMatchObject({campaignId:campaign.id,campaignCharacterId:id,progression:expectedProgression});
+      expect(snapshot.sheet.resources.length).toBeGreaterThan(0);
+      expect(JSON.stringify(snapshot)).not.toMatch(/controllerPrincipalId|privateNotes|boundaries|personaId/);
+    }
+    expect(repo.getCampaignCharacterSheetSnapshot("sheet-other",campaign.id,id)).toBeNull();
+    expect(repo.getCampaignCharacterSheetSnapshot("sheet-observer",campaign.id,id)).toBeNull();
+    expect(repo.getCampaignCharacterSheetSnapshot("local-owner","other-campaign",id)).toBeNull();
+    repo.close();
+  });
   it("rejects unresolved choices and stale tokens without partial writes, then correction compensates without deleveling",()=>{
     const {repo,id}=finalized();repo.grantCharacterXp("local-owner",id,{amount:900,reason:"Journey award",expectedRevision:0,idempotencyKey:"award"});const preview=repo.previewCharacterProgression("local-owner",id)!;
     expect(()=>repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[],idempotencyKey:"missing-choice"})).toThrow("required");expect(repo.getCharacterProgression("local-owner",id)?.level).toBe(1);
