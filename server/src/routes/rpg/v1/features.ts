@@ -85,6 +85,7 @@ import { characterProgressionRoutes } from "./characterProgression.js";
 import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
 import { campaignMembershipHttpRoutes } from "./campaignMemberships.js";
 import { campaignHistoryHttpRoutes } from "./campaignHistory.js";
+import { campaignTransferHttpRoutes } from "./campaignTransfer.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
@@ -102,7 +103,7 @@ export interface CampaignListRepository extends
     | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
     | "detachAuditedCampaignRoom" | "listCampaignTimelineHistory" | "createCampaignCheckpoint"
     | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-    | "getCampaignAdministrationReceipt">>,
+    | "getCampaignAdministrationReceipt" | "dryRunCampaignImport">>,
   Partial<QuestRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -170,6 +171,7 @@ type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
+type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository, "dryRunCampaignImport">;
 type CampaignMembershipLaneRepository = Pick<CampaignAdministrationRepository,
   "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
   | "detachAuditedCampaignRoom"> & {
@@ -220,6 +222,12 @@ function assertCampaignAdministrationRepository(
     || typeof repository.archiveCampaignWithConfirmation !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
+}
+
+function assertCampaignTransferRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignTransferLaneRepository {
+  if (typeof repository.dryRunCampaignImport !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertCampaignMembershipRepository(
@@ -301,6 +309,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCampaignAdministrationRepository(repository);
     return repository;
   };
+  const campaignTransferRepositoryAccessor = (): CampaignTransferLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignTransferRepository(repository);
+    return repository;
+  };
   const campaignMembershipRepositoryAccessor = (): CampaignMembershipLaneRepository => {
     const repository = getCampaignRepository();
     assertCampaignMembershipRepository(repository);
@@ -325,6 +338,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,
   });
+  await app.register(campaignTransferHttpRoutes, { campaignTransferRepositoryAccessor });
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });

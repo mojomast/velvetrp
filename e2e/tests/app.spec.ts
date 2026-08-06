@@ -520,6 +520,45 @@ test("campaign administration lifecycle and settings API smoke", async ({ reques
   expect(remainsUnarchived.campaign.status).not.toBe("archived");
 });
 
+test("campaign import dry-run API smoke does not write", async ({ request }) => {
+  const created = await json<{ campaign: { id: string; revision: number } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-Import-Dry-Run-Campaign`,
+  });
+  const campaignsBefore = await json<{ campaigns: Array<{ id: string; name: string }> }>(request, "GET", "/rpg/v1/campaigns");
+  const administrationBefore = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${created.campaign.id}/administration`,
+  );
+  const sourceTimelineId = `${runId}-import-source-timeline`;
+  const packageToImport = {
+    formatVersion: 1,
+    exportedAt: "2026-01-01T00:00:00.000Z",
+    campaign: {
+      name: `${runId}-Imported-Campaign`,
+      status: "draft",
+      settings: { maxPlayers: 4, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members", gmNotes: "" },
+      administrationRevision: 0,
+    },
+    timelines: [{ sourceId: sourceTimelineId, parentSourceId: null, forkedFromRevision: null, revision: 0,
+      createdAt: "2026-01-01T00:00:00.000Z", events: [] }],
+    activeTimelineSourceId: sourceTimelineId,
+    content: { status: "unconfigured" },
+    records: { actors: [], checkpoints: [], recaps: [], memberships: [], roomAttachments: [], administration: { events: [], receipts: [] } },
+    excluded: ["credentials", "localPaths", "usageHistory", "privateActorState"],
+  };
+
+  const dryRun = await json<{
+    importId: string;
+    report: { valid: boolean; conflicts: string[]; missingReferences: string[]; warnings: string[]; counts: { timelines: number } };
+  }>(request, "POST", "/rpg/v1/campaign-imports", { package: packageToImport, mode: "dry-run" }, 200);
+
+  expect(dryRun).toMatchObject({
+    importId: expect.any(String),
+    report: expect.objectContaining({ valid: true, conflicts: [], missingReferences: [], counts: expect.objectContaining({ timelines: 1 }) }),
+  });
+  expect(await json(request, "GET", "/rpg/v1/campaigns")).toEqual(campaignsBefore);
+  expect(await json(request, "GET", `/rpg/v1/campaigns/${created.campaign.id}/administration`)).toEqual(administrationBefore);
+});
+
 test("campaign membership and stopped-room administration API smoke", async ({ request }) => {
   const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
     name: `${runId}-Membership-Campaign`,
