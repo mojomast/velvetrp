@@ -245,6 +245,77 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   expect(preview.preview).toHaveProperty("previewToken");
 });
 
+test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips it", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M2.7-Waylamp-Bearer`, age: 30, archetype: "Disciplined scout",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-M2.7-Inventory-Campaign`,
+  });
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/administration`,
+  );
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaign.campaign.id}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+    contentPacks: [pin],
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-m2.7-configure`,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts`, {
+      personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${runId}-m2.7-draft`,
+    },
+  );
+  const reference = (kind: "race" | "background" | "class") => fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(
+    request, "PATCH", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}`, {
+      expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m2.7-select`,
+      selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+    },
+  );
+  const finalized = await json<{ receipt: { actorId: string } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
+      expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-finalize`,
+    }, 200,
+  );
+  const inventoryPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/inventory`;
+  const commandPath = `${inventoryPath}-commands`;
+  const initial = await json<{ entries: unknown[]; equipment: unknown[]; capacity: number; revision: number }>(request, "GET", inventoryPath);
+  expect(initial).toMatchObject({ entries: [], equipment: [], capacity: 1000, revision: 0 });
+
+  const entryId = `${runId}-waylamp`;
+  const materialized = await request.post("/api/__e2e/materialize-waylamp", {
+    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, entryId, expectedRevision: initial.revision },
+  });
+  expect(materialized.status()).toBe(204);
+  const stocked = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { definitionId: string } }>; equipment: unknown[]; revision: number }>(request, "GET", inventoryPath);
+  expect(stocked).toMatchObject({
+    entries: [{ kind: "instanced", entryId, item: { ...pin, definitionId: "velvet:mechanics:item:waylamp" } }],
+    equipment: [], revision: initial.revision,
+  });
+
+  const equip = { kind: "equip" as const, slot: "hand" as const, entryId, expectedRevision: stocked.revision, idempotencyKey: `${runId}-m2.7-equip` };
+  const equipped = await json<{ inventory: { equipment: Array<{ slot: string; entryId: string }>; revision: number }; receipt: { kind: string; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", commandPath, equip, 200);
+  expect(equipped).toMatchObject({
+    inventory: { equipment: [{ slot: "hand", entryId }], revision: stocked.revision + 1 },
+    receipt: { kind: "equip", revisionBefore: stocked.revision, revisionAfter: stocked.revision + 1, idempotencyKey: equip.idempotencyKey },
+  });
+  expect(await json<typeof equipped>(request, "POST", commandPath, equip, 200)).toEqual(equipped);
+  expect(await json<typeof stocked>(request, "GET", inventoryPath)).toEqual(equipped.inventory);
+
+  const unequip = { kind: "unequip" as const, slot: "hand" as const, expectedRevision: equipped.inventory.revision, idempotencyKey: `${runId}-m2.7-unequip` };
+  const unequipped = await json<{ inventory: { entries: unknown[]; equipment: unknown[]; revision: number }; receipt: { kind: string; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", commandPath, unequip, 200);
+  expect(unequipped).toMatchObject({
+    inventory: { entries: [{ entryId }], equipment: [], revision: equipped.inventory.revision + 1 },
+    receipt: { kind: "unequip", revisionBefore: equipped.inventory.revision, revisionAfter: equipped.inventory.revision + 1, idempotencyKey: unequip.idempotencyKey },
+  });
+});
+
 test("critical browser and public API workflows", async ({ page, request }) => {
   const characterIds: string[] = [];
   const sessionIds: string[] = [];

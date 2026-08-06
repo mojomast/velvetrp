@@ -67,14 +67,17 @@ function populatedM15(dir: string): void {
     return repo.finalizeCharacterDraft("local-owner", draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: `${key}-final` }).receipt.actorId;
   };
   const owner = actor("M15 owner", "owner"), recipient = actor("M15 recipient", "recipient");
+  const item = MECHANICS_STARTER_CATALOG.definitions.find((definition) => definition.reference.kind === "item")!.reference as {kind:"item";packId:string;packVersion:string;definitionId:string};
   const db = new DatabaseDriver(file(dir));
   db.prepare("INSERT INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?)").run(campaign.id, owner, "focus", 1, 4);
+  db.prepare("INSERT INTO rpg_campaign_catalog_definitions_v25 VALUES(?,?,?,?,?)").run(campaign.id, item.packId, item.packVersion, item.kind, item.definitionId);
+  db.prepare("INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at) VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)").run("instance", campaign.id, owner, item.packId, item.packVersion, item.definitionId, "instance", "2035-01-01T00:00:00.000Z");
+  db.prepare("INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at) VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)").run("discard", campaign.id, owner, item.packId, item.packVersion, item.definitionId, "discard", "2035-01-01T00:00:00.000Z");
   db.close();
   repo.mutateActorResource("local-owner", { type: "set_actor_resource_binding", campaignId: campaign.id, actorId: owner, resourceId: "focus", binding: { kind: "ability", recovery: "short-rest" }, expectedRevision: 0, idempotencyKey: "binding" });
   repo.takeRest("local-owner", { type: "take_short_rest", campaignId: campaign.id, actorId: owner, expectedRevision: 1, idempotencyKey: "rest" });
-  const item = MECHANICS_STARTER_CATALOG.definitions.find((definition) => definition.reference.kind === "item")!.reference as {kind:"item";packId:string;packVersion:string;definitionId:string};
-  repo.mutateInventory("local-owner", { type: "add_inventory_item", campaignId: campaign.id, actorId: owner, expectedRevision: 2, idempotencyKey: "item", item: { kind: "instanced", entryId: "instance", item } });
-  repo.mutateInventory("local-owner", { type: "transfer_inventory_item", campaignId: campaign.id, actorId: owner, recipientActorId: recipient, entryId: "instance", item, quantity: 1, expectedRevision: 3, idempotencyKey: "transfer" });
+  repo.mutateInventoryForActor("local-owner", campaign.id, owner, { kind: "gift", recipientActorId: recipient, entryId: "instance", item, quantity: 1, expectedRevision: 2, idempotencyKey: "transfer" });
+  repo.mutateInventoryForActor("local-owner", campaign.id, owner, { kind: "drop", entryId: "discard", item, quantity: 1, expectedRevision: 3, idempotencyKey: "discard" });
   repo.close();
 }
 

@@ -1,6 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
 import { actorInventorySchema, inventoryCommandSchema, resourceIdSchema, type ActorInventory, type InventoryCommand } from "@velvet/contracts";
-import { ActorResourceConflictError, ActorResourceNegativeError, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
+import { ActorResourceConflictError, ActorResourceNegativeError, getM15ActorRevision, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
 
 export class InventoryAuthorizationError extends Error { readonly code="INVENTORY_FORBIDDEN"; }
 export class InventoryCapacityError extends Error { readonly code="INVENTORY_CAPACITY"; }
@@ -8,7 +8,16 @@ export class InventorySlotConflictError extends Error { readonly code="INVENTORY
 export class InventoryBindingError extends Error { readonly code="INVENTORY_BINDING"; }
 export class InventoryStaleError extends Error { readonly code="INVENTORY_STALE"; }
 
-export interface InventoryRepository { getActorInventory(principal:string,campaignId:string,actorId:string):ActorInventory|null; mutateInventory(principal:string,command:InventoryCommand):M15Result<{inventory:ActorInventory}>; }
+export interface ActorInventorySnapshot { campaignId:string; actorId:string; inventory:ActorInventory["inventory"]; equipment:ActorInventory["equipment"]; revision:number; }
+export type ActorScopedInventoryCommand=
+  |{kind:"equip";entryId:string;slot:string;expectedRevision:number;idempotencyKey:string}
+  |{kind:"unequip";slot:string;expectedRevision:number;idempotencyKey:string}
+  |{kind:"consume"|"drop";entryId:string;item:{kind:"item";packId:string;packVersion:string;definitionId:string};quantity:number;expectedRevision:number;idempotencyKey:string}
+  |{kind:"gift";recipientActorId:string;entryId:string;item:{kind:"item";packId:string;packVersion:string;definitionId:string};quantity:number;expectedRevision:number;idempotencyKey:string};
+export interface InventoryRepository {
+  getActorInventorySnapshot(principal:string,campaignId:string,actorId:string):ActorInventorySnapshot|null;
+  mutateInventoryForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedInventoryCommand):M15Result<{inventory:ActorInventory}>;
+}
 export function createInventoryRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):InventoryRepository {
   const capacity=(campaign:string,actor:string)=>((db.prepare("SELECT max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='inventory-capacity'").get(campaign,actor) as any)?.max??1000);
   const read=(principal:string,campaign:string,actor:string):ActorInventory|null=>{resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);if(!m15Authorized(db,principal,campaign,actor))return null;
@@ -29,7 +38,13 @@ export function createInventoryRepository(db:DatabaseDriver.Database,deps:M15Dep
     if(valid)db.prepare("INSERT INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,'item',?)").run(campaign,item.packId,item.packVersion,item.definitionId);
     return valid;
   };
-  return {getActorInventory:read,mutateInventory(principal,input){const command=inventoryCommandSchema.parse(input),changed=[`inventory:${command.actorId}`];if('recipientActorId'in command)changed.push(`inventory:${command.recipientActorId}`);
+  const snapshot=(principal:string,campaign:string,actor:string):ActorInventorySnapshot|null=>db.transaction(()=>{
+    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
+    if(!m15Authorized(db,principal,campaign,actor))return null;
+    const inventory=read(principal,campaign,actor);
+    return inventory?{campaignId:campaign,actorId:actor,inventory:inventory.inventory,equipment:inventory.equipment,revision:getM15ActorRevision(db,campaign,actor)}:null;
+  })();
+  const mutate=(principal:string,input:InventoryCommand)=>{const command=inventoryCommandSchema.parse(input),changed=[`inventory:${command.actorId}`];if('recipientActorId'in command)changed.push(`inventory:${command.recipientActorId}`);
     return runM15Mutation(db,deps,assertMutation,{principal,campaignId:command.campaignId,actorId:command.actorId,family:'inventory',type:command.type,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,changedKeys:changed,additionalActorIds:command.type==='transfer_inventory_item'?[command.recipientActorId]:[],apply:(_revision,now)=>{
       if(!m15Authorized(db,principal,command.campaignId,command.actorId))throw new InventoryAuthorizationError('inventory unavailable');
       const entry=('entryId'in command)?db.prepare("SELECT * FROM rpg_inventory_entries_v25 WHERE entry_id=? AND campaign_id=? AND actor_id=?").get(command.entryId,command.campaignId,command.actorId) as any:undefined;
@@ -63,5 +78,12 @@ export function createInventoryRepository(db:DatabaseDriver.Database,deps:M15Dep
        }
       return {inventory:read(principal,command.campaignId,command.actorId)!};
     }});
+    };
+  return {getActorInventorySnapshot:snapshot,mutateInventoryForActor(principal,campaignId,actorId,input){
+    const command:InventoryCommand=input.kind==="equip"?{type:"equip_inventory_item",campaignId,actorId,entryId:input.entryId,slot:input.slot as any,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+      :input.kind==="unequip"?{type:"unequip_inventory_item",campaignId,actorId,slot:input.slot as any,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+      :input.kind==="gift"?{type:"transfer_inventory_item",campaignId,actorId,recipientActorId:input.recipientActorId,entryId:input.entryId,item:input.item,quantity:input.quantity,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+      :{type:input.kind==="consume"?"consume_inventory_item":"drop_inventory_item",campaignId,actorId,entryId:input.entryId,item:input.item,quantity:input.quantity,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey};
+    return mutate(principal,command);
   }};
 }

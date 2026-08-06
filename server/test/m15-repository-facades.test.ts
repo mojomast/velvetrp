@@ -49,7 +49,14 @@ function fixture() {
   db.prepare("INSERT INTO rpg_shop_definitions_v25 VALUES(?,?,?,?)").run("shop", campaign.id, "Lamplighter", now);
    db.prepare("INSERT INTO rpg_shop_stock_v25 VALUES(?,?,?,?,?,?,?,?,?,?)").run("stock", campaign.id, "shop", item.packId, item.packVersion, "item", item.definitionId, 3, 10, "GLM");
   db.close();
-  return { repo, campaign: campaign.id, actor, recipient, sourcePlayer: "source-player", recipientPlayer: "recipient-player", thirdPlayer: "third-player", advance: () => { time = new Date(time.getTime() + 301_000); } };
+  const seedInventory = (actorId: string, entryId: string, mode: "stackable" | "instanced", quantity = 1, capacity?: number) => {
+    const seed = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    if (capacity !== undefined) seed.prepare("INSERT OR REPLACE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?, 'inventory-capacity',0,?)").run(campaign.id, actorId, capacity);
+    seed.prepare("INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at) VALUES(?,?,?,?,?,'item',?,?,?,?,NULL,0,?)")
+      .run(entryId, campaign.id, actorId, item.packId, item.packVersion, item.definitionId, mode, quantity, mode === "instanced" ? entryId : null, now);
+    seed.close();
+  };
+  return { repo, campaign: campaign.id, actor, recipient, sourcePlayer: "source-player", recipientPlayer: "recipient-player", thirdPlayer: "third-player", seedInventory, advance: () => { time = new Date(time.getTime() + 301_000); } };
 }
 
 function databaseState(f: ReturnType<typeof fixture>) {
@@ -98,26 +105,25 @@ describe("M1.5 repository facades", () => {
     const afterChange = f.repo.getActorResourceSnapshot(f.sourcePlayer, f.campaign, f.actor);
     expect(afterChange?.revision).toBe(1);
     expect(afterChange?.resources.find((resource) => resource.resourceId === "focus")).toEqual({ resourceId: "focus", current: 3, capacity: 4 });
-    f.repo.mutateInventory(f.sourcePlayer, { type: "set_inventory_capacity", campaignId: f.campaign, actorId: f.actor, capacity: 1, expectedRevision: 1, idempotencyKey: "shared-revision" });
+    f.seedInventory(f.actor, "snapshot-item", "instanced");
+    f.repo.mutateInventoryForActor(f.sourcePlayer, f.campaign, f.actor, { kind: "drop", entryId: "snapshot-item", item, quantity: 1, expectedRevision: 1, idempotencyKey: "shared-revision" });
     expect(f.repo.getActorResourceSnapshot(f.sourcePlayer, f.campaign, f.actor)?.revision).toBe(2);
     f.repo.close();
   });
 
   it("keeps stack and instance identity, enforces equipment/capacity/binding, and advances recipient transfer revision", () => {
     const f = fixture();
-    const add = (entryId: string, kind: "stackable" | "instanced", revision: number) => f.repo.mutateInventory("local-owner", { type: "add_inventory_item", campaignId: f.campaign, actorId: f.actor, expectedRevision: revision, idempotencyKey: entryId, item: kind === "stackable" ? { kind, entryId, item, quantity: 2 } : { kind, entryId, item } });
-    add("stack", "stackable", 0); add("stack-again", "stackable", 1); add("instance", "instanced", 2);
-    const inventory = f.repo.getActorInventory("local-owner", f.campaign, f.actor)!.inventory.items;
+    f.seedInventory(f.actor, "stack", "stackable", 4); f.seedInventory(f.actor, "instance", "instanced");
+    const inventory = f.repo.getActorInventorySnapshot("local-owner", f.campaign, f.actor)!.inventory.items;
     expect(inventory.find((entry) => entry.entryId === "stack")).toMatchObject({ quantity: 4 });
     expect(inventory.find((entry) => entry.entryId === "instance")).toMatchObject({ kind: "instanced" });
-    f.repo.mutateInventory("local-owner", { type: "equip_inventory_item", campaignId: f.campaign, actorId: f.actor, entryId: "instance", slot: "hand", expectedRevision: 3, idempotencyKey: "equip" });
-    expect(() => f.repo.mutateInventory("local-owner", { type: "equip_inventory_item", campaignId: f.campaign, actorId: f.actor, entryId: "stack", slot: "hand", expectedRevision: 4, idempotencyKey: "slot" })).toThrow(InventorySlotConflictError);
-    expect(() => f.repo.mutateInventory("local-owner", { type: "transfer_inventory_item", campaignId: f.campaign, actorId: f.actor, recipientActorId: f.recipient, entryId: "instance", item, quantity: 1, expectedRevision: 4, idempotencyKey: "bound" })).toThrow(InventoryBindingError);
-    f.repo.mutateInventory("local-owner", { type: "unequip_inventory_item", campaignId: f.campaign, actorId: f.actor, slot: "hand", expectedRevision: 4, idempotencyKey: "unequip" });
-    const transfer = f.repo.mutateInventory("local-owner", { type: "transfer_inventory_item", campaignId: f.campaign, actorId: f.actor, recipientActorId: f.recipient, entryId: "instance", item, quantity: 1, expectedRevision: 5, idempotencyKey: "transfer" });
+    f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor, { kind: "equip", entryId: "instance", slot: "hand", expectedRevision: 0, idempotencyKey: "equip" });
+    expect(() => f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor, { kind: "equip", entryId: "stack", slot: "hand", expectedRevision: 1, idempotencyKey: "slot" })).toThrow(InventorySlotConflictError);
+    expect(() => f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor, { kind: "gift", recipientActorId: f.recipient, entryId: "instance", item, quantity: 1, expectedRevision: 1, idempotencyKey: "bound" })).toThrow(InventoryBindingError);
+    f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor, { kind: "unequip", slot: "hand", expectedRevision: 1, idempotencyKey: "unequip" });
+    const transfer = f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor, { kind: "gift", recipientActorId: f.recipient, entryId: "instance", item, quantity: 1, expectedRevision: 2, idempotencyKey: "transfer" });
     expect(transfer.receipt.changedKeys).toEqual([`inventory:${f.actor}`, `inventory:${f.recipient}`].sort());
-    expect(f.repo.getActorInventory("local-owner", f.campaign, f.recipient)!.inventory.items).toMatchObject([{ entryId: "instance", kind: "instanced" }]);
-    expect(() => f.repo.mutateInventory("local-owner", { type: "set_inventory_capacity", campaignId: f.campaign, actorId: f.actor, capacity: 0, expectedRevision: 6, idempotencyKey: "small" })).toThrow(InventoryCapacityError);
+    expect(f.repo.getActorInventorySnapshot("local-owner", f.campaign, f.recipient)!.inventory.items).toMatchObject([{ entryId: "instance", kind: "instanced" }]);
     f.repo.close();
   });
 
@@ -130,7 +136,7 @@ describe("M1.5 repository facades", () => {
     const purchase = { type: "purchase_from_shop" as const, campaignId: f.campaign, buyerActorId: f.actor, quoteId, expectedRevision: 1, idempotencyKey: "buy" };
     expect(f.repo.mutateEconomy("local-owner", purchase)).toEqual(f.repo.mutateEconomy("local-owner", purchase));
     expect(f.repo.getWallet("local-owner", f.campaign, f.actor)?.balances[0]?.minorUnits).toBe(10);
-    expect(f.repo.getActorInventory("local-owner", f.campaign, f.actor)!.inventory.items).toMatchObject([{ quantity: 2, item }]);
+    expect(f.repo.getActorInventorySnapshot("local-owner", f.campaign, f.actor)!.inventory.items).toMatchObject([{ quantity: 2, item }]);
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
     expect(db.prepare("SELECT count(*) count FROM rpg_currency_ledger_v25 WHERE actor_id=?").get(f.actor)).toEqual({ count: 1 }); expect(db.prepare("SELECT count(*) count FROM rpg_purchase_receipts_v25").get()).toEqual({ count: 1 }); db.close();
     const expired = f.repo.mutateEconomy("local-owner", { type: "request_purchase_quote", campaignId: f.campaign, buyerActorId: f.actor, shopId: "shop", item, quantity: 1, expectedRevision: 2, idempotencyKey: "expired-quote" }); f.advance();
@@ -159,10 +165,10 @@ describe("M1.5 repository facades", () => {
 
   it("lets a source player gift without recipient control and makes the recipient's cross-actor revision observable", () => {
     const f = fixture();
-    f.repo.mutateInventory(f.sourcePlayer, { type: "add_inventory_item", campaignId: f.campaign, actorId: f.actor, expectedRevision: 0, idempotencyKey: "gift-item", item: { kind: "instanced", entryId: "gift-instance", item } });
-    const gift = f.repo.mutateInventory(f.sourcePlayer, { type: "transfer_inventory_item", campaignId: f.campaign, actorId: f.actor, recipientActorId: f.recipient, entryId: "gift-instance", item, quantity: 1, expectedRevision: 1, idempotencyKey: "gift" });
+    f.seedInventory(f.actor, "gift-instance", "instanced");
+    const gift = f.repo.mutateInventoryForActor(f.sourcePlayer, f.campaign, f.actor, { kind: "gift", recipientActorId: f.recipient, entryId: "gift-instance", item, quantity: 1, expectedRevision: 0, idempotencyKey: "gift" });
     expect(gift.receipt.changedKeys).toEqual([`inventory:${f.actor}`, `inventory:${f.recipient}`].sort());
-    expect(f.repo.getActorInventory(f.recipientPlayer, f.campaign, f.recipient)?.inventory.items).toMatchObject([{ entryId: "gift-instance", kind: "instanced" }]);
+    expect(f.repo.getActorInventorySnapshot(f.recipientPlayer, f.campaign, f.recipient)?.inventory.items).toMatchObject([{ entryId: "gift-instance", kind: "instanced" }]);
     expect(() => f.repo.mutateActorResource(f.recipientPlayer, { type: "change_actor_resource", campaignId: f.campaign, actorId: f.recipient, resourceId: "health", amount: 1, expectedRevision: 0, idempotencyKey: "recipient-old" })).toThrow(ActorResourceStaleError);
     expect(f.repo.mutateActorResource(f.recipientPlayer, { type: "change_actor_resource", campaignId: f.campaign, actorId: f.recipient, resourceId: "health", amount: 1, expectedRevision: 1, idempotencyKey: "recipient-current" }).receipt.revisionAfter).toBe(2);
     f.repo.close();
@@ -170,31 +176,31 @@ describe("M1.5 repository facades", () => {
 
   it("requires recipient-controller acceptance and settles the exact selected instance", () => {
     const f = fixture();
-    for (const entryId of ["unoffered-instance", "offered-instance"]) f.repo.mutateInventory(f.sourcePlayer, { type: "add_inventory_item", campaignId: f.campaign, actorId: f.actor, expectedRevision: entryId === "unoffered-instance" ? 0 : 1, idempotencyKey: entryId, item: { kind: "instanced", entryId, item } });
+    for (const entryId of ["unoffered-instance", "offered-instance"]) f.seedInventory(f.actor, entryId, "instanced");
     const trade = { tradeId: "exact-instance-trade", campaignId: f.campaign, offeredByActorId: f.actor, acceptedByActorId: f.recipient, offeredItems: [{ kind: "instanced" as const, entryId: "offered-instance", item }], requestedItems: [], offeredCurrency: [{ currency, minorUnits: 1 }], requestedCurrency: [{ currency, minorUnits: 1 }] };
-    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade, expectedRevision: 2, idempotencyKey: "exact-offer" });
+    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade, expectedRevision: 0, idempotencyKey: "exact-offer" });
     const beforeUnauthorized = databaseState(f);
     expect(() => f.repo.mutateEconomy(f.thirdPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: trade.tradeId, acceptedByActorId: f.recipient, expectedRevision: 1, idempotencyKey: "third-accept" })).toThrow(ActorResourceAuthorizationError);
     expect(databaseState(f)).toEqual(beforeUnauthorized);
     expect(f.repo.mutateEconomy(f.recipientPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: trade.tradeId, acceptedByActorId: f.recipient, expectedRevision: 1, idempotencyKey: "accept-exact" }).trade).toEqual({ tradeId: trade.tradeId, status: "settled" });
-    expect(f.repo.getActorInventory(f.recipientPlayer, f.campaign, f.recipient)?.inventory.items.map((entry) => entry.entryId)).toContain("offered-instance");
-    expect(f.repo.getActorInventory(f.sourcePlayer, f.campaign, f.actor)?.inventory.items.map((entry) => entry.entryId)).toContain("unoffered-instance");
+    expect(f.repo.getActorInventorySnapshot(f.recipientPlayer, f.campaign, f.recipient)?.inventory.items.map((entry) => entry.entryId)).toContain("offered-instance");
+    expect(f.repo.getActorInventorySnapshot(f.sourcePlayer, f.campaign, f.actor)?.inventory.items.map((entry) => entry.entryId)).toContain("unoffered-instance");
     f.repo.close();
   });
 
   it("rolls back capacity and missing-asset trade failures without changing either party or the open trade", () => {
     const f = fixture();
-    f.repo.mutateInventory(f.sourcePlayer, { type: "add_inventory_item", campaignId: f.campaign, actorId: f.actor, expectedRevision: 0, idempotencyKey: "capacity-item", item: { kind: "instanced", entryId: "capacity-instance", item } });
+    f.seedInventory(f.actor, "capacity-instance", "instanced");
     const trade = { tradeId: "capacity-trade", campaignId: f.campaign, offeredByActorId: f.actor, acceptedByActorId: f.recipient, offeredItems: [{ kind: "instanced" as const, entryId: "capacity-instance", item }], requestedItems: [], offeredCurrency: [{ currency, minorUnits: 1 }], requestedCurrency: [{ currency, minorUnits: 1 }] };
-    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade, expectedRevision: 1, idempotencyKey: "capacity-offer" });
-    f.repo.mutateInventory(f.recipientPlayer, { type: "set_inventory_capacity", campaignId: f.campaign, actorId: f.recipient, capacity: 0, expectedRevision: 1, idempotencyKey: "recipient-full" });
+    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade, expectedRevision: 0, idempotencyKey: "capacity-offer" });
+    f.seedInventory(f.recipient, "capacity-marker", "instanced", 1, 1);
     const before = databaseState(f);
-    expect(() => f.repo.mutateEconomy(f.recipientPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: trade.tradeId, acceptedByActorId: f.recipient, expectedRevision: 2, idempotencyKey: "capacity-accept" })).toThrow(EconomyConflictError);
+    expect(() => f.repo.mutateEconomy(f.recipientPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: trade.tradeId, acceptedByActorId: f.recipient, expectedRevision: 1, idempotencyKey: "capacity-accept" })).toThrow(EconomyConflictError);
     expect(databaseState(f)).toEqual(before);
     const missing = { ...trade, tradeId: "missing-asset-trade", offeredItems: [{ kind: "instanced" as const, entryId: "missing-instance", item }] };
-    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade: missing, expectedRevision: 2, idempotencyKey: "missing-offer" });
+    f.repo.mutateEconomy(f.sourcePlayer, { type: "propose_bilateral_trade", campaignId: f.campaign, trade: missing, expectedRevision: 1, idempotencyKey: "missing-offer" });
     const beforeMissing = databaseState(f);
-    expect(() => f.repo.mutateEconomy(f.recipientPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: missing.tradeId, acceptedByActorId: f.recipient, expectedRevision: 3, idempotencyKey: "missing-accept" })).toThrow(EconomyConflictError);
+    expect(() => f.repo.mutateEconomy(f.recipientPlayer, { type: "accept_bilateral_trade", campaignId: f.campaign, tradeId: missing.tradeId, acceptedByActorId: f.recipient, expectedRevision: 2, idempotencyKey: "missing-accept" })).toThrow(EconomyConflictError);
     expect(databaseState(f)).toEqual(beforeMissing);
     f.repo.close();
   });

@@ -97,6 +97,10 @@ export interface ActorResourceRepository {
   changeActorResourceForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedResourceChange):M15Result<{resources:M15ActorResource[]}>;
   mutateActorResource(principal:string,command:ActorResourceCommand):M15Result<{resources:M15ActorResource[]}>;
 }
+/** Reads the shared M1.5 stream revision inside a caller-owned snapshot transaction. */
+export function getM15ActorRevision(db:DatabaseDriver.Database,campaignId:string,actorId:string):number {
+  return (db.prepare("SELECT revision FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=? AND actor_id=?").get(campaignId,actorId) as {revision:number}|undefined)?.revision??0;
+}
 export function createActorResourceRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):ActorResourceRepository {
   const list=(principal:string,campaign:string,actor:string)=>{resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
     if(!m15Authorized(db,principal,campaign,actor))return [];
@@ -117,8 +121,7 @@ export function createActorResourceRepository(db:DatabaseDriver.Database,deps:M1
     resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
     // Authorization is checked before either projection so denied and absent roots stay indistinguishable.
     if(!m15Authorized(db,principal,campaign,actor))return null;
-    const revision=db.prepare("SELECT revision FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=? AND actor_id=?").get(campaign,actor)as {revision:number}|undefined;
-    return {campaignId:campaign,actorId:actor,resources:list(principal,campaign,actor),revision:revision?.revision??0};
+    return {campaignId:campaign,actorId:actor,resources:list(principal,campaign,actor),revision:getM15ActorRevision(db,campaign,actor)};
   })();
   const mutate=(principal:string,input:ActorResourceCommand)=>{const command=actorResourceCommandSchema.parse(input);
     return runM15Mutation(db,deps,assertMutation,{principal,campaignId:command.campaignId,actorId:command.actorId,family:"resource",type:command.type,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,changedKeys:[`resource:${command.resourceId}`],apply(){
