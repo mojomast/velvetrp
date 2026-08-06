@@ -7085,7 +7085,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const characterProgressionRepository=new Proxy(rawCharacterProgressionRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
     if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as CharacterProgressionRepository;
   const m15Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.5 mutation cannot run inside a repository transaction");};
-  const actorResourceRepository=createActorResourceRepository(db,dependencies,m15Guard);
+  const rawActorResourceRepository=createActorResourceRepository(db,dependencies,m15Guard);
+  const actorResourceRepository=new Proxy(rawActorResourceRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
+    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as ActorResourceRepository;
   const inventoryRepository=createInventoryRepository(db,dependencies,m15Guard);
   const economyRepository=createEconomyRepository(db,dependencies,m15Guard);
   const restRepository=createRestRepository(db,dependencies,m15Guard);

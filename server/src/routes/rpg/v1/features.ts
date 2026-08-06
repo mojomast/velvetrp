@@ -95,6 +95,8 @@ import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
 import { contentCatalogHttpRoutes } from "./contentCatalog.js";
 import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.js";
+import { actorResourcesHttpRoutes } from "./actorResources.js";
+import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
@@ -108,6 +110,7 @@ export interface CampaignListRepository extends
     | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
     | "getCampaignAdministrationReceipt" | "dryRunCampaignImport">>,
   Partial<QuestRepository>,
+  Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -201,6 +204,8 @@ type ContentCatalogLaneRepository = Pick<ContentCatalogRepository,
   "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage"
   | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog"
   | "resolveCampaignCatalog">;
+type ActorResourceLaneRepository = Pick<ActorResourceRepository,
+  "getActorResourceSnapshot" | "changeActorResourceForActor">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -291,6 +296,11 @@ function assertContentCatalogRepository(repository: CampaignListRepository): ass
   const methods: Array<keyof ContentCatalogLaneRepository> = ["validateContentCatalog", "publishContentCatalog", "listContentCatalogPublicationPage", "getContentCatalogForOwner", "getCampaignContentCatalog", "configureCampaignCatalog", "resolveCampaignCatalog"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
+function assertActorResourceRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & ActorResourceLaneRepository {
+  if (typeof repository.getActorResourceSnapshot !== "function" || typeof repository.changeActorResourceForActor !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -368,6 +378,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertContentCatalogRepository(repository);
     return repository;
   };
+  const actorResourceRepositoryAccessor = (): ActorResourceLaneRepository => {
+    const repository = getCampaignRepository();
+    assertActorResourceRepository(repository);
+    return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -385,6 +400,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });
   await app.register(contentCatalogHttpRoutes, { contentCatalogRepositoryAccessor });
+  await app.register(actorResourcesHttpRoutes, { actorResourceRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };
