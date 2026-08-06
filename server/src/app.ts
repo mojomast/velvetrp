@@ -145,6 +145,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/sheet$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" ? "Campaign character sheet does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/administration$/.test(instance)) {
     return {
       instance,
@@ -230,13 +239,16 @@ export function buildApp(options: {
       const rawUrl = request.raw.url ?? request.url;
       const rawInstance = rawUrl.split("?", 1)[0]!;
       const malformedWorkspaceShape = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/workspace$/.test(rawInstance);
+      const malformedCharacterSheetShape = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/sheet$/.test(rawInstance);
       const normalizedRoute = normalizedCampaignResourceRoute(request.method, rawUrl)
-        ?? (malformedWorkspaceShape ? {
+        ?? (malformedWorkspaceShape || malformedCharacterSheetShape ? {
           instance: rawInstance,
           hasQuery: rawUrl.includes("?"),
           noStore: request.method === "GET",
           queryDetail: request.method === "GET"
-            ? "Campaign character workspace does not accept query parameters"
+            ? malformedWorkspaceShape
+              ? "Campaign character workspace does not accept query parameters"
+              : "Campaign character sheet does not accept query parameters"
             : null,
         } : null);
       if (normalizedRoute
@@ -258,12 +270,12 @@ export function buildApp(options: {
             instance: normalizedRoute.instance,
           });
         }
-        const isWorkspace = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/workspace$/.test(
+        const isCharacterResource = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/(?:workspace|sheet)$/.test(
           normalizedRoute.instance,
         );
         return sendApiProblem(request, reply, 404,
-          isWorkspace ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isWorkspace ? "Campaign character not found" : "Campaign not found", {
+          isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isCharacterResource ? "Campaign character not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }
@@ -299,8 +311,8 @@ export function buildApp(options: {
     const rawUrl = request.raw.url ?? request.url;
     const pathOnly = rawUrl.split("?", 1)[0]!;
     const hasOverlongSegment = pathOnly.split("/").some((segment) => segment.length > 128);
-    const isExactWorkspaceShape = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/workspace$/.test(pathOnly);
-    if (hasOverlongSegment && !isExactWorkspaceShape
+    const isExactNestedCharacterResource = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/(?:workspace|sheet)$/.test(pathOnly);
+    if (hasOverlongSegment && !isExactNestedCharacterResource
       && normalizedCampaignResourceRoute(request.method, rawUrl) === null) {
       const body = JSON.stringify({
         error: "Bad Request",

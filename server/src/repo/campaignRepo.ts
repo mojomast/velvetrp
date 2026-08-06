@@ -59,6 +59,7 @@ import {
   type PublicCampaignCharacterSummary,
   type CampaignCharacterWorkspaceResponse,
   type CampaignRoomLinkingResponse,
+  type ProgressionState,
 } from "@velvet/contracts";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -360,6 +361,11 @@ export interface RepositoryUnitOfWork {
     campaignId: string,
     campaignCharacterId: string,
   ): CampaignCharacterWorkspaceSnapshot | null;
+  getCampaignCharacterSheetSnapshot(
+    actorPrincipalId: string,
+    campaignId: string,
+    campaignCharacterId: string,
+  ): CampaignCharacterSheetSnapshot | null;
   listActorResources(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
   getActorResource(
     actorPrincipalId: string,
@@ -431,6 +437,14 @@ export interface CampaignCharacterWorkspaceSnapshot {
   campaignId: string;
   campaignCharacterId: string;
   character: CampaignCharacterWorkspaceResponse["character"];
+}
+
+/** A public sheet projection paired with the authoritative progression state. */
+export interface CampaignCharacterSheetSnapshot {
+  campaignId: string;
+  campaignCharacterId: string;
+  sheet: CampaignCharacterWorkspaceResponse["character"];
+  progression: ProgressionState;
 }
 
 /** Bounded, cursor-based projection for the public campaign event log. */
@@ -4544,6 +4558,33 @@ function getCampaignCharacterWorkspaceSync(
   }
 }
 
+/**
+ * The caller owns the surrounding SQLite snapshot. The workspace read proves
+ * the complete campaign ancestry; progression then narrows visibility to an
+ * owner, GM, or the actor's controller before its derived state is returned.
+ */
+function getCampaignCharacterSheetSnapshotSync(
+  db: DatabaseDriver.Database,
+  progressionRepository: CharacterProgressionRepository,
+  actorPrincipalId: string,
+  campaignId: string,
+  campaignCharacterId: string,
+): CampaignCharacterSheetSnapshot | null {
+  const actorId = resourceIdSchema.parse(actorPrincipalId);
+  const id = resourceIdSchema.parse(campaignId);
+  const targetId = resourceIdSchema.parse(campaignCharacterId);
+  const workspace = getCampaignCharacterWorkspaceSync(db, actorId, id, targetId);
+  if (workspace === null) return null;
+
+  const progression = progressionRepository.getCharacterProgression(actorId, targetId);
+  if (progression === null) return null;
+  if (workspace.campaignId !== id || workspace.campaignCharacterId !== targetId
+    || progression.campaignId !== id || progression.campaignCharacterId !== targetId) {
+    throw new Error("campaign character sheet snapshot is malformed");
+  }
+  return { campaignId: id, campaignCharacterId: targetId, sheet: workspace.character, progression };
+}
+
 function getCampaignCharacterSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -6786,6 +6827,9 @@ function runTransaction<T>(
   const administrationRepository = createCampaignAdministrationRepository(db, dependencies, () => {
     throw new Error("campaign administration mutation cannot run inside a repository transaction");
   });
+  const characterProgressionRepository = createCharacterProgressionRepository(db, dependencies, () => {
+    throw new Error("character progression mutation cannot run inside a repository transaction");
+  });
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -6875,6 +6919,12 @@ function runTransaction<T>(
     getCampaignCharacterWorkspace: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertActive();
       return getCampaignCharacterWorkspaceSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+    },
+    getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
+      assertActive();
+      return getCampaignCharacterSheetSnapshotSync(
+        db, characterProgressionRepository, actorPrincipalId, campaignId, campaignCharacterId,
+      );
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertActive();
@@ -7162,6 +7212,13 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     getCampaignCharacterWorkspace: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertOpen();
       return getCampaignCharacterWorkspaceSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+    },
+    getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
+      assertOpen();
+      // Both reads must see the same authority, ancestry, and progression state.
+      return db.transaction(() => getCampaignCharacterSheetSnapshotSync(
+        db, characterProgressionRepository, actorPrincipalId, campaignId, campaignCharacterId,
+      ))();
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertOpen();

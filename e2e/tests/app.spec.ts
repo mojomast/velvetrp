@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { characterSheetHttpResponseSchema } from "../../packages/contracts/src/index.js";
 import { MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -131,7 +132,7 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   const finalization = { expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.6-finalize` };
   const finalized = await json<{
     draft: { id: string; status: string; revision: number; completion: { complete: boolean } };
-    receipt: { draftId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; campaignCharacterId: string; sheetId: string; actorId: string };
+    receipt: { draftId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; campaignCharacterId: string; sheetId: string; actorId: string; derived: unknown };
   }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200);
   expect(finalized).toMatchObject({
     draft: { id: created.draft.id, status: "finalized", revision: 2, completion: { complete: true } },
@@ -154,7 +155,7 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
     idempotencyKey: `${runId}-m2.6-grant-xp`,
   };
   const granted = await json<{
-    progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; revision: number };
+    progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; milestoneCount: number; revision: number; derived: unknown; updatedAt: string };
     receipt: { campaignCharacterId: string; idempotencyKey: string; type: string; revisionBefore: number; revisionAfter: number; occurredAt: string; appliedLevels: unknown[] };
   }>(
     request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/xp-commands`, xpCommand, 200,
@@ -188,6 +189,35 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
     request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
   );
   expect(persisted).toEqual({ progression: granted.progression });
+
+  const publicSheet = characterSheetHttpResponseSchema.parse(await json<unknown>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/sheet`,
+  ));
+  expect(publicSheet.sheet.classes.reduce((total, characterClass) => total + characterClass.level, 0))
+    .toBe(publicSheet.progression.level);
+  expect(publicSheet.derived).toEqual(finalized.receipt.derived);
+  expect(publicSheet.derived).toEqual(granted.progression.derived);
+  expect(publicSheet.progression).toEqual({
+    mode: "xp",
+    level: granted.progression.level,
+    totalXp: granted.progression.totalXp,
+    milestoneCount: granted.progression.milestoneCount,
+    updatedAt: granted.progression.updatedAt,
+  });
+  expect(publicSheet).not.toHaveProperty("campaignId");
+  expect(publicSheet).not.toHaveProperty("campaignCharacterId");
+  expect(publicSheet).not.toHaveProperty("sheetId");
+  expect(publicSheet).not.toHaveProperty("actorId");
+  expect(publicSheet.sheet).not.toHaveProperty("id");
+  expect(publicSheet.sheet).not.toHaveProperty("controllerPrincipalId");
+  expect(publicSheet.sheet).not.toHaveProperty("privateNotes");
+  expect(publicSheet.progression).not.toHaveProperty("revision");
+  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.sheetId);
+  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.actorId);
+  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.campaignCharacterId);
+  expect(JSON.stringify(publicSheet)).not.toContain(created.draft.id);
+  expect(JSON.stringify(publicSheet)).not.toContain(persona.id);
+
   const preview = await json<{ preview: { campaignId: string; campaignCharacterId: string; currentLevel: number; eligibleLevel: number; levels: unknown[] } }>(
     request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression/preview`, { selections: [] }, 200,
   );
