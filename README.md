@@ -232,7 +232,7 @@ M1  █████████████████████████�
      Repository/shared-contract complete through quests and storylines; M1.9 adds no HTTP routes or UI
 
 M2  ████████████░░░░░░░░░░░░░░░░░░░░  STARTED (quest bootstrap, M2.1-M2.3 complete)
-     API surface: history, timeline, checkpoint, fork, and recap routes now complete
+     API surface: history, timeline, checkpoint, fork, recap, and import dry-run routes complete
 
 M3  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  NOT STARTED
     Client UI: character builder, combat tracker,
