@@ -108,6 +108,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/characters\/[^/]+\/progression\/preview$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/progression/preview`;
   }
+  if (/^\/characters\/[^/]+\/progression\/apply$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/progression/apply`;
+  }
   if (/^\/characters\/[^/]+\/workspace$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/workspace`;
   }

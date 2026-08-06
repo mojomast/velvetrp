@@ -84,7 +84,7 @@ test("M2.5 content catalog API flow publishes, configures, and replays an exact 
   expect(replayed).toEqual(configured);
 });
 
-test("M2.6 durable standard-array draft finalizes a legacy persona and replays exactly", async ({ request }) => {
+test("M2.6 durable standard-array draft finalizes, previews progression, and replays exactly", async ({ request }) => {
   const fixture = MECHANICS_STARTER_CATALOG;
   const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
   const persona = await json<{ id: string }>(request, "POST", "/characters", {
@@ -143,6 +143,22 @@ test("M2.6 durable standard-array draft finalizes a legacy persona and replays e
     request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200,
   );
   expect(retried).toEqual(finalized);
+
+  const progression = await json<{ progression: { campaignId: string; campaignCharacterId: string; level: number; revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
+  );
+  const preview = await json<{ preview: { campaignId: string; campaignCharacterId: string; currentLevel: number; eligibleLevel: number; levels: unknown[] } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression/preview`, { selections: [] }, 200,
+  );
+  expect(preview.preview).toMatchObject({
+    campaignId: campaign.campaign.id,
+    campaignCharacterId: finalized.receipt.campaignCharacterId,
+    currentLevel: progression.progression.level,
+    eligibleLevel: progression.progression.level,
+    levels: [],
+  });
+  expect(preview.preview).toHaveProperty("previewRevision");
+  expect(preview.preview).toHaveProperty("previewToken");
 });
 
 test("critical browser and public API workflows", async ({ page, request }) => {

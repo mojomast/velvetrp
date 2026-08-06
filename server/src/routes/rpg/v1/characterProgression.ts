@@ -1,8 +1,7 @@
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
-import { resourceIdSchema, type ProgressionSelection, type ProgressionState, type ProgressionPreview } from "@velvet/contracts";
+import { applyCharacterProgressionInputSchema, resourceIdSchema, type ProgressionSelection, type ProgressionState, type ProgressionPreview } from "@velvet/contracts";
 import {
   characterProgressionHttpPreviewRequestSchema,
-  characterProgressionHttpPreviewResponseSchema,
   characterProgressionHttpStateResponseSchema,
 } from "@velvet/contracts";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -21,7 +20,7 @@ const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+
 export interface CharacterProgressionHttpOptions {
   /** Supplied by the application; this plugin never opens or constructs a repository. */
   characterProgressionRepositoryAccessor: () => Pick<CharacterProgressionRepository,
-    "getCharacterProgression" | "previewCharacterProgression">;
+    "getCharacterProgression" | "previewCharacterProgression" | "applyCharacterProgression">;
 }
 
 function invalidQuery(request: FastifyRequest): boolean {
@@ -38,9 +37,20 @@ function stateProjection(state: ProgressionState) {
 }
 
 function previewProjection(preview: ProgressionPreview, campaignId: string) {
-  return { campaignId, campaignCharacterId: preview.campaignCharacterId, mode: preview.mode,
+  return { campaignId, campaignCharacterId: preview.campaignCharacterId, previewRevision: preview.revision, previewToken: preview.token, mode: preview.mode,
     currentLevel: preview.currentLevel, eligibleLevel: preview.eligibleLevel, totalXp: preview.totalXp,
     milestoneCount: preview.milestoneCount, pendingChoices: preview.pendingChoices, levels: preview.levels };
+}
+
+function applyProjection(result: ReturnType<CharacterProgressionRepository["applyCharacterProgression"]>) {
+  return {
+    progression: stateProjection(result.progression),
+    receipt: {
+      campaignCharacterId: result.receipt.campaignCharacterId, idempotencyKey: result.receipt.idempotencyKey, type: result.receipt.type,
+      revisionBefore: result.receipt.revisionBefore, revisionAfter: result.receipt.revisionAfter,
+      occurredAt: result.receipt.occurredAt, appliedLevels: result.receipt.appliedLevels,
+    },
+  };
 }
 
 function failure(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], status: 404 | 500) {
@@ -123,7 +133,37 @@ export const characterProgressionRoutes: FastifyPluginAsync<CharacterProgression
         if (!state || state.campaignId !== campaignId.data || state.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
         const preview = repository.previewCharacterProgression(LOCAL_OWNER, characterId.data, body.data.selections as ProgressionSelection[]);
         if (!preview || preview.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
-        return reply.code(200).send(characterProgressionHttpPreviewResponseSchema.parse({ preview: previewProjection(preview, campaignId.data) }));
+        return reply.code(200).send({ preview: previewProjection(preview, campaignId.data) });
+      } catch (error) { return mapFailure(request, reply, error); }
+    });
+
+  app.post<{ Params: { campaignId: string; campaignCharacterId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/campaigns/:campaignId/characters/:campaignCharacterId/progression/apply", {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        if (!(await guard(request, reply))) return;
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Progression apply requires application/json");
+        }
+      },
+      errorHandler: (_error, request, reply) => sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Progression apply request is invalid"),
+    }, async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const characterId = resourceIdSchema.safeParse(request.params.campaignCharacterId);
+      if (!campaignId.success) return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
+      if (!characterId.success) return sendApiProblem(request, reply, 404, "RPG_CHARACTER_NOT_FOUND", "Character not found");
+      const body = applyCharacterProgressionInputSchema.safeParse(request.body);
+      if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Progression apply request is invalid");
+      try {
+        const repository = options.characterProgressionRepositoryAccessor();
+        const state = repository.getCharacterProgression(LOCAL_OWNER, characterId.data);
+        if (!state || state.campaignId !== campaignId.data || state.campaignCharacterId !== characterId.data) return failure(request, reply, 404);
+        const result = repository.applyCharacterProgression(LOCAL_OWNER, characterId.data, body.data);
+        if (result.progression.campaignId !== campaignId.data || result.progression.campaignCharacterId !== characterId.data) {
+          return failure(request, reply, 404);
+        }
+        return reply.code(200).send(applyProjection(result));
       } catch (error) { return mapFailure(request, reply, error); }
     });
 };
