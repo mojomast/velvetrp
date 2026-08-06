@@ -30,6 +30,7 @@ export * from "./campaign-administration-http.js";
 export * from "./campaign-history-http.js";
 export * from "./campaign-transfer-http.js";
 export * from "./actor-resources.js";
+export * from "./actor-resources-http.js";
 export * from "./inventory.js";
 export * from "./economy.js";
 export * from "./rest.js";

@@ -145,6 +145,19 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   );
   expect(retried).toEqual(finalized);
 
+  const resources = await json<{ resources: Array<{ name: string; current: number; max: number }>; revision: number }>(
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`,
+  );
+  const health = resources.resources.find((resource) => resource.name === "health")!;
+  expect(health).toMatchObject({ current: health.max });
+  const damage = { kind: "change" as const, resourceName: "health", amount: -1, expectedRevision: resources.revision, idempotencyKey: `${runId}-m2.7-damage` };
+  const changedResources = await json<{ resources: Array<{ name: string; current: number; max: number }>; receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resource-commands`, damage, 200,
+  );
+  expect(changedResources.resources.find((resource) => resource.name === "health")).toMatchObject({ current: health.current - 1, max: health.max });
+  expect(changedResources.receipt).toMatchObject({ revisionBefore: resources.revision, revisionAfter: resources.revision + 1, idempotencyKey: damage.idempotencyKey });
+  expect(await json<typeof changedResources>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resource-commands`, damage, 200)).toEqual(changedResources);
+
   const progression = await json<{ progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; revision: number } }>(
     request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
   );

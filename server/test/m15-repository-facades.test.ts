@@ -87,6 +87,22 @@ describe("M1.5 repository facades", () => {
     f.repo.close();
   });
 
+  it("resolves an authorized resource snapshot and binds change commands to its actor path", () => {
+    const f = fixture();
+    const initial = f.repo.getActorResourceSnapshot(f.sourcePlayer, f.campaign, f.actor);
+    expect(initial).toMatchObject({ campaignId: f.campaign, actorId: f.actor, revision: 0 });
+    expect(initial?.resources.find((resource) => resource.resourceId === "focus")).toEqual({ resourceId: "focus", current: 1, capacity: 4 });
+    expect(f.repo.getActorResourceSnapshot(f.thirdPlayer, f.campaign, f.actor)).toBeNull();
+    const changed = f.repo.changeActorResourceForActor(f.sourcePlayer, f.campaign, f.actor, { kind: "change", resourceName: "focus", amount: 2, expectedRevision: 0, idempotencyKey: "path-change" });
+    expect(changed.receipt.revisionAfter).toBe(1);
+    const afterChange = f.repo.getActorResourceSnapshot(f.sourcePlayer, f.campaign, f.actor);
+    expect(afterChange?.revision).toBe(1);
+    expect(afterChange?.resources.find((resource) => resource.resourceId === "focus")).toEqual({ resourceId: "focus", current: 3, capacity: 4 });
+    f.repo.mutateInventory(f.sourcePlayer, { type: "set_inventory_capacity", campaignId: f.campaign, actorId: f.actor, capacity: 1, expectedRevision: 1, idempotencyKey: "shared-revision" });
+    expect(f.repo.getActorResourceSnapshot(f.sourcePlayer, f.campaign, f.actor)?.revision).toBe(2);
+    f.repo.close();
+  });
+
   it("keeps stack and instance identity, enforces equipment/capacity/binding, and advances recipient transfer revision", () => {
     const f = fixture();
     const add = (entryId: string, kind: "stackable" | "instanced", revision: number) => f.repo.mutateInventory("local-owner", { type: "add_inventory_item", campaignId: f.campaign, actorId: f.actor, expectedRevision: revision, idempotencyKey: entryId, item: kind === "stackable" ? { kind, entryId, item, quantity: 2 } : { kind, entryId, item } });

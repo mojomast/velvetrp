@@ -149,7 +149,7 @@ Persist the durable coordination state needed for player declarations, proposed 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: Started. Quest bootstrap routes, M2.1-M2.3, M2.5, and M2.6 are complete; M2.4 import dry-run is complete while durable apply/export remains pending.**
+**Progress: Started. Quest bootstrap routes, M2.1-M2.3, M2.5, and M2.6 are complete; M2.4 import dry-run is complete while durable apply/export remains pending. M2.7 actor-resource reads and revisioned changes are complete.**
 
 All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 

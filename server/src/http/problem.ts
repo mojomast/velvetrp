@@ -120,6 +120,12 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/characters\/[^/]+\/sheet$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/characters/:campaignCharacterId/sheet`;
   }
+  if (/^\/actors\/[^/]+\/resources$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/actors/:actorId/resources`;
+  }
+  if (/^\/actors\/[^/]+\/resource-commands$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/actors/:actorId/resource-commands`;
+  }
   // Unknown/lookalike suffixes are caller-controlled too. Retain only enough
   // context to identify this as a nested campaign resource.
   return `${campaignPrefix}:campaignId/*`;
