@@ -98,7 +98,7 @@ import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
   Partial<CampaignDiceRepository>,
-  Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">>,
+  Partial<Pick<CharacterBuilderRepository, "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">>,
   Partial<Pick<CharacterProgressionRepository, "getCharacterProgression" | "previewCharacterProgression">>,
   Partial<Pick<CampaignAdministrationRepository,
     "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
@@ -169,7 +169,7 @@ function logCampaignOperationFailure(
 }
 
 type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
-  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft">;
+  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression">;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
@@ -207,7 +207,8 @@ function assertCharacterBuilderRepository(
 ): asserts repository is CampaignListRepository & CharacterBuilderLaneRepository {
   if (typeof repository.createCharacterDraft !== "function"
     || typeof repository.getCharacterDraft !== "function"
-    || typeof repository.updateCharacterDraft !== "function") {
+    || typeof repository.updateCharacterDraft !== "function"
+    || typeof repository.finalizeCharacterDraft !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
