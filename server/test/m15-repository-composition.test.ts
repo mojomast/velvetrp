@@ -10,7 +10,8 @@ describe("M1.5 repository composition", () => {
     const clock={now:vi.fn(()=>new Date("2030-01-01T00:00:00.000Z"))};
     const repository=createRepository({dataDir:process.env.VELVET_DATA_DIR as string,ids,clock});
     expect(typeof repository.mutateActorResource).toBe("function");
-    expect(typeof repository.mutateInventory).toBe("function");
+    expect(typeof repository.getActorInventorySnapshot).toBe("function");
+    expect(typeof repository.mutateInventoryForActor).toBe("function");
     expect(typeof repository.mutateEconomy).toBe("function");
     expect(typeof repository.takeRest).toBe("function");
     expect(()=>repository.mutateActorResource("missing",{type:"change_actor_resource",campaignId:"campaign",actorId:"actor",resourceId:"health",amount:-1,expectedRevision:0,idempotencyKey:"key"})).toThrow();

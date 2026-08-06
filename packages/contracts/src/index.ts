@@ -32,6 +32,7 @@ export * from "./campaign-transfer-http.js";
 export * from "./actor-resources.js";
 export * from "./actor-resources-http.js";
 export * from "./inventory.js";
+export * from "./inventory-http.js";
 export * from "./economy.js";
 export * from "./rest.js";
 export * from "./checks.js";
