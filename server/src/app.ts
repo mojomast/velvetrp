@@ -82,6 +82,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/content(?:-packs\/[^/]+\/versions\/[^/]+)?$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "PUT" ? "Campaign content does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+$/.test(instance)) {
     return { instance, hasQuery, queryDetail: method === "DELETE" ? "Campaign room detachment does not accept query parameters" : null, noStore: true };
   }
@@ -178,6 +187,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
           ? "Campaign rename does not accept query parameters"
           : null,
       noStore: method === "GET",
+    };
+  }
+  if (/^\/api\/rpg\/v1\/content-packs(?:\/validate|\/[^/]+\/versions\/[^/]+)?$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: instance === "/api/rpg/v1/content-packs" && method === "GET" ? null : "Content catalog request does not accept query parameters",
+      mechanics: true,
+      noStore: true,
     };
   }
   return null;

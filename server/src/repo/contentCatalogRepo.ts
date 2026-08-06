@@ -302,10 +302,22 @@ export class ContentCatalogStaleError extends Error {
   constructor() { super("campaign catalog revision is stale"); this.name = "ContentCatalogStaleError"; }
 }
 
+export interface ContentCatalogPublicationPageInput {
+  status: "validated";
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ContentCatalogPublicationPage {
+  publications: PublicationSummary[];
+  nextCursor: string | null;
+}
+
 export interface ContentCatalogRepository {
   validateContentCatalog(input: unknown): CatalogValidationReport;
   publishContentCatalog(actorPrincipalId: string, input: unknown): OwnerCatalogProjection;
   listContentCatalogPublications(actorPrincipalId: string): PublicationSummary[];
+  listContentCatalogPublicationPage(actorPrincipalId: string, input: ContentCatalogPublicationPageInput): ContentCatalogPublicationPage;
   getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): OwnerCatalogProjection | null;
   getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string): GmCatalogProjection | PlayerCatalogProjection | ObserverCatalogProjection | null;
   configureCampaignCatalog(actorPrincipalId: string, campaignId: string, input: ConfigureCampaignCatalogInput): CampaignCatalogConfigurationResult;
@@ -357,6 +369,38 @@ const PUBLICATION_SELECT = `SELECT pack.pack_id,pack.pack_version,pack.rules_pro
   JOIN rpg_catalog_publication_attestations attestation
     ON attestation.pack_id=publication.pack_id AND attestation.pack_version=publication.pack_version
   WHERE publication.validation_level='validated-v1'`;
+
+const MAX_PUBLICATION_PAGE_SIZE = 100;
+
+function encodePublicationCursor(packId: string, packVersion: string): string {
+  return Buffer.from(JSON.stringify([packId, packVersion]), "utf8").toString("base64url");
+}
+
+function decodePublicationCursor(cursor: string): [string, string] {
+  try {
+    if (cursor.length === 0 || cursor.length > 512) throw new Error("invalid cursor");
+    const decoded = Buffer.from(cursor, "base64url").toString("utf8");
+    if (Buffer.from(decoded, "utf8").toString("base64url") !== cursor) throw new Error("invalid cursor");
+    const value: unknown = JSON.parse(decoded);
+    if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== "string" || typeof value[1] !== "string") {
+      throw new Error("invalid cursor");
+    }
+    return [contentPackIdSchema.parse(value[0]), contentPackVersionSchema.parse(value[1])];
+  } catch {
+    throw new Error("invalid content catalog publication cursor");
+  }
+}
+
+function parsePublicationPageInput(input: ContentCatalogPublicationPageInput): { cursor: [string, string] | null; limit: number } {
+  if (input === null || typeof input !== "object" || Array.isArray(input)
+    || input.status !== "validated"
+    || (input.cursor !== undefined && typeof input.cursor !== "string")
+    || (input.limit !== undefined && (typeof input.limit !== "number" || !Number.isInteger(input.limit)
+      || input.limit < 1 || input.limit > MAX_PUBLICATION_PAGE_SIZE))) {
+    throw new Error("invalid content catalog publication page input");
+  }
+  return { cursor: input.cursor === undefined ? null : decodePublicationCursor(input.cursor), limit: input.limit ?? 25 };
+}
 
 function readDefinitions(db: DatabaseDriver.Database, packId: string, packVersion: string): CatalogDefinition[] {
   return (db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=?
@@ -794,6 +838,19 @@ export function createContentCatalogRepository(
       if (!isApplicationOwner(db, actor)) return [];
       return (db.prepare(`${PUBLICATION_SELECT} ORDER BY pack.pack_id COLLATE BINARY,pack.pack_version COLLATE BINARY`).all() as PublicationRow[])
         .map((row) => { validateStoredPublication(db, row); return summary(row); });
+    },
+    listContentCatalogPublicationPage: (actor, input) => {
+      const { cursor, limit } = parsePublicationPageInput(input);
+      if (!isApplicationOwner(db, actor)) return { publications: [], nextCursor: null };
+      const cursorClause = cursor === null ? "" : ` AND (pack.pack_id COLLATE BINARY > ?
+        OR (pack.pack_id COLLATE BINARY = ? AND pack.pack_version COLLATE BINARY > ?))`;
+      const rows = db.prepare(`${PUBLICATION_SELECT}${cursorClause}
+        ORDER BY pack.pack_id COLLATE BINARY,pack.pack_version COLLATE BINARY LIMIT ?`)
+        .all(...(cursor === null ? [] : [cursor[0], cursor[0], cursor[1]]), limit + 1) as PublicationRow[];
+      const hasNextPage = rows.length > limit;
+      const publications = rows.slice(0, limit).map((row) => { validateStoredPublication(db, row); return summary(row); });
+      const last = publications.at(-1);
+      return { publications, nextCursor: hasNextPage && last ? encodePublicationCursor(last.packId, last.packVersion) : null };
     },
     getContentCatalogForOwner: (actor, packIdValue, packVersion) => {
       const packId = contentPackIdSchema.parse(packIdValue);

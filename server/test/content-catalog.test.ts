@@ -292,6 +292,33 @@ describe("validated immutable content catalog", () => {
     repo.close();
   });
 
+  it("pages validated publications with a bounded opaque cursor without changing the legacy list", () => {
+    const alpha = finalizeCatalog((catalog) => { catalog.manifest.name = "Alpha catalog"; }, "velvet:alpha");
+    const beta = finalizeCatalog((catalog) => { catalog.manifest.name = "Beta catalog"; }, "velvet:beta");
+    const repo = createRepository({ dataDir: dataDir() });
+    repo.publishContentCatalog("local-owner", beta);
+    repo.publishContentCatalog("local-owner", alpha);
+
+    expect(repo.listContentCatalogPublications("local-owner").map((publication) => publication.packId))
+      .toEqual(["velvet:alpha", "velvet:beta"]);
+    const first = repo.listContentCatalogPublicationPage("local-owner", { status: "validated", limit: 1 });
+    expect(first.publications.map((publication) => publication.packId)).toEqual(["velvet:alpha"]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = repo.listContentCatalogPublicationPage("local-owner", { status: "validated", cursor: first.nextCursor!, limit: 1 });
+    expect(second.publications.map((publication) => publication.packId)).toEqual(["velvet:beta"]);
+    expect(second.nextCursor).toBeNull();
+    expect(repo.transaction((unitOfWork) => unitOfWork.listContentCatalogPublicationPage("local-owner", {
+      status: "validated", limit: 100,
+    }))).toMatchObject({ publications: [{ packId: "velvet:alpha" }, { packId: "velvet:beta" }], nextCursor: null });
+    expect(repo.listContentCatalogPublicationPage("player", { status: "validated", limit: 1 }))
+      .toEqual({ publications: [], nextCursor: null });
+    for (const input of [
+      { status: "legacy", limit: 1 }, { status: "validated", limit: 0 },
+      { status: "validated", limit: 101 }, { status: "validated", cursor: "not-a-cursor" },
+    ]) expect(() => repo.listContentCatalogPublicationPage("local-owner", input as any)).toThrow(/invalid content catalog publication/);
+    repo.close();
+  });
+
   it("enforces application/campaign ownership and factory lifecycle and nesting guards", () => {
     const campaignId = seedRoles();
     const repo = createRepository({ dataDir: dataDir() });
