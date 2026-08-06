@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { characterProgressionHttpPreviewRequestSchema, characterProgressionHttpStateResponseSchema } from "../src/character-progression-http.js";
+import {
+  characterProgressionHttpApplyReceiptSchema,
+  characterProgressionHttpApplyRequestSchema,
+  characterProgressionHttpPreviewSchema,
+  characterProgressionHttpPreviewRequestSchema,
+  characterProgressionHttpStateResponseSchema,
+} from "../src/character-progression-http.js";
 
 describe("character progression HTTP contracts", () => {
   it("requires an explicit, strict preview body", () => {
@@ -9,5 +15,26 @@ describe("character progression HTTP contracts", () => {
   it("does not admit repository-private state fields", () => {
     const value = { progression: { campaignId: "campaign", campaignCharacterId: "character", actorId: "actor" } };
     expect(() => characterProgressionHttpStateResponseSchema.parse(value)).toThrow();
+  });
+  it("publishes the opaque preview proof under apply-safe names", () => {
+    const preview = {
+      campaignId: "campaign", campaignCharacterId: "character", previewRevision: 0, previewToken: "a".repeat(64),
+      mode: "xp", currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [],
+    };
+    expect(characterProgressionHttpPreviewSchema.parse(preview)).toEqual(preview);
+    expect(() => characterProgressionHttpPreviewSchema.parse({ ...preview, revision: 0 })).toThrow();
+  });
+  it("accepts only the domain apply proof and public apply receipt", () => {
+    const request = { previewRevision: 0, previewToken: "a".repeat(64), selections: [], idempotencyKey: "apply" };
+    expect(characterProgressionHttpApplyRequestSchema.parse(request)).toEqual(request);
+    expect(() => characterProgressionHttpApplyRequestSchema.parse({ ...request, level: 2 })).toThrow();
+
+    const receipt = {
+      campaignCharacterId: "character", idempotencyKey: "apply", type: "apply-levels",
+      revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z", appliedLevels: [],
+    };
+    expect(characterProgressionHttpApplyReceiptSchema.parse(receipt)).toEqual(receipt);
+    expect(() => characterProgressionHttpApplyReceiptSchema.parse({ ...receipt, commandId: "private" })).toThrow();
+    expect(() => characterProgressionHttpApplyReceiptSchema.parse({ ...receipt, state: {} })).toThrow();
   });
 });

@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { resourceIdSchema } from "./domain-primitives.js";
 import {
+  applyCharacterProgressionInputSchema,
   progressionLevelChangeSchema,
   progressionPendingChoiceSchema,
   progressionProfileSchema,
   progressionSelectionSchema,
   progressionModeSchema,
+  progressionReceiptSchema,
 } from "./character-progression.js";
 import { characterDerivedStatsSchema } from "./character-builder.js";
 
@@ -30,10 +32,12 @@ export const characterProgressionHttpStateSchema = z.object({
 
 export const characterProgressionHttpStateResponseSchema = z.object({ progression: characterProgressionHttpStateSchema }).strict();
 
-/** The preview token is intentionally omitted: this lane has no apply endpoint. */
+/** The opaque preview fields are required unchanged by the apply request. */
 export const characterProgressionHttpPreviewSchema = z.object({
   campaignId: resourceIdSchema,
   campaignCharacterId: resourceIdSchema,
+  previewRevision: applyCharacterProgressionInputSchema.shape.previewRevision,
+  previewToken: applyCharacterProgressionInputSchema.shape.previewToken,
   mode: progressionModeSchema,
   currentLevel: z.number().int().min(1).max(20),
   eligibleLevel: z.number().int().min(1).max(20),
@@ -48,6 +52,28 @@ export const characterProgressionHttpPreviewRequestSchema = z.object({
 }).strict();
 export const characterProgressionHttpPreviewResponseSchema = z.object({ preview: characterProgressionHttpPreviewSchema }).strict();
 
+/** Apply accepts only the optimistic preview proof and caller selections. */
+export const characterProgressionHttpApplyRequestSchema = applyCharacterProgressionInputSchema;
+
+/** Apply receipts omit command and repository-state identities; the response carries public state. */
+export const characterProgressionHttpApplyReceiptSchema = z.object({
+  campaignCharacterId: progressionReceiptSchema.shape.campaignCharacterId,
+  idempotencyKey: progressionReceiptSchema.shape.idempotencyKey,
+  type: z.literal("apply-levels"),
+  revisionBefore: progressionReceiptSchema.shape.revisionBefore,
+  revisionAfter: progressionReceiptSchema.shape.revisionAfter,
+  occurredAt: progressionReceiptSchema.shape.occurredAt,
+  appliedLevels: progressionReceiptSchema.shape.appliedLevels,
+}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1,
+  "progression apply advances exactly one revision");
+export const characterProgressionHttpApplyResponseSchema = z.object({
+  progression: characterProgressionHttpStateSchema,
+  receipt: characterProgressionHttpApplyReceiptSchema,
+}).strict();
+
 export type CharacterProgressionHttpState = z.infer<typeof characterProgressionHttpStateSchema>;
 export type CharacterProgressionHttpPreview = z.infer<typeof characterProgressionHttpPreviewSchema>;
 export type CharacterProgressionHttpPreviewRequest = z.infer<typeof characterProgressionHttpPreviewRequestSchema>;
+export type CharacterProgressionHttpApplyRequest = z.infer<typeof characterProgressionHttpApplyRequestSchema>;
+export type CharacterProgressionHttpApplyReceipt = z.infer<typeof characterProgressionHttpApplyReceiptSchema>;
+export type CharacterProgressionHttpApplyResponse = z.infer<typeof characterProgressionHttpApplyResponseSchema>;
