@@ -306,6 +306,10 @@ export interface RepositoryUnitOfWork {
   getCampaignAdministration: CampaignAdministrationRepository["getCampaignAdministration"];
   validateContentCatalog(input: unknown): import("@velvet/contracts").CatalogValidationReport;
   listContentCatalogPublications(actorPrincipalId: string): import("@velvet/contracts").PublicationSummary[];
+  listContentCatalogPublicationPage(
+    actorPrincipalId: string,
+    input: import("./contentCatalogRepo.js").ContentCatalogPublicationPageInput,
+  ): import("./contentCatalogRepo.js").ContentCatalogPublicationPage;
   getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): import("@velvet/contracts").OwnerCatalogProjection | null;
   getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string):
     import("@velvet/contracts").GmCatalogProjection | import("@velvet/contracts").PlayerCatalogProjection | import("@velvet/contracts").ObserverCatalogProjection | null;
@@ -6794,6 +6798,10 @@ function runTransaction<T>(
     listContentCatalogPublications: (actorPrincipalId) => {
       assertActive();
       return contentCatalogRepository.listContentCatalogPublications(actorPrincipalId);
+    },
+    listContentCatalogPublicationPage: (actorPrincipalId, input) => {
+      assertActive();
+      return contentCatalogRepository.listContentCatalogPublicationPage(actorPrincipalId, input);
     },
     getContentCatalogForOwner: (actorPrincipalId, packId, packVersion) => {
       assertActive();

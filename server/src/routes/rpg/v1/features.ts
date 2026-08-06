@@ -92,6 +92,8 @@ import type { CampaignAdministrationRepository } from "../../../repo/campaignAdm
 import type { CampaignEventPage } from "../../../repo/campaignRepo.js";
 import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
+import { contentCatalogHttpRoutes } from "./contentCatalog.js";
+import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
@@ -104,7 +106,8 @@ export interface CampaignListRepository extends
     | "detachAuditedCampaignRoom" | "listCampaignTimelineHistory" | "createCampaignCheckpoint"
     | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
     | "getCampaignAdministrationReceipt" | "dryRunCampaignImport">>,
-  Partial<QuestRepository> {
+  Partial<QuestRepository>,
+  Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
   listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
@@ -187,6 +190,10 @@ type QuestLaneRepository = Pick<QuestRepository,
   "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
   | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
   | "completeObjective">;
+type ContentCatalogLaneRepository = Pick<ContentCatalogRepository,
+  "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage"
+  | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog"
+  | "resolveCampaignCatalog">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -262,6 +269,10 @@ function assertQuestRepository(repository: CampaignListRepository): asserts repo
   ];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
+function assertContentCatalogRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & ContentCatalogLaneRepository {
+  const methods: Array<keyof ContentCatalogLaneRepository> = ["validateContentCatalog", "publishContentCatalog", "listContentCatalogPublicationPage", "getContentCatalogForOwner", "getCampaignContentCatalog", "configureCampaignCatalog", "resolveCampaignCatalog"];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -329,6 +340,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertQuestRepository(repository);
     return repository;
   };
+  const contentCatalogRepositoryAccessor = (): ContentCatalogLaneRepository => {
+    const repository = getCampaignRepository();
+    assertContentCatalogRepository(repository);
+    return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -342,6 +358,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });
+  await app.register(contentCatalogHttpRoutes, { contentCatalogRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };

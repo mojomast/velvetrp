@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -20,6 +21,69 @@ async function stream(request: APIRequestContext, sessionId: string, content: st
   return events;
 }
 
+test("M2.5 content catalog API flow publishes, configures, and replays an exact pin", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = {
+    packId: fixture.manifest.packId,
+    packVersion: fixture.manifest.packVersion,
+  };
+  const published = await json<{ catalog: { publication: { packId: string; packVersion: string; digest: string } } }>(
+    request, "POST", "/rpg/v1/content-packs", fixture,
+  );
+  expect(published.catalog.publication).toMatchObject({ ...pin, digest: fixture.manifest.digest });
+
+  const listed = await json<{ publications: Array<{ packId: string; packVersion: string }>; nextCursor: string | null }>(
+    request, "GET", "/rpg/v1/content-packs?limit=100",
+  );
+  expect(listed.publications).toContainEqual(expect.objectContaining(pin));
+  expect(listed.nextCursor).toBeNull();
+
+  const detail = await json<{ catalog: { publication: { packId: string; packVersion: string; digest: string } } }>(
+    request,
+    "GET",
+    `/rpg/v1/content-packs/${encodeURIComponent(pin.packId)}/versions/${encodeURIComponent(pin.packVersion)}`,
+  );
+  expect(detail.catalog.publication).toMatchObject({ ...pin, digest: fixture.manifest.digest });
+
+  const created = await json<{ campaign: { id: string } }>(
+    request, "POST", "/rpg/v1/campaigns", { name: `${runId}-Catalog-API-Campaign` },
+  );
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${created.campaign.id}/administration`,
+  );
+  const configuration = {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+    contentPacks: [pin],
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-catalog-pin`,
+  };
+  const configured = await json<{
+    content: { rulesProfileId: string; contentPacks: Array<{ packId: string; packVersion: string }> };
+    receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string };
+  }>(
+    request,
+    "PUT",
+    `/rpg/v1/campaigns/${created.campaign.id}/content`,
+    configuration,
+  );
+  expect(configured).toMatchObject({
+    content: { rulesProfileId: fixture.manifest.compatibility.rulesProfileId, contentPacks: [pin] },
+    receipt: {
+      revisionBefore: administration.campaign.revision,
+      revisionAfter: administration.campaign.revision + 1,
+      idempotencyKey: configuration.idempotencyKey,
+    },
+  });
+
+  const replayed = await json<typeof configured>(
+    request,
+    "PUT",
+    `/rpg/v1/campaigns/${created.campaign.id}/content`,
+    configuration,
+  );
+  expect(replayed).toEqual(configured);
+});
+
 test("critical browser and public API workflows", async ({ page, request }) => {
   const characterIds: string[] = [];
   const sessionIds: string[] = [];
@@ -37,7 +101,6 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     expect(await json<{ ok: boolean }>(request, "GET", "/health")).toEqual({ ok: true });
     await page.getByRole("button", { name: "Campaigns" }).click();
     await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
-    await expect(page.getByText("No campaigns yet.")).toBeVisible();
     const campaignName = `${runId}-Campaign`;
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Create campaign" }).click();

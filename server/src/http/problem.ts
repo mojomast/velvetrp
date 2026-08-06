@@ -25,6 +25,10 @@ function safeProblemInstance(requestTarget: string): string {
   const queryIndex = requestTarget.indexOf("?");
   const path = queryIndex === -1 ? requestTarget : requestTarget.slice(0, queryIndex);
   const campaignPrefix = "/api/rpg/v1/campaigns/";
+  if (path === "/api/rpg/v1/content-packs" || path === "/api/rpg/v1/content-packs/validate") return path;
+  if (/^\/api\/rpg\/v1\/content-packs\/[^/]+\/versions\/[^/]+$/.test(path)) {
+    return "/api/rpg/v1/content-packs/:packId/versions/:packVersion";
+  }
   if (!path.startsWith(campaignPrefix)) return path;
 
   const remainder = path.slice(campaignPrefix.length);
@@ -44,6 +48,10 @@ function safeProblemInstance(requestTarget: string): string {
   }
   if (suffix === "/administration" || suffix === "/character-drafts") {
     return `${campaignPrefix}:campaignId${suffix}`;
+  }
+  if (suffix === "/content") return `${campaignPrefix}:campaignId/content`;
+  if (/^\/content-packs\/[^/]+\/versions\/[^/]+$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/content-packs/:packId/versions/:packVersion`;
   }
   if (suffix === "/timelines" || suffix === "/events" || suffix === "/checkpoints"
     || suffix === "/timeline-forks" || suffix === "/recaps") {
