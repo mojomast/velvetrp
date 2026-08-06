@@ -150,6 +150,16 @@ describe("M1.5 repository facades", () => {
     f.repo.close();
   });
 
+  it("returns an authorized wallet revision snapshot and binds economy commands to its actor path", () => {
+    const f = fixture();
+    expect(f.repo.getActorEconomySnapshot(f.sourcePlayer, f.campaign, f.actor)).toMatchObject({ campaignId: f.campaign, actorId: f.actor, wallet: { balances: [{ minorUnits: 30 }] }, revision: 0 });
+    expect(f.repo.getActorEconomySnapshot(f.thirdPlayer, f.campaign, f.actor)).toBeNull();
+    const quote = f.repo.mutateEconomyForActor(f.sourcePlayer, f.campaign, f.actor, { kind: "request_purchase_quote", shopId: "shop", item, quantity: 1, expectedRevision: 0, idempotencyKey: "bound-quote" });
+    expect(f.repo.mutateEconomyForActor(f.sourcePlayer, f.campaign, f.actor, { kind: "request_purchase_quote", shopId: "shop", item, quantity: 1, expectedRevision: 0, idempotencyKey: "bound-quote" })).toEqual(quote);
+    expect(f.repo.getActorEconomySnapshot(f.sourcePlayer, f.campaign, f.actor)?.revision).toBe(1);
+    f.repo.close();
+  });
+
   it("applies short and long rest recovery only to bound resources and records every changed resource", () => {
     const f = fixture();
     const bind = (resourceId: string, recovery: "short-rest" | "long-rest", revision: number) => f.repo.mutateActorResource("local-owner", { type: "set_actor_resource_binding", campaignId: f.campaign, actorId: f.actor, resourceId, binding: { kind: "ability", recovery }, expectedRevision: revision, idempotencyKey: `bind-${resourceId}` });
