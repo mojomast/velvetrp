@@ -26,6 +26,7 @@ import { createAdministrationCommandRepo } from "./campaignAdmin/administrationC
 import { createAdministrationEventRepo, publicAdministrationPayload } from "./campaignAdmin/administrationEventRepo.js";
 import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";
 import { createCampaignTimelineRepo } from "./campaignAdmin/campaignTimelineRepo.js";
+import { createAdministrationAccessRepo, type AdministrationAuthority } from "./campaignAdmin/administrationAccessRepo.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
   readonly code = "CAMPAIGN_ADMINISTRATION_FORBIDDEN";
@@ -71,40 +72,19 @@ export interface CampaignAdministrationRepository {
   getCampaignAdministrationReceipt(actor: string, campaignId: string, commandId: string): CampaignAdministrationReceipt | null;
 }
 
-type Role = "owner" | "gm" | "player" | "observer";
-interface Authority { role: Role; ownerId: string; revision: number; status: string; settings: CampaignSettings;
-  activeTimelineId: string; updatedAt: string; }
-function getAuthority(db: DatabaseDriver.Database, actor: string, campaignId: string): Authority | null {
-  const row = db.prepare(`SELECT m.role,c.owner_principal_id,c.administration_revision,c.lifecycle_status,
-      c.settings,c.active_timeline_id,c.updated_at FROM campaigns c JOIN campaign_memberships m ON m.campaign_id=c.id
-      JOIN principals p ON p.id=m.principal_id WHERE c.id=? AND m.principal_id=?`).get(campaignId, actor) as any;
-  if (!row || !["owner", "gm", "player", "observer"].includes(row.role)) return null;
-  if (row.role === "owner" && row.owner_principal_id !== actor) return null;
-  return { role: row.role, ownerId: resourceIdSchema.parse(row.owner_principal_id), revision: row.administration_revision,
-    status: row.lifecycle_status, settings: campaignSettingsSchema.parse(JSON.parse(row.settings)),
-    activeTimelineId: resourceIdSchema.parse(row.active_timeline_id), updatedAt: utcIsoTimestampSchema.parse(row.updated_at) };
-}
-function project(campaignId: string, auth: Authority): CampaignAdministration {
-  const settings = auth.role === "owner" || auth.role === "gm" ? auth.settings : {
-    maxPlayers: auth.settings.maxPlayers, allowPlayerDice: auth.settings.allowPlayerDice,
-    safetyMode: auth.settings.safetyMode, recapVisibility: auth.settings.recapVisibility,
-  };
-  return campaignAdministrationSchema.parse({ id: campaignId, status: auth.status, settings,
-    activeTimelineId: auth.activeTimelineId, revision: auth.revision, updatedAt: auth.updatedAt, actorRole: auth.role });
-}
 const transitions: Record<string, readonly string[]> = { draft: ["published", "archived"],
   published: ["paused", "completed", "archived"], paused: ["published", "completed", "archived"],
   completed: ["archived"], archived: [] };
-interface NewContext { commandId: string; eventId: string; at: string; auth: Authority }
+interface NewContext { commandId: string; eventId: string; at: string; auth: AdministrationAuthority }
 
-function mutation<T>(db: DatabaseDriver.Database, deps: RepositoryDependencies, actorRaw: string, campaignRaw: string,
+function mutation<T>(db: DatabaseDriver.Database, deps: RepositoryDependencies, getAuthority: (actor: string, campaignId: string) => AdministrationAuthority | null, actorRaw: string, campaignRaw: string,
   expectedRevision: number, keyRaw: string, type: CampaignAdministrationReceipt["type"], payload: object,
   apply: (context: NewContext) => T, retry: (commandId: string, stored: unknown) => T): MutationResult<T> {
   const actor = resourceIdSchema.parse(actorRaw), campaignId = resourceIdSchema.parse(campaignRaw);
   const key = resourceIdSchema.parse(keyRaw), payloadJson = JSON.stringify(payload);
   const normalizedPayload = JSON.parse(payloadJson) as object;
   return db.transaction(() => {
-    const auth = getAuthority(db, actor, campaignId);
+    const auth = getAuthority(actor, campaignId);
     if (!auth || auth.role !== "owner" || auth.ownerId !== actor) throw new CampaignAdministrationForbiddenError();
     const old = db.prepare(`SELECT c.command_id,c.type,c.expected_revision,c.payload,c.created_at,
       r.revision_before,r.revision_after,r.result_data FROM campaign_administration_commands c
@@ -215,15 +195,12 @@ function timelineTransferEvents(db: DatabaseDriver.Database, campaignId: string,
 export function createCampaignAdministrationRepository(db: DatabaseDriver.Database,
   deps: RepositoryDependencies, assertCanMutate: () => void = () => undefined,
   validateRoom: (sessionId: string) => "running" | "stopped" | null = () => null): CampaignAdministrationRepository {
+  const access = createAdministrationAccessRepo(db);
   const runMutation = <T>(actor: string, campaignId: string, expectedRevision: number, key: string,
     type: CampaignAdministrationReceipt["type"], payload: object, apply: (context: NewContext) => T,
     retry: (commandId: string, stored: unknown) => T): MutationResult<T> => {
     assertCanMutate();
-    return mutation(db, deps, actor, campaignId, expectedRevision, key, type, payload, apply, retry);
-  };
-  const get = (actorRaw: string, campaignRaw: string) => {
-    const actor = resourceIdSchema.parse(actorRaw), campaignId = resourceIdSchema.parse(campaignRaw);
-    const auth = getAuthority(db, actor, campaignId); return auth ? project(campaignId, auth) : null;
+    return mutation(db, deps, access.getAuthority, actor, campaignId, expectedRevision, key, type, payload, apply, retry);
   };
   const member = (row: any) => campaignMembershipReadSchema.parse({ campaignId: row.campaign_id,
     principalId: row.principal_id, role: row.role, createdAt: row.created_at });
@@ -238,15 +215,15 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     campaignId: row.campaign_id, parentTimelineId: row.parent_timeline_id, forkedFromRevision: row.forked_from_revision,
     revision: row.revision, createdAt: row.created_at, active: row.id === activeId });
   const commands = createAdministrationCommandRepo({ db, nextId: () => deps.ids.nextId(),
-    getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId),
+    getAuthority: access.getAuthority,
     runMutation, forbidden: () => new CampaignAdministrationForbiddenError(), stale: () => new CampaignAdministrationStaleError(),
     conflict: (message) => new CampaignAdministrationConflictError(message), validateRoom, member, attachment, checkpoint, recap, timeline });
-  const events = createAdministrationEventRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId) });
+  const events = createAdministrationEventRepo({ db, getAuthority: access.getAuthority });
   const receipts = createAdministrationReceiptRepo({ db, event: campaignAdministrationEventSchema.parse,
-    getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), receipt: campaignAdministrationReceiptSchema.parse });
-  const timelines = createCampaignTimelineRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), timeline });
+    getAuthority: access.getAuthority, receipt: campaignAdministrationReceiptSchema.parse });
+  const timelines = createCampaignTimelineRepo({ db, getAuthority: access.getAuthority, timeline });
   const api: CampaignAdministrationRepository = {
-    getCampaignAdministration: get,
+    getCampaignAdministration: access.getCampaignAdministration,
     renameCampaignCompatibility: commands.renameCampaignCompatibility,
     updateCampaignAdministration: commands.updateCampaignAdministration,
     archiveCampaignWithConfirmation: commands.archiveCampaignWithConfirmation,
@@ -819,7 +796,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           (event_id,campaign_id,command_id,revision_before,revision,type,public_data,private_data,occurred_at)
           VALUES (?,?,?,?,?,'import_applied',?,? ,?)`)
           .run(eventId, campaignId, commandId, sourceRevision, after, payload, payload, at);
-        const imported = get(actor, campaignId)!;
+        const imported = access.getCampaignAdministration(actor, campaignId)!;
         db.prepare(`INSERT INTO campaign_administration_receipts
           (command_id,campaign_id,event_id,type,revision_before,revision_after,result_data)
           VALUES (?,?,?,'import_applied',?,?,?)`)
