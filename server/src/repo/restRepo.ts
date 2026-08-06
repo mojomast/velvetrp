@@ -1,12 +1,12 @@
 import type DatabaseDriver from "better-sqlite3";
-import { restCommandSchema, restReceiptSchema, resourceIdSchema, type RestCommand, type RestReceipt } from "@velvet/contracts";
+import { actorResourcesSchema, restCommandSchema, restReceiptSchema, resourceIdSchema, type RestCommand, type RestReceipt } from "@velvet/contracts";
 import { ActorResourceConflictError, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
 
 export class RestAuthorizationError extends Error { readonly code="REST_FORBIDDEN"; }
 export class RestStaleError extends Error { readonly code="REST_STALE"; }
 export class RestIllegalStateError extends Error { readonly code="REST_ILLEGAL_STATE"; }
 
-export interface RestRepository { takeRest(principal:string,command:RestCommand):M15Result<{rest:RestReceipt}>; listRestReceipts(principal:string,campaignId:string,actorId:string):RestReceipt[]; }
+export interface RestRepository { takeRest(principal:string,command:RestCommand):M15Result<{rest:RestReceipt;actorState:{resources:ReturnType<typeof actorResourcesSchema.parse>;revision:number}}>; listRestReceipts(principal:string,campaignId:string,actorId:string):RestReceipt[]; }
 export function createRestRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):RestRepository {
   const list=(principal:string,campaign:string,actor:string):RestReceipt[]=>{resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);if(!m15Authorized(db,principal,campaign,actor))return [];
     return (db.prepare(`SELECT receipt.canonical_result_json FROM rpg_rest_receipts_v25 rest
@@ -41,6 +41,6 @@ export function createRestRepository(db:DatabaseDriver.Database,deps:M15Dependen
      for(const delta of ammunitionChanges)db.prepare("UPDATE rpg_actor_resource_ammunition_v25 SET current_ammunition=? WHERE campaign_id=? AND actor_id=? AND resource_name=?").run(delta.after,command.campaignId,command.actorId,delta.resourceName);
     // The v25 rest receipt is the immutable domain receipt; generic M1.5 receipt retains retry data.
      db.prepare("INSERT INTO rpg_rest_receipts_v25 VALUES(?,?,?,?,?,?,?,?)").run(commandId,command.campaignId,command.actorId,commandId,after,command.type==='take_short_rest'?'short':'long',JSON.stringify(changes),now);
-    return {rest:restReceiptSchema.parse({restId:commandId,campaignId:command.campaignId,actorId:command.actorId,kind:command.type==='take_short_rest'?'short':'long',recoveredAt:now,recovery:{resources:changes},revisionBefore:command.expectedRevision,revisionAfter:after,idempotencyKey:command.idempotencyKey})};
+     return {rest:restReceiptSchema.parse({restId:commandId,campaignId:command.campaignId,actorId:command.actorId,kind:command.type==='take_short_rest'?'short':'long',recoveredAt:now,recovery:{resources:changes},revisionBefore:command.expectedRevision,revisionAfter:after,idempotencyKey:command.idempotencyKey}),actorState:{resources:actorResourcesSchema.parse((db.prepare("SELECT name resourceId,current,max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(command.campaignId,command.actorId)as any[])),revision:after}};
   }});}};
 }

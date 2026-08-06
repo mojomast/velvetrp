@@ -314,6 +314,45 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
     inventory: { entries: [{ entryId }], equipment: [], revision: equipped.inventory.revision + 1 },
     receipt: { kind: "unequip", revisionBefore: equipped.inventory.revision, revisionAfter: equipped.inventory.revision + 1, idempotencyKey: unequip.idempotencyKey },
   });
+
+});
+
+test("M2.7 finalized actor short-rests and replays exactly", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M2.7-Rest-Bearer`, age: 30, archetype: "Disciplined scout", boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", { name: `${runId}-M2.7-Rest-Campaign` });
+  const administration = await json<{ campaign: { revision: number } }>(request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/administration`);
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaign.campaign.id}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId, contentPacks: [pin], expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-m2.7-rest-configure`,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts`, {
+    personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${runId}-m2.7-rest-draft`,
+  });
+  const reference = (kind: "race" | "background" | "class") => fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(request, "PATCH", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}`, {
+    expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m2.7-rest-select`,
+    selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+  });
+  const finalized = await json<{ receipt: { actorId: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
+    expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-rest-finalize`,
+  }, 200);
+  const resources = await json<{ revision: number }>(request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`);
+  const materialized = await request.post("/api/__e2e/materialize-short-rest-resource", {
+    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: resources.revision },
+  });
+  expect(materialized.status()).toBe(204);
+  const command = { type: "take_short_rest" as const, campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: resources.revision, idempotencyKey: `${runId}-m2.7-short-rest` };
+  const rested = await json<{ rest: { kind: string; recovery: { resources: Array<{ resourceId: string; before: number; after: number }> }; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", "/__e2e/take-short-rest", command, 200);
+  expect(rested.rest).toMatchObject({
+    kind: "short", recovery: { resources: [{ resourceId: "focus", before: 1, after: 4 }] }, revisionBefore: command.expectedRevision,
+    revisionAfter: command.expectedRevision + 1, idempotencyKey: command.idempotencyKey,
+  });
+  expect(await json<typeof rested>(request, "POST", "/__e2e/take-short-rest", command, 200)).toEqual(rested);
 });
 
 test("critical browser and public API workflows", async ({ page, request }) => {
