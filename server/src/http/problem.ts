@@ -45,6 +45,13 @@ function safeProblemInstance(requestTarget: string): string {
   if (suffix === "/administration" || suffix === "/character-drafts") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
+  if (suffix === "/timelines" || suffix === "/events" || suffix === "/checkpoints"
+    || suffix === "/timeline-forks" || suffix === "/recaps") {
+    return `${campaignPrefix}:campaignId${suffix}`;
+  }
+  if (/^\/commands\/[^/]+\/receipt$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/commands/:commandId/receipt`;
+  }
   if (/^\/memberships\/[^/]+$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/memberships/:principalId`;
   }

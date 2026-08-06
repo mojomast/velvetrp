@@ -84,9 +84,11 @@ import { characterBuilderHttpRoutes } from "./characterBuilder.js";
 import { characterProgressionRoutes } from "./characterProgression.js";
 import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
 import { campaignMembershipHttpRoutes } from "./campaignMemberships.js";
+import { campaignHistoryHttpRoutes } from "./campaignHistory.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
+import type { CampaignEventPage } from "../../../repo/campaignRepo.js";
 import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
 
@@ -98,10 +100,14 @@ export interface CampaignListRepository extends
   Partial<Pick<CampaignAdministrationRepository,
     "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation"
     | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
-    | "detachAuditedCampaignRoom">>,
+    | "detachAuditedCampaignRoom" | "listCampaignTimelineHistory" | "createCampaignCheckpoint"
+    | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
+    | "getCampaignAdministrationReceipt">>,
   Partial<QuestRepository> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
+  listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
+  getCommandReceipt?(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -169,6 +175,12 @@ type CampaignMembershipLaneRepository = Pick<CampaignAdministrationRepository,
   | "detachAuditedCampaignRoom"> & {
   listCampaignMemberships(actorPrincipalId: string, campaignId: string): unknown[];
 };
+type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
+  "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
+  | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps" | "getCampaignAdministrationReceipt"> & {
+  listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
+  getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
+};
 type QuestLaneRepository = Pick<QuestRepository,
   "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
   | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
@@ -218,6 +230,20 @@ function assertCampaignMembershipRepository(
     || typeof repository.removeAuditedCampaignMembership !== "function"
     || typeof repository.detachAuditedCampaignRoom !== "function"
     || typeof repository.listCampaignMemberships !== "function") throw new UnsupportedCampaignRepositoryError();
+}
+
+function assertCampaignHistoryRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CampaignHistoryLaneRepository {
+  if (typeof repository.listCampaignTimelineHistory !== "function"
+    || typeof repository.createCampaignCheckpoint !== "function"
+    || typeof repository.listCampaignCheckpoints !== "function"
+    || typeof repository.forkCampaignTimeline !== "function"
+    || typeof repository.createCampaignRecap !== "function"
+    || typeof repository.listCampaignRecaps !== "function"
+    || typeof repository.getCampaignAdministrationReceipt !== "function"
+    || typeof repository.listPublicCampaignEvents !== "function"
+    || typeof repository.getCommandReceipt !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
@@ -280,6 +306,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCampaignMembershipRepository(repository);
     return repository;
   };
+  const campaignHistoryRepositoryAccessor = (): CampaignHistoryLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCampaignHistoryRepository(repository);
+    return repository;
+  };
   const questRepositoryAccessor = (): QuestLaneRepository => {
     const repository = getCampaignRepository();
     assertQuestRepository(repository);
@@ -295,6 +326,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     campaignAdministrationRepositoryAccessor,
   });
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
+  await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });
 
   app.get<{

@@ -117,6 +117,7 @@ export {
   type CampaignCharacterWorkspaceSnapshot,
   type CampaignDiceEvent,
   type CampaignDiceVisibleCharacterBinding,
+  type CampaignEventPage,
   type CampaignRoomLinkingSnapshot,
   type CreateRepositoryOptions,
   type OriginalStarterCampaignCharacterCreationResult,

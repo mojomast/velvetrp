@@ -145,6 +145,18 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/(?:timelines|checkpoints|timeline-forks|recaps)$/.test(instance)
+    || /^\/api\/rpg\/v1\/campaigns\/[^/]+\/commands\/[^/]+\/receipt$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "POST" ? "Campaign history does not accept query parameters" : null,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/events$/.test(instance)) {
+    return { instance, hasQuery, queryDetail: method === "GET" ? "Campaign history request is invalid" : null, noStore: true };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/storylines(?:\/[^/]+(?:\/status)?)?$/.test(instance)
     || /^\/api\/rpg\/v1\/campaigns\/[^/]+\/quests(?:\/[^/]+(?:\/(?:clues(?:\/[^/]+\/discover)?|rewards(?:\/[^/]+\/grant)?|objectives|status))?)?$/.test(instance)) {
     const questList = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/quests$/.test(instance);
