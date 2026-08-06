@@ -172,6 +172,24 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/(?:wallet|economy-commands)$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" || method === "POST" ? "Actor economy does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/shops\/[^/]+$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "GET" ? "Shop does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/rest-commands$/.test(instance)) {
     return {
       instance,
@@ -309,9 +327,13 @@ export function buildApp(options: {
         const isActorRest = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/rest-commands$/.test(
           normalizedRoute.instance,
         );
+        const isActorEconomy = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/(?:wallet|economy-commands)$/.test(
+          normalizedRoute.instance,
+        );
+        const isShop = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/shops\/[^/]+$/.test(normalizedRoute.instance);
         return sendApiProblem(request, reply, 404,
-          isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : "Campaign not found", {
+          isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }

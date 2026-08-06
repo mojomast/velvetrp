@@ -34,6 +34,7 @@ export * from "./actor-resources-http.js";
 export * from "./inventory.js";
 export * from "./inventory-http.js";
 export * from "./economy.js";
+export * from "./economy-http.js";
 export * from "./rest.js";
 export * from "./rest-http.js";
 export * from "./checks.js";

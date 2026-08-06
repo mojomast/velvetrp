@@ -7091,7 +7091,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const rawInventoryRepository=createInventoryRepository(db,dependencies,m15Guard);
   const inventoryRepository=new Proxy(rawInventoryRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
     if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as InventoryRepository;
-  const economyRepository=createEconomyRepository(db,dependencies,m15Guard);
+  const rawEconomyRepository=createEconomyRepository(db,dependencies,m15Guard);
+  const economyRepository=new Proxy(rawEconomyRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
+    if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as EconomyRepository;
   const restRepository=createRestRepository(db,dependencies,m15Guard);
   const m16Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.6 mutation cannot run inside a repository transaction");};
   const checkRepository=createCheckRepository(db,dependencies,m16Guard);

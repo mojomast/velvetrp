@@ -355,6 +355,54 @@ test("M2.7 finalized actor short-rests and replays exactly", async ({ request })
   expect(await json<typeof rested>(request, "POST", "/__e2e/take-short-rest", command, 200)).toEqual(rested);
 });
 
+test("M2.7 economy quotes, replays, purchases, and reconciles authoritative state", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const waylamp = { kind: "item" as const, ...pin, definitionId: "velvet:mechanics:item:waylamp" };
+  const glimmer = { kind: "currency" as const, ...pin, definitionId: "velvet:mechanics:currency:glimmer" };
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M2.7-Economy-Bearer`, age: 30, archetype: "Disciplined scout", boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", { name: `${runId}-M2.7-Economy-Campaign` });
+  const administration = await json<{ campaign: { revision: number } }>(request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/administration`);
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaign.campaign.id}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId, contentPacks: [pin], expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-m2.7-economy-configure`,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts`, {
+    personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${runId}-m2.7-economy-draft`,
+  });
+  const reference = (kind: "race" | "background" | "class") => fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(request, "PATCH", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}`, {
+    expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m2.7-economy-select`, selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+  });
+  const finalized = await json<{ receipt: { actorId: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
+    expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-economy-finalize`,
+  }, 200);
+  const base = `/__e2e/economy/campaigns/${campaign.campaign.id}`;
+  const resourcesPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`;
+  const initialResources = await json<{ revision: number }>(request, "GET", resourcesPath);
+  const materialized = await request.post("/api/__e2e/materialize-economy-fixture", {
+    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: initialResources.revision },
+  });
+  expect(materialized.status()).toBe(204);
+  const walletPath = `${base}/actors/${finalized.receipt.actorId}/wallet`;
+  const shopPath = `${base}/shops/e2e-waylamp-shop`;
+  expect(await json<{ wallet: { balances: Array<{ currency: typeof glimmer; minorUnits: number }> } }>(request, "GET", walletPath)).toEqual({ wallet: { balances: [{ currency: glimmer, minorUnits: 20 }] } });
+  expect(await json<{ shop: { name: string; stock: Array<{ item: typeof waylamp; quantity: number; unitPrice: { currency: typeof glimmer; minorUnits: number } }> } }>(request, "GET", shopPath)).toEqual({ shop: { shopId: "e2e-waylamp-shop", campaignId: campaign.campaign.id, name: "E2E Waylamp Shop", stock: [{ item: waylamp, quantity: 2, unitPrice: { currency: glimmer, minorUnits: 8 } }] } });
+  const quoteCommand = { type: "request_purchase_quote" as const, campaignId: campaign.campaign.id, buyerActorId: finalized.receipt.actorId, shopId: "e2e-waylamp-shop", item: waylamp, quantity: 1, expectedRevision: initialResources.revision, idempotencyKey: `${runId}-m2.7-economy-quote` };
+  const quoted = await json<{ quote: { quoteId: string; total: { currency: typeof glimmer; minorUnits: number } }; receipt: { revisionBefore: number; revisionAfter: number } }>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200);
+  expect(quoted).toMatchObject({ quote: { campaignId: campaign.campaign.id, shopId: quoteCommand.shopId, buyerActorId: finalized.receipt.actorId, item: waylamp, quantity: 1, total: { currency: glimmer, minorUnits: 8 } }, receipt: { revisionBefore: initialResources.revision, revisionAfter: initialResources.revision + 1 } });
+  expect(await json<typeof quoted>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200)).toEqual(quoted);
+  const purchaseCommand = { type: "purchase_from_shop" as const, campaignId: campaign.campaign.id, buyerActorId: finalized.receipt.actorId, quoteId: quoted.quote.quoteId, expectedRevision: quoted.receipt.revisionAfter, idempotencyKey: `${runId}-m2.7-economy-purchase` };
+  const purchased = await json<{ purchase: { quoteId: string; total: { currency: typeof glimmer; minorUnits: number }; revisionBefore: number; revisionAfter: number }; receipt: { revisionBefore: number; revisionAfter: number } }>(request, "POST", "/__e2e/economy/commands", purchaseCommand, 200);
+  expect(purchased).toMatchObject({ purchase: { quoteId: quoted.quote.quoteId, total: { currency: glimmer, minorUnits: 8 }, revisionBefore: quoted.receipt.revisionAfter, revisionAfter: quoted.receipt.revisionAfter + 1 }, receipt: { revisionBefore: quoted.receipt.revisionAfter, revisionAfter: quoted.receipt.revisionAfter + 1 } });
+  expect(await json<typeof purchased>(request, "POST", "/__e2e/economy/commands", purchaseCommand, 200)).toEqual(purchased);
+  expect(await json<{ wallet: { balances: Array<{ currency: typeof glimmer; minorUnits: number }> } }>(request, "GET", walletPath)).toEqual({ wallet: { balances: [{ currency: glimmer, minorUnits: 12 }] } });
+  expect(await json<{ shop: { stock: Array<{ quantity: number }> } }>(request, "GET", shopPath)).toMatchObject({ shop: { stock: [{ quantity: 1 }] } });
+});
+
 test("critical browser and public API workflows", async ({ page, request }) => {
   const characterIds: string[] = [];
   const sessionIds: string[] = [];

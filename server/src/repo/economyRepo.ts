@@ -1,6 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
-import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, resourceIdSchema, shopSchema, walletSchema, type EconomyCommand, type Shop, type Wallet } from "@velvet/contracts";
-import { ActorResourceConflictError, ActorResourceNegativeError, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
+import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, resourceIdSchema, shopSchema, walletSchema, type BilateralTrade, type EconomyCommand, type Shop, type Wallet } from "@velvet/contracts";
+import { ActorResourceConflictError, ActorResourceNegativeError, getM15ActorRevision, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
 
 export class EconomyAuthorizationError extends Error { readonly code="ECONOMY_FORBIDDEN"; }
 export class ShopStockExhaustedError extends Error { readonly code="SHOP_STOCK_EXHAUSTED"; }
@@ -12,10 +12,19 @@ const totalFor=(quantity:number,unitPrice:number):number=>{
   if(quantity>Math.floor(MAX_MINOR/unitPrice))throw new EconomyConflictError("quote total exceeds supported currency range");
   return quantity*unitPrice;
 };
+export interface ActorEconomySnapshot { campaignId:string; actorId:string; wallet:Wallet; revision:number; }
+export type ActorScopedEconomyCommand=
+  |{kind:"request_purchase_quote";shopId:string;item:{kind:"item";packId:string;packVersion:string;definitionId:string};quantity:number;expectedRevision:number;idempotencyKey:string}
+  |{kind:"purchase_from_shop";quoteId:string;expectedRevision:number;idempotencyKey:string}
+  |{kind:"propose_bilateral_trade";trade:Omit<BilateralTrade,"campaignId"|"offeredByActorId">;expectedRevision:number;idempotencyKey:string}
+  |{kind:"accept_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string}
+  |{kind:"cancel_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string};
 export interface EconomyRepository {
   getWallet(principal:string,campaignId:string,actorId:string):Wallet|null;
+  getActorEconomySnapshot(principal:string,campaignId:string,actorId:string):ActorEconomySnapshot|null;
   getShop(principal:string,campaignId:string,shopId:string):Shop|null;
   mutateEconomy(principal:string,command:EconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
+  mutateEconomyForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedEconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
 }
 
 /** Currency codes are legacy storage keys.  The v25 reference sidecar is the
@@ -30,6 +39,12 @@ export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Depen
     if(balances.some(row=>!row.currency)) return null; // never fabricate an exact reference
     return walletSchema.parse({balances});
   };
+  const snapshot=(principal:string,campaign:string,actor:string):ActorEconomySnapshot|null=>db.transaction(()=>{
+    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
+    if(!m15Authorized(db,principal,campaign,actor))return null;
+    const current=wallet(principal,campaign,actor);
+    return current?{campaignId:campaign,actorId:actor,wallet:current,revision:getM15ActorRevision(db,campaign,actor)}:null;
+  })();
   const shop=(principal:string,campaign:string,shopId:string):Shop|null=>{
     resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(shopId);
     if(!db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(campaign,principal)) return null;
@@ -44,7 +59,7 @@ export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Depen
     db.prepare("UPDATE rpg_wallets_v25 SET balance_minor=balance_minor-?,updated_at=? WHERE campaign_id=? AND actor_id=? AND currency_code=?").run(amount,now,campaign,actor,code);
     db.prepare("INSERT INTO rpg_currency_ledger_v25(entry_id,campaign_id,actor_id,currency_code,delta_minor,reason,reference_type,reference_id,occurred_at) VALUES(?,?,?,?,? ,?,?,?,?)").run(id,campaign,actor,code,-amount,reason,reason,id,now);
   };
-  return {getWallet:wallet,getShop:shop,mutateEconomy(principal,input){const command=economyCommandSchema.parse(input);const actor='buyerActorId'in command?command.buyerActorId:'trade'in command?command.trade.offeredByActorId:'acceptedByActorId'in command?command.acceptedByActorId:command.cancelledByActorId;
+  const mutateEconomy=(principal:string,input:EconomyCommand)=>{const command=economyCommandSchema.parse(input);const actor='buyerActorId'in command?command.buyerActorId:'trade'in command?command.trade.offeredByActorId:'acceptedByActorId'in command?command.acceptedByActorId:command.cancelledByActorId;
     const existingTrade=(command.type==='accept_bilateral_trade'||command.type==='cancel_bilateral_trade')
       ?db.prepare("SELECT proposer_actor_id,recipient_actor_id FROM rpg_trade_proposals_v25 WHERE campaign_id=? AND trade_id=?").get(command.campaignId,command.tradeId)as any:undefined;
     const counterpart=command.type==='propose_bilateral_trade'?command.trade.acceptedByActorId:existingTrade
@@ -88,5 +103,18 @@ export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Depen
       moveItems(trade.proposer_actor_id,trade.recipient_actor_id,terms.offeredItems);moveItems(trade.recipient_actor_id,trade.proposer_actor_id,terms.requestedItems);moveCurrency(trade.proposer_actor_id,trade.recipient_actor_id,terms.offeredCurrency);moveCurrency(trade.recipient_actor_id,trade.proposer_actor_id,terms.requestedCurrency);
       db.prepare("UPDATE rpg_trade_proposals_v25 SET status='settled' WHERE trade_id=?").run(command.tradeId);db.prepare("INSERT INTO rpg_trade_settlement_receipts_v25 VALUES(?,?,?,?,?)").run(commandId,command.tradeId,command.campaignId,JSON.stringify({tradeId:command.tradeId}),now);return {trade:{tradeId:command.tradeId,status:'settled'}};
     }});
-  }};
+    };
+  const mutateForActor=(principal:string,campaignId:string,actorId:string,input:ActorScopedEconomyCommand)=>{
+    const command:EconomyCommand=input.kind==="request_purchase_quote"
+      ?{type:"request_purchase_quote",campaignId,buyerActorId:actorId,shopId:input.shopId,item:input.item,quantity:input.quantity,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+      :input.kind==="purchase_from_shop"
+        ?{type:"purchase_from_shop",campaignId,buyerActorId:actorId,quoteId:input.quoteId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+        :input.kind==="propose_bilateral_trade"
+          ?{type:"propose_bilateral_trade",campaignId,trade:{...input.trade,campaignId,offeredByActorId:actorId},expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+          :input.kind==="accept_bilateral_trade"
+            ?{type:"accept_bilateral_trade",campaignId,tradeId:input.tradeId,acceptedByActorId:actorId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+            :{type:"cancel_bilateral_trade",campaignId,tradeId:input.tradeId,cancelledByActorId:actorId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey};
+    return mutateEconomy(principal,command);
+  };
+  return {getWallet:wallet,getActorEconomySnapshot:snapshot,getShop:shop,mutateEconomy,mutateEconomyForActor:mutateForActor};
 }
