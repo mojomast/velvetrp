@@ -128,6 +128,7 @@ import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
 import { createCampaignCoreRepository } from "./campaign/campaignCoreRepo.js";
 import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
 import { createCampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
+import { createCampaignActorResourceRepository } from "./campaign/campaignActorResourceRepo.js";
 import { createCampaignEventProjectionRepo } from "./campaign/campaignEventProjectionRepo.js";
 import type {
   AddCampaignMembershipInput,
@@ -4666,118 +4667,6 @@ function getCampaignCharacterByActorIdSyncInternal(
   return toCampaignCharacterRead(row);
 }
 
-interface ActorResourceReadRow {
-  actor_presence: string | null;
-  campaign_character_presence: string | null;
-  sheet_presence: string | null;
-  resource_presence: string | null;
-  campaign_id: string | null;
-  actor_id: string | null;
-  name: string | null;
-  current: unknown;
-  max: unknown;
-}
-
-function actorResourceFromReadRow(
-  row: ActorResourceReadRow,
-  campaignId: string,
-  actorId: string,
-): ActorResource | null {
-  if (
-    row.actor_presence === null || row.campaign_character_presence === null
-    || row.sheet_presence === null
-  ) {
-    throw new Error("actor resource root is incomplete");
-  }
-  if (row.resource_presence === null) return null;
-  const resource = actorResourceSchema.parse({
-    campaignId: row.campaign_id,
-    actorId: row.actor_id,
-    name: row.name,
-    current: row.current,
-    max: row.max,
-  });
-  if (resource.campaignId !== campaignId || resource.actorId !== actorId) {
-    throw new Error("actor resource record is invalid");
-  }
-  return resource;
-}
-
-const ACTOR_RESOURCE_READ_SELECT = `SELECT
-    actor.id AS actor_presence,
-    campaign_character.id AS campaign_character_presence,
-    sheet.id AS sheet_presence,
-    resource.name AS resource_presence,
-    resource.campaign_id, resource.actor_id, resource.name, resource.current, resource.max
-  FROM campaign_memberships membership
-  JOIN principals principal ON principal.id = membership.principal_id
-  JOIN campaigns campaign ON campaign.id = membership.campaign_id
-  JOIN (
-    SELECT campaign_id, id AS actor_id FROM campaign_actors WHERE campaign_id = ? AND id = ?
-    UNION
-    SELECT resource.campaign_id, resource.actor_id
-    FROM rpg_actor_resources resource
-    WHERE resource.campaign_id = ? AND resource.actor_id = ?
-      AND NOT EXISTS (SELECT 1 FROM campaign_actors known_actor WHERE known_actor.id = resource.actor_id)
-  ) actor_identity ON actor_identity.campaign_id = membership.campaign_id
-  LEFT JOIN campaign_actors actor
-    ON actor.campaign_id = actor_identity.campaign_id AND actor.id = actor_identity.actor_id
-  LEFT JOIN campaign_characters campaign_character
-    ON campaign_character.campaign_id = actor.campaign_id
-      AND campaign_character.id = actor.campaign_character_id
-  LEFT JOIN rpg_campaign_sheets sheet
-    ON sheet.campaign_id = actor.campaign_id AND sheet.id = actor.sheet_id
-      AND sheet.campaign_character_id = campaign_character.id
-  LEFT JOIN rpg_actor_resources resource
-    ON resource.actor_id = actor_identity.actor_id`;
-
-function listActorResourcesSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-  actorId: string,
-): ActorResource[] {
-  const principalId = resourceIdSchema.parse(actorPrincipalId);
-  const normalizedCampaignId = resourceIdSchema.parse(campaignId);
-  const normalizedActorId = resourceIdSchema.parse(actorId);
-  const rows = db.prepare(`${ACTOR_RESOURCE_READ_SELECT}
-    WHERE membership.principal_id = ? AND membership.campaign_id = ?
-      AND (membership.role IN ('gm', 'player', 'observer') OR (
-        membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-      ))
-    ORDER BY resource.name COLLATE BINARY ASC`)
-    .all(normalizedCampaignId, normalizedActorId, normalizedCampaignId, normalizedActorId,
-      principalId, normalizedCampaignId) as ActorResourceReadRow[];
-  const resources: ActorResource[] = [];
-  for (const row of rows) {
-    const resource = actorResourceFromReadRow(row, normalizedCampaignId, normalizedActorId);
-    if (resource) resources.push(resource);
-  }
-  return resources;
-}
-
-function getActorResourceSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-  actorId: string,
-  name: string,
-): ActorResource | null {
-  const principalId = resourceIdSchema.parse(actorPrincipalId);
-  const normalizedCampaignId = resourceIdSchema.parse(campaignId);
-  const normalizedActorId = resourceIdSchema.parse(actorId);
-  const normalizedName = actorResourceNameSchema.parse(name);
-  const row = db.prepare(`${ACTOR_RESOURCE_READ_SELECT}
-      AND resource.name = ? COLLATE BINARY
-    WHERE membership.principal_id = ? AND membership.campaign_id = ?
-      AND (membership.role IN ('gm', 'player', 'observer') OR (
-        membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-      ))`)
-    .get(normalizedCampaignId, normalizedActorId, normalizedCampaignId, normalizedActorId,
-      normalizedName, principalId, normalizedCampaignId) as ActorResourceReadRow | undefined;
-  return row ? actorResourceFromReadRow(row, normalizedCampaignId, normalizedActorId) : null;
-}
-
 interface CampaignEventReadRow {
   audit_command_id: string | null;
   command_presence: string | null;
@@ -6880,6 +6769,7 @@ function runTransaction<T>(
   const campaignEventProjectionRepository = createCampaignEventProjectionRepo({
     listCampaignEvents: (actor, campaignId, timelineId) => listCampaignEventsSync(db, actor, campaignId, timelineId),
   });
+  const campaignActorResourceRepository = createCampaignActorResourceRepository(db);
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -6976,11 +6866,11 @@ function runTransaction<T>(
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertActive();
-      return listActorResourcesSync(db, actorPrincipalId, campaignId, actorId);
+      return campaignActorResourceRepository.listActorResources(actorPrincipalId, campaignId, actorId);
     },
     getActorResource: (actorPrincipalId, campaignId, actorId, name) => {
       assertActive();
-      return getActorResourceSync(db, actorPrincipalId, campaignId, actorId, name);
+      return campaignActorResourceRepository.getActorResource(actorPrincipalId, campaignId, actorId, name);
     },
     listCampaignEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertActive();
@@ -7123,6 +7013,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignEventProjectionRepository = createCampaignEventProjectionRepo({
     listCampaignEvents: (actor, campaignId, timelineId) => listCampaignEventsSync(db, actor, campaignId, timelineId),
   });
+  const campaignActorResourceRepository = createCampaignActorResourceRepository(db);
   let closed = false;
   let transactionDepth = 0;
   const assertOpen = () => {
@@ -7315,11 +7206,11 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertOpen();
-      return listActorResourcesSync(db, actorPrincipalId, campaignId, actorId);
+      return campaignActorResourceRepository.listActorResources(actorPrincipalId, campaignId, actorId);
     },
     getActorResource: (actorPrincipalId, campaignId, actorId, name) => {
       assertOpen();
-      return getActorResourceSync(db, actorPrincipalId, campaignId, actorId, name);
+      return campaignActorResourceRepository.getActorResource(actorPrincipalId, campaignId, actorId, name);
     },
     listCampaignEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertOpen();
