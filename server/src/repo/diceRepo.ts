@@ -1,12 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import type { CommandEnvelope, CommandReceipt, RpgEvent } from "../types.js";
-import {
-  executeRollActorDiceForVisibleCharacterSync,
-  executeRollActorDiceSync,
-  getCommandReceiptSync,
-  listRecentCampaignDiceEventsSync,
-  type RepositoryDependencies,
-} from "./campaignRepo.js";
+import type { CampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
+import type { RepositoryDependencies } from "./campaign/repositoryDependencies.js";
 
 export type CampaignDiceEvent = Extract<RpgEvent, { type: "actor_dice_rolled" }>;
 
@@ -51,15 +46,16 @@ export interface DiceRepository {
 export function createDiceRepository(
   db: DatabaseDriver.Database,
   dependencies: RepositoryDependencies,
+  commandRepository: CampaignCommandRepository,
 ): DiceRepository {
   return {
     executeRollActorDice: (actorPrincipalId, envelope) =>
-      executeRollActorDiceSync(db, dependencies, actorPrincipalId, envelope),
+      commandRepository.executeRollActorDice(actorPrincipalId, envelope),
     executeRollActorDiceForVisibleCharacter: (actorPrincipalId, envelope, binding) =>
-      executeRollActorDiceForVisibleCharacterSync(db, dependencies, actorPrincipalId, envelope, binding),
+      commandRepository.executeRollActorDiceForVisibleCharacter(actorPrincipalId, envelope, binding),
     listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) =>
-      listRecentCampaignDiceEventsSync(db, actorPrincipalId, campaignId, timelineId),
+      commandRepository.listRecentCampaignDiceEvents(actorPrincipalId, campaignId, timelineId),
     getCommandReceipt: (actorPrincipalId, campaignId, commandId) =>
-      getCommandReceiptSync(db, actorPrincipalId, campaignId, commandId),
+      commandRepository.getCommandReceipt(actorPrincipalId, campaignId, commandId),
   };
 }

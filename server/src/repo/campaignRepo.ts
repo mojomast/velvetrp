@@ -125,6 +125,9 @@ import {
   updateSessionContextSourceSync,
 } from "./sessionRepo.js";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
+import { createCampaignCoreRepository } from "./campaign/campaignCoreRepo.js";
+import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
+import { createCampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
@@ -901,7 +904,7 @@ export function executeRollActorDiceForVisibleCharacterSync(
   return executeRollActorDiceAtomic(db, dependencies, actorPrincipalId, input, (envelope, principalId) => {
     // BEGIN IMMEDIATE is already held. Roster drift cannot occur between this
     // validation and the generic executor's RNG, identities, clock, or writes.
-    const roster = getCampaignCharacterRosterSync(db, principalId, envelope.campaignId);
+    const roster = getCampaignCharacterRosterSyncInternal(db, principalId, envelope.campaignId);
     if (roster === null) throw new Error("roll actor dice command unavailable");
     const current = roster.characters[position - 1];
     if (current === undefined || current.id !== campaignCharacterId || current.name !== name) {
@@ -1717,7 +1720,7 @@ function createCampaignCharacterSync(
       { id: unknown } | undefined;
     if (duplicate) {
       const duplicateId = resourceIdSchema.parse(duplicate.id);
-      const complete = getCampaignCharacterSync(db, actorPrincipal, normalized.campaignId, duplicateId);
+      const complete = getCampaignCharacterSyncInternal(db, actorPrincipal, normalized.campaignId, duplicateId);
       if (!complete || complete.projection.campaignCharacter.characterId !== normalized.characterId) {
         throw new Error("campaign character duplicate aggregate is malformed");
       }
@@ -1903,7 +1906,7 @@ function validateOriginalStarterCharacterContent(
   }
 }
 
-function createCampaignSync(
+function createCampaignSyncInternal(
   db: DatabaseDriver.Database,
   dependencies: RepositoryDependencies,
   actorPrincipalId: string,
@@ -1984,7 +1987,7 @@ function toCampaign(row: CampaignRow): Campaign {
   });
 }
 
-function recordCompatibilityAdministrationAudit(db: DatabaseDriver.Database, campaignId: string,
+function recordCompatibilityAdministrationAuditInternal(db: DatabaseDriver.Database, campaignId: string,
   actorPrincipalId: string, type: "campaign_renamed" | "membership_added" | "room_attached" | "room_detached",
   payload: object, result: object, occurredAt: string): void {
   const row = db.prepare("SELECT administration_revision FROM campaigns WHERE id=?").get(campaignId) as { administration_revision: number };
@@ -2005,7 +2008,7 @@ function recordCompatibilityAdministrationAudit(db: DatabaseDriver.Database, cam
     .run(commandId, campaignId, eventId, type, before, after, JSON.stringify(result));
 }
 
-function renameCampaignSync(
+function renameCampaignSyncInternal(
   db: DatabaseDriver.Database,
   clock: Clock,
   actorPrincipalId: string,
@@ -2048,7 +2051,7 @@ interface CampaignOwnerIntegrityRow {
  * renameCampaignSync: the older factory method retains its exact signature and
  * behavior for compatibility.
  */
-function renameCampaignIfUnchangedSync(
+function renameCampaignIfUnchangedSyncInternal(
   db: DatabaseDriver.Database,
   clock: Clock,
   actorPrincipalId: string,
@@ -2152,7 +2155,7 @@ function toCampaignMembership(row: CampaignMembershipRow): CampaignMembership {
   });
 }
 
-function addCampaignMembershipSync(
+function addCampaignMembershipSyncInternal(
   db: DatabaseDriver.Database,
   clock: Clock,
   actorPrincipalId: string,
@@ -2237,7 +2240,7 @@ const RUNNING_CAMPAIGN_ROOM_STATES = ["setup", "active", "paused", "cooldown"] a
  * eligible to link. This deliberately projects display values even though the
  * write does not return them, so attach cannot accept a graph that GET rejects.
  */
-function validateCampaignRoomSessionIntegrity(row: CampaignRoomSessionIntegrityRow): "running" | "stopped" {
+function validateCampaignRoomSessionIntegrityInternal(row: CampaignRoomSessionIntegrityRow): "running" | "stopped" {
   if (row.primary_character_presence !== row.character_id
     || !Number.isInteger(row.participant_count) || (row.participant_count as number) < 1
     || (row.participant_count as number) > 12
@@ -2277,7 +2280,7 @@ function validateCampaignRoomSessionIntegrity(row: CampaignRoomSessionIntegrityR
   throw new Error("campaign room session graph is malformed");
 }
 
-function getCampaignRoomSessionIntegrityRow(
+function getCampaignRoomSessionIntegrityRowInternal(
   db: DatabaseDriver.Database,
   sessionId: string,
 ): CampaignRoomSessionIntegrityRow | undefined {
@@ -2327,7 +2330,7 @@ function toCampaignSessionAttachment(row: CampaignSessionAttachmentRow): Campaig
   });
 }
 
-function attachCampaignSessionSync(
+function attachCampaignSessionSyncInternal(
   db: DatabaseDriver.Database,
   clock: Clock,
   actorPrincipalId: string,
@@ -2426,7 +2429,7 @@ function attachCampaignSessionSync(
       if (existing) throw new Error("campaign session attachment has no session parent");
       throw new CampaignSessionAttachmentSessionMissingError();
     }
-    const lifecycle = validateCampaignRoomSessionIntegrity(session);
+    const lifecycle = validateCampaignRoomSessionIntegrityInternal(session);
 
     if (existingAttachment) return existingAttachment;
     if (lifecycle === "stopped") {
@@ -2445,7 +2448,7 @@ function attachCampaignSessionSync(
   return run.immediate();
 }
 
-function detachCampaignSessionSync(
+function detachCampaignSessionSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   input: DetachCampaignSessionInput,
@@ -2556,7 +2559,7 @@ function authorizedCampaignAccess(row: CampaignAccessRow, actorId: string): Camp
   return toCampaignAccess(row);
 }
 
-function listCampaignsSync(db: DatabaseDriver.Database, actorPrincipalId: string): CampaignAccess[] {
+function listCampaignsSyncInternal(db: DatabaseDriver.Database, actorPrincipalId: string): CampaignAccess[] {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const rows = db.prepare(`SELECT ${CAMPAIGN_ACCESS_PROJECTION}
     FROM campaign_memberships cm
@@ -2575,7 +2578,7 @@ function listCampaignsSync(db: DatabaseDriver.Database, actorPrincipalId: string
   });
 }
 
-function getCampaignSync(
+function getCampaignSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -2894,7 +2897,7 @@ function toCampaignTimelineRead(row: CampaignTimelineReadRow): CampaignTimeline 
   }
 }
 
-function listCampaignTimelinesSync(
+function listCampaignTimelinesSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -2906,7 +2909,7 @@ function listCampaignTimelinesSync(
   return rows.map(toCampaignTimelineRead);
 }
 
-function getCampaignTimelineSync(
+function getCampaignTimelineSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -2999,7 +3002,7 @@ WHERE actor_membership.principal_id = ? AND actor_membership.campaign_id = ?
   AND (SELECT COUNT(*) FROM campaign_memberships owner_membership
     WHERE owner_membership.campaign_id = campaign.id AND owner_membership.role = 'owner') = 1`;
 
-function listCampaignMembershipsSync(
+function listCampaignMembershipsSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3012,7 +3015,7 @@ ORDER BY target_membership.created_at ASC,
   return rows.map(toCampaignMembershipRead);
 }
 
-function getCampaignMembershipSync(
+function getCampaignMembershipSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3073,7 +3076,7 @@ WHERE actor_membership.principal_id = ? AND actor_membership.campaign_id = ?
   AND (SELECT COUNT(*) FROM campaign_memberships owner_membership
     WHERE owner_membership.campaign_id = campaign.id AND owner_membership.role = 'owner') = 1`;
 
-function listCampaignSessionAttachmentsSync(
+function listCampaignSessionAttachmentsSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3086,7 +3089,7 @@ ORDER BY attachment.attached_at ASC,
   return rows.map(toCampaignSessionAttachmentRead);
 }
 
-function getCampaignSessionAttachmentSync(
+function getCampaignSessionAttachmentSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3175,7 +3178,7 @@ function projectLegacyRoomText(value: unknown, nullable: boolean): string | null
  * to prove them are selected; legacy character IDs and private room data never
  * enter the result set.
  */
-function getCampaignRoomLinkingSnapshotSync(
+function getCampaignRoomLinkingSnapshotSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3405,6 +3408,45 @@ function getCampaignRoomLinkingSnapshotSync(
   const response = campaignRoomLinkingResponseSchema.parse({ attached, eligible });
   return { campaignId: id, ...response };
 }
+
+// Compatibility delegates retained for the composed repository facade.
+function createCampaignSync(db: DatabaseDriver.Database, dependencies: RepositoryDependencies, actor: string, input: CreateCampaignInput): Campaign {
+  return createCampaignSyncInternal(db, dependencies, actor, input);
+}
+function recordCompatibilityAdministrationAudit(db: DatabaseDriver.Database, campaignId: string, actor: string,
+  type: "campaign_renamed" | "membership_added" | "room_attached" | "room_detached", payload: object, result: object, at: string): void {
+  return recordCompatibilityAdministrationAuditInternal(db, campaignId, actor, type, payload, result, at);
+}
+function renameCampaignSync(db: DatabaseDriver.Database, clock: Clock, actor: string, campaignId: string, input: RenameCampaignInput): Campaign {
+  return renameCampaignSyncInternal(db, clock, actor, campaignId, input);
+}
+function renameCampaignIfUnchangedSync(db: DatabaseDriver.Database, clock: Clock, actor: string, campaignId: string, input: CampaignRenameRequest): Campaign {
+  return renameCampaignIfUnchangedSyncInternal(db, clock, actor, campaignId, input);
+}
+function addCampaignMembershipSync(db: DatabaseDriver.Database, clock: Clock, actor: string, campaignId: string, input: AddCampaignMembershipInput): CampaignMembership {
+  return addCampaignMembershipSyncInternal(db, clock, actor, campaignId, input);
+}
+function getCampaignRoomSessionIntegrityRow(db: DatabaseDriver.Database, sessionId: string) {
+  return getCampaignRoomSessionIntegrityRowInternal(db, sessionId);
+}
+function validateCampaignRoomSessionIntegrity(row: CampaignRoomSessionIntegrityRow): "running" | "stopped" {
+  return validateCampaignRoomSessionIntegrityInternal(row);
+}
+function attachCampaignSessionSync(db: DatabaseDriver.Database, clock: Clock, actor: string, input: AttachCampaignSessionInput): CampaignSessionAttachment {
+  return attachCampaignSessionSyncInternal(db, clock, actor, input);
+}
+function detachCampaignSessionSync(db: DatabaseDriver.Database, actor: string, input: DetachCampaignSessionInput): CampaignSessionAttachment | null {
+  return detachCampaignSessionSyncInternal(db, actor, input);
+}
+function listCampaignsSync(db: DatabaseDriver.Database, actor: string): CampaignAccess[] { return listCampaignsSyncInternal(db, actor); }
+function getCampaignSync(db: DatabaseDriver.Database, actor: string, campaignId: string): CampaignAccess | null { return getCampaignSyncInternal(db, actor, campaignId); }
+function listCampaignTimelinesSync(db: DatabaseDriver.Database, actor: string, campaignId: string): CampaignTimeline[] { return listCampaignTimelinesSyncInternal(db, actor, campaignId); }
+function getCampaignTimelineSync(db: DatabaseDriver.Database, actor: string, campaignId: string, timelineId: string): CampaignTimeline | null { return getCampaignTimelineSyncInternal(db, actor, campaignId, timelineId); }
+function listCampaignMembershipsSync(db: DatabaseDriver.Database, actor: string, campaignId: string): CampaignMembershipRead[] { return listCampaignMembershipsSyncInternal(db, actor, campaignId); }
+function getCampaignMembershipSync(db: DatabaseDriver.Database, actor: string, campaignId: string, principalId: string): CampaignMembershipRead | null { return getCampaignMembershipSyncInternal(db, actor, campaignId, principalId); }
+function listCampaignSessionAttachmentsSync(db: DatabaseDriver.Database, actor: string, campaignId: string): CampaignSessionAttachment[] { return listCampaignSessionAttachmentsSyncInternal(db, actor, campaignId); }
+function getCampaignSessionAttachmentSync(db: DatabaseDriver.Database, actor: string, campaignId: string, sessionId: string): CampaignSessionAttachment | null { return getCampaignSessionAttachmentSyncInternal(db, actor, campaignId, sessionId); }
+function getCampaignRoomLinkingSnapshotSync(db: DatabaseDriver.Database, actor: string, campaignId: string): CampaignRoomLinkingSnapshot | null { return getCampaignRoomLinkingSnapshotSyncInternal(db, actor, campaignId); }
 
 interface CampaignCharacterReadRow {
   requesting_campaign_id: string;
@@ -3717,7 +3759,7 @@ function toCampaignCharacterRead(row: CampaignCharacterReadRow): CampaignCharact
   });
 }
 
-function listCampaignCharactersSync(
+function listCampaignCharactersSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -3755,7 +3797,7 @@ function malformedCampaignCharacterRoster(): never {
 }
 
 /** One-statement safe roster snapshot with no private or aggregate payload fields. */
-function getCampaignCharacterRosterSync(
+function getCampaignCharacterRosterSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -4071,7 +4113,7 @@ const WORKSPACE_PROFICIENCY_PREFIX = {
  * resolution and every ordered workspace collection. Technical identities are
  * validated below but are replaced only with contract-defined positions.
  */
-function getCampaignCharacterWorkspaceSync(
+function getCampaignCharacterWorkspaceSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -4563,7 +4605,7 @@ function getCampaignCharacterWorkspaceSync(
  * the complete campaign ancestry; progression then narrows visibility to an
  * owner, GM, or the actor's controller before its derived state is returned.
  */
-function getCampaignCharacterSheetSnapshotSync(
+function getCampaignCharacterSheetSnapshotSyncInternal(
   db: DatabaseDriver.Database,
   progressionRepository: CharacterProgressionRepository,
   actorPrincipalId: string,
@@ -4573,7 +4615,7 @@ function getCampaignCharacterSheetSnapshotSync(
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
   const targetId = resourceIdSchema.parse(campaignCharacterId);
-  const workspace = getCampaignCharacterWorkspaceSync(db, actorId, id, targetId);
+  const workspace = getCampaignCharacterWorkspaceSyncInternal(db, actorId, id, targetId);
   if (workspace === null) return null;
 
   const progression = progressionRepository.getCharacterProgression(actorId, targetId);
@@ -4585,7 +4627,7 @@ function getCampaignCharacterSheetSnapshotSync(
   return { campaignId: id, campaignCharacterId: targetId, sheet: workspace.character, progression };
 }
 
-function getCampaignCharacterSync(
+function getCampaignCharacterSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -4599,7 +4641,7 @@ function getCampaignCharacterSync(
   return row ? toCampaignCharacterRead(row) : null;
 }
 
-function getCampaignCharacterByActorIdSync(
+function getCampaignCharacterByActorIdSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -6102,7 +6144,7 @@ function projectLegacyPersonaDisplayName(value: unknown): string {
  * intentional: factory callers receive SQLite's implicit statement snapshot,
  * while active units of work receive their enclosing transaction snapshot.
  */
-function getCampaignCharacterCreationOptionsSync(
+function getCampaignCharacterCreationOptionsSyncInternal(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
@@ -6505,7 +6547,7 @@ function getCampaignDetailSync(
   actorPrincipalId: string,
   campaignId: string,
 ): CampaignDetail | null {
-  const campaign = getCampaignSync(db, actorPrincipalId, campaignId);
+  const campaign = getCampaignSyncInternal(db, actorPrincipalId, campaignId);
   if (!campaign) return null;
   const configuration = getCampaignContentConfigurationSync(db, actorPrincipalId, campaignId);
   return campaignDetailSchema.parse({
@@ -6572,7 +6614,7 @@ function inspectOriginalStarterSetupSync(
 
   // Validate the attributable campaign row before classifying reserved state,
   // so an exact content pointer cannot hide unrelated campaign corruption.
-  if (!getCampaignSync(db, actor.data, id.data)) return { status: "unavailable" };
+  if (!getCampaignSyncInternal(db, actor.data, id.data)) return { status: "unavailable" };
 
   // Inspect only raw configuration identities before detail reconstruction.
   // An exact starter pointer whose required profile/pack has disappeared (or
@@ -6812,6 +6854,27 @@ function getCampaignContentPackDefinitionSync(
   return toRpgDefinition(row);
 }
 
+function createCampaignActorOperations(
+  db: DatabaseDriver.Database,
+  progressionRepository: CharacterProgressionRepository,
+) {
+  return {
+    getCampaignCharacterCreationOptions: (actor: string, campaignId: string) =>
+      getCampaignCharacterCreationOptionsSyncInternal(db, actor, campaignId),
+    getCampaignCharacterRoster: (actor: string, campaignId: string) =>
+      getCampaignCharacterRosterSyncInternal(db, actor, campaignId),
+    getCampaignCharacterWorkspace: (actor: string, campaignId: string, campaignCharacterId: string) =>
+      getCampaignCharacterWorkspaceSyncInternal(db, actor, campaignId, campaignCharacterId),
+    getCampaignCharacterSheetSnapshot: (actor: string, campaignId: string, campaignCharacterId: string) =>
+      getCampaignCharacterSheetSnapshotSyncInternal(db, progressionRepository, actor, campaignId, campaignCharacterId),
+    listCampaignCharacters: (actor: string, campaignId: string) => listCampaignCharactersSyncInternal(db, actor, campaignId),
+    getCampaignCharacter: (actor: string, campaignId: string, campaignCharacterId: string) =>
+      getCampaignCharacterSyncInternal(db, actor, campaignId, campaignCharacterId),
+    getCampaignCharacterByActorId: (actor: string, campaignId: string, actorId: string) =>
+      getCampaignCharacterByActorIdSyncInternal(db, actor, campaignId, actorId),
+  };
+}
+
 function runTransaction<T>(
   db: DatabaseDriver.Database,
   dependencies: RepositoryDependencies,
@@ -6830,6 +6893,9 @@ function runTransaction<T>(
   const characterProgressionRepository = createCharacterProgressionRepository(db, dependencies, () => {
     throw new Error("character progression mutation cannot run inside a repository transaction");
   });
+  const campaignActorRepository = createCampaignActorRepository(
+    createCampaignActorOperations(db, characterProgressionRepository),
+  );
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -6910,21 +6976,19 @@ function runTransaction<T>(
     },
     getCampaignCharacterCreationOptions: (actorPrincipalId, campaignId) => {
       assertActive();
-      return getCampaignCharacterCreationOptionsSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.getCampaignCharacterCreationOptions(actorPrincipalId, campaignId);
     },
     getCampaignCharacterRoster: (actorPrincipalId, campaignId) => {
       assertActive();
-      return getCampaignCharacterRosterSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.getCampaignCharacterRoster(actorPrincipalId, campaignId);
     },
     getCampaignCharacterWorkspace: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertActive();
-      return getCampaignCharacterWorkspaceSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+      return campaignActorRepository.getCampaignCharacterWorkspace(actorPrincipalId, campaignId, campaignCharacterId);
     },
     getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertActive();
-      return getCampaignCharacterSheetSnapshotSync(
-        db, characterProgressionRepository, actorPrincipalId, campaignId, campaignCharacterId,
-      );
+      return campaignActorRepository.getCampaignCharacterSheetSnapshot(actorPrincipalId, campaignId, campaignCharacterId);
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
       assertActive();
@@ -6952,15 +7016,15 @@ function runTransaction<T>(
     },
     listCampaignCharacters: (actorPrincipalId, campaignId) => {
       assertActive();
-      return listCampaignCharactersSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.listCampaignCharacters(actorPrincipalId, campaignId);
     },
     getCampaignCharacter: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertActive();
-      return getCampaignCharacterSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+      return campaignActorRepository.getCampaignCharacter(actorPrincipalId, campaignId, campaignCharacterId);
     },
     getCampaignCharacterByActorId: (actorPrincipalId, campaignId, actorId) => {
       assertActive();
-      return getCampaignCharacterByActorIdSync(db, actorPrincipalId, campaignId, actorId);
+      return campaignActorRepository.getCampaignCharacterByActorId(actorPrincipalId, campaignId, actorId);
     },
     listRulesProfiles: (actorPrincipalId) => {
       assertActive();
@@ -7037,7 +7101,41 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     rng: options.rng ?? systemRuntime.rng,
   };
   const db = openRepositoryDatabase(path.resolve(options.dataDir ?? resolveDataDir()), dependencies);
-  const diceRepository = createDiceRepository(db, dependencies);
+  const campaignCommandRepository = createCampaignCommandRepository({
+    executeRollActorDice: (actor, input) => executeRollActorDiceSync(db, dependencies, actor, input),
+    executeRollActorDiceForVisibleCharacter: (actor, input, binding) =>
+      executeRollActorDiceForVisibleCharacterSync(db, dependencies, actor, input, binding),
+    listRecentCampaignDiceEvents: (actor, campaignId, timelineId) =>
+      listRecentCampaignDiceEventsSync(db, actor, campaignId, timelineId),
+    getCommandReceipt: (actor, campaignId, commandId) =>
+      getCommandReceiptSync(db, actor, campaignId, commandId),
+  });
+  const diceRepository = createDiceRepository(db, dependencies, campaignCommandRepository);
+  const campaignCoreRepository = createCampaignCoreRepository({
+    createCampaign: (actor, input) => createCampaignSyncInternal(db, dependencies, actor, input),
+    renameCampaign: (actor, campaignId, input) => renameCampaignSyncInternal(db, dependencies.clock, actor, campaignId, input),
+    renameCampaignIfUnchanged: (actor, campaignId, input) =>
+      renameCampaignIfUnchangedSyncInternal(db, dependencies.clock, actor, campaignId, input),
+    addCampaignMembership: (actor, campaignId, input) =>
+      addCampaignMembershipSyncInternal(db, dependencies.clock, actor, campaignId, input),
+    attachCampaignSession: (actor, input) => attachCampaignSessionSyncInternal(db, dependencies.clock, actor, input),
+    detachCampaignSession: (actor, input) => detachCampaignSessionSyncInternal(db, actor, input),
+    listCampaigns: (actor) => listCampaignsSyncInternal(db, actor),
+    getCampaign: (actor, campaignId) => getCampaignSyncInternal(db, actor, campaignId),
+    listCampaignTimelines: (actor, campaignId) => listCampaignTimelinesSyncInternal(db, actor, campaignId),
+    getCampaignTimeline: (actor, campaignId, timelineId) => getCampaignTimelineSyncInternal(db, actor, campaignId, timelineId),
+    listCampaignMemberships: (actor, campaignId) => listCampaignMembershipsSyncInternal(db, actor, campaignId),
+    getCampaignMembership: (actor, campaignId, principalId) => getCampaignMembershipSyncInternal(db, actor, campaignId, principalId),
+    listCampaignSessionAttachments: (actor, campaignId) => listCampaignSessionAttachmentsSyncInternal(db, actor, campaignId),
+    getCampaignSessionAttachment: (actor, campaignId, sessionId) => getCampaignSessionAttachmentSyncInternal(db, actor, campaignId, sessionId),
+    getCampaignRoomLinkingSnapshot: (actor, campaignId) => getCampaignRoomLinkingSnapshotSyncInternal(db, actor, campaignId),
+    getCampaignRoomSessionLifecycle: (sessionId) => {
+      const row = getCampaignRoomSessionIntegrityRowInternal(db, sessionId);
+      return row ? validateCampaignRoomSessionIntegrityInternal(row) : null;
+    },
+  },
+    (campaignId, actor, type, payload, result, occurredAt) =>
+      recordCompatibilityAdministrationAuditInternal(db, campaignId, actor, type, payload, result, occurredAt));
   let closed = false;
   let transactionDepth = 0;
   const assertOpen = () => {
@@ -7047,8 +7145,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     assertOpen();
     if (transactionDepth > 0) throw new Error("campaign administration mutation cannot run inside a repository transaction");
   }, (sessionId) => {
-    const row = getCampaignRoomSessionIntegrityRow(db, sessionId);
-    return row ? validateCampaignRoomSessionIntegrity(row) : null;
+    return campaignCoreRepository.getCampaignRoomSessionLifecycle(sessionId);
   });
   const administrationRepository = new Proxy(rawAdministrationRepository, {
     get(target, property, receiver) {
@@ -7084,6 +7181,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   });
   const characterProgressionRepository=new Proxy(rawCharacterProgressionRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
     if(typeof value!=="function")return value;return(...args:unknown[])=>{assertOpen();return value(...args);};}}) as CharacterProgressionRepository;
+  const campaignActorRepository = createCampaignActorRepository(
+    createCampaignActorOperations(db, characterProgressionRepository),
+  );
   const m15Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.5 mutation cannot run inside a repository transaction");};
   const rawActorResourceRepository=createActorResourceRepository(db,dependencies,m15Guard);
   const actorResourceRepository=new Proxy(rawActorResourceRepository,{get(target,property,receiver){const value=Reflect.get(target,property,receiver);
@@ -7163,11 +7263,11 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listCampaigns: (actorPrincipalId) => {
       assertOpen();
-      return listCampaignsSync(db, actorPrincipalId);
+      return campaignCoreRepository.listCampaigns(actorPrincipalId);
     },
     getCampaign: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignSync(db, actorPrincipalId, campaignId);
+      return campaignCoreRepository.getCampaign(actorPrincipalId, campaignId);
     },
     getCampaignDetail: (actorPrincipalId, campaignId) => {
       assertOpen();
@@ -7177,31 +7277,31 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listCampaignTimelines: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return listCampaignTimelinesSync(db, actorPrincipalId, campaignId);
+      return campaignCoreRepository.listCampaignTimelines(actorPrincipalId, campaignId);
     },
     getCampaignTimeline: (actorPrincipalId, campaignId, timelineId) => {
       assertOpen();
-      return getCampaignTimelineSync(db, actorPrincipalId, campaignId, timelineId);
+      return campaignCoreRepository.getCampaignTimeline(actorPrincipalId, campaignId, timelineId);
     },
     listCampaignMemberships: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return listCampaignMembershipsSync(db, actorPrincipalId, campaignId);
+      return campaignCoreRepository.listCampaignMemberships(actorPrincipalId, campaignId);
     },
     getCampaignMembership: (actorPrincipalId, campaignId, principalId) => {
       assertOpen();
-      return getCampaignMembershipSync(db, actorPrincipalId, campaignId, principalId);
+      return campaignCoreRepository.getCampaignMembership(actorPrincipalId, campaignId, principalId);
     },
     listCampaignSessionAttachments: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return listCampaignSessionAttachmentsSync(db, actorPrincipalId, campaignId);
+      return campaignCoreRepository.listCampaignSessionAttachments(actorPrincipalId, campaignId);
     },
     getCampaignSessionAttachment: (actorPrincipalId, campaignId, sessionId) => {
       assertOpen();
-      return getCampaignSessionAttachmentSync(db, actorPrincipalId, campaignId, sessionId);
+      return campaignCoreRepository.getCampaignSessionAttachment(actorPrincipalId, campaignId, sessionId);
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignRoomLinkingSnapshotSync(db, actorPrincipalId, campaignId);
+      return campaignCoreRepository.getCampaignRoomLinkingSnapshot(actorPrincipalId, campaignId);
     },
     getCampaignContentConfiguration: (actorPrincipalId, campaignId) => {
       assertOpen();
@@ -7209,21 +7309,21 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     getCampaignCharacterCreationOptions: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignCharacterCreationOptionsSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.getCampaignCharacterCreationOptions(actorPrincipalId, campaignId);
     },
     getCampaignCharacterRoster: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignCharacterRosterSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.getCampaignCharacterRoster(actorPrincipalId, campaignId);
     },
     getCampaignCharacterWorkspace: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertOpen();
-      return getCampaignCharacterWorkspaceSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+      return campaignActorRepository.getCampaignCharacterWorkspace(actorPrincipalId, campaignId, campaignCharacterId);
     },
     getCampaignCharacterSheetSnapshot: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertOpen();
       // Both reads must see the same authority, ancestry, and progression state.
-      return db.transaction(() => getCampaignCharacterSheetSnapshotSync(
-        db, characterProgressionRepository, actorPrincipalId, campaignId, campaignCharacterId,
+      return db.transaction(() => campaignActorRepository.getCampaignCharacterSheetSnapshot(
+        actorPrincipalId, campaignId, campaignCharacterId,
       ))();
     },
     listActorResources: (actorPrincipalId, campaignId, actorId) => {
@@ -7252,15 +7352,15 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listCampaignCharacters: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return listCampaignCharactersSync(db, actorPrincipalId, campaignId);
+      return campaignActorRepository.listCampaignCharacters(actorPrincipalId, campaignId);
     },
     getCampaignCharacter: (actorPrincipalId, campaignId, campaignCharacterId) => {
       assertOpen();
-      return getCampaignCharacterSync(db, actorPrincipalId, campaignId, campaignCharacterId);
+      return campaignActorRepository.getCampaignCharacter(actorPrincipalId, campaignId, campaignCharacterId);
     },
     getCampaignCharacterByActorId: (actorPrincipalId, campaignId, actorId) => {
       assertOpen();
-      return getCampaignCharacterByActorIdSync(db, actorPrincipalId, campaignId, actorId);
+      return campaignActorRepository.getCampaignCharacterByActorId(actorPrincipalId, campaignId, actorId);
     },
     listRulesProfiles: (actorPrincipalId) => {
       assertOpen();
@@ -7309,8 +7409,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
         const normalized = addCampaignMembershipInputSchema.parse(input);
         const existed = db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
           .get(campaignId, normalized.principalId);
-        const value = addCampaignMembershipSync(db, dependencies.clock, actorPrincipalId, campaignId, normalized);
-        if (!existed) recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "membership_added",
+        const value = campaignCoreRepository.addCampaignMembership(actorPrincipalId, campaignId, normalized);
+        if (!existed) campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "membership_added",
           { principalId: value.principalId, role: value.role }, value, value.createdAt);
         return value;
       }).immediate();
@@ -7318,14 +7418,14 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     createCampaign: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign creation cannot run inside a repository transaction");
-      return createCampaignSync(db, dependencies, actorPrincipalId, input);
+      return campaignCoreRepository.createCampaign(actorPrincipalId, input);
     },
     renameCampaign: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign rename cannot run inside a repository transaction");
       return db.transaction(() => {
-        const value = renameCampaignSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
-        recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "campaign_renamed",
+        const value = campaignCoreRepository.renameCampaign(actorPrincipalId, campaignId, input);
+        campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "campaign_renamed",
           { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
         return value;
       }).immediate();
@@ -7336,8 +7436,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
         throw new Error("stale-safe campaign rename cannot run inside a repository transaction");
       }
       return db.transaction(() => {
-        const value = renameCampaignIfUnchangedSync(db, dependencies.clock, actorPrincipalId, campaignId, input);
-        recordCompatibilityAdministrationAudit(db, campaignId, actorPrincipalId, "campaign_renamed",
+        const value = campaignCoreRepository.renameCampaignIfUnchanged(actorPrincipalId, campaignId, input);
+        campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "campaign_renamed",
           { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
         return value;
       }).immediate();
@@ -7349,8 +7449,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
         const normalized = attachCampaignSessionInputSchema.parse(input);
         const existed = db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?")
           .get(normalized.campaignId, normalized.sessionId);
-        const value = attachCampaignSessionSync(db, dependencies.clock, actorPrincipalId, normalized);
-        if (!existed) recordCompatibilityAdministrationAudit(db, normalized.campaignId, actorPrincipalId, "room_attached",
+        const value = campaignCoreRepository.attachCampaignSession(actorPrincipalId, normalized);
+        if (!existed) campaignCoreRepository.writeCompatibilityAdministrationAudit(normalized.campaignId, actorPrincipalId, "room_attached",
           { sessionId: value.sessionId }, value, value.attachedAt);
         return value;
       }).immediate();
@@ -7360,10 +7460,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       if (transactionDepth > 0) throw new Error("campaign session detachment cannot run inside a repository transaction");
       return db.transaction(() => {
         const normalized = detachCampaignSessionInputSchema.parse(input);
-        const value = detachCampaignSessionSync(db, actorPrincipalId, normalized);
+        const value = campaignCoreRepository.detachCampaignSession(actorPrincipalId, normalized);
         if (value) {
           const campaign = db.prepare("SELECT updated_at FROM campaigns WHERE id=?").get(normalized.campaignId) as { updated_at: string };
-          recordCompatibilityAdministrationAudit(db, normalized.campaignId, actorPrincipalId, "room_detached",
+          campaignCoreRepository.writeCompatibilityAdministrationAudit(normalized.campaignId, actorPrincipalId, "room_detached",
             { sessionId: value.sessionId }, value, campaign.updated_at);
         }
         return value;

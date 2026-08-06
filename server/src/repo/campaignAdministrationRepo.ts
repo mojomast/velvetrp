@@ -21,7 +21,11 @@ import {
   type CampaignTimelineHistory, type CampaignTransferPackage, type CreateCampaignCheckpointInput,
   type CreateCampaignExportInput, type CreateCampaignRecapInput, type ForkCampaignTimelineInput,
 } from "@velvet/contracts";
-import type { RepositoryDependencies } from "./campaignRepo.js";
+import type { RepositoryDependencies } from "./campaign/repositoryDependencies.js";
+import { createAdministrationCommandRepo } from "./campaignAdmin/administrationCommandRepo.js";
+import { createAdministrationEventRepo, publicAdministrationPayload } from "./campaignAdmin/administrationEventRepo.js";
+import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";
+import { createCampaignTimelineRepo } from "./campaignAdmin/campaignTimelineRepo.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
   readonly code = "CAMPAIGN_ADMINISTRATION_FORBIDDEN";
@@ -154,19 +158,6 @@ function forbidden(value: unknown, depth = 0): boolean {
   return Object.entries(value).some(([key, child]) => /api.?key|credential|password|access.?token|local.?path|usage|price/i.test(key)
     || forbidden(child, depth + 1));
 }
-function publicAdministrationPayload(type: CampaignAdministrationReceipt["type"], payload: object): object {
-  const value = payload as Record<string, unknown>;
-  if (type === "administration_updated" && value.settings && typeof value.settings === "object") {
-    const { gmNotes: _privateNotes, ...publicSettings } = value.settings as Record<string, unknown>;
-    return { ...value, settings: publicSettings };
-  }
-  if (type === "recap_created") {
-    const { text: _privateText, ...metadata } = value;
-    return metadata;
-  }
-  return payload;
-}
-
 function canonicalizeJson(value: unknown, seen = new Set<object>()): unknown {
   if (value === null || typeof value !== "object") {
     if (typeof value === "bigint" || typeof value === "undefined" || typeof value === "function" || typeof value === "symbol")
@@ -221,32 +212,6 @@ function timelineTransferEvents(db: DatabaseDriver.Database, campaignId: string,
   return [...native, ...imported].sort((left, right) => left.revision - right.revision);
 }
 
-function catalogAdministrationEvents(db: DatabaseDriver.Database, campaignId: string): CampaignAdministrationEvent[] {
-  return (db.prepare(`SELECT event_id,command_id,revision,occurred_at,public_data FROM campaign_catalog_events
-    WHERE campaign_id=? ORDER BY revision`).all(campaignId) as any[]).map((row) => campaignAdministrationEventSchema.parse({
-      eventId: row.event_id, commandId: row.command_id, campaignId, type: "catalog_configured",
-      revision: row.revision, occurredAt: row.occurred_at, data: JSON.parse(row.public_data),
-    }));
-}
-
-function catalogAdministrationReceipts(db: DatabaseDriver.Database, campaignId: string): Array<{
-  commandId: string; type: "catalog_configured"; revisionBefore: number; revisionAfter: number; occurredAt: string;
-}> {
-  return (db.prepare(`SELECT receipt.command_id,receipt.revision_before,receipt.revision_after,event.occurred_at
-    FROM campaign_catalog_receipts receipt JOIN campaign_catalog_events event ON event.campaign_id=receipt.campaign_id
-      AND event.command_id=receipt.command_id AND event.event_id=receipt.event_id
-    WHERE receipt.campaign_id=? ORDER BY receipt.revision_after`).all(campaignId) as any[]).map((row) => ({
-      commandId: row.command_id, type: "catalog_configured" as const, revisionBefore: row.revision_before,
-      revisionAfter: row.revision_after, occurredAt: row.occurred_at,
-    }));
-}
-
-function assertContiguousAdministrationHistory(events: Array<{ revision: number }>, revision: number): void {
-  if (events.length !== revision || events.some((event, index) => event.revision !== index + 1)) {
-    throw new Error("campaign administration history is incomplete");
-  }
-}
-
 export function createCampaignAdministrationRepository(db: DatabaseDriver.Database,
   deps: RepositoryDependencies, assertCanMutate: () => void = () => undefined,
   validateRoom: (sessionId: string) => "running" | "stopped" | null = () => null): CampaignAdministrationRepository {
@@ -272,8 +237,30 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   const timeline = (row: any, activeId: string) => campaignTimelineHistorySchema.parse({ id: row.id,
     campaignId: row.campaign_id, parentTimelineId: row.parent_timeline_id, forkedFromRevision: row.forked_from_revision,
     revision: row.revision, createdAt: row.created_at, active: row.id === activeId });
+  const commands = createAdministrationCommandRepo({ db, nextId: () => deps.ids.nextId(),
+    getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId),
+    runMutation, forbidden: () => new CampaignAdministrationForbiddenError(), stale: () => new CampaignAdministrationStaleError(),
+    conflict: (message) => new CampaignAdministrationConflictError(message), validateRoom, member, attachment, checkpoint, recap, timeline });
+  const events = createAdministrationEventRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId) });
+  const receipts = createAdministrationReceiptRepo({ db, event: campaignAdministrationEventSchema.parse,
+    getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), receipt: campaignAdministrationReceiptSchema.parse });
+  const timelines = createCampaignTimelineRepo({ db, getAuthority: (actor, campaignId) => getAuthority(db, actor, campaignId), timeline });
   const api: CampaignAdministrationRepository = {
     getCampaignAdministration: get,
+    renameCampaignCompatibility: commands.renameCampaignCompatibility,
+    updateCampaignAdministration: commands.updateCampaignAdministration,
+    archiveCampaignWithConfirmation: commands.archiveCampaignWithConfirmation,
+    addAuditedCampaignMembership: commands.addAuditedCampaignMembership,
+    changeAuditedCampaignMembershipRole: commands.changeAuditedCampaignMembershipRole,
+    removeAuditedCampaignMembership: commands.removeAuditedCampaignMembership,
+    attachAuditedCampaignRoom: commands.attachAuditedCampaignRoom,
+    detachAuditedCampaignRoom: commands.detachAuditedCampaignRoom,
+    createCampaignCheckpoint: commands.createCampaignCheckpoint,
+    listCampaignCheckpoints: commands.listCampaignCheckpoints,
+    forkCampaignTimeline: commands.forkCampaignTimeline,
+    createCampaignRecap: commands.createCampaignRecap,
+    listCampaignRecaps: commands.listCampaignRecaps,
+    /*
     renameCampaignCompatibility: (actor, campaignId, name, expectedUpdatedAt) => {
       const normalizedName = campaignNameSchema.parse(name);
       const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId));
@@ -379,13 +366,9 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           detached = attachment(row); db.prepare("DELETE FROM campaign_sessions WHERE campaign_id=? AND session_id=?").run(campaignId, input.sessionId);
           return detached;
         }, (_commandId, stored) => campaignSessionAttachmentSchema.parse(stored));
-    },
-    listCampaignTimelineHistory: (actor, campaignId) => {
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId)); if (!auth) return [];
-      return (db.prepare(`SELECT t.*,h.parent_timeline_id,h.forked_from_revision FROM campaign_timelines t
-        JOIN campaign_timeline_history h ON h.campaign_id=t.campaign_id AND h.timeline_id=t.id
-        WHERE t.campaign_id=? ORDER BY t.created_at,t.id`).all(campaignId) as any[]).map((row) => timeline(row, auth.activeTimelineId));
-    },
+    },*/
+    listCampaignTimelineHistory: timelines.listCampaignTimelineHistory,
+    /*
     createCampaignCheckpoint: (actor, campaignId, raw) => {
       const input = createCampaignCheckpointInputSchema.parse(raw);
       return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "checkpoint_created",
@@ -406,9 +389,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           return checkpoint({ id, campaign_id: campaignId, timeline_id: input.timelineId,
             timeline_revision: input.timelineRevision, label: input.label, created_at: at });
         }, (_commandId, stored) => campaignCheckpointSchema.parse(stored));
-    },
-    listCampaignCheckpoints: (actor, campaignId) => getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId))
-      ? (db.prepare("SELECT * FROM campaign_checkpoints WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(checkpoint) : [],
+    },*/
+    /*
     forkCampaignTimeline: (actor, campaignId, raw) => {
       const input = forkCampaignTimelineInputSchema.parse(raw);
       return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "timeline_forked", { checkpointId: input.checkpointId },
@@ -463,12 +445,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           return recap({ id, campaign_id: campaignId, timeline_id: input.timelineId, through_revision: input.throughRevision,
             selected_session_ids: JSON.stringify(input.selectedSessionIds), visibility: input.visibility, text: input.text, created_at: at });
         }, (_commandId, stored) => campaignRecapSchema.parse(stored));
-    },
-    listCampaignRecaps: (actor, campaignId) => {
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId)); if (!auth) return [];
-      const roleFilter = auth.role === "player" || auth.role === "observer" ? " AND visibility='members'" : "";
-      return (db.prepare(`SELECT * FROM campaign_recaps WHERE campaign_id=?${roleFilter} ORDER BY created_at,id`).all(campaignId) as any[]).map(recap);
-    },
+    },*/
     dryRunCampaignImport: (actorRaw, raw) => {
       const actor = resourceIdSchema.parse(actorRaw), owner = db.prepare("SELECT principal_id FROM application_owner WHERE singleton=1").get() as any;
       if (!owner || owner.principal_id !== actor) throw new CampaignAdministrationForbiddenError();
@@ -902,13 +879,13 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
             FROM campaign_imported_administration_receipts WHERE campaign_id=? ORDER BY revision_after`).all(campaignId) as any[])
             .map((receipt) => ({ commandId: receipt.source_command_id, type: receipt.type,
               revisionBefore: receipt.revision_before, revisionAfter: receipt.revision_after, occurredAt: receipt.occurred_at }));
-          const catalogEvents = catalogAdministrationEvents(db,campaignId).map(({ campaignId: _campaignId,...event })=>event);
-          const catalogReceipts = catalogAdministrationReceipts(db,campaignId);
+          const catalogEvents = events.catalogAdministrationEvents(campaignId).map(({ campaignId: _campaignId,...event })=>event);
+          const catalogReceipts = receipts.catalogAdministrationReceipts(campaignId);
           const allAdministrationEvents=[...importedAdminEvents,...currentAdminEvents,...catalogEvents]
             .sort((a,b)=>a.revision-b.revision);
           const allAdministrationReceipts=[...importedReceipts,...currentReceipts,...catalogReceipts]
             .sort((a,b)=>a.revisionAfter-b.revisionAfter);
-          assertContiguousAdministrationHistory(allAdministrationEvents,auth.revision);
+          events.assertContiguousAdministrationHistory(allAdministrationEvents,auth.revision);
           const pkg = campaignTransferPackageSchema.parse({ formatVersion: CAMPAIGN_TRANSFER_FORMAT_VERSION, exportedAt: at,
             campaign: { name: c.name, status: auth.status, settings: auth.settings, administrationRevision: auth.revision },
             activeTimelineSourceId: timelines.find((timeline) => timeline.id === auth.activeTimelineId)!.source_id,
@@ -970,77 +947,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           return { manifest: campaignExportManifestSchema.parse(value.manifest), package: campaignTransferPackageSchema.parse(value.package) };
         });
     },
-    listCampaignAdministrationEvents: (actor, campaignId) => {
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), resourceIdSchema.parse(campaignId)); if (!auth) return [];
-      const imported = (db.prepare("SELECT * FROM campaign_imported_administration_events WHERE campaign_id=? ORDER BY revision")
-        .all(campaignId) as any[]).map((row) => campaignAdministrationEventSchema.parse({ eventId: row.source_event_id,
-          commandId: row.source_command_id, campaignId, revision: row.revision, type: row.type,
-          data: JSON.parse(row.public_data), occurredAt: row.occurred_at }));
-      const current = (db.prepare(`SELECT event.* FROM campaign_administration_events event
-        JOIN campaign_administration_commands command ON command.campaign_id=event.campaign_id
-          AND command.command_id=event.command_id AND command.type=event.type
-          AND command.expected_revision=event.revision_before
-        JOIN campaign_administration_receipts receipt ON receipt.campaign_id=event.campaign_id
-          AND receipt.command_id=event.command_id AND receipt.event_id=event.event_id
-          AND receipt.type=event.type AND receipt.revision_before=event.revision_before
-          AND receipt.revision_after=event.revision
-        WHERE event.campaign_id=? ORDER BY event.revision`).all(campaignId) as any[]).map((row) =>
-          campaignAdministrationEventSchema.parse({ eventId: row.event_id, commandId: row.command_id,
-            campaignId, revision: row.revision, type: row.type,
-            // GM receives exactly the public event projection; only the owner may inspect bounded private event details.
-            data: JSON.parse(auth.role === "owner" ? row.private_data : row.public_data), occurredAt: row.occurred_at }));
-      const catalog=catalogAdministrationEvents(db,campaignId);
-      const merged=[...imported,...current,...catalog].sort((left,right)=>left.revision-right.revision);
-      assertContiguousAdministrationHistory(merged,auth.revision);
-      return merged;
-    },
-    getCampaignAdministrationReceipt: (actor, campaignIdRaw, commandIdRaw) => {
-      const campaignId = resourceIdSchema.parse(campaignIdRaw), commandId = resourceIdSchema.parse(commandIdRaw);
-      const auth = getAuthority(db, resourceIdSchema.parse(actor), campaignId); if (!auth) return null;
-      const row = db.prepare(`SELECT receipt.*,command.created_at,event.occurred_at,event.public_data,event.private_data
-        FROM campaign_administration_receipts receipt
-        JOIN campaign_administration_commands command ON command.campaign_id=receipt.campaign_id
-          AND command.command_id=receipt.command_id AND command.type=receipt.type
-          AND command.expected_revision=receipt.revision_before
-        JOIN campaign_administration_events event ON event.campaign_id=receipt.campaign_id
-          AND event.command_id=receipt.command_id AND event.event_id=receipt.event_id
-          AND event.type=receipt.type AND event.revision_before=receipt.revision_before
-          AND event.revision=receipt.revision_after
-        WHERE receipt.campaign_id=? AND receipt.command_id=?`).get(campaignId, commandId) as any;
-      if (row) {
-        const event = campaignAdministrationEventSchema.parse({ eventId: row.event_id, commandId, campaignId,
-          type: row.type, revision: row.revision_after, occurredAt: row.occurred_at,
-          data: JSON.parse(auth.role === "owner" ? row.private_data : row.public_data) });
-        return campaignAdministrationReceiptSchema.parse({ commandId, campaignId, type: row.type,
-          revisionBefore: row.revision_before, revisionAfter: row.revision_after,
-          occurredAt: row.created_at, events: [event] });
-      }
-      const catalogReceipt=db.prepare(`SELECT receipt.*,event.occurred_at,event.public_data FROM campaign_catalog_receipts receipt
-        JOIN campaign_catalog_events event ON event.campaign_id=receipt.campaign_id AND event.command_id=receipt.command_id
-          AND event.event_id=receipt.event_id AND event.revision=receipt.revision_after
-        WHERE receipt.campaign_id=? AND receipt.command_id=?`).get(campaignId,commandId) as any;
-      if(catalogReceipt){
-        const event=campaignAdministrationEventSchema.parse({eventId:catalogReceipt.event_id,commandId,campaignId,
-          type:"catalog_configured",revision:catalogReceipt.revision_after,occurredAt:catalogReceipt.occurred_at,
-          data:JSON.parse(catalogReceipt.public_data)});
-        return campaignAdministrationReceiptSchema.parse({commandId,campaignId,type:"catalog_configured",
-          revisionBefore:catalogReceipt.revision_before,revisionAfter:catalogReceipt.revision_after,
-          occurredAt:catalogReceipt.occurred_at,events:[event]});
-      }
-      const imported = db.prepare(`SELECT receipt.*,event.source_event_id,event.public_data,event.occurred_at
-        FROM campaign_imported_administration_receipts receipt
-        JOIN campaign_imported_administration_events event ON event.campaign_id=receipt.campaign_id
-          AND event.source_command_id=receipt.source_command_id AND event.type=receipt.type
-          AND event.revision=receipt.revision_after
-        WHERE receipt.campaign_id=? AND receipt.source_command_id=?`).get(campaignId, commandId) as any;
-      if (!imported) return null;
-      const event = campaignAdministrationEventSchema.parse({ eventId: imported.source_event_id, commandId,
-        campaignId, type: imported.type, revision: imported.revision_after,
-        occurredAt: imported.occurred_at, data: JSON.parse(imported.public_data) });
-      return campaignAdministrationReceiptSchema.parse({ commandId, campaignId, type: imported.type,
-        revisionBefore: imported.revision_before, revisionAfter: imported.revision_after,
-        occurredAt: imported.occurred_at, events: [event] });
-    },
+    listCampaignAdministrationEvents: events.listCampaignAdministrationEvents,
+    getCampaignAdministrationReceipt: receipts.getCampaignAdministrationReceipt,
   };
   return api;
 }
