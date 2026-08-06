@@ -70,6 +70,53 @@ app.post("/api/__e2e/materialize-waylamp", async (request, reply) => {
   }
 });
 
+// This fixture bypasses no production command: it creates the depleted,
+// explicitly short-rest-bound state that finalized character construction does
+// not otherwise provide.
+app.post("/api/__e2e/materialize-short-rest-resource", async (request, reply) => {
+  const body = request.body as { campaignId?: unknown; actorId?: unknown; expectedRevision?: unknown };
+  if (typeof body.campaignId !== "string" || typeof body.actorId !== "string" || typeof body.expectedRevision !== "number") {
+    return reply.code(400).send({ error: "invalid E2E short-rest resource materialization request" });
+  }
+  const materializer = createRepository({ dataDir, rng: reviewedDiceRng });
+  try {
+    const snapshot = materializer.getActorResourceSnapshot("local-owner", body.campaignId, body.actorId);
+    if (!snapshot || snapshot.revision !== body.expectedRevision) return reply.code(409).send({ error: "stale or unavailable E2E actor" });
+    const fixtureDb = new DatabaseDriver(path.join(dataDir, "velvet.sqlite"));
+    try {
+      fixtureDb.pragma("foreign_keys = ON");
+      fixtureDb.transaction(() => {
+        fixtureDb.prepare("INSERT INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?, 'focus',1,4)")
+          .run(body.campaignId, body.actorId);
+        fixtureDb.prepare("INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json) VALUES(?,?, 'focus','ability',?)")
+          .run(body.campaignId, body.actorId, JSON.stringify({ kind: "ability", recovery: "short-rest" }));
+      })();
+    } finally {
+      fixtureDb.close();
+    }
+    return reply.code(204).send();
+  } finally {
+    materializer.close();
+  }
+});
+
+// The production HTTP adapter for rest is intentionally outside M2.7. This
+// disposable adapter still exercises the authoritative repository command.
+app.post("/api/__e2e/take-short-rest", async (request, reply) => {
+  const command = request.body as { type?: unknown; campaignId?: unknown; actorId?: unknown; expectedRevision?: unknown; idempotencyKey?: unknown };
+  if (command.type !== "take_short_rest" || typeof command.campaignId !== "string" || typeof command.actorId !== "string" || typeof command.expectedRevision !== "number" || typeof command.idempotencyKey !== "string") {
+    return reply.code(400).send({ error: "invalid E2E short-rest command" });
+  }
+  const restRepository = createRepository({ dataDir, rng: reviewedDiceRng });
+  try {
+    return reply.code(200).send(restRepository.takeRest("local-owner", command as {
+      type: "take_short_rest"; campaignId: string; actorId: string; expectedRevision: number; idempotencyKey: string;
+    }));
+  } finally {
+    restRepository.close();
+  }
+});
+
 app.listen({ port, host }).then(() => {
   app.log.info(`isolated deterministic E2E server listening on http://${host}:${port}`);
 }).catch((error: unknown) => {

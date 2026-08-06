@@ -35,6 +35,7 @@ export * from "./inventory.js";
 export * from "./inventory-http.js";
 export * from "./economy.js";
 export * from "./rest.js";
+export * from "./rest-http.js";
 export * from "./checks.js";
 export * from "./powers.js";
 export * from "./effects.js";

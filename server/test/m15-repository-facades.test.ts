@@ -156,10 +156,13 @@ describe("M1.5 repository facades", () => {
     bind("health", "long-rest", 0); bind("focus", "short-rest", 1);
     const short = f.repo.takeRest("local-owner", { type: "take_short_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 2, idempotencyKey: "short" });
     expect(short.rest.recovery.resources).toEqual([{ resourceId: "focus", before: 1, after: 4 }]);
-    const long = f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 3, idempotencyKey: "long" });
+    expect(short.actorState).toEqual({ resources: [{ resourceId: "focus", current: 4, capacity: 4 }, { resourceId: "grit", current: 1, capacity: 3 }, { resourceId: "health", current: 5, capacity: 10 }], revision: 3 });
+    f.repo.mutateActorResource("local-owner", { type: "change_actor_resource", campaignId: f.campaign, actorId: f.actor, resourceId: "grit", amount: 1, expectedRevision: 3, idempotencyKey: "after-short" });
+    expect(f.repo.takeRest("local-owner", { type: "take_short_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 2, idempotencyKey: "short" })).toEqual(short);
+    const long = f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 4, idempotencyKey: "long" });
     expect(long.rest.recovery.resources).toEqual([{ resourceId: "health", before: 5, after: 10 }]);
     expect(f.repo.listRestReceipts("local-owner", f.campaign, f.actor)).toHaveLength(2);
-    expect(() => f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 4, idempotencyKey: "illegal" })).toThrow(RestIllegalStateError);
+    expect(() => f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 5, idempotencyKey: "illegal" })).toThrow(RestIllegalStateError);
     f.repo.close();
   });
 

@@ -172,6 +172,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/rest-commands$/.test(instance)) {
+    return {
+      instance,
+      hasQuery,
+      queryDetail: method === "POST" ? "Actor rest does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/administration$/.test(instance)) {
     return {
       instance,
@@ -297,9 +306,12 @@ export function buildApp(options: {
         const isActorInventory = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/(?:inventory|inventory-commands)$/.test(
           normalizedRoute.instance,
         );
+        const isActorRest = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/actors\/[^/]+\/rest-commands$/.test(
+          normalizedRoute.instance,
+        );
         return sendApiProblem(request, reply, 404,
-          isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : "Campaign not found", {
+          isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }
