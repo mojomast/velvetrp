@@ -128,6 +128,7 @@ import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
 import { createCampaignCoreRepository } from "./campaign/campaignCoreRepo.js";
 import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
 import { createCampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
+import { createCampaignEventProjectionRepo } from "./campaign/campaignEventProjectionRepo.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
@@ -5219,26 +5220,6 @@ function listCampaignEventsSync(
   return events;
 }
 
-const MAX_PUBLIC_CAMPAIGN_EVENT_PAGE_SIZE = 100;
-
-function listPublicCampaignEventsSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-  timelineId: string,
-  afterRevision: number,
-  limit: number,
-): CampaignEventPage {
-  const cursor = revisionSchema.parse(afterRevision);
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PUBLIC_CAMPAIGN_EVENT_PAGE_SIZE) {
-    throw new RangeError(`campaign event limit must be between 1 and ${MAX_PUBLIC_CAMPAIGN_EVENT_PAGE_SIZE}`);
-  }
-  const visible = listCampaignEventsSync(db, actorPrincipalId, campaignId, timelineId)
-    .filter((event) => event.revision > cursor);
-  const events = visible.slice(0, limit);
-  return { events, nextAfterRevision: visible.length > events.length ? events.at(-1)!.revision : null };
-}
-
 export function listRecentCampaignDiceEventsSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -6896,6 +6877,9 @@ function runTransaction<T>(
   const campaignActorRepository = createCampaignActorRepository(
     createCampaignActorOperations(db, characterProgressionRepository),
   );
+  const campaignEventProjectionRepository = createCampaignEventProjectionRepo({
+    listCampaignEvents: (actor, campaignId, timelineId) => listCampaignEventsSync(db, actor, campaignId, timelineId),
+  });
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -7004,7 +6988,7 @@ function runTransaction<T>(
     },
     listPublicCampaignEvents: (actorPrincipalId, campaignId, timelineId, afterRevision, limit) => {
       assertActive();
-      return listPublicCampaignEventsSync(db, actorPrincipalId, campaignId, timelineId, afterRevision, limit);
+      return campaignEventProjectionRepository.listPublicCampaignEvents(actorPrincipalId, campaignId, timelineId, afterRevision, limit);
     },
     listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertActive();
@@ -7136,6 +7120,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   },
     (campaignId, actor, type, payload, result, occurredAt) =>
       recordCompatibilityAdministrationAuditInternal(db, campaignId, actor, type, payload, result, occurredAt));
+  const campaignEventProjectionRepository = createCampaignEventProjectionRepo({
+    listCampaignEvents: (actor, campaignId, timelineId) => listCampaignEventsSync(db, actor, campaignId, timelineId),
+  });
   let closed = false;
   let transactionDepth = 0;
   const assertOpen = () => {
@@ -7340,7 +7327,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listPublicCampaignEvents: (actorPrincipalId, campaignId, timelineId, afterRevision, limit) => {
       assertOpen();
-      return listPublicCampaignEventsSync(db, actorPrincipalId, campaignId, timelineId, afterRevision, limit);
+      return campaignEventProjectionRepository.listPublicCampaignEvents(actorPrincipalId, campaignId, timelineId, afterRevision, limit);
     },
     listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) => {
       assertOpen();
