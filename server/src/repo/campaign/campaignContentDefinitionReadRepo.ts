@@ -3,7 +3,7 @@ import type DatabaseDriver from "better-sqlite3";
 import { contentPackIdentifierSchema, definitionReferenceSchema, resourceIdSchema } from "@velvet/contracts";
 import type { ContentPackIdentifier, DefinitionReference, RpgDefinition } from "../../types.js";
 import type { PersistedCatalogVisibilityRow } from "../contentCatalogRepo.js";
-import type { RpgDefinitionRow } from "./campaignGlobalContentReadRepo.js";
+import type { RpgDefinitionRow } from "./campaignContentRowMappers.js";
 
 interface Projectors {
   definitionProjection: string;

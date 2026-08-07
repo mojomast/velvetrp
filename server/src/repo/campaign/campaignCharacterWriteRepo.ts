@@ -41,7 +41,7 @@ import {
   type ContentPackRow,
   type RpgDefinitionRow,
   type RulesProfileRow,
-} from "./campaignGlobalContentReadRepo.js";
+} from "./campaignContentRowMappers.js";
 import { projectLegacyPersonaDisplayName } from "./legacyPersonaDisplayName.js";
 
 /** Write boundary for campaign-character creation. */

@@ -12,6 +12,7 @@ export * from "./campaignCommandRepo.js";
 export * from "./campaignCommandWriteRepo.js";
 export * from "./campaignContentConfigurationReadRepo.js";
 export * from "./campaignContentDefinitionReadRepo.js";
+export * from "./campaignContentRowMappers.js";
 export * from "./campaignContentSelectionReadRepo.js";
 export * from "./campaignContentWriteRepo.js";
 export * from "./campaignCoreRepo.js";

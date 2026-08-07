@@ -28,7 +28,7 @@ import {
   type ContentPackRow,
   type RpgDefinitionRow,
   type RulesProfileRow,
-} from "./campaignGlobalContentReadRepo.js";
+} from "./campaignContentRowMappers.js";
 import type {
   OriginalStarterSetupInspection,
   OriginalStarterSetupInspectionRepository,

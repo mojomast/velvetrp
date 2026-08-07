@@ -8,16 +8,19 @@ import {
   campaignMembershipReadSchema,
   campaignSchema,
   campaignTimelineSchema,
-  contentPackSchema,
   MAX_CAMPAIGN_CHARACTER_PERSONAS,
   MAX_CAMPAIGN_CONTENT_PACKS,
   resourceIdSchema,
-  rpgDefinitionSchema,
-  rulesProfileSchema,
   utcIsoTimestampSchema,
 } from "@velvet/contracts";
 import { ORIGINAL_STARTER_MANIFEST } from "../../content/originalStarterManifest.js";
-import type { CampaignCharacterCreationOptionsResponse, ContentPack, RpgDefinition, RulesProfile } from "../../types.js";
+import type { CampaignCharacterCreationOptionsResponse } from "../../types.js";
+import {
+  sameMetadata,
+  toContentPack,
+  toRpgDefinition,
+  toRulesProfile,
+} from "./campaignContentRowMappers.js";
 
 interface CampaignCharacterCreationOptionsRow {
   actor_campaign_id: unknown;
@@ -95,48 +98,6 @@ interface CreationOptionsDefinitionRow {
 
 function malformedCampaignCharacterCreationOptions(): never {
   throw new Error("campaign character creation options are malformed");
-}
-
-function toRulesProfile(row: { rules_profile_id: string; name: string; description: string; tags: string }): RulesProfile {
-  return rulesProfileSchema.parse({
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: JSON.parse(row.tags) as unknown,
-  });
-}
-
-function toContentPack(row: {
-  pack_id: string; pack_version: string; rules_profile_id: string; name: string; description: string; tags: string;
-}): ContentPack {
-  return contentPackSchema.parse({
-    packId: row.pack_id,
-    packVersion: row.pack_version,
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: JSON.parse(row.tags) as unknown,
-  });
-}
-
-function toRpgDefinition(row: { kind: string; definition_id: string; name: string; description: string; tags: string }): RpgDefinition {
-  return rpgDefinitionSchema.parse({
-    kind: row.kind,
-    definitionId: row.definition_id,
-    name: row.name,
-    description: row.description,
-    tags: JSON.parse(row.tags) as unknown,
-  });
-}
-
-function sameMetadata(
-  left: { name: string; description: string; tags: readonly string[] },
-  right: { name: string; description: string; tags: readonly string[] },
-): boolean {
-  return left.name === right.name
-    && left.description === right.description
-    && left.tags.length === right.tags.length
-    && left.tags.every((tag, index) => tag === right.tags[index]);
 }
 
 /**

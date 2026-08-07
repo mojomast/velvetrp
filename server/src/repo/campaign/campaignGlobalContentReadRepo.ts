@@ -2,78 +2,19 @@
 import type DatabaseDriver from "better-sqlite3";
 import {
   contentPackIdentifierSchema,
-  contentPackSchema,
   definitionReferenceSchema,
   resourceIdSchema,
-  rpgDefinitionSchema,
   rulesProfileIdentifierSchema,
-  rulesProfileSchema,
 } from "@velvet/contracts";
 import type { ContentPack, ContentPackIdentifier, DefinitionReference, RpgDefinition, RulesProfile, RulesProfileIdentifier } from "../../types.js";
-
-export interface RulesProfileRow {
-  rules_profile_id: string;
-  name: string;
-  description: string;
-  tags: string;
-}
-
-export interface ContentPackRow extends RulesProfileRow {
-  pack_id: string;
-  pack_version: string;
-}
-
-export interface RpgDefinitionRow {
-  kind: string;
-  definition_id: string;
-  name: string;
-  description: string;
-  tags: string;
-}
-
-function parseTags(tags: string): unknown {
-  return JSON.parse(tags) as unknown;
-}
-
-export function toRulesProfile(row: RulesProfileRow): RulesProfile {
-  return rulesProfileSchema.parse({
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-export function toContentPack(row: ContentPackRow): ContentPack {
-  return contentPackSchema.parse({
-    packId: row.pack_id,
-    packVersion: row.pack_version,
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-export function toRpgDefinition(row: RpgDefinitionRow): RpgDefinition {
-  return rpgDefinitionSchema.parse({
-    kind: row.kind,
-    definitionId: row.definition_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-export function sameMetadata(
-  left: { name: string; description: string; tags: readonly string[] },
-  right: { name: string; description: string; tags: readonly string[] },
-): boolean {
-  return left.name === right.name
-    && left.description === right.description
-    && left.tags.length === right.tags.length
-    && left.tags.every((tag, index) => tag === right.tags[index]);
-}
+import {
+  toContentPack,
+  toRpgDefinition,
+  toRulesProfile,
+  type ContentPackRow,
+  type RpgDefinitionRow,
+  type RulesProfileRow,
+} from "./campaignContentRowMappers.js";
 
 export const RULES_PROFILE_PROJECTION = "rp.rules_profile_id, rp.name, rp.description, rp.tags";
 export const CONTENT_PACK_PROJECTION = `p.pack_id, p.pack_version, p.rules_profile_id,

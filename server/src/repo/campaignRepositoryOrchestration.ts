@@ -210,6 +210,8 @@ import {
   DEFINITION_ORDER,
   DEFINITION_PROJECTION,
   RULES_PROFILE_PROJECTION,
+} from "./campaign/campaignGlobalContentReadRepo.js";
+import {
   sameMetadata,
   toContentPack,
   toRpgDefinition,
@@ -217,7 +219,7 @@ import {
   type ContentPackRow,
   type RpgDefinitionRow,
   type RulesProfileRow,
-} from "./campaign/campaignGlobalContentReadRepo.js";
+} from "./campaign/campaignContentRowMappers.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
