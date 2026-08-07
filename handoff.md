@@ -1,5 +1,5 @@
 # Handoff
-## Completed: Add economy repository package barrel and wire facade
+## Completed: Task 5a: Extract quest scoped read repository
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: Economy barrel/facade wiring is complete. Added `economy/index.ts` as the economy composition barrel for read/write factories, component interfaces, helpers, errors, and command types. `economyRepo.ts` now imports and re-exports through that barrel while preserving its existing public exports, error classes, and facade interface. The facade is 1.3 KB (under 5 KB). Root `TMPDIR=.tmp npm run typecheck` passes. Awaiting commit. Per the user instruction, pre-existing modifications to `devplan.md`, `contentCatalogRepo.ts`, and `.tmp/` were not changed; this packaging task is intentionally not marked in `devplan.md`.
-## Files Modified: server/src/repo/economy/index.ts, server/src/repo/economyRepo.ts, handoff.md
+## Context: Added `quest/questReadRepo.ts` with principal-scoped read operations and command-safe scope helpers. `questRepo.ts` composes those reads with existing commands while preserving all low-level exported DB functions and root exports via re-export. Root `TMPDIR=.tmp npm run typecheck` and `npm --workspace velvet-mvp-server test -- quest-repo.test.ts` pass. Per the user instruction, the existing `devplan.md` item was not marked complete because it represents the broader M1.9 milestone; its pre-existing modification, `contentCatalogRepo.ts`, and `.tmp/` directories were not changed.
+## Files Modified: server/src/repo/quest/questReadRepo.ts, server/src/repo/questRepo.ts, handoff.md
