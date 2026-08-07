@@ -8,15 +8,17 @@ export {
   type CampaignAdministrationRepository,
 } from "./campaignAdministrationRepo.js";
 export {
-  calculateCatalogDigest,
-  canonicalCatalogJson,
   ContentCatalogAuthorizationError,
   ContentCatalogConflictError,
   ContentCatalogStaleError,
   ContentCatalogValidationError,
-  validateContentCatalog,
   type ContentCatalogRepository,
 } from "./contentCatalogRepo.js";
+export {
+  calculateCatalogDigest,
+  canonicalCatalogJson,
+  validateContentCatalog,
+} from "./contentCatalog/index.js";
 export {
   CharacterBuilderAuthorizationError,
   CharacterBuilderConflictError,
