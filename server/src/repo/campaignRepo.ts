@@ -133,6 +133,9 @@ import {
 } from "./campaign/campaignContentConfigurationReadRepo.js";
 import { createCampaignDetailReadRepository } from "./campaign/campaignDetailReadRepo.js";
 import { createCampaignContentSelectionReadRepository } from "./campaign/campaignContentSelectionReadRepo.js";
+import { createCampaignContentDefinitionReadRepository } from "./campaign/campaignContentDefinitionReadRepo.js";
+import { createCampaignLegacyCoreWriteRepository } from "./campaign/campaignLegacyCoreWriteRepo.js";
+import { projectLegacyPersonaDisplayName } from "./campaign/legacyPersonaDisplayName.js";
 import {
   createOriginalStarterSetupInspectionRepository,
   type OriginalStarterSetupInspectionRepository,
@@ -3632,41 +3635,6 @@ export function getCommandReceiptSync(
   });
 }
 
-/**
- * Legacy character storage deliberately has no modern name bound. Project the
- * longest well-formed UTF-16 prefix that fits the strict 200-code-unit wire
- * schema, never splitting a surrogate pair. If that prefix is blank, retry
- * after leading whitespace so valid legacy data still has a visible wire
- * projection. Storage and legacy APIs stay unchanged. Empty, whitespace-only,
- * and malformed UTF-16 names are corrupt.
- */
-function projectLegacyPersonaDisplayName(value: unknown): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error("legacy persona display name is malformed");
-  }
-  for (const source of [value, value.trimStart()]) {
-    let projected = "";
-    for (let index = 0; index < source.length;) {
-      const first = source.charCodeAt(index);
-      let width = 1;
-      if (first >= 0xd800 && first <= 0xdbff) {
-        const second = source.charCodeAt(index + 1);
-        if (!(second >= 0xdc00 && second <= 0xdfff)) {
-          throw new Error("legacy persona display name is malformed");
-        }
-        width = 2;
-      } else if (first >= 0xdc00 && first <= 0xdfff) {
-        throw new Error("legacy persona display name is malformed");
-      }
-      if (projected.length + width > 200) break;
-      projected += source.slice(index, index + width);
-      index += width;
-    }
-    if (projected.trim().length > 0) return projected;
-  }
-  throw new Error("legacy persona display name is malformed");
-}
-
 function requireOriginalStarterInspectionForWrite(
   inspectionRepository: OriginalStarterSetupInspectionRepository,
   actorId: string,
@@ -3955,17 +3923,6 @@ function configureCampaignContentSync(
   }).immediate();
 }
 
-function getCampaignDetailSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): CampaignDetail | null {
-  return createCampaignDetailReadRepository({
-    getCampaign: (actor, id) => createCampaignAccessRepository(db).getCampaign(actor, id),
-    getCampaignContentConfiguration: (actor, id) => getCampaignContentConfigurationReadSync(db, actor, id),
-  }).getCampaignDetail(actorPrincipalId, campaignId);
-}
-
 function listCampaignContentPackDefinitionsSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -4146,6 +4103,10 @@ function runTransaction<T>(
     toRulesProfile,
     toContentPack,
   });
+  const campaignContentDefinitionReadRepository = createCampaignContentDefinitionReadRepository(db, {
+    definitionProjection: DEFINITION_PROJECTION, definitionOrder: DEFINITION_ORDER, toRpgDefinition,
+    verifyCatalogVisibilityProjection,
+  });
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -4310,11 +4271,11 @@ function runTransaction<T>(
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertActive();
-      return listCampaignContentPackDefinitionsSync(db, actorPrincipalId, campaignId, identifier);
+      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(actorPrincipalId, campaignId, identifier);
     },
     getCampaignContentPackDefinition: (actorPrincipalId, campaignId, reference) => {
       assertActive();
-      return getCampaignContentPackDefinitionSync(db, actorPrincipalId, campaignId, reference);
+      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(actorPrincipalId, campaignId, reference);
     },
     getSession: (id) => {
       assertActive();
@@ -4387,6 +4348,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     toRulesProfile,
     toContentPack,
   });
+  const campaignContentDefinitionReadRepository = createCampaignContentDefinitionReadRepository(db, {
+    definitionProjection: DEFINITION_PROJECTION, definitionOrder: DEFINITION_ORDER, toRpgDefinition,
+    verifyCatalogVisibilityProjection,
+  });
   const campaignCoreRepository = createCampaignCoreRepository({
     createCampaign: (actor, input) => createCampaignSyncInternal(db, dependencies, actor, input),
     renameCampaign: (actor, campaignId, input) => renameCampaignSyncInternal(db, dependencies.clock, actor, campaignId, input),
@@ -4414,6 +4379,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   },
     (campaignId, actor, type, payload, result, occurredAt) =>
       recordCompatibilityAdministrationAuditInternal(db, campaignId, actor, type, payload, result, occurredAt));
+  const campaignLegacyCoreWriteRepository = createCampaignLegacyCoreWriteRepository(db, campaignCoreRepository);
   const campaignEventProjectionRepository = createCampaignEventProjectionRepo({
     listCampaignEvents: (actor, campaignId, timelineId) => listCampaignEventsSync(db, actor, campaignId, timelineId),
   });
@@ -4680,78 +4646,43 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertOpen();
-      return listCampaignContentPackDefinitionsSync(db, actorPrincipalId, campaignId, identifier);
+      return campaignContentDefinitionReadRepository.listCampaignContentPackDefinitions(actorPrincipalId, campaignId, identifier);
     },
     getCampaignContentPackDefinition: (actorPrincipalId, campaignId, reference) => {
       assertOpen();
-      return getCampaignContentPackDefinitionSync(db, actorPrincipalId, campaignId, reference);
+      return campaignContentDefinitionReadRepository.getCampaignContentPackDefinition(actorPrincipalId, campaignId, reference);
     },
     addCampaignMembership: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign membership addition cannot run inside a repository transaction");
-      return db.transaction(() => {
-        const normalized = addCampaignMembershipInputSchema.parse(input);
-        const existed = db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
-          .get(campaignId, normalized.principalId);
-        const value = campaignCoreRepository.addCampaignMembership(actorPrincipalId, campaignId, normalized);
-        if (!existed) campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "membership_added",
-          { principalId: value.principalId, role: value.role }, value, value.createdAt);
-        return value;
-      }).immediate();
+      return campaignLegacyCoreWriteRepository.addCampaignMembership(actorPrincipalId, campaignId, input);
     },
     createCampaign: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign creation cannot run inside a repository transaction");
-      return campaignCoreRepository.createCampaign(actorPrincipalId, input);
+      return campaignLegacyCoreWriteRepository.createCampaign(actorPrincipalId, input);
     },
     renameCampaign: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign rename cannot run inside a repository transaction");
-      return db.transaction(() => {
-        const value = campaignCoreRepository.renameCampaign(actorPrincipalId, campaignId, input);
-        campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "campaign_renamed",
-          { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
-        return value;
-      }).immediate();
+      return campaignLegacyCoreWriteRepository.renameCampaign(actorPrincipalId, campaignId, input);
     },
     renameCampaignIfUnchanged: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) {
         throw new Error("stale-safe campaign rename cannot run inside a repository transaction");
       }
-      return db.transaction(() => {
-        const value = campaignCoreRepository.renameCampaignIfUnchanged(actorPrincipalId, campaignId, input);
-        campaignCoreRepository.writeCompatibilityAdministrationAudit(campaignId, actorPrincipalId, "campaign_renamed",
-          { name: value.name }, { name: value.name, updatedAt: value.updatedAt }, value.updatedAt);
-        return value;
-      }).immediate();
+      return campaignLegacyCoreWriteRepository.renameCampaignIfUnchanged(actorPrincipalId, campaignId, input);
     },
     attachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign session attachment cannot run inside a repository transaction");
-      return db.transaction(() => {
-        const normalized = attachCampaignSessionInputSchema.parse(input);
-        const existed = db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?")
-          .get(normalized.campaignId, normalized.sessionId);
-        const value = campaignCoreRepository.attachCampaignSession(actorPrincipalId, normalized);
-        if (!existed) campaignCoreRepository.writeCompatibilityAdministrationAudit(normalized.campaignId, actorPrincipalId, "room_attached",
-          { sessionId: value.sessionId }, value, value.attachedAt);
-        return value;
-      }).immediate();
+      return campaignLegacyCoreWriteRepository.attachCampaignSession(actorPrincipalId, input);
     },
     detachCampaignSession: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("campaign session detachment cannot run inside a repository transaction");
-      return db.transaction(() => {
-        const normalized = detachCampaignSessionInputSchema.parse(input);
-        const value = campaignCoreRepository.detachCampaignSession(actorPrincipalId, normalized);
-        if (value) {
-          const campaign = db.prepare("SELECT updated_at FROM campaigns WHERE id=?").get(normalized.campaignId) as { updated_at: string };
-          campaignCoreRepository.writeCompatibilityAdministrationAudit(normalized.campaignId, actorPrincipalId, "room_detached",
-            { sessionId: value.sessionId }, value, campaign.updated_at);
-        }
-        return value;
-      }).immediate();
+      return campaignLegacyCoreWriteRepository.detachCampaignSession(actorPrincipalId, input);
     },
     installContentPack: (actorPrincipalId, input) => {
       assertOpen();

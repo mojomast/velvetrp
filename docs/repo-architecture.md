@@ -2,7 +2,7 @@
 
 This document describes the current persistence boundary under `server/src/repo/`. It is an implementation guide, not an HTTP or shared-contract specification. Public API behavior remains defined by [the API reference](api.md), and runtime schemas shared with clients remain owned by `packages/contracts`.
 
-Current persistence is schema v25r1. V23 introduced M1.4 progression, v24 repaired its provenance/integrity graph, and v25 completes M1.5 resources, inventory, economy, and rest without rewriting historical ledgers. The fixed canonical v25 DDL digest is `a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7`.
+Current persistence is schema v29. V23 introduced M1.4 progression, v24 repaired its provenance/integrity graph, v25 completes M1.5 resources, inventory, economy, and rest, and later additive migrations preserve those historical ledgers.
 
 ## Public entry point
 
@@ -37,7 +37,9 @@ Routes and services should import `server/src/repo/index.ts`, not domain files d
 | `campaign/campaignCharacterWorkspaceRepo.ts` | Private role-sensitive, ID-free character workspace reader. It owns workspace authority, corruption checks, and response shaping. |
 | `campaign/campaignCharacterSheetSnapshotRepo.ts` | Private sheet-snapshot composer. It combines workspace proof with progression visibility; it does not own progression persistence. |
 | `campaign/campaignGlobalContentReadRepo.ts` | Private owner-only legacy profile, pack, and definition metadata reader. It is distinct from catalog validation and publication behavior. |
-| `campaign/campaignContentSelectionReadRepo.ts` | Private campaign-selected legacy profile and exact-pin metadata reader. It does not own catalog visibility-attested definition reads. |
+| `campaign/campaignContentSelectionReadRepo.ts` | Private campaign-selected legacy profile and exact-pin metadata reader. |
+| `campaign/campaignContentDefinitionReadRepo.ts` | Private campaign-selected definition reader. It preserves catalog visibility attestation and role-safe owner/GM versus player/observer projection. |
+| `campaign/campaignLegacyCoreWriteRepo.ts` | Private compatibility writer for legacy campaign creation, rename, membership, and room attachment changes. It retains immediate transaction and administration-audit composition through `campaignCoreRepo`. |
 | `campaign/campaignDetailReadRepo.ts` | Private detail composer combining campaign access with content-configuration reads inside the caller-owned snapshot. |
 | `campaign/originalStarterSetupInspectionRepo.ts` | Private reserved original-starter namespace inspector. It classifies setup state but does not own install or configuration writes. |
 | `campaign/campaignRoomSessionLifecycleRepo.ts` | Private room lifecycle and legacy room-text adapter shared by attachment compatibility, administration validation, and room-linking snapshots. |
@@ -52,7 +54,7 @@ Routes and services should import `server/src/repo/index.ts`, not domain files d
 | `economyRepo.ts` | Schema-v25r1 economy facade composed by `campaignRepo.ts`. It owns integer-minor wallets and currency ledgers, shops, finite stock, quotes, purchases, and bilateral trade. |
 | `restRepo.ts` | Schema-v25r1 rest facade composed by `campaignRepo.ts`. It owns short/long rest recovery and receipts. |
 | `characterBuilderCalculator.ts` | The one pure closed `velvet-character-derived-v1` calculator. It accepts strict server-assembled inputs and returns HP, three defenses, initiative, speed, carrying limit, spell attack, save DC, and nine explanatory formula records. It has no database, RNG, clock, override, or executable-content dependency. |
-| `diceRepo.ts` | Connection-scoped dice repository facade and dice-owned public repository types/errors. It binds deterministic dice execution, visible-character revalidation, recent dice history, and receipt lookup to the same database and runtime dependencies as the composed repository. Low-level audit SQL currently remains in `campaignRepo.ts` so one transaction owns command, roll, terms, event, receipt, and timeline revision. |
+| `diceRepo.ts` | Connection-scoped dice repository facade and dice-owned public repository types/errors. It binds deterministic dice execution, visible-character revalidation, recent dice history, and receipt lookup to the same database and runtime dependencies as the composed repository. Gameplay audit reconstruction remains in `campaignRepo.ts` as a deliberate atomic facade boundary so one transaction owns command, roll, terms, event, receipt, and timeline revision. Campaign import/export is likewise deliberately retained at its atomic facade boundary. |
 
 ## Connection and composition model
 

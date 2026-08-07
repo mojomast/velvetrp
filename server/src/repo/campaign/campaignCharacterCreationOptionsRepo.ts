@@ -1,5 +1,6 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import type DatabaseDriver from "better-sqlite3";
+import { projectLegacyPersonaDisplayName } from "./legacyPersonaDisplayName.js";
 import {
   campaignCharacterCreationOptionsResponseSchema,
   campaignCharacterPersonaSummarySchema,
@@ -136,41 +137,6 @@ function sameMetadata(
     && left.description === right.description
     && left.tags.length === right.tags.length
     && left.tags.every((tag, index) => tag === right.tags[index]);
-}
-
-/**
- * Legacy character storage deliberately has no modern name bound. Project the
- * longest well-formed UTF-16 prefix that fits the strict 200-code-unit wire
- * schema, never splitting a surrogate pair. If that prefix is blank, retry
- * after leading whitespace so valid legacy data still has a visible wire
- * projection. Storage and legacy APIs stay unchanged. Empty, whitespace-only,
- * and malformed UTF-16 names are corrupt.
- */
-function projectLegacyPersonaDisplayName(value: unknown): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error("legacy persona display name is malformed");
-  }
-  for (const source of [value, value.trimStart()]) {
-    let projected = "";
-    for (let index = 0; index < source.length;) {
-      const first = source.charCodeAt(index);
-      let width = 1;
-      if (first >= 0xd800 && first <= 0xdbff) {
-        const second = source.charCodeAt(index + 1);
-        if (!(second >= 0xdc00 && second <= 0xdfff)) {
-          throw new Error("legacy persona display name is malformed");
-        }
-        width = 2;
-      } else if (first >= 0xdc00 && first <= 0xdfff) {
-        throw new Error("legacy persona display name is malformed");
-      }
-      if (projected.length + width > 200) break;
-      projected += source.slice(index, index + width);
-      index += width;
-    }
-    if (projected.trim().length > 0) return projected;
-  }
-  throw new Error("legacy persona display name is malformed");
 }
 
 /**
