@@ -260,6 +260,14 @@ import type {
 } from "../types.js";
 
 
+/**
+ * Optional dependencies and storage location for `createRepository`.
+ *
+ * The factory opens and owns a new SQLite connection for `dataDir`; it does
+ * not accept a caller-owned connection. Omitted `clock`, `ids`, and `rng` use
+ * the corresponding `systemRuntime` defaults. The returned repository must be
+ * closed by its owner with `repository.close()` when it is no longer needed.
+ */
 export interface CreateRepositoryOptions extends Partial<RepositoryDependencies> {
   dataDir?: string;
 }
@@ -933,6 +941,19 @@ function runTransaction<T>(
   }
 }
 
+/**
+ * Creates the composed campaign repository and its owned SQLite connection.
+ *
+ * `dataDir` defaults to `resolveDataDir()`, and omitted runtime dependencies
+ * default to `systemRuntime`. Call `close()` exactly for the returned
+ * repository's connection lifecycle; no caller-provided connection is shared
+ * or closed by this factory.
+ *
+ * `transaction` callbacks must be synchronous. Their `RepositoryUnitOfWork`
+ * is valid only while the callback is executing and must not be retained or
+ * used after it returns. Do not close the repository from a unit-of-work
+ * callback.
+ */
 export function createRepository(options: CreateRepositoryOptions = {}): Repository {
   const dependencies: RepositoryDependencies = {
     clock: options.clock ?? systemRuntime.clock,

@@ -34,9 +34,20 @@ export type {
   RepositoryDependencies,
   RepositoryUnitOfWork,
 } from "./campaign/campaignTypes.js";
+/**
+ * Compatibility export for the established campaign repository factory path.
+ * New implementation code belongs in `campaignRepositoryOrchestration`, but
+ * the public repository barrel still imports this root facade.
+ */
 export { createRepository, type CreateRepositoryOptions } from "./campaignRepositoryOrchestration.js";
 
-/** @deprecated Prefer the database-scoped campaign event read repository. */
+/**
+ * @deprecated Compatibility delegate for callers importing this historical root API.
+ * Prefer `createCampaignEventReadRepository(db).listRecentCampaignDiceEvents`.
+ * The caller supplies and retains ownership of `db`; this delegate neither
+ * opens nor closes it and can participate in the caller's synchronous SQLite
+ * transaction.
+ */
 export function listRecentCampaignDiceEventsSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -47,7 +58,12 @@ export function listRecentCampaignDiceEventsSync(
     .listRecentCampaignDiceEvents(actorPrincipalId, campaignId, timelineId);
 }
 
-/** @deprecated Prefer the database-scoped campaign event read repository. */
+/**
+ * @deprecated Compatibility delegate for callers importing this historical root API.
+ * Prefer `createCampaignEventReadRepository(db).getCommandReceipt`. The caller
+ * supplies and retains ownership of `db`; this delegate neither opens nor
+ * closes it and can participate in the caller's synchronous SQLite transaction.
+ */
 export function getCommandReceiptSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -57,9 +73,3 @@ export function getCommandReceiptSync(
   return createCampaignEventReadRepository(db)
     .getCommandReceipt(actorPrincipalId, campaignId, commandId);
 }
-
-/*
- * Repository orchestration is implemented in campaignRepositoryOrchestration:
- * createCampaignActorOperations, runTransaction, and createRepository compose
- * database-scoped campaign repositories while this root preserves compatibility.
- */
