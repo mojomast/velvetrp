@@ -14,7 +14,7 @@ import {
   m15Authorized,
   type ActorResourceSnapshot,
   type M15ActorResource,
-} from "../actorResourceRepo.js";
+} from "./m15Protocol.js";
 
 /** Principal-authorized, non-mutating actor-resource projections. */
 export interface ActorResourceReadRepository {

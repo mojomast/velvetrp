@@ -8,7 +8,7 @@ import {
   type M15ActorResource,
   type M15Dependencies,
   type M15Result,
-} from "../actorResourceRepo.js";
+} from "./m15Protocol.js";
 import type { ActorResourceReadRepository } from "./actorResourceReadRepo.js";
 
 /** Matches the canonical JSON representation used by M1.5 receipts. */
