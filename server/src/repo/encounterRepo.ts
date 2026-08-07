@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
-import { combatLogSchema, encounterCommandSchema, legalCombatActionAllowlistSchema, resourceIdSchema, utcIsoTimestampSchema, type EncounterCommand, type LegalCombatActionAllowlist } from "@velvet/contracts";
+import { encounterCommandSchema, resourceIdSchema, utcIsoTimestampSchema, type EncounterCommand, type LegalCombatActionAllowlist } from "@velvet/contracts";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
-import { projectCombatLogRows, type CombatLogRow } from "./encounter/encounterRowTypes.js";
+import {
+  EncounterAuthorizationError,
+  EncounterConflictError,
+  EncounterStaleError,
+  EncounterTurnError,
+  EncounterUnavailableError,
+} from "./encounter/encounterErrors.js";
+import { createEncounterReadRepository, type EncounterReadRepository } from "./encounter/encounterReadRepo.js";
 
-export class EncounterAuthorizationError extends Error { readonly code="ENCOUNTER_FORBIDDEN"; }
-export class EncounterStaleError extends Error { readonly code="ENCOUNTER_STALE"; }
-export class EncounterConflictError extends Error { readonly code="ENCOUNTER_CONFLICT"; }
-export class EncounterUnavailableError extends Error { readonly code="ENCOUNTER_UNAVAILABLE"; }
-export class EncounterTurnError extends Error { readonly code="ENCOUNTER_NOT_CURRENT_TURN"; }
+export { EncounterAuthorizationError, EncounterConflictError, EncounterStaleError, EncounterTurnError, EncounterUnavailableError } from "./encounter/encounterErrors.js";
 export type EncounterDependencies={clock:Clock;ids:IdGenerator;rng:RandomNumberGenerator};
 export type EncounterReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
 export type EncounterResult<T extends object>=T&{receipt:EncounterReceipt};
@@ -23,25 +26,15 @@ const controls=(db:DatabaseDriver.Database,p:string,c:string,a:string)=>Boolean(
 const commandType=(t:string)=>t==="create_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"?"grant_rewards":"resolve_action";
 const actionTypes=new Set(["attack","power","item","defend","flee","end-turn"]);
 
-export interface EncounterRepository {
+/** Public encounter facade composed from command handling and read projections. */
+export interface EncounterRepository extends EncounterReadRepository {
   executeEncounterCommand(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   mutateEncounter(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
-  getLegalCombatActionAllowlist(principal:string,campaignId:string,encounterId:string):LegalCombatActionAllowlist|null;
-  listCombatLog(principal:string,campaignId:string,encounterId:string):unknown[];
 }
 
+/** Creates the public encounter facade with shared database-backed read operations. */
 export function createEncounterRepository(db:DatabaseDriver.Database,deps:EncounterDependencies,guard:()=>void):EncounterRepository {
-  const legal=(p:string,c:string,e:string):LegalCombatActionAllowlist|null=>{
-    if(!member(db,p,c)) return null;
-    const encounter=db.prepare("SELECT * FROM encounter WHERE encounter_id=? AND campaign_id=? AND status='active'").get(e,c) as any;
-    const current=encounter?.current_turn_combatant_id&&db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(e,encounter.current_turn_combatant_id) as any;
-    if(!current?.actor_id||!controls(db,p,c,current.actor_id)) return null;
-    const targets=(db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id").all(e,current.team) as any[]).map(x=>x.combatant_id);
-    const actions:any[]=[{kind:"defend"},{kind:"flee"},{kind:"end-turn"}];
-    if(targets.length) actions.unshift({kind:"attack",attackId:"basic_attack",targetCombatantIds:targets});
-    const revision=(db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(e) as any)?.revision;
-    return legalCombatActionAllowlistSchema.parse({campaignId:c,encounterId:e,combatantId:current.combatant_id,revision:revision??0,issuedAt:now(deps),actions});
-  };
+  const reads=createEncounterReadRepository(db,deps), legal=reads.getLegalCombatActionAllowlist;
 
   const execute=(p:string,input:EncounterCommand):EncounterResult<{encounterId:string;status:string}>=>{
     guard(); const command=encounterCommandSchema.parse(input), request=canonical(command);
@@ -83,11 +76,7 @@ export function createEncounterRepository(db:DatabaseDriver.Database,deps:Encoun
       advanceRevision(db,command.encounterId,after,at); return result;
     }).immediate();
   };
-  return {executeEncounterCommand:execute,mutateEncounter:execute,getLegalCombatActionAllowlist:legal,listCombatLog(p,c,e){
-    if(!member(db,p,c)||!db.prepare("SELECT 1 FROM encounter WHERE encounter_id=? AND campaign_id=?").get(e,c)) return [];
-    const rows=db.prepare("SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=? ORDER BY occurred_at,log_ordinal,log_id").all(e) as CombatLogRow[];
-    return combatLogSchema.parse(projectCombatLogRows(rows,c,e));
-  }};
+  return {executeEncounterCommand:execute,mutateEncounter:execute,...reads};
 }
 
 function replayAuthority(db:DatabaseDriver.Database,p:string,c:any,row:any){
