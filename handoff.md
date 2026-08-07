@@ -1,116 +1,28 @@
 # Handoff
-## Completed: Tasks 4, 5, and 6 — repository package-boundary cleanup
-## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context
-- The content-catalog barrel now exports the public `ContentCatalogRepository` type, errors, read-page types, validation helpers, and visibility helpers. The content-catalog facade and root facade consume/re-export catalog API from that barrel.
-- Campaign type/error re-exports in both root facades now source `campaign/index.js`, rather than campaign implementation files.
-- Root typecheck passed: `TMPDIR="$PWD/.tmp" npm run typecheck`.
-- No commit was created. `devplan.md` and the pre-existing untracked `.tmp/` directory were deliberately left untouched.
 
-### Priorities (exact)
-1. Ensure contentCatalog index exports ContentCatalogRepository type if root needs it
-2. root catalog errors/types/helpers all through catalog barrel
-3. Change campaign direct export sources to campaign/index
-4. Update handoff with commits through current session, final byte sizes of requested root facades and recursive inventories file sizes campaign/campaignAdmin/contentCatalog/characterBuilder/characterProgression; priorities exact from prompt and risk note
-5. Root typecheck TMPDIR .tmp
-6. No commit, devplan/.tmp untouched
+## Session 4 — Orchestration Analysis
 
-### Risk note
-`contentCatalog/index.ts` has a deliberate **type-only** re-export from its parent facade to expose `ContentCatalogRepository`. It is erased at runtime; retain `export type` if this boundary is changed to avoid introducing a runtime import cycle.
+### Scope
+- Analyzed `server/src/repo/campaignRepositoryOrchestration.ts` as the repository composition root. No source code was changed and no commit was created.
 
-### Commits through this session
-- `5f0a889` refactor(catalog): extract validateContentCatalog and digest helpers
-- `347836b` refactor(builder): extract row mappers to characterBuilderRowTypes
-- `d2f625b` refactor(catalog): move remaining read projections into catalogReadRepo
-- `d9e379c` refactor(builder): extract read projections to characterBuilderReadRepo
-- `7ea4769` refactor(builder): extract write commands to characterBuilderWriteRepo
-- `bc0fd38` refactor(builder): wire characterBuilder subdir and slim facade
-- `9e17205` refactor(progression): extract read projections to characterProgressionReadRepo
-- `7555c79` refactor(progression): extract write commands to characterProgressionWriteRepo
-- `7f4acc8` fix(builder): track shared builder errors module
-- `ecca554` fix(catalog): update validation helper imports
-- `3a2b8ca` refactor(progression): add characterProgression barrel index
-- `30b0191` refactor(admin): slim createCampaignAdministrationRepository to wiring only
+### Composition Surface
+- `createRepository(options: CreateRepositoryOptions = {}): Repository` is the public factory. It resolves `dataDir`, opens and owns the SQLite connection, supplies omitted `clock`/`ids`/`rng` from `systemRuntime`, enforces synchronous unit-of-work callbacks, tracks transaction depth, guards use after `close()`, and returns the composed repository.
+- The root directly imports/calls 34 campaign factories and operations. They group into campaign core/access; command, event, dice, and actor-resource; character write/read/roster/workspace/sheet/creation options; membership/session/room snapshots and lifecycle; content write/configuration/selection/definition/global reads; original-starter inspection; and legacy-core compatibility writes.
+- `createCampaignActorOperations` is a local sub-composition for character creation options, roster, workspace, and sheet snapshots. `runTransaction` separately composes the transaction-scoped unit of work.
+- It composes the campaign-administration factory (`createCampaignAdministrationRepository`) and domain factories for content catalog, character builder, character progression, actor resources, inventory, economy, rest, checks, powers, effects, encounters, world, and quests. Mutating domain facades receive open/transaction guards; administration, catalog, builder, progression, selected M1.5 repositories, and quests are additionally proxy-wrapped to guard all method calls.
 
-### Final root facade sizes (bytes)
-- `server/src/repo/campaignAdministrationRepo.ts`: 9,281
-- `server/src/repo/contentCatalogRepo.ts`: 3,693
-- `server/src/repo/characterBuilderRepo.ts`: 3,186
-- `server/src/repo/characterProgressionRepo.ts`: 2,023
+### Contract Boundary
+- `@velvet/contracts` runtime schemas used here: `addCampaignMembershipInputSchema`, `actorResourceNameSchema`, `actorResourceSchema`, `attachCampaignSessionInputSchema`, `campaignCharacterAttributeSchema`, `campaignCharacterClassSchema`, `campaignCharacterProficiencySchema`, `publicCampaignCharacterSummarySchema`, `publicCampaignActorSchema`, `campaignContentConfigurationSchema`, `campaignMembershipSchema`, `campaignRenameRequestSchema`, `campaignSessionAttachmentSchema`, `commandEnvelopeSchema`, `contentPackIdentifierSchema`, `contentPackSchema`, `configureCampaignContentInputSchema`, `createCampaignInputSchema`, `definitionReferenceSchema`, `detachCampaignSessionInputSchema`, `installContentPackInputSchema`, `renameCampaignInputSchema`, `resourceIdSchema`, `resolvedCharacterChoiceSchema`, `setActorAttributePayloadSchema`, and `utcIsoTimestampSchema`.
+- Contract limits imported here: `MAX_CAMPAIGN_CHARACTER_PERSONAS`, `MAX_CAMPAIGN_CHARACTER_ROSTER`, `MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES`, `MAX_CHARACTER_ATTRIBUTES`, `MAX_CHARACTER_CHOICES`, `MAX_CHARACTER_CLASSES`, and `MAX_CHARACTER_PROFICIENCIES`.
+- Contract types imported here: `PublicCampaignCharacterSummary`, `CampaignCharacterWorkspaceResponse`, `CampaignRoomLinkingResponse`, and `ProgressionState`. Repository API types come from `campaign/campaignTypes.ts` and are re-exported through `campaign/index.ts`.
 
-### Recursive file inventory (bytes)
-#### campaign (total: 395,237)
-- 19,985 `campaignCoreWriteRepo.ts`
-- 15,289 `campaignRoomLinkingSnapshotRepo.ts`
-- 383 `repositoryDependencies.ts`
-- 35,833 `campaignCharacterWorkspaceRepo.ts`
-- 13,059 `campaignTypes.ts`
-- 8,445 `campaignContentConfigurationReadRepo.ts`
-- 1,933 `index.ts`
-- 19,269 `campaignCharacterReadRepo.ts`
-- 11,291 `originalStarterSetupInspectionRepo.ts`
-- 5,995 `campaignContentDefinitionReadRepo.ts`
-- 1,480 `campaignCommandRepo.ts`
-- 37,415 `campaignEventReadRepo.ts`
-- 2,430 `campaignActorRepo.ts`
-- 4,090 `campaignLegacyCoreWriteRepo.ts`
-- 3,806 `campaignMembershipReadRepo.ts`
-- 4,077 `campaignErrors.ts`
-- 5,610 `campaignAccessRepo.ts`
-- 3,982 `campaignSessionAttachmentReadRepo.ts`
-- 2,457 `campaignContentSelectionReadRepo.ts`
-- 2,481 `campaignContentRowMappers.ts`
-- 5,094 `campaignActorResourceRepo.ts`
-- 1,547 `campaignDetailReadRepo.ts`
-- 24,019 `campaignCharacterCreationOptionsRepo.ts`
-- 6,880 `campaignRoomSessionLifecycleRepo.ts`
-- 4,605 `campaignCoreRepo.ts`
-- 2,524 `campaignCharacterSheetSnapshotRepo.ts`
-- 22,048 `campaignTimelineReadRepo.ts`
-- 1,202 `legacyPersonaDisplayName.ts`
-- 63,947 `campaignCommandWriteRepo.ts`
-- 6,701 `campaignGlobalContentReadRepo.ts`
-- 1,154 `campaignEventProjectionRepo.ts`
-- 17,224 `campaignCharacterRosterRepo.ts`
-- 15,161 `campaignContentWriteRepo.ts`
-- 23,821 `campaignCharacterWriteRepo.ts`
+### Legacy Work Remaining
+- Four inline legacy SQL helpers remain in the orchestration module: `installContentPackSync`, `configureCampaignContentSync`, `listCampaignContentPackDefinitionsSync`, and `getCampaignContentPackDefinitionSync`.
+- These helpers carry validation, authorization, visibility-projection verification, and immediate-transaction behavior. They are used by the content-write and transaction composition paths, so extraction requires preserving their shared mapping/projection dependencies and snapshot semantics.
 
-#### campaignAdmin (total: 91,887)
-- 5,405 `administrationReceiptRepo.ts`
-- 646 `index.ts`
-- 4,826 `administrationImportHelpers.ts`
-- 16,833 `administrationCommandRepo.ts`
-- 32,987 `administrationImportRepo.ts`
-- 7,108 `campaignCheckpointRepo.ts`
-- 12,824 `administrationExportRepo.ts`
-- 2,461 `administrationAccessRepo.ts`
-- 1,188 `campaignTimelineRepo.ts`
-- 4,302 `administrationEventRepo.ts`
-- 3,307 `campaignRecapRepo.ts`
+### Public Exports
+- `server/src/repo/index.ts` publicly exports `createRepository` and `CreateRepositoryOptions` from `campaignRepositoryOrchestration.ts`.
+- Campaign repository types, snapshots, original-starter inspection types, errors, and dice types are re-exported through the campaign/orchestration facade. Domain repository types, errors, and selected helpers remain re-exported from their domain facades.
 
-#### contentCatalog (total: 59,648)
-- 941 `index.ts`
-- 21,171 `catalogReadRepo.ts`
-- 16,677 `catalogWriteRepo.ts`
-- 5,619 `catalogVisibility.ts`
-- 15,240 `catalogValidation.ts`
-
-#### characterBuilder (total: 51,200)
-- 1,844 `characterBuilderErrors.ts`
-- 802 `index.ts`
-- 8,256 `characterBuilderRowTypes.ts`
-- 22,752 `characterBuilderWriteRepo.ts`
-- 17,546 `characterBuilderReadRepo.ts`
-
-#### characterProgression (total: 35,996)
-- 24,094 `characterProgressionWriteRepo.ts`
-- 570 `index.ts`
-- 10,240 `characterProgressionReadRepo.ts`
-- 1,092 `characterProgressionErrors.ts`
-
-## Files Modified
-- `server/src/repo/contentCatalog/index.ts`
-- `server/src/repo/contentCatalogRepo.ts`
-- `server/src/repo/index.ts`
-- `server/src/repo/campaignRepositoryOrchestration.ts`
-- `handoff.md`
+### Recommendation
+- Do not split Task 8 further now. The composition root has moderate circular-composition risk: campaign adapters depend on peer adapters, transaction-scoped construction mirrors root construction, and the root’s public facade preserves lifecycle and guard invariants. Further extraction should wait for a concrete boundary that can avoid reverse imports and duplicate wiring.
