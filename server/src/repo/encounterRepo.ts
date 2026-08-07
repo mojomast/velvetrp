@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
-import { combatLogEntrySchema, combatLogSchema, encounterCommandSchema, legalCombatActionAllowlistSchema, resourceIdSchema, utcIsoTimestampSchema, type EncounterCommand, type LegalCombatActionAllowlist } from "@velvet/contracts";
+import { combatLogSchema, encounterCommandSchema, legalCombatActionAllowlistSchema, resourceIdSchema, utcIsoTimestampSchema, type EncounterCommand, type LegalCombatActionAllowlist } from "@velvet/contracts";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../runtime.js";
+import { projectCombatLogRows, type CombatLogRow } from "./encounter/encounterRowTypes.js";
 
 export class EncounterAuthorizationError extends Error { readonly code="ENCOUNTER_FORBIDDEN"; }
 export class EncounterStaleError extends Error { readonly code="ENCOUNTER_STALE"; }
@@ -84,10 +85,8 @@ export function createEncounterRepository(db:DatabaseDriver.Database,deps:Encoun
   };
   return {executeEncounterCommand:execute,mutateEncounter:execute,getLegalCombatActionAllowlist:legal,listCombatLog(p,c,e){
     if(!member(db,p,c)||!db.prepare("SELECT 1 FROM encounter WHERE encounter_id=? AND campaign_id=?").get(e,c)) return [];
-    const rows=db.prepare("SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=? ORDER BY occurred_at,log_ordinal,log_id").all(e) as any[];
-    // Projection is deliberately schema validated; internal damage/state audit records never leak
-    // as malformed public combat-log entries.
-    return combatLogSchema.parse(rows.flatMap((r,i)=>{try{return [combatLogEntrySchema.parse({logEntryId:r.log_id,campaignId:c,encounterId:e,sequence:i+1,occurredAt:r.occurred_at,event:JSON.parse(r.log_json)})]}catch{return []}}));
+    const rows=db.prepare("SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=? ORDER BY occurred_at,log_ordinal,log_id").all(e) as CombatLogRow[];
+    return combatLogSchema.parse(projectCombatLogRows(rows,c,e));
   }};
 }
 
