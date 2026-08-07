@@ -1,6 +1,7 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import type { CommandEnvelope, CommandReceipt } from "../../types.js";
 import type { CampaignDiceEvent, CampaignDiceVisibleCharacterBinding } from "../diceRepo.js";
+import type { CampaignEventReadRepository } from "./campaignEventReadRepo.js";
 
 export interface CampaignCommandRepository {
   executeRollActorDice(actorPrincipalId: string, input: CommandEnvelope): CommandReceipt;
@@ -10,7 +11,14 @@ export interface CampaignCommandRepository {
 }
 
 export function createCampaignCommandRepository(
-  operations: CampaignCommandRepository,
+  writeOperations: Pick<CampaignCommandRepository, "executeRollActorDice" | "executeRollActorDiceForVisibleCharacter">,
+  eventReadRepository: CampaignEventReadRepository,
 ): CampaignCommandRepository {
-  return operations;
+  return {
+    ...writeOperations,
+    listRecentCampaignDiceEvents: (actorPrincipalId, campaignId, timelineId) =>
+      eventReadRepository.listRecentCampaignDiceEvents(actorPrincipalId, campaignId, timelineId),
+    getCommandReceipt: (actorPrincipalId, campaignId, commandId) =>
+      eventReadRepository.getCommandReceipt(actorPrincipalId, campaignId, commandId),
+  };
 }
