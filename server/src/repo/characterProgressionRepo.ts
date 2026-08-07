@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   applyCharacterProgressionInputSchema, correctCharacterXpInputSchema, grantCharacterMilestoneInputSchema,
-  grantCharacterXpInputSchema, progressionCommandResultSchema, progressionEventSchema, progressionPendingChoiceSchema,
+  grantCharacterXpInputSchema, progressionCommandResultSchema, progressionEventSchema,
   progressionReceiptSchema, progressionStateSchema, resourceIdSchema, utcIsoTimestampSchema,
   type ApplyCharacterProgressionInput, type CharacterDerivedStats, type CorrectCharacterXpInput,
   type GrantCharacterMilestoneInput, type GrantCharacterXpInput, type ProgressionCommandResult,
@@ -12,11 +12,10 @@ import type { Clock, IdGenerator } from "../runtime.js";
 import { progressionCatalogDigest, progressionReferenceKey, type ExactReference } from "../characterProgressionCatalog.js";
 import { canonicalProgressionJson, canonicalStarterProgressionProfile, progressionProfileDigest,
   starterProgressionProfileId } from "../characterProgressionProfile.js";
-import { canonicalCatalogJson } from "./contentCatalogRepo.js";
-import { calculateAuthoritativeProgressionPreview, expectedKnownPowerSources, loadCanonicalProgressionProfile,
-  loadExactProgressionCatalog, readKnownPowerReferences, type ProgressionRootRow } from "./characterProgressionPersistence.js";
+import { canonicalCatalogJson } from "./contentCatalog/index.js";
+import { loadCanonicalProgressionProfile, loadExactProgressionCatalog, type ProgressionRootRow } from "./characterProgressionPersistence.js";
+import { createCharacterProgressionReadRepository } from "./characterProgression/characterProgressionReadRepo.js";
 
-type Role="owner"|"gm"|"player"|"observer";
 const digest=(value:unknown)=>createHash("sha256").update(canonicalCatalogJson(value)).digest("hex");
 const sortReferences=<T extends ExactReference>(values:T[])=>[...values].sort((left,right)=>
   progressionReferenceKey(left).localeCompare(progressionReferenceKey(right)));
@@ -65,30 +64,6 @@ export function initializeCharacterProgressionV24(db:DatabaseDriver.Database,inp
     .run(input.campaignCharacterId,pendingJson,progressionCatalogDigest([]),input.now);return true;
 }
 
-const rootFor=(db:DatabaseDriver.Database,id:string)=>db.prepare(`SELECT root.* FROM character_progression_v23 root
-  JOIN character_progression_bootstrap_v24 bootstrap ON bootstrap.campaign_character_id=root.campaign_character_id WHERE root.campaign_character_id=?`).get(id) as ProgressionRootRow|undefined;
-function authority(db:DatabaseDriver.Database,principal:string,row:ProgressionRootRow):Role|null{const membership=db.prepare(`SELECT membership.role,state.controller_principal_id FROM campaign_memberships membership
-  JOIN campaign_actor_private_state state ON state.campaign_id=membership.campaign_id AND state.actor_id=? WHERE membership.campaign_id=? AND membership.principal_id=?`)
-  .get(row.actor_id,row.campaign_id,principal) as {role:Role;controller_principal_id:string}|undefined;if(!membership||membership.role==="observer")return null;
-  if(membership.role==="player"&&membership.controller_principal_id!==principal)return null;return membership.role;}
-
-function pendingFor(db:DatabaseDriver.Database,row:ProgressionRootRow){const stored=db.prepare("SELECT pending_json,pending_digest FROM character_progression_pending_snapshots_v24 WHERE campaign_character_id=? AND revision=?")
-  .get(row.campaign_character_id,row.revision) as {pending_json:string;pending_digest:string}|undefined;const expected=calculateAuthoritativeProgressionPreview(db,row).pendingChoices,expectedJson=canonicalCatalogJson(expected);
-  if(!stored||stored.pending_json!==expectedJson||stored.pending_digest!==progressionCatalogDigest(expected))throw new Error("progression pending choice provenance is inconsistent");
-  return expected.map((choice)=>progressionPendingChoiceSchema.parse(choice));}
-function assertPowerProvenance(db:DatabaseDriver.Database,row:ProgressionRootRow):void{const catalog=loadExactProgressionCatalog(db,row),expected=expectedKnownPowerSources(db,row,catalog);
-  const actual=db.prepare(`SELECT power.kind,power.pack_id,power.pack_version,power.definition_id,source.source_kind,source.source_reference_json,source.source_digest
-    FROM character_known_powers_v23 power LEFT JOIN character_known_power_sources_v24 source ON source.campaign_character_id=power.campaign_character_id
-      AND source.kind=power.kind AND source.pack_id=power.pack_id AND source.pack_version=power.pack_version AND source.definition_id=power.definition_id
-    WHERE power.campaign_character_id=?`).all(row.campaign_character_id) as Array<any>;
-  if(actual.length!==expected.size)throw new Error("known power provenance is incomplete");for(const power of actual){const key=progressionReferenceKey({kind:power.kind,packId:power.pack_id,packVersion:power.pack_version,definitionId:power.definition_id}),source=expected.get(key);
-    if(!source||power.source_kind!==source.sourceKind||power.source_reference_json!==canonicalCatalogJson(source.sourceReference)||power.source_digest!==progressionCatalogDigest(source.sourceReference))throw new Error("known power exact source provenance is inconsistent");}}
-function stateFor(db:DatabaseDriver.Database,row:ProgressionRootRow,pendingOverride?:ProgressionPreview["pendingChoices"]):ProgressionState{loadCanonicalProgressionProfile(db,row.profile_id);assertPowerProvenance(db,row);
-  const refs=readKnownPowerReferences(db,row.campaign_character_id);return progressionStateSchema.parse({campaignCharacterId:row.campaign_character_id,campaignId:row.campaign_id,sheetId:row.sheet_id,actorId:row.actor_id,
-    profile:loadCanonicalProgressionProfile(db,row.profile_id),classRef:{kind:"class",packId:row.class_pack_id,packVersion:row.class_pack_version,definitionId:row.class_definition_id},
-    level:row.level,totalXp:row.total_xp,milestoneCount:row.milestone_count,revision:row.revision,pendingChoices:pendingOverride??pendingFor(db,row),
-    knownAbilities:refs.filter((ref)=>ref.kind==="ability"),knownSpells:refs.filter((ref)=>ref.kind==="spell"),derived:JSON.parse(row.derived_json),updatedAt:row.updated_at});}
-const previewFor=(db:DatabaseDriver.Database,row:ProgressionRootRow,selections:ProgressionSelection[]=[])=>calculateAuthoritativeProgressionPreview(db,row,selections);
 function retry(db:DatabaseDriver.Database,campaignId:string,actor:string,key:string){return db.prepare(`SELECT command.type,command.requested_json,command.campaign_character_id,receipt.result_json
   FROM character_progression_commands_v23 command JOIN character_progression_receipts_v23 receipt ON receipt.campaign_character_id=command.campaign_character_id AND receipt.command_id=command.command_id
   JOIN character_progression_command_proposals_v24 proposal ON proposal.campaign_character_id=command.campaign_character_id AND proposal.command_id=command.command_id AND proposal.proposed_result_json=receipt.result_json
@@ -120,13 +95,13 @@ export interface CharacterProgressionRepository{
   listCharacterProgressionEvents(actorPrincipalId:string,campaignCharacterId:string):ProgressionEvent[];
 }
 export function createCharacterProgressionRepository(db:DatabaseDriver.Database,deps:{clock:Clock;ids:IdGenerator},assertFactoryMutation:()=>void):CharacterProgressionRepository{
-  const authorized=(actor:string,id:string)=>{const row=rootFor(db,resourceIdSchema.parse(id));if(!row||!authority(db,resourceIdSchema.parse(actor),row))return null;return row;};
+  const reads=createCharacterProgressionReadRepository(db),authorized=reads.getAuthorized,rootFor=reads.rootFor,authority=reads.authority,stateFor=reads.getState,previewFor=reads.getPreview;
   const ledgerCommand=(kind:"grant-xp"|"grant-milestone",actor:string,id:string,input:GrantCharacterXpInput|GrantCharacterMilestoneInput)=>{assertFactoryMutation();const normalized=(kind==="grant-xp"?grantCharacterXpInputSchema:grantCharacterMilestoneInputSchema).parse(input) as any;
     return db.transaction(()=>{const row=authorized(actor,id);if(!row)throw new CharacterProgressionAuthorizationError();const again=exactRetry(retry(db,row.campaign_id,actor,normalized.idempotencyKey),kind,normalized,id);if(again)return again;
       if(row.revision!==normalized.expectedRevision)throw new CharacterProgressionStaleError();const mode=loadCanonicalProgressionProfile(db,row.profile_id).mode;if((kind==="grant-xp")!==(mode==="xp"))throw new CharacterProgressionConflictError("grant kind does not match progression mode");
       const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),eventId=resourceIdSchema.parse(deps.ids.nextId()),entryId=resourceIdSchema.parse(deps.ids.nextId());
       db.prepare("UPDATE character_progression_v23 SET total_xp=total_xp+?,milestone_count=milestone_count+?,revision=revision+1,updated_at=? WHERE campaign_character_id=?")
-        .run(kind==="grant-xp"?normalized.amount:0,kind==="grant-milestone"?1:0,now,id);const updated=rootFor(db,id)!,preview=previewFor(db,updated),state=stateFor(db,updated,preview.pendingChoices);
+        .run(kind==="grant-xp"?normalized.amount:0,kind==="grant-milestone"?1:0,now,id);const updated=rootFor(id)!,preview=previewFor(updated),state=stateFor(updated,preview.pendingChoices);
       const receipt=progressionReceiptSchema.parse({commandId,campaignCharacterId:id,idempotencyKey:normalized.idempotencyKey,type:kind,revisionBefore:row.revision,revisionAfter:updated.revision,occurredAt:now,state,appliedLevels:[]}),result=progressionCommandResultSchema.parse({progression:state,receipt});
       const event=eventFor({eventId,commandId,characterId:id,type:"progress_granted",revision:updated.revision,now,publicData:{kind:"grant",mode,amount:kind==="grant-xp"?normalized.amount:1}});
       insertCommandProposal(db,{row:updated,actor,commandId,event,key:normalized.idempotencyKey,type:kind,expected:row.revision,requested:normalized,now,result});
@@ -134,25 +109,25 @@ export function createCharacterProgressionRepository(db:DatabaseDriver.Database,
         .run(entryId,id,commandId,kind==="grant-xp"?"xp":"milestone",kind==="grant-xp"?normalized.amount:0,kind==="grant-milestone"?1:0,normalized.reason,now);
       insertPending(db,updated,commandId,preview.pendingChoices,now);finishAudit(db,updated,event,row.revision,now,result);return result;}).immediate();};
   return {
-    getCharacterProgression(actor,id){const row=authorized(actor,id);return row?stateFor(db,row):null;},
-    previewCharacterProgression(actor,id,selections=[]){const row=authorized(actor,id);return row?previewFor(db,row,selections):null;},
+    getCharacterProgression:reads.getCharacterProgression,
+    previewCharacterProgression:reads.previewCharacterProgression,
     grantCharacterXp(actor,id,input){return ledgerCommand("grant-xp",actor,id,input);},grantCharacterMilestone(actor,id,input){return ledgerCommand("grant-milestone",actor,id,input);},
-    correctCharacterProgressionEntry(actor,id,input){assertFactoryMutation();const normalized=correctCharacterXpInputSchema.parse(input);return db.transaction(()=>{const row=authorized(actor,id);if(!row)throw new CharacterProgressionAuthorizationError();const role=authority(db,actor,row);if(role!=="owner"&&role!=="gm")throw new CharacterProgressionAuthorizationError();
+    correctCharacterProgressionEntry(actor,id,input){assertFactoryMutation();const normalized=correctCharacterXpInputSchema.parse(input);return db.transaction(()=>{const row=authorized(actor,id);if(!row)throw new CharacterProgressionAuthorizationError();const role=authority(actor,row);if(role!=="owner"&&role!=="gm")throw new CharacterProgressionAuthorizationError();
       const again=exactRetry(retry(db,row.campaign_id,actor,normalized.idempotencyKey),"correct-xp",normalized,id);if(again)return again;if(row.revision!==normalized.expectedRevision)throw new CharacterProgressionStaleError();
       const original=db.prepare("SELECT * FROM character_progression_ledger_v23 WHERE entry_id=? AND campaign_character_id=? AND kind IN ('xp','milestone')").get(normalized.entryId,id) as any;if(!original)throw new CharacterProgressionConflictError("corrected entry is unavailable");
       const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),eventId=resourceIdSchema.parse(deps.ids.nextId()),entryId=resourceIdSchema.parse(deps.ids.nextId());
       db.prepare("UPDATE character_progression_v23 SET total_xp=total_xp-?,milestone_count=milestone_count-?,revision=revision+1,updated_at=? WHERE campaign_character_id=?").run(original.xp_delta,original.milestone_delta,now,id);
-      const updated=rootFor(db,id)!,preview=previewFor(db,updated),state=stateFor(db,updated,preview.pendingChoices),receipt=progressionReceiptSchema.parse({commandId,campaignCharacterId:id,idempotencyKey:normalized.idempotencyKey,type:"correct-xp",revisionBefore:row.revision,revisionAfter:updated.revision,occurredAt:now,state,appliedLevels:[]}),result=progressionCommandResultSchema.parse({progression:state,receipt});
+      const updated=rootFor(id)!,preview=previewFor(updated),state=stateFor(updated,preview.pendingChoices),receipt=progressionReceiptSchema.parse({commandId,campaignCharacterId:id,idempotencyKey:normalized.idempotencyKey,type:"correct-xp",revisionBefore:row.revision,revisionAfter:updated.revision,occurredAt:now,state,appliedLevels:[]}),result=progressionCommandResultSchema.parse({progression:state,receipt});
       const event=eventFor({eventId,commandId,characterId:id,type:"progress_corrected",revision:updated.revision,now,publicData:{kind:"correction",correctedEntryId:original.entry_id,reason:normalized.reason}});
       insertCommandProposal(db,{row:updated,actor,commandId,event,key:normalized.idempotencyKey,type:"correct-xp",expected:row.revision,requested:normalized,now,result});
       db.prepare(`INSERT INTO character_progression_ledger_v23(entry_id,campaign_character_id,command_id,kind,xp_delta,milestone_delta,correction_of_entry_id,reason,occurred_at) VALUES(?,?,?,'correction',?,?,?,?,?)`)
         .run(entryId,id,commandId,-original.xp_delta,-original.milestone_delta,original.entry_id,normalized.reason,now);insertPending(db,updated,commandId,preview.pendingChoices,now);finishAudit(db,updated,event,row.revision,now,result);return result;}).immediate();},
     applyCharacterProgression(actor,id,input){assertFactoryMutation();const normalized=applyCharacterProgressionInputSchema.parse(input);return db.transaction(()=>{const row=authorized(actor,id);if(!row)throw new CharacterProgressionAuthorizationError();const again=exactRetry(retry(db,row.campaign_id,actor,normalized.idempotencyKey),"apply-levels",normalized,id);if(again)return again;
-      if(row.revision!==normalized.previewRevision)throw new CharacterProgressionStaleError();const base=previewFor(db,row),selected=previewFor(db,row,normalized.selections);if(base.token!==normalized.previewToken)throw new CharacterProgressionStaleError();if(!base.levels.length)throw new CharacterProgressionConflictError("no eligible levels");
+      if(row.revision!==normalized.previewRevision)throw new CharacterProgressionStaleError();const base=previewFor(row),selected=previewFor(row,normalized.selections);if(base.token!==normalized.previewToken)throw new CharacterProgressionStaleError();if(!base.levels.length)throw new CharacterProgressionConflictError("no eligible levels");
       const required=new Map(base.pendingChoices.map((choice)=>[choice.choiceId,choice]));if(normalized.selections.length!==required.size||new Set(normalized.selections.map((value)=>value.choiceId)).size!==required.size)throw new CharacterProgressionConflictError("every required progression choice must be selected exactly once");
       for(const selection of normalized.selections){const choice=required.get(selection.choiceId);if(!choice||!choice.options.some((option)=>progressionReferenceKey(option)===progressionReferenceKey(selection.ability)))throw new CharacterProgressionConflictError("progression selection is not an exact offered option");}
       const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),eventId=resourceIdSchema.parse(deps.ids.nextId()),final=selected.levels.at(-1)!;
-      const advancementIds=selected.levels.map(()=>resourceIdSchema.parse(deps.ids.nextId())),known=stateFor(db,row),newAbilities=[...known.knownAbilities,...selected.levels.flatMap((level)=>[...level.fixedAbilities,...level.selectedAbilities])],newSpells=[...known.knownSpells,...selected.levels.flatMap((level)=>level.spells)];
+      const advancementIds=selected.levels.map(()=>resourceIdSchema.parse(deps.ids.nextId())),known=stateFor(row),newAbilities=[...known.knownAbilities,...selected.levels.flatMap((level)=>[...level.fixedAbilities,...level.selectedAbilities])],newSpells=[...known.knownSpells,...selected.levels.flatMap((level)=>level.spells)];
       if(new Set(newAbilities.map(progressionReferenceKey)).size!==newAbilities.length||new Set(newSpells.map(progressionReferenceKey)).size!==newSpells.length)throw new CharacterProgressionConflictError("advancement contains a duplicate known power");
       const projected=progressionStateSchema.parse({...known,level:final.level,revision:row.revision+1,pendingChoices:[],knownAbilities:sortReferences(newAbilities),knownSpells:sortReferences(newSpells),derived:final.derivedAfter,updatedAt:now});
       const receipt=progressionReceiptSchema.parse({commandId,campaignCharacterId:id,idempotencyKey:normalized.idempotencyKey,type:"apply-levels",revisionBefore:row.revision,revisionAfter:row.revision+1,occurredAt:now,state:projected,appliedLevels:selected.levels}),result=progressionCommandResultSchema.parse({progression:projected,receipt});
@@ -164,8 +139,8 @@ export function createCharacterProgressionRepository(db:DatabaseDriver.Database,
         db.prepare("INSERT INTO character_level_advancements_v23(advancement_id,campaign_character_id,command_id,level,position,preview_token,selections_json,changes_json,applied_at) VALUES(?,?,?,?,?,?,?,?,?)").run(advancementId,id,commandId,level.level,index,normalized.previewToken,canonicalCatalogJson(levelSelections),canonicalCatalogJson(level),now);
         for(const reference of [...level.fixedAbilities,...level.spells]){const sourceRef={advancementId,commandId,level:level.level},json=canonicalCatalogJson(sourceRef);power.run(id,reference.kind,reference.packId,reference.packVersion,reference.definitionId,level.level,null,commandId,now);source.run(id,reference.kind,reference.packId,reference.packVersion,reference.definitionId,"advancement-fixed",json,progressionCatalogDigest(sourceRef));}
         for(const reference of level.selectedAbilities){const selection=levelSelections.find((value)=>progressionReferenceKey(value.ability)===progressionReferenceKey(reference))!;const sourceRef={advancementId,choiceId:selection.choiceId,commandId,level:level.level},json=canonicalCatalogJson(sourceRef);power.run(id,reference.kind,reference.packId,reference.packVersion,reference.definitionId,level.level,selection.choiceId,commandId,now);source.run(id,reference.kind,reference.packId,reference.packVersion,reference.definitionId,"advancement-choice",json,progressionCatalogDigest(sourceRef));}}
-      const updated=rootFor(db,id)!;insertPending(db,updated,commandId,[],now);const actual=stateFor(db,updated);if(canonicalCatalogJson(actual)!==canonicalCatalogJson(projected))throw new Error("applied progression result does not match inserted authoritative state");finishAudit(db,updated,event,row.revision,now,result);return result;}).immediate();},
-    getCharacterProgressionReceipt(actor,id,commandId){const row=authorized(actor,id);if(!row)return null;const receipt=db.prepare(`SELECT receipt.result_json FROM character_progression_receipts_v23 receipt JOIN character_progression_command_proposals_v24 proposal ON proposal.campaign_character_id=receipt.campaign_character_id AND proposal.command_id=receipt.command_id AND proposal.proposed_result_json=receipt.result_json JOIN character_progression_events_v24 event ON event.campaign_character_id=receipt.campaign_character_id AND event.command_id=receipt.command_id AND event.event_id=proposal.proposed_event_id WHERE receipt.campaign_character_id=? AND receipt.command_id=?`).get(id,resourceIdSchema.parse(commandId)) as {result_json:string}|undefined;return receipt?progressionReceiptSchema.parse(JSON.parse(receipt.result_json).receipt):null;},
-    listCharacterProgressionEvents(actor,id){const row=authorized(actor,id);if(!row)return [];return (db.prepare("SELECT event_id,command_id,type,revision,occurred_at,public_data FROM character_progression_events_v24 WHERE campaign_character_id=? ORDER BY revision").all(id) as Array<any>).map((event)=>progressionEventSchema.parse({eventId:event.event_id,commandId:event.command_id,campaignCharacterId:id,type:event.type,revision:event.revision,occurredAt:event.occurred_at,publicData:JSON.parse(event.public_data)}));},
+      const updated=rootFor(id)!;insertPending(db,updated,commandId,[],now);const actual=stateFor(updated);if(canonicalCatalogJson(actual)!==canonicalCatalogJson(projected))throw new Error("applied progression result does not match inserted authoritative state");finishAudit(db,updated,event,row.revision,now,result);return result;}).immediate();},
+    getCharacterProgressionReceipt:reads.getCharacterProgressionReceipt,
+    listCharacterProgressionEvents:reads.listCharacterProgressionEvents,
   };
 }
