@@ -39,7 +39,23 @@ import {
   type PublishContentCatalogInput,
 } from "@velvet/contracts";
 import type { Clock } from "../runtime.js";
-import { createCatalogReadRepository } from "./contentCatalog/catalogReadRepo.js";
+import {
+  ContentCatalogAuthorizationError,
+  ContentCatalogConflictError,
+  ContentCatalogStaleError,
+  ContentCatalogValidationError,
+} from "./contentCatalog/catalogWriteRepo.js";
+import {
+  createCatalogReadRepository,
+  createCatalogWriteRepository,
+} from "./contentCatalog/index.js";
+
+export {
+  ContentCatalogAuthorizationError,
+  ContentCatalogConflictError,
+  ContentCatalogStaleError,
+  ContentCatalogValidationError,
+} from "./contentCatalog/catalogWriteRepo.js";
 
 const KINDS = catalogDefinitionKindSchema.options;
 
@@ -284,23 +300,6 @@ export function validateContentCatalog(input: unknown): CatalogValidationReport 
     issues,
     normalizedSummary: { totalDefinitions: normalized.definitions.length, counts: KINDS.map((kind) => ({ kind, count: counts.get(kind) ?? 0 })), digest },
   });
-}
-
-export class ContentCatalogValidationError extends Error {
-  readonly code = "CONTENT_CATALOG_INVALID";
-  constructor(readonly report: CatalogValidationReport) { super("content catalog validation failed"); this.name = "ContentCatalogValidationError"; }
-}
-export class ContentCatalogAuthorizationError extends Error {
-  readonly code = "CONTENT_CATALOG_FORBIDDEN";
-  constructor(message = "content catalog publication requires the application owner") { super(message); this.name = "ContentCatalogAuthorizationError"; }
-}
-export class ContentCatalogConflictError extends Error {
-  readonly code = "CONTENT_CATALOG_CONFLICT";
-  constructor(message: string) { super(message); this.name = "ContentCatalogConflictError"; }
-}
-export class ContentCatalogStaleError extends Error {
-  readonly code = "CONTENT_CATALOG_STALE";
-  constructor() { super("campaign catalog revision is stale"); this.name = "ContentCatalogStaleError"; }
 }
 
 export interface ContentCatalogPublicationPageInput {
@@ -837,14 +836,22 @@ export function createContentCatalogRepository(
     validateContentCatalog,
     verifyCatalogVisibilityProjection,
   });
+  const writes = createCatalogWriteRepository(db, {
+    clock,
+    canonicalCatalogJson,
+    validateContentCatalog,
+    verifyCatalogVisibilityProjection,
+    deriveCatalogVisibility,
+    dependencies,
+  });
   return {
     validateContentCatalog,
-    publishContentCatalog: (actor, input) => { mutationGuard(); return publish(db, clock, actor, input); },
+    publishContentCatalog: (actor, input) => { mutationGuard(); return writes.publishContentCatalog(actor, input); },
     listContentCatalogPublications: reads.listContentCatalogPublications,
     listContentCatalogPublicationPage: reads.listContentCatalogPublicationPage,
     getContentCatalogForOwner: reads.getContentCatalogForOwner,
     getCampaignContentCatalog: reads.getCampaignContentCatalog,
-    configureCampaignCatalog: (actor, campaignId, input) => { mutationGuard(); return configure(db, clock, actor, campaignId, input); },
+    configureCampaignCatalog: (actor, campaignId, input) => { mutationGuard(); return writes.configureCampaignCatalog(actor, campaignId, input); },
     resolveCampaignCatalog: reads.resolveCampaignCatalog,
     getCampaignCatalogReceipt: reads.getCampaignCatalogReceipt,
   };
