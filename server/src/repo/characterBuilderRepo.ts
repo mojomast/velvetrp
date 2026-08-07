@@ -14,14 +14,10 @@ import {
   CharacterBuilderIncompleteError,
   CharacterBuilderStaleError,
   CharacterBuilderUnavailableError,
-} from "./characterBuilder/characterBuilderErrors.js";
-import {
   createCharacterBuilderReadRepository,
-} from "./characterBuilder/characterBuilderReadRepo.js";
-import {
   createCharacterBuilderWriteRepository,
   type CharacterBuilderWriteRepository,
-} from "./characterBuilder/characterBuilderWriteRepo.js";
+} from "./characterBuilder/index.js";
 
 export {
   CharacterBuilderAuthorizationError,
@@ -30,7 +26,7 @@ export {
   CharacterBuilderIncompleteError,
   CharacterBuilderStaleError,
   CharacterBuilderUnavailableError,
-} from "./characterBuilder/characterBuilderErrors.js";
+} from "./characterBuilder/index.js";
 
 type Dependencies = { clock: Clock; ids: IdGenerator; rng: RandomNumberGenerator };
 
