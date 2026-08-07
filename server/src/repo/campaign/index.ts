@@ -19,6 +19,7 @@ export * from "./campaignCoreWriteRepo.js";
 export * from "./campaignDetailReadRepo.js";
 export * from "./campaignErrors.js";
 export * from "./campaignEventProjectionRepo.js";
+export * from "./campaignEventReadRepo.js";
 export * from "./campaignGlobalContentReadRepo.js";
 export * from "./campaignLegacyCoreWriteRepo.js";
 export * from "./campaignMembershipReadRepo.js";
