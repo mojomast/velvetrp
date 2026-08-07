@@ -1,6 +1,9 @@
 import type DatabaseDriver from "better-sqlite3";
-import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, resourceIdSchema, shopSchema, walletSchema, type BilateralTrade, type EconomyCommand, type Shop, type Wallet } from "@velvet/contracts";
-import { ActorResourceConflictError, ActorResourceNegativeError, getM15ActorRevision, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
+import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, resourceIdSchema, type BilateralTrade, type EconomyCommand } from "@velvet/contracts";
+import { ActorResourceConflictError, ActorResourceNegativeError, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
+import { createEconomyReadRepository, type EconomyReadRepository } from "./economy/economyReadRepo.js";
+
+export type { ActorEconomySnapshot } from "./economy/economyReadRepo.js";
 
 export class EconomyAuthorizationError extends Error { readonly code="ECONOMY_FORBIDDEN"; }
 export class ShopStockExhaustedError extends Error { readonly code="SHOP_STOCK_EXHAUSTED"; }
@@ -12,17 +15,14 @@ const totalFor=(quantity:number,unitPrice:number):number=>{
   if(quantity>Math.floor(MAX_MINOR/unitPrice))throw new EconomyConflictError("quote total exceeds supported currency range");
   return quantity*unitPrice;
 };
-export interface ActorEconomySnapshot { campaignId:string; actorId:string; wallet:Wallet; revision:number; }
 export type ActorScopedEconomyCommand=
   |{kind:"request_purchase_quote";shopId:string;item:{kind:"item";packId:string;packVersion:string;definitionId:string};quantity:number;expectedRevision:number;idempotencyKey:string}
   |{kind:"purchase_from_shop";quoteId:string;expectedRevision:number;idempotencyKey:string}
   |{kind:"propose_bilateral_trade";trade:Omit<BilateralTrade,"campaignId"|"offeredByActorId">;expectedRevision:number;idempotencyKey:string}
   |{kind:"accept_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string}
   |{kind:"cancel_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string};
-export interface EconomyRepository {
-  getWallet(principal:string,campaignId:string,actorId:string):Wallet|null;
-  getActorEconomySnapshot(principal:string,campaignId:string,actorId:string):ActorEconomySnapshot|null;
-  getShop(principal:string,campaignId:string,shopId:string):Shop|null;
+/** Public economy facade combining authorized reads with transactional commands. */
+export interface EconomyRepository extends EconomyReadRepository {
   mutateEconomy(principal:string,command:EconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
   mutateEconomyForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedEconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
 }
@@ -31,28 +31,10 @@ export interface EconomyRepository {
  * authoritative public projection and prevents a code from silently meaning a
  * different pinned definition. */
 export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):EconomyRepository {
-  const ref=(campaign:string,code:string)=>db.prepare("SELECT 'currency' kind,pack_id packId,pack_version packVersion,definition_id definitionId FROM rpg_currency_references_v25 WHERE campaign_id=? AND currency_code=?").get(campaign,code) as any;
-  const wallet=(principal:string,campaign:string,actor:string):Wallet|null=>{
-    resourceIdSchema.parse(principal); resourceIdSchema.parse(campaign); resourceIdSchema.parse(actor);
-    if(!m15Authorized(db,principal,campaign,actor)) return null;
-    const balances=(db.prepare("SELECT currency_code,balance_minor FROM rpg_wallets_v25 WHERE campaign_id=? AND actor_id=? ORDER BY currency_code").all(campaign,actor) as any[]).map(row=>({currency:ref(campaign,row.currency_code),minorUnits:row.balance_minor}));
-    if(balances.some(row=>!row.currency)) return null; // never fabricate an exact reference
-    return walletSchema.parse({balances});
-  };
-  const snapshot=(principal:string,campaign:string,actor:string):ActorEconomySnapshot|null=>db.transaction(()=>{
-    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
-    if(!m15Authorized(db,principal,campaign,actor))return null;
-    const current=wallet(principal,campaign,actor);
-    return current?{campaignId:campaign,actorId:actor,wallet:current,revision:getM15ActorRevision(db,campaign,actor)}:null;
-  })();
-  const shop=(principal:string,campaign:string,shopId:string):Shop|null=>{
-    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(shopId);
-    if(!db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(campaign,principal)) return null;
-    const definition=db.prepare("SELECT name FROM rpg_shop_definitions_v25 WHERE campaign_id=? AND shop_id=?").get(campaign,shopId) as any;if(!definition)return null;
-    const stock=(db.prepare("SELECT * FROM rpg_shop_stock_v25 WHERE campaign_id=? AND shop_id=? ORDER BY stock_id").all(campaign,shopId)as any[]).map(row=>({item:{kind:'item',packId:row.item_pack_id,packVersion:row.item_pack_version,definitionId:row.item_definition_id},quantity:row.available_quantity,unitPrice:{currency:ref(campaign,row.currency_code),minorUnits:row.unit_price_minor}}));
-    if(stock.some(row=>!row.unitPrice.currency))return null;
-    return shopSchema.parse({shopId,campaignId:campaign,name:definition.name,stock});
-  };
+  const reads=createEconomyReadRepository(db);
+  // Commands receive their reference resolver from reads, preventing a second
+  // implementation of pinned-currency lookup while keeping the facade public API unchanged.
+  const {currencyReference:ref,...readRepository}=reads;
   const walletRow=(campaign:string,actor:string,code:string)=>db.prepare("SELECT balance_minor FROM rpg_wallets_v25 WHERE campaign_id=? AND actor_id=? AND currency_code=?").get(campaign,actor,code)as any;
   const debit=(campaign:string,actor:string,code:string,amount:number,now:string,id:string,reason:string)=>{
     const row=walletRow(campaign,actor,code);if(!row||row.balance_minor<amount)throw new ActorResourceNegativeError("wallet cannot become negative");
@@ -116,5 +98,5 @@ export function createEconomyRepository(db:DatabaseDriver.Database,deps:M15Depen
             :{type:"cancel_bilateral_trade",campaignId,tradeId:input.tradeId,cancelledByActorId:actorId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey};
     return mutateEconomy(principal,command);
   };
-  return {getWallet:wallet,getActorEconomySnapshot:snapshot,getShop:shop,mutateEconomy,mutateEconomyForActor:mutateForActor};
+  return {...readRepository,mutateEconomy,mutateEconomyForActor:mutateForActor};
 }
