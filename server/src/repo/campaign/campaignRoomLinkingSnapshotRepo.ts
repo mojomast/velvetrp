@@ -9,6 +9,7 @@ import {
   type CampaignRoomLinkingResponse,
 } from "@velvet/contracts";
 import type { CampaignRoomLinkingSnapshot } from "../campaignRepo.js";
+import { projectLegacyRoomText } from "./campaignRoomSessionLifecycleRepo.js";
 
 interface CampaignRoomSnapshotRow {
   row_kind: "authority" | "attached" | "eligible";
@@ -61,7 +62,6 @@ interface CampaignRoomLinkingSnapshotRepository {
 /** Factory-local reader; presentation remains owned by session integrity. */
 export function createCampaignRoomLinkingSnapshotRepository(
   db: DatabaseDriver.Database,
-  projectLegacyRoomText: (value: unknown, nullable: boolean) => string | null,
 ): CampaignRoomLinkingSnapshotRepository {
   return {
     getCampaignRoomLinkingSnapshot(actorPrincipalId, campaignId) {

@@ -11,7 +11,6 @@ import {
   publicCampaignActorSchema,
   campaignCharacterSchema,
   campaignContentConfigurationSchema,
-  campaignDetailSchema,
   campaignMembershipReadSchema,
   campaignMembershipSchema,
   campaignRenameRequestSchema,
@@ -43,9 +42,6 @@ import {
   renameCampaignInputSchema,
   resourceIdSchema,
   resolvedCharacterChoiceSchema,
-  rpgDefinitionSchema,
-  rulesProfileIdentifierSchema,
-  rulesProfileSchema,
   utcIsoTimestampSchema,
   type PublicCampaignCharacterSummary,
   type CampaignCharacterWorkspaceResponse,
@@ -127,6 +123,7 @@ import { createCampaignEventProjectionRepo } from "./campaign/campaignEventProje
 import { createCampaignMembershipReadRepository } from "./campaign/campaignMembershipReadRepo.js";
 import { createCampaignSessionAttachmentReadRepository } from "./campaign/campaignSessionAttachmentReadRepo.js";
 import { createCampaignRoomLinkingSnapshotRepository } from "./campaign/campaignRoomLinkingSnapshotRepo.js";
+import { createCampaignRoomSessionLifecycleRepository } from "./campaign/campaignRoomSessionLifecycleRepo.js";
 import { createCampaignCharacterCreationOptionsRepository } from "./campaign/campaignCharacterCreationOptionsRepo.js";
 import { createCampaignCharacterWorkspaceRepository } from "./campaign/campaignCharacterWorkspaceRepo.js";
 import { createCampaignCharacterSheetSnapshotRepository } from "./campaign/campaignCharacterSheetSnapshotRepo.js";
@@ -134,6 +131,26 @@ import {
   createCampaignContentConfigurationReadRepository,
   getCampaignContentConfigurationReadSync,
 } from "./campaign/campaignContentConfigurationReadRepo.js";
+import { createCampaignDetailReadRepository } from "./campaign/campaignDetailReadRepo.js";
+import { createCampaignContentSelectionReadRepository } from "./campaign/campaignContentSelectionReadRepo.js";
+import {
+  createOriginalStarterSetupInspectionRepository,
+  type OriginalStarterSetupInspectionRepository,
+} from "./campaign/originalStarterSetupInspectionRepo.js";
+import {
+  createCampaignGlobalContentReadRepository,
+  CONTENT_PACK_PROJECTION,
+  DEFINITION_ORDER,
+  DEFINITION_PROJECTION,
+  RULES_PROFILE_PROJECTION,
+  sameMetadata,
+  toContentPack,
+  toRpgDefinition,
+  toRulesProfile,
+  type ContentPackRow,
+  type RpgDefinitionRow,
+  type RulesProfileRow,
+} from "./campaign/campaignGlobalContentReadRepo.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
@@ -2220,115 +2237,6 @@ interface CampaignSessionAttachmentRow {
   attached_at: string;
 }
 
-interface CampaignRoomSessionIntegrityRow {
-  session_id: string;
-  character_id: string;
-  primary_character_presence: string | null;
-  title: string;
-  state: string;
-  created_at: string;
-  stopped_at: string | null;
-  stop_reason_kind: unknown;
-  participant_names: string;
-  participant_count: unknown;
-  joined_character_count: unknown;
-  primary_participant_count: unknown;
-  distinct_character_count: unknown;
-  distinct_position_count: unknown;
-  malformed_position_count: unknown;
-  minimum_position: unknown;
-  maximum_position: unknown;
-}
-
-const RUNNING_CAMPAIGN_ROOM_STATES = ["setup", "active", "paused", "cooldown"] as const;
-
-/**
- * Validate the legacy session fields that make a room safe to summarize and
- * eligible to link. This deliberately projects display values even though the
- * write does not return them, so attach cannot accept a graph that GET rejects.
- */
-function validateCampaignRoomSessionIntegrityInternal(row: CampaignRoomSessionIntegrityRow): "running" | "stopped" {
-  if (row.primary_character_presence !== row.character_id
-    || !Number.isInteger(row.participant_count) || (row.participant_count as number) < 1
-    || (row.participant_count as number) > 12
-    || row.joined_character_count !== row.participant_count
-    || row.primary_participant_count !== 1
-    || row.distinct_character_count !== row.participant_count
-    || row.distinct_position_count !== row.participant_count
-    || row.malformed_position_count !== 0
-    || row.minimum_position !== 0
-    || row.maximum_position !== (row.participant_count as number) - 1) {
-    throw new Error("campaign room session graph is malformed");
-  }
-  let names: unknown;
-  try {
-    names = JSON.parse(row.participant_names);
-  } catch {
-    throw new Error("campaign room session graph is malformed");
-  }
-  if (!Array.isArray(names) || names.length !== row.participant_count) {
-    throw new Error("campaign room session graph is malformed");
-  }
-  try {
-    projectLegacyRoomText(row.title, true);
-    for (const name of names) projectLegacyRoomText(name, false);
-    const createdAt = utcIsoTimestampSchema.parse(row.created_at);
-    const running = (RUNNING_CAMPAIGN_ROOM_STATES as readonly string[]).includes(row.state)
-      && row.stopped_at === null && row.stop_reason_kind === 0;
-    if (running) return "running";
-    if (row.state === "closed" && row.stopped_at !== null && row.stop_reason_kind === 1) {
-      const stoppedAt = utcIsoTimestampSchema.parse(row.stopped_at);
-      if (stoppedAt < createdAt) throw new Error("invalid stopped provenance");
-      return "stopped";
-    }
-  } catch {
-    throw new Error("campaign room session graph is malformed");
-  }
-  throw new Error("campaign room session graph is malformed");
-}
-
-function getCampaignRoomSessionIntegrityRowInternal(
-  db: DatabaseDriver.Database,
-  sessionId: string,
-): CampaignRoomSessionIntegrityRow | undefined {
-  return db.prepare(`SELECT target_session.id AS session_id, target_session.character_id,
-      primary_character.id AS primary_character_presence, target_session.title,
-      target_session.state, target_session.created_at, target_session.stopped_at,
-      CASE WHEN target_session.stop_reason IS NULL THEN 0
-        WHEN typeof(target_session.stop_reason) = 'text'
-          AND length(trim(target_session.stop_reason)) > 0 THEN 1 ELSE 2 END AS stop_reason_kind,
-      COALESCE((SELECT json_group_array(participant_name) FROM (
-        SELECT character.name AS participant_name
-        FROM session_characters participant
-        JOIN characters character ON character.id = participant.character_id
-        WHERE participant.session_id = target_session.id
-        ORDER BY participant.position ASC
-        LIMIT 13
-      )), '[]') AS participant_names,
-      (SELECT COUNT(*) FROM session_characters participant
-        WHERE participant.session_id = target_session.id) AS participant_count,
-      (SELECT COUNT(*) FROM session_characters participant
-        JOIN characters character ON character.id = participant.character_id
-        WHERE participant.session_id = target_session.id) AS joined_character_count,
-      (SELECT COUNT(*) FROM session_characters participant
-        WHERE participant.session_id = target_session.id
-          AND participant.character_id = target_session.character_id) AS primary_participant_count,
-      (SELECT COUNT(DISTINCT participant.character_id) FROM session_characters participant
-        WHERE participant.session_id = target_session.id) AS distinct_character_count,
-      (SELECT COUNT(DISTINCT participant.position) FROM session_characters participant
-        WHERE participant.session_id = target_session.id) AS distinct_position_count,
-      (SELECT COUNT(*) FROM session_characters participant
-        WHERE participant.session_id = target_session.id
-          AND typeof(participant.position) <> 'integer') AS malformed_position_count,
-      (SELECT MIN(participant.position) FROM session_characters participant
-        WHERE participant.session_id = target_session.id) AS minimum_position,
-      (SELECT MAX(participant.position) FROM session_characters participant
-        WHERE participant.session_id = target_session.id) AS maximum_position
-    FROM sessions target_session
-    LEFT JOIN characters primary_character ON primary_character.id = target_session.character_id
-    WHERE target_session.id = ?`).get(sessionId) as CampaignRoomSessionIntegrityRow | undefined;
-}
-
 function toCampaignSessionAttachment(row: CampaignSessionAttachmentRow): CampaignSessionAttachment {
   return campaignSessionAttachmentSchema.parse({
     campaignId: row.campaign_id,
@@ -2431,12 +2339,12 @@ function attachCampaignSessionSyncInternal(
       }
     }
 
-    const session = getCampaignRoomSessionIntegrityRow(db, normalized.sessionId);
-    if (!session) {
+    const lifecycle = createCampaignRoomSessionLifecycleRepository(db)
+      .getCampaignRoomSessionLifecycle(normalized.sessionId);
+    if (lifecycle === null) {
       if (existing) throw new Error("campaign session attachment has no session parent");
       throw new CampaignSessionAttachmentSessionMissingError();
     }
-    const lifecycle = validateCampaignRoomSessionIntegrityInternal(session);
 
     if (existingAttachment) return existingAttachment;
     if (lifecycle === "stopped") {
@@ -2831,33 +2739,6 @@ function getCampaignTimelineSyncInternal(
   }
 }
 
-function projectLegacyRoomText(value: unknown, nullable: boolean): string | null {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    if (nullable) return null;
-    throw new Error("campaign room summary is malformed");
-  }
-  let projected = "";
-  for (let index = 0; index < value.length;) {
-    const first = value.charCodeAt(index);
-    let width = 1;
-    if (first >= 0xd800 && first <= 0xdbff) {
-      const second = value.charCodeAt(index + 1);
-      if (!(second >= 0xdc00 && second <= 0xdfff)) throw new Error("campaign room summary is malformed");
-      width = 2;
-    } else if (first >= 0xdc00 && first <= 0xdfff) {
-      throw new Error("campaign room summary is malformed");
-    }
-    if (projected.length + width > 200) break;
-    projected += value.slice(index, index + width);
-    index += width;
-  }
-  if (projected.trim().length === 0) {
-    const trimmed = value.trimStart();
-    return projectLegacyRoomText(trimmed, nullable);
-  }
-  return projected;
-}
-
 // Compatibility delegates retained for the composed repository facade.
 function createCampaignSync(db: DatabaseDriver.Database, dependencies: RepositoryDependencies, actor: string, input: CreateCampaignInput): Campaign {
   return createCampaignSyncInternal(db, dependencies, actor, input);
@@ -2874,12 +2755,6 @@ function renameCampaignIfUnchangedSync(db: DatabaseDriver.Database, clock: Clock
 }
 function addCampaignMembershipSync(db: DatabaseDriver.Database, clock: Clock, actor: string, campaignId: string, input: AddCampaignMembershipInput): CampaignMembership {
   return addCampaignMembershipSyncInternal(db, clock, actor, campaignId, input);
-}
-function getCampaignRoomSessionIntegrityRow(db: DatabaseDriver.Database, sessionId: string) {
-  return getCampaignRoomSessionIntegrityRowInternal(db, sessionId);
-}
-function validateCampaignRoomSessionIntegrity(row: CampaignRoomSessionIntegrityRow): "running" | "stopped" {
-  return validateCampaignRoomSessionIntegrityInternal(row);
 }
 function attachCampaignSessionSync(db: DatabaseDriver.Database, clock: Clock, actor: string, input: AttachCampaignSessionInput): CampaignSessionAttachment {
   return attachCampaignSessionSyncInternal(db, clock, actor, input);
@@ -3757,70 +3632,6 @@ export function getCommandReceiptSync(
   });
 }
 
-interface RulesProfileRow {
-  rules_profile_id: string;
-  name: string;
-  description: string;
-  tags: string;
-}
-
-interface ContentPackRow extends RulesProfileRow {
-  pack_id: string;
-  pack_version: string;
-}
-
-interface RpgDefinitionRow {
-  kind: string;
-  definition_id: string;
-  name: string;
-  description: string;
-  tags: string;
-}
-
-function parseTags(tags: string): unknown {
-  return JSON.parse(tags) as unknown;
-}
-
-function toRulesProfile(row: RulesProfileRow): RulesProfile {
-  return rulesProfileSchema.parse({
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-function toContentPack(row: ContentPackRow): ContentPack {
-  return contentPackSchema.parse({
-    packId: row.pack_id,
-    packVersion: row.pack_version,
-    rulesProfileId: row.rules_profile_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-function toRpgDefinition(row: RpgDefinitionRow): RpgDefinition {
-  return rpgDefinitionSchema.parse({
-    kind: row.kind,
-    definitionId: row.definition_id,
-    name: row.name,
-    description: row.description,
-    tags: parseTags(row.tags),
-  });
-}
-
-function sameMetadata(
-  left: { name: string; description: string; tags: readonly string[] },
-  right: { name: string; description: string; tags: readonly string[] },
-): boolean {
-  return left.name === right.name
-    && left.description === right.description
-    && left.tags.length === right.tags.length
-    && left.tags.every((tag, index) => tag === right.tags[index]);
-}
-
 /**
  * Legacy character storage deliberately has no modern name bound. Project the
  * longest well-formed UTF-16 prefix that fits the strict 200-code-unit wire
@@ -3857,12 +3668,12 @@ function projectLegacyPersonaDisplayName(value: unknown): string {
 }
 
 function requireOriginalStarterInspectionForWrite(
-  db: DatabaseDriver.Database,
+  inspectionRepository: OriginalStarterSetupInspectionRepository,
   actorId: string,
   campaignId: string,
   operation: "install" | "configure",
 ): OriginalStarterSetupInspection {
-  const inspection = inspectOriginalStarterSetupSync(db, actorId, campaignId);
+  const inspection = inspectionRepository.inspectOriginalStarterSetup(actorId, campaignId);
   if (inspection.status === "unavailable") {
     if (operation === "install") throw new ContentPackInstallationAuthorizationError();
     throw new CampaignContentConfigurationAuthorizationError();
@@ -3881,6 +3692,7 @@ function installContentPackSync(
   actorPrincipalId: string,
   input: InstallContentPackInput,
   originalStarterCampaignId?: string,
+  originalStarterSetupInspectionRepository?: OriginalStarterSetupInspectionRepository,
 ): ContentPack {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const starterCampaignId = originalStarterCampaignId === undefined
@@ -3910,7 +3722,9 @@ function installContentPackSync(
       // Full authority, campaign configuration, reserved profile, every pack
       // version, and every expected/captured definition are checked after the
       // IMMEDIATE lock is acquired, before any generic install decisions.
-      requireOriginalStarterInspectionForWrite(db, actorId, starterCampaignId, "install");
+      requireOriginalStarterInspectionForWrite(
+        originalStarterSetupInspectionRepository!, actorId, starterCampaignId, "install",
+      );
     } else {
       // Preserve the generic installation API's established authorization.
       const owner = db.prepare("SELECT principal_id FROM application_owner WHERE singleton = 1").get() as
@@ -3959,7 +3773,9 @@ function installContentPackSync(
     // This is deliberately the last statement before the first global write.
     // BEGIN IMMEDIATE prevents either authority from changing afterward.
     if (starterCampaignId !== undefined) {
-      requireOriginalStarterInspectionForWrite(db, actorId, starterCampaignId, "install");
+      requireOriginalStarterInspectionForWrite(
+        originalStarterSetupInspectionRepository!, actorId, starterCampaignId, "install",
+      );
     }
     if (!profileRow) {
       db.prepare(`INSERT INTO rpg_rules_profiles (rules_profile_id, name, description, tags)
@@ -4018,6 +3834,7 @@ function configureCampaignContentSync(
   campaignId: string,
   input: ConfigureCampaignContentInput,
   requireOriginalStarterAuthority = false,
+  originalStarterSetupInspectionRepository?: OriginalStarterSetupInspectionRepository,
 ): CampaignContentConfiguration {
   const actorId = resourceIdSchema.parse(actorPrincipalId);
   const id = resourceIdSchema.parse(campaignId);
@@ -4032,7 +3849,9 @@ function configureCampaignContentSync(
 
   return db.transaction(() => {
     if (requireOriginalStarterAuthority) {
-      requireOriginalStarterInspectionForWrite(db, actorId, id, "configure");
+      requireOriginalStarterInspectionForWrite(
+        originalStarterSetupInspectionRepository!, actorId, id, "configure",
+      );
     }
     const campaign = db.prepare("SELECT owner_principal_id FROM campaigns WHERE id = ?").get(id) as
       | { owner_principal_id: string }
@@ -4121,7 +3940,9 @@ function configureCampaignContentSync(
     // before the first configuration write. The IMMEDIATE lock closes the
     // remaining window through both profile and pin inserts.
     if (requireOriginalStarterAuthority) {
-      requireOriginalStarterInspectionForWrite(db, actorId, id, "configure");
+      requireOriginalStarterInspectionForWrite(
+        originalStarterSetupInspectionRepository!, actorId, id, "configure",
+      );
     }
     db.prepare(`INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id)
       VALUES (?, ?)`).run(id, normalized.rulesProfileId);
@@ -4134,315 +3955,15 @@ function configureCampaignContentSync(
   }).immediate();
 }
 
-const RULES_PROFILE_PROJECTION = "rp.rules_profile_id, rp.name, rp.description, rp.tags";
-const CONTENT_PACK_PROJECTION = `p.pack_id, p.pack_version, p.rules_profile_id,
-  p.name, p.description, p.tags`;
-const DEFINITION_PROJECTION = "d.kind, d.definition_id, d.name, d.description, d.tags";
-const DEFINITION_ORDER = `CASE d.kind
-      WHEN 'class' THEN 1 WHEN 'race' THEN 2 WHEN 'background' THEN 3 WHEN 'item' THEN 4
-      WHEN 'spell' THEN 5 WHEN 'ability' THEN 6 WHEN 'enemy' THEN 7 END ASC, d.definition_id ASC`;
-
-function listRulesProfilesSync(db: DatabaseDriver.Database, actorPrincipalId: string): RulesProfile[] {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const rows = db.prepare(`SELECT ${RULES_PROFILE_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_rules_profiles rp ON ao.principal_id = ?
-    WHERE ao.singleton = 1
-    ORDER BY rp.rules_profile_id ASC`).all(actorId) as RulesProfileRow[];
-  return rows.map(toRulesProfile);
-}
-
-function getRulesProfileSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  identifier: RulesProfileIdentifier,
-): RulesProfile | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const normalized = rulesProfileIdentifierSchema.parse(identifier);
-  const row = db.prepare(`SELECT ${RULES_PROFILE_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_rules_profiles rp ON ao.principal_id = ? AND rp.rules_profile_id = ?
-    WHERE ao.singleton = 1`).get(actorId, normalized.rulesProfileId) as RulesProfileRow | undefined;
-  return row ? toRulesProfile(row) : null;
-}
-
-function listContentPacksSync(db: DatabaseDriver.Database, actorPrincipalId: string): ContentPack[] {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const rows = db.prepare(`SELECT ${CONTENT_PACK_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_content_packs p ON ao.principal_id = ?
-    WHERE ao.singleton = 1 AND p.sealed = 1
-    ORDER BY p.pack_id ASC, p.pack_version ASC`).all(actorId) as ContentPackRow[];
-  return rows.map(toContentPack);
-}
-
-function getContentPackSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  identifier: ContentPackIdentifier,
-): ContentPack | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const normalized = contentPackIdentifierSchema.parse(identifier);
-  const row = db.prepare(`SELECT ${CONTENT_PACK_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_content_packs p ON ao.principal_id = ? AND p.pack_id = ? AND p.pack_version = ?
-    WHERE ao.singleton = 1 AND p.sealed = 1`).get(actorId, normalized.packId, normalized.packVersion) as ContentPackRow | undefined;
-  return row ? toContentPack(row) : null;
-}
-
-function listContentPackDefinitionsSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  identifier: ContentPackIdentifier,
-): RpgDefinition[] {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const normalized = contentPackIdentifierSchema.parse(identifier);
-  const rows = db.prepare(`SELECT ${DEFINITION_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_definitions d ON ao.principal_id = ? AND d.pack_id = ? AND d.pack_version = ?
-    JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
-    WHERE ao.singleton = 1
-    ORDER BY ${DEFINITION_ORDER}`).all(actorId, normalized.packId, normalized.packVersion) as RpgDefinitionRow[];
-  return rows.map(toRpgDefinition);
-}
-
-function getContentPackDefinitionSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  reference: DefinitionReference,
-): RpgDefinition | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const normalized = definitionReferenceSchema.parse(reference);
-  const row = db.prepare(`SELECT ${DEFINITION_PROJECTION}
-    FROM application_owner ao
-    JOIN rpg_definitions d ON ao.principal_id = ? AND d.pack_id = ? AND d.pack_version = ?
-      AND d.kind = ? AND d.definition_id = ?
-    JOIN rpg_content_packs p ON p.pack_id = d.pack_id AND p.pack_version = d.pack_version AND p.sealed = 1
-    WHERE ao.singleton = 1`).get(
-      actorId,
-      normalized.packId,
-      normalized.packVersion,
-      normalized.kind,
-      normalized.definitionId,
-    ) as RpgDefinitionRow | undefined;
-  return row ? toRpgDefinition(row) : null;
-}
-
-function getCampaignRulesProfileSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): RulesProfile | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const row = db.prepare(`SELECT ${RULES_PROFILE_PROJECTION}
-    FROM campaign_memberships cm
-    JOIN campaign_rules_profiles crp ON crp.campaign_id = cm.campaign_id
-    JOIN rpg_rules_profiles rp ON rp.rules_profile_id = crp.rules_profile_id
-    WHERE cm.principal_id = ? AND cm.campaign_id = ?`).get(actorId, id) as RulesProfileRow | undefined;
-  return row ? toRulesProfile(row) : null;
-}
-
 function getCampaignDetailSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
   campaignId: string,
 ): CampaignDetail | null {
-  const campaign = createCampaignAccessRepository(db).getCampaign(actorPrincipalId, campaignId);
-  if (!campaign) return null;
-  const configuration = getCampaignContentConfigurationReadSync(db, actorPrincipalId, campaignId);
-  return campaignDetailSchema.parse({
-    id: campaign.id,
-    name: campaign.name,
-    actorRole: campaign.actorRole,
-    createdAt: campaign.createdAt,
-    updatedAt: campaign.updatedAt,
-    content: configuration
-      ? {
-        status: "configured",
-        rulesProfileId: configuration.rulesProfileId,
-        contentPacks: configuration.contentPacks,
-      }
-      : { status: "unconfigured" },
-  });
-}
-
-function inspectOriginalStarterSetupSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): OriginalStarterSetupInspection {
-  const actor = resourceIdSchema.safeParse(actorPrincipalId);
-  const id = resourceIdSchema.safeParse(campaignId);
-  if (!actor.success || !id.success) return { status: "unavailable" };
-
-  // Check both authorities before reserved identities to avoid disclosing state.
-  const authority = db.prepare(`SELECT ao.principal_id, p.id AS principal_parent_id, p.is_local,
-      (SELECT COUNT(*) FROM application_owner) AS owner_count
-    FROM application_owner ao JOIN principals p ON p.id = ao.principal_id
-    WHERE ao.singleton = 1`).get() as
-      | { principal_id: string; principal_parent_id: string; is_local: number; owner_count: number }
-      | undefined;
-  if (!authority || authority.owner_count !== 1 || authority.principal_id !== actor.data
-    || authority.principal_parent_id !== actor.data || authority.is_local !== 1) {
-    return { status: "unavailable" };
-  }
-  const ownership = db.prepare(`SELECT c.owner_principal_id, owner_principal.id AS owner_parent_id,
-      cm.campaign_id AS membership_campaign_id, cm.principal_id AS membership_principal_id,
-      cm.role, cm.created_at AS membership_created_at,
-      (SELECT COUNT(*) FROM campaign_memberships owner_lock
-        WHERE owner_lock.campaign_id = c.id AND owner_lock.role = 'owner') AS owner_count
-    FROM campaigns c
-    LEFT JOIN principals owner_principal ON owner_principal.id = c.owner_principal_id
-    LEFT JOIN campaign_memberships cm
-      ON cm.campaign_id = c.id AND cm.principal_id = ?
-    WHERE c.id = ?`).get(actor.data, id.data) as
-      | { owner_principal_id: string; owner_parent_id: string | null; membership_campaign_id: unknown;
-          membership_principal_id: unknown; role: unknown; membership_created_at: unknown; owner_count: number }
-      | undefined;
-  const ownerMembership = ownership && campaignMembershipReadSchema.safeParse({
-    campaignId: ownership.membership_campaign_id,
-    principalId: ownership.membership_principal_id,
-    role: ownership.role,
-    createdAt: ownership.membership_created_at,
-  });
-  if (!ownership || !ownerMembership || !ownerMembership.success
-    || ownership.owner_principal_id !== actor.data || ownership.owner_parent_id !== actor.data
-    || ownerMembership.data.campaignId !== id.data || ownerMembership.data.principalId !== actor.data
-    || ownerMembership.data.role !== "owner" || ownership.owner_count !== 1) {
-    return { status: "unavailable" };
-  }
-
-  // Validate the attributable campaign row before classifying reserved state,
-  // so an exact content pointer cannot hide unrelated campaign corruption.
-  if (!createCampaignAccessRepository(db).getCampaign(actor.data, id.data)) return { status: "unavailable" };
-
-  // Inspect only raw configuration identities before detail reconstruction.
-  // An exact starter pointer whose required profile/pack has disappeared (or
-  // is malformed) is a stable reserved-namespace conflict, not an incidental
-  // failure of the general detail projection. Other malformed configurations
-  // still flow through the ordinary detail validator below and remain loud.
-  const selectedIdentity = db.prepare(`SELECT campaign_id, rules_profile_id
-    FROM campaign_rules_profiles WHERE campaign_id = ?`).get(id.data) as
-    | { campaign_id: string; rules_profile_id: string }
-    | undefined;
-  const pinIdentities = db.prepare(`SELECT campaign_id, pack_id, pack_version, rules_profile_id
-    FROM campaign_content_packs WHERE campaign_id = ? ORDER BY rowid ASC`).all(id.data) as Array<{
-      campaign_id: string;
-      pack_id: string;
-      pack_version: string;
-      rules_profile_id: string;
-    }>;
-  const pointsExactlyToStarter = selectedIdentity?.campaign_id === id.data
-    && selectedIdentity.rules_profile_id === ORIGINAL_STARTER_RULES_PROFILE_ID
-    && pinIdentities.length === 1
-    && pinIdentities[0]?.campaign_id === id.data
-    && pinIdentities[0]?.rules_profile_id === ORIGINAL_STARTER_RULES_PROFILE_ID
-    && pinIdentities[0]?.pack_id === ORIGINAL_STARTER_PACK_ID
-    && pinIdentities[0]?.pack_version === ORIGINAL_STARTER_PACK_VERSION;
-  if (pointsExactlyToStarter) {
-    const requiredProfile = db.prepare(`SELECT rules_profile_id, name, description, tags
-      FROM rpg_rules_profiles WHERE rules_profile_id = ?`)
-      .get(ORIGINAL_STARTER_RULES_PROFILE_ID) as RulesProfileRow | undefined;
-    const requiredPack = db.prepare(`SELECT pack_id, pack_version, rules_profile_id, name, description, tags, sealed
-      FROM rpg_content_packs WHERE pack_id = ? AND pack_version = ?`)
-      .get(ORIGINAL_STARTER_PACK_ID, ORIGINAL_STARTER_PACK_VERSION) as
-      | (ContentPackRow & { sealed: number })
-      | undefined;
-    try {
-      if (!requiredProfile || !requiredPack || requiredPack.sealed !== 1
-        || requiredPack.rules_profile_id !== ORIGINAL_STARTER_RULES_PROFILE_ID
-        || !sameMetadata(toRulesProfile(requiredProfile), ORIGINAL_STARTER_MANIFEST.rulesProfile)
-        || !sameMetadata(toContentPack(requiredPack), ORIGINAL_STARTER_MANIFEST)) {
-        return { status: "conflict" };
-      }
-    } catch {
-      return { status: "conflict" };
-    }
-  }
-
-  const campaign = getCampaignDetailSync(db, actor.data, id.data);
-  if (!campaign) return { status: "unavailable" };
-  const exactConfiguration = campaign.content.status === "configured"
-    && campaign.content.rulesProfileId === ORIGINAL_STARTER_RULES_PROFILE_ID
-    && campaign.content.contentPacks.length === 1
-    && campaign.content.contentPacks[0]?.packId === ORIGINAL_STARTER_PACK_ID
-    && campaign.content.contentPacks[0]?.packVersion === ORIGINAL_STARTER_PACK_VERSION;
-  if (campaign.content.status === "configured" && !exactConfiguration) return { status: "conflict" };
-
-  const profile = db.prepare(`SELECT rules_profile_id, name, description, tags
-    FROM rpg_rules_profiles WHERE rules_profile_id = ?`)
-    .get(ORIGINAL_STARTER_RULES_PROFILE_ID) as RulesProfileRow | undefined;
-  const packs = db.prepare(`SELECT pack_id, pack_version, rules_profile_id, name, description, tags, sealed
-    FROM rpg_content_packs WHERE pack_id = ? ORDER BY pack_version`)
-    .all(ORIGINAL_STARTER_PACK_ID) as Array<ContentPackRow & { sealed: number }>;
-  if (packs.some((pack) => pack.pack_version !== ORIGINAL_STARTER_PACK_VERSION) || packs.length > 1) {
-    return { status: "conflict" };
-  }
-
-  const expectedDefinitions = [
-    ...ORIGINAL_STARTER_MANIFEST.classes, ...ORIGINAL_STARTER_MANIFEST.races,
-    ...ORIGINAL_STARTER_MANIFEST.backgrounds, ...ORIGINAL_STARTER_MANIFEST.items,
-    ...ORIGINAL_STARTER_MANIFEST.spells, ...ORIGINAL_STARTER_MANIFEST.abilities,
-    ...ORIGINAL_STARTER_MANIFEST.enemies,
-  ];
-  const placeholders = expectedDefinitions.map(() => "?").join(", ");
-  // Compare every row owned by the reserved pack (including unexpected kinds
-  // and IDs), while also finding expected reserved IDs captured elsewhere.
-  const reservedDefinitions = db.prepare(`SELECT pack_id, pack_version, kind, definition_id, name, description, tags
-    FROM rpg_definitions
-    WHERE pack_id = ? OR definition_id IN (${placeholders})`)
-    .all(
-      ORIGINAL_STARTER_PACK_ID,
-      ...expectedDefinitions.map((definition) => definition.definitionId),
-    ) as
-      Array<RpgDefinitionRow & { pack_id: string; pack_version: string }>;
-  if (reservedDefinitions.some((definition) => definition.pack_id !== ORIGINAL_STARTER_PACK_ID
-    || definition.pack_version !== ORIGINAL_STARTER_PACK_VERSION)) return { status: "conflict" };
-
-  const pack = packs[0];
-  try {
-    if (profile && !sameMetadata(toRulesProfile(profile), ORIGINAL_STARTER_MANIFEST.rulesProfile)) {
-      return { status: "conflict" };
-    }
-    if (pack) {
-      if (!profile || pack.sealed !== 1 || pack.rules_profile_id !== ORIGINAL_STARTER_RULES_PROFILE_ID
-        || !sameMetadata(toContentPack(pack), ORIGINAL_STARTER_MANIFEST)) return { status: "conflict" };
-    let installed: Map<string, RpgDefinition>;
-      installed = new Map(reservedDefinitions.map((row) => {
-          const definition = toRpgDefinition(row);
-          return [`${definition.kind}:${definition.definitionId}`, definition];
-        }));
-      if (installed.size !== expectedDefinitions.length || expectedDefinitions.some((definition) => {
-        const persisted = installed.get(`${definition.kind}:${definition.definitionId}`);
-        return !persisted || !sameMetadata(persisted, definition);
-      })) return { status: "conflict" };
-    } else if (reservedDefinitions.length > 0) {
-      return { status: "conflict" };
-    }
-  } catch {
-    return { status: "conflict" };
-  }
-
-  if (exactConfiguration && pack) return { status: "exact", campaign };
-  return { status: "unconfigured", campaign };
-}
-
-function listCampaignContentPacksSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): ContentPack[] {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const rows = db.prepare(`SELECT ${CONTENT_PACK_PROJECTION}
-    FROM campaign_memberships cm
-    JOIN campaign_content_packs cp ON cp.campaign_id = cm.campaign_id
-    JOIN rpg_content_packs p ON p.pack_id = cp.pack_id AND p.pack_version = cp.pack_version
-      AND p.rules_profile_id = cp.rules_profile_id AND p.sealed = 1
-    WHERE cm.principal_id = ? AND cm.campaign_id = ?
-    ORDER BY p.pack_id ASC, p.pack_version ASC`).all(actorId, id) as ContentPackRow[];
-  return rows.map(toContentPack);
+  return createCampaignDetailReadRepository({
+    getCampaign: (actor, id) => createCampaignAccessRepository(db).getCampaign(actor, id),
+    getCampaignContentConfiguration: (actor, id) => getCampaignContentConfigurationReadSync(db, actor, id),
+  }).getCampaignDetail(actorPrincipalId, campaignId);
 }
 
 function listCampaignContentPackDefinitionsSync(
@@ -4611,8 +4132,20 @@ function runTransaction<T>(
   const campaignActorResourceRepository = createCampaignActorResourceRepository(db);
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
-  const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db, projectLegacyRoomText);
+  const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
+  const campaignDetailReadRepository = createCampaignDetailReadRepository({
+    getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
+    getCampaignContentConfiguration: (actor, campaignId) =>
+      campaignContentConfigurationReadRepository.getCampaignContentConfiguration(actor, campaignId),
+  });
+  const campaignGlobalContentReadRepository = createCampaignGlobalContentReadRepository(db);
+  const campaignContentSelectionReadRepository = createCampaignContentSelectionReadRepository(db, {
+    rulesProfileProjection: RULES_PROFILE_PROJECTION,
+    contentPackProjection: CONTENT_PACK_PROJECTION,
+    toRulesProfile,
+    toContentPack,
+  });
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -4657,7 +4190,7 @@ function runTransaction<T>(
     getCampaignDetail: (actorPrincipalId, campaignId) => {
       assertActive();
       // runTransaction owns the snapshot for all composed aggregate reads.
-      return getCampaignDetailSync(db, actorPrincipalId, campaignId);
+      return campaignDetailReadRepository.getCampaignDetail(actorPrincipalId, campaignId);
     },
     listCampaignTimelines: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -4745,35 +4278,35 @@ function runTransaction<T>(
     },
     listRulesProfiles: (actorPrincipalId) => {
       assertActive();
-      return listRulesProfilesSync(db, actorPrincipalId);
+      return campaignGlobalContentReadRepository.listRulesProfiles(actorPrincipalId);
     },
     getRulesProfile: (actorPrincipalId, identifier) => {
       assertActive();
-      return getRulesProfileSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.getRulesProfile(actorPrincipalId, identifier);
     },
     listContentPacks: (actorPrincipalId) => {
       assertActive();
-      return listContentPacksSync(db, actorPrincipalId);
+      return campaignGlobalContentReadRepository.listContentPacks(actorPrincipalId);
     },
     getContentPack: (actorPrincipalId, identifier) => {
       assertActive();
-      return getContentPackSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.getContentPack(actorPrincipalId, identifier);
     },
     listContentPackDefinitions: (actorPrincipalId, identifier) => {
       assertActive();
-      return listContentPackDefinitionsSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.listContentPackDefinitions(actorPrincipalId, identifier);
     },
     getContentPackDefinition: (actorPrincipalId, reference) => {
       assertActive();
-      return getContentPackDefinitionSync(db, actorPrincipalId, reference);
+      return campaignGlobalContentReadRepository.getContentPackDefinition(actorPrincipalId, reference);
     },
     getCampaignRulesProfile: (actorPrincipalId, campaignId) => {
       assertActive();
-      return getCampaignRulesProfileSync(db, actorPrincipalId, campaignId);
+      return campaignContentSelectionReadRepository.getCampaignRulesProfile(actorPrincipalId, campaignId);
     },
     listCampaignContentPacks: (actorPrincipalId, campaignId) => {
       assertActive();
-      return listCampaignContentPacksSync(db, actorPrincipalId, campaignId);
+      return campaignContentSelectionReadRepository.listCampaignContentPacks(actorPrincipalId, campaignId);
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertActive();
@@ -4831,8 +4364,29 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignAccessRepository = createCampaignAccessRepository(db);
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
-  const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db, projectLegacyRoomText);
+  const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
+  const campaignRoomSessionLifecycleRepository = createCampaignRoomSessionLifecycleRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
+  const campaignDetailReadRepository = createCampaignDetailReadRepository({
+    getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
+    getCampaignContentConfiguration: (actor, campaignId) =>
+      campaignContentConfigurationReadRepository.getCampaignContentConfiguration(actor, campaignId),
+  });
+  const originalStarterSetupInspectionRepository = createOriginalStarterSetupInspectionRepository(db, {
+    getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
+    getCampaignDetail: (actor, campaignId) => campaignDetailReadRepository.getCampaignDetail(actor, campaignId),
+    toRulesProfile,
+    toContentPack,
+    toRpgDefinition,
+    sameMetadata,
+  });
+  const campaignGlobalContentReadRepository = createCampaignGlobalContentReadRepository(db);
+  const campaignContentSelectionReadRepository = createCampaignContentSelectionReadRepository(db, {
+    rulesProfileProjection: RULES_PROFILE_PROJECTION,
+    contentPackProjection: CONTENT_PACK_PROJECTION,
+    toRulesProfile,
+    toContentPack,
+  });
   const campaignCoreRepository = createCampaignCoreRepository({
     createCampaign: (actor, input) => createCampaignSyncInternal(db, dependencies, actor, input),
     renameCampaign: (actor, campaignId, input) => renameCampaignSyncInternal(db, dependencies.clock, actor, campaignId, input),
@@ -4855,10 +4409,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(actor, campaignId, sessionId),
     getCampaignRoomLinkingSnapshot: (actor, campaignId) =>
       campaignRoomLinkingSnapshotRepository.getCampaignRoomLinkingSnapshot(actor, campaignId),
-    getCampaignRoomSessionLifecycle: (sessionId) => {
-      const row = getCampaignRoomSessionIntegrityRowInternal(db, sessionId);
-      return row ? validateCampaignRoomSessionIntegrityInternal(row) : null;
-    },
+    getCampaignRoomSessionLifecycle: (sessionId) =>
+      campaignRoomSessionLifecycleRepository.getCampaignRoomSessionLifecycle(sessionId),
   },
     (campaignId, actor, type, payload, result, occurredAt) =>
       recordCompatibilityAdministrationAuditInternal(db, campaignId, actor, type, payload, result, occurredAt));
@@ -4971,7 +4523,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     inspectOriginalStarterSetup: (actorPrincipalId, campaignId) => {
       assertOpen();
       // One SQLite read transaction owns authority, campaign and content state.
-      return db.transaction(() => inspectOriginalStarterSetupSync(db, actorPrincipalId, campaignId))();
+      return db.transaction(() =>
+        originalStarterSetupInspectionRepository.inspectOriginalStarterSetup(actorPrincipalId, campaignId))();
     },
     installOriginalStarterContent: (actorPrincipalId, campaignId) => {
       assertOpen();
@@ -4981,6 +4534,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
         actorPrincipalId,
         installContentPackInputSchema.parse(ORIGINAL_STARTER_MANIFEST),
         campaignId,
+        originalStarterSetupInspectionRepository,
       );
     },
     configureOriginalStarterContent: (actorPrincipalId, campaignId) => {
@@ -4989,7 +4543,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       return configureCampaignContentSync(db, actorPrincipalId, campaignId, {
         rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE_ID,
         contentPacks: [{ packId: ORIGINAL_STARTER_PACK_ID, packVersion: ORIGINAL_STARTER_PACK_VERSION }],
-      }, true);
+      }, true, originalStarterSetupInspectionRepository);
     },
     listCampaigns: (actorPrincipalId) => {
       assertOpen();
@@ -5003,7 +4557,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       assertOpen();
       // Both authorization and content graph reconstruction must observe the
       // same SQLite snapshot; do not split this aggregate across requests.
-      return db.transaction(() => getCampaignDetailSync(db, actorPrincipalId, campaignId))();
+      return db.transaction(() => campaignDetailReadRepository.getCampaignDetail(actorPrincipalId, campaignId))();
     },
     listCampaignTimelines: (actorPrincipalId, campaignId) => {
       assertOpen();
@@ -5094,35 +4648,35 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     listRulesProfiles: (actorPrincipalId) => {
       assertOpen();
-      return listRulesProfilesSync(db, actorPrincipalId);
+      return campaignGlobalContentReadRepository.listRulesProfiles(actorPrincipalId);
     },
     getRulesProfile: (actorPrincipalId, identifier) => {
       assertOpen();
-      return getRulesProfileSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.getRulesProfile(actorPrincipalId, identifier);
     },
     listContentPacks: (actorPrincipalId) => {
       assertOpen();
-      return listContentPacksSync(db, actorPrincipalId);
+      return campaignGlobalContentReadRepository.listContentPacks(actorPrincipalId);
     },
     getContentPack: (actorPrincipalId, identifier) => {
       assertOpen();
-      return getContentPackSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.getContentPack(actorPrincipalId, identifier);
     },
     listContentPackDefinitions: (actorPrincipalId, identifier) => {
       assertOpen();
-      return listContentPackDefinitionsSync(db, actorPrincipalId, identifier);
+      return campaignGlobalContentReadRepository.listContentPackDefinitions(actorPrincipalId, identifier);
     },
     getContentPackDefinition: (actorPrincipalId, reference) => {
       assertOpen();
-      return getContentPackDefinitionSync(db, actorPrincipalId, reference);
+      return campaignGlobalContentReadRepository.getContentPackDefinition(actorPrincipalId, reference);
     },
     getCampaignRulesProfile: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignRulesProfileSync(db, actorPrincipalId, campaignId);
+      return campaignContentSelectionReadRepository.getCampaignRulesProfile(actorPrincipalId, campaignId);
     },
     listCampaignContentPacks: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return listCampaignContentPacksSync(db, actorPrincipalId, campaignId);
+      return campaignContentSelectionReadRepository.listCampaignContentPacks(actorPrincipalId, campaignId);
     },
     listCampaignContentPackDefinitions: (actorPrincipalId, campaignId, identifier) => {
       assertOpen();
