@@ -1,7 +1,8 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import DatabaseDriver from "better-sqlite3";
 import { createHash } from "node:crypto";
-import { canonicalCatalogJson, deriveCatalogVisibility, validateContentCatalog } from "../../contentCatalogRepo.js";
+import { canonicalCatalogJson, validateContentCatalog } from "../../contentCatalog/index.js";
+import { deriveCatalogVisibility } from "../../contentCatalog/catalogVisibility.js";
 
 /** Additive v16 catalog sidecars; existing v10 content tables are unchanged. */
 export function createContentCatalogV16(db: DatabaseDriver.Database): void {

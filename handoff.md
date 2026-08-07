@@ -1,5 +1,5 @@
 # Handoff
-## Completed: Task 6a: extract character-builder draft row types and view mapper
+## Completed: Task 5a/5b: thin content-catalog facade and extract visibility helpers
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: `characterBuilder/characterBuilderRowTypes.ts` owns `DraftRow`, `rowFor`, `pinsFor`, and `buildView`, with TSDoc. `characterBuilderRepo.ts` supplies view-mapper callbacks for catalog/domain behavior, preventing an import cycle back to repository orchestration. Root typecheck passed with `TMPDIR=/home/mojo/projects/velvet-mvp/.tmp`. Per request, `devplan.md` and `.tmp` were not modified intentionally, and no commit was created. Existing unrelated worktree changes remain.
-## Files Modified: server/src/repo/characterBuilder/characterBuilderRowTypes.ts; server/src/repo/characterBuilderRepo.ts; handoff.md
+## Context: `contentCatalogRepo.ts` is now a 3,894-byte facade over catalog read/write factories. Visibility derivation and verification moved to `contentCatalog/catalogVisibility.ts`; `readVerifiedPublicDefinitionKeys` moved to `catalogReadRepo.ts`. Direct migration and orchestration imports now use those owning modules. Root typecheck passed with `TMPDIR=/home/mojo/projects/velvet-mvp/.tmp`. The focused catalog test could not start because `/tmp` is full (`ENOSPC`); root filesystem has free space. Per request, `devplan.md` and `.tmp` were not intentionally modified, and no commit was created. Existing unrelated worktree changes remain.
+## Files Modified: server/src/repo/contentCatalogRepo.ts; server/src/repo/contentCatalog/catalogVisibility.ts; server/src/repo/contentCatalog/catalogReadRepo.ts; server/src/repo/campaignRepositoryOrchestration.ts; server/src/repo/db/migrations/v16_v18_catalog.ts; handoff.md

@@ -27,13 +27,18 @@ import {
   type PublicationSummary,
   type PublishContentCatalogInput,
 } from "@velvet/contracts";
+import {
+  type PersistedCatalogVisibilityRow,
+  verifyCatalogVisibilityProjection,
+} from "./catalogVisibility.js";
+import { canonicalCatalogJson } from "./catalogValidation.js";
 
 /** Input accepted by the validated-publication page reader. */
 export interface ContentCatalogPublicationPageInput { status: "validated"; cursor?: string; limit?: number; }
 /** A deterministic page of validated publication summaries. */
 export interface ContentCatalogPublicationPage { publications: PublicationSummary[]; nextCursor: string | null; }
 /** Persisted, attestable role-visibility record. */
-export interface PersistedCatalogVisibilityRow { kind: CatalogDefinitionKind; definition_id: string; public_definition_json: string; public_dependencies_json: string; private_dependencies_json: string; row_digest: string; publicly_reachable: number; }
+export type { PersistedCatalogVisibilityRow } from "./catalogVisibility.js";
 
 interface PublicationRow { pack_id: string; pack_version: string; name: string; description: string; tags: string; rules_profile_id: string; manifest_digest: string; manifest_json: string; provenance_json: string; validation_report_json: string; published_at: string; definition_count: number; definition_counts_json: string; publication_digest: string; public_projection_digest: string; public_projection_count: number; }
 interface Projectors { canonicalCatalogJson(value: unknown): string; validateContentCatalog(input: unknown): CatalogValidationReport; verifyCatalogVisibilityProjection(input: { packId: string; packVersion: string; expectedCount: number; publicationDigest: string; manifestDigest: string; aggregateDigest: string; rows: PersistedCatalogVisibilityRow[] }): unknown[]; }
@@ -41,16 +46,72 @@ const PUBLICATION_SELECT = `SELECT pack.pack_id,pack.pack_version,pack.rules_pro
 const MAX_PUBLICATION_PAGE_SIZE = 100;
 const binaryCompare = (left: string, right: string): number => left < right ? -1 : left > right ? 1 : 0;
 
+/**
+ * Verifies persisted visibility data before returning legacy public definition
+ * identities. Callers must not trust `publicly_reachable` directly.
+ */
+export function readVerifiedPublicDefinitionKeys(
+  db: DatabaseDriver.Database,
+  packId: string,
+  packVersion: string,
+): Set<string> {
+  const publication = db.prepare(`${PUBLICATION_SELECT} AND pack.pack_id=? AND pack.pack_version=?`)
+    .get(packId, packVersion) as PublicationRow | undefined;
+  if (!publication) throw new Error("validated content publication attestation is missing");
+  publicationSummary(publication, canonicalCatalogJson);
+  const rows = db.prepare(`SELECT kind,definition_id,public_definition_json,public_dependencies_json,
+    private_dependencies_json,row_digest,publicly_reachable FROM rpg_catalog_definition_visibility
+    WHERE pack_id=? AND pack_version=? ORDER BY kind COLLATE BINARY,definition_id COLLATE BINARY`)
+    .all(packId, packVersion) as PersistedCatalogVisibilityRow[];
+  return new Set(verifyCatalogVisibilityProjection({
+    packId,
+    packVersion,
+    expectedCount: publication.definition_count,
+    rows,
+    publicationDigest: publication.publication_digest,
+    manifestDigest: publication.manifest_digest,
+    aggregateDigest: publication.public_projection_digest,
+  }).map((definition) => {
+    const parsed = memberCatalogDefinitionSchema.parse(definition);
+    const kind = parsed.reference.kind === "enemy-template" ? "enemy" : parsed.reference.kind;
+    return `${kind}\0${parsed.reference.definitionId}`;
+  }));
+}
+
+/** Validates and projects an attested publication summary from persisted fields. */
+function publicationSummary(
+  row: PublicationRow,
+  canonicalJson: (value: unknown) => string,
+): PublicationSummary {
+  const manifest = publishContentCatalogInputSchema.shape.manifest.parse(JSON.parse(row.manifest_json));
+  if (manifest.packId !== row.pack_id || manifest.packVersion !== row.pack_version
+    || manifest.compatibility.rulesProfileId !== row.rules_profile_id || manifest.digest !== row.manifest_digest
+    || manifest.name !== row.name || manifest.description !== row.description || JSON.stringify(manifest.tags) !== row.tags) {
+    throw new Error("persisted content publication manifest is inconsistent");
+  }
+  const report = catalogValidationReportSchema.parse(JSON.parse(row.validation_report_json));
+  if (!report.valid || report.issues.length !== 0 || report.normalizedSummary.digest !== row.manifest_digest
+    || report.normalizedSummary.totalDefinitions !== row.definition_count
+    || canonicalJson(report.normalizedSummary.counts) !== canonicalJson(JSON.parse(row.definition_counts_json))) {
+    throw new Error("persisted content publication report is inconsistent");
+  }
+  return publicationSummarySchema.parse({
+    packId: row.pack_id,
+    packVersion: row.pack_version,
+    name: row.name,
+    description: row.description,
+    tags: JSON.parse(row.tags),
+    compatibility: manifest.compatibility,
+    digest: row.manifest_digest,
+    validationLevel: CONTENT_VALIDATION_LEVEL,
+    publishedAt: row.published_at,
+  });
+}
+
 /** Builds the database-backed, non-mutating content-catalog operations. */
 export function createCatalogReadRepository(db: DatabaseDriver.Database, projectors: Projectors) {
   const isApplicationOwner = (actor: string): boolean => !!db.prepare(`SELECT 1 FROM application_owner owner JOIN principals principal ON principal.id=owner.principal_id WHERE owner.singleton=1 AND owner.principal_id=?`).get(actor);
-  const summary = (row: PublicationRow): PublicationSummary => {
-    const manifest = publishContentCatalogInputSchema.shape.manifest.parse(JSON.parse(row.manifest_json));
-    if (manifest.packId !== row.pack_id || manifest.packVersion !== row.pack_version || manifest.compatibility.rulesProfileId !== row.rules_profile_id || manifest.digest !== row.manifest_digest || manifest.name !== row.name || manifest.description !== row.description || JSON.stringify(manifest.tags) !== row.tags) throw new Error("persisted content publication manifest is inconsistent");
-    const report = catalogValidationReportSchema.parse(JSON.parse(row.validation_report_json));
-    if (!report.valid || report.issues.length !== 0 || report.normalizedSummary.digest !== row.manifest_digest || report.normalizedSummary.totalDefinitions !== row.definition_count || projectors.canonicalCatalogJson(report.normalizedSummary.counts) !== projectors.canonicalCatalogJson(JSON.parse(row.definition_counts_json))) throw new Error("persisted content publication report is inconsistent");
-    return publicationSummarySchema.parse({ packId: row.pack_id, packVersion: row.pack_version, name: row.name, description: row.description, tags: JSON.parse(row.tags), compatibility: manifest.compatibility, digest: row.manifest_digest, validationLevel: CONTENT_VALIDATION_LEVEL, publishedAt: row.published_at });
-  };
+  const summary = (row: PublicationRow): PublicationSummary => publicationSummary(row, projectors.canonicalCatalogJson);
   const publicationRow = (packId: string, packVersion: string): PublicationRow | undefined => db.prepare(`${PUBLICATION_SELECT} AND pack.pack_id=? AND pack.pack_version=?`).get(packId, packVersion) as PublicationRow | undefined;
   const readDefinitions = (packId: string, packVersion: string): CatalogDefinition[] => (db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? ORDER BY kind COLLATE BINARY,definition_id COLLATE BINARY`).all(packId, packVersion) as Array<{ definition_json: string }>).map((row) => catalogDefinitionSchema.parse(JSON.parse(row.definition_json)));
   const legacyKind = (kind: CatalogDefinitionKind): "race" | "background" | "class" | "item" | "spell" | "ability" | "enemy" | null => kind === "enemy-template" ? "enemy" : kind === "race" || kind === "background" || kind === "class" || kind === "item" || kind === "spell" || kind === "ability" ? kind : null;

@@ -61,11 +61,13 @@ import {
 } from "./campaignAdministrationRepo.js";
 import {
   createContentCatalogRepository,
-  verifyCatalogVisibilityProjection,
-  validateContentCatalog,
-  type PersistedCatalogVisibilityRow,
   type ContentCatalogRepository,
 } from "./contentCatalogRepo.js";
+import { validateContentCatalog } from "./contentCatalog/index.js";
+import {
+  verifyCatalogVisibilityProjection,
+  type PersistedCatalogVisibilityRow,
+} from "./contentCatalog/catalogVisibility.js";
 import {
   createCharacterBuilderRepository,
   type CharacterBuilderRepository,
