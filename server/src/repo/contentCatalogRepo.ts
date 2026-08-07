@@ -39,6 +39,7 @@ import {
   type PublishContentCatalogInput,
 } from "@velvet/contracts";
 import type { Clock } from "../runtime.js";
+import { createCatalogReadRepository } from "./contentCatalog/catalogReadRepo.js";
 
 const KINDS = catalogDefinitionKindSchema.options;
 
@@ -831,54 +832,20 @@ export function createContentCatalogRepository(
   clock: Clock,
   mutationGuard: () => void,
 ): ContentCatalogRepository {
+  const reads = createCatalogReadRepository(db, {
+    canonicalCatalogJson,
+    validateContentCatalog,
+    verifyCatalogVisibilityProjection,
+  });
   return {
     validateContentCatalog,
     publishContentCatalog: (actor, input) => { mutationGuard(); return publish(db, clock, actor, input); },
-    listContentCatalogPublications: (actor) => {
-      if (!isApplicationOwner(db, actor)) return [];
-      return (db.prepare(`${PUBLICATION_SELECT} ORDER BY pack.pack_id COLLATE BINARY,pack.pack_version COLLATE BINARY`).all() as PublicationRow[])
-        .map((row) => { validateStoredPublication(db, row); return summary(row); });
-    },
-    listContentCatalogPublicationPage: (actor, input) => {
-      const { cursor, limit } = parsePublicationPageInput(input);
-      if (!isApplicationOwner(db, actor)) return { publications: [], nextCursor: null };
-      const cursorClause = cursor === null ? "" : ` AND (pack.pack_id COLLATE BINARY > ?
-        OR (pack.pack_id COLLATE BINARY = ? AND pack.pack_version COLLATE BINARY > ?))`;
-      const rows = db.prepare(`${PUBLICATION_SELECT}${cursorClause}
-        ORDER BY pack.pack_id COLLATE BINARY,pack.pack_version COLLATE BINARY LIMIT ?`)
-        .all(...(cursor === null ? [] : [cursor[0], cursor[0], cursor[1]]), limit + 1) as PublicationRow[];
-      const hasNextPage = rows.length > limit;
-      const publications = rows.slice(0, limit).map((row) => { validateStoredPublication(db, row); return summary(row); });
-      const last = publications.at(-1);
-      return { publications, nextCursor: hasNextPage && last ? encodePublicationCursor(last.packId, last.packVersion) : null };
-    },
-    getContentCatalogForOwner: (actor, packIdValue, packVersion) => {
-      const packId = contentPackIdSchema.parse(packIdValue);
-      const version = contentPackVersionSchema.parse(packVersion);
-      if (!isApplicationOwner(db, actor)) return null;
-      const row = publicationRow(db, packId, version);
-      return row ? ownerProjection(db, row) : null;
-    },
-    getCampaignContentCatalog: (actor, campaignIdValue, packIdValue, packVersion) => {
-      const campaignId = resourceIdSchema.parse(campaignIdValue);
-      const packId = contentPackIdSchema.parse(packIdValue);
-      const version = contentPackVersionSchema.parse(packVersion);
-      const role = campaignAuthority(db, actor, campaignId);
-      if (!role) return null;
-      if (!db.prepare(`SELECT 1 FROM campaign_catalog_current_pins WHERE campaign_id=? AND pack_id=? AND pack_version=?`).get(campaignId, packId, version)) return null;
-      const row = publicationRow(db, packId, version);
-      if (!row) throw new Error("persisted campaign catalog publication is missing");
-      if (role === "owner" || role === "gm") {
-        const validated = validateStoredPublication(db, row);
-        return gmCatalogProjectionSchema.parse({ publication: summary(row), definitions: validated.definitions });
-      }
-      const safe = readPublicDefinitions(db, packId, version, row.definition_count);
-      return role === "player"
-        ? playerCatalogProjectionSchema.parse({ publication: summary(row), definitions: safe })
-        : observerCatalogProjectionSchema.parse({ publication: summary(row), definitions: safe.map(observerDefinition) });
-    },
+    listContentCatalogPublications: reads.listContentCatalogPublications,
+    listContentCatalogPublicationPage: reads.listContentCatalogPublicationPage,
+    getContentCatalogForOwner: reads.getContentCatalogForOwner,
+    getCampaignContentCatalog: reads.getCampaignContentCatalog,
     configureCampaignCatalog: (actor, campaignId, input) => { mutationGuard(); return configure(db, clock, actor, campaignId, input); },
-    resolveCampaignCatalog: (actor, campaignId) => resolve(db, actor, campaignId),
-    getCampaignCatalogReceipt: (actor, campaignId, commandId) => getReceipt(db, actor, campaignId, commandId),
+    resolveCampaignCatalog: reads.resolveCampaignCatalog,
+    getCampaignCatalogReceipt: reads.getCampaignCatalogReceipt,
   };
 }
