@@ -1,9 +1,9 @@
 # Handoff
-## Completed: Task 8: remove deprecated campaign repository delegates
+## Completed: Task 2: extract campaign import dry-run repository
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: A whole-repository scan found 0 source/test callers of the 2 deprecated delegates (`listRecentCampaignDiceEventsSync` and `getCommandReceiptSync`) and 0 `campaignRepo` imports. The delegates and now-empty `server/src/repo/campaignRepo.ts` shim were removed. Root typecheck passed with `TMPDIR` set outside the repository; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
-## Quality Risks: The removed historical direct-import path is no longer supported; consumers must import public APIs from `server/src/repo/index.ts` or implementation APIs from their owning modules.
-## Files Modified: server/src/repo/campaignRepo.ts (deleted); docs/repo-architecture.md; docs/roleplay-architecture-2026.md; docs/ROADMAP.md; README.md; HANDOFF.md; handoff.md
+## Context: `campaignAdmin/administrationImportRepo.ts` now owns the dry-run validation factory and shares the facade's database, dependencies, room validator, authority lookup, and authorization-error factory. The facade delegates dry runs to it and the campaignAdmin barrel exports it. Root typecheck passed with `TMPDIR=/tmp/velvet-typecheck`; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
+## Quality Risks: The prior facade body remains in a block comment pending a cleanup-only patch; it is not compiled or executed. Import behavior, including the facade-specific forbidden error, is preserved through injected error construction.
+## Files Modified: server/src/repo/campaignAdmin/administrationImportRepo.ts; server/src/repo/campaignAdmin/index.ts; server/src/repo/campaignAdministrationRepo.ts; handoff.md
 
 ## Content Catalog Extraction Plan
 Phase 1 will create `contentCatalog/` modules for canonical serialization/digests, validation, errors/types, shared internal SQL rows, publication reads, visibility verification, campaign authority, and campaign reads. Read modules must validate stored publications before privileged projections and use attested visibility rather than raw reachability for player/observer definitions.

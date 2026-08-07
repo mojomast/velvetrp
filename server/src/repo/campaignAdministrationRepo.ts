@@ -25,6 +25,7 @@ import { createAdministrationEventRepo } from "./campaignAdmin/administrationEve
 import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";
 import { createCampaignTimelineRepo } from "./campaignAdmin/campaignTimelineRepo.js";
 import { createAdministrationAccessRepo } from "./campaignAdmin/administrationAccessRepo.js";
+import { createAdministrationImportRepo } from "./campaignAdmin/administrationImportRepo.js";
 import { canonicalizeJson, forbidden, serializeForImport, timelineTransferEvents } from "./campaignAdmin/administrationImportHelpers.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
@@ -75,6 +76,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   deps: RepositoryDependencies, assertCanMutate: () => void = () => undefined,
   validateRoom: (sessionId: string) => "running" | "stopped" | null = () => null): CampaignAdministrationRepository {
   const access = createAdministrationAccessRepo(db);
+  const imports = createAdministrationImportRepo({ db, deps, validateRoom, getAuthority: access.getAuthority,
+    forbidden: () => new CampaignAdministrationForbiddenError() });
   const member = (row: any) => campaignMembershipReadSchema.parse({ campaignId: row.campaign_id,
     principalId: row.principal_id, role: row.role, createdAt: row.created_at });
   const attachment = (row: any) => campaignSessionAttachmentSchema.parse({ campaignId: row.campaign_id,
@@ -113,6 +116,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     listCampaignRecaps: commands.listCampaignRecaps,
     listCampaignTimelineHistory: timelines.listCampaignTimelineHistory,
     dryRunCampaignImport: (actorRaw, raw) => {
+      return imports.dryRunCampaignImport(actorRaw, raw);
+      /* Relocated to administrationImportRepo.ts.
       const actor = resourceIdSchema.parse(actorRaw), owner = db.prepare("SELECT principal_id FROM application_owner WHERE singleton=1").get() as any;
       if (!owner || owner.principal_id !== actor) throw new CampaignAdministrationForbiddenError();
       const conflicts: string[] = [], missingReferences: string[] = [], warnings: string[] = [];
@@ -260,7 +265,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
           roomIds.add(room.sessionId);
           const attached = db.prepare("SELECT campaign_id FROM campaign_sessions WHERE session_id=?").get(room.sessionId) as any;
           let lifecycle: "running" | "stopped" | null = null;
-          try { lifecycle = validateRoom(room.sessionId); } catch { /* malformed sessions are deliberately unattachable */ }
+          try { lifecycle = validateRoom(room.sessionId); } catch { malformed sessions are deliberately unattachable }
           if (lifecycle === null) add(missingReferences, `room ${room.sessionId} is not attachable`);
           else if (lifecycle === "stopped") add(conflicts, `room ${room.sessionId} is stopped`);
           else if (attached) add(conflicts, `room ${room.sessionId} is already attached`);
@@ -331,7 +336,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
             actors: pkg?.records.actors.length ?? 0,
             checkpoints: pkg?.records.checkpoints.length ?? 0, recaps: pkg?.records.recaps.length ?? 0,
             memberships: pkg?.records.memberships.length ?? 0, roomAttachments: pkg?.records.roomAttachments.length ?? 0 } } });
-    },
+      */
+      },
     applyCampaignImport: (actorRaw, raw) => {
       assertCanMutate();
       const actor = resourceIdSchema.parse(actorRaw);
