@@ -42,7 +42,9 @@ export const abilityCheckCommandSchema = z.object({ ...checkCommandBase, kind: z
 export const skillCheckCommandSchema = z.object({ ...checkCommandBase, kind: z.literal("skill"), skillId: resourceIdSchema }).strict();
 export const saveCheckCommandSchema = z.object({ ...checkCommandBase, kind: z.literal("save"), abilityId: resourceIdSchema }).strict();
 export const attackCheckCommandSchema = z.object({ ...checkCommandBase, kind: z.literal("attack"), attackId: resourceIdSchema, targetActorId: actorIdSchema.optional() }).strict();
-export const opposedCheckCommandSchema = z.object({ ...checkCommandBase, kind: z.literal("opposed"), opponentActorId: actorIdSchema }).strict();
+// skillId was added for the actor-only HTTP adapter. Its default preserves
+// existing internal command fixtures and the original insight behavior.
+export const opposedCheckCommandSchema = z.object({ ...checkCommandBase, kind: z.literal("opposed"), opponentActorId: actorIdSchema, skillId: resourceIdSchema.optional() }).strict();
 
 /** Closed mutation boundary; it intentionally contains no formulas or scripts. */
 export const checkCommandSchema = z.discriminatedUnion("kind", [

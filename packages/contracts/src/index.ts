@@ -38,6 +38,7 @@ export * from "./economy-http.js";
 export * from "./rest.js";
 export * from "./rest-http.js";
 export * from "./checks.js";
+export * from "./check-commands-http.js";
 export * from "./powers.js";
 export * from "./effects.js";
 export * from "./encounters.js";

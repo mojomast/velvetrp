@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
-import { EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { CheckUnavailableError, EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -84,6 +84,18 @@ describe("M1.6 repository behavior", () => {
       expect(result).toMatchObject({ total, outcome });
       expect(result.terms).toEqual(expect.arrayContaining([{ kind: "roll", roll: expect.objectContaining({ expression: "1d20", total: 10 }) }]));
     }
+    const actorOnly = {
+      kind: "ability" as const, skillOrAttribute: "might", difficultyRef: "hard" as const,
+      expectedRevision: 5, idempotencyKey: "actor-only",
+    };
+    const first = f.repo.resolveActorCheck("local-owner", f.source, actorOnly);
+    expect(first.resolution.target).toEqual({ kind: "difficulty_class", value: 12 });
+    expect(f.repo.resolveActorCheck("local-owner", f.source, actorOnly)).toEqual(first);
+    expect(() => f.repo.resolveActorCheck("local-owner", f.source, { ...actorOnly, difficultyRef: "legendary", idempotencyKey: "unknown-difficulty" } as any)).toThrow(CheckUnavailableError);
+    expect(() => f.repo.resolveActorCheck("local-owner", f.source, {
+      kind: "attack", skillOrAttribute: "melee", targetActorId: "outside-campaign",
+      expectedRevision: 6, idempotencyKey: "invalid-target",
+    })).toThrow(CheckUnavailableError);
     f.repo.close();
   });
 
