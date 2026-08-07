@@ -12,11 +12,9 @@ export {
   ContentCatalogConflictError,
   ContentCatalogStaleError,
   ContentCatalogValidationError,
-  type ContentCatalogRepository,
-} from "./contentCatalogRepo.js";
-export {
   calculateCatalogDigest,
   canonicalCatalogJson,
+  type ContentCatalogRepository,
   validateContentCatalog,
 } from "./contentCatalog/index.js";
 export {
@@ -113,7 +111,7 @@ export type {
   Repository,
   RepositoryDependencies,
   RepositoryUnitOfWork,
-} from "./campaign/campaignTypes.js";
+} from "./campaign/index.js";
 export {
   CampaignCharacterCreationConflictError,
   CampaignCharacterCreationUnavailableError,
@@ -129,7 +127,7 @@ export {
   CampaignSessionAttachmentUnavailableError,
   ContentPackInstallationAuthorizationError,
   ContentPackInstallationConflictError,
-} from "./campaign/campaignErrors.js";
+} from "./campaign/index.js";
 export {
   CampaignDiceCharacterConflict,
   type CampaignDiceEvent,
