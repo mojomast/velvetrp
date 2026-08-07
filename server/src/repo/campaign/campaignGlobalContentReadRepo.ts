@@ -16,6 +16,17 @@ import {
   type RulesProfileRow,
 } from "./campaignContentRowMappers.js";
 
+// Preserve the historical deep-import surface after moving these shared mappers.
+export {
+  sameMetadata,
+  toContentPack,
+  toRpgDefinition,
+  toRulesProfile,
+  type ContentPackRow,
+  type RpgDefinitionRow,
+  type RulesProfileRow,
+} from "./campaignContentRowMappers.js";
+
 export const RULES_PROFILE_PROJECTION = "rp.rules_profile_id, rp.name, rp.description, rp.tags";
 export const CONTENT_PACK_PROJECTION = `p.pack_id, p.pack_version, p.rules_profile_id,
   p.name, p.description, p.tags`;

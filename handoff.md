@@ -1,5 +1,6 @@
 # Handoff
-## Completed: Task 5: Normalize campaign repository import boundaries
+## Completed: Review follow-up: preserve campaign mapper deep imports
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: Audited non-generated source import declarations. Public `repo/index.ts` imports were already normalized (29 before/after). Direct `campaignRepo.ts` imports remain 1 before/after: the supported public root barrel re-export. Direct `campaignRepositoryOrchestration.ts` imports remain 1 before/after: the compatibility facade delegation. Direct `campaign/index.ts` imports remain 0 before/after. No safe source import changes were needed; the supported public root boundary remains intact. `npm run typecheck` passes in `server/`. No commit was created. The pre-existing `devplan.md` modification and untracked `.tmp/` directory were left untouched.
-## Files Modified: handoff.md
+## Context: Restored the historical deep-import mapper surface from `campaignGlobalContentReadRepo.ts`: `RulesProfileRow`, `ContentPackRow`, `RpgDefinitionRow`, `toRulesProfile`, `toContentPack`, `toRpgDefinition`, and `sameMetadata`. `parseTags` is now private to `campaignContentRowMappers.ts`, so the campaign barrel does not expose it. Root typecheck and the focused dice test pass with `TMPDIR` set to the workspace. No commit was created. The pre-existing `devplan.md` modification and untracked `.tmp/` directory were left untouched.
+## Quality Risks: No known functional risk from this compatibility-only change. Deep imports retain the prior mapper API; `parseTags` is intentionally no longer public.
+## Files Modified: server/src/repo/campaign/campaignGlobalContentReadRepo.ts; server/src/repo/campaign/campaignContentRowMappers.ts; handoff.md

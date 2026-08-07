@@ -30,7 +30,7 @@ export interface RpgDefinitionRow {
 }
 
 /** Parses the JSON-encoded tag list stored in a content metadata row. */
-export function parseTags(tags: string): unknown {
+function parseTags(tags: string): unknown {
   return JSON.parse(tags) as unknown;
 }
 
