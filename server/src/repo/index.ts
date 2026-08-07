@@ -97,6 +97,22 @@ export {
   setActiveBranch,
 } from "./messageRepo.js";
 export {
+  createRepository,
+  type CreateRepositoryOptions,
+} from "./campaignRepositoryOrchestration.js";
+export type {
+  CampaignCharacterRosterSnapshot,
+  CampaignCharacterSheetSnapshot,
+  CampaignCharacterWorkspaceSnapshot,
+  CampaignEventPage,
+  CampaignRoomLinkingSnapshot,
+  OriginalStarterCampaignCharacterCreationResult,
+  OriginalStarterSetupInspection,
+  Repository,
+  RepositoryDependencies,
+  RepositoryUnitOfWork,
+} from "./campaign/campaignTypes.js";
+export {
   CampaignCharacterCreationConflictError,
   CampaignCharacterCreationUnavailableError,
   CampaignCharacterPersonaUnavailableError,
@@ -104,7 +120,6 @@ export {
   CampaignContentConfigurationConflictError,
   CampaignCreationAuthorizationError,
   CampaignCreationIdCollisionError,
-  CampaignDiceCharacterConflict,
   CampaignRenameStaleError,
   CampaignRenameUnavailableError,
   CampaignSessionAttachmentConflictError,
@@ -112,21 +127,12 @@ export {
   CampaignSessionAttachmentUnavailableError,
   ContentPackInstallationAuthorizationError,
   ContentPackInstallationConflictError,
-  createRepository,
-  type CampaignCharacterRosterSnapshot,
-  type CampaignCharacterSheetSnapshot,
-  type CampaignCharacterWorkspaceSnapshot,
+} from "./campaign/campaignErrors.js";
+export {
+  CampaignDiceCharacterConflict,
   type CampaignDiceEvent,
   type CampaignDiceVisibleCharacterBinding,
-  type CampaignEventPage,
-  type CampaignRoomLinkingSnapshot,
-  type CreateRepositoryOptions,
-  type OriginalStarterCampaignCharacterCreationResult,
-  type OriginalStarterSetupInspection,
-  type Repository,
-  type RepositoryDependencies,
-  type RepositoryUnitOfWork,
-} from "./campaignRepo.js";
+} from "./diceRepo.js";
 export {
   addMemoryFacts,
   forgetMemory,
