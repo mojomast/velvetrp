@@ -6,7 +6,7 @@ import {
   type CatalogDefinition,
   type CatalogDefinitionReference,
 } from "@velvet/contracts";
-import { canonicalCatalogJson } from "./repo/contentCatalogRepo.js";
+import { canonicalCatalogJson } from "./repo/contentCatalog/index.js";
 
 /** A fully versioned catalog reference; free-form kinds are deliberately excluded. */
 export type ExactReference = CatalogDefinitionReference;

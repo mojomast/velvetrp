@@ -6,7 +6,7 @@ import {
   publishContentCatalogInputSchema,
   type PublishContentCatalogInput,
 } from "@velvet/contracts";
-import { calculateCatalogDigest } from "../repo/contentCatalogRepo.js";
+import { calculateCatalogDigest } from "../repo/contentCatalog/index.js";
 
 type DeepReadonly<T> = T extends (...args: never[]) => unknown ? T
   : T extends readonly unknown[] ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
