@@ -3,11 +3,11 @@ import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import {
   createQuestReadRepository,
   type QuestReadRepository,
-} from "./quest/questReadRepo.js";
+} from "./quest/index.js";
 import {
   createQuestWriteRepository,
   type QuestWriteRepository,
-} from "./quest/questWriteRepo.js";
+} from "./quest/index.js";
 
 export {
   getQuest,
@@ -29,7 +29,7 @@ export {
   type Storyline,
   type UpdateQuestInput,
   type UpdateStorylineInput,
-} from "./quest/questReadRepo.js";
+} from "./quest/index.js";
 export {
   addClue,
   addReward,
@@ -41,7 +41,7 @@ export {
   reorderQuests,
   updateQuestStatus,
   updateStorylineStatus,
-} from "./quest/questWriteRepo.js";
+} from "./quest/index.js";
 
 type Database = DatabaseDriver.Database;
 
