@@ -8,3 +8,10 @@
 Character creation now executes inside `campaign/campaignCharacterWriteRepo.ts`; content installation/configuration live in `campaign/campaignContentWriteRepo.ts`; event, receipt, and recent-dice audit reads live in `campaign/campaignEventReadRepo.ts`. Shared errors/types, command writes, core writes, and timeline reads are also leaf campaign modules. `campaignRepo.ts` was reduced from 2,428 lines at session start to 65 lines and is now a compatibility facade; `campaignRepositoryOrchestration.ts` owns factory and unit-of-work composition. The public `Repository` surface in `campaignTypes.ts` is unchanged.
 
 Open follow-on work: campaign import/export and administration mutation kernels remain deliberate atomic transaction boundaries. Vitest may require workspace-backed temporary storage while `/tmp` is full.
+
+## Post-refactor audit
+- Keep `campaignRepo.ts`: `server/src/repo/index.ts` remains its sole in-repo consumer and it preserves historical root exports plus deprecated event-read delegates.
+- Keep orchestration: `campaignRepositoryOrchestration.ts` owns factory/UoW guards and compatibility administration audits; import/export and gameplay audit reconstruction remain deliberate atomic boundaries.
+- Candidate cleanup: delete deprecated root event-read delegates and duplicate `repositoryDependencies.ts` only after a public barrel contract test proves supported imports do not rely on them.
+- Test gap: add inherited/imported timeline coverage for `listRecentCampaignDiceEvents`; existing repository tests already cover character creation, content writes, command receipts, and ordinary dice reconstruction.
+- Documentation gap: architecture docs and README should refer to `campaignRepositoryOrchestration.ts` rather than claiming factory composition remains in `campaignRepo.ts`.
