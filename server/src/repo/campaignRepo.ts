@@ -6,12 +6,7 @@ import {
   attachCampaignSessionInputSchema,
   campaignCharacterAttributeSchema,
   campaignCharacterClassSchema,
-  campaignCharacterCreationOptionsResponseSchema,
-  campaignCharacterPersonaSummarySchema,
   campaignCharacterProficiencySchema,
-  campaignCharacterWorkspaceDescriptionSchema,
-  campaignCharacterWorkspaceNameSchema,
-  campaignCharacterWorkspaceResponseSchema,
   publicCampaignCharacterSummarySchema,
   publicCampaignActorSchema,
   campaignCharacterSchema,
@@ -125,12 +120,20 @@ import { createCampaignCoreRepository } from "./campaign/campaignCoreRepo.js";
 import { createCampaignAccessRepository } from "./campaign/campaignAccessRepo.js";
 import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
 import { createCampaignCharacterReadOperations } from "./campaign/campaignCharacterReadRepo.js";
+import { createCampaignCharacterRosterOperations } from "./campaign/campaignCharacterRosterRepo.js";
 import { createCampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
 import { createCampaignActorResourceRepository } from "./campaign/campaignActorResourceRepo.js";
 import { createCampaignEventProjectionRepo } from "./campaign/campaignEventProjectionRepo.js";
 import { createCampaignMembershipReadRepository } from "./campaign/campaignMembershipReadRepo.js";
 import { createCampaignSessionAttachmentReadRepository } from "./campaign/campaignSessionAttachmentReadRepo.js";
 import { createCampaignRoomLinkingSnapshotRepository } from "./campaign/campaignRoomLinkingSnapshotRepo.js";
+import { createCampaignCharacterCreationOptionsRepository } from "./campaign/campaignCharacterCreationOptionsRepo.js";
+import { createCampaignCharacterWorkspaceRepository } from "./campaign/campaignCharacterWorkspaceRepo.js";
+import { createCampaignCharacterSheetSnapshotRepository } from "./campaign/campaignCharacterSheetSnapshotRepo.js";
+import {
+  createCampaignContentConfigurationReadRepository,
+  getCampaignContentConfigurationReadSync,
+} from "./campaign/campaignContentConfigurationReadRepo.js";
 import type {
   AddCampaignMembershipInput,
   ActorResource,
@@ -3144,605 +3147,6 @@ function getCampaignCharacterRosterSyncInternal(
   }
 }
 
-interface CampaignCharacterWorkspaceRow {
-  requesting_campaign_id: string;
-  requesting_principal_id: string;
-  requesting_role: string;
-  requesting_created_at: string;
-  campaign_owner_principal_id: string;
-  campaign_owner_role: string;
-  owner_role_count: unknown;
-  exact_owner_count: unknown;
-  owner_membership_campaign_id: string | null;
-  owner_membership_principal_id: string | null;
-  owner_membership_role: string | null;
-  owner_membership_created_at: string | null;
-  owner_parent_id: string | null;
-  campaign_character_id: string | null;
-  character_id: string | null;
-  character_name: string | null;
-  campaign_character_created_at: string | null;
-  campaign_character_updated_at: string | null;
-  sheet_id: string | null;
-  sheet_campaign_id: string | null;
-  sheet_campaign_character_id: string | null;
-  sheet_created_at: string | null;
-  sheet_updated_at: string | null;
-  race_pack_id: string | null;
-  race_pack_version: string | null;
-  race_kind: string | null;
-  race_definition_id: string | null;
-  background_pack_id: string | null;
-  background_pack_version: string | null;
-  background_kind: string | null;
-  background_definition_id: string | null;
-  actor_id: string | null;
-  actor_campaign_id: string | null;
-  actor_campaign_character_id: string | null;
-  actor_sheet_id: string | null;
-  actor_kind: string | null;
-  actor_control: string | null;
-  actor_created_at: string | null;
-  actor_updated_at: string | null;
-  persona_count: unknown;
-  sheet_count: unknown;
-  actor_count: unknown;
-  private_state_count: unknown;
-  integrity_error_count: unknown;
-  race_pin_count: unknown;
-  background_pin_count: unknown;
-  race_definition_count: unknown;
-  background_definition_count: unknown;
-  race_name: string | null;
-  race_description: string | null;
-  background_name: string | null;
-  background_description: string | null;
-  classes: string | null;
-  attributes: string | null;
-  proficiencies: string | null;
-  choices: string | null;
-  resources: string | null;
-}
-
-function malformedCampaignCharacterWorkspace(): never {
-  throw new Error("campaign character workspace is malformed");
-}
-
-function parseWorkspaceJson(value: string | null): unknown[] {
-  if (typeof value !== "string") return malformedCampaignCharacterWorkspace();
-  const parsed = JSON.parse(value) as unknown;
-  if (!Array.isArray(parsed)) return malformedCampaignCharacterWorkspace();
-  return parsed;
-}
-
-const WORKSPACE_PROFICIENCY_PREFIX = {
-  skill: "Skill proficiency",
-  "saving-throw": "Saving throw proficiency",
-  tool: "Tool proficiency",
-  weapon: "Weapon proficiency",
-  armor: "Armor proficiency",
-  language: "Language proficiency",
-} as const;
-
-/**
- * One explicit-column statement owns authorization, ancestry evidence, content
- * resolution and every ordered workspace collection. Technical identities are
- * validated below but are replaced only with contract-defined positions.
- */
-function getCampaignCharacterWorkspaceSyncInternal(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-  campaignCharacterId: string,
-): CampaignCharacterWorkspaceSnapshot | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const targetId = resourceIdSchema.parse(campaignCharacterId);
-  let row: CampaignCharacterWorkspaceRow | undefined;
-  try {
-    row = db.prepare(`WITH authorized AS (
-      SELECT membership.campaign_id, membership.principal_id, membership.role, membership.created_at,
-        campaign.owner_principal_id, campaign.owner_role
-      FROM campaign_memberships membership
-      JOIN principals requesting_principal ON requesting_principal.id = membership.principal_id
-      JOIN campaigns campaign ON campaign.id = membership.campaign_id
-      WHERE membership.principal_id = $actorId AND membership.campaign_id = $campaignId
-        AND (membership.role IN ('gm', 'player', 'observer') OR
-          (membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id))
-    ), target AS (
-      SELECT cc.id, cc.campaign_id, cc.character_id, cc.created_at, cc.updated_at
-      FROM campaign_characters cc
-      WHERE cc.campaign_id = $campaignId AND cc.id = $campaignCharacterId
-    )
-    SELECT authorized.campaign_id AS requesting_campaign_id,
-      authorized.principal_id AS requesting_principal_id,
-      authorized.role AS requesting_role,
-      authorized.created_at AS requesting_created_at,
-      authorized.owner_principal_id AS campaign_owner_principal_id,
-      authorized.owner_role AS campaign_owner_role,
-      (SELECT COUNT(*) FROM campaign_memberships owner
-        WHERE owner.campaign_id = authorized.campaign_id AND owner.role = 'owner') AS owner_role_count,
-      (SELECT COUNT(*) FROM campaign_memberships owner
-        JOIN principals parent ON parent.id = owner.principal_id
-        WHERE owner.campaign_id = authorized.campaign_id AND owner.role = 'owner'
-          AND owner.principal_id = authorized.owner_principal_id) AS exact_owner_count,
-      owner_membership.campaign_id AS owner_membership_campaign_id,
-      owner_membership.principal_id AS owner_membership_principal_id,
-      owner_membership.role AS owner_membership_role,
-      owner_membership.created_at AS owner_membership_created_at,
-      owner_parent.id AS owner_parent_id,
-      target.id AS campaign_character_id, target.character_id,
-      persona.name AS character_name,
-      target.created_at AS campaign_character_created_at,
-      target.updated_at AS campaign_character_updated_at,
-      sheet.id AS sheet_id, sheet.campaign_id AS sheet_campaign_id,
-      sheet.campaign_character_id AS sheet_campaign_character_id,
-      sheet.created_at AS sheet_created_at, sheet.updated_at AS sheet_updated_at,
-      sheet.race_pack_id, sheet.race_pack_version, sheet.race_kind, sheet.race_definition_id,
-      sheet.background_pack_id, sheet.background_pack_version, sheet.background_kind,
-      sheet.background_definition_id,
-      actor.id AS actor_id, actor.campaign_id AS actor_campaign_id,
-      actor.campaign_character_id AS actor_campaign_character_id,
-      actor.sheet_id AS actor_sheet_id, actor.kind AS actor_kind, actor.control AS actor_control,
-      actor.created_at AS actor_created_at, actor.updated_at AS actor_updated_at,
-      (SELECT COUNT(*) FROM characters candidate
-        WHERE candidate.id = target.character_id) AS persona_count,
-      (SELECT COUNT(*) FROM rpg_campaign_sheets candidate
-        WHERE candidate.campaign_character_id = target.id) AS sheet_count,
-      (SELECT COUNT(*) FROM campaign_actors candidate
-        WHERE candidate.campaign_character_id = target.id OR candidate.sheet_id = sheet.id) AS actor_count,
-      -- Private state contributes ancestry evidence only. No controller or note
-      -- payload is selected by this workspace statement.
-      (SELECT COUNT(*) FROM campaign_actor_private_state candidate
-        WHERE candidate.actor_id = actor.id AND candidate.campaign_id = actor.campaign_id) AS private_state_count,
-      (
-        -- Campaign-attributable descendants must retain their complete root
-        -- chain even when they are detached from the selected, otherwise-valid
-        -- aggregate. Evidence in another campaign is intentionally irrelevant.
-        (SELECT COUNT(*) FROM campaign_characters child
-          WHERE child.campaign_id = authorized.campaign_id
-            AND NOT EXISTS (SELECT 1 FROM characters parent WHERE parent.id = child.character_id))
-        + (SELECT COUNT(*) FROM rpg_campaign_sheets child
-          WHERE child.campaign_id = authorized.campaign_id
-            AND NOT EXISTS (SELECT 1 FROM campaign_characters root
-              WHERE root.campaign_id = child.campaign_id AND root.id = child.campaign_character_id))
-        + (SELECT COUNT(*) FROM campaign_actors child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM campaign_characters root
-            JOIN rpg_campaign_sheets parent
-              ON parent.campaign_id = root.campaign_id AND parent.id = child.sheet_id
-             AND parent.campaign_character_id = root.id
-            WHERE root.campaign_id = child.campaign_id AND root.id = child.campaign_character_id))
-        + (SELECT COUNT(*) FROM campaign_actor_private_state child
-          WHERE child.campaign_id = authorized.campaign_id AND (
-            NOT EXISTS (
-              SELECT 1 FROM campaign_actors parent
-              JOIN campaign_characters root
-                ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-              JOIN rpg_campaign_sheets sheet_parent
-                ON sheet_parent.campaign_id = parent.campaign_id AND sheet_parent.id = parent.sheet_id
-               AND sheet_parent.campaign_character_id = root.id
-              WHERE parent.campaign_id = child.campaign_id AND parent.id = child.actor_id)
-            OR (SELECT COUNT(*) FROM campaign_memberships controller_membership
-              JOIN principals controller_parent
-                ON controller_parent.id = controller_membership.principal_id
-              WHERE controller_membership.campaign_id = child.campaign_id
-                AND controller_membership.principal_id = child.controller_principal_id
-                AND typeof(controller_membership.role) = 'text'
-                AND controller_membership.role IN ('owner', 'gm', 'player')
-                AND typeof(controller_membership.created_at) = 'text'
-                AND strftime('%Y-%m-%dT%H:%M:%fZ', controller_membership.created_at) IS NOT NULL
-                AND controller_membership.created_at =
-                  strftime('%Y-%m-%dT%H:%M:%fZ', controller_membership.created_at)
-                AND substr(controller_membership.created_at, 12, 2) BETWEEN '00' AND '23') <> 1))
-        + (SELECT COUNT(*) FROM rpg_character_classes child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM rpg_campaign_sheets parent
-            JOIN campaign_characters root
-              ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-            WHERE parent.campaign_id = child.campaign_id AND parent.id = child.sheet_id))
-        + (SELECT COUNT(*) FROM rpg_character_attributes child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM rpg_campaign_sheets parent
-            JOIN campaign_characters root
-              ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-            WHERE parent.campaign_id = child.campaign_id AND parent.id = child.sheet_id))
-        + (SELECT COUNT(*) FROM rpg_character_proficiencies child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM rpg_campaign_sheets parent
-            JOIN campaign_characters root
-              ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-            WHERE parent.campaign_id = child.campaign_id AND parent.id = child.sheet_id))
-        + (SELECT COUNT(*) FROM rpg_character_choices child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM rpg_campaign_sheets parent
-            JOIN campaign_characters root
-              ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-            WHERE parent.campaign_id = child.campaign_id AND parent.id = child.sheet_id))
-        + (SELECT COUNT(*) FROM rpg_actor_resources child
-          WHERE child.campaign_id = authorized.campaign_id AND NOT EXISTS (
-            SELECT 1 FROM campaign_actors parent
-            JOIN campaign_characters root
-              ON root.campaign_id = parent.campaign_id AND root.id = parent.campaign_character_id
-            JOIN rpg_campaign_sheets sheet_parent
-              ON sheet_parent.campaign_id = parent.campaign_id AND sheet_parent.id = parent.sheet_id
-             AND sheet_parent.campaign_character_id = root.id
-            WHERE parent.campaign_id = child.campaign_id AND parent.id = child.actor_id))
-      ) AS integrity_error_count,
-      (SELECT COUNT(*) FROM campaign_content_packs pin
-        JOIN rpg_content_packs pack ON pack.pack_id = pin.pack_id AND pack.pack_version = pin.pack_version
-          AND pack.rules_profile_id = pin.rules_profile_id AND pack.sealed IS 1
-        JOIN campaign_rules_profiles selection ON selection.campaign_id = pin.campaign_id
-          AND selection.rules_profile_id = pin.rules_profile_id
-        JOIN rpg_rules_profiles profile ON profile.rules_profile_id = selection.rules_profile_id
-        WHERE pin.campaign_id = sheet.campaign_id AND pin.pack_id = sheet.race_pack_id
-          AND pin.pack_version = sheet.race_pack_version) AS race_pin_count,
-      (SELECT COUNT(*) FROM campaign_content_packs pin
-        JOIN rpg_content_packs pack ON pack.pack_id = pin.pack_id AND pack.pack_version = pin.pack_version
-          AND pack.rules_profile_id = pin.rules_profile_id AND pack.sealed IS 1
-        JOIN campaign_rules_profiles selection ON selection.campaign_id = pin.campaign_id
-          AND selection.rules_profile_id = pin.rules_profile_id
-        JOIN rpg_rules_profiles profile ON profile.rules_profile_id = selection.rules_profile_id
-        WHERE pin.campaign_id = sheet.campaign_id AND pin.pack_id = sheet.background_pack_id
-          AND pin.pack_version = sheet.background_pack_version) AS background_pin_count,
-      (SELECT COUNT(*) FROM rpg_definitions definition
-        WHERE definition.pack_id = sheet.race_pack_id AND definition.pack_version = sheet.race_pack_version
-          AND definition.kind = sheet.race_kind AND definition.definition_id = sheet.race_definition_id
-          AND definition.kind = 'race'
-          AND typeof(definition.name) = 'text' AND definition.name = trim(definition.name)
-          AND length(definition.name) BETWEEN 1 AND 200
-          AND typeof(definition.description) = 'text'
-          AND definition.description = trim(definition.description)
-          AND length(definition.description) BETWEEN 1 AND 4000
-          AND json_valid(definition.tags) AND json_type(definition.tags) = 'array'
-          AND json_array_length(definition.tags) <= 32
-          AND NOT EXISTS (SELECT 1 FROM json_each(
-            CASE WHEN json_valid(definition.tags) THEN definition.tags ELSE '[]' END) tag
-            WHERE tag.type <> 'text' OR tag.value <> trim(tag.value)
-              OR length(tag.value) NOT BETWEEN 1 AND 64
-              OR tag.value GLOB '*[^A-Za-z0-9._:-]*')) AS race_definition_count,
-      (SELECT COUNT(*) FROM rpg_definitions definition
-        WHERE definition.pack_id = sheet.background_pack_id
-          AND definition.pack_version = sheet.background_pack_version
-          AND definition.kind = sheet.background_kind
-          AND definition.definition_id = sheet.background_definition_id
-          AND definition.kind = 'background'
-          AND typeof(definition.name) = 'text' AND definition.name = trim(definition.name)
-          AND length(definition.name) BETWEEN 1 AND 200
-          AND typeof(definition.description) = 'text'
-          AND definition.description = trim(definition.description)
-          AND length(definition.description) BETWEEN 1 AND 4000
-          AND json_valid(definition.tags) AND json_type(definition.tags) = 'array'
-          AND json_array_length(definition.tags) <= 32
-          AND NOT EXISTS (SELECT 1 FROM json_each(
-            CASE WHEN json_valid(definition.tags) THEN definition.tags ELSE '[]' END) tag
-            WHERE tag.type <> 'text' OR tag.value <> trim(tag.value)
-              OR length(tag.value) NOT BETWEEN 1 AND 64
-              OR tag.value GLOB '*[^A-Za-z0-9._:-]*')) AS background_definition_count,
-      race_definition.name AS race_name, race_definition.description AS race_description,
-      background_definition.name AS background_name,
-      background_definition.description AS background_description,
-      (SELECT json_group_array(json_object(
-          'campaignId', item.campaign_id, 'sheetId', item.sheet_id, 'position', item.position,
-          'packId', item.pack_id, 'packVersion', item.pack_version, 'kind', item.kind,
-          'definitionId', item.definition_id, 'level', item.level,
-          'name', item.name, 'description', item.description,
-          'pinCount', item.pin_count, 'definitionCount', item.definition_count))
-        FROM (SELECT child.campaign_id, child.sheet_id, child.position, child.pack_id,
-            child.pack_version, child.kind, child.definition_id, child.level,
-            definition.name, definition.description,
-            (SELECT COUNT(*) FROM campaign_content_packs pin
-              JOIN rpg_content_packs pack ON pack.pack_id = pin.pack_id
-                AND pack.pack_version = pin.pack_version
-                AND pack.rules_profile_id = pin.rules_profile_id AND pack.sealed IS 1
-              JOIN campaign_rules_profiles selection ON selection.campaign_id = pin.campaign_id
-                AND selection.rules_profile_id = pin.rules_profile_id
-              JOIN rpg_rules_profiles profile ON profile.rules_profile_id = selection.rules_profile_id
-              WHERE pin.campaign_id = child.campaign_id AND pin.pack_id = child.pack_id
-                AND pin.pack_version = child.pack_version) AS pin_count,
-            (SELECT COUNT(*) FROM rpg_definitions exact_definition
-              WHERE exact_definition.pack_id = child.pack_id
-                AND exact_definition.pack_version = child.pack_version
-                AND exact_definition.kind = child.kind
-                AND exact_definition.definition_id = child.definition_id
-                AND exact_definition.kind = 'class'
-                AND typeof(exact_definition.name) = 'text'
-                AND exact_definition.name = trim(exact_definition.name)
-                AND length(exact_definition.name) BETWEEN 1 AND 200
-                AND typeof(exact_definition.description) = 'text'
-                AND exact_definition.description = trim(exact_definition.description)
-                AND length(exact_definition.description) BETWEEN 1 AND 4000
-                AND json_valid(exact_definition.tags) AND json_type(exact_definition.tags) = 'array'
-                AND json_array_length(exact_definition.tags) <= 32
-                AND NOT EXISTS (SELECT 1 FROM json_each(
-                  CASE WHEN json_valid(exact_definition.tags) THEN exact_definition.tags ELSE '[]' END) tag
-                  WHERE tag.type <> 'text' OR tag.value <> trim(tag.value)
-                    OR length(tag.value) NOT BETWEEN 1 AND 64
-                    OR tag.value GLOB '*[^A-Za-z0-9._:-]*')) AS definition_count
-          FROM rpg_character_classes child
-          LEFT JOIN rpg_definitions definition ON definition.pack_id = child.pack_id
-            AND definition.pack_version = child.pack_version AND definition.kind = child.kind
-            AND definition.definition_id = child.definition_id
-          WHERE child.sheet_id = sheet.id
-          ORDER BY child.position ASC LIMIT ${MAX_CHARACTER_CLASSES + 1}) item) AS classes,
-      (SELECT json_group_array(json_object('campaignId', item.campaign_id, 'sheetId', item.sheet_id,
-          'position', item.position, 'attributeId', item.attribute_id, 'value', item.value))
-        FROM (SELECT child.campaign_id, child.sheet_id, child.position, child.attribute_id, child.value
-          FROM rpg_character_attributes child WHERE child.sheet_id = sheet.id
-          ORDER BY child.position ASC LIMIT ${MAX_CHARACTER_ATTRIBUTES + 1}) item) AS attributes,
-      (SELECT json_group_array(json_object('campaignId', item.campaign_id, 'sheetId', item.sheet_id,
-          'position', item.position, 'category', item.category, 'proficiencyId', item.proficiency_id))
-        FROM (SELECT child.campaign_id, child.sheet_id, child.position, child.category, child.proficiency_id
-          FROM rpg_character_proficiencies child WHERE child.sheet_id = sheet.id
-          ORDER BY child.position ASC LIMIT ${MAX_CHARACTER_PROFICIENCIES + 1}) item) AS proficiencies,
-      (SELECT json_group_array(json_object('campaignId', item.campaign_id, 'sheetId', item.sheet_id,
-          'position', item.position, 'choiceId', item.choice_id, 'packId', item.pack_id,
-          'packVersion', item.pack_version, 'kind', item.kind, 'definitionId', item.definition_id,
-          'name', item.name, 'description', item.description,
-          'pinCount', item.pin_count, 'definitionCount', item.definition_count))
-        FROM (SELECT child.campaign_id, child.sheet_id, child.position, child.choice_id,
-            child.pack_id, child.pack_version, child.kind, child.definition_id,
-            definition.name, definition.description,
-            (SELECT COUNT(*) FROM campaign_content_packs pin
-              JOIN rpg_content_packs pack ON pack.pack_id = pin.pack_id
-                AND pack.pack_version = pin.pack_version
-                AND pack.rules_profile_id = pin.rules_profile_id AND pack.sealed IS 1
-              JOIN campaign_rules_profiles selection ON selection.campaign_id = pin.campaign_id
-                AND selection.rules_profile_id = pin.rules_profile_id
-              JOIN rpg_rules_profiles profile ON profile.rules_profile_id = selection.rules_profile_id
-              WHERE pin.campaign_id = child.campaign_id AND pin.pack_id = child.pack_id
-                AND pin.pack_version = child.pack_version) AS pin_count,
-            (SELECT COUNT(*) FROM rpg_definitions exact_definition
-              WHERE exact_definition.pack_id = child.pack_id
-                AND exact_definition.pack_version = child.pack_version
-                AND exact_definition.kind = child.kind
-                AND exact_definition.definition_id = child.definition_id
-                AND typeof(exact_definition.name) = 'text'
-                AND exact_definition.name = trim(exact_definition.name)
-                AND length(exact_definition.name) BETWEEN 1 AND 200
-                AND typeof(exact_definition.description) = 'text'
-                AND exact_definition.description = trim(exact_definition.description)
-                AND length(exact_definition.description) BETWEEN 1 AND 4000
-                AND json_valid(exact_definition.tags) AND json_type(exact_definition.tags) = 'array'
-                AND json_array_length(exact_definition.tags) <= 32
-                AND NOT EXISTS (SELECT 1 FROM json_each(
-                  CASE WHEN json_valid(exact_definition.tags) THEN exact_definition.tags ELSE '[]' END) tag
-                  WHERE tag.type <> 'text' OR tag.value <> trim(tag.value)
-                    OR length(tag.value) NOT BETWEEN 1 AND 64
-                    OR tag.value GLOB '*[^A-Za-z0-9._:-]*')) AS definition_count
-          FROM rpg_character_choices child
-          LEFT JOIN rpg_definitions definition ON definition.pack_id = child.pack_id
-            AND definition.pack_version = child.pack_version AND definition.kind = child.kind
-            AND definition.definition_id = child.definition_id
-          WHERE child.sheet_id = sheet.id
-          ORDER BY child.position ASC LIMIT ${MAX_CHARACTER_CHOICES + 1}) item) AS choices,
-      (SELECT json_group_array(json_object('campaignId', item.campaign_id, 'actorId', item.actor_id,
-          'name', item.name, 'current', item.current, 'max', item.max))
-        FROM (SELECT resource.campaign_id, resource.actor_id, resource.name, resource.current, resource.max
-          FROM rpg_actor_resources resource WHERE resource.actor_id = actor.id
-          ORDER BY resource.name COLLATE BINARY ASC
-          LIMIT ${MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES + 1}) item) AS resources
-    FROM authorized
-    LEFT JOIN campaign_memberships owner_membership
-      ON owner_membership.campaign_id = authorized.campaign_id
-      AND owner_membership.principal_id = authorized.owner_principal_id
-      AND owner_membership.role = 'owner'
-    LEFT JOIN principals owner_parent ON owner_parent.id = owner_membership.principal_id
-    LEFT JOIN target ON target.campaign_id = authorized.campaign_id
-    LEFT JOIN characters persona ON persona.id = target.character_id
-    LEFT JOIN rpg_campaign_sheets sheet
-      ON sheet.campaign_id = target.campaign_id AND sheet.campaign_character_id = target.id
-    LEFT JOIN campaign_actors actor ON actor.campaign_id = target.campaign_id
-      AND actor.campaign_character_id = target.id AND actor.sheet_id = sheet.id
-    LEFT JOIN rpg_definitions race_definition
-      ON race_definition.pack_id = sheet.race_pack_id
-      AND race_definition.pack_version = sheet.race_pack_version
-      AND race_definition.kind = sheet.race_kind
-      AND race_definition.definition_id = sheet.race_definition_id
-    LEFT JOIN rpg_definitions background_definition
-      ON background_definition.pack_id = sheet.background_pack_id
-      AND background_definition.pack_version = sheet.background_pack_version
-      AND background_definition.kind = sheet.background_kind
-      AND background_definition.definition_id = sheet.background_definition_id`).get({
-      actorId,
-      campaignId: id,
-      campaignCharacterId: targetId,
-    }) as CampaignCharacterWorkspaceRow | undefined;
-  } catch {
-    return malformedCampaignCharacterWorkspace();
-  }
-
-  if (!row) return null;
-  try {
-    const authorization = campaignMembershipReadSchema.parse({
-      campaignId: row.requesting_campaign_id,
-      principalId: row.requesting_principal_id,
-      role: row.requesting_role,
-      createdAt: row.requesting_created_at,
-    });
-    const owner = campaignMembershipReadSchema.parse({
-      campaignId: row.owner_membership_campaign_id,
-      principalId: row.owner_membership_principal_id,
-      role: row.owner_membership_role,
-      createdAt: row.owner_membership_created_at,
-    });
-    if (authorization.campaignId !== id || authorization.principalId !== actorId
-      || row.campaign_owner_role !== "owner" || row.owner_role_count !== 1
-      || row.exact_owner_count !== 1 || row.owner_parent_id !== owner.principalId
-      || owner.campaignId !== id || owner.principalId !== row.campaign_owner_principal_id
-      || owner.role !== "owner") malformedCampaignCharacterWorkspace();
-
-    // Authorization and its exact-owner invariant are validated before target
-    // absence, while a missing or other-campaign target remains non-disclosing.
-    if (row.campaign_character_id === null) return null;
-    if (row.campaign_character_id !== targetId || row.persona_count !== 1
-      || row.sheet_count !== 1 || row.actor_count !== 1 || row.private_state_count !== 1
-      || row.integrity_error_count !== 0
-      || row.race_pin_count !== 1 || row.background_pin_count !== 1
-      || row.race_definition_count !== 1 || row.background_definition_count !== 1) {
-      return malformedCampaignCharacterWorkspace();
-    }
-
-    const campaignCharacter = campaignCharacterSchema.parse({
-      id: row.campaign_character_id, campaignId: row.requesting_campaign_id,
-      characterId: row.character_id, createdAt: row.campaign_character_created_at,
-      updatedAt: row.campaign_character_updated_at,
-    });
-    const sheetId = resourceIdSchema.parse(row.sheet_id);
-    const raceReference = definitionReferenceSchema.parse({
-      packId: row.race_pack_id, packVersion: row.race_pack_version,
-      kind: row.race_kind, definitionId: row.race_definition_id,
-    });
-    const backgroundReference = definitionReferenceSchema.parse({
-      packId: row.background_pack_id, packVersion: row.background_pack_version,
-      kind: row.background_kind, definitionId: row.background_definition_id,
-    });
-    const actorRecord = publicCampaignActorSchema.parse({
-      id: row.actor_id, campaignId: row.actor_campaign_id,
-      campaignCharacterId: row.actor_campaign_character_id, sheetId: row.actor_sheet_id,
-      kind: row.actor_kind, control: row.actor_control,
-      createdAt: row.actor_created_at, updatedAt: row.actor_updated_at,
-    });
-    if (row.sheet_campaign_id !== id || row.sheet_campaign_character_id !== targetId
-      || actorRecord.campaignId !== id || actorRecord.campaignCharacterId !== targetId
-      || actorRecord.sheetId !== sheetId) malformedCampaignCharacterWorkspace();
-    const sheetCreatedAt = utcIsoTimestampSchema.parse(row.sheet_created_at);
-    const sheetUpdatedAt = utcIsoTimestampSchema.parse(row.sheet_updated_at);
-    if (raceReference.kind !== "race" || backgroundReference.kind !== "background"
-      || campaignCharacter.updatedAt < campaignCharacter.createdAt
-      || sheetUpdatedAt < sheetCreatedAt || actorRecord.updatedAt < actorRecord.createdAt) {
-      return malformedCampaignCharacterWorkspace();
-    }
-
-    const classesRaw = parseWorkspaceJson(row.classes);
-    const attributesRaw = parseWorkspaceJson(row.attributes);
-    const proficienciesRaw = parseWorkspaceJson(row.proficiencies);
-    const choicesRaw = parseWorkspaceJson(row.choices);
-    const resourcesRaw = parseWorkspaceJson(row.resources);
-    if (classesRaw.length < 1 || classesRaw.length > MAX_CHARACTER_CLASSES
-      || attributesRaw.length > MAX_CHARACTER_ATTRIBUTES
-      || proficienciesRaw.length > MAX_CHARACTER_PROFICIENCIES
-      || choicesRaw.length > MAX_CHARACTER_CHOICES
-      || resourcesRaw.length > MAX_CAMPAIGN_CHARACTER_WORKSPACE_RESOURCES) {
-      return malformedCampaignCharacterWorkspace();
-    }
-
-    const positions = (entries: unknown[], maximum: number, project: (entry: Record<string, unknown>, index: number) => unknown) => {
-      const seen = new Set<number>();
-      return entries.map((unknownEntry, index) => {
-        if (unknownEntry === null || typeof unknownEntry !== "object" || Array.isArray(unknownEntry)) {
-          return malformedCampaignCharacterWorkspace();
-        }
-        const entry = unknownEntry as Record<string, unknown>;
-        if (!Number.isSafeInteger(entry.position) || (entry.position as number) < 0
-          || (entry.position as number) >= maximum || seen.has(entry.position as number)
-          || entry.campaignId !== id || entry.sheetId !== sheetId) {
-          return malformedCampaignCharacterWorkspace();
-        }
-        seen.add(entry.position as number);
-        return project(entry, index);
-      });
-    };
-
-    const classReferences = new Set<string>();
-    const classes = positions(classesRaw, MAX_CHARACTER_CLASSES, (entry) => {
-      if (entry.pinCount !== 1 || entry.definitionCount !== 1) return malformedCampaignCharacterWorkspace();
-      const value = campaignCharacterClassSchema.parse({
-        class: { packId: entry.packId, packVersion: entry.packVersion,
-          kind: entry.kind, definitionId: entry.definitionId }, level: entry.level,
-      });
-      const key = `${value.class.packId}\u0000${value.class.packVersion}\u0000${value.class.definitionId}`;
-      if (classReferences.has(key)) return malformedCampaignCharacterWorkspace();
-      classReferences.add(key);
-      return { name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
-        description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description), level: entry.level };
-    });
-    const attributeIds = new Set<string>();
-    const attributes = positions(attributesRaw, MAX_CHARACTER_ATTRIBUTES, (entry, index) => {
-      const value = campaignCharacterAttributeSchema.parse({ attributeId: entry.attributeId, value: entry.value });
-      if (attributeIds.has(value.attributeId)) return malformedCampaignCharacterWorkspace();
-      attributeIds.add(value.attributeId);
-      return { label: `Attribute ${index + 1}`, value: value.value };
-    });
-    const proficiencyIds = new Set<string>();
-    const proficiencies = positions(proficienciesRaw, MAX_CHARACTER_PROFICIENCIES, (entry, index) => {
-      const value = campaignCharacterProficiencySchema.parse({ category: entry.category,
-        proficiencyId: entry.proficiencyId });
-      const key = `${value.category}\u0000${value.proficiencyId}`;
-      if (proficiencyIds.has(key)) return malformedCampaignCharacterWorkspace();
-      proficiencyIds.add(key);
-      return { category: value.category,
-        label: `${WORKSPACE_PROFICIENCY_PREFIX[value.category]} ${index + 1}` };
-    });
-    const choiceIds = new Set<string>();
-    const choices = positions(choicesRaw, MAX_CHARACTER_CHOICES, (entry, index) => {
-      if (entry.pinCount !== 1 || entry.definitionCount !== 1) return malformedCampaignCharacterWorkspace();
-      const value = resolvedCharacterChoiceSchema.parse({ choiceId: entry.choiceId,
-        selection: { packId: entry.packId, packVersion: entry.packVersion,
-          kind: entry.kind, definitionId: entry.definitionId } });
-      if (choiceIds.has(value.choiceId)) return malformedCampaignCharacterWorkspace();
-      choiceIds.add(value.choiceId);
-      return { label: `Choice ${index + 1}`, selection: { kind: value.selection.kind,
-        name: campaignCharacterWorkspaceNameSchema.parse(entry.name),
-        description: campaignCharacterWorkspaceDescriptionSchema.parse(entry.description) } };
-    });
-    const seenResources = new Set<string>();
-    const resources = resourcesRaw.map((unknownEntry, index) => {
-      if (unknownEntry === null || typeof unknownEntry !== "object" || Array.isArray(unknownEntry)) {
-        return malformedCampaignCharacterWorkspace();
-      }
-      const entry = unknownEntry as Record<string, unknown>;
-      const resource = actorResourceSchema.parse({ campaignId: entry.campaignId,
-        actorId: entry.actorId, name: entry.name, current: entry.current, max: entry.max });
-      if (resource.campaignId !== id || resource.actorId !== actorRecord.id
-        || seenResources.has(resource.name)) return malformedCampaignCharacterWorkspace();
-      seenResources.add(resource.name);
-      return { label: `Resource ${index + 1}`, current: resource.current, max: resource.max };
-    });
-
-    const response = campaignCharacterWorkspaceResponseSchema.parse({ character: {
-      name: campaignCharacterWorkspaceNameSchema.parse(row.character_name),
-      race: { name: row.race_name, description: row.race_description },
-      background: { name: row.background_name, description: row.background_description },
-      classes, attributes, proficiencies, choices, resources,
-    } });
-    if (campaignCharacter.campaignId !== id || campaignCharacter.id !== targetId) {
-      return malformedCampaignCharacterWorkspace();
-    }
-    return { campaignId: id, campaignCharacterId: targetId, character: response.character };
-  } catch (error) {
-    if (error instanceof Error && error.message === "campaign character workspace is malformed") throw error;
-    return malformedCampaignCharacterWorkspace();
-  }
-}
-
-/**
- * The caller owns the surrounding SQLite snapshot. The workspace read proves
- * the complete campaign ancestry; progression then narrows visibility to an
- * owner, GM, or the actor's controller before its derived state is returned.
- */
-function getCampaignCharacterSheetSnapshotSyncInternal(
-  db: DatabaseDriver.Database,
-  progressionRepository: CharacterProgressionRepository,
-  actorPrincipalId: string,
-  campaignId: string,
-  campaignCharacterId: string,
-): CampaignCharacterSheetSnapshot | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const targetId = resourceIdSchema.parse(campaignCharacterId);
-  const workspace = getCampaignCharacterWorkspaceSyncInternal(db, actorId, id, targetId);
-  if (workspace === null) return null;
-
-  const progression = progressionRepository.getCharacterProgression(actorId, targetId);
-  if (progression === null) return null;
-  if (workspace.campaignId !== id || workspace.campaignCharacterId !== targetId
-    || progression.campaignId !== id || progression.campaignCharacterId !== targetId) {
-    throw new Error("campaign character sheet snapshot is malformed");
-  }
-  return { campaignId: id, campaignCharacterId: targetId, sheet: workspace.character, progression };
-}
-
 interface CampaignEventReadRow {
   audit_command_id: string | null;
   command_presence: string | null;
@@ -4417,6 +3821,41 @@ function sameMetadata(
     && left.tags.every((tag, index) => tag === right.tags[index]);
 }
 
+/**
+ * Legacy character storage deliberately has no modern name bound. Project the
+ * longest well-formed UTF-16 prefix that fits the strict 200-code-unit wire
+ * schema, never splitting a surrogate pair. If that prefix is blank, retry
+ * after leading whitespace so valid legacy data still has a visible wire
+ * projection. Storage and legacy APIs stay unchanged. Empty, whitespace-only,
+ * and malformed UTF-16 names are corrupt.
+ */
+function projectLegacyPersonaDisplayName(value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error("legacy persona display name is malformed");
+  }
+  for (const source of [value, value.trimStart()]) {
+    let projected = "";
+    for (let index = 0; index < source.length;) {
+      const first = source.charCodeAt(index);
+      let width = 1;
+      if (first >= 0xd800 && first <= 0xdbff) {
+        const second = source.charCodeAt(index + 1);
+        if (!(second >= 0xdc00 && second <= 0xdfff)) {
+          throw new Error("legacy persona display name is malformed");
+        }
+        width = 2;
+      } else if (first >= 0xdc00 && first <= 0xdfff) {
+        throw new Error("legacy persona display name is malformed");
+      }
+      if (projected.length + width > 200) break;
+      projected += source.slice(index, index + width);
+      index += width;
+    }
+    if (projected.trim().length > 0) return projected;
+  }
+  throw new Error("legacy persona display name is malformed");
+}
+
 function requireOriginalStarterInspectionForWrite(
   db: DatabaseDriver.Database,
   actorId: string,
@@ -4804,690 +4243,6 @@ function getCampaignRulesProfileSync(
   return row ? toRulesProfile(row) : null;
 }
 
-interface CampaignContentConfigurationReadRow {
-  actor_campaign_id: string;
-  actor_principal_id: string;
-  actor_role: string;
-  actor_created_at: string;
-  campaign_id: string;
-  selected_campaign_id: string | null;
-  selected_rules_profile_id: string | null;
-  profile_rules_profile_id: string | null;
-  profile_name: string | null;
-  profile_description: string | null;
-  profile_tags: string | null;
-  pin_campaign_id: string | null;
-  pin_pack_id: string | null;
-  pin_pack_version: string | null;
-  pin_rules_profile_id: string | null;
-  pack_id: string | null;
-  pack_version: string | null;
-  pack_rules_profile_id: string | null;
-  pack_name: string | null;
-  pack_description: string | null;
-  pack_tags: string | null;
-  pack_sealed: number | null;
-}
-
-function malformedCampaignContentConfiguration(): never {
-  throw new Error("campaign content configuration is malformed");
-}
-
-function getCampaignContentConfigurationSync(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): CampaignContentConfiguration | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const rows = db.prepare(`SELECT
-      membership.campaign_id AS actor_campaign_id,
-      membership.principal_id AS actor_principal_id,
-      membership.role AS actor_role,
-      membership.created_at AS actor_created_at,
-      campaign.id AS campaign_id,
-      selected.campaign_id AS selected_campaign_id,
-      selected.rules_profile_id AS selected_rules_profile_id,
-      profile.rules_profile_id AS profile_rules_profile_id,
-      profile.name AS profile_name,
-      profile.description AS profile_description,
-      profile.tags AS profile_tags,
-      pin.campaign_id AS pin_campaign_id,
-      pin.pack_id AS pin_pack_id,
-      pin.pack_version AS pin_pack_version,
-      pin.rules_profile_id AS pin_rules_profile_id,
-      pack.pack_id,
-      pack.pack_version,
-      pack.rules_profile_id AS pack_rules_profile_id,
-      pack.name AS pack_name,
-      pack.description AS pack_description,
-      pack.tags AS pack_tags,
-      pack.sealed AS pack_sealed
-    FROM campaign_memberships membership
-    JOIN principals principal ON principal.id = membership.principal_id
-    JOIN campaigns campaign ON campaign.id = membership.campaign_id
-    LEFT JOIN campaign_rules_profiles selected ON selected.campaign_id = campaign.id
-    LEFT JOIN rpg_rules_profiles profile ON profile.rules_profile_id = selected.rules_profile_id
-    LEFT JOIN campaign_content_packs pin ON pin.campaign_id = campaign.id
-    LEFT JOIN rpg_content_packs pack
-      ON pack.pack_id = pin.pack_id AND pack.pack_version = pin.pack_version
-    WHERE membership.principal_id = ? AND membership.campaign_id = ?
-      AND (membership.role IN ('gm', 'player', 'observer') OR (
-        membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-      ))
-    ORDER BY pin.pack_id COLLATE BINARY ASC, pin.pack_version COLLATE BINARY ASC`)
-    .all(actorId, id) as CampaignContentConfigurationReadRow[];
-  if (rows.length === 0) return null;
-
-  try {
-    const first = rows[0]!;
-    const authorization = campaignMembershipReadSchema.parse({
-      campaignId: first.actor_campaign_id,
-      principalId: first.actor_principal_id,
-      role: first.actor_role,
-      createdAt: first.actor_created_at,
-    });
-    if (authorization.campaignId !== id || authorization.principalId !== actorId
-      || rows.some((row) => row.campaign_id !== id
-        || row.actor_campaign_id !== first.actor_campaign_id
-        || row.actor_principal_id !== first.actor_principal_id
-        || row.actor_role !== first.actor_role
-        || row.actor_created_at !== first.actor_created_at)) {
-      malformedCampaignContentConfiguration();
-    }
-
-    const selectedFields = [
-      first.selected_campaign_id,
-      first.selected_rules_profile_id,
-      first.profile_rules_profile_id,
-      first.profile_name,
-      first.profile_description,
-      first.profile_tags,
-    ];
-    if (selectedFields.every((value) => value === null)) {
-      const hasAnyContent = rows.some((row) => row.pin_campaign_id !== null || row.pin_pack_id !== null
-        || row.pin_pack_version !== null || row.pin_rules_profile_id !== null || row.pack_id !== null
-        || row.pack_version !== null || row.pack_rules_profile_id !== null || row.pack_name !== null
-        || row.pack_description !== null || row.pack_tags !== null || row.pack_sealed !== null);
-      if (hasAnyContent || rows.length !== 1) malformedCampaignContentConfiguration();
-      return null;
-    }
-    if (selectedFields.some((value) => value === null)
-      || first.selected_campaign_id !== id
-      || first.selected_rules_profile_id !== first.profile_rules_profile_id) {
-      malformedCampaignContentConfiguration();
-    }
-    toRulesProfile({
-      rules_profile_id: first.profile_rules_profile_id!,
-      name: first.profile_name!,
-      description: first.profile_description!,
-      tags: first.profile_tags!,
-    });
-
-    const contentPacks: ContentPackIdentifier[] = [];
-    for (const row of rows) {
-      if (row.selected_campaign_id !== first.selected_campaign_id
-        || row.selected_rules_profile_id !== first.selected_rules_profile_id
-        || row.profile_rules_profile_id !== first.profile_rules_profile_id
-        || row.profile_name !== first.profile_name
-        || row.profile_description !== first.profile_description
-        || row.profile_tags !== first.profile_tags) {
-        malformedCampaignContentConfiguration();
-      }
-      const pinFields = [row.pin_campaign_id, row.pin_pack_id, row.pin_pack_version, row.pin_rules_profile_id];
-      const packFields = [row.pack_id, row.pack_version, row.pack_rules_profile_id, row.pack_name,
-        row.pack_description, row.pack_tags, row.pack_sealed];
-      if (pinFields.every((value) => value === null)) {
-        if (packFields.some((value) => value !== null) || rows.length !== 1) malformedCampaignContentConfiguration();
-        continue;
-      }
-      if (pinFields.some((value) => value === null) || packFields.some((value) => value === null)
-        || row.pin_campaign_id !== id
-        || row.pin_rules_profile_id !== first.selected_rules_profile_id
-        || row.pack_id !== row.pin_pack_id
-        || row.pack_version !== row.pin_pack_version
-        || row.pack_rules_profile_id !== first.selected_rules_profile_id
-        || row.pack_sealed !== 1) {
-        malformedCampaignContentConfiguration();
-      }
-      const pack = toContentPack({
-        pack_id: row.pack_id!,
-        pack_version: row.pack_version!,
-        rules_profile_id: row.pack_rules_profile_id!,
-        name: row.pack_name!,
-        description: row.pack_description!,
-        tags: row.pack_tags!,
-      });
-      contentPacks.push({ packId: pack.packId, packVersion: pack.packVersion });
-    }
-    return campaignContentConfigurationSchema.parse({
-      campaignId: id,
-      rulesProfileId: first.selected_rules_profile_id,
-      contentPacks,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message === "campaign content configuration is malformed") throw error;
-    return malformedCampaignContentConfiguration();
-  }
-}
-
-interface CampaignCharacterCreationOptionsRow {
-  actor_campaign_id: unknown;
-  actor_principal_id: unknown;
-  actor_role: unknown;
-  actor_created_at: unknown;
-  campaign_id: unknown;
-  campaign_name: unknown;
-  active_timeline_id: unknown;
-  owner_principal_id: unknown;
-  campaign_owner_role: unknown;
-  campaign_created_at: unknown;
-  campaign_updated_at: unknown;
-  owner_role_count: number;
-  exact_owner_count: number;
-  owner_membership_campaign_id: unknown;
-  owner_membership_principal_id: unknown;
-  owner_membership_role: unknown;
-  owner_membership_created_at: unknown;
-  active_timeline_count: number;
-  active_timeline_revision: unknown;
-  active_timeline_created_at: unknown;
-  selected_count: number;
-  selected_rules_profile_id: string | null;
-  profile_rules_profile_id: string | null;
-  profile_name: string | null;
-  profile_description: string | null;
-  profile_tags: string | null;
-  pin_count: number;
-  pins_json: string;
-  reserved_definition_count: number;
-  reserved_definitions_json: string;
-  persona_count: number;
-  persona_id: string | null;
-  persona_name: string | null;
-  persona_created_at: string | null;
-  persona_fictional_confirmed: number | null;
-  persona_is_real_person: number | null;
-  already_used: number | null;
-  campaign_link_count: number;
-  campaign_links_json: string;
-}
-
-interface CreationOptionsPinRow {
-  campaignId: unknown;
-  packId: unknown;
-  packVersion: unknown;
-  pinRulesProfileId: unknown;
-  storedPackId: unknown;
-  storedPackVersion: unknown;
-  packRulesProfileId: unknown;
-  name: unknown;
-  description: unknown;
-  tags: unknown;
-  sealed: unknown;
-}
-
-interface CreationOptionsLinkRow {
-  id: unknown;
-  campaignId: unknown;
-  characterId: unknown;
-  createdAt: unknown;
-  updatedAt: unknown;
-}
-
-interface CreationOptionsDefinitionRow {
-  packId: unknown;
-  packVersion: unknown;
-  kind: unknown;
-  definitionId: unknown;
-  name: unknown;
-  description: unknown;
-  tags: unknown;
-}
-
-function malformedCampaignCharacterCreationOptions(): never {
-  throw new Error("campaign character creation options are malformed");
-}
-
-/**
- * Legacy character storage deliberately has no modern name bound. Project the
- * longest well-formed UTF-16 prefix that fits the strict 200-code-unit wire
- * schema, never splitting a surrogate pair. If that prefix is blank, retry
- * after leading whitespace so valid legacy data still has a visible wire
- * projection. Storage and legacy APIs stay unchanged. Empty, whitespace-only,
- * and malformed UTF-16 names are corrupt.
- */
-function projectLegacyPersonaDisplayName(value: unknown): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error("legacy persona display name is malformed");
-  }
-  for (const source of [value, value.trimStart()]) {
-    let projected = "";
-    for (let index = 0; index < source.length;) {
-      const first = source.charCodeAt(index);
-      let width = 1;
-      if (first >= 0xd800 && first <= 0xdbff) {
-        const second = source.charCodeAt(index + 1);
-        if (!(second >= 0xdc00 && second <= 0xdfff)) {
-          throw new Error("legacy persona display name is malformed");
-        }
-        width = 2;
-      } else if (first >= 0xdc00 && first <= 0xdfff) {
-        throw new Error("legacy persona display name is malformed");
-      }
-      if (projected.length + width > 200) break;
-      projected += source.slice(index, index + width);
-      index += width;
-    }
-    if (projected.trim().length > 0) return projected;
-  }
-  throw new Error("legacy persona display name is malformed");
-}
-
-/**
- * Reconstructs authority, configuration, persona availability, and current
- * campaign links from one statement. Keeping this as a single statement is
- * intentional: factory callers receive SQLite's implicit statement snapshot,
- * while active units of work receive their enclosing transaction snapshot.
- */
-function getCampaignCharacterCreationOptionsSyncInternal(
-  db: DatabaseDriver.Database,
-  actorPrincipalId: string,
-  campaignId: string,
-): CampaignCharacterCreationOptionsResponse | null {
-  const actorId = resourceIdSchema.parse(actorPrincipalId);
-  const id = resourceIdSchema.parse(campaignId);
-  const starterRace = ORIGINAL_STARTER_MANIFEST.races[0]!;
-  const starterBackground = ORIGINAL_STARTER_MANIFEST.backgrounds[0]!;
-  const starterClass = ORIGINAL_STARTER_MANIFEST.classes[0]!;
-  const expectedDefinitions = [
-    ...ORIGINAL_STARTER_MANIFEST.classes, ...ORIGINAL_STARTER_MANIFEST.races,
-    ...ORIGINAL_STARTER_MANIFEST.backgrounds, ...ORIGINAL_STARTER_MANIFEST.items,
-    ...ORIGINAL_STARTER_MANIFEST.spells, ...ORIGINAL_STARTER_MANIFEST.abilities,
-    ...ORIGINAL_STARTER_MANIFEST.enemies,
-  ];
-  const rows = db.prepare(`WITH authorized AS (
-      SELECT membership.campaign_id AS actor_campaign_id,
-        membership.principal_id AS actor_principal_id,
-        membership.role AS actor_role,
-        membership.created_at AS actor_created_at,
-        campaign.id AS campaign_id,
-        campaign.name AS campaign_name,
-        campaign.active_timeline_id,
-        campaign.owner_principal_id,
-        campaign.owner_role AS campaign_owner_role,
-        campaign.created_at AS campaign_created_at,
-        campaign.updated_at AS campaign_updated_at
-      FROM campaign_memberships membership
-      JOIN principals actor_parent ON actor_parent.id = membership.principal_id
-      JOIN campaigns campaign ON campaign.id = membership.campaign_id
-      WHERE membership.principal_id = $actorId AND membership.campaign_id = $campaignId
-        AND (membership.role = 'gm' OR (
-          membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id
-        ))
-    ), selected_state AS (
-      SELECT COUNT(*) AS selected_count,
-        MIN(selected.rules_profile_id) AS selected_rules_profile_id
-      FROM campaign_rules_profiles selected WHERE selected.campaign_id = $campaignId
-    ), pin_state AS (
-      SELECT COUNT(*) AS pin_count FROM campaign_content_packs pin
-      WHERE pin.campaign_id = $campaignId
-    )
-    SELECT
-      authorized.actor_campaign_id,
-      authorized.actor_principal_id,
-      authorized.actor_role,
-      authorized.actor_created_at,
-      authorized.campaign_id,
-      authorized.campaign_name,
-      authorized.active_timeline_id,
-      authorized.owner_principal_id,
-      authorized.campaign_owner_role,
-      authorized.campaign_created_at,
-      authorized.campaign_updated_at,
-      (SELECT COUNT(*) FROM campaign_memberships owner_membership
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner') AS owner_role_count,
-      (SELECT COUNT(*) FROM campaign_memberships owner_membership
-        JOIN principals owner_parent ON owner_parent.id = owner_membership.principal_id
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner'
-          AND owner_membership.principal_id = authorized.owner_principal_id) AS exact_owner_count,
-      (SELECT owner_membership.campaign_id FROM campaign_memberships owner_membership
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner' LIMIT 1) AS owner_membership_campaign_id,
-      (SELECT owner_membership.principal_id FROM campaign_memberships owner_membership
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner' LIMIT 1) AS owner_membership_principal_id,
-      (SELECT owner_membership.role FROM campaign_memberships owner_membership
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner' LIMIT 1) AS owner_membership_role,
-      (SELECT owner_membership.created_at FROM campaign_memberships owner_membership
-        WHERE owner_membership.campaign_id = authorized.campaign_id
-          AND owner_membership.role = 'owner' LIMIT 1) AS owner_membership_created_at,
-      (SELECT COUNT(*) FROM campaign_timelines active_timeline
-        WHERE active_timeline.campaign_id = authorized.campaign_id
-          AND active_timeline.id = authorized.active_timeline_id) AS active_timeline_count,
-      (SELECT active_timeline.revision FROM campaign_timelines active_timeline
-        WHERE active_timeline.campaign_id = authorized.campaign_id
-          AND active_timeline.id = authorized.active_timeline_id) AS active_timeline_revision,
-      (SELECT active_timeline.created_at FROM campaign_timelines active_timeline
-        WHERE active_timeline.campaign_id = authorized.campaign_id
-          AND active_timeline.id = authorized.active_timeline_id) AS active_timeline_created_at,
-      selected_state.selected_count,
-      selected_state.selected_rules_profile_id,
-      profile.rules_profile_id AS profile_rules_profile_id,
-      profile.name AS profile_name,
-      profile.description AS profile_description,
-      profile.tags AS profile_tags,
-      pin_state.pin_count,
-      (SELECT json_group_array(json_object(
-          'campaignId', bounded_pin.campaign_id,
-          'packId', bounded_pin.pin_pack_id,
-          'packVersion', bounded_pin.pin_pack_version,
-          'pinRulesProfileId', bounded_pin.pin_rules_profile_id,
-          'storedPackId', bounded_pin.pack_id,
-          'storedPackVersion', bounded_pin.pack_version,
-          'packRulesProfileId', bounded_pin.pack_rules_profile_id,
-          'name', bounded_pin.pack_name,
-          'description', bounded_pin.pack_description,
-          'tags', bounded_pin.pack_tags,
-          'sealed', bounded_pin.pack_sealed
-        )) FROM (
-          SELECT pin.campaign_id, pin.pack_id AS pin_pack_id,
-            pin.pack_version AS pin_pack_version,
-            pin.rules_profile_id AS pin_rules_profile_id,
-            pack.pack_id, pack.pack_version,
-            pack.rules_profile_id AS pack_rules_profile_id,
-            pack.name AS pack_name, pack.description AS pack_description,
-            pack.tags AS pack_tags, pack.sealed AS pack_sealed
-          FROM campaign_content_packs pin
-          LEFT JOIN rpg_content_packs pack
-            ON pack.pack_id = pin.pack_id AND pack.pack_version = pin.pack_version
-          WHERE pin.campaign_id = authorized.campaign_id
-          ORDER BY pin.pack_id COLLATE BINARY ASC, pin.pack_version COLLATE BINARY ASC
-          LIMIT ${MAX_CAMPAIGN_CONTENT_PACKS + 1}
-        ) bounded_pin) AS pins_json,
-      (SELECT COUNT(*) FROM rpg_definitions definition
-        WHERE definition.pack_id = $starterPackId
-          OR definition.definition_id IN ($starterClassId, $starterRaceId, $starterBackgroundId)
-      ) AS reserved_definition_count,
-      (SELECT json_group_array(json_object(
-          'packId', bounded_definition.pack_id,
-          'packVersion', bounded_definition.pack_version,
-          'kind', bounded_definition.kind,
-          'definitionId', bounded_definition.definition_id,
-          'name', bounded_definition.name,
-          'description', bounded_definition.description,
-          'tags', bounded_definition.tags
-        )) FROM (
-          SELECT definition.pack_id, definition.pack_version, definition.kind,
-            definition.definition_id, definition.name, definition.description, definition.tags
-          FROM rpg_definitions definition
-          WHERE definition.pack_id = $starterPackId
-            OR definition.definition_id IN ($starterClassId, $starterRaceId, $starterBackgroundId)
-          ORDER BY definition.pack_id COLLATE BINARY ASC, definition.pack_version COLLATE BINARY ASC,
-            definition.kind COLLATE BINARY ASC, definition.definition_id COLLATE BINARY ASC
-          LIMIT ${expectedDefinitions.length + 1}
-        ) bounded_definition) AS reserved_definitions_json,
-      (SELECT COUNT(*) FROM characters) AS persona_count,
-      persona.id AS persona_id,
-      persona.name AS persona_name,
-      persona.created_at AS persona_created_at,
-      persona.fictional_confirmed AS persona_fictional_confirmed,
-      persona.is_real_person AS persona_is_real_person,
-      CASE WHEN persona.id IS NULL THEN NULL ELSE EXISTS (
-        SELECT 1 FROM campaign_characters link
-        WHERE link.campaign_id = authorized.campaign_id AND link.character_id = persona.id
-      ) END AS already_used,
-      (SELECT COUNT(*) FROM campaign_characters link
-        WHERE link.campaign_id = authorized.campaign_id) AS campaign_link_count,
-      (SELECT json_group_array(json_object(
-          'id', bounded_link.id,
-          'campaignId', bounded_link.campaign_id,
-          'characterId', bounded_link.character_id,
-          'createdAt', bounded_link.created_at,
-          'updatedAt', bounded_link.updated_at
-        )) FROM (
-          SELECT link.id, link.campaign_id, link.character_id, link.created_at, link.updated_at
-          FROM campaign_characters link
-          WHERE link.campaign_id = authorized.campaign_id
-          ORDER BY link.created_at ASC, link.id COLLATE BINARY ASC
-          LIMIT ${MAX_CAMPAIGN_CHARACTER_PERSONAS + 1}
-        ) bounded_link) AS campaign_links_json
-    FROM authorized
-    CROSS JOIN selected_state
-    CROSS JOIN pin_state
-    LEFT JOIN rpg_rules_profiles profile
-      ON profile.rules_profile_id = selected_state.selected_rules_profile_id
-    LEFT JOIN characters persona ON 1 = 1
-    ORDER BY persona.created_at ASC, persona.id COLLATE BINARY ASC
-    LIMIT ${MAX_CAMPAIGN_CHARACTER_PERSONAS + 1}`).all({
-      actorId,
-      campaignId: id,
-      starterPackId: ORIGINAL_STARTER_MANIFEST.packId,
-      starterPackVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-      starterRaceId: starterRace.definitionId,
-      starterBackgroundId: starterBackground.definitionId,
-      starterClassId: starterClass.definitionId,
-    }) as CampaignCharacterCreationOptionsRow[];
-  if (rows.length === 0) return null;
-
-  try {
-    const first = rows[0]!;
-    const authorization = campaignMembershipReadSchema.parse({
-      campaignId: first.actor_campaign_id,
-      principalId: first.actor_principal_id,
-      role: first.actor_role,
-      createdAt: first.actor_created_at,
-    });
-    if (authorization.campaignId !== id || authorization.principalId !== actorId
-      || !["owner", "gm"].includes(authorization.role)) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const campaign = campaignSchema.parse({
-      id: first.campaign_id,
-      name: first.campaign_name,
-      activeTimelineId: first.active_timeline_id,
-      ownerPrincipalId: first.owner_principal_id,
-      createdAt: first.campaign_created_at,
-      updatedAt: first.campaign_updated_at,
-    });
-    if (campaign.id !== id || first.owner_role_count !== 1 || first.exact_owner_count !== 1
-      || first.active_timeline_count !== 1 || first.campaign_owner_role !== "owner") {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const ownerMembership = campaignMembershipReadSchema.parse({
-      campaignId: first.owner_membership_campaign_id,
-      principalId: first.owner_membership_principal_id,
-      role: first.owner_membership_role,
-      createdAt: first.owner_membership_created_at,
-    });
-    if (ownerMembership.campaignId !== id || ownerMembership.principalId !== campaign.ownerPrincipalId
-      || ownerMembership.role !== "owner") malformedCampaignCharacterCreationOptions();
-    const activeTimeline = campaignTimelineSchema.parse({
-      id: campaign.activeTimelineId,
-      campaignId: campaign.id,
-      revision: first.active_timeline_revision,
-      createdAt: first.active_timeline_created_at,
-    });
-    if (activeTimeline.id !== campaign.activeTimelineId || activeTimeline.campaignId !== id) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    if (rows.some((row) => row.actor_campaign_id !== first.actor_campaign_id
-      || row.actor_principal_id !== first.actor_principal_id
-      || row.actor_role !== first.actor_role
-      || row.actor_created_at !== first.actor_created_at
-      || row.campaign_id !== first.campaign_id
-      || row.selected_count !== first.selected_count
-      || row.selected_rules_profile_id !== first.selected_rules_profile_id
-      || row.pin_count !== first.pin_count
-      || row.persona_count !== first.persona_count
-      || row.campaign_link_count !== first.campaign_link_count)) {
-      malformedCampaignCharacterCreationOptions();
-    }
-
-    if (first.persona_count > MAX_CAMPAIGN_CHARACTER_PERSONAS
-      || first.campaign_link_count > MAX_CAMPAIGN_CHARACTER_PERSONAS) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const links = JSON.parse(first.campaign_links_json) as CreationOptionsLinkRow[];
-    if (!Array.isArray(links) || links.length !== first.campaign_link_count) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const linkedPersonas = new Set<string>();
-    const linkIds = new Set<string>();
-    for (const rawLink of links) {
-      const link = campaignCharacterSchema.parse(rawLink);
-      if (link.campaignId !== id || linkIds.has(link.id) || linkedPersonas.has(link.characterId)) {
-        malformedCampaignCharacterCreationOptions();
-      }
-      linkIds.add(link.id);
-      linkedPersonas.add(link.characterId);
-    }
-    const personaRows = first.persona_count === 0 ? [] : rows;
-    if (personaRows.length !== first.persona_count) malformedCampaignCharacterCreationOptions();
-    const knownPersonas = new Set<string>();
-    const personas = personaRows.map((row) => {
-      if (row.persona_id === null || row.persona_name === null || row.persona_created_at === null
-        || row.persona_fictional_confirmed !== 1 || row.persona_is_real_person !== 0
-        || (row.already_used !== 0 && row.already_used !== 1)) {
-        return malformedCampaignCharacterCreationOptions();
-      }
-      utcIsoTimestampSchema.parse(row.persona_created_at);
-      if (knownPersonas.has(row.persona_id)) malformedCampaignCharacterCreationOptions();
-      knownPersonas.add(row.persona_id);
-      const alreadyUsed = row.already_used === 1;
-      if (alreadyUsed !== linkedPersonas.has(row.persona_id)) malformedCampaignCharacterCreationOptions();
-      return campaignCharacterPersonaSummarySchema.parse({
-        characterId: row.persona_id,
-        name: projectLegacyPersonaDisplayName(row.persona_name),
-        alreadyUsed,
-      });
-    });
-    if ([...linkedPersonas].some((characterId) => !knownPersonas.has(characterId))) {
-      malformedCampaignCharacterCreationOptions();
-    }
-
-    if (first.selected_count === 0) {
-      if (first.pin_count !== 0) malformedCampaignCharacterCreationOptions();
-      return null;
-    }
-    if (first.selected_count !== 1 || first.profile_rules_profile_id === null
-      || first.profile_name === null || first.profile_description === null || first.profile_tags === null) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const profile = toRulesProfile({
-      rules_profile_id: first.profile_rules_profile_id,
-      name: first.profile_name,
-      description: first.profile_description,
-      tags: first.profile_tags,
-    });
-    if (profile.rulesProfileId !== first.selected_rules_profile_id
-      || first.pin_count > MAX_CAMPAIGN_CONTENT_PACKS) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const pins = JSON.parse(first.pins_json) as CreationOptionsPinRow[];
-    if (!Array.isArray(pins) || pins.length !== first.pin_count) malformedCampaignCharacterCreationOptions();
-    const parsedPins = pins.map((pin) => {
-      if (pin.campaignId !== id || pin.pinRulesProfileId !== profile.rulesProfileId
-        || pin.packId !== pin.storedPackId || pin.packVersion !== pin.storedPackVersion
-        || pin.packRulesProfileId !== profile.rulesProfileId || pin.sealed !== 1
-        || typeof pin.storedPackId !== "string" || typeof pin.storedPackVersion !== "string"
-        || typeof pin.name !== "string" || typeof pin.description !== "string" || typeof pin.tags !== "string") {
-        return malformedCampaignCharacterCreationOptions();
-      }
-      return toContentPack({
-        pack_id: pin.storedPackId,
-        pack_version: pin.storedPackVersion,
-        rules_profile_id: profile.rulesProfileId,
-        name: pin.name,
-        description: pin.description,
-        tags: pin.tags,
-      });
-    });
-
-    const starterPack = parsedPins.length === 1
-      && parsedPins[0]!.packId === ORIGINAL_STARTER_MANIFEST.packId
-      && parsedPins[0]!.packVersion === ORIGINAL_STARTER_MANIFEST.packVersion;
-    if (profile.rulesProfileId !== ORIGINAL_STARTER_MANIFEST.rulesProfileId || !starterPack) return null;
-    if (!sameMetadata(profile, ORIGINAL_STARTER_MANIFEST.rulesProfile)
-      || !sameMetadata(parsedPins[0]!, ORIGINAL_STARTER_MANIFEST)) {
-      malformedCampaignCharacterCreationOptions();
-    }
-
-    if (first.reserved_definition_count !== expectedDefinitions.length) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const rawDefinitions = JSON.parse(first.reserved_definitions_json) as CreationOptionsDefinitionRow[];
-    if (!Array.isArray(rawDefinitions) || rawDefinitions.length !== expectedDefinitions.length) {
-      malformedCampaignCharacterCreationOptions();
-    }
-    const installedDefinitions = new Map(rawDefinitions.map((raw) => {
-      if (raw.packId !== ORIGINAL_STARTER_MANIFEST.packId
-        || raw.packVersion !== ORIGINAL_STARTER_MANIFEST.packVersion
-        || typeof raw.kind !== "string" || typeof raw.definitionId !== "string"
-        || typeof raw.name !== "string" || typeof raw.description !== "string" || typeof raw.tags !== "string") {
-        return malformedCampaignCharacterCreationOptions();
-      }
-      const definition = toRpgDefinition({
-        kind: raw.kind,
-        definition_id: raw.definitionId,
-        name: raw.name,
-        description: raw.description,
-        tags: raw.tags,
-      });
-      return [`${definition.kind}:${definition.definitionId}`, definition] as const;
-    }));
-    if (installedDefinitions.size !== expectedDefinitions.length || expectedDefinitions.some((expected) => {
-      const definition = installedDefinitions.get(`${expected.kind}:${expected.definitionId}`);
-      return definition === undefined || !sameMetadata(definition, expected);
-    })) malformedCampaignCharacterCreationOptions();
-
-    const response = campaignCharacterCreationOptionsResponseSchema.parse({
-      campaignId: id,
-      personas,
-      starter: {
-        rulesProfile: {
-          rulesProfileId: ORIGINAL_STARTER_MANIFEST.rulesProfileId,
-          name: ORIGINAL_STARTER_MANIFEST.rulesProfile.name,
-          description: ORIGINAL_STARTER_MANIFEST.rulesProfile.description,
-        },
-        pack: {
-          packId: ORIGINAL_STARTER_MANIFEST.packId,
-          packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-          rulesProfileId: ORIGINAL_STARTER_MANIFEST.rulesProfileId,
-          name: ORIGINAL_STARTER_MANIFEST.name,
-          description: ORIGINAL_STARTER_MANIFEST.description,
-        },
-        race: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
-            packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterRace.definitionId, kind: starterRace.kind },
-          name: starterRace.name, description: starterRace.description,
-        },
-        background: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
-            packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterBackground.definitionId, kind: starterBackground.kind },
-          name: starterBackground.name, description: starterBackground.description,
-        },
-        class: {
-          reference: { packId: ORIGINAL_STARTER_MANIFEST.packId,
-            packVersion: ORIGINAL_STARTER_MANIFEST.packVersion,
-            definitionId: starterClass.definitionId, kind: starterClass.kind },
-          name: starterClass.name, description: starterClass.description, level: 1,
-        },
-      },
-    });
-    if (response.campaignId !== id) malformedCampaignCharacterCreationOptions();
-    return response;
-  } catch (error) {
-    if (error instanceof Error && error.message === "campaign character creation options are malformed") throw error;
-    return malformedCampaignCharacterCreationOptions();
-  }
-}
-
 function getCampaignDetailSync(
   db: DatabaseDriver.Database,
   actorPrincipalId: string,
@@ -5495,7 +4250,7 @@ function getCampaignDetailSync(
 ): CampaignDetail | null {
   const campaign = createCampaignAccessRepository(db).getCampaign(actorPrincipalId, campaignId);
   if (!campaign) return null;
-  const configuration = getCampaignContentConfigurationSync(db, actorPrincipalId, campaignId);
+  const configuration = getCampaignContentConfigurationReadSync(db, actorPrincipalId, campaignId);
   return campaignDetailSchema.parse({
     id: campaign.id,
     name: campaign.name,
@@ -5804,15 +4559,26 @@ function createCampaignActorOperations(
   db: DatabaseDriver.Database,
   progressionRepository: CharacterProgressionRepository,
 ) {
+  const characterCreationOptionsRepository = createCampaignCharacterCreationOptionsRepository(db);
+  const characterRosterRepository = createCampaignCharacterRosterOperations(
+    db,
+    projectLegacyPersonaDisplayName,
+  );
+  const characterWorkspaceRepository = createCampaignCharacterWorkspaceRepository(db);
+  const characterSheetSnapshotRepository = createCampaignCharacterSheetSnapshotRepository(
+    db,
+    progressionRepository,
+    characterWorkspaceRepository,
+  );
   return {
     getCampaignCharacterCreationOptions: (actor: string, campaignId: string) =>
-      getCampaignCharacterCreationOptionsSyncInternal(db, actor, campaignId),
+      characterCreationOptionsRepository.getCampaignCharacterCreationOptions(actor, campaignId),
     getCampaignCharacterRoster: (actor: string, campaignId: string) =>
-      getCampaignCharacterRosterSyncInternal(db, actor, campaignId),
+      characterRosterRepository.getCampaignCharacterRoster(actor, campaignId),
     getCampaignCharacterWorkspace: (actor: string, campaignId: string, campaignCharacterId: string) =>
-      getCampaignCharacterWorkspaceSyncInternal(db, actor, campaignId, campaignCharacterId),
+      characterWorkspaceRepository.getCampaignCharacterWorkspace(actor, campaignId, campaignCharacterId),
     getCampaignCharacterSheetSnapshot: (actor: string, campaignId: string, campaignCharacterId: string) =>
-      getCampaignCharacterSheetSnapshotSyncInternal(db, progressionRepository, actor, campaignId, campaignCharacterId),
+      characterSheetSnapshotRepository.getCampaignCharacterSheetSnapshot(actor, campaignId, campaignCharacterId),
     ...createCampaignCharacterReadOperations(db),
   };
 }
@@ -5846,6 +4612,7 @@ function runTransaction<T>(
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db, projectLegacyRoomText);
+  const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const unitOfWork: RepositoryUnitOfWork = {
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -5922,7 +4689,7 @@ function runTransaction<T>(
     },
     getCampaignContentConfiguration: (actorPrincipalId, campaignId) => {
       assertActive();
-      return getCampaignContentConfigurationSync(db, actorPrincipalId, campaignId);
+      return campaignContentConfigurationReadRepository.getCampaignContentConfiguration(actorPrincipalId, campaignId);
     },
     getCampaignCharacterCreationOptions: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -6065,6 +4832,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db, projectLegacyRoomText);
+  const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const campaignCoreRepository = createCampaignCoreRepository({
     createCampaign: (actor, input) => createCampaignSyncInternal(db, dependencies, actor, input),
     renameCampaign: (actor, campaignId, input) => renameCampaignSyncInternal(db, dependencies.clock, actor, campaignId, input),
@@ -6267,7 +5035,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     },
     getCampaignContentConfiguration: (actorPrincipalId, campaignId) => {
       assertOpen();
-      return getCampaignContentConfigurationSync(db, actorPrincipalId, campaignId);
+      return campaignContentConfigurationReadRepository.getCampaignContentConfiguration(actorPrincipalId, campaignId);
     },
     getCampaignCharacterCreationOptions: (actorPrincipalId, campaignId) => {
       assertOpen();
