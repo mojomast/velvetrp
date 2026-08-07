@@ -1,5 +1,5 @@
 # Handoff
-## Completed: Extracted campaign-character writes into a database-scoped factory
+## Completed: Extracted campaign-content writes into a database-scoped factory
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: `campaignCharacterWriteRepo` is now a real `(db, dependencies)` factory. It owns the unchanged character-creation transaction and original-starter validation, while `campaignRepo` constructs it directly. SQL was retained verbatim and `npm run typecheck` in `server/` passes. No commit was created. `devplan.md` remains unchanged because its pending M1.9 item is unrelated to this corrective refactor.
-## Files Modified: server/src/repo/campaign/campaignCharacterWriteRepo.ts, server/src/repo/campaignRepo.ts, handoff.md
+## Context: `campaignContentWriteRepo` owns content-pack installation, campaign-content configuration, and the original-starter inspection gate. `campaignRepo` constructs it with the inspection repository and delegates generic and original-starter write methods to it. The campaign barrel exports the new module alphabetically. `npm run typecheck` in `server/` passes. No commit was created. `devplan.md` remains unchanged because its pending M1.9 item is unrelated to this corrective refactor.
+## Files Modified: server/src/repo/campaign/campaignContentWriteRepo.ts, server/src/repo/campaign/index.ts, server/src/repo/campaignRepo.ts, handoff.md

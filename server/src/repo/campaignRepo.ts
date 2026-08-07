@@ -137,6 +137,7 @@ import { createCampaignActorRepository } from "./campaign/campaignActorRepo.js";
 import { createCampaignCharacterReadOperations } from "./campaign/campaignCharacterReadRepo.js";
 import { createCampaignCharacterRosterOperations } from "./campaign/campaignCharacterRosterRepo.js";
 import { createCampaignCharacterWriteRepository } from "./campaign/campaignCharacterWriteRepo.js";
+import { createCampaignContentWriteRepository } from "./campaign/campaignContentWriteRepo.js";
 import { createCampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
 import { createCampaignCommandWriteOperations } from "./campaign/campaignCommandWriteRepo.js";
 import { createCampaignActorResourceRepository } from "./campaign/campaignActorResourceRepo.js";
@@ -1589,6 +1590,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     toRpgDefinition,
     sameMetadata,
   });
+  const campaignContentWriteRepository = createCampaignContentWriteRepository(
+    db,
+    originalStarterSetupInspectionRepository,
+  );
   const campaignGlobalContentReadRepository = createCampaignGlobalContentReadRepository(db);
   const campaignContentSelectionReadRepository = createCampaignContentSelectionReadRepository(db, {
     rulesProfileProjection: RULES_PROFILE_PROJECTION,
@@ -1743,21 +1748,19 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     installOriginalStarterContent: (actorPrincipalId, campaignId) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("original starter installation cannot run inside a repository transaction");
-      return installContentPackSync(
-        db,
+      return campaignContentWriteRepository.installOriginalStarterContent(
         actorPrincipalId,
-        installContentPackInputSchema.parse(ORIGINAL_STARTER_MANIFEST),
         campaignId,
-        originalStarterSetupInspectionRepository,
+        installContentPackInputSchema.parse(ORIGINAL_STARTER_MANIFEST),
       );
     },
     configureOriginalStarterContent: (actorPrincipalId, campaignId) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("original starter configuration cannot run inside a repository transaction");
-      return configureCampaignContentSync(db, actorPrincipalId, campaignId, {
+      return campaignContentWriteRepository.configureOriginalStarterContent(actorPrincipalId, campaignId, {
         rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE_ID,
         contentPacks: [{ packId: ORIGINAL_STARTER_PACK_ID, packVersion: ORIGINAL_STARTER_PACK_VERSION }],
-      }, true, originalStarterSetupInspectionRepository);
+      });
     },
     listCampaigns: (actorPrincipalId) => {
       assertOpen();
@@ -1935,14 +1938,14 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     installContentPack: (actorPrincipalId, input) => {
       assertOpen();
       if (transactionDepth > 0) throw new Error("content pack installation cannot run inside a repository transaction");
-      return installContentPackSync(db, actorPrincipalId, input);
+      return campaignContentWriteRepository.installContentPack(actorPrincipalId, input);
     },
     configureCampaignContent: (actorPrincipalId, campaignId, input) => {
       assertOpen();
       if (transactionDepth > 0) {
         throw new Error("campaign content configuration cannot run inside a repository transaction");
       }
-      return configureCampaignContentSync(db, actorPrincipalId, campaignId, input);
+      return campaignContentWriteRepository.configureCampaignContent(actorPrincipalId, campaignId, input);
     },
     createCampaignCharacter: (actorPrincipalId, input) => {
       assertOpen();

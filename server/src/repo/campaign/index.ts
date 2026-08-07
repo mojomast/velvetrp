@@ -13,6 +13,7 @@ export * from "./campaignCommandWriteRepo.js";
 export * from "./campaignContentConfigurationReadRepo.js";
 export * from "./campaignContentDefinitionReadRepo.js";
 export * from "./campaignContentSelectionReadRepo.js";
+export * from "./campaignContentWriteRepo.js";
 export * from "./campaignCoreRepo.js";
 export * from "./campaignCoreWriteRepo.js";
 export * from "./campaignDetailReadRepo.js";
