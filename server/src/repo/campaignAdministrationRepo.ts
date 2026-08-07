@@ -21,10 +21,10 @@ import {
 } from "@velvet/contracts";
 import type { RepositoryDependencies } from "./campaign/campaignTypes.js";
 import { createAdministrationCommandRepo } from "./campaignAdmin/administrationCommandRepo.js";
-import { createAdministrationEventRepo, publicAdministrationPayload } from "./campaignAdmin/administrationEventRepo.js";
+import { createAdministrationEventRepo } from "./campaignAdmin/administrationEventRepo.js";
 import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";
 import { createCampaignTimelineRepo } from "./campaignAdmin/campaignTimelineRepo.js";
-import { createAdministrationAccessRepo, type AdministrationAuthority } from "./campaignAdmin/administrationAccessRepo.js";
+import { createAdministrationAccessRepo } from "./campaignAdmin/administrationAccessRepo.js";
 import { canonicalizeJson, forbidden, serializeForImport, timelineTransferEvents } from "./campaignAdmin/administrationImportHelpers.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
@@ -71,71 +71,10 @@ export interface CampaignAdministrationRepository {
   getCampaignAdministrationReceipt(actor: string, campaignId: string, commandId: string): CampaignAdministrationReceipt | null;
 }
 
-interface NewContext { commandId: string; eventId: string; at: string; auth: AdministrationAuthority }
-
-function mutation<T>(db: DatabaseDriver.Database, deps: RepositoryDependencies, getAuthority: (actor: string, campaignId: string) => AdministrationAuthority | null, actorRaw: string, campaignRaw: string,
-  expectedRevision: number, keyRaw: string, type: CampaignAdministrationReceipt["type"], payload: object,
-  apply: (context: NewContext) => T, retry: (commandId: string, stored: unknown) => T): MutationResult<T> {
-  const actor = resourceIdSchema.parse(actorRaw), campaignId = resourceIdSchema.parse(campaignRaw);
-  const key = resourceIdSchema.parse(keyRaw), payloadJson = JSON.stringify(payload);
-  const normalizedPayload = JSON.parse(payloadJson) as object;
-  return db.transaction(() => {
-    const auth = getAuthority(actor, campaignId);
-    if (!auth || auth.role !== "owner" || auth.ownerId !== actor) throw new CampaignAdministrationForbiddenError();
-    const old = db.prepare(`SELECT c.command_id,c.type,c.expected_revision,c.payload,c.created_at,
-      r.revision_before,r.revision_after,r.result_data FROM campaign_administration_commands c
-      LEFT JOIN campaign_administration_receipts r ON r.command_id=c.command_id
-      WHERE c.campaign_id=? AND c.idempotency_key=?`).get(campaignId, key) as any;
-    if (old) {
-      if (old.type !== type || old.expected_revision !== expectedRevision || old.payload !== payloadJson
-        || old.revision_before === null) throw new CampaignAdministrationConflictError("idempotency identity collision");
-      const eventRow = db.prepare("SELECT event_id,public_data,occurred_at FROM campaign_administration_events WHERE command_id=?")
-        .get(old.command_id) as any;
-      const event = campaignAdministrationEventSchema.parse({ eventId: eventRow.event_id, commandId: old.command_id,
-        campaignId, type, revision: old.revision_after, occurredAt: eventRow.occurred_at,
-        data: JSON.parse(eventRow.public_data) });
-      return { value: retry(old.command_id, JSON.parse(old.result_data)), receipt: campaignAdministrationReceiptSchema.parse({
-        commandId: old.command_id, campaignId, type, revisionBefore: old.revision_before,
-        revisionAfter: old.revision_after, occurredAt: old.created_at, events: [event] }) };
-    }
-    if (db.prepare(`SELECT 1 FROM campaign_catalog_commands WHERE campaign_id=? AND idempotency_key=?`).get(campaignId,key)) {
-      throw new CampaignAdministrationConflictError("idempotency identity collision");
-    }
-    if (auth.revision !== expectedRevision) throw new CampaignAdministrationStaleError();
-    const commandId = resourceIdSchema.parse(deps.ids.nextId()), eventId = resourceIdSchema.parse(deps.ids.nextId());
-    const clockAt = utcIsoTimestampSchema.parse(deps.clock.now().toISOString());
-    const at = utcIsoTimestampSchema.parse(new Date(Math.max(Date.parse(clockAt), Date.parse(auth.updatedAt) + 1)).toISOString());
-    db.prepare(`INSERT INTO campaign_administration_commands
-      (command_id,campaign_id,idempotency_key,actor_principal_id,expected_revision,type,payload,created_at)
-      VALUES (?,?,?,?,?,?,?,?)`).run(commandId, campaignId, key, actor, expectedRevision, type, payloadJson, at);
-    const value = apply({ commandId, eventId, at, auth });
-    const next = expectedRevision + 1;
-    const changed = db.prepare("UPDATE campaigns SET administration_revision=?,updated_at=? WHERE id=? AND administration_revision=?")
-      .run(next, at, campaignId, expectedRevision);
-    if (changed.changes !== 1) throw new CampaignAdministrationStaleError();
-    db.prepare(`INSERT INTO campaign_administration_events
-      (event_id,campaign_id,command_id,revision_before,revision,type,public_data,private_data,occurred_at) VALUES (?,?,?,?,?,?,?,?,?)`)
-      .run(eventId, campaignId, commandId, expectedRevision, next, type,
-        JSON.stringify(publicAdministrationPayload(type, normalizedPayload)), payloadJson, at);
-    db.prepare(`INSERT INTO campaign_administration_receipts
-      (command_id,campaign_id,event_id,type,revision_before,revision_after,result_data) VALUES (?,?,?,?,?,?,?)`)
-      .run(commandId, campaignId, eventId, type, expectedRevision, next, JSON.stringify(value));
-    const event = campaignAdministrationEventSchema.parse({ eventId, commandId, campaignId, type, revision: next,
-      occurredAt: at, data: publicAdministrationPayload(type, normalizedPayload) });
-    return { value, receipt: campaignAdministrationReceiptSchema.parse({ commandId, campaignId,
-      type, revisionBefore: expectedRevision, revisionAfter: next, occurredAt: at, events: [event] }) };
-  }).immediate();
-}
 export function createCampaignAdministrationRepository(db: DatabaseDriver.Database,
   deps: RepositoryDependencies, assertCanMutate: () => void = () => undefined,
   validateRoom: (sessionId: string) => "running" | "stopped" | null = () => null): CampaignAdministrationRepository {
   const access = createAdministrationAccessRepo(db);
-  const runMutation = <T>(actor: string, campaignId: string, expectedRevision: number, key: string,
-    type: CampaignAdministrationReceipt["type"], payload: object, apply: (context: NewContext) => T,
-    retry: (commandId: string, stored: unknown) => T): MutationResult<T> => {
-    assertCanMutate();
-    return mutation(db, deps, access.getAuthority, actor, campaignId, expectedRevision, key, type, payload, apply, retry);
-  };
   const member = (row: any) => campaignMembershipReadSchema.parse({ campaignId: row.campaign_id,
     principalId: row.principal_id, role: row.role, createdAt: row.created_at });
   const attachment = (row: any) => campaignSessionAttachmentSchema.parse({ campaignId: row.campaign_id,
@@ -148,10 +87,11 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   const timeline = (row: any, activeId: string) => campaignTimelineHistorySchema.parse({ id: row.id,
     campaignId: row.campaign_id, parentTimelineId: row.parent_timeline_id, forkedFromRevision: row.forked_from_revision,
     revision: row.revision, createdAt: row.created_at, active: row.id === activeId });
-  const commands = createAdministrationCommandRepo({ db, nextId: () => deps.ids.nextId(),
-    getAuthority: access.getAuthority,
-    runMutation, forbidden: () => new CampaignAdministrationForbiddenError(), stale: () => new CampaignAdministrationStaleError(),
-    conflict: (message) => new CampaignAdministrationConflictError(message), validateRoom, member, attachment, checkpoint, recap, timeline });
+  const commands = createAdministrationCommandRepo({ db, nextId: () => deps.ids.nextId(), now: () => deps.clock.now(),
+    getAuthority: access.getAuthority, assertCanMutate,
+    errors: { forbidden: () => new CampaignAdministrationForbiddenError(), stale: () => new CampaignAdministrationStaleError(),
+      conflict: (message) => new CampaignAdministrationConflictError(message) },
+    validateRoom, member, attachment, checkpoint, recap, timeline });
   const events = createAdministrationEventRepo({ db, getAuthority: access.getAuthority });
   const receipts = createAdministrationReceiptRepo({ db, event: campaignAdministrationEventSchema.parse,
     getAuthority: access.getAuthority, receipt: campaignAdministrationReceiptSchema.parse });
@@ -562,7 +502,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     },
     createCampaignExport: (actor, campaignId, raw) => {
       const input = createCampaignExportInputSchema.parse(raw);
-      return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "export_created", {},
+      return commands.runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "export_created", {},
         ({ commandId, at, auth }) => {
           const c = db.prepare("SELECT name FROM campaigns WHERE id=?").get(campaignId) as any;
           const timelines = db.prepare(`SELECT t.id,COALESCE(h.source_timeline_id,t.id) source_id,t.revision,t.created_at,
