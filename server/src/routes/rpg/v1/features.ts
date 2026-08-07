@@ -90,7 +90,7 @@ import { campaignTransferHttpRoutes } from "./campaignTransfer.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
-import type { CampaignEventPage } from "../../../repo/campaignRepo.js";
+import type { CampaignEventPage } from "../../../repo/campaign/campaignTypes.js";
 import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
 import { contentCatalogHttpRoutes } from "./contentCatalog.js";

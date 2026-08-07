@@ -1,7 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import type { CommandEnvelope, CommandReceipt, RpgEvent } from "../types.js";
 import type { CampaignCommandRepository } from "./campaign/campaignCommandRepo.js";
-import type { RepositoryDependencies } from "./campaign/repositoryDependencies.js";
+import type { RepositoryDependencies } from "./campaign/campaignTypes.js";
 
 export type CampaignDiceEvent = Extract<RpgEvent, { type: "actor_dice_rolled" }>;
 

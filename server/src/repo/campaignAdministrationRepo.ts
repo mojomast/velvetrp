@@ -21,7 +21,7 @@ import {
   type CampaignTimelineHistory, type CampaignTransferPackage, type CreateCampaignCheckpointInput,
   type CreateCampaignExportInput, type CreateCampaignRecapInput, type ForkCampaignTimelineInput,
 } from "@velvet/contracts";
-import type { RepositoryDependencies } from "./campaign/repositoryDependencies.js";
+import type { RepositoryDependencies } from "./campaign/campaignTypes.js";
 import { createAdministrationCommandRepo } from "./campaignAdmin/administrationCommandRepo.js";
 import { createAdministrationEventRepo, publicAdministrationPayload } from "./campaignAdmin/administrationEventRepo.js";
 import { createAdministrationReceiptRepo } from "./campaignAdmin/administrationReceiptRepo.js";

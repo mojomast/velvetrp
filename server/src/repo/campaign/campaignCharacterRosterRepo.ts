@@ -6,7 +6,7 @@ import {
   publicCampaignCharacterSummarySchema,
   resourceIdSchema,
 } from "@velvet/contracts";
-import type { CampaignCharacterRosterSnapshot } from "../campaignRepo.js";
+import type { CampaignCharacterRosterSnapshot } from "./campaignTypes.js";
 
 interface CampaignCharacterRosterRow {
   requesting_campaign_id: string;

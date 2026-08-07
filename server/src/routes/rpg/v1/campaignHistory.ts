@@ -23,7 +23,7 @@ import {
   CampaignAdministrationStaleError,
   type CampaignAdministrationRepository,
 } from "../../../repo/campaignAdministrationRepo.js";
-import type { Repository } from "../../../repo/campaignRepo.js";
+import type { Repository } from "../../../repo/campaign/campaignTypes.js";
 
 const LOCAL_OWNER = "local-owner";
 const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;

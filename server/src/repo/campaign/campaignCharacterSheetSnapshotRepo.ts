@@ -5,7 +5,7 @@ import type { CharacterProgressionRepository } from "../characterProgressionRepo
 import type {
   CampaignCharacterSheetSnapshot,
   CampaignCharacterWorkspaceSnapshot,
-} from "../campaignRepo.js";
+} from "./campaignTypes.js";
 
 interface CampaignCharacterWorkspaceRepository {
   getCampaignCharacterWorkspace(

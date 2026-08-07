@@ -4,7 +4,7 @@ import type {
   CampaignMembership, CampaignMembershipRead, CampaignRenameRequest, CampaignSessionAttachment,
   CampaignTimeline, CreateCampaignInput, DetachCampaignSessionInput, RenameCampaignInput,
 } from "../../types.js";
-import type { CampaignRoomLinkingSnapshot } from "../campaignRepo.js";
+import type { CampaignRoomLinkingSnapshot } from "./campaignTypes.js";
 
 interface CampaignCoreOperations {
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;

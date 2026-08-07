@@ -21,7 +21,7 @@ import {
   resolvedCharacterChoiceSchema,
   utcIsoTimestampSchema,
 } from "@velvet/contracts";
-import type { CampaignCharacterWorkspaceSnapshot } from "../campaignRepo.js";
+import type { CampaignCharacterWorkspaceSnapshot } from "./campaignTypes.js";
 
 interface CampaignCharacterWorkspaceRow {
   requesting_campaign_id: string;

@@ -8,7 +8,7 @@ import {
   utcIsoTimestampSchema,
   type CampaignRoomLinkingResponse,
 } from "@velvet/contracts";
-import type { CampaignRoomLinkingSnapshot } from "../campaignRepo.js";
+import type { CampaignRoomLinkingSnapshot } from "./campaignTypes.js";
 import { projectLegacyRoomText } from "./campaignRoomSessionLifecycleRepo.js";
 
 interface CampaignRoomSnapshotRow {

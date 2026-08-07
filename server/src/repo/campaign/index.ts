@@ -2,4 +2,3 @@
 export * from "./campaignActorRepo.js";
 export * from "./campaignCommandRepo.js";
 export * from "./campaignCoreRepo.js";
-export * from "./repositoryDependencies.js";

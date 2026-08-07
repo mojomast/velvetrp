@@ -4,7 +4,7 @@ import type {
   CampaignCharacterRosterSnapshot,
   CampaignCharacterSheetSnapshot,
   CampaignCharacterWorkspaceSnapshot,
-} from "../campaignRepo.js";
+} from "./campaignTypes.js";
 
 interface CampaignActorOperations {
   getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;
