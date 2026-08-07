@@ -1,11 +1,19 @@
 import type DatabaseDriver from "better-sqlite3";
 import type { Clock, IdGenerator } from "../runtime.js";
 import type { ProgressionEvent, ProgressionPreview, ProgressionReceipt, ProgressionSelection, ProgressionState } from "@velvet/contracts";
-import { createCharacterProgressionReadRepository } from "./characterProgression/characterProgressionReadRepo.js";
-import { createCharacterProgressionWriteRepository, type CharacterProgressionWriteRepository } from "./characterProgression/characterProgressionWriteRepo.js";
+import {
+  createCharacterProgressionReadRepository,
+  createCharacterProgressionWriteRepository,
+  type CharacterProgressionWriteRepository,
+} from "./characterProgression/index.js";
 
-export { CharacterProgressionAuthorizationError, CharacterProgressionConflictError, CharacterProgressionStaleError, CharacterProgressionUnavailableError } from "./characterProgression/characterProgressionErrors.js";
-export { initializeCharacterProgressionV24 } from "./characterProgression/characterProgressionWriteRepo.js";
+export {
+  CharacterProgressionAuthorizationError,
+  CharacterProgressionConflictError,
+  CharacterProgressionStaleError,
+  CharacterProgressionUnavailableError,
+  initializeCharacterProgressionV24,
+} from "./characterProgression/index.js";
 
 /** Public progression repository composed from shared reads and write commands. */
 export interface CharacterProgressionRepository extends CharacterProgressionWriteRepository {
