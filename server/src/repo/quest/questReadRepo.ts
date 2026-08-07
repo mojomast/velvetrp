@@ -130,29 +130,57 @@ export interface QuestReadRepository {
   listObjectiveCompletions(campaignId: string, questId: string): Promise<QuestObjectiveCompletion[]>;
 }
 
-/** Scoped database lookups shared internally with the quest command facade. */
-interface QuestReadHelpers {
-  hasCampaignAccess(campaignId: string): boolean;
-  requireCampaign(campaignId: string): void;
-  scopedStoryline(campaignId: string, storylineId: string): any | undefined;
-  scopedQuest(campaignId: string, questId: string): any | undefined;
-  requireStoryline(campaignId: string, storylineId: string): any;
-  requireQuest(campaignId: string, questId: string): any;
-  scopedClue(campaignId: string, questId: string, clueId: string): any | undefined;
-  scopedReward(campaignId: string, questId: string, rewardId: string): any | undefined;
-}
-
 const storyline = (row: any): Storyline => ({ id: row.id, campaignId: row.campaign_id, title: row.title, description: row.description, status: row.status, createdAt: row.created_at });
 const quest = (row: any): Quest => ({ id: row.id, storylineId: row.storyline_id, campaignId: row.campaign_id, title: row.title, description: row.description, status: row.status, sortOrder: row.sort_order, createdAt: row.created_at, updatedAt: row.updated_at });
 const clue = (row: any): QuestClue => ({ id: row.id, questId: row.quest_id, campaignId: row.campaign_id, content: row.content, discoveredByCharacterId: row.discovered_by_character_id, discoveredAt: row.discovered_at, createdAt: row.created_at });
 const reward = (row: any): QuestReward => ({ id: row.id, questId: row.quest_id, campaignId: row.campaign_id, kind: row.kind, amount: row.amount, label: row.label, grantedToCharacterId: row.granted_to_character_id, grantedAt: row.granted_at, createdAt: row.created_at });
 const completion = (row: any): QuestObjectiveCompletion => ({ id: row.id, questId: row.quest_id, description: row.description, completedByCharacterId: row.completed_by_character_id, completedAt: row.completed_at });
 
-/** Creates principal-scoped quest reads and command-safe scope lookup helpers. */
+/** Low-level storyline listing retained for trusted database callers. */
+export async function listStorylines(db: Database, campaignId: string): Promise<Storyline[]> {
+  return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline);
+}
+
+/** Low-level storyline lookup retained for trusted database callers. */
+export async function getStoryline(db: Database, storylineId: string): Promise<Storyline | null> {
+  const row = db.prepare("SELECT * FROM quest_storylines WHERE id=?").get(storylineId);
+  return row ? storyline(row) : null;
+}
+
+/** Low-level quest listing retained for trusted database callers. */
+export async function listQuests(db: Database, campaignId: string, storylineId?: string): Promise<Quest[]> {
+  const rows = storylineId === undefined
+    ? db.prepare("SELECT * FROM quests WHERE campaign_id=? ORDER BY sort_order,id").all(campaignId)
+    : db.prepare("SELECT * FROM quests WHERE campaign_id=? AND storyline_id=? ORDER BY sort_order,id").all(campaignId, storylineId);
+  return (rows as any[]).map(quest);
+}
+
+/** Low-level quest lookup retained for trusted database callers. */
+export async function getQuest(db: Database, questId: string): Promise<Quest | null> {
+  const row = db.prepare("SELECT * FROM quests WHERE id=?").get(questId);
+  return row ? quest(row) : null;
+}
+
+/** Low-level clue listing retained for trusted database callers. */
+export async function listClues(db: Database, questId: string): Promise<QuestClue[]> {
+  return (db.prepare("SELECT * FROM quest_clues WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(clue);
+}
+
+/** Low-level reward listing retained for trusted database callers. */
+export async function listRewards(db: Database, questId: string): Promise<QuestReward[]> {
+  return (db.prepare("SELECT * FROM quest_rewards WHERE quest_id=? ORDER BY created_at,id").all(questId) as any[]).map(reward);
+}
+
+/** Low-level objective completion listing retained for trusted database callers. */
+export async function listObjectiveCompletions(db: Database, questId: string): Promise<QuestObjectiveCompletion[]> {
+  return (db.prepare("SELECT * FROM quest_objective_completions WHERE quest_id=? ORDER BY completed_at,id").all(questId) as any[]).map(completion);
+}
+
+/** Creates principal-scoped, non-mutating quest projections. */
 export function createQuestReadRepository(
   db: Database,
   principalId: string,
-): QuestReadRepository & QuestReadHelpers {
+): QuestReadRepository {
   const hasCampaignAccess = (campaignId: string) => Boolean(db.prepare(
     "SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
   ).get(campaignId, principalId));
@@ -183,14 +211,6 @@ export function createQuestReadRepository(
   ).get(rewardId, questId, campaignId) as any | undefined;
 
   return {
-    hasCampaignAccess,
-    requireCampaign,
-    scopedStoryline,
-    scopedQuest,
-    requireStoryline,
-    requireQuest,
-    scopedClue,
-    scopedReward,
     async listStorylines(campaignId) {
       requireCampaign(campaignId);
       return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline);
