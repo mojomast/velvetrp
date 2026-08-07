@@ -1,9 +1,9 @@
 # Handoff
-## Completed: Task 3: extract campaign import apply repository
+## Completed: Task 4: extract campaign export repository
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: `campaignAdmin/administrationImportRepo.ts` now owns both dry-run and atomic apply operations. Apply retains the immediate transaction, idempotent submission lookup, injected IDs/clock, validation of rooms at write time, and injected conflict/access projections. The facade delegates apply and injects a dry-run reference rather than creating a facade cycle. Root typecheck passed with `TMPDIR=/tmp/velvet-typecheck`; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
+## Context: `campaignAdmin/administrationExportRepo.ts` now owns `createCampaignExport`. Its factory receives `db`, `deps`, `runMutation`, `events`, and `receipts`; it uses `timelineTransferEvents` and preserves the export command's contiguous administration-history verification, manifest persistence, and idempotent retry projection. The administration facade wires and delegates the operation, and the campaign-admin barrel exports the factory. Root typecheck passed with `TMPDIR=/tmp/velvet-typecheck`; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
 ## Quality Risks: The prior dry-run implementation remains in a block comment and the prior apply implementation remains behind `if (false)` in the facade as reviewable extraction history. Both are unreachable; remove them in a cleanup-only patch before further facade work.
-## Files Modified: server/src/repo/campaignAdmin/administrationImportRepo.ts; server/src/repo/campaignAdministrationRepo.ts; handoff.md
+## Files Modified: server/src/repo/campaignAdmin/administrationExportRepo.ts; server/src/repo/campaignAdmin/index.ts; server/src/repo/campaignAdministrationRepo.ts; handoff.md
 
 ## Content Catalog Extraction Plan
 Phase 1 will create `contentCatalog/` modules for canonical serialization/digests, validation, errors/types, shared internal SQL rows, publication reads, visibility verification, campaign authority, and campaign reads. Read modules must validate stored publications before privileged projections and use attested visibility rather than raw reachability for player/observer definitions.
