@@ -1,9 +1,9 @@
 # Handoff
-## Completed: Task 2: extract campaign import dry-run repository
+## Completed: Task 3: extract campaign import apply repository
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: `campaignAdmin/administrationImportRepo.ts` now owns the dry-run validation factory and shares the facade's database, dependencies, room validator, authority lookup, and authorization-error factory. The facade delegates dry runs to it and the campaignAdmin barrel exports it. Root typecheck passed with `TMPDIR=/tmp/velvet-typecheck`; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
-## Quality Risks: The prior facade body remains in a block comment pending a cleanup-only patch; it is not compiled or executed. Import behavior, including the facade-specific forbidden error, is preserved through injected error construction.
-## Files Modified: server/src/repo/campaignAdmin/administrationImportRepo.ts; server/src/repo/campaignAdmin/index.ts; server/src/repo/campaignAdministrationRepo.ts; handoff.md
+## Context: `campaignAdmin/administrationImportRepo.ts` now owns both dry-run and atomic apply operations. Apply retains the immediate transaction, idempotent submission lookup, injected IDs/clock, validation of rooms at write time, and injected conflict/access projections. The facade delegates apply and injects a dry-run reference rather than creating a facade cycle. Root typecheck passed with `TMPDIR=/tmp/velvet-typecheck`; no commit was created. Per request, `devplan.md` and `.tmp/` were left alone.
+## Quality Risks: The prior dry-run implementation remains in a block comment and the prior apply implementation remains behind `if (false)` in the facade as reviewable extraction history. Both are unreachable; remove them in a cleanup-only patch before further facade work.
+## Files Modified: server/src/repo/campaignAdmin/administrationImportRepo.ts; server/src/repo/campaignAdministrationRepo.ts; handoff.md
 
 ## Content Catalog Extraction Plan
 Phase 1 will create `contentCatalog/` modules for canonical serialization/digests, validation, errors/types, shared internal SQL rows, publication reads, visibility verification, campaign authority, and campaign reads. Read modules must validate stored publications before privileged projections and use attested visibility rather than raw reachability for player/observer definitions.

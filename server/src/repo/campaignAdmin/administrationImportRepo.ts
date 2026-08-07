@@ -1,13 +1,16 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import type DatabaseDriver from "better-sqlite3";
+import { createHash } from "node:crypto";
 import {
-  MAX_CAMPAIGN_IMPORT_BYTES, MAX_CAMPAIGN_IMPORT_RECORDS,
-  campaignImportDryRunSchema, campaignTransferPackageSchema, resourceIdSchema,
-  type CampaignImportDryRun, type CampaignTransferPackage,
+  MAX_CAMPAIGN_IMPORT_BYTES, MAX_CAMPAIGN_IMPORT_RECORDS, applyCampaignImportInputSchema,
+  campaignAdministrationEventSchema, campaignAdministrationReceiptSchema,
+  campaignAdministrationSchema, campaignImportDryRunSchema, campaignTransferPackageSchema,
+  resourceIdSchema, utcIsoTimestampSchema, type ApplyCampaignImportInput, type CampaignAdministration,
+  type CampaignAdministrationReceipt, type CampaignImportDryRun, type CampaignTransferPackage,
 } from "@velvet/contracts";
 import type { RepositoryDependencies } from "../campaign/campaignTypes.js";
 import type { AdministrationAuthority } from "./administrationAccessRepo.js";
-import { forbidden, serializeForImport } from "./administrationImportHelpers.js";
+import { canonicalizeJson, forbidden, serializeForImport } from "./administrationImportHelpers.js";
 
 /** Dependencies retained by campaign import operations as they are extracted. */
 export interface AdministrationImportRepoDependencies {
@@ -18,6 +21,19 @@ export interface AdministrationImportRepoDependencies {
   getAuthority: (actor: string, campaignId: string) => AdministrationAuthority | null;
   /** Produces the facade's public authorization error. */
   forbidden: () => Error;
+  /** Enforces the repository-wide mutation guard before an import is applied. */
+  assertCanMutate: () => void;
+  /** Produces the facade's public conflict error. */
+  conflict: (message: string) => Error;
+  /** Reads the completed import through the administration access projection. */
+  getCampaignAdministration: (actor: string, campaignId: string) => CampaignAdministration | null;
+  /**
+   * Invokes the authoritative dry-run operation while applying an import.
+   *
+   * This is injected instead of calling the administration facade, which keeps
+   * the import factory independent of the facade that wires it.
+   */
+  dryRunCampaignImport: (actor: string, input: unknown) => CampaignImportDryRun;
 }
 
 /**
@@ -26,7 +42,8 @@ export interface AdministrationImportRepoDependencies {
  * The dependencies include the shared authority lookup and mutation dependencies so
  * apply/import operations can remain colocated without rebuilding facade state.
  */
-export function createAdministrationImportRepo({ db, validateRoom, forbidden: forbiddenError }: AdministrationImportRepoDependencies) {
+export function createAdministrationImportRepo({ db, deps, validateRoom, forbidden: forbiddenError, assertCanMutate,
+  conflict, getCampaignAdministration, dryRunCampaignImport: runDryRun }: AdministrationImportRepoDependencies) {
   /** Validates a portable campaign package without making any database changes. */
   const dryRunCampaignImport = (actorRaw: string, raw: unknown): CampaignImportDryRun => {
     const actor = resourceIdSchema.parse(actorRaw);
@@ -133,5 +150,131 @@ export function createAdministrationImportRepo({ db, validateRoom, forbidden: fo
     }
     return campaignImportDryRunSchema.parse({ importId: `import-${serialized.hash.slice(0, 32)}`, packageHash: serialized.hash, report: { valid: conflicts.length === 0 && missingReferences.length === 0, conflicts, missingReferences, warnings, counts: { timelines: pkg?.timelines.length ?? 0, events: pkg?.timelines.reduce((sum, timeline) => sum + timeline.events.length, 0) ?? 0, actors: pkg?.records.actors.length ?? 0, checkpoints: pkg?.records.checkpoints.length ?? 0, recaps: pkg?.records.recaps.length ?? 0, memberships: pkg?.records.memberships.length ?? 0, roomAttachments: pkg?.records.roomAttachments.length ?? 0 } } });
   };
-  return { dryRunCampaignImport };
+  /** Applies a validated transfer package atomically and records its receipt. */
+  const applyCampaignImport = (actorRaw: string, raw: ApplyCampaignImportInput): { value: CampaignAdministration;
+    receipt: CampaignAdministrationReceipt } => {
+    assertCanMutate();
+    const actor = resourceIdSchema.parse(actorRaw);
+    return db.transaction(() => {
+      const input = applyCampaignImportInputSchema.parse(raw);
+      const canonicalSubmission = serializeForImport(input.package);
+      if (canonicalSubmission.json === null) throw conflict("import package is not serializable");
+      const prior = db.prepare(`SELECT submission.package_hash,submission.campaign_id,submission.command_id,
+          command.created_at,receipt.type,receipt.revision_before,receipt.revision_after,receipt.result_data,
+          event.event_id,event.public_data,event.occurred_at FROM campaign_import_submissions submission
+          JOIN campaign_administration_commands command ON command.command_id=submission.command_id
+          JOIN campaign_administration_receipts receipt ON receipt.command_id=command.command_id
+          JOIN campaign_administration_events event ON event.event_id=receipt.event_id
+          WHERE submission.principal_id=? AND submission.idempotency_key=?`).get(actor, input.idempotencyKey) as any;
+      if (prior) {
+        if (prior.package_hash !== canonicalSubmission.hash) throw conflict("idempotency identity collision");
+        const event = campaignAdministrationEventSchema.parse({ eventId: prior.event_id, commandId: prior.command_id,
+          campaignId: prior.campaign_id, type: prior.type, revision: prior.revision_after,
+          occurredAt: prior.occurred_at, data: JSON.parse(prior.public_data) });
+        return { value: campaignAdministrationSchema.parse(JSON.parse(prior.result_data)),
+          receipt: campaignAdministrationReceiptSchema.parse({ commandId: prior.command_id, campaignId: prior.campaign_id,
+            type: prior.type, revisionBefore: prior.revision_before, revisionAfter: prior.revision_after,
+            occurredAt: prior.created_at, events: [event] }) };
+      }
+      const dry = runDryRun(actor, input.package);
+      if (!dry.report.valid || dry.packageHash !== canonicalSubmission.hash || JSON.stringify(dry) !== JSON.stringify(input.dryRun))
+        throw conflict("import dry run is stale or invalid");
+      const campaignId = resourceIdSchema.parse(deps.ids.nextId()), timelineIds = new Map<string, string>();
+      for (const timeline of input.package.timelines) timelineIds.set(timeline.sourceId, resourceIdSchema.parse(deps.ids.nextId()));
+      const actorIds = new Map(input.package.records.actors.map((portableActor) => [portableActor.sourceActorId, {
+        actorId: resourceIdSchema.parse(deps.ids.nextId()), campaignCharacterId: resourceIdSchema.parse(deps.ids.nextId()),
+        sheetId: resourceIdSchema.parse(deps.ids.nextId()), characterId: resourceIdSchema.parse(deps.ids.nextId()),
+      }]));
+      const activeId = timelineIds.get(input.package.activeTimelineSourceId)!;
+      const at = utcIsoTimestampSchema.parse(deps.clock.now().toISOString());
+      const sourceRevision = input.package.campaign.administrationRevision;
+      db.prepare(`INSERT INTO campaigns (id,name,active_timeline_id,owner_principal_id,created_at,updated_at,lifecycle_status,settings,administration_revision)
+        VALUES (?,?,?,?,?,?,?,?,?)`).run(campaignId, input.package.campaign.name, activeId, actor, at, at,
+          input.package.campaign.status, JSON.stringify(input.package.campaign.settings), sourceRevision);
+      db.prepare("INSERT INTO campaign_memberships (campaign_id,principal_id,role,created_at) VALUES (?,?,'owner',?)").run(campaignId, actor, at);
+      for (const timeline of input.package.timelines) {
+        const id = timelineIds.get(timeline.sourceId)!;
+        db.prepare("INSERT INTO campaign_timelines (id,campaign_id,revision,created_at) VALUES (?,?,?,?)").run(id, campaignId, timeline.revision, timeline.createdAt);
+        db.prepare(`INSERT INTO campaign_timeline_history (campaign_id,timeline_id,source_timeline_id,parent_timeline_id,created_by_command_id,forked_from_revision)
+          VALUES (?,?,?,?,NULL,?)`).run(campaignId, id, timeline.sourceId,
+          timeline.parentSourceId === null ? null : timelineIds.get(timeline.parentSourceId), timeline.forkedFromRevision);
+      }
+      if (input.package.content.status === "configured") {
+        db.prepare("INSERT INTO campaign_rules_profiles (campaign_id,rules_profile_id) VALUES (?,?)").run(campaignId, input.package.content.rulesProfileId);
+        for (const pin of input.package.content.contentPacks) db.prepare(`INSERT INTO campaign_content_packs
+          (campaign_id,pack_id,pack_version,rules_profile_id) VALUES (?,?,?,?)`).run(campaignId, pin.packId, pin.packVersion, input.package.content.rulesProfileId);
+      }
+      for (const portableActor of input.package.records.actors) {
+        const mapped = actorIds.get(portableActor.sourceActorId)!;
+        db.prepare(`INSERT INTO characters (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at)
+          VALUES (?,?,18,'Imported campaign actor','',1,0,?)`).run(mapped.characterId, portableActor.name, at);
+        db.prepare(`INSERT INTO campaign_characters (id,campaign_id,character_id,created_at,updated_at) VALUES (?,?,?,?,?)`).run(mapped.campaignCharacterId, campaignId, mapped.characterId, at, at);
+        db.prepare(`INSERT INTO rpg_campaign_sheets (id,campaign_id,campaign_character_id,race_pack_id,race_pack_version,race_kind,race_definition_id,
+          background_pack_id,background_pack_version,background_kind,background_definition_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+          .run(mapped.sheetId, campaignId, mapped.campaignCharacterId, portableActor.race.packId, portableActor.race.packVersion, portableActor.race.kind, portableActor.race.definitionId,
+            portableActor.background.packId, portableActor.background.packVersion, portableActor.background.kind, portableActor.background.definitionId, at, at);
+        portableActor.classes.forEach((entry, position) => db.prepare(`INSERT INTO rpg_character_classes
+          (campaign_id,sheet_id,position,pack_id,pack_version,kind,definition_id,level) VALUES (?,?,?,?,?,?,?,?)`).run(campaignId, mapped.sheetId, position, entry.class.packId, entry.class.packVersion, entry.class.kind, entry.class.definitionId, entry.level));
+        portableActor.attributes.forEach((attribute, position) => db.prepare(`INSERT INTO rpg_character_attributes
+          (campaign_id,sheet_id,position,attribute_id,value) VALUES (?,?,?,?,?)`).run(campaignId, mapped.sheetId, position, attribute.attributeId, attribute.value));
+        db.prepare(`INSERT INTO campaign_actors (id,campaign_id,campaign_character_id,sheet_id,kind,control,created_at,updated_at)
+          VALUES (?,?,?,?,'player-character','principal',?,?)`).run(mapped.actorId, campaignId, mapped.campaignCharacterId, mapped.sheetId, at, at);
+        db.prepare(`INSERT INTO campaign_actor_private_state (actor_id,campaign_id,controller_principal_id,private_notes) VALUES (?,?,?,NULL)`).run(mapped.actorId, campaignId, actor);
+        for (const resource of portableActor.resources) db.prepare(`INSERT INTO rpg_actor_resources
+          (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)`).run(campaignId, mapped.actorId, resource.name, resource.current, resource.max);
+      }
+      for (const timeline of input.package.timelines) for (const portableEvent of timeline.events) {
+        const mappedActor = actorIds.get(portableEvent.actorId)!;
+        db.prepare(`INSERT INTO campaign_imported_timeline_events (campaign_id,timeline_id,revision,source_event_id,source_command_id,actor_id,source_turn_id,type,occurred_at,public_data)
+          VALUES (?,?,?,?,?,?,?,?,?,?)`).run(campaignId, timelineIds.get(timeline.sourceId), portableEvent.revision, portableEvent.sourceEventId,
+            portableEvent.sourceCommandId, mappedActor.actorId, portableEvent.sourceTurnId, portableEvent.type, portableEvent.occurredAt, JSON.stringify(portableEvent.data));
+      }
+      const commandId = resourceIdSchema.parse(deps.ids.nextId()), eventId = resourceIdSchema.parse(deps.ids.nextId());
+      const payload = JSON.stringify({ importId: dry.importId, packageHash: dry.packageHash });
+      db.prepare(`INSERT INTO campaign_administration_commands (command_id,campaign_id,idempotency_key,actor_principal_id,expected_revision,type,payload,created_at)
+        VALUES (?,?,?,?,?,'import_applied',?,?)`).run(commandId, campaignId, input.idempotencyKey, actor, sourceRevision, payload, at);
+      for (const checkpoint of input.package.records.checkpoints) {
+        const id = resourceIdSchema.parse(deps.ids.nextId());
+        db.prepare(`INSERT INTO campaign_checkpoints (id,source_checkpoint_id,campaign_id,timeline_id,timeline_revision,label,created_at,command_id)
+          VALUES (?,?,?,?,?,?,?,?)`).run(id, checkpoint.sourceId, campaignId, timelineIds.get(checkpoint.timelineSourceId), checkpoint.timelineRevision, checkpoint.label, checkpoint.createdAt, commandId);
+        for (const state of checkpoint.state.attributes) db.prepare("INSERT INTO campaign_checkpoint_attribute_snapshots (checkpoint_id,actor_id,attribute_id,value) VALUES (?,?,?,?)").run(id, actorIds.get(state.actorId)!.actorId, state.attributeId, state.value);
+        for (const state of checkpoint.state.resources) db.prepare("INSERT INTO campaign_checkpoint_resource_snapshots (checkpoint_id,actor_id,name,current,max) VALUES (?,?,?,?,?)").run(id, actorIds.get(state.actorId)!.actorId, state.name, state.current, state.max);
+      }
+      for (const recap of input.package.records.recaps) db.prepare(`INSERT INTO campaign_recaps (id,source_recap_id,campaign_id,timeline_id,through_revision,selected_session_ids,visibility,text,created_at,command_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?)`).run(resourceIdSchema.parse(deps.ids.nextId()), recap.sourceId, campaignId, timelineIds.get(recap.timelineSourceId), recap.throughRevision, JSON.stringify(recap.selectedSessionIds), recap.visibility, recap.text, recap.createdAt, commandId);
+      for (const membership of input.package.records.memberships) if (membership.principalId !== actor && db.prepare("SELECT 1 FROM principals WHERE id=?").get(membership.principalId))
+        db.prepare("INSERT OR IGNORE INTO campaign_memberships (campaign_id,principal_id,role,created_at) VALUES (?,?,?,?)").run(campaignId, membership.principalId, membership.role, membership.createdAt);
+      for (const room of input.package.records.roomAttachments) {
+        let lifecycle: "running" | "stopped" | null = null;
+        try { lifecycle = validateRoom(room.sessionId); } catch { /* normalized below */ }
+        if (lifecycle !== "running") throw conflict("room is not attachable");
+        if (db.prepare("SELECT 1 FROM campaign_sessions WHERE session_id=?").get(room.sessionId)) throw conflict("room attachment already exists");
+        db.prepare("INSERT INTO campaign_sessions (campaign_id,session_id,attached_at) VALUES (?,?,?)").run(campaignId, room.sessionId, room.attachedAt);
+      }
+      for (const event of input.package.records.administration.events) db.prepare(`INSERT INTO campaign_imported_administration_events
+        (campaign_id,revision,source_event_id,source_command_id,type,occurred_at,public_data) VALUES (?,?,?,?,?,?,?)`).run(campaignId, event.revision, event.eventId, event.commandId, event.type, event.occurredAt, JSON.stringify(event.data));
+      for (const receipt of input.package.records.administration.receipts) db.prepare(`INSERT INTO campaign_imported_administration_receipts
+        (campaign_id,source_command_id,type,revision_before,revision_after,occurred_at) VALUES (?,?,?,?,?,?)`).run(campaignId, receipt.commandId, receipt.type, receipt.revisionBefore, receipt.revisionAfter, receipt.occurredAt);
+      const importedCatalogEvent = [...input.package.records.administration.events].filter((event) => event.type === "catalog_configured").sort((left, right) => right.revision - left.revision)[0];
+      if (importedCatalogEvent && input.package.content.status === "configured") {
+        const identifiers = [...input.package.content.contentPacks].sort((left, right) => left.packId < right.packId ? -1 : left.packId > right.packId ? 1 : 0);
+        const selectionDigest = createHash("sha256").update(JSON.stringify(canonicalizeJson({ rulesProfileId: input.package.content.rulesProfileId, contentPacks: identifiers }))).digest("hex");
+        db.prepare("INSERT INTO campaign_catalog_current_selections VALUES (?,?,?,?,?,?)").run(campaignId, input.package.content.rulesProfileId, selectionDigest, actor, importedCatalogEvent.occurredAt, importedCatalogEvent.commandId);
+        const insertImportedPin = db.prepare("INSERT INTO campaign_catalog_current_pins VALUES (?,?,?,?,?)");
+        identifiers.forEach((pin, position) => insertImportedPin.run(campaignId, pin.packId, pin.packVersion, position, importedCatalogEvent.commandId));
+      }
+      const after = sourceRevision + 1;
+      db.prepare("UPDATE campaigns SET administration_revision=? WHERE id=?").run(after, campaignId);
+      db.prepare(`INSERT INTO campaign_administration_events (event_id,campaign_id,command_id,revision_before,revision,type,public_data,private_data,occurred_at)
+        VALUES (?,?,?,?,?,'import_applied',?,? ,?)`).run(eventId, campaignId, commandId, sourceRevision, after, payload, payload, at);
+      const imported = getCampaignAdministration(actor, campaignId)!;
+      db.prepare(`INSERT INTO campaign_administration_receipts (command_id,campaign_id,event_id,type,revision_before,revision_after,result_data)
+        VALUES (?,?,?,'import_applied',?,?,?)`).run(commandId, campaignId, eventId, sourceRevision, after, JSON.stringify(imported));
+      db.prepare("INSERT INTO campaign_imports VALUES (?,?,?,1,?,?)").run(dry.importId, campaignId, dry.packageHash, at, commandId);
+      db.prepare(`INSERT INTO campaign_import_submissions (principal_id,idempotency_key,package_hash,campaign_id,command_id,created_at) VALUES (?,?,?,?,?,?)`).run(actor, input.idempotencyKey, dry.packageHash, campaignId, commandId, at);
+      const event = campaignAdministrationEventSchema.parse({ eventId, commandId, campaignId, type: "import_applied", revision: after, occurredAt: at, data: JSON.parse(payload) });
+      return { value: imported, receipt: campaignAdministrationReceiptSchema.parse({ commandId, campaignId, type: "import_applied", revisionBefore: sourceRevision, revisionAfter: after, occurredAt: at, events: [event] }) };
+    }).immediate();
+  };
+  return { dryRunCampaignImport, applyCampaignImport };
 }

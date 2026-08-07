@@ -76,8 +76,13 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   deps: RepositoryDependencies, assertCanMutate: () => void = () => undefined,
   validateRoom: (sessionId: string) => "running" | "stopped" | null = () => null): CampaignAdministrationRepository {
   const access = createAdministrationAccessRepo(db);
+  let runDryRunCampaignImport: (actor: string, input: unknown) => CampaignImportDryRun;
   const imports = createAdministrationImportRepo({ db, deps, validateRoom, getAuthority: access.getAuthority,
-    forbidden: () => new CampaignAdministrationForbiddenError() });
+    forbidden: () => new CampaignAdministrationForbiddenError(), assertCanMutate,
+    conflict: (message) => new CampaignAdministrationConflictError(message),
+    getCampaignAdministration: access.getCampaignAdministration,
+    dryRunCampaignImport: (actor, input) => runDryRunCampaignImport(actor, input) });
+  runDryRunCampaignImport = imports.dryRunCampaignImport;
   const member = (row: any) => campaignMembershipReadSchema.parse({ campaignId: row.campaign_id,
     principalId: row.principal_id, role: row.role, createdAt: row.created_at });
   const attachment = (row: any) => campaignSessionAttachmentSchema.parse({ campaignId: row.campaign_id,
@@ -339,6 +344,9 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
       */
       },
     applyCampaignImport: (actorRaw, raw) => {
+      return imports.applyCampaignImport(actorRaw, raw);
+      // Retained temporarily to keep this extraction mechanically reviewable.
+      if (false) {
       assertCanMutate();
       const actor = resourceIdSchema.parse(actorRaw);
       return db.transaction(() => {
@@ -505,6 +513,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
         return { value: imported, receipt: campaignAdministrationReceiptSchema.parse({ commandId, campaignId,
           type: "import_applied", revisionBefore: sourceRevision, revisionAfter: after, occurredAt: at, events: [event] }) };
       }).immediate();
+      }
     },
     createCampaignExport: (actor, campaignId, raw) => {
       const input = createCampaignExportInputSchema.parse(raw);
