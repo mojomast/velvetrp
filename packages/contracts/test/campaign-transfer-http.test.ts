@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  campaignTransferHttpApplyRequestSchema,
+  campaignTransferHttpApplyResponseSchema,
   campaignTransferHttpDryRunRequestSchema,
   campaignTransferHttpDryRunResponseSchema,
 } from "../src/campaign-transfer-http.js";
@@ -33,5 +35,25 @@ describe("campaign transfer HTTP contracts", () => {
 
     expect(campaignTransferHttpDryRunResponseSchema.parse(response)).toEqual(response);
     expect(campaignTransferHttpDryRunResponseSchema.safeParse({ ...response, packageHash: "a".repeat(64) }).success).toBe(false);
+  });
+
+  it("accepts only an idempotency key and an explicitly empty resolution set", () => {
+    const request = { idempotencyKey: "apply-key", conflictResolutions: [] };
+    expect(campaignTransferHttpApplyRequestSchema.parse(request)).toEqual(request);
+    expect(campaignTransferHttpApplyRequestSchema.safeParse({ ...request,
+      conflictResolutions: ["ignore warning"] }).success).toBe(false);
+    expect(campaignTransferHttpApplyRequestSchema.safeParse({ ...request, extra: true }).success).toBe(false);
+  });
+
+  it("binds apply responses to strict administration envelopes", () => {
+    const campaign = { id: "campaign", actorRole: "owner" as const, status: "draft" as const,
+      activeTimelineId: "timeline", revision: 1, updatedAt: at, settings: { maxPlayers: 6,
+        allowPlayerDice: true, safetyMode: "standard" as const, recapVisibility: "members" as const, gmNotes: "" } };
+    const event = { eventId: "event", commandId: "command", campaignId: "campaign", type: "import_applied" as const,
+      revision: 1, occurredAt: at, data: {} };
+    const response = { campaign, receipt: { commandId: "command", campaignId: "campaign",
+      type: "import_applied" as const, revisionBefore: 0, revisionAfter: 1, occurredAt: at, events: [event] as [typeof event] } };
+    expect(campaignTransferHttpApplyResponseSchema.parse(response)).toEqual(response);
+    expect(campaignTransferHttpApplyResponseSchema.safeParse({ ...response, internal: true }).success).toBe(false);
   });
 });

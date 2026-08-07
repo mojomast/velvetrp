@@ -114,7 +114,7 @@ export interface CampaignListRepository extends
     | "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
     | "detachAuditedCampaignRoom" | "listCampaignTimelineHistory" | "createCampaignCheckpoint"
     | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-    | "getCampaignAdministrationReceipt" | "dryRunCampaignImport">>,
+    | "getCampaignAdministrationReceipt" | "dryRunCampaignImport" | "applyCampaignImportById">>,
   Partial<QuestRepository>,
   Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
   Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
@@ -193,7 +193,8 @@ type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
 type CharacterSheetLaneRepository = Required<Pick<CampaignListRepository, "getCampaignCharacterSheetSnapshot">>;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
-type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository, "dryRunCampaignImport">;
+type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository,
+  "dryRunCampaignImport" | "applyCampaignImportById">;
 type CampaignMembershipLaneRepository = Pick<CampaignAdministrationRepository,
   "addAuditedCampaignMembership" | "changeAuditedCampaignMembershipRole" | "removeAuditedCampaignMembership"
   | "detachAuditedCampaignRoom"> & {
@@ -270,7 +271,8 @@ function assertCampaignAdministrationRepository(
 function assertCampaignTransferRepository(
   repository: CampaignListRepository,
 ): asserts repository is CampaignListRepository & CampaignTransferLaneRepository {
-  if (typeof repository.dryRunCampaignImport !== "function") throw new UnsupportedCampaignRepositoryError();
+  if (typeof repository.dryRunCampaignImport !== "function"
+    || typeof repository.applyCampaignImportById !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertCampaignMembershipRepository(

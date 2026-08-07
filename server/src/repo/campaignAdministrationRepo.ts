@@ -6,6 +6,7 @@ import {
   type ApplyCampaignImportInput, type CampaignAdministration, type CampaignAdministrationEvent,
   type CampaignAdministrationPatch, type CampaignAdministrationReceipt, type CampaignCheckpoint,
   type CampaignExportManifest, type CampaignImportDryRun, type CampaignMembership,
+  type CampaignTransferHttpApplyRequest,
   type CampaignMembershipMutation, type CampaignMembershipRead, type CampaignMembershipRoleMutation,
   type CampaignRecap, type CampaignRevisionMutation, type CampaignRoomMutation,
   type CampaignSessionAttachment, type CampaignTimelineHistory, type CampaignTransferPackage,
@@ -57,6 +58,8 @@ export interface CampaignAdministrationRepository {
   listCampaignRecaps(actor: string, campaignId: string): CampaignRecap[];
   dryRunCampaignImport(actor: string, input: unknown): CampaignImportDryRun;
   applyCampaignImport(actor: string, input: ApplyCampaignImportInput): MutationResult<CampaignAdministration>;
+  applyCampaignImportById(actor: string, importId: string, input: CampaignTransferHttpApplyRequest):
+    MutationResult<CampaignAdministration>;
   createCampaignExport(actor: string, campaignId: string, input: CreateCampaignExportInput):
     MutationResult<{ manifest: CampaignExportManifest; package: CampaignTransferPackage }>;
   listCampaignAdministrationEvents(actor: string, campaignId: string): CampaignAdministrationEvent[];
@@ -114,6 +117,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     listCampaignTimelineHistory: timelines.listCampaignTimelineHistory,
     dryRunCampaignImport: imports.dryRunCampaignImport,
     applyCampaignImport: imports.applyCampaignImport,
+    applyCampaignImportById: imports.applyCampaignImportById,
     createCampaignExport: exports.createCampaignExport,
     listCampaignAdministrationEvents: events.listCampaignAdministrationEvents,
     getCampaignAdministrationReceipt: receipts.getCampaignAdministrationReceipt,

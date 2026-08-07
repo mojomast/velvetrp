@@ -4,9 +4,11 @@ import { createHash } from "node:crypto";
 import {
   MAX_CAMPAIGN_IMPORT_BYTES, MAX_CAMPAIGN_IMPORT_RECORDS, applyCampaignImportInputSchema,
   campaignAdministrationEventSchema, campaignAdministrationReceiptSchema,
-  campaignAdministrationSchema, campaignImportDryRunSchema, campaignTransferPackageSchema,
+  campaignAdministrationSchema, campaignImportDryRunSchema, campaignImportReportSchema,
+  campaignTransferHttpApplyRequestSchema, campaignTransferPackageSchema,
   resourceIdSchema, utcIsoTimestampSchema, type ApplyCampaignImportInput, type CampaignAdministration,
-  type CampaignAdministrationReceipt, type CampaignImportDryRun, type CampaignTransferPackage,
+  type CampaignAdministrationReceipt, type CampaignImportDryRun, type CampaignTransferHttpApplyRequest,
+  type CampaignTransferPackage,
 } from "@velvet/contracts";
 import type { RepositoryDependencies } from "../campaign/campaignTypes.js";
 import type { AdministrationAuthority } from "./administrationAccessRepo.js";
@@ -148,15 +150,61 @@ export function createAdministrationImportRepo({ db, deps, validateRoom, forbidd
       if (recordCount + (pkg.content.status === "configured" ? 1 + pkg.content.contentPacks.length : 0) > MAX_CAMPAIGN_IMPORT_RECORDS) add(conflicts, "package exceeds record limit");
       if (db.prepare("SELECT 1 FROM campaign_imports WHERE package_hash=?").get(serialized.hash)) add(conflicts, "package was already imported");
     }
-    return campaignImportDryRunSchema.parse({ importId: `import-${serialized.hash.slice(0, 32)}`, packageHash: serialized.hash, report: { valid: conflicts.length === 0 && missingReferences.length === 0, conflicts, missingReferences, warnings, counts: { timelines: pkg?.timelines.length ?? 0, events: pkg?.timelines.reduce((sum, timeline) => sum + timeline.events.length, 0) ?? 0, actors: pkg?.records.actors.length ?? 0, checkpoints: pkg?.records.checkpoints.length ?? 0, recaps: pkg?.records.recaps.length ?? 0, memberships: pkg?.records.memberships.length ?? 0, roomAttachments: pkg?.records.roomAttachments.length ?? 0 } } });
+    const dryRun = campaignImportDryRunSchema.parse({ importId: `import-${serialized.hash.slice(0, 32)}`, packageHash: serialized.hash, report: { valid: conflicts.length === 0 && missingReferences.length === 0, conflicts, missingReferences, warnings, counts: { timelines: pkg?.timelines.length ?? 0, events: pkg?.timelines.reduce((sum, timeline) => sum + timeline.events.length, 0) ?? 0, actors: pkg?.records.actors.length ?? 0, checkpoints: pkg?.records.checkpoints.length ?? 0, recaps: pkg?.records.recaps.length ?? 0, memberships: pkg?.records.memberships.length ?? 0, roomAttachments: pkg?.records.roomAttachments.length ?? 0 } } });
+    // Staging is deliberately outside campaign state. The deterministic key and
+    // INSERT OR IGNORE make identical retries safe while immutable triggers keep
+    // the report used for a later apply auditable.
+    if (pkg && serialized.json !== null) {
+      const existing = db.prepare(`SELECT 1 FROM campaign_import_dry_runs_v30
+        WHERE principal_id=? AND import_id=? AND package_hash=?`).get(actor, dryRun.importId, serialized.hash);
+      if (!existing) {
+        try {
+          db.prepare(`INSERT INTO campaign_import_dry_runs_v30
+            (principal_id,import_id,package_json,package_hash,report_json,created_at) VALUES (?,?,?,?,?,?)`)
+            .run(actor, dryRun.importId, serialized.json, serialized.hash, JSON.stringify(dryRun.report),
+              utcIsoTimestampSchema.parse(deps.clock.now().toISOString()));
+        } catch (error) {
+          // A concurrent identical dry-run may win between the read and insert.
+          // Accept only the exact canonical identity; propagate every other failure.
+          const raced = db.prepare(`SELECT package_json,package_hash FROM campaign_import_dry_runs_v30
+            WHERE principal_id=? AND import_id=?`).get(actor, dryRun.importId) as
+            { package_json: string; package_hash: string } | undefined;
+          if (!raced || raced.package_json !== serialized.json || raced.package_hash !== serialized.hash) throw error;
+        }
+      }
+    }
+    return dryRun;
+  };
+  const stagedApplyInput = (actor: string, importId: string, idempotencyKey: string): ApplyCampaignImportInput => {
+    const row = db.prepare(`SELECT package_json,package_hash,report_json,created_at FROM campaign_import_dry_runs_v30
+      WHERE principal_id=? AND import_id=?`).get(actor, importId) as
+      { package_json: string; package_hash: string; report_json: string; created_at: string } | undefined;
+    if (!row) throw forbiddenError();
+    let pkg: CampaignTransferPackage;
+    let report: CampaignImportDryRun["report"];
+    try {
+      pkg = campaignTransferPackageSchema.parse(JSON.parse(row.package_json));
+      report = campaignImportReportSchema.parse(JSON.parse(row.report_json));
+      utcIsoTimestampSchema.parse(row.created_at);
+    } catch { throw conflict("import dry run is stale or invalid"); }
+    const canonical = serializeForImport(pkg);
+    if (canonical.json !== row.package_json || canonical.hash !== row.package_hash
+      || importId !== `import-${row.package_hash.slice(0, 32)}`) {
+      throw conflict("import dry run is stale or invalid");
+    }
+    return { dryRun: { importId, packageHash: row.package_hash, report }, package: pkg, idempotencyKey };
   };
   /** Applies a validated transfer package atomically and records its receipt. */
-  const applyCampaignImport = (actorRaw: string, raw: ApplyCampaignImportInput): { value: CampaignAdministration;
+  const applyCampaignImport = (actorRaw: string, raw: ApplyCampaignImportInput, stagedImportId?: string): { value: CampaignAdministration;
     receipt: CampaignAdministrationReceipt } => {
     assertCanMutate();
     const actor = resourceIdSchema.parse(actorRaw);
     return db.transaction(() => {
-      const input = applyCampaignImportInputSchema.parse(raw);
+      // The route-compatible path reloads its immutable stage after BEGIN
+      // IMMEDIATE so package selection and authoritative revalidation share the
+      // same atomic apply boundary.
+      const input = applyCampaignImportInputSchema.parse(stagedImportId
+        ? stagedApplyInput(actor, stagedImportId, raw.idempotencyKey) : raw);
       const canonicalSubmission = serializeForImport(input.package);
       if (canonicalSubmission.json === null) throw conflict("import package is not serializable");
       const prior = db.prepare(`SELECT submission.package_hash,submission.campaign_id,submission.command_id,
@@ -276,5 +324,15 @@ export function createAdministrationImportRepo({ db, deps, validateRoom, forbidd
       return { value: imported, receipt: campaignAdministrationReceiptSchema.parse({ commandId, campaignId, type: "import_applied", revisionBefore: sourceRevision, revisionAfter: after, occurredAt: at, events: [event] }) };
     }).immediate();
   };
-  return { dryRunCampaignImport, applyCampaignImport };
+  /** Applies only the immutable package associated with the caller's staged dry-run. */
+  const applyCampaignImportById = (actorRaw: string, importIdRaw: string, raw: CampaignTransferHttpApplyRequest) => {
+    const actor = resourceIdSchema.parse(actorRaw);
+    const importId = resourceIdSchema.parse(importIdRaw);
+    const input = campaignTransferHttpApplyRequestSchema.parse(raw);
+    const owner = db.prepare("SELECT principal_id FROM application_owner WHERE singleton=1").get() as any;
+    if (!owner || owner.principal_id !== actor) throw forbiddenError();
+    const staged = stagedApplyInput(actor, importId, input.idempotencyKey);
+    return applyCampaignImport(actor, staged, importId);
+  };
+  return { dryRunCampaignImport, applyCampaignImport, applyCampaignImportById };
 }

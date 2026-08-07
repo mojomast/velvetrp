@@ -169,7 +169,7 @@ describe("schema v10 RPG rules and content", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("30");
       for (const table of V10_TABLES) {
         expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
       }
@@ -430,7 +430,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("30");
     expect(migrated.pragma("foreign_key_check")).toEqual([]);
     migrated.close();
   });
@@ -455,7 +455,7 @@ describe("schema v10 RPG rules and content", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const retried = new DatabaseDriver(dbPath, { readonly: true });
-    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("29");
+    expect((retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("30");
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
   });

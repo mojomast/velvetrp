@@ -3,11 +3,12 @@ import DatabaseDriver from "better-sqlite3";
 
 type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
-  | "assertCampaignContentPacksHaveExactSealedPacks"
+  | "assertCampaignContentPacksHaveExactSealedPacks" | "assertCampaignImportStagingV30"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
   | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28"
   | "createCampaignAdministrationV15" | "createCampaignContentPackSealedPinTriggers" | "createCampaignEventMatchingTriggerV14"
+  | "createCampaignImportStagingV30"
   | "createCharacterBuilderIntegrityV21" | "createCharacterBuilderIntegrityV22" | "createCharacterBuilderProvenanceV20"
   | "createCharacterBuilderV19" | "createCharacterLayoutV29" | "createCharacterProgressionIntegrityV24"
   | "createCharacterProgressionV23" | "createChecksPowersEffectsV26" | "createCombatFoundationV27"
@@ -18,7 +19,7 @@ type SchemaDependencies = Record<
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -36,15 +37,15 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "29";
+export const SCHEMA_VERSION = "30";
 export const SCHEMA_REVISION = "1";
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
-    createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCharacterBuilderIntegrityV21,
+    createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
     createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20, createCharacterBuilderV19,
     createCharacterLayoutV29, createCharacterProgressionIntegrityV24, createCharacterProgressionV23,
     createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16, createContentCatalogV17,
@@ -53,7 +54,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10, migrate10to11,
     migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17, migrate17to18,
     migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24, migrate24to25,
-    migrate25to26, migrate26to27, migrate27to28, migrate28to29, validateCharacterProgressionV23,
+    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, validateCharacterProgressionV23,
     validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25,
     validateM16PersistenceV26, validateV20DraftAudit, validateWorldTravelNpcFactionV28,
   } = getSchemaDependencies();
@@ -89,8 +90,9 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
        createChecksPowersEffectsV26(db);
          createCombatFoundationV27(db);
           createWorldTravelNpcFactionV28(db);
-          createCharacterLayoutV29(db);
-          createQuestsV29r2(db);
+           createCharacterLayoutV29(db);
+           createQuestsV29r2(db);
+          createCampaignImportStagingV30(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -102,6 +104,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertCombatFoundationLayoutV27(db);
     assertWorldTravelNpcFactionLayoutV28(db);
     assertCharacterLayoutV29(db);
+    assertCampaignImportStagingV30(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -148,6 +151,18 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   if (futureWorldArtifact) throw new Error(`schema marker ${version} cannot contain future v28 artifact ${futureWorldArtifact.name}`);
   const futureCharacterLayoutArtifact = Number(version) < 29 && db.prepare("SELECT type,name FROM sqlite_master WHERE name='character_layout_attestation_v29'").get() as { type: string; name: string } | undefined;
   if (futureCharacterLayoutArtifact) throw new Error(`schema marker ${version} cannot contain future v29 artifact ${futureCharacterLayoutArtifact.name}`);
+  const futureImportStagingArtifact = Number(version) < 30 && db.prepare("SELECT type,name FROM sqlite_master WHERE name='campaign_import_dry_runs_v30'").get() as { type: string; name: string } | undefined;
+  if (futureImportStagingArtifact) {
+    // Historical migration fixtures rewind the marker of an otherwise-current,
+    // empty database. An empty additive sidecar is safe to remove; never discard
+    // an actual staged import from a mis-marked database.
+    const count = (db.prepare("SELECT COUNT(*) count FROM campaign_import_dry_runs_v30").get() as { count: number }).count;
+    if (count > 0) throw new Error(`schema marker ${version} cannot contain future v30 artifact ${futureImportStagingArtifact.name}`);
+    db.exec(`DROP TRIGGER IF EXISTS campaign_import_dry_runs_v30_immutable_update;
+      DROP TRIGGER IF EXISTS campaign_import_dry_runs_v30_immutable_delete;
+      DROP TRIGGER IF EXISTS campaign_import_dry_runs_v30_prevent_replace;
+      DROP TABLE campaign_import_dry_runs_v30;`);
+  }
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
     // pre-v18 database can never contain this future-derived sidecar.
@@ -311,6 +326,10 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     migrate28to29(db);
     version = "29";
   }
+  if (version === "29") {
+    migrate29to30(db);
+    version = "30";
+  }
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -324,6 +343,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertCombatFoundationLayoutV27(db);
   assertWorldTravelNpcFactionLayoutV28(db);
   assertCharacterLayoutV29(db);
+  assertCampaignImportStagingV30(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

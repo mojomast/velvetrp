@@ -52,6 +52,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
   const instance = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
   const hasQuery = queryIndex !== -1;
 
+  if (/^\/api\/rpg\/v1\/campaign-imports\/[^/]+\/apply$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaign-imports/:importId/apply",
+      hasQuery,
+      queryDetail: method === "POST" ? "Campaign import apply does not accept query parameters" : null,
+      noStore: true,
+    };
+  }
+
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/creation-options$/.test(instance)) {
     return {
       instance,
@@ -315,6 +324,10 @@ export function buildApp(options: {
             instance: normalizedRoute.instance,
           });
         }
+        if (normalizedRoute.instance === "/api/rpg/v1/campaign-imports/:importId/apply") {
+          return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST",
+            "Campaign import apply request is invalid", { instance: normalizedRoute.instance });
+        }
         const isCharacterResource = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/(?:workspace|sheet)$/.test(
           normalizedRoute.instance,
         );
@@ -395,6 +408,12 @@ export function buildApp(options: {
   app.setNotFoundHandler((request, reply) => {
     const rawUrl = request.raw.url ?? request.url;
     const instance = rawUrl.split("?", 1)[0]!;
+    if (/^\/api\/rpg\/v1\/campaign-imports\/[^/]+\/apply$/.test(instance)) {
+      reply.header("cache-control", "no-store");
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
+        instance: "/api/rpg/v1/campaign-imports/:importId/apply",
+      });
+    }
     return reply.code(404).send({
       message: `Route ${request.method}:${instance} not found`,
       error: "Not Found",

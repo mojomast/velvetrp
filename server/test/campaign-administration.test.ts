@@ -141,6 +141,35 @@ describe("campaign administration repository", () => {
     repo.close();
   });
 
+  it("durably stages a dry-run and applies it by id across repository instances", () => {
+    const first = repository();
+    const source = first.createCampaign("local-owner", { name: "Durable staged import" });
+    const pkg = first.createCampaignExport("local-owner", source.id, {
+      expectedRevision: 0, idempotencyKey: "durable-stage-export",
+    }).value.package;
+    const dry = first.dryRunCampaignImport("local-owner", pkg);
+    first.close();
+
+    let sequence = 0;
+    const second = createRepository({ dataDir: dir(), clock: { now: () => new Date(at) },
+      ids: { nextId: () => `staged-generated-${++sequence}` } });
+    const input = { idempotencyKey: "durable-stage-apply", conflictResolutions: [] as [] };
+    const applied = second.applyCampaignImportById("local-owner", dry.importId, input);
+    expect(second.applyCampaignImportById("local-owner", dry.importId, input)).toEqual(applied);
+    const changedDry = second.dryRunCampaignImport("local-owner", { ...pkg,
+      campaign: { ...pkg.campaign, name: "Different staged identity" } });
+    expect(() => second.applyCampaignImportById("local-owner", changedDry.importId, input))
+      .toThrow(CampaignAdministrationConflictError);
+    expect(() => second.applyCampaignImportById("local-owner", "import-missing", input))
+      .toThrow(CampaignAdministrationForbiddenError);
+    const db = new DatabaseDriver(dbPath());
+    expect(db.prepare("SELECT principal_id,package_hash FROM campaign_import_dry_runs_v30 WHERE import_id=?")
+      .get(dry.importId)).toEqual({ principal_id: "local-owner", package_hash: dry.packageHash });
+    expect(() => db.prepare("UPDATE campaign_import_dry_runs_v30 SET report_json='{}' WHERE import_id=?")
+      .run(dry.importId)).toThrow(/immutable/);
+    db.close(); second.close();
+  });
+
   it("rolls back every import row when apply collides", () => {
     const seed = repository();
     const existing = seed.createCampaign("local-owner", { name: "Existing" });
@@ -419,8 +448,9 @@ describe("campaign administration repository", () => {
     changedDb.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='user-stop' WHERE id='running-room'").run(at);
     const campaignCount = (changedDb.prepare("SELECT COUNT(*) count FROM campaigns").get() as { count: number }).count;
     changedDb.close();
-    expect(() => repo.applyCampaignImport("local-owner", { dryRun: dry, package: runningPackage,
-      idempotencyKey: "room-lifecycle-race" })).toThrow(CampaignAdministrationConflictError);
+    expect(() => repo.applyCampaignImportById("local-owner", dry.importId, {
+      idempotencyKey: "room-lifecycle-race", conflictResolutions: [],
+    })).toThrow(CampaignAdministrationConflictError);
     const verifyDb = new DatabaseDriver(dbPath());
     expect((verifyDb.prepare("SELECT COUNT(*) count FROM campaigns").get() as { count: number }).count).toBe(campaignCount);
     verifyDb.close(); repo.close();
