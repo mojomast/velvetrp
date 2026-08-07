@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
-import { actorResourceBindingProjectionSchema, actorResourceChargesProjectionSchema, actorResourceAmmunitionProjectionSchema,
-  actorResourceCommandSchema, actorResourcesSchema, resourceIdSchema, utcIsoTimestampSchema,
-  type ActorResourceCommand, type ActorResourceAmmunitionProjection, type ActorResourceBindingProjection, type ActorResourceChargesProjection } from "@velvet/contracts";
+import { actorResourceCommandSchema, actorResourcesSchema, resourceIdSchema, utcIsoTimestampSchema,
+  type ActorResourceCommand } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../runtime.js";
+import { createActorResourceReadRepository, type ActorResourceReadRepository } from "./actorResource/actorResourceReadRepo.js";
+
+export type { ActorResourceReadRepository } from "./actorResource/actorResourceReadRepo.js";
 
 /** M1.5 failures are deliberately small and safe for a future HTTP adapter. */
 export class ActorResourceAuthorizationError extends Error { readonly code="ACTOR_RESOURCE_FORBIDDEN"; }
@@ -88,12 +90,7 @@ export type M15ActorResource=ReturnType<typeof actorResourcesSchema.parse>[numbe
 export interface ActorResourceSnapshot { campaignId:string; actorId:string; resources:M15ActorResource[]; revision:number; }
 /** Route payload with actor and campaign identity bound by the request path. */
 export interface ActorScopedResourceChange { kind:"change"; resourceName:string; amount:number; expectedRevision:number; idempotencyKey:string; }
-export interface ActorResourceRepository {
-  getActorResourceSnapshot(principal:string,campaignId:string,actorId:string):ActorResourceSnapshot|null;
-  getM15ActorResources(principal:string,campaignId:string,actorId:string):M15ActorResource[];
-  getActorResourceCharges(principal:string,campaignId:string,actorId:string,resourceId:string):ActorResourceChargesProjection|null;
-  getActorResourceAmmunition(principal:string,campaignId:string,actorId:string,resourceId:string):ActorResourceAmmunitionProjection|null;
-  getActorResourceBinding(principal:string,campaignId:string,actorId:string,resourceId:string):ActorResourceBindingProjection|null;
+export interface ActorResourceRepository extends ActorResourceReadRepository {
   changeActorResourceForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedResourceChange):M15Result<{resources:M15ActorResource[]}>;
   mutateActorResource(principal:string,command:ActorResourceCommand):M15Result<{resources:M15ActorResource[]}>;
 }
@@ -102,27 +99,7 @@ export function getM15ActorRevision(db:DatabaseDriver.Database,campaignId:string
   return (db.prepare("SELECT revision FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=? AND actor_id=?").get(campaignId,actorId) as {revision:number}|undefined)?.revision??0;
 }
 export function createActorResourceRepository(db:DatabaseDriver.Database,deps:M15Dependencies,assertMutation:()=>void):ActorResourceRepository {
-  const list=(principal:string,campaign:string,actor:string)=>{resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
-    if(!m15Authorized(db,principal,campaign,actor))return [];
-    return actorResourcesSchema.parse((db.prepare("SELECT name resourceId,current, max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(campaign,actor) as any[]));};
-  const sidecarRead=(principal:string,campaign:string,actor:string,resource:string,table:string,column:string,schema:any,property:string)=>{
-    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);resourceIdSchema.parse(resource);
-    if(!m15Authorized(db,principal,campaign,actor))return null;
-    const row=db.prepare(`SELECT current_${column} current,maximum_${column} capacity FROM ${table} WHERE campaign_id=? AND actor_id=? AND resource_name=?`).get(campaign,actor,resource)as any;
-    return row?schema.parse({campaignId:campaign,actorId:actor,resourceId:resource,[property]:row}):null;
-  };
-  const bindingRead=(principal:string,campaign:string,actor:string,resource:string)=>{
-    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);resourceIdSchema.parse(resource);
-    if(!m15Authorized(db,principal,campaign,actor))return null;
-    const row=db.prepare("SELECT binding_json FROM rpg_actor_resource_bindings_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?").get(campaign,actor,resource)as any;
-    return row?actorResourceBindingProjectionSchema.parse({campaignId:campaign,actorId:actor,resourceId:resource,binding:JSON.parse(row.binding_json)}):null;
-  };
-  const snapshot=(principal:string,campaign:string,actor:string)=>db.transaction(()=>{
-    resourceIdSchema.parse(principal);resourceIdSchema.parse(campaign);resourceIdSchema.parse(actor);
-    // Authorization is checked before either projection so denied and absent roots stay indistinguishable.
-    if(!m15Authorized(db,principal,campaign,actor))return null;
-    return {campaignId:campaign,actorId:actor,resources:list(principal,campaign,actor),revision:getM15ActorRevision(db,campaign,actor)};
-  })();
+  const reads=createActorResourceReadRepository(db);
   const mutate=(principal:string,input:ActorResourceCommand)=>{const command=actorResourceCommandSchema.parse(input);
     return runM15Mutation(db,deps,assertMutation,{principal,campaignId:command.campaignId,actorId:command.actorId,family:"resource",type:command.type,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,changedKeys:[`resource:${command.resourceId}`],apply(){
       const row=db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?").get(command.campaignId,command.actorId,command.resourceId) as any;
@@ -138,13 +115,10 @@ export function createActorResourceRepository(db:DatabaseDriver.Database,deps:M1
          VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET current_ammunition=excluded.current_ammunition,maximum_ammunition=excluded.maximum_ammunition`).run(command.campaignId,command.actorId,command.resourceId,command.current,command.capacity);
        if(command.type==="set_actor_resource_binding") db.prepare(`INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
          VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name) DO UPDATE SET binding_key=excluded.binding_key,binding_json=excluded.binding_json`).run(command.campaignId,command.actorId,command.resourceId,command.binding.kind,canonical(command.binding));
-      return {resources:list(principal,command.campaignId,command.actorId)};
+       return {resources:reads.getM15ActorResources(principal,command.campaignId,command.actorId)};
     }});
   };
-  return {getActorResourceSnapshot:snapshot,getM15ActorResources:list,
-    getActorResourceCharges:(p,c,a,r)=>sidecarRead(p,c,a,r,"rpg_actor_resource_charges_v25","charges",actorResourceChargesProjectionSchema,"charges"),
-    getActorResourceAmmunition:(p,c,a,r)=>sidecarRead(p,c,a,r,"rpg_actor_resource_ammunition_v25","ammunition",actorResourceAmmunitionProjectionSchema,"ammunition"),
-    getActorResourceBinding:bindingRead,
+  return {...reads,
     changeActorResourceForActor(principal,campaignId,actorId,input){return mutate(principal,{type:"change_actor_resource",campaignId,actorId,resourceId:input.resourceName,amount:input.amount,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey});},
     mutateActorResource:mutate};
 }
