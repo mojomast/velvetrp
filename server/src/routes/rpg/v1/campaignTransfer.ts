@@ -4,6 +4,9 @@ import {
   campaignTransferHttpApplyResponseSchema,
   campaignTransferHttpDryRunRequestSchema,
   campaignTransferHttpDryRunResponseSchema,
+  campaignTransferHttpExportDocumentSchema,
+  MAX_CAMPAIGN_IMPORT_BYTES,
+  MAX_CAMPAIGN_IMPORT_RECORDS,
   resourceIdSchema,
 } from "@velvet/contracts";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -14,13 +17,14 @@ import {
   CampaignAdministrationForbiddenError,
   CampaignAdministrationStaleError,
 } from "../../../repo/campaignAdministrationRepo.js";
+import { CampaignExportLimitError, countCampaignTransferPackageRecords } from "../../../repo/campaignAdmin/administrationExportRepo.js";
 
 const LOCAL_OWNER = "local-owner";
 const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 
 export interface CampaignTransferHttpOptions {
   campaignTransferRepositoryAccessor: () => Pick<CampaignAdministrationRepository,
-    "dryRunCampaignImport" | "applyCampaignImportById">;
+    "dryRunCampaignImport" | "applyCampaignImportById" | "readCampaignExport">;
 }
 
 function noStore(reply: FastifyReply): void { reply.header("cache-control", "no-store"); }
@@ -30,6 +34,75 @@ function invalid(request: FastifyRequest, reply: FastifyReply, detail = "Campaig
 }
 
 export const campaignTransferHttpRoutes: FastifyPluginAsync<CampaignTransferHttpOptions> = async (app, options) => {
+  app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/campaigns/:campaignId/export",
+    {
+      exposeHeadRoute: false,
+      errorHandler: (_error, request, reply) => {
+        noStore(reply);
+        const instance = "/api/rpg/v1/campaigns/:campaignId/export";
+        if (!readRpgFeatureFlags().campaign) return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND",
+          "RPG route not found", { instance });
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign export request is invalid", { instance });
+      },
+    },
+    async (request, reply) => {
+      noStore(reply);
+      const instance = "/api/rpg/v1/campaigns/:campaignId/export";
+      if (!readRpgFeatureFlags().campaign) {
+        return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", { instance });
+      }
+      const rawTarget = request.raw.url ?? request.url;
+      const queryIndex = rawTarget.indexOf("?");
+      const rawQuery = queryIndex === -1 ? "" : rawTarget.slice(queryIndex + 1);
+      const includeMessages = rawQuery === "includeMessages=true" ? true
+        : rawQuery === "includeMessages=false" ? false : null;
+      if (includeMessages === null || Object.keys(request.query).length !== 1
+        || request.query.includeMessages !== String(includeMessages) || request.body !== undefined) {
+        return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST",
+          "Campaign export requires exactly one literal includeMessages query and no request body", { instance });
+      }
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      if (!campaignId.success) return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND",
+        "Campaign was not found", { instance });
+      try {
+        const result = options.campaignTransferRepositoryAccessor()
+          .readCampaignExport(LOCAL_OWNER, campaignId.data, { includeMessages });
+        const exactResult = Object.keys(result).sort().join(",")
+          === "administrationRevision,byteLength,campaignId,document,recordCount";
+        const document = campaignTransferHttpExportDocumentSchema.parse(result.document);
+        const serialized = JSON.stringify(document);
+        const recordCount = countCampaignTransferPackageRecords(document.package)
+          + (document.messages.included
+            ? document.messages.rooms.reduce((count, room) => count + 1 + room.messages.length, 0) : 0);
+        const byteLength = Buffer.byteLength(serialized, "utf8");
+        const bound = exactResult && result.campaignId === campaignId.data
+          && result.administrationRevision === document.package.campaign.administrationRevision
+          && Number.isSafeInteger(result.administrationRevision) && result.administrationRevision >= 0
+          && Number.isSafeInteger(result.recordCount) && Number.isSafeInteger(result.byteLength)
+          && result.recordCount === recordCount && result.byteLength === byteLength
+          && recordCount <= MAX_CAMPAIGN_IMPORT_RECORDS && byteLength <= MAX_CAMPAIGN_IMPORT_BYTES
+          && document.messages.included === includeMessages;
+        if (!bound) throw new Error("invalid repository output binding");
+        return reply.code(200)
+          .header("content-type", "application/json")
+          .header("content-disposition", `attachment; filename="${campaignId.data}-campaign-export-v1.json"`)
+          .header("content-length", String(byteLength))
+          .header("x-content-type-options", "nosniff")
+          .send(Buffer.from(serialized, "utf8"));
+      } catch (error) {
+        if (error instanceof CampaignAdministrationForbiddenError) {
+          return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign was not found", { instance });
+        }
+        if (error instanceof CampaignExportLimitError) {
+          return sendApiProblem(request, reply, 422, "RPG_CAMPAIGN_EXPORT_LIMIT_EXCEEDED",
+            "Campaign export exceeds transfer limits", { instance });
+        }
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Campaign export could not be read", { instance });
+      }
+    },
+  );
+
   app.post<{ Querystring: Record<string, unknown>; Body: unknown }>("/campaign-imports", {
     exposeHeadRoute: false,
     errorHandler: (error, request, reply) => {

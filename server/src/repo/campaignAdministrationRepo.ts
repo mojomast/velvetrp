@@ -19,6 +19,8 @@ import {
   createAdministrationExportRepository, createAdministrationImportRepository,
   createAdministrationReceiptRepo, createCampaignTimelineRepo,
 } from "./campaignAdmin/index.js";
+import type { CampaignExportReadResult } from "./campaignAdmin/administrationExportRepo.js";
+export { CampaignExportLimitError } from "./campaignAdmin/administrationExportRepo.js";
 
 export class CampaignAdministrationForbiddenError extends Error {
   readonly code = "CAMPAIGN_ADMINISTRATION_FORBIDDEN";
@@ -62,6 +64,7 @@ export interface CampaignAdministrationRepository {
     MutationResult<CampaignAdministration>;
   createCampaignExport(actor: string, campaignId: string, input: CreateCampaignExportInput):
     MutationResult<{ manifest: CampaignExportManifest; package: CampaignTransferPackage }>;
+  readCampaignExport(actor: string, campaignId: string, options: { includeMessages: boolean }): CampaignExportReadResult;
   listCampaignAdministrationEvents(actor: string, campaignId: string): CampaignAdministrationEvent[];
   getCampaignAdministrationReceipt(actor: string, campaignId: string, commandId: string): CampaignAdministrationReceipt | null;
 }
@@ -97,7 +100,8 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
   const events = createAdministrationEventRepo({ db, getAuthority: access.getAuthority });
   const receipts = createAdministrationReceiptRepo({ db, event: campaignAdministrationEventSchema.parse,
     getAuthority: access.getAuthority, receipt: campaignAdministrationReceiptSchema.parse });
-  const exports = createAdministrationExportRepository({ db, deps, runMutation: commands.runMutation, events, receipts });
+  const exports = createAdministrationExportRepository({ db, deps, runMutation: commands.runMutation, events, receipts,
+    getAuthority: access.getAuthority, forbidden: () => new CampaignAdministrationForbiddenError() });
   const timelines = createCampaignTimelineRepo({ db, getAuthority: access.getAuthority, timeline });
   return {
     getCampaignAdministration: access.getCampaignAdministration,
@@ -119,6 +123,7 @@ export function createCampaignAdministrationRepository(db: DatabaseDriver.Databa
     applyCampaignImport: imports.applyCampaignImport,
     applyCampaignImportById: imports.applyCampaignImportById,
     createCampaignExport: exports.createCampaignExport,
+    readCampaignExport: exports.readCampaignExport,
     listCampaignAdministrationEvents: events.listCampaignAdministrationEvents,
     getCampaignAdministrationReceipt: receipts.getCampaignAdministrationReceipt,
   };

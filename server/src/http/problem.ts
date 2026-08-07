@@ -46,7 +46,7 @@ function safeProblemInstance(requestTarget: string): string {
     || suffix === "/dice-rolls") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
-  if (suffix === "/administration" || suffix === "/character-drafts") {
+  if (suffix === "/administration" || suffix === "/character-drafts" || suffix === "/export") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (suffix === "/content") return `${campaignPrefix}:campaignId/content`;

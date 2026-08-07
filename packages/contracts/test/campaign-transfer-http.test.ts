@@ -4,6 +4,8 @@ import {
   campaignTransferHttpApplyResponseSchema,
   campaignTransferHttpDryRunRequestSchema,
   campaignTransferHttpDryRunResponseSchema,
+  campaignTransferHttpExportDocumentSchema,
+  campaignTransferHttpExportQuerySchema,
 } from "../src/campaign-transfer-http.js";
 
 const at = "2035-01-02T03:04:05.006Z";
@@ -21,6 +23,31 @@ const packageValue = {
 };
 
 describe("campaign transfer HTTP contracts", () => {
+  it("accepts only the exact required export query", () => {
+    expect(campaignTransferHttpExportQuerySchema.parse({ includeMessages: "true" })).toEqual({ includeMessages: "true" });
+    expect(campaignTransferHttpExportQuerySchema.safeParse({ includeMessages: true }).success).toBe(false);
+    expect(campaignTransferHttpExportQuerySchema.safeParse({ includeMessages: "false", extra: "x" }).success).toBe(false);
+  });
+
+  it("validates the strict export-only message archive and graph", () => {
+    const message = { id: "message-1", role: "character" as const, speakerCharacterId: "legacy-character",
+      content: "alternate reply", parentId: null, swipeGroupId: "swipe-1", swipeIndex: 1,
+      sequence: 2, status: "aborted" as const, createdAt: at };
+    const value = { package: { ...packageValue, records: { ...packageValue.records,
+      roomAttachments: [{ sessionId: "legacy-room", attachedAt: at }] } },
+      messages: { included: true as const, rooms: [{ sessionId: "legacy-room", activeLeafId: "message-1",
+        messages: [message] }] } };
+    expect(campaignTransferHttpExportDocumentSchema.parse(value)).toEqual(value);
+    expect(campaignTransferHttpExportDocumentSchema.safeParse({ ...value, messages: { included: true,
+      rooms: [{ ...value.messages.rooms[0], activeLeafId: "other" }] } }).success).toBe(false);
+    expect(campaignTransferHttpExportDocumentSchema.safeParse({ ...value, messages: { included: true,
+      rooms: [{ ...value.messages.rooms[0], messages: [{ ...message, usage: null }] }] } }).success).toBe(false);
+    expect(campaignTransferHttpExportDocumentSchema.safeParse({ ...value, messages: { included: true,
+      rooms: [{ ...value.messages.rooms[0], messages: [{ ...message, parentId: message.id }] }] } }).success).toBe(false);
+    expect(campaignTransferHttpExportDocumentSchema.parse({ package: packageValue,
+      messages: { included: false } })).toEqual({ package: packageValue, messages: { included: false } });
+  });
+
   it("accepts only an exact dry-run package request", () => {
     const request = { package: packageValue, mode: "dry-run" as const };
 
