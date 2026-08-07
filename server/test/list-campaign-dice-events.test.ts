@@ -127,6 +127,51 @@ describe("listCampaignEvents dice projection", () => {
     }
   });
 
+  it("returns the newest twenty dice events from inherited and imported timeline history", () => {
+    seed();
+    let event = 0;
+    const repository = createRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      rng: { integer: () => 6 },
+      ids: { nextId: () => `derived-event-${String(event++).padStart(2, "0")}` },
+      clock: { now: () => new Date(AT) },
+    });
+    for (let revision = 0; revision < 10; revision += 1) {
+      repository.executeRollActorDice("local-owner", envelope("1d6", revision, `derived-command-${revision}`));
+    }
+    repository.close();
+
+    const db = new DatabaseDriver(dbPath());
+    db.transaction(() => {
+      db.prepare("INSERT INTO campaign_timelines (id,campaign_id,created_at,revision) VALUES ('timeline-derived','campaign',?,21)")
+        .run(AT);
+      db.prepare(`INSERT INTO campaign_timeline_history
+        (campaign_id,timeline_id,source_timeline_id,parent_timeline_id,created_by_command_id,forked_from_revision)
+        VALUES ('campaign','timeline-derived','timeline-derived','timeline-old',NULL,10)`).run();
+      db.prepare(`INSERT INTO campaign_timeline_events (campaign_id,timeline_id,revision,event_id,inherited)
+        SELECT campaign_id,'timeline-derived',revision,event_id,1 FROM campaign_timeline_events
+        WHERE campaign_id='campaign' AND timeline_id='timeline-old'`).run();
+      const insertImported = db.prepare(`INSERT INTO campaign_imported_timeline_events
+        (campaign_id,timeline_id,revision,source_event_id,source_command_id,actor_id,source_turn_id,type,occurred_at,public_data)
+        VALUES ('campaign','timeline-derived',?,?,?,?,?,'actor_dice_rolled',?,?)`);
+      for (let revision = 11; revision <= 21; revision += 1) {
+        insertImported.run(revision, `imported-event-${revision}`, `imported-command-${revision}`, "actor", null, AT,
+          JSON.stringify({ expression: "1d6", normalized: { count: 1, sides: 6, selection: { type: "all" }, modifier: 0 },
+            terms: [{ value: 6, kept: true }], modifier: 0, total: 6 }));
+      }
+    })();
+    db.close();
+
+    const derived = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const recent = derived.listRecentCampaignDiceEvents("observer", "campaign", "timeline-derived");
+    expect(recent).toHaveLength(20);
+    expect(recent.map((item) => item.revision)).toEqual(Array.from({ length: 20 }, (_, index) => 21 - index));
+    expect(recent[0]?.eventId).toBe("imported-event-21");
+    expect(recent[19]?.eventId).toBe("derived-event-01");
+    expect(derived.listRecentCampaignDiceEvents("outsider", "campaign", "timeline-derived")).toEqual([]);
+    derived.close();
+  });
+
   it("validates full history corruption outside the recent window", () => {
     seed();
     let event = 0;

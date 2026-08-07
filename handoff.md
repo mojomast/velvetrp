@@ -13,5 +13,5 @@ Open follow-on work: campaign import/export and administration mutation kernels 
 - Keep `campaignRepo.ts`: `server/src/repo/index.ts` remains its sole in-repo consumer and it preserves historical root exports plus deprecated event-read delegates.
 - Keep orchestration: `campaignRepositoryOrchestration.ts` owns factory/UoW guards and compatibility administration audits; import/export and gameplay audit reconstruction remain deliberate atomic boundaries.
 - Candidate cleanup: delete deprecated root event-read delegates and duplicate `repositoryDependencies.ts` only after a public barrel contract test proves supported imports do not rely on them.
-- Test gap: add inherited/imported timeline coverage for `listRecentCampaignDiceEvents`; existing repository tests already cover character creation, content writes, command receipts, and ordinary dice reconstruction.
+- Test coverage: `server/test/list-campaign-dice-events.test.ts` covers inherited/imported timeline reads for `listRecentCampaignDiceEvents`, including newest-first ordering, the 20-event limit, and outsider masking.
 - Documentation gap: architecture docs and README should refer to `campaignRepositoryOrchestration.ts` rather than claiming factory composition remains in `campaignRepo.ts`.
