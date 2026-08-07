@@ -28,16 +28,36 @@ type RaceCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "ra
 type BackgroundCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "background" } }>;
 type ClassCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class" } }>;
 type ClassLevelCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class-level" } }>;
-interface Authority { role: Role; ownerPrincipalId: string }
-interface CatalogContext { rulesProfileId: string; pins: CharacterDraftPin[]; definitions: CatalogDefinition[]; }
+export interface CharacterBuilderAuthority { role: Role; ownerPrincipalId: string }
+export interface CharacterBuilderCatalogContext { rulesProfileId: string; pins: CharacterDraftPin[]; definitions: CatalogDefinition[]; }
 
 /** Dependencies required by non-mutating character-builder operations. */
 export interface CharacterBuilderReadDependencies { clock: Clock; }
 
+/** The actor-authorized reads and authoritative lookup helpers for character drafts. */
+export interface CharacterBuilderReadRepository {
+  authority(actorPrincipalId: string, campaignId: string): CharacterBuilderAuthority | null;
+  mayControl(actor: string, auth: CharacterBuilderAuthority, controller: string): boolean;
+  validateController(campaignId: string, controller: string): Role;
+  validatePersona(campaignId: string, personaId: string, now: string, exceptDraftId?: string): void;
+  currentCatalog(campaignId: string): CharacterBuilderCatalogContext;
+  catalogForPins(rulesProfileId: string, pins: CharacterDraftPin[]): CatalogDefinition[];
+  refKey(reference: { packId: string; packVersion: string; kind: string; definitionId: string }): string;
+  selectedDefinitions(definitions: CatalogDefinition[], selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>): {
+    race: RaceCatalogDefinition; background: BackgroundCatalogDefinition; klass: ClassCatalogDefinition; level: ClassLevelCatalogDefinition;
+  } | null;
+  grantsFor(background: BackgroundCatalogDefinition, choice: "kit" | "currency"): CharacterStartingGrant[];
+  samePins(current: CharacterBuilderCatalogContext, rulesProfileId: string, pins: CharacterDraftPin[]): boolean;
+  viewMappers: CharacterBuilderViewMappers;
+  getAuthorized(actorPrincipalId: string, draftId: string): { row: DraftRow; auth: CharacterBuilderAuthority } | null;
+  getCharacterDraft(actorPrincipalId: string, draftId: string): CharacterDraftView | null;
+  getCharacterDraftReceipt(actorPrincipalId: string, draftId: string, commandId: string): CharacterDraftMutationReceipt | import("@velvet/contracts").CharacterFinalizationReceipt | null;
+}
+
 /** Creates the database-backed read, authorization, and catalog helpers for character drafts. */
-export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database, dependencies: CharacterBuilderReadDependencies) {
+export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database, dependencies: CharacterBuilderReadDependencies): CharacterBuilderReadRepository {
   /** Resolves a campaign member's authority while verifying the campaign owner invariant. */
-  const authority = (actorPrincipalId: string, campaignId: string): Authority | null => {
+  const authority = (actorPrincipalId: string, campaignId: string): CharacterBuilderAuthority | null => {
     const row = db.prepare(`SELECT campaign.owner_principal_id, actor.role,
         actor.principal_id actor_id, actor_parent.id actor_parent_id,
         owner.principal_id owner_id, owner.role owner_role, owner_parent.id owner_parent_id,
@@ -57,7 +77,7 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
     return { role: row.role, ownerPrincipalId: row.owner_principal_id };
   };
   /** Tests whether campaign authority permits controlling the given draft controller. */
-  const mayControl = (actor: string, auth: Authority, controller: string): boolean => auth.role === "owner" || auth.role === "gm" || (auth.role === "player" && actor === controller);
+  const mayControl = (actor: string, auth: CharacterBuilderAuthority, controller: string): boolean => auth.role === "owner" || auth.role === "gm" || (auth.role === "player" && actor === controller);
   /** Validates that a draft controller remains an eligible campaign member. */
   const validateController = (campaignId: string, controller: string): Role => {
     const row = db.prepare(`SELECT membership.role,principal.id parent_id FROM campaign_memberships membership LEFT JOIN principals principal ON principal.id=membership.principal_id WHERE membership.campaign_id=? AND membership.principal_id=?`).get(campaignId, controller) as { role: Role; parent_id: string | null } | undefined;
@@ -73,7 +93,7 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
     if (competing) throw new CharacterBuilderConflictError("persona already has an active character draft");
   };
   /** Reads the campaign's complete, validated content pins and builder definitions. */
-  const currentCatalog = (campaignId: string): CatalogContext => {
+  const currentCatalog = (campaignId: string): CharacterBuilderCatalogContext => {
     const selection = db.prepare(`SELECT rules_profile_id FROM campaign_catalog_current_selections WHERE campaign_id=?`).get(campaignId) as { rules_profile_id: string } | undefined;
     if (!selection) throw new CharacterBuilderUnavailableError("campaign requires validated-v1 content pins");
     const rows = db.prepare(`SELECT pin.position,pin.pack_id,pin.pack_version,publication.manifest_digest,publication.validation_level,pack.sealed,pack.rules_profile_id FROM campaign_catalog_current_pins pin LEFT JOIN rpg_content_pack_publications publication ON publication.pack_id=pin.pack_id AND publication.pack_version=pin.pack_version LEFT JOIN rpg_content_packs pack ON pack.pack_id=pin.pack_id AND pack.pack_version=pin.pack_version WHERE pin.campaign_id=? ORDER BY pin.position`).all(campaignId) as Array<{ position: number; pack_id: string; pack_version: string; manifest_digest: string | null; validation_level: string | null; sealed: number | null; rules_profile_id: string | null }>;
@@ -103,11 +123,11 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
   /** Builds the starting grants granted by the selected background option. */
   const grantsFor = (background: BackgroundCatalogDefinition, choice: "kit" | "currency"): CharacterStartingGrant[] => choice === "kit" ? background.mechanics.itemRefs.map((reference) => characterStartingGrantSchema.parse({ kind: "item", reference, quantity: 1, source: "background-kit" })) : [characterStartingGrantSchema.parse({ kind: "currency", reference: background.mechanics.startingCurrency.currency, amount: background.mechanics.startingCurrency.amount, source: "background-currency" })];
   /** Compares draft pins to the campaign's current content selection. */
-  const samePins = (current: CatalogContext, rulesProfileId: string, pins: CharacterDraftPin[]): boolean => current.rulesProfileId === rulesProfileId && canonicalCatalogJson(current.pins) === canonicalCatalogJson(pins);
+  const samePins = (current: CharacterBuilderCatalogContext, rulesProfileId: string, pins: CharacterDraftPin[]): boolean => current.rulesProfileId === rulesProfileId && canonicalCatalogJson(current.pins) === canonicalCatalogJson(pins);
   /** Supplies row mappers with catalog collaborators without importing command orchestration. */
   const viewMappers: CharacterBuilderViewMappers = { catalogForPins: (_db, rulesProfileId, pins) => catalogForPins(rulesProfileId, pins), pinsMatchCurrent: (_db, campaignId, rulesProfileId, pins) => samePins(currentCatalog(campaignId), rulesProfileId, pins), selectedDefinitions, grantsFor };
   /** Finds a draft and confirms that the actor may view or control it. */
-  const getAuthorized = (actorPrincipalId: string, draftId: string): { row: DraftRow; auth: Authority } | null => { const actor = resourceIdSchema.parse(actorPrincipalId); const id = resourceIdSchema.parse(draftId); const row = rowFor(db, id); if (!row) return null; const auth = authority(actor, row.campaign_id); return !auth || !mayControl(actor, auth, row.controller_principal_id) ? null : { row, auth }; };
+  const getAuthorized = (actorPrincipalId: string, draftId: string): { row: DraftRow; auth: CharacterBuilderAuthority } | null => { const actor = resourceIdSchema.parse(actorPrincipalId); const id = resourceIdSchema.parse(draftId); const row = rowFor(db, id); if (!row) return null; const auth = authority(actor, row.campaign_id); return !auth || !mayControl(actor, auth, row.controller_principal_id) ? null : { row, auth }; };
   /** Reads the actor-authorized current public view for a character draft. */
   const getCharacterDraft = (actorPrincipalId: string, draftId: string): CharacterDraftView | null => { const found = getAuthorized(actorPrincipalId, draftId); if (!found) return null; const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()); return db.transaction(() => buildView(db, rowFor(db, found.row.id)!, found.auth.role, now, viewMappers))(); };
   /** Reads an actor-authorized command receipt after validating its persisted path binding. */
