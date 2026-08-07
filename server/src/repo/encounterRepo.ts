@@ -2,12 +2,12 @@ import type DatabaseDriver from "better-sqlite3";
 import {
   createEncounterReadRepository,
   type EncounterReadRepository,
-} from "./encounter/encounterReadRepo.js";
+} from "./encounter/index.js";
 import {
   createEncounterWriteRepository,
   type EncounterDependencies,
   type EncounterWriteRepository,
-} from "./encounter/encounterWriteRepo.js";
+} from "./encounter/index.js";
 
 export {
   EncounterAuthorizationError,
@@ -15,12 +15,12 @@ export {
   EncounterStaleError,
   EncounterTurnError,
   EncounterUnavailableError,
-} from "./encounter/encounterErrors.js";
+} from "./encounter/index.js";
 export type {
   EncounterDependencies,
   EncounterReceipt,
   EncounterResult,
-} from "./encounter/encounterWriteRepo.js";
+} from "./encounter/index.js";
 
 /** Public encounter facade composed from command handling and read projections. */
 export interface EncounterRepository extends EncounterReadRepository, EncounterWriteRepository {}

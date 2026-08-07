@@ -1,5 +1,5 @@
 # Handoff
-## Completed: Task 3c: Extract encounter command repository
+## Completed: Task 3d: Add encounter package barrel
 ## Next Task: M1.9 quests, storylines, clues, and rewards
-## Context: Added `encounter/encounterWriteRepo.ts`, which owns all existing encounter mutation/command logic and takes the mutation guard plus the legal-action read dependency. `encounterRepo.ts` remains the unchanged public facade, composing the read and write factories while retaining its existing methods, error exports, and types. Immediate transactions and command idempotency, revisions, and receipts remain in the write factory. Pre-existing modifications to `contentCatalogRepo.ts` and `.tmp/` remain unrelated and untouched. Root typecheck passed with `TMPDIR=.tmp`.
-## Files Modified: server/src/repo/encounter/encounterWriteRepo.ts, server/src/repo/encounterRepo.ts, devplan.md, handoff.md
+## Context: Added `encounter/index.ts` as the encounter package composition barrel for errors plus read/write factories and their public types. `encounterRepo.ts` now reaches its split implementation exclusively through that barrel, while its facade API and root `server/src/repo/index.ts` exports remain unchanged. The facade is 1,203 bytes, below the 6 KB limit. Pre-existing modifications to `contentCatalogRepo.ts` and `.tmp/` remain unrelated and untouched.
+## Files Modified: server/src/repo/encounter/index.ts, server/src/repo/encounterRepo.ts, devplan.md, handoff.md
