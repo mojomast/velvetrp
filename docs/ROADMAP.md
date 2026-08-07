@@ -15,7 +15,7 @@ M1.1-M1.8 are complete repository/shared-contract capabilities. The trusted-loca
 Extend the existing campaign foundation with lifecycle state, settings, membership administration, canonical checkpoints, non-destructive timeline forks, recaps, command logs, and versioned import/export records.
 
 - **Complexity:** L
-- **Dependencies:** Existing v9-v14 campaign, membership, timeline, event, receipt, and room-attachment tables; `campaignRepo.ts`; shared campaign contracts.
+- **Dependencies:** Existing v9-v14 campaign, membership, timeline, event, receipt, and room-attachment tables; `campaignRepositoryOrchestration.ts`; shared campaign contracts.
 - **Acceptance criteria:**
   - Additive migrations and strict shared types represent draft, published, paused, completed, and archived lifecycle states; bounded campaign settings; membership role changes; checkpoints; forks; recaps; imports; and export manifests.
   - Repository methods enforce the sole-owner invariant, role-based projections, active-timeline revisions, immutable historical timelines, and append-only command/event provenance in atomic transactions.

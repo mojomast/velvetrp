@@ -116,7 +116,7 @@ server/src/repo/
 ├── summaryRepo.ts    ← scene synthesis snapshots
 ├── settingsRepo.ts   ← harness and provider settings
 ├── diceRepo.ts       ← normalized dice audit, roll persistence
-├── campaignRepo.ts   ← repository factory, campaigns, rooms, actors
+├── campaignRepositoryOrchestration.ts ← repository factory, campaigns, rooms, actors
 ├── campaignAdministrationRepo.ts ← lifecycle, membership, timelines, import/export
 ├── contentCatalogRepo.ts          ← immutable catalogs and campaign pins
 ├── characterBuilderRepo.ts        ← drafts, derived sheets, finalization
