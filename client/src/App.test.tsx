@@ -1,6 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { CharacterBuilderPage, resetCharacterBuilderPageModuleStateForTests } from "./components/rpg/character/CharacterBuilderPage";
+import { LevelUpWizard, resetLevelUpWizardModuleStateForTests } from "./components/rpg/character/LevelUpWizard";
+import { ApiError } from "./api";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_PACK, ORIGINAL_STARTER_RACE, ORIGINAL_STARTER_RULES_PROFILE } from "@velvet/contracts";
 
 const aria = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boundaries: "fictional adults only", fictionalConfirmed: true, isRealPerson: false, createdAt: "2026-01-01T00:00:00.000Z" };
@@ -1079,5 +1082,90 @@ describe("persistence and multi-character frontend", () => {
     const scopeChecks = screen.getAllByRole("checkbox"); fireEvent.click(scopeChecks[2]!); fireEvent.click(scopeChecks[3]!);
     fireEvent.change(screen.getByPlaceholderText("moon gate, old harbor"), { target: { value: "harbor, moon" } }); fireEvent.change(screen.getByPlaceholderText(/World details/), { target: { value: "The harbor closes at midnight." } }); fireEvent.click(screen.getByRole("button", { name: "Add lore" }));
     await waitFor(() => expect(lorePayload).toMatchObject({ characterIds: [aria.id, rowan.id], keys: ["harbor", "moon"], content: "The harbor closes at midnight." }));
+  });
+});
+
+describe("character builder and advancement safety flows", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const ref = (kind: string, id: string) => ({ kind, packId: "pack", packVersion: "1", definitionId: id });
+  const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 150, spellAttack: 3, saveDc: 11,
+    explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server formula", inputs: {}, result: 10 })) };
+  function draft(id = "draft-one", complete = false) { return { id, campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false, revision: 1, rulesProfileId: "rules",
+    pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }], allocation: { method: "standard-array", scores },
+    selections: complete ? { race: ref("race", "race"), background: ref("background", "background"), class: ref("class", "class"), starterGrant: "kit" } : { race: null, background: null, class: null, starterGrant: null },
+    choiceGroups: [{ id: "race", required: true, options: [{ reference: ref("race", "race"), name: `Race ${id}`, description: "Server race." }] }, { id: "background", required: true, options: [{ reference: ref("background", "background"), name: "Guide", description: "Server background." }] }, { id: "class", required: true, options: [{ reference: ref("class", "class"), name: "Warden", description: "Server class." }] }, { id: "starter-grant", required: true, options: ["kit", "currency"] }],
+    completion: complete ? { complete: true, issues: [] } : { complete: false, issues: [{ code: "missing-race", path: "selections.race", message: "Choose a race" }] }, derivedPreview: complete ? derived : null,
+    startingGrants: complete ? [{ kind: "item", reference: ref("item", "bedroll"), quantity: 1, source: "background-kit" }] : [], createdAt: at, updatedAt: at }; }
+  const sheet = { sheet: { name: "Persona", race: { name: "Race", description: "Race." }, background: { name: "Guide", description: "Guide." }, classes: [{ name: "Warden", description: "Warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] }, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
+
+  beforeEach(() => { resetCharacterBuilderPageModuleStateForTests(); resetLevelUpWizardModuleStateForTests(); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+  it("focus-links issues and preserves an ambiguous autosave lock across unmount until explicit refresh", async () => {
+    const write = deferred<any>();
+    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft()), update: vi.fn(() => write.promise), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    const props = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], initialDraftId: "draft-one", api, onBack: vi.fn(), onUnavailable: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn() };
+    render(<CharacterBuilderPage {...props} />);
+    const issue = await screen.findByRole("button", { name: "Choose a race" }); fireEvent.click(issue);
+    expect(document.activeElement).toBe(document.getElementById("builder-choice-race"));
+    fireEvent.click(screen.getAllByRole("radio")[0]!);
+    await screen.findByText("Saving revision 2…");
+    cleanup();
+    await act(async () => { write.reject(new TypeError("network lost")); await Promise.resolve(); });
+    render(<CharacterBuilderPage {...props} />);
+    expect(await screen.findByText(/Save outcome is uncertain/)).toBeTruthy();
+    expect((screen.getAllByRole("radio")[0]!.closest("fieldset") as HTMLFieldSetElement).disabled).toBe(true);
+    expect(api.update).toHaveBeenCalledTimes(1);
+    const refresh = screen.getByRole("button", { name: "Refresh authoritative draft" }); fireEvent.click(refresh);
+    await screen.findByText(/Authoritative draft revision refreshed/);
+    await waitFor(() => expect(document.activeElement).not.toBe(refresh));
+    expect(api.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an out-of-order draft load from the prior route identity", async () => {
+    const first = deferred<any>(); const second = deferred<any>();
+    const api = { create: vi.fn(), get: vi.fn((_: string, id: string) => id === "draft-one" ? first.promise : second.promise), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    const base = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], api, onBack: vi.fn(), onUnavailable: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn() };
+    const view = render(<CharacterBuilderPage {...base} initialDraftId="draft-one" />);
+    view.rerender(<CharacterBuilderPage {...base} initialDraftId="draft-two" />);
+    await act(async () => { second.resolve(draft("draft-two")); });
+    expect(await screen.findByText("Race draft-two")).toBeTruthy();
+    await act(async () => { first.resolve(draft("draft-one")); });
+    expect(screen.queryByText("Race draft-one")).toBeNull();
+  });
+
+  it("shows exact grants before confirmation, finalizes once, and refreshes the sheet", async () => {
+    const final = { draft: { ...draft("draft-one", true), controllerPrincipalId: "local-owner", role: "owner", status: "finalized", revision: 2 }, receipt: { draftId: "draft-one", commandId: "command", eventId: "event", idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, campaignCharacterId: "character", sheetId: "sheet", actorId: "actor", derived, startingGrants: [] } };
+    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft("draft-one", true)), update: vi.fn(), finalize: vi.fn().mockResolvedValue(final), getSheet: vi.fn().mockResolvedValue(sheet) } as any;
+    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    expect(await screen.findByText(/1 × item/)).toBeTruthy();
+    const finalize = screen.getByRole("button", { name: "Finalize playable character once" }); expect((finalize as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox")); await waitFor(() => expect((finalize as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(finalize);
+    expect(await screen.findByText(/Finalization receipt confirmed/)).toBeTruthy();
+    expect(api.finalize).toHaveBeenCalledTimes(1); expect(api.getSheet).toHaveBeenCalledWith("campaign", "character");
+  });
+
+  it("renders every crossed level and leaves the reviewed preview after one rejected apply", async () => {
+    const ability = ref("ability", "moon-step");
+    const state = { campaignId: "campaign", campaignCharacterId: "character", profile: { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 3, thresholds: [{ level: 1, xp: 0 }, { level: 2, xp: 10 }, { level: 3, xp: 30 }] }, classRef: ref("class", "warden"), level: 1, totalXp: 30, milestoneCount: 0, revision: 4, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: at };
+    const level = (value: number) => ({ level: value, hp: { maxBefore: 10, maxAfter: 15, currentBefore: 8, currentAfter: 13, gain: 5 }, proficiency: { before: 2, after: value === 3 ? 3 : 2 }, resources: [], fixedAbilities: [], selectedAbilities: [ability], spells: [], derivedBefore: derived, derivedAfter: { ...derived, maxHp: 15 } });
+    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 4, previewToken: "b".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 3, totalXp: 30, milestoneCount: 0, pendingChoices: [{ level: 2, choiceId: "choice", kind: "ability", required: true, options: [ability, ref("ability", "sun-step")] }], levels: [level(2), level(3)] };
+    const api = { getProgression: vi.fn().mockResolvedValue(state), getSheet: vi.fn().mockResolvedValue(sheet), preview: vi.fn().mockResolvedValue(preview), apply: vi.fn().mockRejectedValue(new ApiError(409, "rejected")) } as any;
+    render(<LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} />);
+    expect(await screen.findByRole("heading", { name: "Level 2" })).toBeTruthy(); expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "pack:1:moon-step" } });
+    fireEvent.click(screen.getByRole("button", { name: "Calculate exact changes" }));
+    await screen.findByText("Exact advancement changes are ready for review.");
+    fireEvent.click(screen.getByRole("button", { name: "Apply reviewed levels once" }));
+    expect(await screen.findByText(/reviewed preview and sheet remain unchanged/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy(); expect(api.apply).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats progression role absence as unavailable without exposing server detail", async () => {
+    const unavailable = vi.fn(); const api = { getProgression: vi.fn().mockRejectedValue(new ApiError(404, "private role")), getSheet: vi.fn().mockResolvedValue(sheet), preview: vi.fn(), apply: vi.fn() } as any;
+    render(<LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} onUnavailable={unavailable} />);
+    await waitFor(() => expect(unavailable).toHaveBeenCalledOnce());
+    expect(document.body.textContent).not.toContain("private role");
   });
 });

@@ -1,8 +1,78 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext, validateContentPackDraft } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M2.6 character API bindings", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const reference = <K extends "race" | "background" | "class">(kind: K, definitionId: string) => ({ kind, packId: "pack", packVersion: "1", definitionId });
+  const groups = [
+    { id: "race", required: true, options: [{ reference: reference("race", "race"), name: "Avelune", description: "Moonlit." }] },
+    { id: "background", required: true, options: [{ reference: reference("background", "background"), name: "Guide", description: "A guide." }] },
+    { id: "class", required: true, options: [{ reference: reference("class", "class"), name: "Warden", description: "A warden." }] },
+    { id: "starter-grant", required: true, options: ["kit", "currency"] },
+  ];
+  const draft = { id: "draft", campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false,
+    revision: 0, rulesProfileId: "rules", pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }],
+    allocation: { method: "standard-array", scores }, selections: { race: null, background: null, class: null, starterGrant: null }, choiceGroups: groups,
+    completion: { complete: false, issues: [{ code: "missing-race", path: "selections.race", message: "Choose race" }] }, derivedPreview: null, startingGrants: [], createdAt: at, updatedAt: at };
+  const receipt = { draftId: "draft", idempotencyKey: "create-key", type: "create", revisionBefore: 0, revisionAfter: 0, occurredAt: at };
+  const derived = { maxHp: 10, defenses: { guard: 10, evasion: 10, will: 10 }, initiative: 2, speed: 30, carryingLimit: 150, spellAttack: 3, saveDc: 11,
+    explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 10 })) };
+
+  it("binds draft create, no-store load, and revision autosave without retry", async () => {
+    const selected = { ...draft, revision: 1, selections: { ...draft.selections, race: reference("race", "race") }, updatedAt: "2030-01-01T00:00:01.000Z" };
+    const updateReceipt = { ...receipt, idempotencyKey: "save-key", type: "update", revisionAfter: 1 };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ draft, receipt }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(draft), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ draft: selected, receipt: updateReceipt }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createCharacterDraft("campaign", { personaId: "persona", durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: "create-key" })).resolves.toMatchObject({ draft: { id: "draft" } });
+    await expect(getCharacterDraft("campaign", "draft")).resolves.toMatchObject({ revision: 0 });
+    await expect(updateCharacterDraft("campaign", "draft", { expectedRevision: 0, idempotencyKey: "save-key", selections: { race: reference("race", "race") } })).resolves.toMatchObject({ draft: { revision: 1 } });
+    expect(fetchMock.mock.calls.map(([url, init]) => [String(url), (init as RequestInit).method ?? "GET", (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/campaigns/campaign/character-drafts", "POST", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/character-drafts/draft", "GET", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/character-drafts/draft", "PATCH", "no-store"],
+    ]);
+    await expect(getCharacterDraft("wrong/id", "draft")).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("path/status/binds finalization, sheet, progression preview, apply, and XP routes", async () => {
+    const completeDraft = { ...draft, controllerPrincipalId: "local-owner", role: "owner", status: "finalized", revision: 2,
+      selections: { race: reference("race", "race"), background: reference("background", "background"), class: reference("class", "class"), starterGrant: "kit" },
+      completion: { complete: true, issues: [] }, derivedPreview: derived };
+    const finalReceipt = { draftId: "draft", commandId: "command", eventId: "event", idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at,
+      campaignCharacterId: "character", sheetId: "sheet", actorId: "actor", derived, startingGrants: [] };
+    const workspace = { name: "Persona", race: { name: "Avelune", description: "Moonlit." }, background: { name: "Guide", description: "A guide." }, classes: [{ name: "Warden", description: "A warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] };
+    const sheet = { sheet: workspace, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
+    const profile = { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 1, thresholds: [{ level: 1, xp: 0 }] };
+    const progression = { campaignId: "campaign", campaignCharacterId: "character", profile, classRef: reference("class", "class"), level: 1, totalXp: 0, milestoneCount: 0, revision: 2, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: at };
+    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 2, previewToken: "b".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [] };
+    const applyReceipt = { campaignCharacterId: "character", idempotencyKey: "apply-key", type: "apply-levels", revisionBefore: 2, revisionAfter: 3, occurredAt: at, appliedLevels: [] };
+    const xpReceipt = { ...applyReceipt, idempotencyKey: "xp-key", type: "grant-xp" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ draft: completeDraft, receipt: finalReceipt }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(sheet), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ progression }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ preview }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ progression: { ...progression, revision: 3 }, receipt: applyReceipt }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ progression: { ...progression, revision: 3, totalXp: 10 }, receipt: xpReceipt }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(finalizeCharacterDraft("campaign", "draft", { expectedRevision: 1, idempotencyKey: "final-key" })).resolves.toMatchObject({ receipt: { campaignCharacterId: "character" } });
+    await expect(getCharacterSheet("campaign", "character")).resolves.toEqual(sheet);
+    await expect(getCharacterProgression("campaign", "character")).resolves.toMatchObject({ revision: 2 });
+    await expect(previewCharacterProgression("campaign", "character", { selections: [] })).resolves.toEqual(preview);
+    await expect(applyCharacterProgression("campaign", "character", { previewRevision: 2, previewToken: "b".repeat(64), selections: [], idempotencyKey: "apply-key" })).resolves.toMatchObject({ receipt: { revisionAfter: 3 } });
+    await expect(grantCharacterXp("campaign", "character", { amount: 10, reason: "Quest", expectedRevision: 2, idempotencyKey: "xp-key" })).resolves.toMatchObject({ progression: { totalXp: 10 } });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    for (const [, init] of fetchMock.mock.calls) expect((init as RequestInit).cache).toBe("no-store");
+  });
 });
 
 describe("createSseParser", () => {

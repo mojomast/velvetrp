@@ -9,6 +9,7 @@ export interface CampaignDetailPageProps {
   onBack: () => void;
   onUnavailable: () => void;
   onOpenCharacter?: (campaignCharacterId: string) => void;
+  onOpenCharacterBuilder?: () => void;
   onOpenRoom?: (sessionId: string) => void;
   onOpenAdministration?: (campaignName: string) => void;
   mechanicsEnabled?: boolean;
@@ -369,7 +370,7 @@ function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string;
   };
 }
 
-export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenRoom = () => undefined, onOpenAdministration = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
+export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenCharacterBuilder = () => undefined, onOpenRoom = () => undefined, onOpenAdministration = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1853,7 +1854,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
           {roomOpenFailure && <p ref={roomOpenStatusRef} tabIndex={-1} className="form-error" role="alert">{roomOpenFailure.text}</p>}
         </section>
         {rosterPhase !== "unsupported" && <section className="campaign-roster" aria-labelledby="campaign-roster-heading" aria-busy={rosterPhase === "loading"}>
-          <h2 ref={rosterHeadingRef} tabIndex={-1} id="campaign-roster-heading">Characters</h2>
+          <div className="campaign-roster-heading"><h2 ref={rosterHeadingRef} tabIndex={-1} id="campaign-roster-heading">Characters</h2>{mechanicsEnabled && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}</div>
           <p className="sr-only" role="status" aria-live="polite">{rosterAnnouncement}</p>
           {rosterPhase === "loading" && <p className="roster-status" role="status">Loading characters…</p>}
           {rosterPhase === "failed" && <div className="roster-error" role="alert">

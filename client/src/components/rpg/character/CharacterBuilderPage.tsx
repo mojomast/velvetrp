@@ -34,6 +34,7 @@ type DraftLock = { token: symbol; phase: "writing" | "uncertain"; kind: "save" |
 const draftLocks = new Map<string, DraftLock>();
 const draftListeners = new Set<(key: string, lock: DraftLock | null) => void>();
 const lockKey = (campaignId: string, draftId: string) => `${campaignId.length}:${campaignId}${draftId}`;
+const createLockKey = (campaignId: string, personaId: string) => `new:${campaignId.length}:${campaignId}${personaId}`;
 function publish(key: string, lock: DraftLock | null) { if (lock) draftLocks.set(key, lock); else draftLocks.delete(key); for (const listener of draftListeners) listener(key, lock); }
 function idempotency(kind: string) { const value = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`; return `ui-${kind}-${value}`; }
 function knownNonCommit(error: unknown) { return error instanceof ApiInputError || (error instanceof ApiError && [400, 404, 415, 422].includes(error.status)); }
@@ -51,7 +52,7 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmed, setConfirmed] = useState(false);
-  const [lock, setLock] = useState<DraftLock | null>(() => initialDraftId ? draftLocks.get(lockKey(campaignId, initialDraftId)) ?? null : null);
+  const [lock, setLock] = useState<DraftLock | null>(() => initialDraftId ? draftLocks.get(lockKey(campaignId, initialDraftId)) ?? null : draftLocks.get(createLockKey(campaignId, personas[0]?.id ?? "")) ?? null);
   const [finalReceipt, setFinalReceipt] = useState<CharacterDraftFinalizationResult["receipt"] | null>(null);
   const [finalSheet, setFinalSheet] = useState<CharacterSheetHttpResponse | null>(null);
   const mountedRef = useRef(true);
@@ -62,6 +63,7 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
   const statusRef = useRef<HTMLDivElement>(null);
   const focusedRequestRef = useRef<number | undefined>();
   const unavailableRef = useRef(onUnavailable); unavailableRef.current = onUnavailable;
+  const draftIdentityRef = useRef(onDraftIdentity); draftIdentityRef.current = onDraftIdentity;
 
   const focus = useCallback((generation: number, target: "heading" | "retry" | "status") => queueMicrotask(() => {
     if (!mountedRef.current || generationRef.current !== generation) return;
@@ -75,7 +77,7 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
     try {
       const result = await api.get(campaignId, initialDraftId);
       if (!mountedRef.current || generationRef.current !== generation || activeRef.current.campaignId !== requested.campaignId || activeRef.current.draftId !== requested.draftId) return;
-      setDraft(result); setPersonaId(result.personaId); setLoading(false); setSaveState("saved"); onDraftIdentity(result.id);
+      setDraft(result); setPersonaId(result.personaId); setLoading(false); setSaveState("saved"); draftIdentityRef.current(result.id);
       if (authoritative) { publish(lockKey(campaignId, result.id), null); setNotice("Authoritative draft revision refreshed. No save or finalization was retried."); focus(generation, "status"); }
       else if (focusHeadingRequest !== undefined && focusedRequestRef.current !== focusHeadingRequest) { focusedRequestRef.current = focusHeadingRequest; focus(generation, "heading"); }
     } catch (loadError) {
@@ -83,23 +85,29 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
       setLoading(false); setError("Character draft could not be loaded.");
       if (loadError instanceof ApiError && loadError.status === 404) unavailableRef.current(); else focus(generation, "retry");
     }
-  }, [api, campaignId, focus, focusHeadingRequest, initialDraftId, onDraftIdentity]);
+  }, [api, campaignId, focus, focusHeadingRequest, initialDraftId]);
 
   useEffect(() => {
     mountedRef.current = true; activeRef.current = { campaignId, draftId: initialDraftId ?? "" };
-    const key = initialDraftId ? lockKey(campaignId, initialDraftId) : ""; setLock(key ? draftLocks.get(key) ?? null : null);
-    const listener = (changed: string, next: DraftLock | null) => { if (mountedRef.current && changed === lockKey(activeRef.current.campaignId, activeRef.current.draftId)) setLock(next); };
+    const key = initialDraftId ? lockKey(campaignId, initialDraftId) : createLockKey(campaignId, personaId); setLock(draftLocks.get(key) ?? null);
+    const listener = (changed: string, next: DraftLock | null) => { const activeKey = activeRef.current.draftId ? lockKey(activeRef.current.campaignId, activeRef.current.draftId) : createLockKey(activeRef.current.campaignId, personaId); if (mountedRef.current && changed === activeKey) setLock(next); };
     draftListeners.add(listener); if (initialDraftId) void load();
     return () => { mountedRef.current = false; generationRef.current += 1; draftListeners.delete(listener); };
-  }, [campaignId, initialDraftId, load]);
+  }, [campaignId, initialDraftId, load, personaId]);
 
   async function create(allocation: CreateCharacterDraftHttpInput["allocation"]) {
-    if (!personaId || creating) return; const generation = ++generationRef.current; setCreating(true); setError("");
+    if (!personaId || creating) return; const key = createLockKey(campaignId, personaId); if (draftLocks.has(key)) return;
+    const token = Symbol(key); const generation = ++generationRef.current; publish(key, { token, phase: "writing", kind: "save", message: "Creating this draft once…" }); setCreating(true); setError("");
     try {
       const result = await api.create(campaignId, { personaId, durability: "durable", allocation, idempotencyKey: idempotency("draft-create") });
+      if (draftLocks.get(key)?.token !== token) return; publish(key, null);
       if (!mountedRef.current || generationRef.current !== generation) return;
-      activeRef.current = { campaignId, draftId: result.draft.id }; setDraft(result.draft); setSaveState("saved"); setNotice("Draft created and saved at revision 0."); onDraftIdentity(result.draft.id); focus(generation, "status");
-    } catch (createError) { if (mountedRef.current && generationRef.current === generation) { setError(createError instanceof ApiError ? createError.message : "Draft creation outcome is uncertain. Return to the campaign and refresh before creating again."); focus(generation, "status"); } }
+      activeRef.current = { campaignId, draftId: result.draft.id }; setDraft(result.draft); setSaveState("saved"); setNotice("Draft created and saved at revision 0."); draftIdentityRef.current(result.draft.id); focus(generation, "status");
+    } catch (createError) {
+      if (draftLocks.get(key)?.token !== token) return;
+      if (knownNonCommit(createError)) publish(key, null); else publish(key, { token, phase: "uncertain", kind: "save", message: "Draft creation outcome is uncertain. Duplicate creation is locked; return to the campaign and refresh. No POST will be retried." });
+      if (mountedRef.current && generationRef.current === generation) { setError(knownNonCommit(createError) && createError instanceof ApiError ? createError.message : "Draft creation outcome is uncertain. Return to the campaign and refresh before creating again."); focus(generation, "status"); }
+    }
     finally { if (mountedRef.current && generationRef.current === generation) setCreating(false); }
   }
 
@@ -140,11 +148,11 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
   return <main className="page library-page campaign-page character-builder-page"><section className="character-builder-shell" aria-labelledby="character-builder-heading">
     <header className="library-header"><div><button className="back-link" type="button" disabled={busy} onClick={onBack}>← Back to campaign</button><p className="eyebrow">PLAYABLE MECHANICS · PERSONA SEPARATE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="character-builder-heading">Character builder</h1><p className="subtitle">Build a server-validated sheet without changing the persona.</p></div>{draft && <span className="status-pill">Revision {draft.revision}</span>}</header>
     {(error || notice || lock || saveState !== "idle") && <div ref={statusRef} tabIndex={-1} className={`builder-status ${error || saveState === "stale" || lock?.phase === "uncertain" ? "is-error" : ""}`} role={error || saveState === "stale" || lock?.phase === "uncertain" ? "alert" : "status"}><p>{error || lock?.message || notice || (saveState === "saving" ? "Saving…" : saveState === "saved" ? `Saved revision ${draft?.revision ?? 0}.` : saveState === "stale" ? "Stale revision." : "Save failed.")}</p>{lock?.phase === "uncertain" && initialDraftId && <button className="primary" disabled={loading} onClick={() => void load(true)}>{loading ? "Refreshing…" : "Refresh authoritative draft"}</button>}</div>}
-    {!draft && !loading && <section className="builder-section persona-selection"><h2>Choose an existing persona</h2><p className="builder-help">Persona name, description, boundaries, and memories stay in the separate persona editor.</p>{personas.length ? <><label className="field"><span>Persona</span><select value={personaId} disabled={creating} onChange={(event) => setPersonaId(event.target.value)}>{personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}</select></label><button className="ghost" type="button" disabled={!personaId || creating} onClick={() => onEditPersona(personaId)}>Edit selected persona separately</button><AttributeAllocator disabled={creating} onContinue={(allocation) => void create(allocation)} /></> : <p role="alert">Create a persona in the character library before building playable mechanics.</p>}</section>}
+    {!draft && !loading && <section className="builder-section persona-selection"><h2>Choose an existing persona</h2><p className="builder-help">Persona name, description, boundaries, and memories stay in the separate persona editor.</p>{personas.length ? <><label className="field"><span>Persona</span><select value={personaId} disabled={creating || Boolean(lock)} onChange={(event) => setPersonaId(event.target.value)}>{personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}</select></label><button className="ghost" type="button" disabled={!personaId || creating || Boolean(lock)} onClick={() => onEditPersona(personaId)}>Edit selected persona separately</button><AttributeAllocator disabled={creating || Boolean(lock)} onContinue={(allocation) => void create(allocation)} /></> : <p role="alert">Create a persona in the character library before building playable mechanics.</p>}</section>}
     {loading && !draft && <section className="builder-section" aria-busy="true"><p role="status">Loading draft…</p></section>}
     {error && !draft && initialDraftId && <button ref={retryRef} className="primary" onClick={() => void load()}>Retry draft</button>}
     {draft && <div className="character-builder-layout">
-      <ChoiceGroupEditor groups={draft.choiceGroups} selections={draft.selections} disabled={busy || draft.status !== "active"} onSelect={(selection) => void save(selection)} />
+      <ChoiceGroupEditor groups={draft.choiceGroups} selections={draft.selections} disabled={busy || Boolean(lock) || draft.status !== "active"} onSelect={(selection) => void save(selection)} />
       {!draft.completion.complete && <section className="builder-section completion-issues" aria-labelledby="completion-heading"><h2 id="completion-heading">Complete required choices</h2><ul>{draft.completion.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><button type="button" onClick={() => document.getElementById(issueTarget(issue.path))?.focus()}>{issue.message}</button></li>)}</ul></section>}
       {draft.derivedPreview && <DerivedStatsReview derived={draft.derivedPreview} startingGrants={draft.startingGrants} />}
       {draft.completion.complete && draft.derivedPreview && draft.status === "active" && <section className="builder-section finalization-review"><h2>Explicit finalization confirmation</h2><p>Review every server-derived value and exact grant above. Finalization creates the playable sheet once.</p><label className="builder-confirm"><input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)} /> I reviewed the server preview and exact starter grants and want to finalize once.</label><button className="primary" disabled={!confirmed || busy || Boolean(lock)} onClick={() => void finalize()}>Finalize playable character once</button></section>}

@@ -55,7 +55,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
     if (mountedRef.current && generationRef.current === generation) (retry ? retryRef.current : statusRef.current)?.focus();
   }), []);
 
-  const load = useCallback(async (authoritative = false) => {
+  const load = useCallback(async (authoritative = false, retryFocus = false) => {
     const requestedKey = key; const generation = ++generationRef.current;
     if (authoritative) setRefreshing(true); else setLoading(true);
     setError("");
@@ -71,7 +71,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
     } catch (loadError) {
       if (!mountedRef.current || activeRef.current !== requestedKey || generationRef.current !== generation) return;
       setLoading(false); setRefreshing(false); setError("Character advancement could not be loaded.");
-      if (loadError instanceof ApiError && loadError.status === 404) unavailableRef.current(); else focusStatus(generation, true);
+      if (loadError instanceof ApiError && loadError.status === 404) unavailableRef.current(); else if (retryFocus || authoritative) focusStatus(generation, true);
     }
   }, [api, campaignCharacterId, campaignId, focusStatus, key]);
 
@@ -118,7 +118,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
   }
 
   if (loading && !state) return <section className="builder-section level-up-wizard" aria-busy="true"><h2>Advancement</h2><p role="status">Loading progression…</p></section>;
-  if (!state) return <section className="builder-section level-up-wizard"><h2>Advancement unavailable</h2><p role="alert">{error}</p><button ref={retryRef} className="primary" onClick={() => void load()}>Retry</button></section>;
+  if (!state) return <section className="builder-section level-up-wizard"><h2>Advancement unavailable</h2><p role="alert">{error}</p><button ref={retryRef} className="primary" onClick={() => void load(false, true)}>Retry</button></section>;
   const pending = preview?.pendingChoices ?? state.pendingChoices;
   const allSelected = pending.every((choice) => selections.some((selection) => selection.choiceId === choice.choiceId));
   return <section className="builder-section level-up-wizard" aria-labelledby="level-up-heading" aria-busy={lock?.phase === "writing" || refreshing}>

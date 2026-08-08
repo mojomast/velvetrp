@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CampaignCharacterWorkspace } from "@velvet/contracts";
-import { ApiError, getCampaignCharacterWorkspace } from "../api";
+import { ApiError, applyCharacterProgression, getCampaignCharacterWorkspace, getCharacterProgression, getCharacterSheet, previewCharacterProgression } from "../api";
+import { LevelUpWizard, type LevelUpWizardApi } from "../components/rpg/character/LevelUpWizard";
+
+const levelUpApi: LevelUpWizardApi = {
+  getProgression: getCharacterProgression, preview: previewCharacterProgression,
+  apply: applyCharacterProgression, getSheet: getCharacterSheet,
+};
 
 export interface CampaignCharacterWorkspacePageProps {
   campaignId: string;
@@ -135,6 +141,7 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
         <section className="workspace-section"><h2>Proficiencies</h2>{workspace.proficiencies.length ? <ul>{workspace.proficiencies.map((item, index) => <li key={index}><span>{displayKind(item.category)}</span><strong>{item.label}</strong></li>)}</ul> : <p>No proficiencies.</p>}</section>
         <section className="workspace-section"><h2>Choices</h2>{workspace.choices.length ? <ul>{workspace.choices.map((item, index) => <li key={index}><span>{item.label} · {displayKind(item.selection.kind)}</span><h3><bdi dir="auto">{item.selection.name}</bdi></h3><p><bdi dir="auto">{item.selection.description}</bdi></p></li>)}</ul> : <p>No choices.</p>}</section>
         <section className="workspace-section"><h2>Resources</h2>{workspace.resources.length ? <dl>{workspace.resources.map((item, index) => <div key={index}><dt>{item.label}</dt><dd>{item.current} / {item.max}</dd></div>)}</dl> : <p>No resources.</p>}</section>
+        <LevelUpWizard campaignId={campaignId} campaignCharacterId={campaignCharacterId} api={levelUpApi} onUnavailable={onUnavailable} onSheetRefreshed={(sheet) => setWorkspace(sheet.sheet)} />
       </>}
     </section>
   </section></main>;

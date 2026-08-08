@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-administration" | "content-packs";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-builder" | "campaign-administration" | "content-packs";
 
 export interface StoredNavigation {
   view: View;
@@ -10,12 +10,13 @@ export interface StoredNavigation {
   primaryId?: string;
   campaignId?: string;
   campaignCharacterId?: string;
+  characterDraftId?: string;
   chatReturnCampaignId?: string;
 }
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration", "content-packs"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-builder", "campaign-administration", "content-packs"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };
@@ -34,6 +35,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof candidate.campaignCharacterId === "string" && resourceIdSchema.safeParse(candidate.campaignCharacterId).success) {
     navigation.campaignCharacterId = candidate.campaignCharacterId;
   }
+  if (typeof candidate.characterDraftId === "string" && resourceIdSchema.safeParse(candidate.characterDraftId).success) navigation.characterDraftId = candidate.characterDraftId;
   if (navigation.view === "chat" && navigation.sessionId
     && typeof candidate.chatReturnCampaignId === "string"
     && resourceIdSchema.safeParse(candidate.chatReturnCampaignId).success) {
@@ -45,6 +47,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (navigation.view === "chat" && !navigation.sessionId) navigation.view = "home";
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
   if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration") && !navigation.campaignId) navigation.view = "campaigns";
+  if (navigation.view === "campaign-character-builder" && !navigation.campaignId) { navigation.view = "campaigns"; delete navigation.characterDraftId; }
   if (navigation.view === "campaign-character") {
     if (!navigation.campaignId) {
       navigation.view = "campaigns";

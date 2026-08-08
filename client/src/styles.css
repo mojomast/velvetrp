@@ -110,6 +110,8 @@ body {
 .eligible-rooms, .rooms-error, .room-result-actions { display: grid; gap: 12px; }
 .rooms-error, .room-result-actions { justify-items: start; }
 .campaign-roster h2 { margin: 0 0 14px; font-size: 20px; }
+.campaign-roster-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.campaign-roster-heading h2 { margin: 0; }
 .campaign-roster-list { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; list-style: none; }
 .campaign-roster-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; overflow-wrap: anywhere; word-break: break-word; }
 .campaign-roster-list bdi { display: block; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
@@ -261,6 +263,49 @@ body {
 .publication-confirm { min-height: 44px; padding: 9px; }
 .content-studio-page button { min-height: 44px; }
 .content-studio-page :focus-visible { outline: 3px solid #b99af7; outline-offset: 3px; }
+.character-builder-shell { width: min(1040px, 100%); }
+.character-builder-layout { display: grid; gap: 18px; }
+.builder-section { display: grid; gap: 16px; min-width: 0; padding: 22px; border: 1px solid var(--border); border-radius: 14px; background: rgba(23,22,29,.94); box-shadow: 0 18px 60px rgba(0,0,0,.2); }
+.builder-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.builder-section h2, .builder-section h3, .builder-section h4, .builder-section-heading p { margin: 0; }
+.builder-help, .builder-callout, .starting-grants p, .finalization-review p { margin: 0; color: var(--muted); line-height: 1.55; }
+.builder-callout { padding: 13px; border: 1px solid #514263; border-radius: 9px; background: rgba(117,70,216,.08); }
+.builder-section fieldset { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+.builder-section legend { padding: 0 8px; font-weight: 700; }
+.allocation-methods { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.allocation-methods label, .builder-choice-options label { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); cursor: pointer; }
+.allocation-methods input, .builder-choice-options input, .builder-confirm input { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--accent); }
+.attribute-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 13px; }
+.attribute-grid legend { grid-column: 1 / -1; }
+.attribute-grid small { color: var(--muted); line-height: 1.4; }
+.builder-choice-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.builder-choice-options label > span { display: grid; gap: 5px; min-width: 0; }
+.builder-choice-options small { color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+.builder-status { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid #456b55; border-radius: 11px; background: rgba(74,164,111,.09); }
+.builder-status.is-error { border-color: #7f4d52; background: rgba(229,72,77,.09); }
+.builder-status p { margin: 0; line-height: 1.5; }
+.completion-issues { border-color: #6b5b3f; background: rgba(193,151,65,.06); }
+.completion-issues ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.completion-issues button { width: 100%; min-height: 44px; text-align: left; color: #efd99c; background: var(--surface-2); border: 1px solid #6b5b3f; }
+.derived-stat-grid, .progression-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; }
+.derived-stat-grid div, .progression-summary div { padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.derived-stat-grid dt, .progression-summary dt { color: var(--muted); font-size: 12px; }
+.derived-stat-grid dd, .progression-summary dd { margin: 6px 0 0; font-size: 19px; font-weight: 700; }
+.derived-explanations summary { min-height: 44px; padding: 11px 0; cursor: pointer; font-weight: 700; }
+.derived-explanations ul, .starting-grants ul, .level-crossings ol { display: grid; gap: 8px; margin: 8px 0 0; padding: 0; list-style: none; }
+.derived-explanations li, .starting-grants li, .level-crossings li { display: grid; gap: 7px; padding: 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.derived-explanations span, .starting-grants code { color: var(--muted); overflow-wrap: anywhere; }
+.builder-confirm { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px; line-height: 1.5; }
+.builder-receipt { margin: 0; color: #9fe0b9; line-height: 1.5; }
+.level-up-wizard { margin-top: 20px; }
+.level-up-wizard > fieldset { display: grid; gap: 12px; }
+.level-crossings { display: grid; gap: 12px; }
+.level-crossings dl { display: grid; gap: 7px; margin: 0; }
+.level-crossings dl div { display: flex; justify-content: space-between; gap: 14px; }
+.level-crossings dt { color: var(--muted); }
+.level-crossings dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.character-builder-page button, .character-builder-page select, .character-builder-page input { min-height: 44px; }
+.character-builder-page :focus-visible, .level-up-wizard :focus-visible { outline: 3px solid #b99af7; outline-offset: 3px; }
 .campaign-catalog-section { display: grid; gap: 18px; }
 .campaign-pack-inspection { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--border); }
 .campaign-pack-inspection > code { color: #a98aef; overflow-wrap: anywhere; }
@@ -712,6 +757,8 @@ button:disabled {
   .starter-character-metadata { grid-template-columns: 1fr; }
   .starter-submit { width: 100%; }
   .campaign-roster-list li { align-items: stretch; flex-direction: column; }
+  .campaign-roster-heading { align-items: stretch; flex-direction: column; }
+  .campaign-roster-heading button { width: 100%; }
   .campaign-rooms-heading, .campaign-room-list li { align-items: stretch; flex-direction: column; }
   .campaign-room-list button, .campaign-rooms-heading button { width: 100%; }
   .administration-page .library-header { align-items: stretch; flex-direction: column; }
@@ -747,6 +794,13 @@ button:disabled {
   .workspace-identity { grid-template-columns: 1fr; }
   .workspace-identity article:last-child { grid-column: auto; }
   .workspace-section dl div, .workspace-section li:has(> strong) { align-items: flex-start; flex-direction: column; }
+  .character-builder-page { padding: 14px; }
+  .character-builder-page .library-header, .builder-section-heading, .builder-status { align-items: stretch; flex-direction: column; }
+  .allocation-methods, .attribute-grid, .builder-choice-options, .derived-stat-grid, .progression-summary { grid-template-columns: 1fr; }
+  .builder-section { padding: 17px; }
+  .builder-section > button, .builder-status button { width: 100%; }
+  .level-crossings dl div { align-items: flex-start; flex-direction: column; }
+  .level-crossings dd { text-align: left; }
 
   .runtime-settings-grid {
     grid-template-columns: 1fr;

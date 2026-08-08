@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration", "content-packs"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-builder", "campaign-administration", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -119,6 +119,14 @@ describe("navigation persistence", () => {
       .toEqual({ view: "campaigns", selectedIds: [] });
     expect(parseStoredNavigation({ view: "campaign-character", campaignId: "campaign-one", campaignCharacterId: "entry-one" }))
       .toEqual({ view: "campaign-character", campaignId: "campaign-one", campaignCharacterId: "entry-one", selectedIds: [] });
+  });
+
+  it("restores a campaign-bound builder draft and drops malformed identities", () => {
+    expect(parseStoredNavigation({ view: "campaign-character-builder" })).toEqual({ view: "campaigns", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "draft-one" }))
+      .toEqual({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "draft-one", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "bad/id" }))
+      .toEqual({ view: "campaign-character-builder", campaignId: "campaign-one", selectedIds: [] });
   });
 
   it("ignores unknown fields", () => {
