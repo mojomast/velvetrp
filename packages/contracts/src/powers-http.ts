@@ -57,7 +57,9 @@ export const actorPowerLegalTargetSchema = z.object({
 export const actorPowerLegalCommandSchema = z.object({
   powerRef: powerReferenceSchema,
   targeting: z.enum(["self", "single", "area"]),
-  validTargets: z.array(actorPowerLegalTargetSchema).max(128),
+  validTargets: z.array(actorPowerLegalTargetSchema).max(32),
+  /** Maximum caller-selected IDs. Self is represented by an empty request and resolves server-side. */
+  maxTargets: z.number().int().min(0).max(32),
   costs: z.array(z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("ability-use"), amount: z.literal(1) }).strict(),
     z.object({ kind: z.literal("slot"), slotId: z.string().regex(/^slot-(?:[1-9])$/), amount: z.literal(1) }).strict(),
@@ -71,6 +73,11 @@ export const actorPowerLegalCommandSchema = z.object({
   }
   if (command.targeting === "self" ? ids.length !== 1 : ids.length === 0) {
     context.addIssue({ code: "custom", message: "legal power targets must match targeting cardinality", path: ["validTargets"] });
+  }
+  if ((command.targeting === "self" && command.maxTargets !== 0)
+      || (command.targeting === "single" && command.maxTargets !== 1)
+      || (command.targeting === "area" && (command.maxTargets < 1 || command.maxTargets > ids.length))) {
+    context.addIssue({ code: "custom", message: "maxTargets must match targeting and returned candidates", path: ["maxTargets"] });
   }
   if (new Set(command.effectKinds).size !== command.effectKinds.length) {
     context.addIssue({ code: "custom", message: "effect kinds must be unique", path: ["effectKinds"] });

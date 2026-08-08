@@ -76,11 +76,20 @@ describe("M3.5 server-authoritative combat controls", () => {
 
   it("submits only a server-planned self power with the contract's empty target request",()=>{
     const power={kind:"ability" as const,packId:"pack",packVersion:"1",definitionId:"ward"};const use=vi.fn();
-    render(<PowerLibraryPanel powers={{known:[power],prepared:[power],slots:[],uses:[],legalNow:[{powerRef:power,legal:true,reasons:[]}],legalCommands:[{powerRef:power,targeting:"self",validTargets:[{actorId:"actor-one",label:"Aster"}],costs:[],concentration:false,effectKinds:["modifier"]}],revision:2}} onUse={use}/>);
+    render(<PowerLibraryPanel powers={{known:[power],prepared:[power],slots:[],uses:[],legalNow:[{powerRef:power,legal:true,reasons:[]}],legalCommands:[{powerRef:power,targeting:"self",validTargets:[{actorId:"actor-one",label:"Aster"}],maxTargets:0,costs:[],concentration:false,effectKinds:["modifier"]}],revision:2}} onUse={use}/>);
     fireEvent.click(screen.getByRole("button",{name:"Choose server-planned power"}));
     expect(screen.queryByRole("radio")).toBeNull();fireEvent.click(screen.getByRole("button",{name:"Review power command"}));
     expect(screen.getByText("None (server resolves self)")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Execute once"}));
     expect(use).toHaveBeenCalledWith(expect.objectContaining({targeting:"self"}),[]);
+  });
+
+  it("caps area selection at 32 and renders structured outcomes, deltas, receipt, and actor states",()=>{
+    const power={kind:"ability" as const,packId:"pack",packVersion:"1",definitionId:"wave"},targets=Array.from({length:33},(_,index)=>({actorId:`target-${index}`,label:`Target ${index}`})),use=vi.fn();
+    const powers={known:[power],prepared:[power],slots:[],uses:[],legalNow:[{powerRef:power,legal:true,reasons:[]}],legalCommands:[{powerRef:power,targeting:"area" as const,validTargets:targets,maxTargets:32,costs:[],concentration:false,effectKinds:["damage" as const]}],revision:2};
+    const result={resolution:{powerUseId:"use",powerRef:power,targetIds:["target-0"],costs:[],outcomes:[{kind:"damage" as const,targetId:"target-0",damageType:"physical" as const,roll:{expression:"1d4",normalized:{count:1,sides:4,selection:{type:"all" as const},modifier:0},terms:[{value:3,kept:true}],modifier:0,total:3},adjustment:"none" as const,applied:3}],stateDeltas:[{kind:"resource" as const,actorId:"target-0",resourceId:"health",before:10,after:7}]},actorStates:[{actorId:"source",resources:[],activeEffects:[],revision:3},{actorId:"target-0",resources:[{resourceId:"health",current:7,capacity:10}],activeEffects:[],revision:1}],receipt:{idempotencyKey:"power-key",revisionBefore:2,revisionAfter:3,occurredAt:at}};
+    render(<PowerLibraryPanel powers={powers} onUse={use} result={result}/>);const choose=screen.getByRole("button",{name:"Choose server-planned power"});choose.focus();expect(document.activeElement).toBe(choose);fireEvent.click(choose);
+    const checks=screen.getAllByRole("checkbox");checks.slice(0,32).forEach((check)=>fireEvent.click(check));expect((checks[32] as HTMLInputElement).disabled).toBe(true);fireEvent.click(screen.getByRole("button",{name:"Review power command"}));fireEvent.click(screen.getByRole("button",{name:"Execute once"}));expect(use.mock.calls[0]?.[1]).toHaveLength(32);
+    expect(screen.getByText("power-key")).toBeTruthy();expect(screen.getByText(/roll 1d4 = 3/)).toBeTruthy();expect(screen.getByText(/health 10 → 7/)).toBeTruthy();expect(screen.getByRole("list",{name:"Returned actor states"}).textContent).toContain("health 7/10");
   });
 
   it("loads state and paginated log on reconnect without posting an action", async () => {

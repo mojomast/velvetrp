@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
-import { CheckUnavailableError, EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { ActorPowerConflictError, CheckUnavailableError, EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -76,10 +76,7 @@ describe("M1.6 repository behavior", () => {
     expect(initial!.slots).toContainEqual({slotId:"slot-1",level:1,current:1,max:1});
     expect(initial!.uses.every((state) => state.current>=0&&state.current<=state.max)).toBe(true);
     expect(initial!.legalNow).toHaveLength(initial!.known.length);
-    expect(initial!.legalCommands).toEqual(expect.arrayContaining([
-      expect.objectContaining({powerRef:ability,targeting:"single",validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[],effectKinds:["damage"]}),
-      expect.objectContaining({powerRef:spell,targeting:"single",validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"slot",slotId:"slot-1",amount:1}],concentration:true,effectKinds:["modifier"]}),
-    ]));
+    expect(initial!.legalCommands).toEqual([]);
     const accessDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     for(const [principal,label] of [["powers-gm","GM"],["powers-controller","Controller"],["powers-observer","Observer"],["powers-unrelated","Unrelated"]])
       accessDb.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,label);
@@ -168,30 +165,12 @@ describe("M1.6 repository behavior", () => {
     after.close(); f.repo.close();
   });
 
-  it("executes actor-only powers with server costs, deterministic effects, target revisions, and exact replay",()=>{
+  it("fails closed for immutable starter ally/enemy powers without mutating actor state",()=>{
     const f=fixture();
-    const strike={powerRef:ability,targetIds:[f.opponent],choices:[] as [],expectedRevision:0,idempotencyKey:"actor-strike"};
-    const first=f.repo.useActorPower("local-owner",f.source,strike);
-    expect(first.resolution).toMatchObject({powerRef:ability,targetIds:[f.opponent],costs:[],outcomes:[{kind:"damage",targetId:f.opponent,applied:6}]});
-    expect(first.actorStates).toEqual([
-      expect.objectContaining({actorId:f.source,revision:1}),
-      expect.objectContaining({actorId:f.opponent,revision:1,resources:expect.arrayContaining([expect.objectContaining({resourceId:"health",current:4,capacity:10})])}),
-    ]);
-    expect(f.repo.useActorPower("local-owner",f.source,strike)).toEqual(first);
-    const glow=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:1,idempotencyKey:"actor-glow"});
-    expect(glow.resolution.costs).toEqual([{kind:"slot",slotId:"slot-1",amount:1}]);
-    expect(glow.resolution.outcomes).toEqual([expect.objectContaining({kind:"modifier",targetId:f.opponent,statistic:"defense",amount:2})]);
-    expect(glow.actorStates[0]!.resources).toContainEqual({resourceId:"slot-1",current:0,capacity:1});
-    expect(glow.actorStates[1]!.activeEffects).toEqual([expect.objectContaining({source:spell,concentration:true,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}]})]);
-    expect(f.repo.getActorEffectSnapshot("local-owner",f.opponent)).toMatchObject({campaignId:f.campaign,actorId:f.opponent,revision:2,effects:[expect.objectContaining({source:spell,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}],concentration:{kind:"required",concentrationId:"power-concentration"}})]});
-    const replenish=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
-    replenish.prepare("UPDATE rpg_actor_resources SET current=1 WHERE campaign_id=? AND actor_id=? AND name='slot-1'").run(f.campaign,f.source);replenish.close();
-    const replacement=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:2,idempotencyKey:"actor-glow-replacement"});
-    expect(replacement.actorStates[1]!.activeEffects).toHaveLength(1);
-    expect(replacement.resolution.stateDeltas.map(delta=>delta.kind)).toEqual(["resource","effect-replaced","effect-applied"]);
-    expect(()=>f.repo.useActorPower("local-owner",f.source,{...strike,idempotencyKey:"stale"})).toThrow(M16StaleError);
-    expect(()=>f.repo.useActorPower("local-owner",f.source,{...strike,targetIds:[],expectedRevision:3,idempotencyKey:"bad-target"})).toThrow();
-    f.repo.close();
+    const before=f.repo.getActorPowerSnapshot("local-owner",f.source)!;
+    for(const [power,key] of [[ability,"enemy"],[spell,"ally"]] as const)
+      expect(()=>f.repo.useActorPower("local-owner",f.source,{powerRef:power,targetIds:[f.opponent],choices:[],expectedRevision:before.revision,idempotencyKey:`fail-${key}`})).toThrow(ActorPowerConflictError);
+    const after=f.repo.getActorPowerSnapshot("local-owner",f.source)!;expect(after.revision).toBe(before.revision);expect(after.slots).toEqual(before.slots);expect(after.legalCommands).toEqual([]);f.repo.close();
   });
 
   it("stacks effects, replaces concentration atomically, applies immunity, and expires duration at query time", () => {

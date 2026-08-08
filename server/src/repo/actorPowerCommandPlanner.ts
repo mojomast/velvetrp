@@ -73,13 +73,17 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
       if (!slot || slot.current < 1) continue;
       costs.push({ kind: "slot", slotId, amount: 1 });
     }
-    const targeting = definition.mechanics.target === "self" || definition.mechanics.target === "area" ? definition.mechanics.target : "single";
-    const validRows = targeting === "self" ? targetRows.filter((target) => target.actor_id === actorId)
-      : targetRows.filter((target) => target.actor_id !== actorId && hasRequiredResources(db, campaignId, target.actor_id, definition));
+    const targeting = definition.mechanics.target;
+    // This actor lane has no authoritative teams and cannot address encounter enemies.
+    // Ally/enemy powers therefore remain unavailable rather than becoming generic single-target powers.
+    if (targeting === "ally" || targeting === "enemy") continue;
+    const validRows = (targeting === "self" ? targetRows.filter((target) => target.actor_id === actorId)
+      : targetRows.filter((target) => target.actor_id !== actorId && hasRequiredResources(db, campaignId, target.actor_id, definition))).slice(0,32);
     if (targeting === "self" && !hasRequiredResources(db, campaignId, actorId, definition)) continue;
     if (validRows.length === 0) continue;
     const effectKinds = [...new Set(definition.mechanics.effects.map((effect: any) => effect.type))];
-    const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting, validTargets: validRows.map(publicTarget), costs,
+    const maxTargets=targeting==="self"?0:targeting==="single"?1:validRows.length;
+    const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting, validTargets: validRows.map(publicTarget), maxTargets,costs,
       concentration: definition.reference.kind === "spell" ? definition.mechanics.concentration : false, effectKinds });
     plans.push({ ...command, definition });
   }
@@ -91,5 +95,6 @@ export function plannedPowerSelection(plan: ActorPowerCommandPlan, actorId: stri
   const valid = new Set(plan.validTargets.map((target: { actorId: string }) => target.actorId));
   if (plan.targeting === "self") return intent.targetIds.length === 0 && valid.has(actorId) ? [actorId] : null;
   if (plan.targeting === "single") return intent.targetIds.length === 1 && valid.has(intent.targetIds[0]!) ? [...intent.targetIds] : null;
-  return intent.targetIds.length > 0 && intent.targetIds.every((id: string) => valid.has(id)) ? [...intent.targetIds] : null;
+  return intent.targetIds.length > 0 && intent.targetIds.length <= plan.maxTargets
+    && intent.targetIds.every((id: string) => valid.has(id)) ? [...intent.targetIds] : null;
 }

@@ -45,7 +45,7 @@ describe("M2.9 combat command repository",()=>{
       {expectedRevision:1,idempotencyKey:"start"}).combat;
     expect(combat.legalActions.map((action)=>action.legalActionId)).not.toContain("defend");
     const enemyCombatant=combat.combatants.find((combatant)=>combatant.kind==="enemy")!;
-    let actionCount=0,firstResult:ReturnType<typeof repo.resolveCombatAction>|null=null;
+    let actionCount=0,firstResult:ReturnType<typeof repo.resolveCombatAction>|null=null,actorActionKey="";
     while(combat.currentCombatant!==null&&actionCount<30){
       const current=combat.combatants.find((combatant)=>combatant.combatantId===combat.currentCombatant)!;
       const body=current.kind==="actor"
@@ -54,6 +54,7 @@ describe("M2.9 combat command repository",()=>{
         :{legalActionId:"end-turn",targetIds:[],choices:[] as [],expectedRevision:combat.revision,
           idempotencyKey:`action-${actionCount}`};
       const result=repo.resolveCombatAction("local-owner",combat.combatId,body);
+      if(current.kind==="actor"&&!actorActionKey)actorActionKey=body.idempotencyKey;
       if(firstResult===null){
         firstResult=result;expect(repo.resolveCombatAction("local-owner",combat.combatId,body)).toEqual(result);
         expect(()=>repo.resolveCombatAction("local-owner",combat.combatId,{...body,expectedRevision:body.expectedRevision+1}))
@@ -68,12 +69,39 @@ describe("M2.9 combat command repository",()=>{
     expect(combat.combatants.find((combatant)=>combatant.combatantId===enemyCombatant.combatantId)).toMatchObject({hitPoints:0,status:"defeated"});
     expect(repo.listEncounters("local-owner",campaign.id)?.[0]?.status).toBe("active");
 
+    expect(actorActionKey).not.toBe("");
+    const authDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    for(const [id,role] of [["combat-gm","gm"],["combat-controller","player"],["combat-controller-two","player"],["combat-observer","observer"]] as const){
+      authDb.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(id,id);
+      authDb.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)").run(campaign.id,id,role,at);
+    }
+    authDb.close();
+    const transfer=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    const counts=()=>({revision:(transfer.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(combat.combatId) as {revision:number}).revision,
+      commands:(transfer.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+      receipts:(transfer.prepare("SELECT count(*) count FROM combat_receipts_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+      logs:(transfer.prepare("SELECT count(*) count FROM combat_log WHERE encounter_id=?").get(combat.combatId) as {count:number}).count});
+    transfer.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='combat-controller' WHERE campaign_id=? AND actor_id=?").run(campaign.id,actorId);
+    const beforeReads=counts();
+    expect(repo.getCombatCommandResult("combat-controller",campaign.id,combat.combatId,actorActionKey)).toMatchObject({operation:"action"});
+    expect(repo.getCombatCommandResult("combat-gm",campaign.id,combat.combatId,actorActionKey)).toMatchObject({operation:"action"});
+    expect(repo.getCombatCommandResult("combat-observer",campaign.id,combat.combatId,actorActionKey)).toBeNull();
+    expect(repo.getCombatCommandResult("combat-unrelated",campaign.id,combat.combatId,actorActionKey)).toBeNull();
+    transfer.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='combat-controller-two' WHERE campaign_id=? AND actor_id=?").run(campaign.id,actorId);
+    expect(repo.getCombatCommandResult("combat-controller",campaign.id,combat.combatId,actorActionKey)).toBeNull();
+    expect(repo.getCombatCommandResult("combat-controller-two",campaign.id,combat.combatId,actorActionKey)).toMatchObject({operation:"action"});
+    expect(counts()).toEqual(beforeReads);transfer.close();
+
     const endBody={expectedRevision:combat.revision,idempotencyKey:"end"};
     const ended=repo.endCombat("local-owner",combat.combatId,endBody);
     expect(ended.encounter).toMatchObject({status:"completed",revision:combat.revision+1});
     expect(ended.rewards).toHaveLength(1);
     expect(ended.rewards[0]).toMatchObject({recipientActorId:actorId,rewards:[{kind:"currency",amount:1,
       currency:{kind:"currency",definitionId:"velvet:mechanics:currency:glimmer"}}]});
+    expect(repo.getCombatCommandResult("combat-gm",campaign.id,combat.combatId,endBody.idempotencyKey)).toMatchObject({operation:"end"});
+    expect(repo.getCombatCommandResult("combat-controller-two",campaign.id,combat.combatId,endBody.idempotencyKey)).toBeNull();
+    expect(repo.getCombatCommandResult("combat-observer",campaign.id,combat.combatId,endBody.idempotencyKey)).toBeNull();
+    expect(repo.getCombatCommandResult("combat-unrelated",campaign.id,combat.combatId,endBody.idempotencyKey)).toBeNull();
     expect(repo.endCombat("local-owner",combat.combatId,endBody)).toEqual(ended);
     expect(repo.getCombatCommandResult("local-owner",campaign.id,combat.combatId,endBody.idempotencyKey)).toEqual({operation:"end",result:{
       encounter:Object.fromEntries(Object.entries(ended.encounter).filter(([key])=>key!=="campaignId")),
