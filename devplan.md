@@ -9,5 +9,18 @@
 - [✅] M1.6 checks, powers, and deterministic effects
 - [✅] M1.7 encounters and turn-based combat (repository/shared-contract layer; schema v27r1)
 - [✅] M1.8 world, travel, NPCs, and factions (repository/shared-contract layer; schema v28r1; no HTTP/UI)
+- [✅] Task 4: Extract shared campaign content row mappers
+- [✅] Task 3c: Extract encounter command repository
+- [✅] Task 3d: Add encounter package barrel
+- [✅] Task 2: Remove unused legacy campaign content SQL helpers
 - [✅] Remove the safe-word feature across model, API/UI, persistence, generation, policy, tests, and documentation (schema v29)
-- [ ] M1.9 quests, storylines, clues, and rewards
+- [✅] Task 6: Extract actor-resource write repository
+- [✅] Task 7: Extract world read projection and inject required read context
+- [✅] M1.9 quests, storylines, clues, and rewards (repository/shared-contract layer; schema v29r2)
+- [✅] M2.4 campaign import dry-run, durable apply, and export routes
+- [✅] M2.5 content catalog and publication routes
+- [✅] M2.6 character builder and progression routes
+- [✅] M2.7 resource, inventory, economy, and rest routes
+- [✅] M2.8 actor checks, powers, and effects routes
+- [✅] M2.9 encounter and combat routes
+- [✅] M2.10 world, NPC, faction, quest, and story routes

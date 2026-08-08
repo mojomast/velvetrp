@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. It starts from schema v28 revision 1, the repository modules under `server/src/repo/`, the shared runtime contracts under `packages/contracts/src/`, and the 21 trusted-local operations in `server/src/routes/rpg/v1/features.ts`. M1.8 adds no HTTP routes or client/UI.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. Current persistence is schema v34 revision 1, with repository modules under `server/src/repo/`, shared runtime contracts under `packages/contracts/src/`, and 84 trusted-local operations registered under `server/src/routes/rpg/v1/`.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.8 are complete repository/shared-contract capabilities. The trusted-local HTTP boundary remains exactly 21 operations: the historical 14 plus builder create/read/update, progression read/preview, and administration GET/PATCH. M1.8 is repository-only and adds no routes or client/UI; M1.9 is next. The fixed v28r1 DDL digest is `2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7`.
+M1.1-M1.9 and trusted-local HTTP milestones M2.1-M2.10 are complete. The current boundary is exactly 84 operations; M2.11 is next. Earlier schema digests remain historical milestone records in the sections below.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -149,7 +149,7 @@ Persist the durable coordination state needed for player declarations, proposed 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: Started. Quest bootstrap routes, M2.1-M2.3, M2.5, M2.6, and M2.7 are complete; M2.4 import dry-run is complete while durable apply/export remains pending.**
+**Progress: M2.1-M2.10 complete as trusted-local HTTP routes; M2.11 is next.**
 
 All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
@@ -196,6 +196,8 @@ Expose canonical history and non-destructive restoration with bounded pagination
   - `POST /campaigns/:campaignId/recaps` accepts `{ timelineId, throughRevision, selectedSessionIds, idempotencyKey }` and returns `{ recap }`; `GET /campaigns/:campaignId/recaps` returns bounded metadata and text permitted to the requesting role.
 
 ### M2.4 Campaign import and export routes
+
+**Status: Complete (trusted-local HTTP routes)**
 
 Make transfer packages reviewable, versioned, and safe for local files without accepting filesystem paths.
 
@@ -251,6 +253,8 @@ Expose authoritative actor state and command receipts for common non-combat mech
 
 ### M2.8 Check, power, and effect routes
 
+**Status: Complete (trusted-local HTTP routes)**
+
 Expose deterministic resolution without allowing clients to supply authoritative modifiers or outcomes.
 
 - **Complexity:** L
@@ -262,6 +266,8 @@ Expose deterministic resolution without allowing clients to supply authoritative
   - Responses expose typed source, duration, stacking, modifiers, and state deltas; hidden enemy details and private DC sources are omitted from player projections.
 
 ### M2.9 Encounter and combat routes
+
+**Status: Complete (trusted-local HTTP routes)**
 
 Provide encounter preparation, legal turn actions, and an append-only combat log.
 
@@ -275,6 +281,8 @@ Provide encounter preparation, legal turn actions, and an append-only combat log
 
 ### M2.10 World, NPC, faction, quest, and story routes
 
+**Status: Complete (trusted-local HTTP routes)**
+
 Expose separate player and GM projections for campaign world and narrative state.
 
 - **Complexity:** L
@@ -283,7 +291,7 @@ Expose separate player and GM projections for campaign world and narrative state
   - `GET /campaigns/:campaignId/world` returns `{ currentLocations, visibleLocations, visibleConnections }`; `POST /actors/:actorId/travel-commands` accepts `{ connectionId, partyActorIds, expectedRevision, idempotencyKey }` and returns `{ locations, discoveries, receipt }`.
   - `GET /campaigns/:campaignId/npcs` returns `{ npcs, relationships }`; `POST /campaigns/:campaignId/npcs` accepts `{ personaId, publicState, privateState, expectedRevision, idempotencyKey }` and returns `201 { npc, receipt }`; `POST /npcs/:npcId/relationship-commands` accepts `{ subjectActorId, affinityDelta, trustDelta, fearDelta, reason, expectedRevision, idempotencyKey }` and returns `{ relationship, receipt }`.
   - `GET /campaigns/:campaignId/factions` returns `{ factions, standings }`; `POST /campaigns/:campaignId/factions` accepts `{ name, publicState, privateState, expectedRevision, idempotencyKey }` and returns `201 { faction, receipt }`; `POST /factions/:factionId/reputation-commands` accepts `{ subjectActorId, delta, reason, expectedRevision, idempotencyKey }` and returns `{ standing, receipt }`.
-  - `GET /campaigns/:campaignId/quests` returns `{ quests, objectives, journal }`; `POST /campaigns/:campaignId/quests` accepts `{ quest, expectedRevision, idempotencyKey }` and returns `201 { quest, receipt }`; `POST /quests/:questId/commands` accepts a discriminated `{ kind: "accept"|"advance-objective"|"abandon"|"claim-reward", objectiveId?, expectedRevision, idempotencyKey }` and returns `{ quest, receipt }`.
+  - `GET /campaigns/:campaignId/quests` returns `{ quests, objectives, journal }`; `POST /campaigns/:campaignId/quests` accepts `{ quest, expectedRevision, idempotencyKey }` and returns `201 { quest, receipt }`; `POST /quests/:questId/commands` accepts a discriminated `{ kind: "accept"|"advance-objective"|"abandon"|"claim-reward", objectiveId?, actorId?, rewardId?, expectedRevision, idempotencyKey }` and returns `{ quest, receipt }`; `claim-reward` requires both `actorId` and `rewardId`.
   - `GET /campaigns/:campaignId/story` returns player-safe `{ visibleNodes, discoveredClues }` or GM `{ storylines, nodes, edges, plotPoints, clues }`; `POST /campaigns/:campaignId/storylines` accepts `{ storyline, expectedRevision, idempotencyKey }` and returns `201 { storyline, receipt }`; `POST /storylines/:storylineId/commands` accepts `{ kind, targetId, data, expectedRevision, idempotencyKey }` and returns `{ story, receipt }`, rejecting cross-story or cross-campaign references.
 
 ### M2.11 Adventure turn, confirmation, and generation routes
