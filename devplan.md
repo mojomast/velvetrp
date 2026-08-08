@@ -24,4 +24,11 @@
 - [✅] M2.8 actor checks, powers, and effects routes
 - [✅] M2.9 encounter and combat routes
 - [✅] M2.10 world, NPC, faction, quest, and story routes
-- [ ] M3.1 Campaign Administration Studio
+- [✅] M3.1 Campaign Administration Studio
+- [✅] M3.2 Content Pack Studio
+- [✅] M3.3 Character Builder and Advancement Flow
+- [✅] M3.4 Character Sheet, Inventory, and Economy
+- [✅] M3.5 Powers and Combat Workspace
+- [✅] M3.6 World, Cast, and Journal Studio
+- [ ] M3.7 Campaign Play Shell: blocked pending M2.11 adventure-turn streaming; intentionally deferred and not attempted
+- [✅] M3.8 Event Log, recap, import, and export experience
