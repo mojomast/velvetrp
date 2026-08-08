@@ -23,12 +23,12 @@ function sse(events: Array<{ event: string; data: unknown }>) { return new Respo
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason?: unknown) => void; const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; }); return { promise, resolve, reject }; }
 interface Route { method: string; match: RegExp; handler: (body: unknown) => Response | Promise<Response>; }
 let routes: Route[] = [];
-function installFetch(characters = [aria, rowan], sessions = [baseSession], campaign = false, mechanics = false) {
+function installFetch(characters = [aria, rowan], sessions = [baseSession], campaign = false, mechanics = false, studio = false) {
   routes = [
     { method: "GET", match: /\/api\/characters$/, handler: () => json({ characters }) },
     { method: "GET", match: /\/api\/sessions$/, handler: () => json({ sessions }) },
     { method: "GET", match: /\/api\/features$/, handler: () => json({ voice: false, images: false }) },
-    { method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign, mechanics, combat: false, studio: false, remoteAuthentication: false }) },
+    { method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign, mechanics, combat: false, studio, remoteAuthentication: false }) },
     { method: "GET", match: /\/api\/provider$/, handler: () => json(provider) },
     { method: "GET", match: /\/api\/harness$/, handler: () => json(harness) },
   ];
@@ -77,7 +77,7 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it("restores a campaign world entry and returns focus to its campaign trigger",async()=>{
-    installFetch([aria],[],true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-world",campaignId:campaignAccess.id}));
+    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-world",campaignId:campaignAccess.id}));
     routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"0"}})},
@@ -87,6 +87,43 @@ describe("persistence and multi-character frontend", () => {
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,handler:()=>json({rooms:[],eligible:[]})},
     );
     render(<App/>);await screen.findByRole("heading",{name:"World explorer"});expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}")).toMatchObject({view:"campaign-world",campaignId:campaignAccess.id});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:"World"})));
+  });
+
+  it("falls restored narrative studios back to campaign detail when the studio rollout is off",async()=>{
+    installFetch([aria],[],true,true,false);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-story",campaignId:campaignAccess.id}));routes.push({method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)});render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaign-detail"));expect(screen.queryByRole("button",{name:"Story studio"})).toBeNull();
+  });
+
+  it("opens every campaign studio entry and restores focus to its exact trigger",async()=>{
+    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-detail",campaignId:campaignAccess.id}));routes.push(
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200,headers:{"x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,handler:()=>new Response(JSON.stringify({quests:[],objectives:[],journal:[]}),{status:200,headers:{"x-quest-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/story$/,handler:()=>new Response(JSON.stringify({storylines:[],nodes:[],edges:[],plotPoints:[],clues:[]}),{status:200,headers:{"x-story-revision":"0"}})},
+    );render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});
+    for(const [button,heading] of [["World","World explorer"],["Cast & factions","Cast & factions"],["Quest journal","Quest journal"],["Story studio","Story studio"]] as const){fireEvent.click(screen.getByRole("button",{name:button}));await screen.findByRole("heading",{name:heading});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:button})));}
+  });
+
+  it.each(["player","observer"] as const)("clears GM cast records before rendering a downgraded %s projection",async(nextRole)=>{
+    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));let detailReads=0;
+    routes.push(
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json({campaign:{...configuredCampaignDetail.campaign,actorRole:++detailReads===1?"gm":nextRole}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify(detailReads===1?{npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET GOAL",gmNotes:"SECRET NOTE",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}:{npcs:[],relationships:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
+    );
+    render(<App/>);await screen.findByText("SECRET GOAL");if(nextRole==="observer")fireEvent.focus(window);else fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await screen.findByText("No visible NPCs.");expect(document.body.textContent).not.toContain("SECRET");expect(screen.queryByRole("heading",{name:"Create NPC definition"})).toBeNull();
+  });
+
+  it("clears a GM studio and leaves campaign navigation when reauthorization becomes unavailable",async()=>{
+    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));let detailReads=0;
+    routes.push(
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>++detailReads===1?json(configuredCampaignDetail):json({type:"x",title:"Missing",status:404,detail:"missing",code:"RPG_CAMPAIGN_NOT_FOUND",requestId:"r",error:"missing"},404)},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET",gmNotes:"SECRET",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}),{status:200,headers:{"x-world-revision":"1"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"1"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns$/,handler:()=>json({campaigns:[]})},
+    );
+    render(<App/>);await screen.findAllByText("SECRET");fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaigns"));expect(document.body.textContent).not.toContain("SECRET");
   });
 
   it("restores a saved session and renders each message's actual speaker", async () => {

@@ -80,7 +80,7 @@ export const questHttpRoutes: FastifyPluginAsync<QuestHttpRoutesOptions> = async
         || !("storylineId" in result.quest) || result.quest.storylineId !== body.data.quest.storylineId || result.quest.title !== body.data.quest.title
         || result.receipt.idempotencyKey !== body.data.idempotencyKey || result.receipt.revisionBefore !== body.data.expectedRevision
         || result.receipt.revisionAfter !== body.data.expectedRevision + 1) throw new Error("quest creation binding is invalid");
-      return reply.code(201).send(createCampaignQuestHttpResponseSchema.parse({ quest: result.quest, projection: { quests: projection.quests, objectives: projection.objectives, journal: projection.journal }, receipt: {
+      return reply.code(201).send(createCampaignQuestHttpResponseSchema.parse({ quest: result.quest, definition: body.data.quest, projection: { quests: projection.quests, objectives: projection.objectives, journal: projection.journal }, receipt: {
         idempotencyKey: result.receipt.idempotencyKey, revisionBefore: result.receipt.revisionBefore,
         revisionAfter: result.receipt.revisionAfter, occurredAt: result.receipt.occurredAt,
       } }));

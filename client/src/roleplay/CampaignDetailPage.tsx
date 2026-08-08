@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION } from "@velvet/contracts";
 import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, type CampaignDetail } from "../api";
@@ -30,6 +30,20 @@ export interface CampaignDetailPageProps {
   roomOpenPending?: boolean;
   /** Privacy-safe, request-scoped room hydration failure. */
   roomOpenFailure?: { request: number; text: string } | null;
+}
+
+let campaignStudioRollout = false;
+const campaignStudioRolloutListeners = new Set<() => void>();
+export function setCampaignStudioRolloutAvailable(available: boolean): void {
+  if (campaignStudioRollout === available) return;
+  campaignStudioRollout = available;
+  for (const listener of campaignStudioRolloutListeners) listener();
+}
+function useCampaignStudioRollout(): boolean {
+  return useSyncExternalStore((listener) => {
+    campaignStudioRolloutListeners.add(listener);
+    return () => campaignStudioRolloutListeners.delete(listener);
+  }, () => campaignStudioRollout, () => false);
 }
 
 type RenamePhase = "idle" | "writing" | "reconciling";
@@ -377,6 +391,7 @@ function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string;
 }
 
 export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenCharacterBuilder = () => undefined, onOpenRoom = () => undefined, onOpenAdministration = () => undefined, onOpenCombat, onOpenStudio = (studio) => window.dispatchEvent(new CustomEvent("velvet:open-campaign-studio", { detail: { studio } })), focusStudioRequest, onStudioFocused = () => undefined, focusCombatRequest, onCombatFocused = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
+  const studioRolloutAvailable = useCampaignStudioRollout();
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1826,7 +1841,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const roomBusy = roomActivity === "writing" || roomActivity === "reconciling";
   const pageBusy = renameBusy || setupBusy || createBusy || diceBusy || roomBusy || sharedMutationPending || roomOpenPending;
   return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-detail-heading">
-    <header className="library-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">TRUSTED LOCAL CAMPAIGN</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <div className="button-row">{mechanicsEnabled&&<>{(["world","cast","journal","story"] as const).map((studio)=><button key={studio} data-campaign-studio={studio} ref={(node)=>{studioButtonRefs.current[studio]=node}} className="ghost" disabled={pageBusy} onClick={()=>onOpenStudio(studio)}>{studio==="world"?"World":studio==="cast"?"Cast & factions":studio==="journal"?"Quest journal":"Story studio"}</button>)}</>}{onOpenCombat && <button ref={combatButtonRef} className="primary" disabled={pageBusy} onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button></div>}</header>
+    <header className="library-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">TRUSTED LOCAL CAMPAIGN</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <div className="button-row">{mechanicsEnabled&&studioRolloutAvailable&&<>{(["world","cast","journal","story"] as const).map((studio)=><button key={studio} data-campaign-studio={studio} ref={(node)=>{studioButtonRefs.current[studio]=node}} className="ghost" disabled={pageBusy} onClick={()=>onOpenStudio(studio)}>{studio==="world"?"World":studio==="cast"?"Cast & factions":studio==="journal"?"Quest journal":"Story studio"}</button>)}</>}{onOpenCombat && <button ref={combatButtonRef} className="primary" disabled={pageBusy} onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button></div>}</header>
     <section className="library-panel campaign-detail-panel" aria-busy={loading}>
       {loading && <p className="empty-state" role="status">Loading campaign…</p>}
       {!loading && failed && <div className="empty-state large" role="alert"><p>Campaign could not be loaded.</p><button className="ghost" onClick={() => void load()}>Retry</button></div>}
