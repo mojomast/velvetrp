@@ -79,7 +79,7 @@ export const storyHttpRoutes: FastifyPluginAsync<StoryHttpRoutesOptions> = async
           && item.sources.length === input.sources.length && input.sources.every((source) => item.sources.some((actual) => actual.sourceId === source.sourceId && actual.kind === source.kind && actual.targetId === source.targetId))))
         || result.receipt.idempotencyKey !== body.data.idempotencyKey
         || result.receipt.revisionBefore !== body.data.expectedRevision || result.receipt.revisionAfter !== body.data.expectedRevision + 1) throw new Error("storyline creation binding is invalid");
-      return reply.code(201).send(createCampaignStorylineHttpResponseSchema.parse({ storyline: result.storyline, receipt: publicReceipt(result.receipt) }));
+      return reply.code(201).send(createCampaignStorylineHttpResponseSchema.parse({ storyline: result.storyline, story, receipt: publicReceipt(result.receipt) }));
     } catch (error) { return fail(request, reply, error, "storyline-create"); } });
 
   app.post<{ Params: { storylineId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/storylines/:storylineId/commands", {

@@ -152,6 +152,7 @@ export const questCommandReceiptHttpSchema = z.object({
 
 export const createCampaignQuestHttpResponseSchema = z.object({
   quest: campaignQuestHttpSchema,
+  projection: gmCampaignQuestsHttpResponseSchema,
   receipt: questCommandReceiptHttpSchema,
 }).strict();
 

@@ -1,4 +1,4 @@
-import {campaignNpcsHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
+import {gmCampaignNpcsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
   npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema,resourceIdSchema} from "@velvet/contracts";
 import type {FastifyPluginAsync,FastifyRequest} from "fastify";
 import {readRpgFeatureFlags} from "../../../features.js";import {sendApiProblem} from "../../../http/problem.js";
@@ -22,8 +22,8 @@ export const npcHttpRoutes:FastifyPluginAsync<NpcHttpOptions>=async(app,options)
       if((req.raw.url??req.url).includes("?")||Object.keys(req.query).length)await sendApiProblem(req,rep,400,"RPG_INVALID_REQUEST","Campaign NPCs do not accept query parameters");}},
   async(request,reply)=>{const campaignId=resourceIdSchema.safeParse(request.params.campaignId);if(!campaignId.success)return missing(request,reply);
     try{const result=options.npcRepositoryAccessor().listCampaignNpcs(LOCAL_OWNER,campaignId.data);if(result===null)return missing(request,reply);
-      const allowed=new Set(["campaignId","revision","npcs","relationships"]);if(Object.keys(result).length!==allowed.size||Object.keys(result).some((key)=>!allowed.has(key))||result.campaignId!==campaignId.data)throw new Error("NPC list binding is invalid");
-      reply.header("x-world-revision",String(result.revision));return reply.send(campaignNpcsHttpResponseSchema.parse({npcs:result.npcs,relationships:result.relationships}));
+       const allowed=new Set(["campaignId","revision","audience","npcs","relationships"]);if(Object.keys(result).length!==allowed.size||Object.keys(result).some((key)=>!allowed.has(key))||result.campaignId!==campaignId.data)throw new Error("NPC list binding is invalid");
+       reply.header("x-world-revision",String(result.revision));const schema=result.audience==="gm"?gmCampaignNpcsHttpResponseSchema:playerCampaignNpcsHttpResponseSchema;return reply.send(schema.parse({npcs:result.npcs,relationships:result.relationships}));
     }catch(error){return failure(request,reply,error,"npc-list");}});
 
   app.post<{Params:{campaignId:string};Querystring:Record<string,unknown>;Body:unknown}>("/campaigns/:campaignId/npcs",{
@@ -35,7 +35,7 @@ export const npcHttpRoutes:FastifyPluginAsync<NpcHttpOptions>=async(app,options)
   async(request,reply)=>{const campaignId=resourceIdSchema.safeParse(request.params.campaignId);if(!campaignId.success)return missing(request,reply);
     const body=createCampaignNpcHttpRequestSchema.safeParse(request.body);if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","NPC creation request is invalid");
     try{const result=options.npcRepositoryAccessor().createCampaignNpc(LOCAL_OWNER,campaignId.data,body.data);
-      if(result.campaignId!==campaignId.data||result.npc.personaId!==body.data.personaId
+      if(!("privateState" in result.npc)||!("personaId" in result.npc)||result.campaignId!==campaignId.data||result.npc.personaId!==body.data.personaId
         ||JSON.stringify(result.npc.publicState)!==JSON.stringify(body.data.publicState)
         ||JSON.stringify(result.npc.privateState)!==JSON.stringify(body.data.privateState)
         ||result.receipt.idempotencyKey!==body.data.idempotencyKey||result.receipt.revisionBefore!==body.data.expectedRevision||result.receipt.revisionAfter!==body.data.expectedRevision+1)

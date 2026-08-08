@@ -62,24 +62,26 @@ export const npcPrivateStateHttpSchema=z.object({
   merchantState:z.record(z.string(),z.json()).nullable(),
 }).strict().refine((state)=>state.merchantState===null||JSON.stringify(state.merchantState).length<=16_000,
   {message:"merchant state must fit durable storage",path:["merchantState"]});
-export const campaignNpcHttpSchema=z.object({
-  npcId:resourceIdSchema,personaId:resourceIdSchema.optional(),publicState:npcPublicStateHttpSchema,
-  privateState:npcPrivateStateHttpSchema.optional(),createdAt:utcIsoTimestampSchema,
-}).strict().refine((npc)=>(npc.personaId===undefined)===(npc.privateState===undefined),
-  "persona and private state must appear together only in GM projections");
+export const playerCampaignNpcHttpSchema=z.object({
+  npcId:resourceIdSchema,publicState:npcPublicStateHttpSchema,createdAt:utcIsoTimestampSchema,
+}).strict();
+export const gmCampaignNpcHttpSchema=playerCampaignNpcHttpSchema.extend({
+  personaId:resourceIdSchema,privateState:npcPrivateStateHttpSchema,
+}).strict();
+export const campaignNpcHttpSchema=z.union([gmCampaignNpcHttpSchema,playerCampaignNpcHttpSchema]);
 export const npcRelationshipHttpSchema=z.object({
   npcId:resourceIdSchema,subjectActorId:actorIdSchema,
   affinity:z.number().int().min(-1000).max(1000),trust:z.number().int().min(-1000).max(1000),
   fear:z.number().int().min(-1000).max(1000),updatedAt:utcIsoTimestampSchema,
 }).strict();
-export const campaignNpcsHttpResponseSchema=z.object({
-  npcs:z.array(campaignNpcHttpSchema).max(1_000),relationships:z.array(npcRelationshipHttpSchema).max(10_000),
-}).strict();
+export const gmCampaignNpcsHttpResponseSchema=z.object({npcs:z.array(gmCampaignNpcHttpSchema).max(1_000),relationships:z.array(npcRelationshipHttpSchema).max(10_000)}).strict();
+export const playerCampaignNpcsHttpResponseSchema=z.object({npcs:z.array(playerCampaignNpcHttpSchema).max(1_000),relationships:z.array(npcRelationshipHttpSchema).max(10_000)}).strict();
+export const campaignNpcsHttpResponseSchema=z.union([gmCampaignNpcsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema]);
 export const createCampaignNpcHttpRequestSchema=z.object({
   personaId:resourceIdSchema,publicState:npcPublicStateHttpSchema,privateState:npcPrivateStateHttpSchema,
   expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema,
 }).strict();
-export const createCampaignNpcHttpResponseSchema=z.object({npc:campaignNpcHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
+export const createCampaignNpcHttpResponseSchema=z.object({npc:gmCampaignNpcHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
 export const npcRelationshipCommandHttpRequestSchema=z.object({
   subjectActorId:actorIdSchema,affinityDelta:z.number().int().min(-100).max(100),
   trustDelta:z.number().int().min(-100).max(100),fearDelta:z.number().int().min(-100).max(100),
@@ -91,6 +93,10 @@ export const npcRelationshipCommandHttpResponseSchema=z.object({
 }).strict();
 
 export type CampaignNpcHttp=z.infer<typeof campaignNpcHttpSchema>;
+export type GmCampaignNpcHttp=z.infer<typeof gmCampaignNpcHttpSchema>;
+export type PlayerCampaignNpcHttp=z.infer<typeof playerCampaignNpcHttpSchema>;
+export type GmCampaignNpcsHttpResponse=z.infer<typeof gmCampaignNpcsHttpResponseSchema>;
+export type PlayerCampaignNpcsHttpResponse=z.infer<typeof playerCampaignNpcsHttpResponseSchema>;
 export type NpcRelationshipHttp=z.infer<typeof npcRelationshipHttpSchema>;
 export type CreateCampaignNpcHttpRequest=z.infer<typeof createCampaignNpcHttpRequestSchema>;
 export type NpcRelationshipCommandHttpRequest=z.infer<typeof npcRelationshipCommandHttpRequestSchema>;
@@ -98,17 +104,20 @@ export type NpcRelationshipCommandHttpRequest=z.infer<typeof npcRelationshipComm
 export const factionPublicStateHttpSchema=z.object({description:z.string().max(4_000)}).strict();
 export const factionPrivateStateHttpSchema=z.object({gmNotes:z.string().max(8_000),
   visibility:z.enum(["public","discovered","gm"])}).strict();
-export const campaignFactionHttpSchema=z.object({factionId:resourceIdSchema,name:z.string().trim().min(1).max(200),
-  publicState:factionPublicStateHttpSchema,privateState:factionPrivateStateHttpSchema.optional(),createdAt:utcIsoTimestampSchema}).strict();
+export const playerCampaignFactionHttpSchema=z.object({factionId:resourceIdSchema,name:z.string().trim().min(1).max(200),
+  publicState:factionPublicStateHttpSchema,createdAt:utcIsoTimestampSchema}).strict();
+export const gmCampaignFactionHttpSchema=playerCampaignFactionHttpSchema.extend({privateState:factionPrivateStateHttpSchema}).strict();
+export const campaignFactionHttpSchema=z.union([gmCampaignFactionHttpSchema,playerCampaignFactionHttpSchema]);
 export const factionStandingHttpSchema=z.object({factionId:resourceIdSchema,subjectActorId:actorIdSchema,
   reputation:z.number().int().safe(),updatedAt:utcIsoTimestampSchema}).strict();
-export const campaignFactionsHttpResponseSchema=z.object({factions:z.array(campaignFactionHttpSchema).max(1_000),
-  standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
+export const gmCampaignFactionsHttpResponseSchema=z.object({factions:z.array(gmCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
+export const playerCampaignFactionsHttpResponseSchema=z.object({factions:z.array(playerCampaignFactionHttpSchema).max(1_000),standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
+export const campaignFactionsHttpResponseSchema=z.union([gmCampaignFactionsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema]);
 export const createCampaignFactionHttpRequestSchema=z.object({name:z.string().trim().min(1).max(200),
   publicState:factionPublicStateHttpSchema,privateState:factionPrivateStateHttpSchema,
   expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict()
   .refine((request)=>request.privateState.visibility!=="discovered",{message:"new factions require authoritative visibility",path:["privateState","visibility"]});
-export const createCampaignFactionHttpResponseSchema=z.object({faction:campaignFactionHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
+export const createCampaignFactionHttpResponseSchema=z.object({faction:gmCampaignFactionHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
 export const factionReputationCommandHttpRequestSchema=z.object({subjectActorId:actorIdSchema,
   delta:z.number().int().min(-10_000).max(10_000),reason:z.string().trim().min(1).max(500),
   expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict()
@@ -116,6 +125,10 @@ export const factionReputationCommandHttpRequestSchema=z.object({subjectActorId:
 export const factionReputationCommandHttpResponseSchema=z.object({standing:factionStandingHttpSchema,
   receipt:worldCommandReceiptHttpSchema}).strict();
 export type CampaignFactionHttp=z.infer<typeof campaignFactionHttpSchema>;
+export type GmCampaignFactionHttp=z.infer<typeof gmCampaignFactionHttpSchema>;
+export type PlayerCampaignFactionHttp=z.infer<typeof playerCampaignFactionHttpSchema>;
+export type GmCampaignFactionsHttpResponse=z.infer<typeof gmCampaignFactionsHttpResponseSchema>;
+export type PlayerCampaignFactionsHttpResponse=z.infer<typeof playerCampaignFactionsHttpResponseSchema>;
 export type FactionStandingHttp=z.infer<typeof factionStandingHttpSchema>;
 export type CreateCampaignFactionHttpRequest=z.infer<typeof createCampaignFactionHttpRequestSchema>;
 export type FactionReputationCommandHttpRequest=z.infer<typeof factionReputationCommandHttpRequestSchema>;

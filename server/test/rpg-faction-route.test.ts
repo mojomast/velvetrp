@@ -4,13 +4,13 @@ const at="2035-01-01T00:00:00.000Z",state={description:"Road wardens"},privateSt
 const faction={factionId:"guild",name:"Guild",publicState:state,privateState,createdAt:at};
 const receipt={commandId:"private",idempotencyKey:"guild",revisionBefore:0,revisionAfter:1,occurredAt:at};
 afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;});const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";};
-function repo(overrides:Record<string,unknown>={}){return {listCampaignFactions:()=>({campaignId:"campaign",revision:1,factions:[faction],standings:[]}),
+function repo(overrides:Record<string,unknown>={}){return {listCampaignFactions:()=>({campaignId:"campaign",revision:1,audience:"gm",factions:[faction],standings:[]}),
   createCampaignFaction:()=>({campaignId:"campaign",faction,receipt}),changeFactionReputation:()=>({campaignId:"campaign",factionId:"guild",
     standing:{factionId:"guild",subjectActorId:"actor",reputation:4,updatedAt:at},receipt:{...receipt,idempotencyKey:"rep",revisionBefore:1,revisionAfter:2}}),
   close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;}
 describe("M2.10 faction routes",()=>{
   it("uses local ownership and strips internal faction provenance",async()=>{enable();const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repo({
-    listCampaignFactions:(...args:any[])=>{calls.push(["list",...args]);return {campaignId:"campaign",revision:1,factions:[faction],standings:[]};},
+    listCampaignFactions:(...args:any[])=>{calls.push(["list",...args]);return {campaignId:"campaign",revision:1,audience:"gm",factions:[faction],standings:[]};},
     createCampaignFaction:(...args:any[])=>{calls.push(["create",...args]);return {campaignId:"campaign",faction,receipt};},
     changeFactionReputation:(...args:any[])=>{calls.push(["rep",...args]);return {campaignId:"campaign",factionId:"guild",standing:{factionId:"guild",subjectActorId:"actor",reputation:4,updatedAt:at},receipt:{...receipt,idempotencyKey:"rep",revisionBefore:1,revisionAfter:2}};}})});
     const read=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/factions",headers:{authorization:"attacker"}});expect(read.statusCode).toBe(200);expect(read.headers["x-world-revision"]).toBe("1");

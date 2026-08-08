@@ -18,10 +18,10 @@ function repository(overrides: Record<string, unknown> = {}) { return { close() 
 
 describe("M2.10 quest routes", () => {
   it("uses trusted local ownership, exact bodies, and strips command IDs", async () => {
-    enable(); const calls: any[] = [];
+    enable(); const calls: any[] = []; let createdState=false;
     const app = buildApp({ campaignRepositoryFactory: () => repository({
-      listCampaignQuests: (...args: any[]) => { calls.push(["list", ...args]); return { campaignId: "campaign", revision: 1, quests: [quest], objectives: [], journal: [] }; },
-      createCampaignQuest: (...args: any[]) => { calls.push(["create", ...args]); return { campaignId: "campaign", quest, receipt }; },
+      listCampaignQuests: (...args: any[]) => { calls.push(["list", ...args]); return { campaignId: "campaign", revision: 1, quests: [quest], objectives: createdState?[{objectiveId:"door",questId:"quest",description:"Open",targetProgress:1,progress:0,dependencyObjectiveIds:[],completedAt:null}]:[], journal: createdState?[{entryId:"entry",questId:"quest",text:"A gate.",occurredAt:at}]:[] }; },
+      createCampaignQuest: (...args: any[]) => { calls.push(["create", ...args]);createdState=true; return { campaignId: "campaign", quest, receipt }; },
       executeQuestCommand: (...args: any[]) => { calls.push(["command", ...args]); return { campaignId: "campaign", quest: { ...quest, status: "active" }, receipt: { ...receipt, idempotencyKey: "accept", revisionBefore: 1, revisionAfter: 2 } }; },
     }) });
     const listed = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/quests", headers: { authorization: "attacker" } });
@@ -35,7 +35,7 @@ describe("M2.10 quest routes", () => {
     const commandBody = { kind: "accept", expectedRevision: 1, idempotencyKey: "accept" };
     const commanded = await app.inject({ method: "POST", url: "/api/rpg/v1/quests/quest/commands", headers: { "content-type": "application/json" }, payload: commandBody });
     expect(commanded.statusCode).toBe(200); expect(commanded.body).not.toContain("commandId");
-    expect(calls).toEqual([["list", "local-owner", "campaign"], ["create", "local-owner", "campaign", createBody], ["command", "local-owner", "quest", commandBody]]);
+    expect(calls).toEqual([["list", "local-owner", "campaign"], ["create", "local-owner", "campaign", createBody], ["list", "local-owner", "campaign"], ["command", "local-owner", "quest", commandBody]]);
     await app.close();
   });
 

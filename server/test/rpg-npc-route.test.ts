@@ -10,13 +10,13 @@ const changed={campaignId:"campaign",npcId:"npc",relationship:{npcId:"npc",subje
   receipt:{commandId:"private-2",idempotencyKey:"relationship",revisionBefore:1,revisionAfter:2,occurredAt:at}};
 afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;});
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";};
-function repository(overrides:Record<string,unknown>={}){return {listCampaignNpcs:()=>({campaignId:"campaign",revision:1,npcs:[npc],relationships:[]}),
+function repository(overrides:Record<string,unknown>={}){return {listCampaignNpcs:()=>({campaignId:"campaign",revision:1,audience:"gm",npcs:[npc],relationships:[]}),
   createCampaignNpc:()=>created,changeNpcRelationship:()=>changed,close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;}
 
 describe("M2.10 NPC routes",()=>{
   it("uses fixed local ownership and returns only reviewed NPC projections",async()=>{
     enable();const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repository({
-      listCampaignNpcs:(...args:any[])=>{calls.push(["list",...args]);return {campaignId:"campaign",revision:1,npcs:[npc],relationships:[]};},
+       listCampaignNpcs:(...args:any[])=>{calls.push(["list",...args]);return {campaignId:"campaign",revision:1,audience:"gm",npcs:[npc],relationships:[]};},
       createCampaignNpc:(...args:any[])=>{calls.push(["create",...args]);return created;},
       changeNpcRelationship:(...args:any[])=>{calls.push(["relationship",...args]);return changed;},
     })});const hostile={authorization:"Bearer attacker","x-principal-id":"attacker"};

@@ -1,6 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
-import { campaignFactionsHttpResponseSchema,campaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
-  type CampaignFactionHttp,type CampaignNpcHttp,type CampaignWorldHttpResponse,type FactionStandingHttp,type NpcRelationshipHttp,type WorldProjection } from "@velvet/contracts";
+import { gmCampaignFactionsHttpResponseSchema,gmCampaignNpcsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
+  type CampaignWorldHttpResponse,type FactionStandingHttp,type GmCampaignFactionHttp,type GmCampaignNpcHttp,type NpcRelationshipHttp,type PlayerCampaignFactionHttp,type PlayerCampaignNpcHttp,type WorldProjection } from "@velvet/contracts";
 import { WorldConflictError } from "./worldWriteRepo.js";
 
 /** Context required to run a world projection. */
@@ -18,8 +18,8 @@ export interface WorldReadRepository {
   listCampaignFactions(principalId:string,campaignId:string):CampaignFactionsSnapshot|null;
 }
 export type WorldCampaignHttpSnapshot=CampaignWorldHttpResponse&{campaignId:string;sessionId:string;revision:number};
-export type CampaignNpcsSnapshot={campaignId:string;revision:number;npcs:CampaignNpcHttp[];relationships:NpcRelationshipHttp[]};
-export type CampaignFactionsSnapshot={campaignId:string;revision:number;factions:CampaignFactionHttp[];standings:FactionStandingHttp[]};
+export type CampaignNpcsSnapshot={campaignId:string;revision:number;audience:"gm";npcs:GmCampaignNpcHttp[];relationships:NpcRelationshipHttp[]}|{campaignId:string;revision:number;audience:"player";npcs:PlayerCampaignNpcHttp[];relationships:NpcRelationshipHttp[]};
+export type CampaignFactionsSnapshot={campaignId:string;revision:number;audience:"gm";factions:GmCampaignFactionHttp[];standings:FactionStandingHttp[]}|{campaignId:string;revision:number;audience:"player";factions:PlayerCampaignFactionHttp[];standings:FactionStandingHttp[]};
 
 /** Creates database-backed world projections with their required lifecycle guard. */
 export function createWorldReadRepository(
@@ -128,7 +128,8 @@ export function createWorldReadRepository(
       .get(campaignId,row.actor_id,principalId));
     const relationships=visibleRelationshipRows.map((row)=>({npcId:row.npc_id,subjectActorId:row.actor_id,
       affinity:row.affinity,trust:row.trust,fear:row.fear,updatedAt:row.updated_at}));
-    const response=campaignNpcsHttpResponseSchema.parse({npcs,relationships});return {campaignId,revision,...response};
+    if(isGm){const response=gmCampaignNpcsHttpResponseSchema.parse({npcs,relationships});return {campaignId,revision,audience:"gm",...response};}
+    const response=playerCampaignNpcsHttpResponseSchema.parse({npcs,relationships});return {campaignId,revision,audience:"player",...response};
   };
   const listCampaignFactions=(principalId:string,campaignId:string):CampaignFactionsSnapshot|null=>{
     context.guard();if(!member(principalId,campaignId))return null;const isGm=gm(principalId,campaignId);
@@ -150,7 +151,8 @@ export function createWorldReadRepository(
       WHERE campaign_id=? AND controller_principal_id=?`).all(campaignId,principalId) as any[]).map((row)=>row.actor_id));
     const standings=ledger.filter((row)=>visibleIds.has(row.faction_id)&&(isGm||controlled!.has(row.actor_id))).map((row)=>({
       factionId:row.faction_id,subjectActorId:row.actor_id,reputation:row.reputation,updatedAt:row.updated_at}));
-    const response=campaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,...response};
+    if(isGm){const response=gmCampaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,audience:"gm",...response};}
+    const response=playerCampaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,audience:"player",...response};
   };
 
   return { getWorldProjection,getCampaignWorld,listCampaignNpcs,listCampaignFactions };

@@ -64,7 +64,6 @@ export const createCampaignStorylineHttpRequestSchema = z.object({
 export const storyCommandReceiptHttpSchema = z.object({ idempotencyKey: idempotencyKeySchema,
   revisionBefore: revisionSchema, revisionAfter: revisionSchema, occurredAt: utcIsoTimestampSchema }).strict()
   .refine((value) => value.revisionAfter === value.revisionBefore + 1, "a story command advances exactly one revision");
-export const createCampaignStorylineHttpResponseSchema = z.object({ storyline: storyStorylineSchema, receipt: storyCommandReceiptHttpSchema }).strict();
 
 const envelope = { targetId: resourceIdSchema, expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema };
 const emptyData = z.object({}).strict();
@@ -79,6 +78,7 @@ export const gmCampaignStoryHttpResponseSchema = z.object({ storylines: z.array(
   edges: z.array(storyEdgeSchema), plotPoints: z.array(storyPlotPointSchema), clues: z.array(storyClueSchema) }).strict();
 export const playerCampaignStoryHttpResponseSchema = z.object({ visibleNodes: z.array(visibleStoryNodeSchema), discoveredClues: z.array(discoveredStoryClueSchema) }).strict();
 export const campaignStoryHttpResponseSchema = z.union([gmCampaignStoryHttpResponseSchema, playerCampaignStoryHttpResponseSchema]);
+export const createCampaignStorylineHttpResponseSchema = z.object({ storyline: storyStorylineSchema, story: gmCampaignStoryHttpResponseSchema, receipt: storyCommandReceiptHttpSchema }).strict();
 export const storylineCommandHttpResponseSchema = z.object({ story: campaignStoryHttpResponseSchema, receipt: storyCommandReceiptHttpSchema }).strict();
 
 export type NewStorylineGraph = z.infer<typeof newStorylineGraphSchema>;

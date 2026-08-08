@@ -3,6 +3,7 @@ import {actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaig
   campaignWorldHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
   npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema,campaignFactionsHttpResponseSchema,
   createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema} from "../src/index.js";
+import {gmCampaignNpcsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,gmCampaignFactionsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema} from "../src/index.js";
 
 const at="2035-01-01T00:00:00.000Z";
 describe("world HTTP contracts",()=>{
@@ -28,7 +29,11 @@ describe("world HTTP contracts",()=>{
     const publicState={name:"Marrow"},privateState={goals:"Trade",gmNotes:"Knows the passphrase",merchantState:{stock:3}};
     const gmNpc={npcId:"npc",personaId:"persona",publicState,privateState,createdAt:at};
     const playerNpc={npcId:"npc",publicState,createdAt:at};
-    expect(campaignNpcsHttpResponseSchema.parse({npcs:[gmNpc,playerNpc],relationships:[]})).toBeTruthy();
+    expect(gmCampaignNpcsHttpResponseSchema.parse({npcs:[gmNpc],relationships:[]})).toBeTruthy();
+    expect(playerCampaignNpcsHttpResponseSchema.parse({npcs:[playerNpc],relationships:[]})).toBeTruthy();
+    expect(campaignNpcsHttpResponseSchema.safeParse({npcs:[gmNpc,playerNpc],relationships:[]}).success).toBe(false);
+    expect(gmCampaignNpcsHttpResponseSchema.safeParse({npcs:[],relationships:[]}).success).toBe(true);
+    expect(playerCampaignNpcsHttpResponseSchema.safeParse({npcs:[],relationships:[]}).success).toBe(true);
     expect(campaignNpcsHttpResponseSchema.safeParse({npcs:[{...playerNpc,privateState}],relationships:[]}).success).toBe(false);
     const create={personaId:"persona",publicState,privateState,expectedRevision:0,idempotencyKey:"create-npc"};
     expect(createCampaignNpcHttpRequestSchema.parse(create)).toEqual(create);
@@ -49,7 +54,10 @@ describe("world HTTP contracts",()=>{
   });
   it("keeps faction projections and reputation commands strict",()=>{
     const faction={factionId:"guild",name:"Guild",publicState:{description:"Traders"},createdAt:at};
-    expect(campaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[]})).toBeTruthy();
+    const gmFaction={...faction,privateState:{gmNotes:"Secret",visibility:"public" as const}};
+    expect(playerCampaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[]})).toBeTruthy();
+    expect(gmCampaignFactionsHttpResponseSchema.parse({factions:[gmFaction],standings:[]})).toBeTruthy();
+    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[faction,gmFaction],standings:[]}).success).toBe(false);
     expect(campaignFactionsHttpResponseSchema.safeParse({factions:[{...faction,gmNotes:"leak"}],standings:[]}).success).toBe(false);
     const create={name:"Guild",publicState:{description:"Traders"},privateState:{gmNotes:"Secret",visibility:"public" as const},expectedRevision:0,idempotencyKey:"guild"};
     expect(createCampaignFactionHttpRequestSchema.parse(create)).toEqual(create);
