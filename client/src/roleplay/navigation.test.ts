@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -99,6 +99,13 @@ describe("navigation persistence", () => {
     }
     expect(parseStoredNavigation({ view: "campaign-detail", campaignId: "campaign-one" }))
       .toEqual({ view: "campaign-detail", campaignId: "campaign-one", selectedIds: [] });
+  });
+
+  it("guards campaign administration with the same strict campaign identity", () => {
+    expect(parseStoredNavigation({ view: "campaign-administration" })).toEqual({ view: "campaigns", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "bad/id" })).toEqual({ view: "campaigns", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "campaign-one" }))
+      .toEqual({ view: "campaign-administration", campaignId: "campaign-one", selectedIds: [] });
   });
 
   it("requires both strict workspace IDs and falls back to the nearest safe campaign view", () => {

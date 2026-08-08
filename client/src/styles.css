@@ -584,6 +584,14 @@ button:disabled {
   .campaign-roster-list li { align-items: stretch; flex-direction: column; }
   .campaign-rooms-heading, .campaign-room-list li { align-items: stretch; flex-direction: column; }
   .campaign-room-list button, .campaign-rooms-heading button { width: 100%; }
+  .administration-page .library-header { align-items: stretch; flex-direction: column; }
+  .administration-page .library-header > button { width: 100%; }
+  .admin-section { padding: 17px; }
+  .admin-settings-form fieldset, .membership-add, .checkpoint-create { grid-template-columns: 1fr; }
+  .admin-settings-form .admin-wide { grid-column: auto; }
+  .admin-settings-form button, .membership-add button, .checkpoint-create button { width: 100%; }
+  .membership-list li, .checkpoint-list li, .admin-status { align-items: stretch; flex-direction: column; }
+  .membership-list select, .membership-list button, .checkpoint-list button, .admin-status button { width: 100%; }
   .roster-open { width: 100%; }
   .dice-form { grid-template-columns: 1fr; }
   .dice-form .primary { width: 100%; }

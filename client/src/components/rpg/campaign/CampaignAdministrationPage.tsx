@@ -91,11 +91,14 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   const retryRef = useRef<HTMLButtonElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const focusedRequestRef = useRef<number | undefined>(undefined);
+  const onHeadingFocusedRef = useRef(onHeadingFocused);
+  onHeadingFocusedRef.current = onHeadingFocused;
 
-  const load = useCallback(async (explicitRefresh = false) => {
+  const load = useCallback(async (explicitRefresh = false, preserveCurrent = false): Promise<boolean> => {
     const generation = ++generationRef.current;
-    if (explicitRefresh) setRefreshing(true); else setLoading(true);
-    setFailed(false); setError("");
+    if (explicitRefresh) setRefreshing(true); else if (!preserveCurrent) setLoading(true);
+    if (!preserveCurrent) setFailed(false);
+    setError("");
     try {
       const [administration, timelineData, checkpointData, detail] = await Promise.all([
         getCampaignAdministration(campaignId),
@@ -105,7 +108,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       ]);
       const membershipData = administration.campaign.actorRole === "owner"
         ? await listCampaignMemberships(campaignId) : { memberships: [] };
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (!mountedRef.current || generation !== generationRef.current) return false;
       setCampaign(administration.campaign);
       if (detail) setCampaignName(detail.campaign.name);
       else if (initialName) setCampaignName(initialName);
@@ -121,16 +124,20 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         queueMicrotask(() => statusRef.current?.focus());
       } else if (focusHeadingRequest !== undefined && focusedRequestRef.current !== focusHeadingRequest) {
         focusedRequestRef.current = focusHeadingRequest;
-        queueMicrotask(() => { headingRef.current?.focus(); onHeadingFocused(focusHeadingRequest); });
+        queueMicrotask(() => { headingRef.current?.focus(); onHeadingFocusedRef.current(focusHeadingRequest); });
       }
+      return true;
     } catch (loadError) {
-      if (!mountedRef.current || generation !== generationRef.current) return;
-      if (loadError instanceof ApiError && loadError.status === 404) { onUnavailable(); return; }
-      setFailed(true); setLoading(false); setRefreshing(false);
-      setError("Campaign administration could not be loaded.");
-      if (explicitRefresh) queueMicrotask(() => retryRef.current?.focus());
+      if (!mountedRef.current || generation !== generationRef.current) return false;
+      if (loadError instanceof ApiError && loadError.status === 404) { onUnavailable(); return false; }
+      setFailed(!preserveCurrent); setLoading(false); setRefreshing(false);
+      setError(preserveCurrent
+        ? "The command receipt confirmed success, but fresh authoritative state could not be loaded. Refresh before another write."
+        : "Campaign administration could not be loaded.");
+      if (explicitRefresh) queueMicrotask(() => (preserveCurrent ? statusRef.current : retryRef.current)?.focus());
+      return false;
     }
-  }, [campaignId, focusHeadingRequest, initialName, onHeadingFocused, onUnavailable]);
+  }, [campaignId, focusHeadingRequest, initialName, onUnavailable]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -152,9 +159,14 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       setNotice(receiptSummary(result.receipt));
       // A valid bound receipt proves the exact commit. Read reconciliation is
       // safe and never turns success into failure or repeats the command.
-      await load(false);
+      const refreshed = await load(false, true);
       if (mountedRef.current) {
-        setNotice(receiptSummary(result.receipt));
+        if (refreshed) setNotice(receiptSummary(result.receipt));
+        else {
+          const lock = { kind, message: `${receiptSummary(result.receipt)} Fresh authoritative state is unavailable, so further writes are locked until refresh.` };
+          uncertainCampaignMutations.set(campaignId, lock);
+          setUncertain(lock);
+        }
         queueMicrotask(() => statusRef.current?.focus());
       }
     } catch (mutationError) {
@@ -196,16 +208,16 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   }
 
   if (loading && !campaign) return <main className="page library-page campaign-page administration-page"><section className="campaign-shell"><header className="library-header"><div><button className="back-link" onClick={onBack}>← Campaign</button><p className="eyebrow">CAMPAIGN ADMINISTRATION</p><h1 className="title">Opening administration…</h1></div></header><div className="library-panel admin-loading" aria-busy="true"><p>Loading permitted campaign controls…</p></div></section></main>;
-  if (failed || !campaign) return <main className="page library-page campaign-page administration-page"><section className="campaign-shell"><header className="library-header"><div><button className="back-link" onClick={onBack}>← Campaign</button><p className="eyebrow">CAMPAIGN ADMINISTRATION</p><h1 className="title">Administration unavailable</h1></div></header><div className="library-panel admin-error"><p role="alert">{error}</p><button ref={retryRef} className="primary" onClick={() => void load()}>Try again</button></div></section></main>;
+  if (failed || !campaign) return <main className="page library-page campaign-page administration-page"><section className="campaign-shell"><header className="library-header"><div><button className="back-link" onClick={onBack}>← Campaign</button><p className="eyebrow">CAMPAIGN ADMINISTRATION</p><h1 className="title">Administration unavailable</h1></div></header><div className="library-panel admin-error"><p role="alert">{error}</p><button ref={retryRef} className="primary" onClick={() => void load(Boolean(uncertain))}>Try again</button></div></section></main>;
 
   const owner = campaign.actorRole === "owner";
   const expectedRevision = campaign.revision;
   return <main className="page library-page campaign-page administration-page"><section className="campaign-shell" aria-labelledby="administration-heading">
-    <header className="library-header"><div><button className="back-link" disabled={busy} onClick={onBack}>← Campaign</button><p className="eyebrow">TRUSTED LOCAL · {campaign.actorRole.toUpperCase()} VIEW</p><h1 ref={headingRef} tabIndex={-1} className="title" id="administration-heading">Campaign administration</h1><p className="subtitle">{campaignName || "Current campaign"}</p></div><button className="ghost" disabled={busy || refreshing} onClick={() => void load(true)}>{refreshing ? "Refreshing…" : "Refresh"}</button></header>
+    <header className="library-header"><div><button className="back-link" disabled={busy} onClick={onBack}>← Campaign</button><p className="eyebrow">TRUSTED LOCAL · {campaign.actorRole.toUpperCase()} VIEW</p><h1 ref={headingRef} tabIndex={-1} className="title" id="administration-heading">Campaign administration</h1><p className="subtitle">{campaignName || "Current campaign"}</p></div><button className="ghost" disabled={busy || refreshing} onClick={() => void load(true, true)}>{refreshing ? "Refreshing…" : "Refresh"}</button></header>
 
     {(notice || error || uncertain) && <div ref={statusRef} tabIndex={-1} className={`admin-status ${error ? "is-error" : "is-success"}`} role={error ? "alert" : "status"}>
       <p>{error || notice}</p>
-      {uncertain && <button className="primary" disabled={refreshing} onClick={() => void load(true)}>{refreshing ? "Refreshing authoritative state…" : "Refresh authoritative state"}</button>}
+      {uncertain && <button className="primary" disabled={refreshing} onClick={() => void load(true, true)}>{refreshing ? "Refreshing authoritative state…" : "Refresh authoritative state"}</button>}
     </div>}
 
     <div className="admin-grid" aria-busy={busy || refreshing}>

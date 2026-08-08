@@ -24,3 +24,4 @@
 - [✅] M2.8 actor checks, powers, and effects routes
 - [✅] M2.9 encounter and combat routes
 - [✅] M2.10 world, NPC, faction, quest, and story routes
+- [✅] M3.1 Campaign Administration Studio

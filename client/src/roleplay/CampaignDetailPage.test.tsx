@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignCharacterCreationOptions, getCampaignDetail, listCampaignCharacters, listCampaignRooms, renameCampaign, setupMechanicsStarter, setupOriginalStarter } from "../api";
+import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
+import { CampaignAdministrationPage } from "../components/rpg/campaign/CampaignAdministrationPage";
 
 vi.mock("../api", async (importOriginal) => ({
   ...await importOriginal<typeof import("../api")>(),
@@ -15,6 +16,11 @@ vi.mock("../api", async (importOriginal) => ({
   renameCampaign: vi.fn(),
   setupOriginalStarter: vi.fn(),
   setupMechanicsStarter: vi.fn(),
+  getCampaignAdministration: vi.fn(),
+  listCampaignMemberships: vi.fn(),
+  listCampaignTimelines: vi.fn(),
+  listCampaignCheckpoints: vi.fn(),
+  updateCampaignAdministration: vi.fn(),
 }));
 
 const unconfigured = { id: "campaign-one", name: "The Long Road", actorRole: "gm" as const, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-04-05T00:00:00.000Z", content: { status: "unconfigured" as const } };
@@ -1658,5 +1664,79 @@ describe("CampaignDetailPage", () => {
     render(<CampaignDetailPage campaignId={unconfigured.id} onBack={onBack} onUnavailable={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
     expect(onBack).toHaveBeenCalledOnce();
+  });
+});
+
+describe("CampaignAdministrationPage role projections", () => {
+  const timestamp = "2030-04-05T00:00:00.000Z";
+  const timeline = { id: "timeline-main", parentTimelineId: null, forkedFromRevision: null, revision: 7, createdAt: timestamp, active: true };
+
+  beforeEach(() => {
+    vi.mocked(listCampaignTimelines).mockResolvedValue({ activeTimelineId: timeline.id, timelines: [timeline] });
+    vi.mocked(listCampaignCheckpoints).mockResolvedValue({ checkpoints: [] });
+  });
+
+  it("structurally omits owner and privileged controls from a player projection", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "player", status: "published", activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members" },
+    } });
+    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "Campaign settings" })).toBeTruthy();
+    expect(screen.getByText("Allowed")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Timeline checkpoints" })).toBeTruthy();
+    expect(screen.queryByText("GM notes")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Memberships" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create checkpoint" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Inspect an import report" })).toBeNull();
+    expect(listCampaignMemberships).not.toHaveBeenCalled();
+  });
+
+  it("renders owner-only lifecycle, membership, checkpoint, archive, and import-report controls", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "Private canon" },
+    } });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [
+      { principalId: "local-owner", role: "owner", createdAt: timestamp },
+      { principalId: "local-player", role: "player", createdAt: timestamp },
+    ] });
+    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Save settings" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pause campaign" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Archive campaign" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("heading", { name: "Memberships" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Create checkpoint" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("heading", { name: "Inspect an import report" })).toBeTruthy();
+    expect(screen.getByDisplayValue("Private canon")).toBeTruthy();
+  });
+
+  it("locks an uncertain write against duplicates until an authoritative refresh", async () => {
+    const administration = { campaign: {
+      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "Private canon" },
+    } };
+    vi.mocked(getCampaignAdministration).mockResolvedValue(administration);
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(updateCampaignAdministration).mockRejectedValueOnce(new Error("connection lost"));
+    render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    const save = await screen.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    fireEvent.click(save);
+    const refresh = await screen.findByRole("button", { name: "Refresh authoritative state" });
+    const lockedSave = screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    expect((lockedSave.closest("fieldset") as HTMLFieldSetElement).disabled).toBe(true);
+    fireEvent.click(lockedSave);
+    expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(refresh);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
   });
 });

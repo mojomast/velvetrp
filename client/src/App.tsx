@@ -14,6 +14,7 @@ import { CharacterLibraryPage as Home } from "./roleplay/CharacterLibraryPage";
 import { CampaignLibraryPage } from "./roleplay/CampaignLibraryPage";
 import { CampaignDetailPage } from "./roleplay/CampaignDetailPage";
 import { CampaignCharacterWorkspacePage } from "./roleplay/CampaignCharacterWorkspacePage";
+import { CampaignAdministrationPage } from "./components/rpg/campaign/CampaignAdministrationPage";
 import { readNavigation, writeNavigation, type StoredNavigation, type View } from "./roleplay/navigation";
 
 function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
@@ -38,6 +39,7 @@ export default function App() {
   const [activeCharacterId, setActiveCharacterId] = useState(stored.characterId ?? "");
   const [activeCampaignId, setActiveCampaignId] = useState(stored.campaignId ?? "");
   const [activeCampaignCharacterId, setActiveCampaignCharacterId] = useState(stored.campaignCharacterId ?? "");
+  const [activeCampaignName, setActiveCampaignName] = useState("");
   const [chatReturnCampaignId, setChatReturnCampaignId] = useState(stored.chatReturnCampaignId ?? "");
   const [roomsRefreshRequest, setRoomsRefreshRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [roomOpenPending, setRoomOpenPending] = useState<{ campaignId: string; request: number } | null>(null);
@@ -50,8 +52,10 @@ export default function App() {
   const navigationEpochRef = useRef(0);
   const chatEntryRef = useRef(0);
   const campaignDetailEntryRef = useRef(0);
+  const campaignAdministrationEntryRef = useRef(0);
   const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
+  const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -111,7 +115,7 @@ export default function App() {
         setCampaignLibraryAvailable(rpgFeatureData.campaign);
         setCampaignMechanicsAvailable(rpgFeatureData.mechanics);
         const current = currentNavigationRef.current;
-        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail"
+        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-administration"
           || current.view === "campaign-character" || (current.view === "chat" && Boolean(current.chatReturnCampaignId));
         if (campaignRelated && !rpgFeatureData.campaign) {
           cancelRoomOpenForNavigation();
@@ -321,7 +325,13 @@ export default function App() {
     const focusRequest = campaignHeadingFocusRequest?.campaignId === activeCampaignId
       && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;
     const leaveDetail = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(""); setActiveCampaignCharacterId(""); setView("campaigns"); };
-    return <CampaignDetailPage campaignId={activeCampaignId} mechanicsEnabled={campaignMechanicsAvailable} focusHeadingRequest={focusRequest} roomsRefreshRequest={roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined} onRoomsRefreshHandled={(request) => setRoomsRefreshRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} roomOpenPending={roomOpenPending?.campaignId === activeCampaignId} roomOpenFailure={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure : null} onHeadingFocused={(request) => setCampaignHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request && campaignDetailEntryRef.current === request ? null : current)} onBack={leaveDetail} onUnavailable={leaveDetail} onOpenRoom={(sessionId) => void openCampaignRoom(activeCampaignId, sessionId)} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setWorkspaceHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId, request }); setActiveCampaignCharacterId(campaignCharacterId); setView("campaign-character"); }} />;
+    return <CampaignDetailPage campaignId={activeCampaignId} mechanicsEnabled={campaignMechanicsAvailable} focusHeadingRequest={focusRequest} roomsRefreshRequest={roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined} onRoomsRefreshHandled={(request) => setRoomsRefreshRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} roomOpenPending={roomOpenPending?.campaignId === activeCampaignId} roomOpenFailure={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure : null} onHeadingFocused={(request) => setCampaignHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request && campaignDetailEntryRef.current === request ? null : current)} onBack={leaveDetail} onUnavailable={leaveDetail} onOpenRoom={(sessionId) => void openCampaignRoom(activeCampaignId, sessionId)} onOpenAdministration={(campaignName) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-administration", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignName(campaignName); setView("campaign-administration"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setWorkspaceHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId, request }); setActiveCampaignCharacterId(campaignCharacterId); setView("campaign-character"); }} />;
+  }
+  if (view === "campaign-administration" && campaignLibraryAvailable && activeCampaignId) {
+    const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };
+    const focusRequest = administrationHeadingFocusRequest?.campaignId === activeCampaignId
+      && administrationHeadingFocusRequest.request === campaignAdministrationEntryRef.current ? administrationHeadingFocusRequest.request : undefined;
+    return <CampaignAdministrationPage campaignId={activeCampaignId} campaignName={activeCampaignName} focusHeadingRequest={focusRequest} onHeadingFocused={(request) => setAdministrationHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} onBack={returnToCampaign} onUnavailable={() => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setActiveCampaignId(""); setActiveCampaignName(""); setView("campaigns"); }} />;
   }
   if (view === "campaign-character" && campaignLibraryAvailable && activeCampaignId && activeCampaignCharacterId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignCharacterId(""); setView("campaign-detail"); };

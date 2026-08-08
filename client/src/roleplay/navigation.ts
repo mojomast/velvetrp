@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-administration";
 
 export interface StoredNavigation {
   view: View;
@@ -15,7 +15,7 @@ export interface StoredNavigation {
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };
@@ -44,7 +44,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
     : [];
   if (navigation.view === "chat" && !navigation.sessionId) navigation.view = "home";
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
-  if (navigation.view === "campaign-detail" && !navigation.campaignId) navigation.view = "campaigns";
+  if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration") && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character") {
     if (!navigation.campaignId) {
       navigation.view = "campaigns";

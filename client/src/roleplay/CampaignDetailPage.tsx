@@ -10,6 +10,7 @@ export interface CampaignDetailPageProps {
   onUnavailable: () => void;
   onOpenCharacter?: (campaignCharacterId: string) => void;
   onOpenRoom?: (sessionId: string) => void;
+  onOpenAdministration?: (campaignName: string) => void;
   mechanicsEnabled?: boolean;
   /** App-owned, campaign-scoped SPA transition request. */
   focusHeadingRequest?: number;
@@ -368,7 +369,7 @@ function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string;
   };
 }
 
-export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenRoom = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
+export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBack, onUnavailable, onOpenCharacter = () => undefined, onOpenRoom = () => undefined, onOpenAdministration = () => undefined, focusHeadingRequest, onHeadingFocused = () => undefined, roomsRefreshRequest, onRoomsRefreshHandled = () => undefined, roomOpenPending = false, roomOpenFailure = null }: CampaignDetailPageProps) {
   const [campaign, setCampaign] = useState<CampaignDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -1806,7 +1807,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const roomBusy = roomActivity === "writing" || roomActivity === "reconciling";
   const pageBusy = renameBusy || setupBusy || createBusy || diceBusy || roomBusy || sharedMutationPending || roomOpenPending;
   return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-detail-heading">
-    <header className="library-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">TRUSTED LOCAL CAMPAIGN</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div></header>
+    <header className="library-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">TRUSTED LOCAL CAMPAIGN</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button>}</header>
     <section className="library-panel campaign-detail-panel" aria-busy={loading}>
       {loading && <p className="empty-state" role="status">Loading campaign…</p>}
       {!loading && failed && <div className="empty-state large" role="alert"><p>Campaign could not be loaded.</p><button className="ghost" onClick={() => void load()}>Retry</button></div>}
