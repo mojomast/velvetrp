@@ -15,6 +15,9 @@ export interface CampaignCharacterWorkspacePageProps {
   onUnavailable: () => void;
   /** App-owned request proving this workspace was opened in the current SPA transition. */
   focusHeadingRequest?: number;
+  focusSheetRequest?: number;
+  onSheetFocused?: (request: number) => void;
+  onOpenSheet?: () => void;
 }
 
 const initialWorkspaceReads = new Map<string, Promise<Awaited<ReturnType<typeof getCampaignCharacterWorkspace>>>>();
@@ -48,7 +51,7 @@ type WorkspaceFocusIntent = {
   outcome: "pending" | "success" | "failure";
 };
 
-export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId, onBack, onUnavailable, focusHeadingRequest }: CampaignCharacterWorkspacePageProps) {
+export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId, onBack, onUnavailable, focusHeadingRequest, focusSheetRequest, onSheetFocused, onOpenSheet }: CampaignCharacterWorkspacePageProps) {
   const [workspace, setWorkspace] = useState<CampaignCharacterWorkspace | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "failed">("loading");
   const mountedRef = useRef(true);
@@ -57,6 +60,7 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
   activeRef.current = { campaignId, campaignCharacterId };
   const retryRef = useRef<HTMLButtonElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const sheetButtonRef = useRef<HTMLButtonElement>(null);
   const focusIntentRef = useRef<WorkspaceFocusIntent | null>(null);
   const focusedHeadingRequestRef = useRef<number | null>(null);
   const unavailableRef = useRef(onUnavailable);
@@ -126,12 +130,18 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
     });
   }, [campaignCharacterId, campaignId, focusHeadingRequest, phase]);
 
+  useEffect(() => {
+    if (phase !== "ready" || focusSheetRequest === undefined) return;
+    queueMicrotask(() => { if (mountedRef.current) { sheetButtonRef.current?.focus(); onSheetFocused?.(focusSheetRequest); } });
+  }, [focusSheetRequest, onSheetFocused, phase]);
+
   return <main className="page library-page campaign-page workspace-page"><section className="campaign-shell" aria-labelledby="workspace-heading">
     <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CHARACTER WORKSPACE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="workspace-heading"><bdi dir="auto">{workspace?.name ?? "Character"}</bdi></h1></div></header>
     <section className="library-panel workspace-panel" aria-busy={phase === "loading"}>
       {phase === "loading" && <p className="empty-state" role="status">Loading character…</p>}
       {phase === "failed" && <div className="empty-state large" role="alert"><p>Character could not be loaded.</p><button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>Retry</button></div>}
       {phase === "ready" && workspace && <>
+        {onOpenSheet && <div className="workspace-command-bar"><button ref={sheetButtonRef} className="primary" type="button" onClick={onOpenSheet}>Open sheet, inventory & economy</button><span>Authoritative gameplay state</span></div>}
         <section className="workspace-identity" aria-label="Character metadata">
           <article><span>Race</span><h2><bdi dir="auto">{workspace.race.name}</bdi></h2><p><bdi dir="auto">{workspace.race.description}</bdi></p></article>
           <article><span>Background</span><h2><bdi dir="auto">{workspace.background.name}</bdi></h2><p><bdi dir="auto">{workspace.background.description}</bdi></p></article>

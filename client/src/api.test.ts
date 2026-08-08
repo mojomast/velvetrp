@@ -1,8 +1,56 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M2.7 actor API bindings", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const item = { kind: "item" as const, packId: "pack", packVersion: "1", definitionId: "potion" };
+  const currency = { kind: "currency" as const, packId: "pack", packVersion: "1", definitionId: "coin" };
+
+  it("uses exact no-store read paths and strict runtime parsing", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ resources: [{ name: "hp", current: 2, max: 3 }], revision: 4 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ entries: [], equipment: [], capacity: 10, revision: 4 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ wallet: { balances: [{ currency, minorUnits: 101 }] }, revision: 4 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ shop: { name: "Known" }, stock: [{ item, quantity: 1, unitPrice: { currency, minorUnits: 101 } }], currencies: [currency] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ effects: [], concentration: [], revision: 4 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await getActorResources("campaign", "actor"); await getActorInventory("campaign", "actor"); await getActorWallet("campaign", "actor"); await getCampaignShop("campaign", "shop"); await getActorEffects("actor");
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/resources", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/inventory", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/wallet", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/shops/shop", "no-store"],
+      ["/api/rpg/v1/actors/actor/effects", "no-store"],
+    ]);
+    await expect(getActorResources("bad/id", "actor")).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("requires exact inventory, economy, and rest receipts", async () => {
+    const base = { idempotencyKey: "key", revisionBefore: 4, revisionAfter: 5, occurredAt: at };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ inventory: { entries: [{ kind: "stackable", entryId: "entry", item, quantity: 1 }], equipment: [{ slot: "hand", entryId: "entry" }], capacity: 10, revision: 5 }, receipt: { kind: "equip", slot: "hand", entryId: "entry", ...base } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ type: "request_purchase_quote", quote: { quoteId: "quote", item, quantity: 2, total: { currency, minorUnits: 202 }, expiresAt: at }, receipt: { type: "request_purchase_quote", ...base } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ actorState: { resources: [{ resourceId: "hp", current: 3, capacity: 3 }], revision: 5 }, receipt: { kind: "short", recoveredAt: at, recovery: { resources: [{ resourceId: "hp", before: 2, after: 3 }] }, idempotencyKey: "key", revisionBefore: 4, revisionAfter: 5 } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(commandActorInventory("campaign", "actor", { kind: "equip", slot: "hand", entryId: "entry", expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { kind: "equip" } });
+    await expect(commandActorEconomy("campaign", "actor", { type: "request_purchase_quote", shopId: "shop", item, quantity: 2, expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ quote: { total: { minorUnits: 202 } } });
+    await expect(commandActorRest("campaign", "actor", { type: "take_short_rest", expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { kind: "short" } });
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit).method, (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/inventory-commands", "POST", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/economy-commands", "POST", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign/actors/actor/rest-commands", "POST", "no-store"],
+    ]);
+  });
+
+  it("rejects a 2xx receipt bound to another exact command", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ inventory: { entries: [], equipment: [], capacity: 10, revision: 5 }, receipt: { kind: "unequip", slot: "focus", idempotencyKey: "key", revisionBefore: 4, revisionAfter: 5, occurredAt: at } }), { status: 200 })));
+    await expect(commandActorInventory("campaign", "actor", { kind: "unequip", slot: "hand", expectedRevision: 4, idempotencyKey: "key" })).rejects.toThrow(/did not match/);
+  });
 });
 
 describe("M2.6 character API bindings", () => {

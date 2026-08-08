@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, getCampaignCharacterWorkspace } from "../api";
 import { CampaignCharacterWorkspacePage, resetCampaignCharacterWorkspacePageModuleStateForTests } from "./CampaignCharacterWorkspacePage";
+import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../components/rpg/actor/RpgCharacterSheetPage";
+import { formatMinorUnits } from "../components/rpg/actor/ShopBrowser";
 
 vi.mock("../api", async (importOriginal) => ({ ...await importOriginal<typeof import("../api")>(), getCampaignCharacterWorkspace: vi.fn() }));
 
@@ -22,7 +24,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-afterEach(() => { cleanup(); resetCampaignCharacterWorkspacePageModuleStateForTests(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); localStorage.clear(); resetCampaignCharacterWorkspacePageModuleStateForTests(); vi.resetAllMocks(); });
 
 describe("CampaignCharacterWorkspacePage", () => {
   it("renders all display-only metadata and mandatory sections without technical identities or controls", async () => {
@@ -118,5 +120,92 @@ describe("CampaignCharacterWorkspacePage", () => {
     expect(unavailable).not.toHaveBeenCalled();
     expect(document.querySelector(".workspace-page")).toBeNull();
     anchor.remove();
+  });
+});
+
+describe("RpgCharacterSheetPage", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const item = { kind: "item" as const, packId: "pack", packVersion: "1", definitionId: "potion" };
+  const currency = { kind: "currency" as const, packId: "pack", packVersion: "1", definitionId: "coin" };
+  const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 100, spellAttack: 3, saveDc: 11,
+    explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })) };
+  const sheet = { sheet: response.character, derived, progression: { mode: "xp" as const, level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
+  const resources = { resources: [{ name: "hp", current: 2, max: 10 }], revision: 4 };
+  const inventory = { entries: [{ kind: "stackable" as const, entryId: "entry", item, quantity: 2 }], equipment: [], capacity: 10, revision: 4 };
+  const wallet = { wallet: { balances: [{ currency, minorUnits: 105 }] }, revision: 4 };
+  const effects = { effects: [], concentration: [], revision: 4 };
+  const actorStorage = "velvet.actor-id.v1:8:campaigncharacter";
+
+  function actorApi(overrides: Partial<RpgCharacterSheetApi> = {}): RpgCharacterSheetApi {
+    return {
+      getSheet: vi.fn(async () => sheet as any),
+      getResources: vi.fn(async () => resources), getInventory: vi.fn(async () => inventory), getWallet: vi.fn(async () => wallet), getEffects: vi.fn(async () => effects),
+      getShop: vi.fn(async () => ({ shop: { name: "Known" }, stock: [], currencies: [] })),
+      inventoryCommand: vi.fn(async (_campaign, _actor, command) => ({ inventory: { ...inventory, revision: 5 }, receipt: { ...command, revisionBefore: 4, revisionAfter: 5, occurredAt: at } } as any)),
+      economyCommand: vi.fn(async () => { throw new Error("unused"); }), rest: vi.fn(async () => { throw new Error("unused"); }),
+      getCampaignContent: vi.fn(async () => { throw new Error("catalog unavailable"); }), getCampaignPack: vi.fn(async () => { throw new Error("unused"); }),
+      ...overrides,
+    };
+  }
+
+  it("focuses the heading, composes server values, and structurally omits unavailable actor lanes", async () => {
+    const api = actorApi({ getResources: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getInventory: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getWallet: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getEffects: vi.fn(async () => { throw new ApiError(404, "hidden"); }) });
+    localStorage.setItem(actorStorage, "actor");
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} focusHeadingRequest={9} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const heading = await screen.findByRole("heading", { name: response.character.name });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(screen.getByText("Maximum HP").nextElementSibling?.textContent).toBe("10");
+    expect(screen.queryByRole("heading", { name: "Inventory" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Wallet & shop" })).toBeNull();
+    expect(document.body.textContent).not.toContain("hidden");
+  });
+
+  it("ignores stale and unmounted sheet completions", async () => {
+    const old = deferred<typeof sheet>(); const fresh = deferred<typeof sheet>();
+    const api = actorApi({ getSheet: vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise) });
+    const unavailable = vi.fn();
+    const view = render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="old" api={api} onBack={vi.fn()} onUnavailable={unavailable} />);
+    view.rerender(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="new" api={api} onBack={vi.fn()} onUnavailable={unavailable} />);
+    fresh.resolve({ ...sheet, sheet: { ...sheet.sheet, name: "Fresh" } } as any);
+    await screen.findByRole("heading", { name: "Fresh" });
+    old.resolve({ ...sheet, sheet: { ...sheet.sheet, name: "Stale" } } as any);
+    await old.promise; expect(screen.queryByText("Stale")).toBeNull();
+    view.unmount(); expect(unavailable).not.toHaveBeenCalled();
+  });
+
+  it("persists an ambiguous write across unmount and blocks duplicate replay", async () => {
+    localStorage.setItem(actorStorage, "actor");
+    const never = new Promise<never>(() => undefined);
+    const command = vi.fn(() => never);
+    const api = actorApi({ inventoryCommand: command });
+    const view = render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Inventory" });
+    fireEvent.click(screen.getByRole("button", { name: "Review equip" }));
+    fireEvent.click(screen.getByLabelText("Confirm this exact command"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(command).toHaveBeenCalledOnce();
+    view.unmount();
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    expect(await screen.findByText(/Write outcome uncertain/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Review equip" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(command).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a confirmed receipt when its authoritative refresh fails", async () => {
+    localStorage.setItem(actorStorage, "actor");
+    const getInventory = vi.fn().mockResolvedValueOnce(inventory).mockRejectedValueOnce(new Error("refresh failed"));
+    const api = actorApi({ getInventory });
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Inventory" });
+    fireEvent.click(screen.getByRole("button", { name: "Review equip" })); fireEvent.click(screen.getByLabelText("Confirm this exact command")); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(await screen.findByText(/Command was confirmed, but authoritative refresh failed/)).toBeTruthy();
+    expect(screen.getByText(/Receipt .* revision 4 → 5/)).toBeTruthy();
+    expect(screen.getByText(/Confirmed write awaiting refresh/)).toBeTruthy();
+  });
+
+  it("formats decimal and non-decimal currency scales without float math", () => {
+    expect(formatMinorUnits(105, currency, { name: "Crowns", symbol: "¤", minorPerMajor: 100 })).toBe("¤1.05 Crowns");
+    expect(formatMinorUnits(25, currency, { name: "Marks", symbol: "M", minorPerMajor: 20 })).toBe("M1 + 5/20 Marks (exact)");
+    expect(formatMinorUnits(Number.MAX_SAFE_INTEGER, currency)).toContain("minor units (coin)");
   });
 });

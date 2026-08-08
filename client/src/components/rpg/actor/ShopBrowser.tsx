@@ -1,3 +1,4 @@
+import { resourceIdSchema } from "@velvet/contracts";
 import type { EconomyHttpCommandResponse, EconomyHttpShopGetResponse, EconomyHttpWalletGetResponse } from "@velvet/contracts";
 import { useState } from "react";
 
@@ -48,7 +49,7 @@ export function ShopBrowser({ wallet, shop, shopId, quote, currencies, disabled 
     {wallet.wallet.balances.length === 0 ? <p className="actor-empty">Wallet has no balances.</p> : <dl className="wallet-list">{wallet.wallet.balances.map((balance) => <div key={catalogReferenceKey(balance.currency)}><dt><bdi dir="auto">{currencies.get(catalogReferenceKey(balance.currency))?.name ?? balance.currency.definitionId}</bdi></dt><dd>{formatMinorUnits(balance.minorUnits, balance.currency, currencies.get(catalogReferenceKey(balance.currency)))}</dd></div>)}</dl>}
     <form className="known-shop-form" onSubmit={(event) => { event.preventDefault(); if (knownId) onLoadShop(knownId); }}>
       <label className="field">Known shop ID<input value={knownId} onChange={(event) => setKnownId(event.target.value)} autoComplete="off" /></label>
-      <button className="ghost" type="submit" disabled={disabled || knownId.length === 0}>Open known shop</button>
+      <button className="ghost" type="submit" disabled={disabled || !resourceIdSchema.safeParse(knownId).success}>Open known shop</button>
       <p className="actor-help">There is no shop discovery endpoint. Enter an ID supplied by your campaign.</p>
     </form>
     {shop && <div className="shop-stock"><h3><bdi dir="auto">{shop.shop.name}</bdi></h3>

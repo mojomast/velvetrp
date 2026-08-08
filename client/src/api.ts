@@ -41,6 +41,36 @@ import type {
   CampaignTransferHttpDryRunResponse,
 } from "@velvet/contracts";
 import {
+  actorEffectsResponseSchema,
+  actorResourcesHttpChangeCommandRequestSchema,
+  actorResourcesHttpChangeCommandResponseSchema,
+  actorResourcesHttpGetResponseSchema,
+  economyHttpCommandRequestSchema,
+  economyHttpCommandResponseSchema,
+  economyHttpShopGetResponseSchema,
+  economyHttpWalletGetResponseSchema,
+  inventoryHttpCommandRequestSchema,
+  inventoryHttpCommandResponseSchema,
+  inventoryHttpGetResponseSchema,
+  restHttpRequestSchema,
+  restHttpResponseSchema,
+} from "@velvet/contracts";
+import type {
+  ActorEffectsResponse,
+  ActorResourcesHttpChangeCommandRequest,
+  ActorResourcesHttpChangeCommandResponse,
+  ActorResourcesHttpGetResponse,
+  EconomyHttpCommandRequest,
+  EconomyHttpCommandResponse,
+  EconomyHttpShopGetResponse,
+  EconomyHttpWalletGetResponse,
+  InventoryHttpCommandRequest,
+  InventoryHttpCommandResponse,
+  InventoryHttpGetResponse,
+  RestHttpRequest,
+  RestHttpResponse,
+} from "@velvet/contracts";
+import {
   characterDraftHttpFinalizationResultSchema,
   characterDraftHttpMutationResultSchema,
   characterDraftHttpViewSchema,
@@ -934,6 +964,119 @@ export async function getCharacterSheet(campaignId: string, campaignCharacterId:
   const success = await requestResponse<unknown>(`${target.path}/sheet`, { cache: "no-store" });
   requireStatus(success, 200, "Character sheet read");
   return characterSheetHttpResponseSchema.parse(success.body);
+}
+
+function actorLanePath(campaignId: string, actorId: string): { campaignId: string; actorId: string; path: string } {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  return { campaignId: validCampaignId, actorId: validActorId,
+    path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/actors/${encodeURIComponent(validActorId)}` };
+}
+
+export async function getActorResources(campaignId: string, actorId: string): Promise<ActorResourcesHttpGetResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const success = await requestResponse<unknown>(`${target.path}/resources`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor resources read");
+  return actorResourcesHttpGetResponseSchema.parse(success.body);
+}
+
+/** Issues one exact signed adjustment. This function deliberately never retries. */
+export async function changeActorResource(campaignId: string, actorId: string, input: ActorResourcesHttpChangeCommandRequest): Promise<ActorResourcesHttpChangeCommandResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const body = parseApiInput(() => actorResourcesHttpChangeCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/resource-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor resource command");
+  const response = actorResourcesHttpChangeCommandResponseSchema.parse(success.body);
+  if (response.receipt.kind !== body.kind || response.receipt.resourceName !== body.resourceName || response.receipt.amount !== body.amount
+    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision) {
+    throw new Error("Actor resource receipt did not match the request");
+  }
+  return response;
+}
+
+export async function getActorInventory(campaignId: string, actorId: string): Promise<InventoryHttpGetResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const success = await requestResponse<unknown>(`${target.path}/inventory`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor inventory read");
+  return inventoryHttpGetResponseSchema.parse(success.body);
+}
+
+function inventoryReceiptMatches(command: InventoryHttpCommandRequest, receipt: InventoryHttpCommandResponse["receipt"]): boolean {
+  if (command.kind !== receipt.kind) return false;
+  if (command.kind === "equip" && receipt.kind === "equip") return command.slot === receipt.slot && command.entryId === receipt.entryId;
+  if (command.kind === "unequip" && receipt.kind === "unequip") return command.slot === receipt.slot;
+  if (command.kind === "consume" && receipt.kind === "consume") return command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
+  if (command.kind === "drop" && receipt.kind === "drop") return command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
+  return command.kind === "gift" && receipt.kind === "gift" && command.recipientActorId === receipt.recipientActorId
+    && command.entryId === receipt.entryId && command.quantity === receipt.quantity && JSON.stringify(command.item) === JSON.stringify(receipt.item);
+}
+
+/** Submits one legal M2.7 inventory discriminant and requires its exact receipt. */
+export async function commandActorInventory(campaignId: string, actorId: string, input: InventoryHttpCommandRequest): Promise<InventoryHttpCommandResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const body = parseApiInput(() => inventoryHttpCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/inventory-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor inventory command");
+  const response = inventoryHttpCommandResponseSchema.parse(success.body);
+  if (!inventoryReceiptMatches(body, response.receipt) || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision || response.inventory.revision !== response.receipt.revisionAfter) {
+    throw new Error("Actor inventory receipt did not match the request");
+  }
+  return response;
+}
+
+export async function getActorWallet(campaignId: string, actorId: string): Promise<EconomyHttpWalletGetResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const success = await requestResponse<unknown>(`${target.path}/wallet`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor wallet read");
+  return economyHttpWalletGetResponseSchema.parse(success.body);
+}
+
+export async function getCampaignShop(campaignId: string, shopId: string): Promise<EconomyHttpShopGetResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const validShopId = parseApiInput(() => resourceIdSchema.parse(shopId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/shops/${encodeURIComponent(validShopId)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign shop read");
+  return economyHttpShopGetResponseSchema.parse(success.body);
+}
+
+/** Submits one canonical economy command and binds its discriminated result. */
+export async function commandActorEconomy(campaignId: string, actorId: string, input: EconomyHttpCommandRequest): Promise<EconomyHttpCommandResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const body = parseApiInput(() => economyHttpCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/economy-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor economy command");
+  const response = economyHttpCommandResponseSchema.parse(success.body);
+  const resultMatches = body.type === "request_purchase_quote" && response.type === body.type
+    ? response.quote.quantity === body.quantity && JSON.stringify(response.quote.item) === JSON.stringify(body.item)
+    : body.type === "purchase_from_shop" && response.type === body.type
+      ? response.purchase.quoteId === body.quoteId
+      : body.type === "propose_bilateral_trade" && response.type === body.type && response.trade.tradeId === body.tradeId;
+  if (!resultMatches || response.receipt.type !== body.type || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision) throw new Error("Actor economy receipt did not match the request");
+  return response;
+}
+
+/** Rest recovery is wholly server-owned and accepted only with a bound receipt/state revision. */
+export async function commandActorRest(campaignId: string, actorId: string, input: RestHttpRequest): Promise<RestHttpResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const body = parseApiInput(() => restHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/rest-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor rest command");
+  const response = restHttpResponseSchema.parse(success.body);
+  const expectedKind = body.type === "take_short_rest" ? "short" : "long";
+  if (response.receipt.kind !== expectedKind || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision || response.actorState.revision !== response.receipt.revisionAfter) {
+    throw new Error("Actor rest receipt did not match the request");
+  }
+  return response;
+}
+
+export async function getActorEffects(actorId: string): Promise<ActorEffectsResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effects`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor effects read");
+  return actorEffectsResponseSchema.parse(success.body);
 }
 
 export async function getCharacterProgression(campaignId: string, campaignCharacterId: string): Promise<CharacterProgressionHttpState> {

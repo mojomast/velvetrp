@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-builder" | "campaign-administration" | "content-packs";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-sheet" | "campaign-character-builder" | "campaign-administration" | "content-packs";
 
 export interface StoredNavigation {
   view: View;
@@ -17,7 +17,7 @@ export interface StoredNavigation {
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-builder", "campaign-administration", "content-packs"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "content-packs"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };
@@ -60,7 +60,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
   if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration") && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character-builder" && !navigation.campaignId) navigation.view = "campaigns";
-  if (navigation.view === "campaign-character") {
+  if (navigation.view === "campaign-character" || navigation.view === "campaign-character-sheet") {
     if (!navigation.campaignId) {
       navigation.view = "campaigns";
       delete navigation.campaignCharacterId;

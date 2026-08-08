@@ -1,3 +1,4 @@
+import { resourceIdSchema } from "@velvet/contracts";
 import type { EconomyHttpCommandRequest, EconomyHttpWalletGetResponse, InventoryHttpGetResponse } from "@velvet/contracts";
 import { useEffect, useRef, useState } from "react";
 import { catalogReferenceKey, formatMinorUnits, type CurrencyPresentations } from "./ShopBrowser";
@@ -36,7 +37,7 @@ export function TradeReviewDialog({ open, inventory, wallet, currencies, disable
   const selectedBalance = wallet.wallet.balances.find((balance) => catalogReferenceKey(balance.currency) === currencyKey);
   const quantity = /^\d+$/.test(itemQuantity) ? Number(itemQuantity) : 0;
   const requestedMinor = /^\d+$/.test(minorUnits) ? Number(minorUnits) : 0;
-  const valid = Boolean(selectedEntry && selectedBalance && recipient && tradeId
+  const valid = Boolean(selectedEntry && selectedBalance && resourceIdSchema.safeParse(recipient).success && resourceIdSchema.safeParse(tradeId).success
     && Number.isSafeInteger(quantity) && quantity >= 1 && quantity <= 1_000_000
     && Number.isSafeInteger(requestedMinor) && requestedMinor >= 1);
   function submit() {

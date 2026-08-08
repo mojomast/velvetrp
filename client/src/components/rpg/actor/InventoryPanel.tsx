@@ -1,3 +1,4 @@
+import { resourceIdSchema } from "@velvet/contracts";
 import type { InventoryHttpCommandRequest, InventoryHttpGetResponse } from "@velvet/contracts";
 import { useState } from "react";
 import { EquipmentSlots } from "./EquipmentSlots";
@@ -46,7 +47,7 @@ export function InventoryPanel({ inventory, disabled = false, describeItem, onCo
               <button className="ghost" type="button" disabled={disabled || !legalQuantity} onClick={() => itemCommand("consume")}>Review consume</button>
               <button className="ghost" type="button" disabled={disabled || !legalQuantity} onClick={() => itemCommand("drop")}>Review drop</button>
               <label className="compact-recipient">Recipient actor ID<input aria-label={`Gift ${presentation.name} recipient actor ID`} value={recipient} onChange={(event) => setRecipient(event.target.value)} /></label>
-              <button className="ghost" type="button" disabled={disabled || !legalQuantity || recipient.length === 0} onClick={() => begin({ kind: "gift", recipientActorId: recipient, entryId: entry.entryId, item: entry.item, quantity: exactQuantity })}>Review gift</button>
+              <button className="ghost" type="button" disabled={disabled || !legalQuantity || !resourceIdSchema.safeParse(recipient).success} onClick={() => begin({ kind: "gift", recipientActorId: recipient, entryId: entry.entryId, item: entry.item, quantity: exactQuantity })}>Review gift</button>
             </div>
           </li>;
         })}
