@@ -134,7 +134,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       setError(preserveCurrent
         ? "The command receipt confirmed success, but fresh authoritative state could not be loaded. Refresh before another write."
         : "Campaign administration could not be loaded.");
-      if (explicitRefresh) queueMicrotask(() => (preserveCurrent ? statusRef.current : retryRef.current)?.focus());
+      if (explicitRefresh || !preserveCurrent) queueMicrotask(() => (preserveCurrent ? statusRef.current : retryRef.current)?.focus());
       return false;
     }
   }, [campaignId, focusHeadingRequest, initialName, onUnavailable]);
