@@ -109,6 +109,24 @@ describe("M1.8 world repository", () => {
     f.db.close(); f.repo.close();
   });
 
+  it("projects the unique campaign world and replays full actor-bound travel results",async()=>{
+    const f=await fixture();
+    const initial=f.repo.getCampaignWorld("local-owner",f.campaignId)!;
+    expect(initial).toMatchObject({campaignId:f.campaignId,sessionId:f.sessionId,revision:0,
+      currentLocations:expect.arrayContaining([{actorId:f.owner.actorId,locationId:"origin",revision:0,updatedAt:at}])});
+    expect(initial.visibleLocations.map((location)=>location.locationId)).toEqual(["destination","origin","secret"]);
+    const command={connectionId:"road",partyActorIds:[f.owner.actorId,f.companion.actorId],expectedRevision:0,idempotencyKey:"http-travel"};
+    const first=f.repo.travelActor("local-owner",f.owner.actorId,command);
+    expect(first).toMatchObject({campaignId:f.campaignId,sessionId:f.sessionId,
+      locations:[{actorId:f.owner.actorId,locationId:"destination",revision:1},{actorId:f.companion.actorId,locationId:"destination",revision:1}],
+      discoveries:[{actorId:f.owner.actorId,locationId:"destination"},{actorId:f.companion.actorId,locationId:"destination"}],
+      receipt:{revisionBefore:0,revisionAfter:1}});
+    expect(f.repo.travelActor("local-owner",f.owner.actorId,command)).toEqual(first);
+    expect(f.repo.getCampaignWorld("local-owner",f.campaignId)).toMatchObject({revision:1});
+    expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,{...command,expectedRevision:1})).toThrow(WorldConflictError);
+    f.db.close();f.repo.close();
+  });
+
   it("projects only a player's discoveries, controlled locations, and no secret world state", async () => {
     const f = await fixture();
     f.repo.executeWorldCommand("local-owner", f.sessionId, { type: "discover_location", campaignId: f.campaignId, actorId: f.player.actorId, locationId: "origin", expectedRevision: 0, idempotencyKey: "discover-origin" });

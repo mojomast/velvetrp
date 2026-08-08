@@ -15,6 +15,8 @@ export {
   type MutationReceipt,
   type WorldDependencies,
   type WorldReceipt,
+  type WorldCampaignHttpSnapshot,
+  type ActorTravelResult,
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */

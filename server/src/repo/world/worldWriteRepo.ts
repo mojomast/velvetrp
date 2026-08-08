@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   changeReputationCommandSchema,
+  actorTravelCommandRequestSchema,
+  actorTravelCommandResponseSchema,
   discoverLocationCommandSchema,
   resourceIdSchema,
   setActorLocationCommandSchema,
@@ -9,6 +11,8 @@ import {
   utcIsoTimestampSchema,
   worldCommandSchema,
   type TravelCommand,
+  type ActorTravelCommandRequest,
+  type ActorTravelCommandResponse,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
 
@@ -35,6 +39,8 @@ export type WorldReceipt = {
 export type MutationReceipt = {
   receipt: { commandId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; occurredAt: string };
 };
+export type ActorTravelResult=Omit<ActorTravelCommandResponse,"receipt">&{campaignId:string;sessionId:string;
+  receipt:{commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string}};
 
 /** Lifecycle and runtime services required by world command handlers. */
 export interface WorldWriteContext extends WorldDependencies {
@@ -48,6 +54,7 @@ export interface WorldWriteRepository {
   executeWorldCommand(principalId: string, sessionId: string, command: unknown): WorldReceipt | MutationReceipt;
   /** Moves a controlled party across an available connection. */
   travel(principalId: string, sessionId: string, command: TravelCommand): WorldReceipt;
+  travelActor(principalId:string,actorId:string,input:ActorTravelCommandRequest):ActorTravelResult;
   /** Sets an actor's session location with GM authority. */
   setActorLocation(principalId: string, sessionId: string, command: unknown): MutationReceipt;
   /** Creates a campaign location with GM authority. */
@@ -129,6 +136,76 @@ export function createWorldWriteRepository(
       const result: WorldReceipt = { travelId: command.travelId, destinationLocationId: route.to_location_id, receipt: { commandId: mutation.commandId, idempotencyKey: command.idempotencyKey, revisionBefore: mutation.before, revisionAfter: mutation.after, occurredAt: mutation.at } }; record(command, sessionId, "travel", command.selectedPartyActorIds[0], mutation, result, "travelled", { travelId: command.travelId, destinationLocationId: route.to_location_id }); for (const actorId of command.selectedPartyActorIds) { db.prepare("INSERT INTO world_travel_party_members_v28 VALUES(?,?,?,?)").run(command.campaignId, sessionId, mutation.commandId, actorId); db.prepare("UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=? WHERE campaign_id=? AND actor_id=? AND session_id=?").run(route.to_location_id, mutation.at, command.campaignId, actorId, sessionId); } db.prepare("INSERT INTO world_travel_destinations_v28 VALUES(?,?,?,?,?)").run(command.campaignId, sessionId, mutation.commandId, route.connection_id, route.to_location_id); return result;
     }).immediate();
   }
+  function travelActor(principalId:string,actorIdInput:string,input:ActorTravelCommandRequest):ActorTravelResult{
+    context.guard();const actorId=resourceIdSchema.parse(actorIdInput),intent=actorTravelCommandRequestSchema.parse(input);
+    return db.transaction(()=>{
+      const actor=db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(actorId) as {campaign_id:string}|undefined;
+      if(!actor)throw new WorldUnavailableError("actor world state is unavailable");
+      const sessions=db.prepare("SELECT session_id FROM campaign_sessions WHERE campaign_id=? ORDER BY attached_at,session_id")
+        .all(actor.campaign_id) as Array<{session_id:string}>;
+      if(sessions.length===0)throw new WorldUnavailableError("campaign world session is unavailable");
+      if(sessions.length!==1)throw new WorldConflictError("campaign world session is ambiguous");
+      const sessionId=sessions[0]!.session_id;
+      if(!intent.partyActorIds.includes(actorId))throw new WorldConflictError("route actor must belong to the travel party");
+      const travelId=`travel:${digest({campaignId:actor.campaign_id,sessionId,actorId,idempotencyKey:intent.idempotencyKey}).slice(0,40)}`;
+      const raw={type:"travel" as const,campaignId:actor.campaign_id,travelId,
+        locationConnectionId:intent.connectionId,selectedPartyActorIds:intent.partyActorIds,
+        expectedRevision:intent.expectedRevision,idempotencyKey:intent.idempotencyKey};
+      const mutation=begin(principalId,sessionId,raw,"travel",()=>{
+        if(!gm(principalId,actor.campaign_id)&&intent.partyActorIds.some((partyActorId)=>
+          !controls(principalId,actor.campaign_id,partyActorId)))throw new WorldAuthorizationError("party control is required");
+      });
+      if(mutation.replay)return JSON.parse(mutation.replay.canonical_result_json);
+      const command=mutation.command;
+      const route=db.prepare("SELECT * FROM campaign_location_connections_v28 WHERE campaign_id=? AND connection_id=?")
+        .get(command.campaignId,command.locationConnectionId) as any;
+      const isGm=gm(principalId,command.campaignId);
+      if(!route||route.route_state!=="open"||(!isGm&&route.visibility==="gm"))
+        throw new WorldUnavailableError("route is unavailable");
+      const positions:any[]=[];
+      for(const partyActorId of command.selectedPartyActorIds){
+        const position=db.prepare(`SELECT location_id,state_revision FROM campaign_actor_locations_v28
+          WHERE campaign_id=? AND actor_id=? AND session_id=?`).get(command.campaignId,partyActorId,sessionId) as any;
+        if(!position||position.location_id!==route.from_location_id)
+          throw new WorldUnavailableError("party is not adjacent to route");
+        if((route.visibility==="discovered"||route.requirement_kind==="discovery")
+          &&!db.prepare(`SELECT 1 FROM campaign_location_discoveries_v28
+            WHERE campaign_id=? AND actor_id=? AND location_id=?`).get(command.campaignId,partyActorId,route.to_location_id))
+          throw new WorldUnavailableError("route destination is undiscovered");
+        if(route.requirement_kind==="faction_reputation"){
+          const total=(db.prepare(`SELECT coalesce(sum(delta),0) total FROM campaign_reputation_ledger_v28
+            WHERE campaign_id=? AND actor_id=? AND faction_id=?`).get(command.campaignId,partyActorId,route.required_faction_id) as {total:number}).total;
+          if(total<route.minimum_reputation)throw new WorldUnavailableError("route requirement is not met");
+        }
+        positions.push({actorId:partyActorId,revision:position.state_revision});
+      }
+      const discoveries=positions.map((position)=>{
+        const existing=db.prepare(`SELECT discovered_at FROM campaign_location_discoveries_v28
+          WHERE campaign_id=? AND actor_id=? AND location_id=?`).get(command.campaignId,position.actorId,route.to_location_id) as any;
+        return {actorId:position.actorId,locationId:route.to_location_id,discoveredAt:existing?.discovered_at??mutation.at};
+      });
+      const locations=positions.map((position)=>({actorId:position.actorId,locationId:route.to_location_id,
+        revision:position.revision+1,updatedAt:mutation.at}));
+      const result:ActorTravelResult={campaignId:command.campaignId,sessionId,locations,discoveries,
+        receipt:{commandId:mutation.commandId,idempotencyKey:command.idempotencyKey,
+          revisionBefore:mutation.before,revisionAfter:mutation.after,occurredAt:mutation.at}};
+      actorTravelCommandResponseSchema.parse({locations,discoveries,receipt:{idempotencyKey:result.receipt.idempotencyKey,
+        revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}});
+      record(command,sessionId,"travel",actorId,mutation,result,"travelled",{travelId,destinationLocationId:route.to_location_id});
+      for(const position of positions){
+        db.prepare("INSERT INTO world_travel_party_members_v28 VALUES(?,?,?,?)")
+          .run(command.campaignId,sessionId,mutation.commandId,position.actorId);
+        db.prepare(`UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=?
+          WHERE campaign_id=? AND actor_id=? AND session_id=?`)
+          .run(route.to_location_id,mutation.at,command.campaignId,position.actorId,sessionId);
+        db.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)")
+          .run(command.campaignId,position.actorId,route.to_location_id,mutation.at);
+      }
+      db.prepare("INSERT INTO world_travel_destinations_v28 VALUES(?,?,?,?,?)")
+        .run(command.campaignId,sessionId,mutation.commandId,route.connection_id,route.to_location_id);
+      return result;
+    }).immediate();
+  }
   function changeReputation(principalId: string, sessionId: string, raw: unknown): MutationReceipt {
     context.guard(); return db.transaction(() => { const mutation = begin(principalId, sessionId, changeReputationCommandSchema.parse(raw), "change_reputation", () => requireGm(principalId, (raw as any).campaignId)); if (mutation.replay) return JSON.parse(mutation.replay.canonical_result_json); const command = mutation.command;
       if (!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(command.campaignId, command.actorId) || !db.prepare("SELECT 1 FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?").get(command.campaignId, command.factionId)) throw new WorldUnavailableError("reputation subject is unavailable"); const reputationLedgerEntryId = command.reputationLedgerEntryId ?? id(); const result = { reputationLedgerEntryId, ...receipt(mutation, command.idempotencyKey) }; record(command, sessionId, "change_reputation", command.actorId, mutation, result, "reputation_changed", { actorId: command.actorId, factionId: command.factionId, delta: command.delta }); db.prepare("INSERT INTO campaign_reputation_ledger_v28 VALUES(?,?,?,?,?,?,?,?,?)").run(reputationLedgerEntryId, command.campaignId, sessionId, command.actorId, command.factionId, command.delta, command.reason, mutation.commandId, mutation.at); return result;
@@ -139,5 +216,5 @@ export function createWorldWriteRepository(
   function createNpc(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); if (input.speechControl !== undefined && input.speechControl !== "manual") throw new WorldUnavailableError("NPC AI speech is unavailable"); const persona = db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(input.personaId) as any; if (!persona || persona.fictional_confirmed !== 1 || persona.is_real_person !== 0) throw new WorldUnavailableError("NPC persona must be fictional and confirmed"); if (db.prepare("SELECT 1 FROM campaign_actors a JOIN campaign_characters cc ON cc.id=a.campaign_character_id AND cc.campaign_id=a.campaign_id WHERE a.campaign_id=? AND cc.character_id=?").get(campaignId, input.personaId)) throw new WorldConflictError("a campaign character cannot be NPC-controlled"); const npcId = input.npcId ?? id(); db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)").run(npcId, campaignId, input.personaId, "manual", String(input.name).trim(), now()); return { npcId, campaignId }; }
   function executeWorldCommand(principalId: string, sessionId: string, input: unknown): WorldReceipt | MutationReceipt { const command = worldCommandSchema.parse(input); switch (command.type) { case "travel": return travel(principalId, sessionId, command); case "set_actor_location": return setActorLocation(principalId, sessionId, command); case "discover_location": return discoverLocation(principalId, sessionId, command); case "change_reputation": return changeReputation(principalId, sessionId, command); } }
 
-  return { executeWorldCommand, travel, setActorLocation, createLocation, createLocationConnection, createNpc, changeReputation };
+  return { executeWorldCommand, travel,travelActor, setActorLocation, createLocation, createLocationConnection, createNpc, changeReputation };
 }

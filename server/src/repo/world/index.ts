@@ -3,6 +3,7 @@ export {
   createWorldReadRepository,
   type WorldReadContext,
   type WorldReadRepository,
+  type WorldCampaignHttpSnapshot,
 } from "./worldReadRepo.js";
 export {
   createWorldWriteRepository,
@@ -15,4 +16,5 @@ export {
   type WorldReceipt,
   type WorldWriteContext,
   type WorldWriteRepository,
+  type ActorTravelResult,
 } from "./worldWriteRepo.js";
