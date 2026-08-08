@@ -9,6 +9,8 @@ export {
 export {
   createEncounterReadRepository,
   type EncounterReadDependencies,
+  type EncounterCombatSnapshot,
+  type EncounterLifecycleSnapshot,
   type EncounterReadRepository,
 } from "./encounterReadRepo.js";
 export {

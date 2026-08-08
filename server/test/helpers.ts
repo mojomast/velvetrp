@@ -123,6 +123,7 @@ export function removeFutureChecksPowersEffectsV26(db:import("better-sqlite3").D
 
 /** Remove every v27 combat artifact before constructing a historical fixture. */
 export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Database):void{
+  removeFutureEncounterLifecycleV31(db);
   removeFutureWorldTravelNpcFactionV28(db);
   const combatTables = "('encounter','combatant','combat_log','reward_bundle','reward_entry_v27','reward_claim_v27')";
   const artifacts = `(name IN ${combatTables} OR name GLOB '*_v27' OR name GLOB '*_v27_*' OR tbl_name IN ${combatTables} OR tbl_name GLOB '*_v27' OR tbl_name GLOB '*_v27_*')`;
@@ -134,6 +135,20 @@ export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Data
   for(const index of indexes)db.exec(`DROP INDEX ${index.name}`);
   const tables=db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND ${artifacts}`).all() as Array<{name:string}>;
   for(const table of tables)db.exec(`DROP TABLE ${table.name}`);
+}
+
+/** Remove additive v31 lifecycle sidecars before dropping their v27 parents. */
+export function removeFutureEncounterLifecycleV31(db:import("better-sqlite3").Database):void{
+  db.exec(`DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_immutable_delete;
+    DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_immutable_update;
+    DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_exact_combatant;
+    DROP TRIGGER IF EXISTS encounter_lifecycle_v31_immutable_delete;
+    DROP TRIGGER IF EXISTS encounter_lifecycle_v31_immutable_update;
+    DROP TRIGGER IF EXISTS encounter_lifecycle_v31_exact_ancestry;
+    DROP INDEX IF EXISTS idx_encounter_enemy_provenance_v31_encounter;
+    DROP INDEX IF EXISTS idx_encounter_lifecycle_v31_campaign;
+    DROP TABLE IF EXISTS encounter_enemy_provenance_v31;
+    DROP TABLE IF EXISTS encounter_lifecycle_v31;`);
 }
 
 /** Remove every v28 world/travel artifact before constructing a historical fixture. */

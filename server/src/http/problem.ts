@@ -40,6 +40,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/actors\/[^/]+\/effect-commands$/.test(path)) {
     return "/api/rpg/v1/actors/:actorId/effect-commands";
   }
+  if (/^\/api\/rpg\/v1\/encounters\/[^/]+\/start-commands$/.test(path)) {
+    return "/api/rpg/v1/encounters/:encounterId/start-commands";
+  }
   if (path === "/api/rpg/v1/content-packs" || path === "/api/rpg/v1/content-packs/validate") return path;
   if (/^\/api\/rpg\/v1\/content-packs\/[^/]+\/versions\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/content-packs/:packId/versions/:packVersion";
@@ -58,7 +61,8 @@ function safeProblemInstance(requestTarget: string): string {
     || suffix === "/characters/creation-options"
     || suffix === "/rooms"
     || suffix === "/memberships"
-    || suffix === "/dice-rolls") {
+    || suffix === "/dice-rolls"
+    || suffix === "/encounters") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (suffix === "/administration" || suffix === "/character-drafts" || suffix === "/export") {

@@ -18,6 +18,8 @@ export {
 } from "./encounter/index.js";
 export type {
   EncounterDependencies,
+  EncounterCombatSnapshot,
+  EncounterLifecycleSnapshot,
   EncounterReceipt,
   EncounterResult,
 } from "./encounter/index.js";

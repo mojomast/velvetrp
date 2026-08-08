@@ -27,6 +27,7 @@ interface NormalizedCampaignResourceRoute {
   hasQuery: boolean;
   queryDetail: string | null;
   mechanics?: boolean;
+  combat?: boolean;
   noStore?: boolean;
 }
 
@@ -89,6 +90,16 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/encounters\/[^/]+\/start-commands$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/encounters/:encounterId/start-commands",
+      hasQuery,
+      queryDetail: method === "POST" ? "Encounter start does not accept query parameters" : null,
+      mechanics: true,
+      combat: true,
+      noStore: true,
+    };
+  }
 
   if (/^\/api\/rpg\/v1\/campaign-imports\/[^/]+\/apply$/.test(instance)) {
     return {
@@ -116,6 +127,18 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
         ? "Campaign dice history does not accept query parameters"
         : method === "POST" ? "Campaign dice roll does not accept query parameters" : null,
       mechanics: true,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/encounters$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/encounters",
+      hasQuery,
+      queryDetail: method === "GET"
+        ? "Encounter list does not accept query parameters"
+        : method === "POST" ? "Encounter creation does not accept query parameters" : null,
+      mechanics: true,
+      combat: true,
       noStore: true,
     };
   }
@@ -352,6 +375,7 @@ export function buildApp(options: {
         if (normalizedRoute.noStore === true) reply.raw.setHeader("cache-control", "no-store");
         const flags = readRpgFeatureFlags();
         if (!flags.campaign || (normalizedRoute.mechanics === true && !flags.mechanics)
+            || (normalizedRoute.combat === true && !flags.combat)
             || normalizedRoute.queryDetail === null) {
           return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
             instance: normalizedRoute.instance,
@@ -387,9 +411,10 @@ export function buildApp(options: {
           || normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/power-commands";
         const isActorEffects = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/effects"
           || normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/effect-commands";
+        const isEncounter = normalizedRoute.instance === "/api/rpg/v1/encounters/:encounterId/start-commands";
         return sendApiProblem(request, reply, 404,
-          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isActorCheck ? "Actor check state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
+          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isEncounter ? "RPG_ENCOUNTER_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isActorCheck ? "Actor check state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isEncounter ? "Encounter not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }
@@ -469,6 +494,12 @@ export function buildApp(options: {
               : instance.endsWith("/powers")
                 ? "/api/rpg/v1/actors/:actorId/powers"
                 : "/api/rpg/v1/actors/:actorId/check-commands",
+      });
+    }
+    if (/^\/api\/rpg\/v1\/encounters\/[^/]+\/start-commands$/.test(instance)) {
+      reply.header("cache-control", "no-store");
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
+        instance: "/api/rpg/v1/encounters/:encounterId/start-commands",
       });
     }
     return reply.code(404).send({

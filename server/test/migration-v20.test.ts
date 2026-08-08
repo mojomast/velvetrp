@@ -63,7 +63,7 @@ describe("schema v19 to v20 draft provenance migration",()=>{
       receipts:before.prepare("SELECT * FROM character_draft_receipts_v19 ORDER BY command_id").all(),
       revisions:before.prepare("SELECT * FROM character_draft_revisions_v19 ORDER BY revision").all()};before.close();
     createRepository({dataDir:dir}).close();const migrated=new DatabaseDriver(file(dir),{readonly:true});
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"30"});
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"31"});
     expect({draft:migrated.prepare("SELECT * FROM character_drafts_v19 WHERE id=?").get(identity.draftId),
       commands:migrated.prepare("SELECT * FROM character_draft_commands_v19 ORDER BY command_id").all(),
       events:migrated.prepare("SELECT * FROM character_draft_events_v19 ORDER BY event_id").all(),
@@ -141,7 +141,7 @@ describe("schema v19 to v20 draft provenance migration",()=>{
     const verify=new DatabaseDriver(file(dir),{readonly:true});
     expect(verify.prepare("SELECT created_by_principal_id FROM character_drafts_v19 WHERE id=?").get(identity.draftId))
       .toEqual({created_by_principal_id:"forged-creator"});
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:phase==="migration"?"19":"30"});
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:phase==="migration"?"19":"31"});
     verify.close();
   });
 
