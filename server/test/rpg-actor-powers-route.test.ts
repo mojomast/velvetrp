@@ -65,4 +65,9 @@ describe("POST /api/rpg/v1/actors/:actorId/power-commands",()=>{
     expect((await app.inject({method:"HEAD",url:"/api/rpg/v1/actors/actor/power-commands"})).statusCode).toBe(404);await app.close();
     for(const [error,status,code] of [[new ActorPowerNotFoundError("private missing"),404,"RPG_ACTOR_POWERS_NOT_FOUND"],[new M16StaleError("private stale"),409,"RPG_ACTOR_POWER_STALE"],[new ActorPowerConflictError("private conflict"),409,"RPG_ACTOR_POWER_CONFLICT"]] as const){const failed=buildApp({campaignRepositoryFactory:()=>repository(()=>snapshot,()=>{throw error;})});const response=await failed.inject({method:"POST",url:"/api/rpg/v1/actors/actor/power-commands",headers:{"content-type":"application/json"},payload:request});expect(response.statusCode).toBe(status);expect(response.json()).toMatchObject({code});expect(response.body).not.toContain(error.message);await failed.close();}
   });
+
+  it("accepts the server-resolved source identity for a self request with no submitted targets",async()=>{
+    enable();const selfRequest={...request,targetIds:[]};const selfResult={...result,resolution:{...result.resolution,targetIds:["actor"]},actorStates:[result.actorStates[0]!]};
+    const app=buildApp({campaignRepositoryFactory:()=>repository(()=>snapshot,()=>selfResult)});const response=await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/power-commands",headers:{"content-type":"application/json"},payload:selfRequest});expect(response.statusCode).toBe(200);expect(response.json().resolution.targetIds).toEqual(["actor"]);await app.close();
+  });
 });

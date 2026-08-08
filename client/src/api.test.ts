@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
-import { getActorPowers, getCombatLog, getCombatState, resolveCombatAction } from "./api";
+import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog, getCombatState, resolveCombatAction } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -73,7 +73,7 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
 
   it("uses strict no-store paths and binds the exact log query cursor", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ known: [], prepared: [], slots: [], uses: [], legalNow: [], revision: 0 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(combat), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ entries: [{ logEntryId: "log", sequence: 8, occurredAt: "2030-01-01T00:00:00.000Z", event: { kind: "turn_advanced", combatantId: "one" } }], nextAfterSequence: 8 }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -94,6 +94,16 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
   it("rejects malformed success statuses before accepting a body", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(combat), { status: 201 })));
     await expect(getCombatState("combat")).rejects.toThrow(/documented status/);
+  });
+
+  it("accepts a self power's server-resolved source target and reads exact immutable combat results",async()=>{
+    const power={kind:"ability" as const,packId:"pack",packVersion:"1",definitionId:"self"};
+    const powerResponse={resolution:{powerUseId:"use",powerRef:power,targetIds:["actor"],costs:[],outcomes:[],stateDeltas:[]},actorStates:[{actorId:"actor",resources:[],activeEffects:[],revision:2}],receipt:{idempotencyKey:"self-key",revisionBefore:1,revisionAfter:2,occurredAt:"2030-01-01T00:00:00.000Z"}};
+    const result={operation:"action",result:{resolution:{actionId:"action",legalActionId:"end",kind:"end-turn",actingCombatantId:"one",targetIds:[],outcomes:[],roundBefore:1,roundAfter:1,currentCombatantBefore:"one",currentCombatantAfter:null},combat:{combatId:"combat",round:1,currentCombatant:null,combatants:combat.combatants,legalActions:[],revision:3},receipt:{idempotencyKey:"result-key",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"}}};
+    const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(powerResponse),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify(result),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(commandActorPower("actor",{powerRef:power,targetIds:[],choices:[],expectedRevision:1,idempotencyKey:"self-key"})).resolves.toEqual(powerResponse);
+    await expect(getCombatCommandResult("campaign","combat","result-key")).resolves.toEqual(result);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/rpg/v1/campaigns/campaign/combats/combat/command-results/result-key");
   });
 });
 

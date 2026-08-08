@@ -65,8 +65,11 @@ export const actorPowersHttpRoutes:FastifyPluginAsync<ActorPowersHttpOptions>=as
       try{
         const result=options.powerRepositoryAccessor().useActorPower(LOCAL_OWNER,actorId.data,body.data);
         const response=actorPowerCommandResponseSchema.parse({resolution:result.resolution,actorStates:result.actorStates,receipt:{idempotencyKey:result.receipt.idempotencyKey,revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}});
+        const targetsMatch=JSON.stringify(response.resolution.targetIds)===JSON.stringify(body.data.targetIds)
+          ||(body.data.targetIds.length===0&&response.resolution.targetIds.length===1&&response.resolution.targetIds[0]===actorId.data);
         if(response.actorStates[0]?.actorId!==actorId.data
           || JSON.stringify(response.resolution.powerRef)!==JSON.stringify(body.data.powerRef)
+          ||!targetsMatch
           || response.receipt.idempotencyKey!==body.data.idempotencyKey
           || response.receipt.revisionBefore!==body.data.expectedRevision)throw new Error("actor power result binding is invalid");
         return reply.code(200).send(response);

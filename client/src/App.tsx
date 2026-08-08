@@ -2,9 +2,9 @@ import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect,
 import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  commandActorEconomy, commandActorInventory, commandActorRest, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getCampaignContent, getCampaignContentPack, getCampaignShop, getCharacterDraft, getCharacterSheet, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
+  commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getCampaignContent, getCampaignContentPack, getCampaignShop, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listAllContentPackPublications, publishContentPack, resolveCombatAction, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  listAllContentPackPublications, listCampaignEncounters, publishContentPack, resolveCombatAction, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -57,8 +57,9 @@ const rpgCharacterSheetApi: RpgCharacterSheetApi = {
   getCampaignPack: getCampaignContentPack,
 };
 const combatTrackerApi: CombatTrackerApi = {
-  getCombat: getCombatState, getCombatLog, resolveAction: resolveCombatAction,
-  getPowers: getActorPowers, getEffects: getActorEffects,
+  listEncounters: listCampaignEncounters, getCombat: getCombatState, getCombatLog, resolveAction: resolveCombatAction,
+  getCommandResult: getCombatCommandResult, getPowers: getActorPowers, getEffects: getActorEffects,
+  getResources: getActorResources, usePower: commandActorPower,
 };
 
 export default function App() {
@@ -414,7 +415,7 @@ export default function App() {
   }
   if (view === "campaign-combat" && campaignLibraryAvailable && campaignMechanicsAvailable && combatAvailable && activeCampaignId) {
     const returnFromCombat = () => { cancelRoomOpenForNavigation(); const destination = combatReturnView === "campaign-character-sheet" && activeCampaignCharacterId ? "campaign-character-sheet" : "campaign-detail"; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setCombatReturnFocusRequest(request); setView(destination); };
-    return <CombatTrackerPage api={combatTrackerApi} onBack={returnFromCombat} onUnavailable={returnFromCombat} focusHeadingRequest={combatEntryRef.current || undefined} />;
+    return <CombatTrackerPage api={combatTrackerApi} campaignId={activeCampaignId} onBack={returnFromCombat} onUnavailable={returnFromCombat} focusHeadingRequest={combatEntryRef.current || undefined} />;
   }
   if (view === "campaign-character-builder" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };

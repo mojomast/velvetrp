@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CombatTrackerPage, type CombatTrackerApi } from "./CombatTrackerPage";
 import { InitiativeRail } from "./InitiativeRail";
 import { LegalActionTray } from "./LegalActionTray";
+import { PowerLibraryPanel } from "./PowerLibraryPanel";
 
 const at = "2030-01-01T00:00:00.000Z";
 const combat: CombatReadResponse = {
@@ -24,16 +25,20 @@ const response: CombatActionCommandResponse = {
   combat: { combatId: "combat-one", ...combat, currentCombatant: "combatant-two", revision: 5, combatants: [combat.combatants[0]!, { ...combat.combatants[1]!, hitPoints: 2 }], legalActions: [] },
   receipt: { idempotencyKey: "command-key", revisionBefore: 4, revisionAfter: 5, occurredAt: at },
 };
-const emptyPowers = { known: [], prepared: [], slots: [], uses: [], legalNow: [], revision: 0 } as const;
+const emptyPowers = { known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 0 } as const;
 const emptyEffects = { effects: [], concentration: [], revision: 0 } as const;
 
 function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
   return {
+    listEncounters: vi.fn().mockResolvedValue({encounters:[{encounterId:"combat-one",sessionId:"session",name:"Ambush",status:"active",combatId:"combat-one",combatants:[],revision:4,createdAt:at,updatedAt:at}]}),
     getCombat: vi.fn().mockResolvedValue(combat),
     getCombatLog: vi.fn().mockResolvedValue({ entries: [], nextAfterSequence: null }),
     resolveAction: vi.fn().mockResolvedValue(response),
+    getCommandResult:vi.fn().mockResolvedValue({operation:"action",result:response}),
     getPowers: vi.fn().mockResolvedValue(emptyPowers),
     getEffects: vi.fn().mockResolvedValue(emptyEffects),
+    getResources:vi.fn().mockResolvedValue({resources:[],revision:0}),
+    usePower:vi.fn(),
     ...overrides,
   };
 }
@@ -69,15 +74,24 @@ describe("M3.5 server-authoritative combat controls", () => {
     expect(buttons[0]!.getAttribute("aria-current")).toBe("step");
   });
 
+  it("submits only a server-planned self power with the contract's empty target request",()=>{
+    const power={kind:"ability" as const,packId:"pack",packVersion:"1",definitionId:"ward"};const use=vi.fn();
+    render(<PowerLibraryPanel powers={{known:[power],prepared:[power],slots:[],uses:[],legalNow:[{powerRef:power,legal:true,reasons:[]}],legalCommands:[{powerRef:power,targeting:"self",validTargets:[{actorId:"actor-one",label:"Aster"}],costs:[],concentration:false,effectKinds:["modifier"]}],revision:2}} onUse={use}/>);
+    fireEvent.click(screen.getByRole("button",{name:"Choose server-planned power"}));
+    expect(screen.queryByRole("radio")).toBeNull();fireEvent.click(screen.getByRole("button",{name:"Review power command"}));
+    expect(screen.getByText("None (server resolves self)")).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Execute once"}));
+    expect(use).toHaveBeenCalledWith(expect.objectContaining({targeting:"self"}),[]);
+  });
+
   it("loads state and paginated log on reconnect without posting an action", async () => {
     const service = api();
-    const { unmount } = render(<CombatTrackerPage api={service} initialCombatId="combat-one" onBack={() => undefined} />);
+    const { unmount } = render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
     await screen.findAllByText("actor-one");
     expect(service.getCombat).toHaveBeenCalledWith("combat-one");
     expect(service.getCombatLog).toHaveBeenCalledWith("combat-one", { afterSequence: 0, limit: 50 });
     expect(service.resolveAction).not.toHaveBeenCalled();
     unmount();
-    render(<CombatTrackerPage api={service} initialCombatId="combat-one" onBack={() => undefined} />);
+    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
     await screen.findAllByText("actor-one");
     expect(service.resolveAction).not.toHaveBeenCalled();
     expect(document.querySelector(".legal-action-tray")).toBeTruthy();
@@ -85,7 +99,7 @@ describe("M3.5 server-authoritative combat controls", () => {
 
   it("keeps an ambiguous stale action locked and never automatically replays it", async () => {
     const service = api({ resolveAction: vi.fn().mockRejectedValue(new Error("stale")) });
-    render(<CombatTrackerPage api={service} initialCombatId="combat-one" onBack={() => undefined} />);
+    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
     await screen.findAllByText("actor-one");
     fireEvent.click(screen.getByRole("button", { name: "Attack" }));
     fireEvent.click(screen.getByRole("radio"));
@@ -93,30 +107,44 @@ describe("M3.5 server-authoritative combat controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     await screen.findByText(/outcome is uncertain or stale/i);
     expect(service.resolveAction).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem("velvet.combat-action.v1:combat-one")).toContain('"phase":"ambiguous"');
+    expect(localStorage.getItem("velvet.combat-action.v2:campaign:combat-one")).toContain('"phase":"ambiguous"');
     fireEvent.click(screen.getByRole("button", { name: "Refresh authoritative state & log" }));
     await waitFor(() => expect(screen.queryByText(/Action outcome unresolved/)).toBeNull());
     expect(service.resolveAction).toHaveBeenCalledTimes(1);
   });
 
+  it("does not clear ambiguity when the exact immutable command result is unavailable",async()=>{
+    const service=api({resolveAction:vi.fn().mockRejectedValue(new Error("offline")),getCommandResult:vi.fn().mockRejectedValue(new Error("missing"))});
+    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");
+    fireEvent.click(screen.getByRole("button",{name:"Attack"}));fireEvent.click(screen.getByRole("radio"));fireEvent.click(screen.getByRole("button",{name:"Review action"}));fireEvent.click(screen.getByRole("button",{name:"Submit once"}));await screen.findByText(/outcome is uncertain or stale/i);
+    fireEvent.click(screen.getByRole("button",{name:"Refresh authoritative state & log"}));await screen.findByText(/No exact authorized command result/i);
+    expect(screen.getByText(/Action outcome unresolved/)).toBeTruthy();expect(service.resolveAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("never hydrates a combat ID absent from the campaign encounter list",async()=>{
+    const service=api();render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="other-campaign-combat" onBack={()=>undefined}/>);
+    await screen.findByRole("heading",{name:"Connect a combat"});expect(service.getCombat).not.toHaveBeenCalled();
+    expect(screen.getByRole("combobox",{name:"Campaign encounter"})).toBeTruthy();
+  });
+
   it("preserves a confirmed response and lock when post-submit refresh is partial", async () => {
     const getLog = vi.fn().mockResolvedValueOnce({ entries: [], nextAfterSequence: null }).mockRejectedValueOnce(new Error("offline"));
     const service = api({ getCombatLog: getLog });
-    render(<CombatTrackerPage api={service} initialCombatId="combat-one" onBack={() => undefined} />);
+    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
     await screen.findAllByText("actor-one");
     fireEvent.click(screen.getByRole("button", { name: "Attack" })); fireEvent.click(screen.getByRole("radio"));
     fireEvent.click(screen.getByRole("button", { name: "Review action" })); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     expect(await screen.findByRole("heading", { name: "Confirmed action receipt" })).toBeTruthy();
     await screen.findByText(/refresh was partial/i);
     expect(screen.getByText(/Confirmed action awaiting complete refresh/)).toBeTruthy();
-    expect(localStorage.getItem("velvet.combat-action.v1:combat-one")).toContain('"phase":"confirmed"');
+    expect(localStorage.getItem("velvet.combat-action.v2:campaign:combat-one")).toContain('"phase":"confirmed"');
   });
 
   it("does not publish state after an unmounted pending action", async () => {
     let resolve!: (value: CombatActionCommandResponse) => void;
     const pending = new Promise<CombatActionCommandResponse>((done) => { resolve = done; });
     const service = api({ resolveAction: vi.fn(() => pending) });
-    const { unmount } = render(<CombatTrackerPage api={service} initialCombatId="combat-one" onBack={() => undefined} />);
+    const { unmount } = render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
     await screen.findAllByText("actor-one");
     fireEvent.click(screen.getByRole("button", { name: "Attack" })); fireEvent.click(screen.getByRole("radio"));
     fireEvent.click(screen.getByRole("button", { name: "Review action" })); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));

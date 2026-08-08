@@ -83,6 +83,7 @@ import type {
 import {
   combatActionCommandRequestSchema,
   combatActionCommandResponseSchema,
+  combatCommandResultResponseSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatLogQuerySchema,
@@ -97,6 +98,7 @@ import {
 import type {
   CombatActionCommandRequest,
   CombatActionCommandResponse,
+  CombatCommandResultResponse,
   CombatEndCommandRequest,
   CombatEndCommandResponse,
   CombatLogQuery,
@@ -1131,9 +1133,11 @@ export async function commandActorPower(actorId: string, input: ActorPowerComman
   const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/power-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Actor power command");
   const response = actorPowerCommandResponseSchema.parse(success.body);
+  const targetsMatch = JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds)
+    || (body.targetIds.length === 0 && response.resolution.targetIds.length === 1 && response.resolution.targetIds[0] === validActorId);
   if (response.actorStates[0]?.actorId !== validActorId
     || JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef)
-    || JSON.stringify(response.resolution.targetIds) !== JSON.stringify(body.targetIds)
+    || !targetsMatch
     || response.receipt.idempotencyKey !== body.idempotencyKey
     || response.receipt.revisionBefore !== body.expectedRevision
     || response.receipt.revisionAfter !== body.expectedRevision + 1) {
@@ -1220,6 +1224,20 @@ export async function getCombatLog(combatId: string, query: CombatLogQuery): Pro
   if (response.entries.length > input.limit || response.entries.some((entry) => entry.sequence <= input.afterSequence)) {
     throw new Error("Combat log response did not match the requested page");
   }
+  return response;
+}
+
+/** Reads an immutable prior command result. This method cannot execute or replay a command. */
+export async function getCombatCommandResult(campaignId: string, combatId: string, idempotencyKey: string): Promise<CombatCommandResultResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const target = combatPath(combatId);
+  const key = parseApiInput(() => actorPowerCommandRequestSchema.shape.idempotencyKey.parse(idempotencyKey));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/combats/${encodeURIComponent(target.id)}/command-results/${encodeURIComponent(key)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat command result");
+  const response = combatCommandResultResponseSchema.parse(success.body);
+  const bound = response.operation === "action" ? response.result.combat.combatId === target.id && response.result.receipt.idempotencyKey === key
+    : response.result.encounter.encounterId === target.id && response.result.receipt.idempotencyKey === key;
+  if (!bound) throw new Error("Combat command result did not match the request");
   return response;
 }
 

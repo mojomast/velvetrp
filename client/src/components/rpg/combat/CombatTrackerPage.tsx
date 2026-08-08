@@ -1,7 +1,8 @@
 import { resourceIdSchema } from "@velvet/contracts";
 import type {
-  ActorEffectsResponse, ActorPowersResponse, CombatActionCommandRequest, CombatActionCommandResponse,
-  CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse,
+  ActorEffectsResponse, ActorPowerCommandRequest, ActorPowerCommandResponse, ActorPowersResponse, ActorResourcesHttpGetResponse,
+  CombatActionCommandRequest, CombatActionCommandResponse, CombatCommandResultResponse,
+  CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterPublic,
 } from "@velvet/contracts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CombatLog } from "./CombatLog";
@@ -11,15 +12,20 @@ import { LegalActionTray } from "./LegalActionTray";
 import { PowerLibraryPanel } from "./PowerLibraryPanel";
 
 export interface CombatTrackerApi {
+  listEncounters: (campaignId: string) => Promise<{ encounters: EncounterPublic[] }>;
   getCombat: (combatId: string) => Promise<CombatReadResponse>;
   getCombatLog: (combatId: string, query: { afterSequence: number; limit: number }) => Promise<CombatLogResponse>;
   resolveAction: (combatId: string, command: CombatActionCommandRequest) => Promise<CombatActionCommandResponse>;
+  getCommandResult: (campaignId: string, combatId: string, idempotencyKey: string) => Promise<CombatCommandResultResponse>;
   getPowers: (actorId: string) => Promise<ActorPowersResponse>;
   getEffects: (actorId: string) => Promise<ActorEffectsResponse>;
+  getResources: (campaignId: string, actorId: string) => Promise<ActorResourcesHttpGetResponse>;
+  usePower: (actorId: string, command: ActorPowerCommandRequest) => Promise<ActorPowerCommandResponse>;
 }
 
 export interface CombatTrackerPageProps {
   api: CombatTrackerApi;
+  campaignId: string;
   initialCombatId?: string;
   onBack: () => void;
   onUnavailable?: () => void;
@@ -27,29 +33,35 @@ export interface CombatTrackerPageProps {
 }
 
 type ActionMarker = {
+  campaignId: string;
   combatId: string;
+  operation: "action";
   phase: "ambiguous" | "confirmed";
   command: CombatActionCommandRequest;
   actionKind: string;
   startedAt: string;
   result?: CombatActionCommandResponse;
 };
+type PowerMarker = { campaignId: string; actorId: string; phase: "ambiguous" | "confirmed"; command: ActorPowerCommandRequest; startedAt: string; result?: ActorPowerCommandResponse };
 
-const COMBAT_KEY = "velvet.combat-id.v1";
-const ACTOR_KEY = "velvet.combat-actor-id.v1";
-const markerKey = (combatId: string) => `velvet.combat-action.v1:${combatId}`;
+const combatStorageKey = (campaignId: string) => `velvet.combat-id.v2:${campaignId}`;
+const actorStorageKey = (campaignId: string) => `velvet.combat-actor-id.v2:${campaignId}`;
+const markerKey = (campaignId: string, combatId: string) => `velvet.combat-action.v2:${campaignId}:${combatId}`;
+const powerMarkerKey = (campaignId: string, actorId: string) => `velvet.power-action.v1:${campaignId}:${actorId}`;
 const readStoredId = (key: string) => { try { const id = localStorage.getItem(key) ?? ""; return resourceIdSchema.safeParse(id).success ? id : ""; } catch { return ""; } };
 const writeStoredId = (key: string, id: string) => { try { if (id) localStorage.setItem(key, id); else localStorage.removeItem(key); } catch { /* optional restoration */ } };
-const readMarker = (combatId: string): ActionMarker | null => {
+const readMarker = (campaignId: string, combatId: string): ActionMarker | null => {
   if (!combatId) return null;
   try {
-    const value = JSON.parse(localStorage.getItem(markerKey(combatId)) ?? "null") as Partial<ActionMarker> | null;
-    return value?.combatId === combatId && (value.phase === "ambiguous" || value.phase === "confirmed") && typeof value.actionKind === "string" && typeof value.startedAt === "string" && value.command !== undefined ? value as ActionMarker : null;
+    const value = JSON.parse(localStorage.getItem(markerKey(campaignId, combatId)) ?? "null") as Partial<ActionMarker> | null;
+    return value?.campaignId === campaignId && value.combatId === combatId && value.operation === "action" && (value.phase === "ambiguous" || value.phase === "confirmed") && typeof value.actionKind === "string" && typeof value.startedAt === "string" && value.command !== undefined ? value as ActionMarker : null;
   } catch { return null; }
 };
-const writeMarker = (combatId: string, marker: ActionMarker | null) => { try { if (marker) localStorage.setItem(markerKey(combatId), JSON.stringify(marker)); else localStorage.removeItem(markerKey(combatId)); } catch { /* best-effort durable write lock */ } };
+const writeMarker = (campaignId: string, combatId: string, marker: ActionMarker | null) => { try { if (marker) localStorage.setItem(markerKey(campaignId, combatId), JSON.stringify(marker)); else localStorage.removeItem(markerKey(campaignId, combatId)); } catch { /* best-effort durable write lock */ } };
+const readPowerMarker = (campaignId: string, actorId: string): PowerMarker | null => { try { const value=JSON.parse(localStorage.getItem(powerMarkerKey(campaignId,actorId))??"null") as Partial<PowerMarker>|null; return value?.campaignId===campaignId&&value.actorId===actorId&&(value.phase==="ambiguous"||value.phase==="confirmed")&&value.command!==undefined?value as PowerMarker:null; } catch{return null;} };
+const writePowerMarker = (campaignId:string,actorId:string,value:PowerMarker|null) => { try { if(value)localStorage.setItem(powerMarkerKey(campaignId,actorId),JSON.stringify(value));else localStorage.removeItem(powerMarkerKey(campaignId,actorId)); } catch{/* durable best effort */} };
 const commandId = () => `combat-ui-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-const readCombatId = (initial?: string) => resourceIdSchema.safeParse(initial).success ? initial! : readStoredId(COMBAT_KEY);
+const readCombatId = (campaignId:string,initial?: string) => resourceIdSchema.safeParse(initial).success ? initial! : readStoredId(combatStorageKey(campaignId));
 
 function publicRead(response: CombatActionCommandResponse): CombatReadResponse {
   const { round, currentCombatant, combatants, legalActions, revision } = response.combat;
@@ -66,11 +78,12 @@ function OutcomeReceipt({ result }: { result: CombatActionCommandResponse }) {
   </section>;
 }
 
-export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable, focusHeadingRequest }: CombatTrackerPageProps) {
-  const initialId = useMemo(() => readCombatId(initialCombatId), [initialCombatId]);
+export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, onUnavailable, focusHeadingRequest }: CombatTrackerPageProps) {
+  const initialId = useMemo(() => readCombatId(campaignId,initialCombatId), [campaignId,initialCombatId]);
+  const [encounters,setEncounters]=useState<EncounterPublic[]>([]);
   const [combatId, setCombatId] = useState(initialId);
   const [combatDraft, setCombatDraft] = useState(initialId);
-  const [actorId, setActorId] = useState(() => readStoredId(ACTOR_KEY));
+  const [actorId, setActorId] = useState(() => readStoredId(actorStorageKey(campaignId)));
   const [actorDraft, setActorDraft] = useState(actorId);
   const [combat, setCombat] = useState<CombatReadResponse | null>(null);
   const [entries, setEntries] = useState<CombatLogEntryPublic[]>([]);
@@ -84,8 +97,11 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
   const [effectError, setEffectError] = useState("");
   const [logLoading, setLogLoading] = useState(false);
   const [actorLoading, setActorLoading] = useState(false);
-  const [marker, setMarkerState] = useState<ActionMarker | null>(() => readMarker(initialId));
-  const [confirmed, setConfirmed] = useState<CombatActionCommandResponse | null>(() => readMarker(initialId)?.result ?? null);
+  const [marker, setMarkerState] = useState<ActionMarker | null>(() => readMarker(campaignId,initialId));
+  const [confirmed, setConfirmed] = useState<CombatActionCommandResponse | null>(() => readMarker(campaignId,initialId)?.result ?? null);
+  const [powerMarker,setPowerMarkerState]=useState<PowerMarker|null>(()=>readPowerMarker(campaignId,readStoredId(actorStorageKey(campaignId))));
+  const [powerResult,setPowerResult]=useState<ActorPowerCommandResponse|null>(()=>readPowerMarker(campaignId,readStoredId(actorStorageKey(campaignId)))?.result??null);
+  const [powerStatus,setPowerStatus]=useState("");
   const [commandStatus, setCommandStatus] = useState("");
   const [inspected, setInspected] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -99,10 +115,10 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
   const retryRef = useRef<HTMLButtonElement>(null);
 
   const current = useCallback((generation: number, id: string) => mountedRef.current && generationRef.current === generation && combatIdRef.current === id, []);
-  const setMarker = useCallback((next: ActionMarker | null, id = combatId) => { writeMarker(id, next); if (mountedRef.current) setMarkerState(next); }, [combatId]);
+  const setMarker = useCallback((next: ActionMarker | null, id = combatId) => { writeMarker(campaignId,id, next); if (mountedRef.current) setMarkerState(next); }, [campaignId,combatId]);
 
   const loadCombat = useCallback(async (id: string, focusFailure = false) => {
-    if (!resourceIdSchema.safeParse(id).success) return;
+    if (!resourceIdSchema.safeParse(id).success) return false;
     const generation = ++generationRef.current;
     setPhase("loading"); setStateError(""); setLogError(""); setLogLoading(true);
     const [stateRead, logRead] = await Promise.allSettled([api.getCombat(id), api.getCombatLog(id, { afterSequence: 0, limit: 50 })] as const);
@@ -115,36 +131,43 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
     return stateRead.status === "fulfilled" && logRead.status === "fulfilled";
   }, [api, combat, current]);
 
-  const loadActor = useCallback(async (id: string) => {
-    if (!resourceIdSchema.safeParse(id).success) return;
+  const loadActor = useCallback(async (id: string):Promise<boolean> => {
+    if (!resourceIdSchema.safeParse(id).success) return false;
     const generation = ++actorGenerationRef.current; setActorLoading(true); setPowerError(""); setEffectError("");
-    const [powerRead, effectRead] = await Promise.allSettled([api.getPowers(id), api.getEffects(id)] as const);
-    if (!mountedRef.current || generation !== actorGenerationRef.current || id !== actorIdRef.current) return;
+    const [powerRead, effectRead,resourceRead] = await Promise.allSettled([api.getPowers(id), api.getEffects(id),api.getResources(campaignId,id)] as const);
+    if (!mountedRef.current || generation !== actorGenerationRef.current || id !== actorIdRef.current) return false;
     if (powerRead.status === "fulfilled") setPowers(powerRead.value); else setPowerError("Powers could not be refreshed. Existing power data is preserved.");
     if (effectRead.status === "fulfilled") setEffects(effectRead.value); else setEffectError("Effects could not be refreshed. Existing effect data is preserved.");
     setActorLoading(false);
-  }, [api]);
+    return powerRead.status==="fulfilled"&&effectRead.status==="fulfilled"&&resourceRead.status==="fulfilled";
+  }, [api,campaignId]);
 
   useEffect(() => {
     mountedRef.current = true;
-    if (combatId) void loadCombat(combatId);
+    void api.listEncounters(campaignId).then((value)=>{
+      if(!mountedRef.current)return;const available=value.encounters.filter((encounter)=>encounter.combatId!==null);setEncounters(available);
+      if(combatId&&available.some((encounter)=>encounter.combatId===combatId))void loadCombat(combatId);
+      else { combatIdRef.current="";setCombatId("");setCombatDraft("");writeStoredId(combatStorageKey(campaignId),"");setPhase("idle"); }
+    }).catch(()=>{if(mountedRef.current){setStateError("Campaign encounters could not be loaded.");setPhase("failed");}});
     if (actorId) void loadActor(actorId);
     return () => { mountedRef.current = false; generationRef.current += 1; actorGenerationRef.current += 1; };
     // Route identity initializes this component; explicit forms handle changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(() => { if (phase === "ready" && focusHeadingRequest !== undefined) queueMicrotask(() => headingRef.current?.focus()); }, [focusHeadingRequest, phase]);
+  useEffect(() => { if ((phase === "ready"||phase==="idle"||phase==="failed") && focusHeadingRequest !== undefined) queueMicrotask(() => headingRef.current?.focus()); }, [focusHeadingRequest, phase]);
 
   function connectCombat(event: FormEvent) {
     event.preventDefault(); if (!resourceIdSchema.safeParse(combatDraft).success) return;
-    generationRef.current += 1; combatIdRef.current = combatDraft; setCombatId(combatDraft); writeStoredId(COMBAT_KEY, combatDraft); setCombat(null); setEntries([]); setNextSequence(null);
-    const restored = readMarker(combatDraft); setMarkerState(restored); setConfirmed(restored?.result ?? null); setCommandStatus("");
+    if(!encounters.some((encounter)=>encounter.combatId===combatDraft))return;
+    generationRef.current += 1; combatIdRef.current = combatDraft; setCombatId(combatDraft); writeStoredId(combatStorageKey(campaignId), combatDraft); setCombat(null); setEntries([]); setNextSequence(null);
+    const restored = readMarker(campaignId,combatDraft); setMarkerState(restored); setConfirmed(restored?.result ?? null); setCommandStatus("");
     // State publication is asynchronous, so this direct read is bound to the submitted exact ID.
     queueMicrotask(() => { if (mountedRef.current) void loadCombat(combatDraft); });
   }
   function connectActor(event: FormEvent) {
     event.preventDefault(); if (!resourceIdSchema.safeParse(actorDraft).success) return;
-    actorGenerationRef.current += 1; actorIdRef.current = actorDraft; setActorId(actorDraft); writeStoredId(ACTOR_KEY, actorDraft); setPowers(null); setEffects(null);
+    actorGenerationRef.current += 1; actorIdRef.current = actorDraft; setActorId(actorDraft); writeStoredId(actorStorageKey(campaignId), actorDraft); setPowers(null); setEffects(null);
+    const restored=readPowerMarker(campaignId,actorDraft);setPowerMarkerState(restored);setPowerResult(restored?.result??null);setPowerStatus("");
     queueMicrotask(() => { if (mountedRef.current) void loadActor(actorDraft); });
   }
   async function loadMoreLog() {
@@ -161,12 +184,12 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
   async function submitAction(action: CombatLegalAction, targetIds: string[]) {
     if (!combat || marker || !action.targetIds.every((id) => combat.combatants.some((entry) => entry.combatantId === id)) || targetIds.some((id) => !action.targetIds.includes(id))) return;
     const command: CombatActionCommandRequest = { legalActionId: action.legalActionId, targetIds, choices: [], expectedRevision: combat.revision, idempotencyKey: commandId() };
-    const pending: ActionMarker = { combatId, phase: "ambiguous", command, actionKind: action.kind, startedAt: new Date().toISOString() };
+    const pending: ActionMarker = { campaignId,combatId,operation:"action", phase: "ambiguous", command, actionKind: action.kind, startedAt: new Date().toISOString() };
     setMarker(pending); setConfirmed(null); setCommandStatus("Submitting once. Automatic replay is disabled.");
     try {
       const result = await api.resolveAction(combatId, command);
       const complete: ActionMarker = { ...pending, phase: "confirmed", result };
-      writeMarker(combatId, complete);
+      writeMarker(campaignId,combatId, complete);
       if (!mountedRef.current) return;
       setMarkerState(complete); setConfirmed(result); setCombat(publicRead(result));
       setCommandStatus("Action confirmed. Refreshing authoritative combat state and log…");
@@ -180,11 +203,22 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
   }
   async function reconcile() {
     if (!combatId || !marker) return;
-    setCommandStatus("Refreshing authoritative state and log; no action will be replayed.");
-    const refreshed = await loadCombat(combatId, true);
-    if (!mountedRef.current) return;
-    if (refreshed) { setMarker(null); setCommandStatus(marker.phase === "confirmed" ? "Confirmed response preserved; authoritative state and log refreshed." : "Authoritative state and log refreshed. The prior action was not replayed."); }
-    else setCommandStatus("Authoritative refresh is incomplete. The persistent action lock remains.");
+    setCommandStatus("Reading the exact immutable command result; no action will be replayed.");
+    try{
+      const found=await api.getCommandResult(campaignId,combatId,marker.command.idempotencyKey);
+      if(!mountedRef.current||found.operation!=="action")return;
+      setConfirmed(found.result);setCombat(publicRead(found.result));
+      const refreshed=await loadCombat(combatId,true);if(!mountedRef.current)return;
+      if(refreshed){setMarker(null);setCommandStatus("Exact command result confirmed; authoritative state and log refreshed.");}
+      else setCommandStatus("Exact result is confirmed, but refresh is partial. The response and lock remain preserved.");
+    }catch{if(mountedRef.current)setCommandStatus("No exact authorized command result is available. Generic state/log reads cannot clear this lock.");}
+  }
+
+  async function submitPower(plan:ActorPowersResponse["legalCommands"][number],targetIds:string[]){
+    if(!powers||!actorId||powerMarker)return;const command:ActorPowerCommandRequest={powerRef:plan.powerRef,targetIds,choices:[],expectedRevision:powers.revision,idempotencyKey:commandId()};
+    const pending:PowerMarker={campaignId,actorId,phase:"ambiguous",command,startedAt:new Date().toISOString()};writePowerMarker(campaignId,actorId,pending);setPowerMarkerState(pending);setPowerResult(null);setPowerStatus("Power command submitted once. It is separate from combat and will not be replayed automatically.");
+    try{const result=await api.usePower(actorId,command);const complete:PowerMarker={...pending,phase:"confirmed",result};writePowerMarker(campaignId,actorId,complete);if(!mountedRef.current)return;setPowerMarkerState(complete);setPowerResult(result);const refreshed=await loadActor(actorId);if(!mountedRef.current)return;if(refreshed){writePowerMarker(campaignId,actorId,null);setPowerMarkerState(null);setPowerStatus("Power response confirmed; powers, effects, and resources refreshed.");}else setPowerStatus("Power response confirmed, but actor refresh is partial. The response and lock are preserved.");}
+    catch{if(mountedRef.current)setPowerStatus("Power outcome is ambiguous. Authoritative actor lanes may be refreshed, but this persistent lock cannot be cleared by generic reads.");}
   }
 
   const labels = useMemo(() => new Map(combat?.combatants.map((entry) => [entry.combatantId, entry.kind === "actor" ? entry.actorId : entry.template?.definitionId ?? "Enemy"]) ?? []), [combat]);
@@ -192,7 +226,7 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
 
   return <main className="combat-page" aria-labelledby="combat-heading"><div className="combat-shell">
     <header className="combat-header"><div><button type="button" className="back-link" onClick={onBack}>← Back</button><p className="eyebrow">LIVE SERVER COMBAT</p><h1 ref={headingRef} tabIndex={-1} id="combat-heading">Combat tracker</h1></div>{combat && <div className="combat-round"><span>Round</span><strong>{combat.round}</strong><small>Revision {combat.revision}</small></div>}</header>
-    <form className="combat-binding" onSubmit={connectCombat}><label>Combat ID<input value={combatDraft} onChange={(event) => setCombatDraft(event.target.value)} autoComplete="off" /></label><button type="submit" className="ghost" disabled={!resourceIdSchema.safeParse(combatDraft).success || Boolean(marker)}>Load combat</button><p>The current APIs provide no campaign-to-combat discovery binding. Enter the exact server-provided combat ID; the client never guesses one.</p></form>
+    <form className="combat-binding" onSubmit={connectCombat}><label>Campaign encounter<select value={combatDraft} onChange={(event) => setCombatDraft(event.target.value)}><option value="">Choose a combat</option>{encounters.map((encounter)=><option key={encounter.encounterId} value={encounter.combatId??""}>{encounter.name} · {encounter.status}</option>)}</select></label><button type="submit" className="ghost" disabled={!encounters.some((encounter)=>encounter.combatId===combatDraft) || Boolean(marker)}>Load combat</button><p>Combat identity comes only from this campaign's authorized encounter list and is restored only within this campaign.</p></form>
     {marker && <section className={`combat-lock ${marker.phase === "ambiguous" ? "is-warning" : ""}`} role="alert"><p><strong>{marker.phase === "confirmed" ? "Confirmed action awaiting complete refresh" : "Action outcome unresolved"}.</strong> {marker.actionKind} was issued once at {marker.startedAt}. Controls remain locked and no automatic replay is allowed.</p><button type="button" className="ghost" onClick={() => void reconcile()}>Refresh authoritative state & log</button></section>}
     {commandStatus && <p className="combat-command-status" role="status">{commandStatus}</p>}
     {confirmed && <OutcomeReceipt result={confirmed} />}
@@ -205,7 +239,8 @@ export function CombatTrackerPage({ api, initialCombatId, onBack, onUnavailable,
         <section className="combat-panel current-turn" aria-live="polite"><div><span>Current turn</span><strong><bdi dir="auto">{combat.currentCombatant ? labels.get(combat.currentCombatant) ?? combat.currentCombatant : "Combat complete"}</bdi></strong></div>{stateError && <p role="alert">{stateError}</p>}{inspectedCombatant && <dl><div><dt>Team</dt><dd>{inspectedCombatant.team}</dd></div><div><dt>Status</dt><dd>{inspectedCombatant.status}</dd></div><div><dt>Hit points</dt><dd>{inspectedCombatant.hitPoints} / {inspectedCombatant.maximumHitPoints}</dd></div></dl>}</section>
         <CombatLog entries={entries} nextAfterSequence={nextSequence} loading={logLoading} error={logError} onLoadMore={() => void loadMoreLog()} onRetry={() => void loadCombat(combatId)} />
         <form className="combat-binding actor-combat-binding" onSubmit={connectActor}><label>Actor ID for powers & effects<input value={actorDraft} onChange={(event) => setActorDraft(event.target.value)} autoComplete="off" /></label><button type="submit" className="ghost" disabled={!resourceIdSchema.safeParse(actorDraft).success}>Load actor lanes</button><p>Actor identity is entered explicitly because combat state does not expose a safe actor-workspace binding.</p></form>
-        <div className="combat-actor-lanes"><PowerLibraryPanel powers={powers} loading={actorLoading} error={powerError} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /><EffectList effects={effects} loading={actorLoading} error={effectError} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /></div>
+        {powerMarker&&<section className={`combat-lock ${powerMarker.phase==="ambiguous"?"is-warning":""}`} role="alert"><p><strong>{powerMarker.phase==="confirmed"?"Confirmed power awaiting complete actor refresh":"Power outcome unresolved"}.</strong> No automatic replay is allowed. Generic actor refresh does not prove an ambiguous result.</p><button type="button" className="ghost" onClick={()=>void loadActor(actorId)}>Refresh actor powers, effects & resources</button></section>}
+        <div className="combat-actor-lanes"><PowerLibraryPanel powers={powers} loading={actorLoading} error={powerError} disabled={Boolean(powerMarker)} commandStatus={powerStatus} result={powerResult} onUse={(plan,targets)=>void submitPower(plan,targets)} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /><EffectList effects={effects} loading={actorLoading} error={effectError} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /></div>
       </section>
       <LegalActionTray legalActions={combat.legalActions} combatantLabels={labels} disabled={Boolean(marker)} busy={marker?.phase === "ambiguous" && commandStatus.startsWith("Submitting")} onSubmit={(action, targets) => void submitAction(action, targets)} />
     </div>}
