@@ -1,10 +1,11 @@
 import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getCampaignContent, getCampaignContentPack, getCampaignShop, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
+  commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listAllContentPackPublications, listCampaignEncounters, publishContentPack, resolveCombatAction, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  listAllContentPackPublications, listCampaignEncounters, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, resolveCombatAction, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -19,6 +20,10 @@ import { ContentPackLibraryPage, type ContentPackLibraryApi } from "./components
 import { CharacterBuilderPage, type CharacterBuilderApi } from "./components/rpg/character/CharacterBuilderPage";
 import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "./components/rpg/actor/RpgCharacterSheetPage";
 import { CombatTrackerPage, type CombatTrackerApi } from "./components/rpg/combat/CombatTrackerPage";
+import { WorldExplorerPage, type WorldExplorerApi } from "./components/rpg/world/WorldExplorerPage";
+import { NpcRosterPage, type CastStudioApi } from "./components/rpg/cast/NpcRosterPage";
+import { QuestJournalPage, type QuestJournalApi } from "./components/rpg/journal/QuestJournalPage";
+import { StoryStudioPage, type StoryStudioApi } from "./components/rpg/journal/StoryStudioPage";
 import { readNavigation, writeNavigation, type StoredNavigation, type View } from "./roleplay/navigation";
 
 function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
@@ -61,6 +66,19 @@ const combatTrackerApi: CombatTrackerApi = {
   getCommandResult: getCombatCommandResult, getPowers: getActorPowers, getEffects: getActorEffects,
   getResources: getActorResources, usePower: commandActorPower,
 };
+const worldExplorerApi:WorldExplorerApi={getWorld:getCampaignWorld,travel:travelActor};
+const castStudioApi:CastStudioApi={listNpcs:listCampaignNpcs,listFactions:listCampaignFactions,createNpc:createCampaignNpc,relationship:commandNpcRelationship,createFaction:createCampaignFaction,reputation:commandFactionReputation,previewNpcs:projectNpcsForPlayers,previewFactions:projectFactionsForPlayers};
+const questJournalApi:QuestJournalApi={list:listCampaignQuests,create:createCampaignQuest,command:commandQuest,preview:projectQuestsForPlayers};
+const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignStoryline,command:commandStoryline,preview:projectStoryForPlayers};
+
+function CampaignStudioGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(isGm:boolean)=>ReactNode}){
+  const [role,setRole]=useState<"gm"|"player"|null>(null),[failed,setFailed]=useState(false);
+  const unavailableRef=useRef(onUnavailable);unavailableRef.current=onUnavailable;
+  useEffect(()=>{let active=true;void getCampaignDetail(campaignId).then(({campaign})=>{if(active)setRole(campaign.actorRole==="owner"||campaign.actorRole==="gm"?"gm":"player")}).catch((error)=>{if(!active)return;if(error instanceof ApiError&&error.status===404)unavailableRef.current();else setFailed(true)});return()=>{active=false}},[campaignId]);
+  if(failed)return <main className="studio-page"><section className="studio-shell" role="alert"><h1>Studio unavailable</h1><p>Campaign authority could not be refreshed.</p><button onClick={onUnavailable}>Return to campaign</button></section></main>;
+  if(role===null)return <main className="studio-page"><section className="studio-shell" role="status">Checking campaign role…</section></main>;
+  return <>{children(role==="gm")}</>;
+}
 
 export default function App() {
   const stored = useRef(readNavigation()).current;
@@ -91,8 +109,10 @@ export default function App() {
   const characterBuilderEntryRef = useRef(0);
   const characterSheetEntryRef = useRef(stored.view === "campaign-character-sheet" ? 1 : 0);
   const combatEntryRef = useRef(stored.view === "campaign-combat" ? 1 : 0);
+  const studioEntryRef = useRef(["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(stored.view) ? 1 : 0);
   const [combatReturnView, setCombatReturnView] = useState<"campaign-detail" | "campaign-character-sheet">(stored.combatReturnView ?? "campaign-detail");
   const [combatReturnFocusRequest, setCombatReturnFocusRequest] = useState<number | null>(null);
+  const [studioReturnFocusRequest,setStudioReturnFocusRequest]=useState<{view:"world"|"cast"|"journal"|"story";request:number}|null>(null);
   const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
   const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
@@ -132,6 +152,9 @@ export default function App() {
     navigationEpochRef.current += 1;
   }, [view]);
 
+  useEffect(()=>{const open=(event:Event)=>{const studio=(event as CustomEvent<{studio?:"world"|"cast"|"journal"|"story"}>).detail?.studio;if(!studio||currentNavigationRef.current.view!=="campaign-detail"||!activeCampaignId)return;cancelRoomOpenForNavigation();const request=++transitionRequestRef.current;studioEntryRef.current=request;const destination:Record<typeof studio,View>={world:"campaign-world",cast:"campaign-cast",journal:"campaign-journal",story:"campaign-story"};currentNavigationRef.current={view:destination[studio],campaignId:activeCampaignId,chatReturnCampaignId:""};setView(destination[studio]);};window.addEventListener("velvet:open-campaign-studio",open);return()=>window.removeEventListener("velvet:open-campaign-studio",open);},[activeCampaignId]);
+  useEffect(()=>{if(view!=="campaign-detail"||!studioReturnFocusRequest)return;let active=true,attempts=0;const focus=()=>{if(!active)return;const target=document.querySelector<HTMLButtonElement>(`[data-campaign-studio="${studioReturnFocusRequest.view}"]`);if(target){target.focus();setStudioReturnFocusRequest(null);}else if(attempts++<40)window.setTimeout(focus,25);};queueMicrotask(focus);return()=>{active=false}},[view,studioReturnFocusRequest]);
+
   function cancelRoomOpenForNavigation() {
     navigationEpochRef.current += 1;
     roomOpenRequestRef.current += 1;
@@ -165,7 +188,7 @@ export default function App() {
         setCombatAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat);
         setContentStudioAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics);
         const current = currentNavigationRef.current;
-        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-administration" || current.view === "campaign-character-builder"
+        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-administration" || current.view === "campaign-character-builder" || current.view === "campaign-world" || current.view === "campaign-cast" || current.view === "campaign-journal" || current.view === "campaign-story"
           || current.view === "campaign-character" || current.view === "campaign-character-sheet" || current.view === "campaign-combat" || (current.view === "chat" && Boolean(current.chatReturnCampaignId));
         if (campaignRelated && !rpgFeatureData.campaign) {
           cancelRoomOpenForNavigation();
@@ -193,6 +216,10 @@ export default function App() {
           setView(current.campaignId ? "campaign-character" : "campaigns");
         }
         if (current.view === "campaign-combat" && !(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat)) {
+          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          setView(current.campaignId ? "campaign-detail" : "campaigns");
+        }
+        if (["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(current.view) && !(rpgFeatureData.campaign && rpgFeatureData.mechanics)) {
           currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
           setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
@@ -396,6 +423,12 @@ export default function App() {
       && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;
     const leaveDetail = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(""); setActiveCampaignCharacterId(""); setView("campaigns"); };
     return <CampaignDetailPage campaignId={activeCampaignId} mechanicsEnabled={campaignMechanicsAvailable} onOpenCombat={combatAvailable ? () => { cancelRoomOpenForNavigation(); setCombatReturnView("campaign-detail"); combatEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-combat", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-combat"); } : undefined} focusCombatRequest={combatReturnView === "campaign-detail" ? combatReturnFocusRequest ?? undefined : undefined} onCombatFocused={(request) => setCombatReturnFocusRequest((current) => current === request ? null : current)} focusHeadingRequest={focusRequest} roomsRefreshRequest={roomsRefreshRequest?.campaignId === activeCampaignId ? roomsRefreshRequest.request : undefined} onRoomsRefreshHandled={(request) => setRoomsRefreshRequest((current) => current?.campaignId === activeCampaignId && current.request === request ? null : current)} roomOpenPending={roomOpenPending?.campaignId === activeCampaignId} roomOpenFailure={roomOpenFailure?.campaignId === activeCampaignId ? roomOpenFailure : null} onHeadingFocused={(request) => setCampaignHeadingFocusRequest((current) => current?.campaignId === activeCampaignId && current.request === request && campaignDetailEntryRef.current === request ? null : current)} onBack={leaveDetail} onUnavailable={leaveDetail} onOpenRoom={(sessionId) => void openCampaignRoom(activeCampaignId, sessionId)} onOpenAdministration={(campaignName) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-administration", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignName(campaignName); setView("campaign-administration"); }} onOpenCharacterBuilder={() => { cancelRoomOpenForNavigation(); setCharacterDraftIds((current) => { const next = { ...current }; delete next[activeCampaignId]; return next; }); characterBuilderEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-character-builder", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-builder"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setWorkspaceHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId, request }); setActiveCampaignCharacterId(campaignCharacterId); setView("campaign-character"); }} />;
+  }
+  if (["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(view) && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId) {
+    const studioView=view as "campaign-world"|"campaign-cast"|"campaign-journal"|"campaign-story";
+    const returnToCampaign=()=>{cancelRoomOpenForNavigation();const studio=studioView.replace("campaign-","") as "world"|"cast"|"journal"|"story";const request=++transitionRequestRef.current;setStudioReturnFocusRequest({view:studio,request});campaignDetailEntryRef.current=request;currentNavigationRef.current={view:"campaign-detail",campaignId:activeCampaignId,chatReturnCampaignId:""};setView("campaign-detail")};
+    const unavailable=()=>{cancelRoomOpenForNavigation();currentNavigationRef.current={view:"campaigns",campaignId:"",chatReturnCampaignId:""};setActiveCampaignId("");setView("campaigns")};
+    return <CampaignStudioGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(isGm)=>studioView==="campaign-world"?<WorldExplorerPage campaignId={activeCampaignId} api={worldExplorerApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-cast"?<NpcRosterPage campaignId={activeCampaignId} isGm={isGm} api={castStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-journal"?<QuestJournalPage campaignId={activeCampaignId} isGm={isGm} api={questJournalApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:<StoryStudioPage campaignId={activeCampaignId} isGm={isGm} api={storyStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>}</CampaignStudioGate>;
   }
   if (view === "campaign-administration" && campaignLibraryAvailable && activeCampaignId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };

@@ -1141,3 +1141,22 @@ button:disabled {
   .legal-action-tray { position: fixed; z-index: 30; inset: auto 0 0; max-block-size: min(48dvh,calc(100dvh - env(safe-area-inset-top) - 24px)); overflow-y: auto; overscroll-behavior: contain; padding-block: 12px calc(12px + env(safe-area-inset-bottom)); padding-inline: max(12px,env(safe-area-inset-left)) max(12px,env(safe-area-inset-right)); border-radius: 14px 14px 0 0; border-color: #5d4883; box-shadow: 0 -16px 50px rgba(0,0,0,.65); }
   .legal-action-heading { margin-bottom: 8px; }.legal-action-heading .eyebrow { display: none; }.legal-action-buttons { display: flex; overflow-x: auto; }.legal-action-buttons button { min-width: 112px; }.combat-header { align-items: flex-start; }.combat-binding { grid-template-columns: 1fr; }.combat-binding p { grid-column: auto; }
 }
+
+/* M3.6 role-filtered world, cast, and journal studios */
+.studio-page { min-height: 100vh; padding: 20px; background: radial-gradient(circle at 15% 0,rgba(103,72,158,.18),transparent 38rem),#0d0c11; }
+.studio-shell { width: min(1280px,100%); margin: 0 auto; }
+.studio-header { display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px; }
+.studio-header h1,.studio-panel h2 { margin:0; }.studio-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start; }
+.studio-panel,.studio-lock,.studio-receipt,.projection-preview { min-width:0;padding:18px;border:1px solid var(--border);border-radius:13px;background:rgba(25,23,31,.98); }
+.studio-lock { margin-bottom:14px;border-color:#806a3d;background:#2b2519; }.studio-lock p { margin-bottom:0; }.studio-receipt,.projection-preview { margin-top:16px;border-color:#526e5b; }
+.projection-preview pre { max-height:320px;overflow:auto;padding:12px;border-radius:8px;background:#111017;color:#e9e5ef;white-space:pre-wrap;overflow-wrap:anywhere; }
+.location-tree,.plain-list,.cast-list,.quest-list,.story-list { display:grid;gap:9px;margin:12px 0 0;padding:0;list-style:none; }
+.location-tree button { width:100%;display:grid;gap:4px;min-height:52px;padding:10px 12px 10px calc(12px + var(--tree-depth) * 20px);text-align:left;color:var(--text);border:1px solid var(--border);background:var(--surface-2); }
+.location-tree button[aria-current] { border-color:#a98ae4;box-shadow:inset 3px 0 #a98ae4; }.location-tree button span { color:#d8c6ff;font-size:11px;text-transform:uppercase; }.location-tree button small { color:#bcb4c8;line-height:1.45; }
+.cast-list>li,.quest-list>li,.story-list>li,.plain-list>li { padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2); }.cast-list h3,.quest-list h3 { margin:0 0 6px; }
+.private-record { padding:10px;border-left:3px solid #bd85e7;background:#261d2c; }.private-record div { display:grid;grid-template-columns:90px 1fr;gap:9px; }.private-record dd { margin:0;overflow-wrap:anywhere; }
+.studio-form { display:grid;gap:11px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border); }.studio-form label,.inline-command label { display:grid;gap:6px;color:#d1cad9;font-size:12px;font-weight:700; }.field-help { color:#aaa1b5;font-weight:400; }
+.inline-command { display:grid;grid-template-columns:1fr minmax(180px,1fr) auto;gap:9px;align-items:end;padding:10px;background:#19171f; }.text-button { min-height:44px;margin-left:8px;color:#d9c5ff;background:transparent;text-decoration:underline; }
+.rpg-dialog { width:min(580px,calc(100% - 24px));padding:22px;color:var(--text);border:1px solid #6b568a;border-radius:13px;background:#1b1822; }.rpg-dialog::backdrop { background:rgba(0,0,0,.72); }.rpg-dialog form { display:grid;gap:13px; }.rpg-dialog label { display:grid;gap:6px; }.review-card { padding:14px;border:1px solid #75603d;background:#292319; }
+.studio-page button,.studio-page input,.studio-page select,.studio-page textarea,.rpg-dialog button,.rpg-dialog input,.rpg-dialog select { min-height:44px; }.studio-page :focus-visible,.rpg-dialog :focus-visible { outline:3px solid #cbb2ff;outline-offset:3px; }
+@media(max-width:760px){.studio-page{padding:10px}.studio-header{align-items:flex-start;flex-direction:column}.studio-grid{grid-template-columns:1fr}.inline-command{grid-template-columns:1fr}.studio-header>.primary,.studio-header>.ghost{width:100%}}

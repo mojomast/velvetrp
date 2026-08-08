@@ -41,6 +41,27 @@ import type {
   CampaignTransferHttpDryRunResponse,
 } from "@velvet/contracts";
 import {
+  actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, campaignFactionsHttpResponseSchema,
+  campaignNpcsHttpResponseSchema, campaignQuestsHttpResponseSchema, campaignStoryHttpResponseSchema,
+  campaignWorldHttpResponseSchema, createCampaignFactionHttpRequestSchema, createCampaignFactionHttpResponseSchema,
+  createCampaignNpcHttpRequestSchema, createCampaignNpcHttpResponseSchema, createCampaignQuestHttpRequestSchema,
+  createCampaignQuestHttpResponseSchema, createCampaignStorylineHttpRequestSchema,
+  createCampaignStorylineHttpResponseSchema, factionReputationCommandHttpRequestSchema,
+  factionReputationCommandHttpResponseSchema, npcRelationshipCommandHttpRequestSchema,
+  npcRelationshipCommandHttpResponseSchema, playerCampaignQuestsHttpResponseSchema,
+  playerCampaignStoryHttpResponseSchema, questCommandHttpRequestSchema, questCommandHttpResponseSchema,
+  storylineCommandHttpRequestSchema, storylineCommandHttpResponseSchema,
+} from "@velvet/contracts";
+import type {
+  ActorTravelCommandRequest, ActorTravelCommandResponse, CampaignQuestsHttpResponse, CampaignStoryHttpResponse,
+  CampaignWorldHttpResponse, CreateCampaignFactionHttpRequest, CreateCampaignNpcHttpRequest,
+  CreateCampaignQuestHttpRequest, CreateCampaignStorylineHttpRequest, FactionReputationCommandHttpRequest,
+  NpcRelationshipCommandHttpRequest, QuestCommandHttpRequest, StorylineCommandHttpRequest,
+} from "@velvet/contracts";
+
+export type CampaignNpcsHttpResponse = ReturnType<typeof campaignNpcsHttpResponseSchema.parse>;
+export type CampaignFactionsHttpResponse = ReturnType<typeof campaignFactionsHttpResponseSchema.parse>;
+import {
   actorEffectCommandRequestSchema,
   actorEffectCommandResponseSchema,
   actorEffectsResponseSchema,
@@ -370,7 +391,7 @@ export async function errorFromResponse(res: Response): Promise<ApiError> {
   return new ApiError(res.status, message, violations, sessionStopped, problem, res.headers.get("x-request-id"));
 }
 
-async function requestResponse<T>(path: string, init?: RequestInit): Promise<{ body: T; status: number }> {
+async function requestResponse<T>(path: string, init?: RequestInit): Promise<{ body: T; status: number; headers: Headers }> {
   const headers = new Headers(init?.headers);
   if (init?.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -384,7 +405,7 @@ async function requestResponse<T>(path: string, init?: RequestInit): Promise<{ b
     throw await errorFromResponse(res);
   }
 
-  return { body: (await res.json()) as T, status: res.status };
+  return { body: (await res.json()) as T, status: res.status, headers: res.headers };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -1768,6 +1789,75 @@ export async function getCampaignContentPack(campaignId: string, packId: string,
   }
   return response;
 }
+
+type Revisioned<T> = { data: T; revision: number };
+function revisionFrom(headers: Headers, name: "x-world-revision" | "x-quest-revision" | "x-story-revision"): number {
+  const raw = headers.get(name);
+  const revision = raw === null ? NaN : Number(raw);
+  if (!Number.isSafeInteger(revision) || revision < 0 || String(revision) !== raw) throw new Error(`Response omitted a valid ${name} header`);
+  return revision;
+}
+function campaignLane(campaignId: string, suffix: string): string {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  return `/rpg/v1/campaigns/${encodeURIComponent(id)}/${suffix}`;
+}
+function resourceLane(prefix: string, id: string, suffix: string): string {
+  const valid = parseApiInput(() => resourceIdSchema.parse(id));
+  return `/rpg/v1/${prefix}/${encodeURIComponent(valid)}/${suffix}`;
+}
+function bindReceipt(receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number }, body: { idempotencyKey: string; expectedRevision: number }, operation: string): void {
+  if (receipt.idempotencyKey !== body.idempotencyKey || receipt.revisionBefore !== body.expectedRevision || receipt.revisionAfter !== body.expectedRevision + 1) {
+    throw new Error(`${operation} receipt did not match the request`);
+  }
+}
+
+/** M2.10 reads expose the mandatory authoritative revision separately from their strict role projection. */
+export async function getCampaignWorld(campaignId: string): Promise<Revisioned<CampaignWorldHttpResponse>> {
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "world"), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign world read");
+  return { data: campaignWorldHttpResponseSchema.parse(success.body), revision: revisionFrom(success.headers, "x-world-revision") };
+}
+export async function travelActor(actorId: string, input: ActorTravelCommandRequest): Promise<ActorTravelCommandResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorTravelCommandRequestSchema.parse(input));
+  if (!body.partyActorIds.includes(id)) throw new ApiInputError("Travel party must contain the route actor");
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "travel-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor travel");
+  const response = actorTravelCommandResponseSchema.parse(success.body); bindReceipt(response.receipt, body, "Actor travel");
+  if (JSON.stringify(response.locations.map((item) => item.actorId)) !== JSON.stringify(body.partyActorIds)) throw new Error("Actor travel response did not match the exact party");
+  return response;
+}
+
+export async function listCampaignNpcs(campaignId: string): Promise<Revisioned<CampaignNpcsHttpResponse>> {
+  const success = await requestResponse<unknown>(campaignLane(campaignId, "npcs"), { cache: "no-store" }); requireStatus(success, 200, "Campaign NPC read");
+  return { data: campaignNpcsHttpResponseSchema.parse(success.body), revision: revisionFrom(success.headers, "x-world-revision") };
+}
+export async function createCampaignNpc(campaignId: string, input: CreateCampaignNpcHttpRequest): Promise<ReturnType<typeof createCampaignNpcHttpResponseSchema.parse>> {
+  const body=parseApiInput(()=>createCampaignNpcHttpRequestSchema.parse(input)); const success=await requestResponse<unknown>(campaignLane(campaignId,"npcs"),{method:"POST",cache:"no-store",body:JSON.stringify(body)}); requireStatus(success,201,"NPC creation");
+  const response=createCampaignNpcHttpResponseSchema.parse(success.body); bindReceipt(response.receipt,body,"NPC creation");
+  if(response.npc.personaId!==body.personaId||JSON.stringify(response.npc.publicState)!==JSON.stringify(body.publicState)||JSON.stringify(response.npc.privateState)!==JSON.stringify(body.privateState))throw new Error("NPC creation response did not match the request"); return response;
+}
+export async function commandNpcRelationship(npcId:string,input:NpcRelationshipCommandHttpRequest):Promise<ReturnType<typeof npcRelationshipCommandHttpResponseSchema.parse>>{
+  const id=parseApiInput(()=>resourceIdSchema.parse(npcId));const body=parseApiInput(()=>npcRelationshipCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("npcs",id,"relationship-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"NPC relationship command");const response=npcRelationshipCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"NPC relationship command");if(response.relationship.npcId!==id||response.relationship.subjectActorId!==body.subjectActorId)throw new Error("NPC relationship response did not match the request");return response;
+}
+
+export async function listCampaignFactions(campaignId:string):Promise<Revisioned<CampaignFactionsHttpResponse>>{const success=await requestResponse<unknown>(campaignLane(campaignId,"factions"),{cache:"no-store"});requireStatus(success,200,"Campaign faction read");return{data:campaignFactionsHttpResponseSchema.parse(success.body),revision:revisionFrom(success.headers,"x-world-revision")};}
+export async function createCampaignFaction(campaignId:string,input:CreateCampaignFactionHttpRequest):Promise<ReturnType<typeof createCampaignFactionHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignFactionHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"factions"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Faction creation");const response=createCampaignFactionHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction creation");if(response.faction.name!==body.name||JSON.stringify(response.faction.publicState)!==JSON.stringify(body.publicState)||JSON.stringify(response.faction.privateState)!==JSON.stringify(body.privateState))throw new Error("Faction creation response did not match the request");return response;}
+export async function commandFactionReputation(factionId:string,input:FactionReputationCommandHttpRequest):Promise<ReturnType<typeof factionReputationCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>factionReputationCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"reputation-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction reputation command");const response=factionReputationCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction reputation command");if(response.standing.factionId!==id||response.standing.subjectActorId!==body.subjectActorId)throw new Error("Faction reputation response did not match the request");return response;}
+
+export async function listCampaignQuests(campaignId:string):Promise<Revisioned<CampaignQuestsHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"quests"),{cache:"no-store"});requireStatus(success,200,"Campaign quest read");const data=campaignQuestsHttpResponseSchema.parse(success.body);if(data.quests.some((quest)=>quest.campaignId!==validCampaignId))throw new Error("Campaign quest response did not match the request");return{data,revision:revisionFrom(success.headers,"x-quest-revision")};}
+export async function createCampaignQuest(campaignId:string,input:CreateCampaignQuestHttpRequest):Promise<ReturnType<typeof createCampaignQuestHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignQuestHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"quests"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Quest creation");const response=createCampaignQuestHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest creation");if(response.quest.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.quest.questId!==body.quest.questId||response.quest.storylineId!==body.quest.storylineId)throw new Error("Quest creation response did not match the request");return response;}
+export async function commandQuest(questId:string,input:QuestCommandHttpRequest):Promise<ReturnType<typeof questCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(questId));const body=parseApiInput(()=>questCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("quests",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Quest command");const response=questCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest command");if(response.quest.questId!==id||(body.kind==="accept"&&response.quest.status!=="active")||(body.kind==="abandon"&&response.quest.status!=="abandoned")||(body.kind==="claim-reward"&&!response.quest.rewards.some((reward)=>reward.rewardId===body.rewardId&&reward.claimedByActorId===body.actorId)))throw new Error("Quest command response did not match the request");return response;}
+
+export async function getCampaignStory(campaignId:string):Promise<Revisioned<CampaignStoryHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"story"),{cache:"no-store"});requireStatus(success,200,"Campaign story read");const data=campaignStoryHttpResponseSchema.parse(success.body);if("storylines"in data&&data.storylines.some((storyline)=>storyline.campaignId!==validCampaignId))throw new Error("Campaign story response did not match the request");return{data,revision:revisionFrom(success.headers,"x-story-revision")};}
+export async function createCampaignStoryline(campaignId:string,input:CreateCampaignStorylineHttpRequest):Promise<ReturnType<typeof createCampaignStorylineHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignStorylineHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"storylines"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Storyline creation");const response=createCampaignStorylineHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Storyline creation");if(response.storyline.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.storyline.storylineId!==body.storyline.storylineId||response.storyline.title!==body.storyline.title)throw new Error("Storyline creation response did not match the request");return response;}
+export async function commandStoryline(storylineId:string,input:StorylineCommandHttpRequest):Promise<ReturnType<typeof storylineCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(storylineId));const body=parseApiInput(()=>storylineCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("storylines",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Storyline command");const response=storylineCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Storyline command");const story=response.story;const targetMatches="storylines"in story?(body.kind==="reveal-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="revealed"):body.kind==="resolve-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="resolved"):body.kind==="reveal-clue"?story.clues.some((clue)=>clue.storylineId===id&&clue.clueId===body.targetId&&clue.revealed):story.plotPoints.some((point)=>point.storylineId===id&&point.plotPointId===body.targetId&&point.answered&&point.playerAnswer===body.data.answer)):(body.kind==="reveal-node"||body.kind==="resolve-node"?story.visibleNodes.some((node)=>node.nodeId===body.targetId):body.kind==="reveal-clue"?story.discoveredClues.some((clue)=>clue.clueId===body.targetId):false);if(!targetMatches)throw new Error("Storyline command response did not match the exact target");return response;}
+
+/** Explicit GM-to-player previews pass through the public schemas and return newly allocated, secret-free structures. */
+export function projectNpcsForPlayers(value:CampaignNpcsHttpResponse):CampaignNpcsHttpResponse{return campaignNpcsHttpResponseSchema.parse({npcs:value.npcs.map(({npcId,publicState,createdAt})=>({npcId,publicState,createdAt})),relationships:value.relationships});}
+export function projectFactionsForPlayers(value:CampaignFactionsHttpResponse):CampaignFactionsHttpResponse{return campaignFactionsHttpResponseSchema.parse({factions:value.factions.filter((item)=>item.privateState?.visibility!=="gm").map(({factionId,name,publicState,createdAt})=>({factionId,name,publicState,createdAt})),standings:value.standings.filter((standing)=>value.factions.some((item)=>item.factionId===standing.factionId&&item.privateState?.visibility!=="gm"))});}
+export function projectQuestsForPlayers(value:CampaignQuestsHttpResponse):ReturnType<typeof playerCampaignQuestsHttpResponseSchema.parse>{return playerCampaignQuestsHttpResponseSchema.parse({quests:value.quests.map((quest)=>{if("storylineId" in quest){const{storylineId:_,...playerQuest}=quest;return playerQuest;}return quest;}),objectives:value.objectives,journal:value.journal});}
+export function projectStoryForPlayers(value:CampaignStoryHttpResponse):ReturnType<typeof playerCampaignStoryHttpResponseSchema.parse>{if("visibleNodes" in value)return playerCampaignStoryHttpResponseSchema.parse(value);return playerCampaignStoryHttpResponseSchema.parse({visibleNodes:value.nodes.filter((node)=>node.status!=="hidden").map((node)=>({nodeId:node.nodeId,title:node.title,description:node.description,status:node.status,updatedAt:node.updatedAt})),discoveredClues:value.clues.filter((clue)=>clue.revealed&&clue.revealedAt!==null).map((clue)=>({clueId:clue.clueId,title:clue.title,content:clue.content,discoveredAt:clue.revealedAt!}))});}
 
 export interface HarnessSettings {
   id: "harness";

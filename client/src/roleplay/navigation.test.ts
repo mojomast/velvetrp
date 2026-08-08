@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "content-packs"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",

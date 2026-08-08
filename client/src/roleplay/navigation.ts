@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-sheet" | "campaign-character-builder" | "campaign-administration" | "campaign-combat" | "content-packs";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-sheet" | "campaign-character-builder" | "campaign-administration" | "campaign-combat" | "campaign-world" | "campaign-cast" | "campaign-journal" | "campaign-story" | "content-packs";
 
 export interface StoredNavigation {
   view: View;
@@ -18,7 +18,7 @@ export interface StoredNavigation {
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "content-packs"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };
@@ -62,7 +62,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
     : [];
   if (navigation.view === "chat" && !navigation.sessionId) navigation.view = "home";
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
-  if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration" || navigation.view === "campaign-combat") && !navigation.campaignId) navigation.view = "campaigns";
+  if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration" || navigation.view === "campaign-combat" || navigation.view === "campaign-world" || navigation.view === "campaign-cast" || navigation.view === "campaign-journal" || navigation.view === "campaign-story") && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character-builder" && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character" || navigation.view === "campaign-character-sheet") {
     if (!navigation.campaignId) {

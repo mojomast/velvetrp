@@ -76,6 +76,19 @@ describe("persistence and multi-character frontend", () => {
     expect((screen.getByLabelText("Character name") as HTMLInputElement).value).toBe("");
   });
 
+  it("restores a campaign world entry and returns focus to its campaign trigger",async()=>{
+    installFetch([aria],[],true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-world",campaignId:campaignAccess.id}));
+    routes.push(
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,handler:()=>json({characters:[]})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,handler:()=>json(appCreationOptions)},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,handler:()=>json({characters:[],rolls:[]})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/,handler:()=>json({rooms:[],eligible:[]})},
+    );
+    render(<App/>);await screen.findByRole("heading",{name:"World explorer"});expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}")).toMatchObject({view:"campaign-world",campaignId:campaignAccess.id});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:"World"})));
+  });
+
   it("restores a saved session and renders each message's actual speaker", async () => {
     installFetch(); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "chat", sessionId: baseSession.id }));
     let savedSource = "They are waiting in the observatory.";
