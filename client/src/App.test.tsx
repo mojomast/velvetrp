@@ -578,6 +578,36 @@ describe("persistence and multi-character frontend", () => {
     expect(window.location.pathname + window.location.search).toBe("/unchanged?local=yes");
   });
 
+  it("restores a scoped sheet focus request, falls back with focus, and restores focus to its workspace trigger", async () => {
+    const rosterEntry = { id: "sheet-entry", characterId: "sheet-persona", name: "Sheet Persona" };
+    const workspace = { character: { name: rosterEntry.name, race: { name: "Avelune", description: "Moonlit." }, background: { name: "Guide", description: "Guides." }, classes: [{ name: "Warden", description: "Wards.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] } };
+    const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 100, spellAttack: 3, saveDc: 11,
+      explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server", inputs: {}, result: 1 })) };
+    const sheet = { sheet: workspace.character, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: "2030-01-01T00:00:00.000Z" } };
+    installFetch([aria], [], true, true);
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/sheet$/, handler: () => json(sheet) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/content$/, handler: () => json({ error: "not configured" }, 404) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/, handler: () => json(workspace) },
+    );
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-sheet", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id }));
+    render(<App />);
+    const sheetHeading = await screen.findByRole("heading", { name: rosterEntry.name });
+    await waitFor(() => expect(document.activeElement).toBe(sheetHeading));
+    fireEvent.click(screen.getByRole("button", { name: "← Character workspace" }));
+    const sheetTrigger = await screen.findByRole("button", { name: "Open sheet, inventory & economy" });
+    await waitFor(() => expect(document.activeElement).toBe(sheetTrigger));
+    cleanup();
+
+    installFetch([aria], [], true, false);
+    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters\/sheet-entry\/workspace$/, handler: () => json(workspace) });
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-sheet", campaignId: campaignAccess.id, campaignCharacterId: rosterEntry.id }));
+    render(<App />);
+    const fallbackHeading = await screen.findByRole("heading", { name: rosterEntry.name });
+    await waitFor(() => expect(document.activeElement).toBe(fallbackHeading));
+    expect(screen.queryByRole("button", { name: "Open sheet, inventory & economy" })).toBeNull();
+  });
+
   it("returns a workspace 404 to campaign detail and focuses only its loaded heading", async () => {
     const rosterEntry = { id: "missing-workspace-entry", characterId: "missing-persona", name: "Missing Workspace" };
     installFetch([aria], [], true);

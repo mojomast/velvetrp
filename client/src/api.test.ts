@@ -51,6 +51,17 @@ describe("M2.7 actor API bindings", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ inventory: { entries: [], equipment: [], capacity: 10, revision: 5 }, receipt: { kind: "unequip", slot: "focus", idempotencyKey: "key", revisionBefore: 4, revisionAfter: 5, occurredAt: at } }), { status: 200 })));
     await expect(commandActorInventory("campaign", "actor", { kind: "unequip", slot: "hand", expectedRevision: 4, idempotencyKey: "key" })).rejects.toThrow(/did not match/);
   });
+
+  it("binds consume and gift receipts to every exact item, quantity, and recipient field", async () => {
+    const base = { idempotencyKey: "key", revisionBefore: 4, revisionAfter: 5, occurredAt: at };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ inventory: { entries: [], equipment: [], capacity: 10, revision: 5 }, receipt: { kind: "consume", entryId: "entry", item, quantity: 2, ...base } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ inventory: { entries: [], equipment: [], capacity: 10, revision: 5 }, receipt: { kind: "gift", recipientActorId: "recipient", entryId: "entry", item, quantity: 1, ...base } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(commandActorInventory("campaign", "actor", { kind: "consume", entryId: "entry", item, quantity: 2, expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { quantity: 2 } });
+    await expect(commandActorInventory("campaign", "actor", { kind: "gift", recipientActorId: "recipient", entryId: "entry", item, quantity: 1, expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { recipientActorId: "recipient" } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("M2.6 character API bindings", () => {

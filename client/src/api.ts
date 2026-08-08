@@ -1065,8 +1065,10 @@ export async function commandActorRest(campaignId: string, actorId: string, inpu
   requireStatus(success, 200, "Actor rest command");
   const response = restHttpResponseSchema.parse(success.body);
   const expectedKind = body.type === "take_short_rest" ? "short" : "long";
+  const returnedResources = new Map(response.actorState.resources.map((resource) => [resource.resourceId, resource]));
   if (response.receipt.kind !== expectedKind || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.expectedRevision || response.actorState.revision !== response.receipt.revisionAfter) {
+    || response.receipt.revisionBefore !== body.expectedRevision || response.actorState.revision !== response.receipt.revisionAfter
+    || response.receipt.recovery.resources.some((delta) => returnedResources.get(delta.resourceId)?.current !== delta.after)) {
     throw new Error("Actor rest receipt did not match the request");
   }
   return response;

@@ -83,14 +83,16 @@ export default function App() {
   const campaignAdministrationEntryRef = useRef(0);
   const contentStudioEntryRef = useRef(0);
   const characterBuilderEntryRef = useRef(0);
-  const characterSheetEntryRef = useRef(0);
+  const characterSheetEntryRef = useRef(stored.view === "campaign-character-sheet" ? 1 : 0);
   const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
   const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [contentHeadingFocusRequest, setContentHeadingFocusRequest] = useState<number | null>(null);
   const [contentReturnFocusRequest, setContentReturnFocusRequest] = useState<number | null>(null);
   const [sheetReturnFocusRequest, setSheetReturnFocusRequest] = useState<number | null>(null);
-  const [sheetHeadingFocusRequest, setSheetHeadingFocusRequest] = useState<number | null>(null);
+  const [sheetHeadingFocusRequest, setSheetHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(() =>
+    stored.view === "campaign-character-sheet" && stored.campaignId && stored.campaignCharacterId
+      ? { campaignId: stored.campaignId, campaignCharacterId: stored.campaignCharacterId, request: 1 } : null);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +177,8 @@ export default function App() {
         }
         if (current.view === "campaign-character-sheet" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
           currentNavigationRef.current = { view: "campaign-character", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          const request = ++transitionRequestRef.current;
+          setWorkspaceHeadingFocusRequest({ campaignId: current.campaignId, campaignCharacterId: activeCampaignCharacterId, request });
           setView(current.campaignId ? "campaign-character" : "campaigns");
         }
       });
@@ -386,11 +390,13 @@ export default function App() {
   }
   if (view === "campaign-character" && campaignLibraryAvailable && activeCampaignId && activeCampaignCharacterId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignCharacterId(""); setView("campaign-detail"); };
-    return <CampaignCharacterWorkspacePage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} focusHeadingRequest={workspaceHeadingFocusRequest?.campaignId === activeCampaignId && workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId ? workspaceHeadingFocusRequest.request : undefined} focusSheetRequest={sheetReturnFocusRequest ?? undefined} onSheetFocused={(request) => setSheetReturnFocusRequest((current) => current === request ? null : current)} onBack={returnToCampaign} onUnavailable={returnToCampaign} onOpenSheet={campaignMechanicsAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest(request); currentNavigationRef.current = { view: "campaign-character-sheet", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-sheet"); } : undefined} />;
+    return <CampaignCharacterWorkspacePage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} focusHeadingRequest={workspaceHeadingFocusRequest?.campaignId === activeCampaignId && workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId ? workspaceHeadingFocusRequest.request : undefined} focusSheetRequest={sheetReturnFocusRequest ?? undefined} onSheetFocused={(request) => setSheetReturnFocusRequest((current) => current === request ? null : current)} onBack={returnToCampaign} onUnavailable={returnToCampaign} onOpenSheet={campaignMechanicsAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); currentNavigationRef.current = { view: "campaign-character-sheet", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-sheet"); } : undefined} />;
   }
   if (view === "campaign-character-sheet" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && activeCampaignCharacterId) {
     const returnToWorkspace = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setSheetReturnFocusRequest(request); setView("campaign-character"); };
-    return <RpgCharacterSheetPage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} api={rpgCharacterSheetApi} focusHeadingRequest={sheetHeadingFocusRequest === characterSheetEntryRef.current ? sheetHeadingFocusRequest : undefined} onBack={returnToWorkspace} onUnavailable={returnToWorkspace} />;
+    const focusRequest = sheetHeadingFocusRequest?.campaignId === activeCampaignId && sheetHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId
+      && sheetHeadingFocusRequest.request === characterSheetEntryRef.current ? sheetHeadingFocusRequest.request : undefined;
+    return <RpgCharacterSheetPage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} api={rpgCharacterSheetApi} focusHeadingRequest={focusRequest} onBack={returnToWorkspace} onUnavailable={returnToWorkspace} />;
   }
   if (view === "campaign-character-builder" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };

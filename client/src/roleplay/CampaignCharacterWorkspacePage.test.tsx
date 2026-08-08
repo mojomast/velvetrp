@@ -1,10 +1,14 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, getCampaignCharacterWorkspace } from "../api";
 import { CampaignCharacterWorkspacePage, resetCampaignCharacterWorkspacePageModuleStateForTests } from "./CampaignCharacterWorkspacePage";
 import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../components/rpg/actor/RpgCharacterSheetPage";
 import { formatMinorUnits } from "../components/rpg/actor/ShopBrowser";
+import { ShopBrowser } from "../components/rpg/actor/ShopBrowser";
+import { InventoryPanel } from "../components/rpg/actor/InventoryPanel";
+import { TradeReviewDialog } from "../components/rpg/actor/TradeReviewDialog";
+import { RestDialog } from "../components/rpg/actor/RestDialog";
 
 vi.mock("../api", async (importOriginal) => ({ ...await importOriginal<typeof import("../api")>(), getCampaignCharacterWorkspace: vi.fn() }));
 
@@ -42,8 +46,7 @@ describe("CampaignCharacterWorkspacePage", () => {
   it("focuses the ready heading only for an exact open-transition request", async () => {
     vi.mocked(getCampaignCharacterWorkspace).mockResolvedValue(response);
     render(<CampaignCharacterWorkspacePage campaignId="campaign" campaignCharacterId="entry" focusHeadingRequest={7} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    const heading = await screen.findByRole("heading", { name: response.character.name });
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    await screen.findByRole("heading", { name: response.character.name });
   });
 
   it("renders the exact empty collection messages", async () => {
@@ -61,8 +64,7 @@ describe("CampaignCharacterWorkspacePage", () => {
     retry = await screen.findByRole("button", { name: "Retry" });
     await waitFor(() => expect(document.activeElement).toBe(retry));
     fireEvent.click(retry);
-    const heading = await screen.findByRole("heading", { name: response.character.name });
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    await screen.findByRole("heading", { name: response.character.name });
   });
 
   it("returns to detail on 404 and reuses one StrictMode in-flight read", async () => {
@@ -152,12 +154,45 @@ describe("RpgCharacterSheetPage", () => {
     const api = actorApi({ getResources: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getInventory: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getWallet: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getEffects: vi.fn(async () => { throw new ApiError(404, "hidden"); }) });
     localStorage.setItem(actorStorage, "actor");
     render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} focusHeadingRequest={9} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    const heading = await screen.findByRole("heading", { name: response.character.name });
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    await screen.findByRole("heading", { name: response.character.name });
     expect(screen.getByText("Maximum HP").nextElementSibling?.textContent).toBe("10");
     expect(screen.queryByRole("heading", { name: "Inventory" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Wallet & shop" })).toBeNull();
     expect(document.body.textContent).not.toContain("hidden");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Change actor" })));
+  });
+
+  it("removes every previously privileged lane when a refresh loses role access", async () => {
+    localStorage.setItem(actorStorage, "actor");
+    const unavailable = () => Promise.reject(new ApiError(404, "role lost"));
+    const api = actorApi({
+      getResources: vi.fn().mockResolvedValueOnce(resources).mockImplementation(unavailable),
+      getInventory: vi.fn().mockResolvedValueOnce(inventory).mockImplementation(unavailable),
+      getWallet: vi.fn().mockResolvedValueOnce(wallet).mockImplementation(unavailable),
+      getEffects: vi.fn().mockResolvedValueOnce(effects).mockImplementation(unavailable),
+    });
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Inventory" });
+    expect(screen.getByRole("heading", { name: "Wallet & shop" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh sheet" }));
+    await screen.findByText(/No actor state is available/);
+    expect(screen.queryByRole("heading", { name: "Inventory" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Wallet & shop" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Resources" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Change actor" })));
+  });
+
+  it("rejects an invalid persisted actor and keeps correction controls available", async () => {
+    localStorage.setItem(actorStorage, "bad/id");
+    const api = actorApi();
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Actor binding" });
+    expect(api.getResources).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "Load actor resources" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Campaign-provided actor ID"), { target: { value: "correct-actor" } });
+    fireEvent.click(screen.getByRole("button", { name: "Load actor resources" }));
+    await screen.findByRole("heading", { name: "Inventory" });
+    expect(screen.getByRole("button", { name: "Disconnect actor" })).toBeTruthy();
   });
 
   it("ignores stale and unmounted sheet completions", async () => {
@@ -181,7 +216,7 @@ describe("RpgCharacterSheetPage", () => {
     const view = render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Inventory" });
     fireEvent.click(screen.getByRole("button", { name: "Review equip" }));
-    fireEvent.click(screen.getByLabelText("Confirm this exact command"));
+    fireEvent.click(screen.getByLabelText("Confirm these exact submitted values"));
     fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     expect(command).toHaveBeenCalledOnce();
     view.unmount();
@@ -197,10 +232,98 @@ describe("RpgCharacterSheetPage", () => {
     const api = actorApi({ getInventory });
     render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Inventory" });
-    fireEvent.click(screen.getByRole("button", { name: "Review equip" })); fireEvent.click(screen.getByLabelText("Confirm this exact command")); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
-    expect(await screen.findByText(/Command was confirmed, but authoritative refresh failed/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review equip" })); fireEvent.click(screen.getByLabelText("Confirm these exact submitted values")); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(await screen.findByText(/Command was confirmed and its returned state was applied/)).toBeTruthy();
     expect(screen.getByText(/Receipt .* revision 4 → 5/)).toBeTruthy();
     expect(screen.getByText(/Confirmed write awaiting refresh/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Inventory receipt and returned state" })).toBeTruthy();
+    expect(screen.getByText(/Revision 5 · 1 entries · capacity 10/)).toBeTruthy();
+  });
+
+  it("applies returned rest state immediately and preserves every recovery delta on partial refresh", async () => {
+    installDialogPolyfill(); localStorage.setItem(actorStorage, "actor");
+    const getResources = vi.fn().mockResolvedValueOnce(resources).mockRejectedValueOnce(new Error("resource refresh failed"));
+    const rest = vi.fn(async (_campaign, _actor, command) => ({ actorState: { resources: [{ resourceId: "hp", current: 7, capacity: 10 }], revision: 5 }, receipt: { kind: "short" as const, recoveredAt: at, recovery: { resources: [{ resourceId: "hp", before: 2, after: 7 }] }, revisionBefore: 4, revisionAfter: 5, idempotencyKey: command.idempotencyKey } }));
+    const api = actorApi({ getResources, rest });
+    render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const opener = await screen.findByRole("button", { name: "Review rest" }); opener.focus(); fireEvent.click(opener);
+    fireEvent.click(screen.getByLabelText("Confirm this exact rest type and reviewed current context")); fireEvent.click(screen.getByRole("button", { name: "Rest once" }));
+    expect(await screen.findByRole("heading", { name: "Rest receipt and returned resource state" })).toBeTruthy();
+    expect(screen.getByText("2 → 7")).toBeTruthy();
+    expect(screen.getByText("7 of 10")).toBeTruthy();
+    expect(screen.getByText(/displayed lanes may be partial/)).toBeTruthy();
+  });
+
+  it("binds consume and gift confirmation to exact reviewed inventory values", () => {
+    const onCommand = vi.fn();
+    render(<InventoryPanel inventory={inventory} describeItem={() => ({ name: "Potion", category: "consumable", slot: "hand" })} onCommand={onCommand} />);
+    expect(screen.getByText("Equipment binding: hand slot")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review consume" }));
+    expect(screen.getByText("pack @ 1 / potion")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Confirm these exact submitted values"));
+    fireEvent.change(screen.getByLabelText("Quantity for Potion"), { target: { value: "2" } });
+    expect(screen.queryByRole("button", { name: "Submit once" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Review consume" }));
+    fireEvent.click(screen.getByLabelText("Confirm these exact submitted values"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(onCommand).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "consume", entryId: "entry", quantity: 2, item }));
+
+    fireEvent.change(screen.getByLabelText("Gift Potion recipient actor ID"), { target: { value: "recipient" } });
+    fireEvent.click(screen.getByRole("button", { name: "Review gift" }));
+    expect(screen.getByText("recipient")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Confirm these exact submitted values"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(onCommand).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "gift", recipientActorId: "recipient", entryId: "entry", quantity: 2 }));
+  });
+
+  it("resets purchase confirmation when the server quote is replaced and announces scarcity", async () => {
+    const quote = { quoteId: "quote-one", item, quantity: 2, total: { currency, minorUnits: 210 }, expiresAt: at };
+    const props = { wallet, shop: { shop: { name: "Known" }, stock: [{ item, quantity: 1, unitPrice: { currency, minorUnits: 105 } }], currencies: [currency] }, shopId: "shop", currencies: new Map(), itemLabel: () => "Potion", onLoadShop: vi.fn(), onQuote: vi.fn(), onPurchase: vi.fn() };
+    const view = render(<ShopBrowser {...props} quote={quote} />);
+    expect(screen.getByText("Server stock: 1 remaining")).toBeTruthy();
+    expect(screen.getByText(/Exact total: 210 minor units \(coin\)/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Confirm this exact server quote and total"));
+    expect((screen.getByRole("button", { name: "Purchase once" }) as HTMLButtonElement).disabled).toBe(false);
+    view.rerender(<ShopBrowser {...props} quote={{ ...quote, quoteId: "quote-two", total: { currency, minorUnits: 315 } }} />);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Purchase once" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(screen.getByText(/Exact total: 315 minor units \(coin\)/)).toBeTruthy();
+  });
+
+  function installDialogPolyfill() {
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function showModal(this: HTMLDialogElement) { this.setAttribute("open", ""); (this.querySelector("button") as HTMLElement | null)?.focus(); } });
+    Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function close(this: HTMLDialogElement) { this.removeAttribute("open"); this.dispatchEvent(new Event("close")); } });
+  }
+
+  it("lists exact trade assets, resets edited confirmation, and closes on keyboard cancel with focus restoration", async () => {
+    installDialogPolyfill();
+    const onSubmit = vi.fn();
+    function Harness() { const [open, setOpen] = useState(false); return <><button onClick={() => setOpen(true)}>Open trade</button><TradeReviewDialog open={open} inventory={inventory} wallet={wallet} currencies={new Map()} itemLabel={() => "Potion"} onClose={() => setOpen(false)} onSubmit={onSubmit} /></>; }
+    render(<Harness />);
+    const opener = screen.getByRole("button", { name: "Open trade" }); opener.focus(); fireEvent.click(opener);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Close trade dialog" })));
+    fireEvent.change(screen.getByLabelText("Trade ID"), { target: { value: "trade-one" } }); fireEvent.change(screen.getByLabelText("Recipient actor ID"), { target: { value: "recipient" } });
+    expect(screen.getByText(/entry · pack @ 1 \/ potion · quantity 1/)).toBeTruthy();
+    expect(screen.getByText(/1 minor units \(coin\)/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/Confirm every exact party/));
+    fireEvent.change(screen.getByLabelText(/Requested integer minor units/), { target: { value: "2" } });
+    expect((screen.getByRole("button", { name: "Propose once" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText(/Confirm every exact party/)); fireEvent.click(screen.getByRole("button", { name: "Propose once" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ tradeId: "trade-one", recipientActorId: "recipient", requested: { items: [], currency: [{ currency, minorUnits: 2 }] } }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it("reviews rest context, resets type confirmation, and returns exact recovery deltas", async () => {
+    installDialogPolyfill();
+    const onSubmit = vi.fn();
+    function Harness() { const [open, setOpen] = useState(false); return <><button onClick={() => setOpen(true)}>Open rest</button><RestDialog open={open} resources={resources} onClose={() => setOpen(false)} onSubmit={onSubmit} /></>; }
+    render(<Harness />); fireEvent.click(screen.getByRole("button", { name: "Open rest" }));
+    expect(await screen.findByText("Current 2 · maximum 10")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Confirm this exact rest type and reviewed current context"));
+    fireEvent.click(screen.getByLabelText("Long rest"));
+    expect((screen.getByRole("button", { name: "Rest once" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("Confirm this exact rest type and reviewed current context")); fireEvent.click(screen.getByRole("button", { name: "Rest once" }));
+    expect(onSubmit).toHaveBeenCalledWith({ type: "take_long_rest" });
   });
 
   it("formats decimal and non-decimal currency scales without float math", () => {

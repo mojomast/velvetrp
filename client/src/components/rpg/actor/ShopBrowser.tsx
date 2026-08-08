@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 import type { EconomyHttpCommandResponse, EconomyHttpShopGetResponse, EconomyHttpWalletGetResponse } from "@velvet/contracts";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type CurrencyReference = EconomyHttpWalletGetResponse["wallet"]["balances"][number]["currency"];
 export interface CurrencyPresentation { name: string; symbol: string; minorPerMajor: number }
@@ -41,19 +41,21 @@ export interface ShopBrowserProps {
 export function ShopBrowser({ wallet, shop, shopId, quote, currencies, disabled = false, itemLabel, onLoadShop, onQuote, onPurchase }: ShopBrowserProps) {
   const [knownId, setKnownId] = useState(shopId);
   const [quantity, setQuantity] = useState("1");
-  const [confirmed, setConfirmed] = useState(false);
+  const [confirmedSnapshot, setConfirmedSnapshot] = useState<string | null>(null);
+  const quoteSnapshot = useMemo(() => quote ? JSON.stringify({ quote, expectedRevision: wallet.revision }) : null, [quote, wallet.revision]);
+  useEffect(() => { setConfirmedSnapshot(null); }, [quoteSnapshot]);
   const parsedQuantity = /^\d+$/.test(quantity) ? Number(quantity) : 0;
   const legalQuantity = Number.isSafeInteger(parsedQuantity) && parsedQuantity >= 1 && parsedQuantity <= 1_000_000;
   return <section className="actor-section shop-browser" aria-labelledby="shop-heading">
     <div className="actor-section-heading"><h2 id="shop-heading">Wallet & shop</h2></div>
     {wallet.wallet.balances.length === 0 ? <p className="actor-empty">Wallet has no balances.</p> : <dl className="wallet-list">{wallet.wallet.balances.map((balance) => <div key={catalogReferenceKey(balance.currency)}><dt><bdi dir="auto">{currencies.get(catalogReferenceKey(balance.currency))?.name ?? balance.currency.definitionId}</bdi></dt><dd>{formatMinorUnits(balance.minorUnits, balance.currency, currencies.get(catalogReferenceKey(balance.currency)))}</dd></div>)}</dl>}
     <form className="known-shop-form" onSubmit={(event) => { event.preventDefault(); if (knownId) onLoadShop(knownId); }}>
-      <label className="field">Known shop ID<input value={knownId} onChange={(event) => setKnownId(event.target.value)} autoComplete="off" /></label>
+      <label className="field">Known shop ID<input value={knownId} onChange={(event) => { setKnownId(event.target.value); setConfirmedSnapshot(null); }} autoComplete="off" /></label>
       <button className="ghost" type="submit" disabled={disabled || !resourceIdSchema.safeParse(knownId).success}>Open known shop</button>
       <p className="actor-help">There is no shop discovery endpoint. Enter an ID supplied by your campaign.</p>
     </form>
     {shop && <div className="shop-stock"><h3><bdi dir="auto">{shop.shop.name}</bdi></h3>
-      <label className="field compact-quantity">Purchase quantity<input inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
+      <label className="field compact-quantity">Purchase quantity<input inputMode="numeric" value={quantity} onChange={(event) => { setQuantity(event.target.value); setConfirmedSnapshot(null); }} /></label>
       <ul>{shop.stock.map((line) => <li key={catalogReferenceKey(line.item)}>
         <div><strong><bdi dir="auto">{itemLabel(line.item)}</bdi></strong><span>{formatMinorUnits(line.unitPrice.minorUnits, line.unitPrice.currency, currencies.get(catalogReferenceKey(line.unitPrice.currency)))} each</span><span className="scarcity-notice" role="status" aria-live="polite">Server stock: {line.quantity} remaining</span></div>
         <button className="ghost" type="button" disabled={disabled || !legalQuantity} onClick={() => onQuote(shopId, line.item, parsedQuantity)}>Request server quote</button>
@@ -63,9 +65,10 @@ export function ShopBrowser({ wallet, shop, shopId, quote, currencies, disabled 
       <h3 id="purchase-review-heading">Server purchase quote</h3>
       <p><strong>{quote.quantity}</strong> × <bdi dir="auto">{itemLabel(quote.item)}</bdi></p>
       <p className="quote-total">Exact total: {formatMinorUnits(quote.total.minorUnits, quote.total.currency, currencies.get(catalogReferenceKey(quote.total.currency)))}</p>
-      <p>Expires <time dateTime={quote.expiresAt}>{quote.expiresAt}</time>. The server will re-check funds, stock, expiry, and capacity.</p>
-      <label className="actor-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /> Confirm this exact server quote</label>
-      <button className="primary" type="button" disabled={disabled || !confirmed} onClick={() => onPurchase(quote.quoteId)}>Purchase once</button>
+      <dl className="command-detail-list"><div><dt>Quote ID</dt><dd>{quote.quoteId}</dd></div><div><dt>Expected wallet revision</dt><dd>{wallet.revision}</dd></div><div><dt>Currency</dt><dd>{quote.total.currency.packId} @ {quote.total.currency.packVersion} / {quote.total.currency.definitionId}</dd></div><div><dt>Server stock at latest shop read</dt><dd>{shop?.stock.find((line) => catalogReferenceKey(line.item) === catalogReferenceKey(quote.item))?.quantity ?? "Not returned"}</dd></div></dl>
+      <p>Expires <time dateTime={quote.expiresAt}>{quote.expiresAt}</time>. Purchase submits this quote ID unchanged; the server will re-check funds, stock scarcity, expiry, binding, and inventory capacity.</p>
+      <label className="actor-confirm"><input type="checkbox" checked={quoteSnapshot !== null && confirmedSnapshot === quoteSnapshot} onChange={(event) => setConfirmedSnapshot(event.target.checked ? quoteSnapshot : null)} /> Confirm this exact server quote and total</label>
+      <button className="primary" type="button" disabled={disabled || quoteSnapshot === null || confirmedSnapshot !== quoteSnapshot} onClick={() => onPurchase(quote.quoteId)}>Purchase once</button>
     </section>}
   </section>;
 }
