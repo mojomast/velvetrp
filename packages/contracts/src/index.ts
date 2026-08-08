@@ -42,6 +42,7 @@ export * from "./check-commands-http.js";
 export * from "./powers.js";
 export * from "./powers-http.js";
 export * from "./effects.js";
+export * from "./effects-http.js";
 export * from "./encounters.js";
 export * from "./world.js";
 export * from "./quest.js";

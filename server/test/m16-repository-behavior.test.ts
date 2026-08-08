@@ -97,6 +97,11 @@ describe("M1.6 repository behavior", () => {
     expect(f.repo.getActorPowerSnapshot("powers-observer",f.source)).toBeNull();
     expect(f.repo.getActorPowerSnapshot("powers-unrelated",f.source)).toBeNull();
     expect(f.repo.getActorPowerSnapshot("local-owner","missing")).toBeNull();
+    expect(f.repo.getActorEffectSnapshot("powers-gm",f.source)).toMatchObject({campaignId:f.campaign,actorId:f.source,effects:[],revision:0});
+    expect(f.repo.getActorEffectSnapshot("powers-controller",f.source)).not.toBeNull();
+    expect(f.repo.getActorEffectSnapshot("powers-observer",f.source)).toBeNull();
+    expect(f.repo.getActorEffectSnapshot("powers-unrelated",f.source)).toBeNull();
+    expect(f.repo.getActorEffectSnapshot("local-owner","missing")).toBeNull();
     f.repo.usePower("local-owner",{type:"use_power",campaignId:f.campaign,actorId:f.source,power:finite.powerRef,targetActorId:null,costs:[],expectedRevision:0,idempotencyKey:"finite",usedAt:timestamp});
     const exhausted=f.repo.getActorPowerSnapshot("local-owner",f.source)!;
     expect(exhausted.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(0);
@@ -173,6 +178,7 @@ describe("M1.6 repository behavior", () => {
     expect(glow.resolution.outcomes).toEqual([expect.objectContaining({kind:"modifier",targetId:f.opponent,statistic:"defense",amount:2})]);
     expect(glow.actorStates[0]!.resources).toContainEqual({resourceId:"slot-1",current:0,capacity:1});
     expect(glow.actorStates[1]!.activeEffects).toEqual([expect.objectContaining({source:spell,concentration:true,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}]})]);
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.opponent)).toMatchObject({campaignId:f.campaign,actorId:f.opponent,revision:2,effects:[expect.objectContaining({source:spell,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}],concentration:{kind:"required",concentrationId:"power-concentration"}})]});
     const replenish=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
     replenish.prepare("UPDATE rpg_actor_resources SET current=1 WHERE campaign_id=? AND actor_id=? AND name='slot-1'").run(f.campaign,f.source);replenish.close();
     const replacement=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:2,idempotencyKey:"actor-glow-replacement"});
@@ -190,10 +196,12 @@ describe("M1.6 repository behavior", () => {
     expect(apply(effect("first", [{ kind: "flat", appliesToId: "might", amount: 2 }, { kind: "advantage", appliesToId: "might" }], { kind: "rounds", remaining: 2 }, { kind: "required", concentrationId: "focus" }), 0, "first").effects).toContainEqual(expect.objectContaining({ effectId: "first" }));
     apply(effect("second", [{ kind: "proficiency", appliesToId: "might", bonus: 1 }, { kind: "resistance", appliesToId: "fire" }, { kind: "vulnerability", appliesToId: "cold" }], { kind: "until_timestamp", expiresAt: "2035-01-01T00:00:01.000Z" }, { kind: "required", concentrationId: "focus" }), 1, "second");
     expect(f.repo.listActiveEffects("local-owner", f.campaign, f.source)).toEqual([expect.objectContaining({ effectId: "second" })]);
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)).toMatchObject({campaignId:f.campaign,actorId:f.source,revision:2,effects:[expect.objectContaining({effectId:"second",modifiers:[{kind:"proficiency",appliesToId:"might",bonus:1},{kind:"resistance",appliesToId:"fire"},{kind:"vulnerability",appliesToId:"cold"}],concentration:{kind:"required",concentrationId:"focus"}})]});
     apply(effect("immune", [{ kind: "immunity", appliesToId: "poison" }], { kind: "until_removed" }), 2, "immune");
     expect(() => apply(effect("poison", [{ kind: "flat", appliesToId: "poison", amount: 1 }], { kind: "until_removed" }), 3, "poison")).toThrow(EffectImmuneError);
     f.advance(1_001);
     expect(f.repo.listActiveEffects("local-owner", f.campaign, f.source).map((value) => value.effectId)).toEqual(["immune"]);
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)).toMatchObject({revision:3,effects:[expect.objectContaining({effectId:"immune"})]});
     f.repo.close();
   });
 
