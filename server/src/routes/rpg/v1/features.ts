@@ -93,6 +93,8 @@ import type { CampaignAdministrationRepository } from "../../../repo/campaignAdm
 import type { CampaignEventPage } from "../../../repo/campaign/campaignTypes.js";
 import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
+import { storyHttpRoutes } from "./storyRoutes.js";
+import type { StoryRepository } from "../../../repo/storyRepo.js";
 import { contentCatalogHttpRoutes } from "./contentCatalog.js";
 import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
@@ -130,6 +132,7 @@ export interface CampaignListRepository extends
     | "listCampaignCheckpoints" | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
     | "getCampaignAdministrationReceipt" | "dryRunCampaignImport" | "applyCampaignImportById" | "readCampaignExport">>,
   Partial<QuestRepository>,
+  Partial<StoryRepository>,
   Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
   Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
   Partial<Pick<RestRepository, "takeRest">>,
@@ -230,8 +233,8 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
 };
 type QuestLaneRepository = Pick<QuestRepository,
-  "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand" | "listCampaignStorylines"
-  | "createCampaignStoryline" | "getCampaignStoryline" | "updateCampaignStoryline">;
+  "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
+type StoryLaneRepository = Pick<StoryRepository, "getCampaignStory" | "createCampaignStorylineGraph" | "executeStorylineCommand">;
 type ContentCatalogLaneRepository = Pick<ContentCatalogRepository,
   "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage"
   | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog"
@@ -333,9 +336,12 @@ function assertCampaignHistoryRepository(
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
   const methods: Array<keyof QuestLaneRepository> = [
-    "listCampaignQuests", "createCampaignQuest", "executeQuestCommand", "listCampaignStorylines",
-    "createCampaignStoryline", "getCampaignStoryline", "updateCampaignStoryline",
+    "listCampaignQuests", "createCampaignQuest", "executeQuestCommand",
   ];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
+function assertStoryRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & StoryLaneRepository {
+  const methods: Array<keyof StoryLaneRepository> = ["getCampaignStory", "createCampaignStorylineGraph", "executeStorylineCommand"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 function assertContentCatalogRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & ContentCatalogLaneRepository {
@@ -464,6 +470,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertQuestRepository(repository);
     return repository;
   };
+  const storyRepositoryAccessor = (): StoryLaneRepository => { const repository = getCampaignRepository(); assertStoryRepository(repository); return repository; };
   const contentCatalogRepositoryAccessor = (): ContentCatalogLaneRepository => {
     const repository = getCampaignRepository();
     assertContentCatalogRepository(repository);
@@ -536,6 +543,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
   await app.register(questHttpRoutes, { questRepositoryAccessor });
+  await app.register(storyHttpRoutes, { storyRepositoryAccessor });
   await app.register(contentCatalogHttpRoutes, { contentCatalogRepositoryAccessor });
   await app.register(actorResourcesHttpRoutes, { actorResourceRepositoryAccessor });
   await app.register(actorInventoryHttpRoutes, { inventoryRepositoryAccessor });

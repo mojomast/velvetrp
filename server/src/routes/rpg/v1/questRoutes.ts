@@ -1,18 +1,12 @@
 import {
-  campaignQuestsHttpResponseSchema,
-  createStorylineRequestSchema,
-  createStorylineResponseSchema,
+  gmCampaignQuestsHttpResponseSchema,
   createCampaignQuestHttpRequestSchema,
   createCampaignQuestHttpResponseSchema,
   questCommandHttpRequestSchema,
   questCommandHttpResponseSchema,
   resourceIdSchema,
-  StorylineSchema,
-  updateStorylineStatusRequestSchema,
-  updateStorylineStatusResponseSchema,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
-import { z } from "zod";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import {
@@ -26,8 +20,7 @@ import {
 
 const OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type Repo = Pick<QuestRepository, "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand"
-  | "listCampaignStorylines" | "createCampaignStoryline" | "getCampaignStoryline" | "updateCampaignStoryline">;
+type Repo = Pick<QuestRepository, "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
 export interface QuestHttpRoutesOptions { questRepositoryAccessor: () => Repo }
 
 const enabled = () => { const flags = readRpgFeatureFlags(); return flags.campaign && flags.mechanics; };
@@ -46,53 +39,6 @@ const hasQuery = (request: FastifyRequest) => (request.raw.url ?? request.url).i
   || Object.keys(request.query as Record<string, unknown>).length > 0;
 
 export const questHttpRoutes: FastifyPluginAsync<QuestHttpRoutesOptions> = async (app, options) => {
-  const storylineListSchema = z.object({ storylines: z.array(StorylineSchema) }).strict();
-  app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>("/campaigns/:campaignId/storylines", {
-    exposeHeadRoute: false, onRequest: async (request, reply) => { reply.header("cache-control", "no-store");
-      if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
-      if (hasQuery(request)) await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Campaign storylines do not accept query parameters"); },
-  }, async (request, reply) => { const campaignId = resourceIdSchema.safeParse(request.params.campaignId); if (!campaignId.success) return missing(request, reply);
-    try { const storylines = options.questRepositoryAccessor().listCampaignStorylines(OWNER, campaignId.data); if (storylines === null) return missing(request, reply);
-      if (storylines.some((storyline) => storyline.campaignId !== campaignId.data)) throw new Error("storyline list binding is invalid");
-      return reply.send(storylineListSchema.parse({ storylines })); } catch (error) { return fail(request, reply, error, "storyline-list"); } });
-
-  app.post<{ Params: { campaignId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/campaigns/:campaignId/storylines", {
-    onRequest: async (request, reply) => { reply.header("cache-control", "no-store");
-      if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
-      if (hasQuery(request)) { await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline creation does not accept query parameters"); return; }
-      if (!resourceIdSchema.safeParse(request.params.campaignId).success) { await missing(request, reply); return; }
-      const type = request.headers["content-type"]; if (typeof type !== "string" || !JSON_TYPE.test(type)) await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Storyline creation requires application/json"); },
-    errorHandler: (_error, request, reply) => sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline creation request is invalid"),
-  }, async (request, reply) => { const campaignId = resourceIdSchema.safeParse(request.params.campaignId), body = createStorylineRequestSchema.safeParse(request.body);
-    if (!campaignId.success) return missing(request, reply); if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline creation request is invalid");
-    try { const storyline = options.questRepositoryAccessor().createCampaignStoryline(OWNER, campaignId.data, { title: body.data.title,
-      ...(body.data.description === undefined ? {} : { description: body.data.description }),
-      ...(body.data.status === undefined ? {} : { status: body.data.status }) });
-      if (storyline.campaignId !== campaignId.data) throw new Error("storyline creation binding is invalid");
-      return reply.code(201).send(createStorylineResponseSchema.parse({ storyline })); } catch (error) { return fail(request, reply, error, "storyline-create"); } });
-
-  app.get<{ Params: { campaignId: string; storylineId: string }; Querystring: Record<string, unknown> }>("/campaigns/:campaignId/storylines/:storylineId", {
-    exposeHeadRoute: false, onRequest: async (request, reply) => { reply.header("cache-control", "no-store");
-      if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
-      if (hasQuery(request)) await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline detail does not accept query parameters"); },
-  }, async (request, reply) => { const campaignId = resourceIdSchema.safeParse(request.params.campaignId), storylineId = resourceIdSchema.safeParse(request.params.storylineId);
-    if (!campaignId.success || !storylineId.success) return missing(request, reply);
-    try { const storyline = options.questRepositoryAccessor().getCampaignStoryline(OWNER, campaignId.data, storylineId.data); if (storyline === null) return missing(request, reply);
-      if (storyline.campaignId !== campaignId.data || storyline.id !== storylineId.data) throw new Error("storyline detail binding is invalid");
-      return reply.send(createStorylineResponseSchema.parse({ storyline })); } catch (error) { return fail(request, reply, error, "storyline-detail"); } });
-
-  app.patch<{ Params: { campaignId: string; storylineId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/campaigns/:campaignId/storylines/:storylineId/status", {
-    onRequest: async (request, reply) => { reply.header("cache-control", "no-store");
-      if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
-      if (hasQuery(request)) { await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline status does not accept query parameters"); return; }
-      const type = request.headers["content-type"]; if (typeof type !== "string" || !JSON_TYPE.test(type)) await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Storyline status requires application/json"); },
-    errorHandler: (_error, request, reply) => sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline status request is invalid"),
-  }, async (request, reply) => { const campaignId = resourceIdSchema.safeParse(request.params.campaignId), storylineId = resourceIdSchema.safeParse(request.params.storylineId), body = updateStorylineStatusRequestSchema.safeParse(request.body);
-    if (!campaignId.success || !storylineId.success) return missing(request, reply); if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Storyline status request is invalid");
-    try { const storyline = options.questRepositoryAccessor().updateCampaignStoryline(OWNER, campaignId.data, storylineId.data, body.data);
-      if (storyline.campaignId !== campaignId.data || storyline.id !== storylineId.data) throw new Error("storyline status binding is invalid");
-      return reply.send(updateStorylineStatusResponseSchema.parse({ storyline })); } catch (error) { return fail(request, reply, error, "storyline-status"); } });
-
   app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>("/campaigns/:campaignId/quests", {
     exposeHeadRoute: false, onRequest: async (request, reply) => {
       reply.header("cache-control", "no-store");
@@ -110,7 +56,7 @@ export const questHttpRoutes: FastifyPluginAsync<QuestHttpRoutesOptions> = async
         || result.objectives.some((objective) => !result.quests.some((quest) => quest.questId === objective.questId))
         || result.journal.some((entry) => !result.quests.some((quest) => quest.questId === entry.questId))) throw new Error("quest list binding is invalid");
       reply.header("x-quest-revision", String(result.revision));
-      return reply.send(campaignQuestsHttpResponseSchema.parse({ quests: result.quests, objectives: result.objectives, journal: result.journal }));
+      return reply.send(gmCampaignQuestsHttpResponseSchema.parse({ quests: result.quests, objectives: result.objectives, journal: result.journal }));
     } catch (error) { return fail(request, reply, error, "quest-list"); }
   });
 
@@ -129,7 +75,7 @@ export const questHttpRoutes: FastifyPluginAsync<QuestHttpRoutesOptions> = async
     try {
       const result = options.questRepositoryAccessor().createCampaignQuest(OWNER, campaignId.data, body.data);
       if (result.campaignId !== campaignId.data || result.quest.campaignId !== campaignId.data || result.quest.questId !== body.data.quest.questId
-        || result.quest.storylineId !== body.data.quest.storylineId || result.quest.title !== body.data.quest.title
+        || !("storylineId" in result.quest) || result.quest.storylineId !== body.data.quest.storylineId || result.quest.title !== body.data.quest.title
         || result.receipt.idempotencyKey !== body.data.idempotencyKey || result.receipt.revisionBefore !== body.data.expectedRevision
         || result.receipt.revisionAfter !== body.data.expectedRevision + 1) throw new Error("quest creation binding is invalid");
       return reply.code(201).send(createCampaignQuestHttpResponseSchema.parse({ quest: result.quest, receipt: {

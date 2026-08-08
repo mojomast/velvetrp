@@ -24,6 +24,7 @@ import { assertCampaignImportStagingV30, createCampaignImportStagingV30, migrate
 import { assertEncounterLifecycleV31, createEncounterLifecycleV31, migrate30to31 } from "./db/migrations/v31_encounter_lifecycle.js";
 import { assertWorldNarrativeV32, createWorldNarrativeV32, migrate31to32 } from "./db/migrations/v32_world_narrative.js";
 import { assertQuestDomainV33, createQuestDomainV33, migrate32to33 } from "./db/migrations/v33_quest_domain.js";
+import { assertStoryDomainV34, createStoryDomainV34, migrate33to34 } from "./db/migrations/v34_story_domain.js";
 import {
   assertCampaignContentPacksHaveExactSealedPacks,
   createCampaignContentPackSealedPinTriggers,
@@ -35,11 +36,11 @@ import {
 
 
 configureSchema({
-  assertCampaignContentPacksHaveExactSealedPacks, assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29,
+  assertCampaignContentPacksHaveExactSealedPacks, assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29,
   assertCharacterProgressionLayoutV23, assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26,
   assertCombatFoundationLayoutV27, assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
   createCampaignAdministrationV15, createCampaignContentPackSealedPinTriggers, createCampaignEventMatchingTriggerV14,
-  createCampaignImportStagingV30, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33,
+  createCampaignImportStagingV30, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createStoryDomainV34,
   createCharacterBuilderIntegrityV21, createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20,
   createCharacterBuilderV19, createCharacterLayoutV29, createCharacterProgressionIntegrityV24,
   createCharacterProgressionV23, createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16,
@@ -48,7 +49,7 @@ configureSchema({
   migrate2to3, migrate3to4, migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10,
   migrate10to11, migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17,
   migrate17to18, migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24,
-  migrate24to25, migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, validateCharacterProgressionV23,
+  migrate24to25, migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, validateCharacterProgressionV23,
   validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25, validateM16PersistenceV26,
   validateV20DraftAudit, validateWorldTravelNpcFactionV28,
 });

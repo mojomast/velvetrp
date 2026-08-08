@@ -55,6 +55,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/quests\/[^/]+\/commands$/.test(path)) {
     return "/api/rpg/v1/quests/:questId/commands";
   }
+  if (/^\/api\/rpg\/v1\/storylines\/[^/]+\/commands$/.test(path)) {
+    return "/api/rpg/v1/storylines/:storylineId/commands";
+  }
   if (/^\/api\/rpg\/v1\/combats\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/combats/:combatId";
   }
@@ -112,7 +115,7 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/rooms\/[^/]+$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/rooms/:sessionId`;
   }
-  if (suffix === "/storylines" || suffix === "/quests") {
+  if (suffix === "/story" || suffix === "/storylines" || suffix === "/quests") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (/^\/storylines\/[^/]+$/.test(suffix)) {

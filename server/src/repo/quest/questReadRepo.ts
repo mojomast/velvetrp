@@ -181,11 +181,15 @@ export function createQuestReadRepository(
   db: Database,
   principalId: string,
 ): QuestReadRepository {
-  const hasCampaignAccess = (campaignId: string) => Boolean(db.prepare(
-    "SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
-  ).get(campaignId, principalId));
+  const campaignRole = (campaignId: string) => (db.prepare(
+    "SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
+  ).get(campaignId, principalId) as { role: string } | undefined)?.role;
+  const hasCampaignAccess = (campaignId: string) => campaignRole(campaignId) !== undefined;
   const requireCampaign = (campaignId: string) => {
     if (!hasCampaignAccess(campaignId)) throw new QuestUnavailableError();
+  };
+  const requireGmCampaign = (campaignId: string) => {
+    const role = campaignRole(campaignId); if (role !== "owner" && role !== "gm") throw new QuestUnavailableError();
   };
   const scopedStoryline = (campaignId: string, storylineId: string) => db.prepare(
     "SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?",
@@ -212,11 +216,11 @@ export function createQuestReadRepository(
 
   return {
     async listStorylines(campaignId) {
-      requireCampaign(campaignId);
+      requireGmCampaign(campaignId);
       return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline);
     },
     async getStoryline(campaignId, storylineId) {
-      requireCampaign(campaignId); const row = scopedStoryline(campaignId, storylineId);
+      requireGmCampaign(campaignId); const row = scopedStoryline(campaignId, storylineId);
       return row ? storyline(row) : null;
     },
     async listQuests(campaignId, storylineId) {

@@ -41,6 +41,10 @@ export const campaignQuestHttpSchema = z.object({
   updatedAt: utcIsoTimestampSchema,
 }).strict();
 
+/** Player quest projections intentionally omit storyline ancestry. */
+export const playerCampaignQuestHttpSchema = campaignQuestHttpSchema.omit({ storylineId: true });
+export const campaignQuestProjectionHttpSchema = z.union([campaignQuestHttpSchema, playerCampaignQuestHttpSchema]);
+
 export const questObjectiveHttpSchema = z.object({
   objectiveId: resourceIdSchema,
   questId: resourceIdSchema,
@@ -58,11 +62,17 @@ export const questJournalEntryHttpSchema = z.object({
   occurredAt: utcIsoTimestampSchema,
 }).strict();
 
-export const campaignQuestsHttpResponseSchema = z.object({
+export const gmCampaignQuestsHttpResponseSchema = z.object({
   quests: z.array(campaignQuestHttpSchema).max(10_000),
   objectives: z.array(questObjectiveHttpSchema).max(100_000),
   journal: z.array(questJournalEntryHttpSchema).max(100_000),
 }).strict();
+export const playerCampaignQuestsHttpResponseSchema = z.object({
+  quests: z.array(playerCampaignQuestHttpSchema).max(10_000),
+  objectives: z.array(questObjectiveHttpSchema).max(100_000),
+  journal: z.array(questJournalEntryHttpSchema).max(100_000),
+}).strict();
+export const campaignQuestsHttpResponseSchema = z.union([gmCampaignQuestsHttpResponseSchema, playerCampaignQuestsHttpResponseSchema]);
 
 const newObjectiveSchema = z.object({
   objectiveId: resourceIdSchema,
@@ -157,11 +167,13 @@ export const questCommandHttpRequestSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const questCommandHttpResponseSchema = z.object({
-  quest: campaignQuestHttpSchema,
+  quest: campaignQuestProjectionHttpSchema,
   receipt: questCommandReceiptHttpSchema,
 }).strict();
 
 export type CampaignQuestHttp = z.infer<typeof campaignQuestHttpSchema>;
+export type PlayerCampaignQuestHttp = z.infer<typeof playerCampaignQuestHttpSchema>;
+export type CampaignQuestProjectionHttp = z.infer<typeof campaignQuestProjectionHttpSchema>;
 export type QuestObjectiveHttp = z.infer<typeof questObjectiveHttpSchema>;
 export type QuestJournalEntryHttp = z.infer<typeof questJournalEntryHttpSchema>;
 export type CampaignQuestsHttpResponse = z.infer<typeof campaignQuestsHttpResponseSchema>;

@@ -11,6 +11,13 @@ const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 const schema = (databaseFile: string) => { const db = new DatabaseDriver(databaseFile, { readonly: true });
   const rows = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all(); db.close(); return rows; };
 function rewindToV32(db: DatabaseDriver.Database): void {
+  for (const row of db.prepare("SELECT name,type FROM sqlite_master WHERE name GLOB '*v34*'").all() as any[]) {
+    if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
+  }
+  for (const table of ["story_layout_attestation_v34","story_discoveries_v34","story_clue_sources_v34","story_clues_v34",
+    "story_plot_point_answers_v34","story_plot_points_v34","story_edges_v34","story_node_state_v34","story_nodes_v34","story_metadata_v34",
+    "story_events_v34","story_receipts_v34","story_commands_v34","story_campaign_revisions_v34"]) db.exec(`DROP TABLE "${table}"`);
+  db.exec("DROP INDEX uq_storyline_campaign_id_v34");
   db.prepare("UPDATE meta SET value='32' WHERE key='schemaVersion'").run();
   for (const row of db.prepare("SELECT name,type FROM sqlite_master WHERE name GLOB '*v33*'").all() as any[]) {
     if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
@@ -26,14 +33,15 @@ describe("schema v33 quest domain", () => {
     const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! });
     const campaign = repo.createCampaign("local-owner", { name: "Quest migration" });
     const db = new DatabaseDriver(file()); db.pragma("foreign_keys=ON");
+    rewindToV32(db);
     db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES(?,?,?,?,?)")
       .run("story", campaign.id, "Legacy", "active", "2035-01-01T00:00:00.000Z");
     db.prepare("INSERT INTO quests VALUES(?,?,?,?,?,?,?,?,?)").run("legacy", "story", campaign.id, "Legacy quest", null,
       "open", 0, "2035-01-01T00:00:00.000Z", "2035-01-01T00:00:00.000Z");
-    rewindToV32(db); db.close(); repo.close();
+    db.close(); repo.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "33" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "34" });
     expect(migrated.prepare("SELECT title FROM quests WHERE id='legacy'").get()).toEqual({ title: "Legacy quest" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM quest_domain_layout_attestation_v33").get()).toEqual({ length: 64 });
     migrated.close();

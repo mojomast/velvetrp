@@ -49,6 +49,8 @@ export * from "./world.js";
 export * from "./world-http.js";
 export * from "./quest.js";
 export * from "./quest-http.js";
+export * from "./story.js";
+export * from "./story-http.js";
 
 export {
   addCampaignMembershipInputSchema,

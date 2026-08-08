@@ -9,6 +9,7 @@ import {
   resourceIdSchema,
   utcIsoTimestampSchema,
   type CampaignQuestHttp,
+  type CampaignQuestProjectionHttp,
   type CreateCampaignQuestHttpRequest,
   type QuestCommandHttpRequest,
   type QuestCommandReceiptHttp,
@@ -27,17 +28,13 @@ export class QuestDomainUnavailableError extends Error { readonly code = "QUEST_
 export interface CampaignQuestSnapshot {
   campaignId: string;
   revision: number;
-  quests: CampaignQuestHttp[];
+  quests: CampaignQuestProjectionHttp[];
   objectives: QuestObjectiveHttp[];
   journal: QuestJournalEntryHttp[];
 }
-export interface QuestMutationResult { campaignId: string; quest: CampaignQuestHttp; receipt: InternalReceipt }
+export interface QuestMutationResult { campaignId: string; quest: CampaignQuestProjectionHttp; receipt: InternalReceipt }
 
 export interface QuestDomainRepository {
-  listCampaignStorylines(principalId: string, campaignId: string): Array<{ id: string; campaignId: string; title: string; description: string | null; status: "active" | "completed" | "abandoned"; createdAt: string }> | null;
-  createCampaignStoryline(principalId: string, campaignId: string, input: { title: string; description?: string | null; status?: "active" | "completed" | "abandoned" }): { id: string; campaignId: string; title: string; description: string | null; status: "active" | "completed" | "abandoned"; createdAt: string };
-  getCampaignStoryline(principalId: string, campaignId: string, storylineId: string): { id: string; campaignId: string; title: string; description: string | null; status: "active" | "completed" | "abandoned"; createdAt: string } | null;
-  updateCampaignStoryline(principalId: string, campaignId: string, storylineId: string, input: { status: "active" | "completed" | "abandoned" }): { id: string; campaignId: string; title: string; description: string | null; status: "active" | "completed" | "abandoned"; createdAt: string };
   listCampaignQuests(principalId: string, campaignId: string): CampaignQuestSnapshot | null;
   createCampaignQuest(principalId: string, campaignId: string, input: CreateCampaignQuestHttpRequest): QuestMutationResult;
   executeQuestCommand(principalId: string, questId: string, input: QuestCommandHttpRequest): QuestMutationResult;
@@ -68,8 +65,6 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
     "SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?",
   ).get(campaignId, principalId) as { role: string } | undefined;
   const isGm = (role: string) => role === "owner" || role === "gm";
-  const storyline = (row: any) => ({ id: row.id, campaignId: row.campaign_id, title: row.title,
-    description: row.description, status: row.status as "active" | "completed" | "abandoned", createdAt: timestamp(row.created_at) });
   const revision = (campaignId: string): number => (db.prepare(
     "SELECT revision FROM quest_domain_revisions_v33 WHERE campaign_id=?",
   ).get(campaignId) as { revision: number } | undefined)?.revision ?? 0;
@@ -90,10 +85,13 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
     }));
   }
 
-  function projectQuest(row: any, privileged: boolean): CampaignQuestHttp {
-    return campaignQuestHttpSchema.parse({ questId: row.id, campaignId: row.campaign_id,
+  function projectQuest(row: any, privileged: boolean): CampaignQuestProjectionHttp {
+    const projected = campaignQuestHttpSchema.parse({ questId: row.id, campaignId: row.campaign_id,
       storylineId: row.storyline_id, title: row.title, description: row.description, status: status(row.status),
       rewards: rewards(row.campaign_id, row.id, privileged), createdAt: timestamp(row.created_at), updatedAt: timestamp(row.updated_at) });
+    if (privileged) return projected;
+    const { storylineId: _hiddenStorylineId, ...player } = projected;
+    return player;
   }
 
   function snapshot(principalId: string, campaignId: string): CampaignQuestSnapshot | null {
@@ -146,7 +144,8 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
     const visibleRewardIds = new Set((db.prepare(`SELECT reward_id FROM quest_reward_definitions_v33
       WHERE campaign_id=? AND quest_id=? AND visibility='public'`).all(result.campaignId, result.quest.questId) as Array<{ reward_id: string }>)
       .map((row) => row.reward_id));
-    return { ...result, quest: { ...result.quest, rewards: result.quest.rewards.filter((reward) => visibleRewardIds.has(reward.rewardId)) } };
+    const { storylineId: _hiddenStorylineId, ...playerQuest } = result.quest as CampaignQuestHttp;
+    return { ...result, quest: { ...playerQuest, rewards: result.quest.rewards.filter((reward) => visibleRewardIds.has(reward.rewardId)) } };
   }
 
   function replay(principalId: string, campaignId: string, type: string, request: string, key: string, privileged: boolean): QuestMutationResult | null {
@@ -212,22 +211,6 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
   }
 
   return {
-    listCampaignStorylines(principalId, campaignIdInput) { context.guard(); const campaignId = resourceIdSchema.parse(campaignIdInput);
-      if (!membership(principalId, campaignId)) return null;
-      return (db.prepare("SELECT * FROM quest_storylines WHERE campaign_id=? ORDER BY created_at,id").all(campaignId) as any[]).map(storyline); },
-    createCampaignStoryline(principalId, campaignIdInput, input) { context.guard(); const campaignId = resourceIdSchema.parse(campaignIdInput);
-      const member = membership(principalId, campaignId); if (!member || !isGm(member.role)) throw new QuestAuthorizationError("GM authority is required");
-      const storylineId = id(), createdAt = now(); db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,description,status,created_at) VALUES(?,?,?,?,?,?)")
-        .run(storylineId, campaignId, input.title, input.description ?? null, input.status ?? "active", createdAt);
-      return storyline(db.prepare("SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?").get(storylineId, campaignId)); },
-    getCampaignStoryline(principalId, campaignIdInput, storylineIdInput) { context.guard(); const campaignId = resourceIdSchema.parse(campaignIdInput), storylineId = resourceIdSchema.parse(storylineIdInput);
-      if (!membership(principalId, campaignId)) return null; const row = db.prepare("SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?").get(storylineId, campaignId);
-      return row ? storyline(row) : null; },
-    updateCampaignStoryline(principalId, campaignIdInput, storylineIdInput, input) { context.guard(); const campaignId = resourceIdSchema.parse(campaignIdInput), storylineId = resourceIdSchema.parse(storylineIdInput);
-      const member = membership(principalId, campaignId); if (!member || !isGm(member.role)) throw new QuestAuthorizationError("GM authority is required");
-      const result = db.prepare("UPDATE quest_storylines SET status=? WHERE id=? AND campaign_id=?").run(input.status, storylineId, campaignId);
-      if (result.changes !== 1) throw new QuestDomainUnavailableError("storyline is unavailable");
-      return storyline(db.prepare("SELECT * FROM quest_storylines WHERE id=? AND campaign_id=?").get(storylineId, campaignId)); },
     listCampaignQuests(principalId, campaignId) { context.guard(); return snapshot(principalId, campaignId); },
     createCampaignQuest(principalId, campaignIdInput, raw) {
       context.guard();

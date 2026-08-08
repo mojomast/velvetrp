@@ -3,6 +3,7 @@ import {
   campaignQuestsHttpResponseSchema,
   createCampaignQuestHttpRequestSchema,
   questCommandHttpRequestSchema,
+  playerCampaignQuestsHttpResponseSchema,
 } from "../src/index.js";
 
 const envelope = { expectedRevision: 0, idempotencyKey: "quest-key" };
@@ -36,5 +37,11 @@ describe("M2.10 quest HTTP contracts", () => {
   it("binds the exact list body and rejects internal provenance", () => {
     expect(campaignQuestsHttpResponseSchema.safeParse({ quests: [], objectives: [], journal: [] }).success).toBe(true);
     expect(campaignQuestsHttpResponseSchema.safeParse({ quests: [], objectives: [], journal: [], revision: 0 }).success).toBe(false);
+  });
+  it("structurally omits storyline ancestry from player quest projections", () => {
+    const playerQuest = { questId: "quest", campaignId: "campaign", title: "Gate", description: null, status: "offered",
+      rewards: [], createdAt: "2035-01-01T00:00:00.000Z", updatedAt: "2035-01-01T00:00:00.000Z" };
+    expect(playerCampaignQuestsHttpResponseSchema.safeParse({ quests: [playerQuest], objectives: [], journal: [] }).success).toBe(true);
+    expect(playerCampaignQuestsHttpResponseSchema.safeParse({ quests: [{ ...playerQuest, storylineId: "hidden" }], objectives: [], journal: [] }).success).toBe(false);
   });
 });

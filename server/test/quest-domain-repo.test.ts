@@ -9,6 +9,9 @@ import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
+const createStoryRoot = (repo: ReturnType<typeof createRepository>, campaignId: string, storylineId: string, title: string) =>
+  repo.createCampaignStorylineGraph("local-owner", campaignId, { storyline: { storylineId, title, summary: null,
+    nodes: [], edges: [], plotPoints: [], clues: [] }, expectedRevision: 0, idempotencyKey: `story-${storylineId}` });
 
 describe("M2.10 quest domain repository", () => {
   it("enforces revisioned transitions, dependencies, exact replay, and one reward claim", async () => {
@@ -22,8 +25,7 @@ describe("M2.10 quest domain repository", () => {
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite")); db.pragma("foreign_keys=ON");
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('quest-player','Quest player',0)").run();
     repo.addCampaignMembership("local-owner", campaign.id, { principalId: "quest-player", role: "player" });
-    db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES(?,?,?,?,?)")
-      .run("story", campaign.id, "Gate", "active", at);
+    createStoryRoot(repo, campaign.id, "story", "Gate");
     const request = { quest: { questId: "gate", storylineId: "story", title: "Open the Gate", description: "GM-safe public text",
       visibility: "public" as const, journalText: "A sealed gate waits.", objectives: [
         { objectiveId: "sigils", description: "Break sigils", targetProgress: 2, dependencyObjectiveIds: [], visibility: "public" as const },
@@ -68,6 +70,7 @@ describe("M2.10 quest domain repository", () => {
     db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='quest-player' WHERE campaign_id=? AND actor_id=?").run(campaign.id, actorId);
     const playerClaim = { kind: "claim-reward" as const, actorId, rewardId: "player-coin", expectedRevision: 7, idempotencyKey: "player-claim" };
     const playerResult = repo.executeQuestCommand("quest-player", "gate", playerClaim);
+    expect(playerResult.quest).not.toHaveProperty("storylineId");
     expect(playerResult.quest.rewards.map((item) => item.rewardId)).toEqual(["coin", "player-coin"]);
     expect(repo.executeQuestCommand("quest-player", "gate", playerClaim)).toEqual(playerResult);
     expect(() => repo.executeQuestCommand("local-owner", "gate", playerClaim)).toThrow(QuestConflictError);
@@ -95,7 +98,7 @@ describe("M2.10 quest domain repository", () => {
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('player','Player',0)").run();
     repo.addCampaignMembership("local-owner", campaign.id, { principalId: "player", role: "player" });
-    db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES(?,?,?,?,?)").run("legacy-story", campaign.id, "Legacy", "active", at);
+    createStoryRoot(repo, campaign.id, "legacy-story", "Legacy");
     db.prepare("INSERT INTO quests VALUES(?,?,?,?,?,?,?,?,?)").run("legacy", "legacy-story", campaign.id, "GM secret", null, "open", 0, at, at);
     expect(repo.listCampaignQuests("local-owner", campaign.id)?.quests).toHaveLength(1);
     expect(repo.listCampaignQuests("player", campaign.id)).toMatchObject({ quests: [], objectives: [], journal: [] });
@@ -107,7 +110,7 @@ describe("M2.10 quest domain repository", () => {
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('player','Player',0)").run();
     repo.addCampaignMembership("local-owner", campaign.id, { principalId: "player", role: "player" });
-    db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES(?,?,?,?,?)").run("story", campaign.id, "Story", "active", at);
+    createStoryRoot(repo, campaign.id, "story", "Story");
     repo.createCampaignQuest("local-owner", campaign.id, { quest: { questId: "hidden", storylineId: "story", title: "Hidden",
       description: null, visibility: "gm", journalText: "Secret", objectives: [{ objectiveId: "secret", description: "Secret",
         targetProgress: 1, dependencyObjectiveIds: [], visibility: "gm" }], rewards: [] }, expectedRevision: 0, idempotencyKey: "hidden-create" });

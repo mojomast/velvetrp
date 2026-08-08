@@ -46,6 +46,7 @@ describe("M2.10 quest routes", () => {
     expect((await app.inject({ method: "POST", url: "/api/rpg/v1/quests/quest/commands", headers: { "content-type": "text/plain" }, payload: "{}" })).statusCode).toBe(415);
     expect((await app.inject({ method: "POST", url: "/api/rpg/v1/quests/quest/commands", headers: { "content-type": "application/json" },
       payload: { kind: "claim-reward", rewardId: "coin", expectedRevision: 0, idempotencyKey: "claim" } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/storylines" })).statusCode).toBe(404);
     expect(access).toBe(0); await app.close();
   });
 
