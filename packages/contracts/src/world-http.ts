@@ -55,3 +55,42 @@ export type ActorTravelCommandRequest=z.infer<typeof actorTravelCommandRequestSc
 export type ActorTravelCommandResponse=z.infer<typeof actorTravelCommandResponseSchema>;
 export type WorldCurrentLocationHttp=z.infer<typeof worldCurrentLocationHttpSchema>;
 export type ActorTravelDiscoveryHttp=z.infer<typeof actorTravelDiscoveryHttpSchema>;
+
+export const npcPublicStateHttpSchema=z.object({name:z.string().trim().min(1).max(200)}).strict();
+export const npcPrivateStateHttpSchema=z.object({
+  goals:z.string().max(8_000),gmNotes:z.string().max(8_000),
+  merchantState:z.record(z.string(),z.json()).nullable(),
+}).strict().refine((state)=>state.merchantState===null||JSON.stringify(state.merchantState).length<=16_000,
+  {message:"merchant state must fit durable storage",path:["merchantState"]});
+export const campaignNpcHttpSchema=z.object({
+  npcId:resourceIdSchema,personaId:resourceIdSchema.optional(),publicState:npcPublicStateHttpSchema,
+  privateState:npcPrivateStateHttpSchema.optional(),createdAt:utcIsoTimestampSchema,
+}).strict().refine((npc)=>(npc.personaId===undefined)===(npc.privateState===undefined),
+  "persona and private state must appear together only in GM projections");
+export const npcRelationshipHttpSchema=z.object({
+  npcId:resourceIdSchema,subjectActorId:actorIdSchema,
+  affinity:z.number().int().min(-1000).max(1000),trust:z.number().int().min(-1000).max(1000),
+  fear:z.number().int().min(-1000).max(1000),updatedAt:utcIsoTimestampSchema,
+}).strict();
+export const campaignNpcsHttpResponseSchema=z.object({
+  npcs:z.array(campaignNpcHttpSchema).max(1_000),relationships:z.array(npcRelationshipHttpSchema).max(10_000),
+}).strict();
+export const createCampaignNpcHttpRequestSchema=z.object({
+  personaId:resourceIdSchema,publicState:npcPublicStateHttpSchema,privateState:npcPrivateStateHttpSchema,
+  expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema,
+}).strict();
+export const createCampaignNpcHttpResponseSchema=z.object({npc:campaignNpcHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
+export const npcRelationshipCommandHttpRequestSchema=z.object({
+  subjectActorId:actorIdSchema,affinityDelta:z.number().int().min(-100).max(100),
+  trustDelta:z.number().int().min(-100).max(100),fearDelta:z.number().int().min(-100).max(100),
+  reason:z.string().trim().min(1).max(500),expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema,
+}).strict().refine((request)=>request.affinityDelta!==0||request.trustDelta!==0||request.fearDelta!==0,
+  "at least one relationship delta is required");
+export const npcRelationshipCommandHttpResponseSchema=z.object({
+  relationship:npcRelationshipHttpSchema,receipt:worldCommandReceiptHttpSchema,
+}).strict();
+
+export type CampaignNpcHttp=z.infer<typeof campaignNpcHttpSchema>;
+export type NpcRelationshipHttp=z.infer<typeof npcRelationshipHttpSchema>;
+export type CreateCampaignNpcHttpRequest=z.infer<typeof createCampaignNpcHttpRequestSchema>;
+export type NpcRelationshipCommandHttpRequest=z.infer<typeof npcRelationshipCommandHttpRequestSchema>;

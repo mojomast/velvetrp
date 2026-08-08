@@ -29,7 +29,7 @@ describe("schema v31 encounter lifecycle",()=>{
     const fresh=makeDir();createRepository({dataDir:fresh}).close();
     expect(layout(migrated)).toEqual(layout(fresh));
     const db=new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"31"});
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"32"});
     expect(()=>db.prepare(`INSERT INTO encounter_lifecycle_v31(encounter_id,campaign_id,session_id,name,
       create_idempotency_key,canonical_create_request_json,request_digest) VALUES('missing','missing','missing','Name',
       'key','{}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')`).run()).toThrow();

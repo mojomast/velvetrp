@@ -46,6 +46,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/encounters\/[^/]+\/start-commands$/.test(path)) {
     return "/api/rpg/v1/encounters/:encounterId/start-commands";
   }
+  if (/^\/api\/rpg\/v1\/npcs\/[^/]+\/relationship-commands$/.test(path)) {
+    return "/api/rpg/v1/npcs/:npcId/relationship-commands";
+  }
   if (/^\/api\/rpg\/v1\/combats\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/combats/:combatId";
   }
@@ -78,7 +81,8 @@ function safeProblemInstance(requestTarget: string): string {
     || suffix === "/memberships"
     || suffix === "/dice-rolls"
     || suffix === "/encounters"
-    || suffix === "/world") {
+    || suffix === "/world"
+    || suffix === "/npcs") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }
   if (suffix === "/administration" || suffix === "/character-drafts" || suffix === "/export") {

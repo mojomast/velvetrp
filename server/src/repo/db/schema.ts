@@ -5,11 +5,12 @@ type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
   | "assertCampaignContentPacksHaveExactSealedPacks" | "assertCampaignImportStagingV30"
   | "assertEncounterLifecycleV31"
+  | "assertWorldNarrativeV32"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
   | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28"
   | "createCampaignAdministrationV15" | "createCampaignContentPackSealedPinTriggers" | "createCampaignEventMatchingTriggerV14"
-  | "createCampaignImportStagingV30" | "createEncounterLifecycleV31"
+  | "createCampaignImportStagingV30" | "createEncounterLifecycleV31" | "createWorldNarrativeV32"
   | "createCharacterBuilderIntegrityV21" | "createCharacterBuilderIntegrityV22" | "createCharacterBuilderProvenanceV20"
   | "createCharacterBuilderV19" | "createCharacterLayoutV29" | "createCharacterProgressionIntegrityV24"
   | "createCharacterProgressionV23" | "createChecksPowersEffectsV26" | "createCombatFoundationV27"
@@ -20,7 +21,7 @@ type SchemaDependencies = Record<
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -38,24 +39,24 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "31";
+export const SCHEMA_VERSION = "32";
 export const SCHEMA_REVISION = "1";
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
     createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20, createCharacterBuilderV19,
     createCharacterLayoutV29, createCharacterProgressionIntegrityV24, createCharacterProgressionV23,
     createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16, createContentCatalogV17,
-    createContentCatalogV18, createEncounterLifecycleV31, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
+    createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
     createSchemaV11, createTimelineRevisionV12, createWorldTravelNpcFactionV28, migrate2to3, migrate3to4,
     migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10, migrate10to11,
     migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17, migrate17to18,
     migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24, migrate24to25,
-    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, validateCharacterProgressionV23,
+    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, validateCharacterProgressionV23,
     validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25,
     validateM16PersistenceV26, validateV20DraftAudit, validateWorldTravelNpcFactionV28,
   } = getSchemaDependencies();
@@ -95,6 +96,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
            createQuestsV29r2(db);
            createCampaignImportStagingV30(db);
            createEncounterLifecycleV31(db);
+           createWorldNarrativeV32(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -108,6 +110,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertCharacterLayoutV29(db);
     assertCampaignImportStagingV30(db);
     assertEncounterLifecycleV31(db);
+    assertWorldNarrativeV32(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -185,6 +188,27 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
       DROP INDEX IF EXISTS idx_encounter_lifecycle_v31_campaign;
       DROP TABLE encounter_enemy_provenance_v31;
       DROP TABLE encounter_lifecycle_v31;`);
+  }
+  const futureWorldNarrativeArtifact=Number(version)<32&&db.prepare("SELECT 1 FROM sqlite_master WHERE name='world_narrative_revisions_v32'").get();
+  if(futureWorldNarrativeArtifact){
+    const count=(db.prepare("SELECT count(*) count FROM world_narrative_commands_v32").get() as {count:number}).count;
+    if(count>0)throw new Error(`schema marker ${version} cannot contain populated future v32 world narrative artifacts`);
+    db.exec(`DROP TRIGGER IF EXISTS campaign_faction_reputation_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS campaign_faction_reputation_v32_immutable_update;
+      DROP TRIGGER IF EXISTS campaign_faction_metadata_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS campaign_faction_metadata_v32_immutable_update;
+      DROP TRIGGER IF EXISTS campaign_npc_metadata_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS campaign_npc_metadata_v32_immutable_update;
+      DROP TRIGGER IF EXISTS world_narrative_events_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS world_narrative_events_v32_immutable_update;
+      DROP TRIGGER IF EXISTS world_narrative_receipts_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS world_narrative_receipts_v32_immutable_update;
+      DROP TRIGGER IF EXISTS world_narrative_commands_v32_immutable_delete;
+      DROP TRIGGER IF EXISTS world_narrative_commands_v32_immutable_update;
+      DROP TABLE campaign_faction_reputation_v32;DROP TABLE campaign_faction_metadata_v32;
+      DROP TABLE campaign_npc_relationships_v32;DROP TABLE campaign_npc_metadata_v32;
+      DROP TABLE world_narrative_events_v32;DROP TABLE world_narrative_receipts_v32;
+      DROP TABLE world_narrative_commands_v32;DROP TABLE world_narrative_revisions_v32;`);
   }
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
@@ -357,6 +381,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     migrate30to31(db);
     version = "31";
   }
+  if(version==="31"){migrate31to32(db);version="32";}
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -372,6 +397,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertCharacterLayoutV29(db);
   assertCampaignImportStagingV30(db);
   assertEncounterLifecycleV31(db);
+  assertWorldNarrativeV32(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

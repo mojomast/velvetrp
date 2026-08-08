@@ -17,6 +17,9 @@ export {
   type WorldReceipt,
   type WorldCampaignHttpSnapshot,
   type ActorTravelResult,
+  type CampaignNpcsSnapshot,
+  type CreateNpcResult,
+  type NpcRelationshipResult,
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */

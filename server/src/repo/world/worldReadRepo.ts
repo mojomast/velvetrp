@@ -1,5 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
-import { campaignWorldHttpResponseSchema, worldProjectionSchema, type CampaignWorldHttpResponse, type WorldProjection } from "@velvet/contracts";
+import { campaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
+  type CampaignNpcHttp,type CampaignWorldHttpResponse,type NpcRelationshipHttp,type WorldProjection } from "@velvet/contracts";
 import { WorldConflictError } from "./worldWriteRepo.js";
 
 /** Context required to run a world projection. */
@@ -13,8 +14,10 @@ export interface WorldReadRepository {
   /** Returns the principal's audience-filtered world state for a campaign session. */
   getWorldProjection(principalId: string, campaignId: string, sessionId: string): WorldProjection | null;
   getCampaignWorld(principalId:string,campaignId:string):WorldCampaignHttpSnapshot|null;
+  listCampaignNpcs(principalId:string,campaignId:string):CampaignNpcsSnapshot|null;
 }
 export type WorldCampaignHttpSnapshot=CampaignWorldHttpResponse&{campaignId:string;sessionId:string;revision:number};
+export type CampaignNpcsSnapshot={campaignId:string;revision:number;npcs:CampaignNpcHttp[];relationships:NpcRelationshipHttp[]};
 
 /** Creates database-backed world projections with their required lifecycle guard. */
 export function createWorldReadRepository(
@@ -91,6 +94,40 @@ export function createWorldReadRepository(
     });
     return {campaignId,sessionId,revision,...response};
   };
+  const listCampaignNpcs=(principalId:string,campaignId:string):CampaignNpcsSnapshot|null=>{
+    context.guard();if(!member(principalId,campaignId))return null;const isGm=gm(principalId,campaignId);
+    const revision=(db.prepare("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?")
+      .get(campaignId) as {revision:number}|undefined)?.revision??0;
+    const rows=db.prepare(`SELECT npc.*,metadata.public_state_json,metadata.private_state_json,
+      private.private_goals,private.gm_notes,private.merchant_state_json
+      FROM campaign_npcs_v28 npc LEFT JOIN campaign_npc_metadata_v32 metadata ON metadata.npc_id=npc.npc_id
+      LEFT JOIN campaign_npc_private_state_v28 private ON private.campaign_id=npc.campaign_id AND private.npc_id=npc.npc_id
+      WHERE npc.campaign_id=? ORDER BY npc.npc_id`).all(campaignId) as any[];
+    const npcs=rows.map((row)=>{
+      const publicState=row.public_state_json?JSON.parse(row.public_state_json):{name:row.public_name};
+      if(!isGm)return {npcId:row.npc_id,publicState,createdAt:row.created_at};
+      const privateState=row.private_state_json?JSON.parse(row.private_state_json):{
+        goals:row.private_goals??"",gmNotes:row.gm_notes??"",
+        merchantState:row.merchant_state_json?JSON.parse(row.merchant_state_json):null,
+      };
+      return {npcId:row.npc_id,personaId:row.persona_id,publicState,privateState,createdAt:row.created_at};
+    });
+    const relationshipRows=db.prepare(`SELECT relationship.campaign_id,relationship.npc_id,relationship.actor_id,
+        relationship.affinity,relationship.trust,relationship.fear,relationship.updated_at
+      FROM campaign_npc_relationships_v32 relationship WHERE relationship.campaign_id=?
+      UNION ALL SELECT legacy.campaign_id,legacy.npc_id,legacy.actor_id,legacy.disposition,0,0,legacy.updated_at
+      FROM campaign_npc_relationships_v28 legacy WHERE legacy.campaign_id=? AND NOT EXISTS (
+        SELECT 1 FROM campaign_npc_relationships_v32 current WHERE current.campaign_id=legacy.campaign_id
+          AND current.npc_id=legacy.npc_id AND current.actor_id=legacy.actor_id)
+      ORDER BY npc_id,actor_id`)
+      .all(campaignId,campaignId) as any[];
+    const visibleRelationshipRows=isGm?relationshipRows:relationshipRows.filter((row)=>db.prepare(`SELECT 1
+      FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`)
+      .get(campaignId,row.actor_id,principalId));
+    const relationships=visibleRelationshipRows.map((row)=>({npcId:row.npc_id,subjectActorId:row.actor_id,
+      affinity:row.affinity,trust:row.trust,fear:row.fear,updatedAt:row.updated_at}));
+    const response=campaignNpcsHttpResponseSchema.parse({npcs,relationships});return {campaignId,revision,...response};
+  };
 
-  return { getWorldProjection,getCampaignWorld };
+  return { getWorldProjection,getCampaignWorld,listCampaignNpcs };
 }

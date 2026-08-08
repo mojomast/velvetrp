@@ -97,7 +97,7 @@ describe("genuine additive v14 to v15 migration", () => {
       (SELECT COUNT(*) FROM campaign_content_packs) pins`).get()).toEqual(closedAudit);
     expect(migrated.prepare("SELECT revision,event_id,inherited FROM campaign_timeline_events").all())
       .toEqual([{ revision: 1, event_id: "v14-id-7", inherited: 0 }]);
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "31" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "32" });
     migrated.close();
     const freshDir = makeDir(); createRepository({ dataDir: freshDir }).close();
     expect(schema(file(migratedDir))).toEqual(schema(file(freshDir)));
@@ -115,7 +115,7 @@ describe("genuine additive v14 to v15 migration", () => {
     failed.exec("DROP TABLE campaign_administration_commands"); failed.close();
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(file(dir), { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "31" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "32" });
     retried.close();
   });
 });

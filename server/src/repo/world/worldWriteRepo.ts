@@ -4,6 +4,10 @@ import {
   changeReputationCommandSchema,
   actorTravelCommandRequestSchema,
   actorTravelCommandResponseSchema,
+  campaignNpcHttpSchema,
+  createCampaignNpcHttpRequestSchema,
+  npcRelationshipCommandHttpRequestSchema,
+  npcRelationshipHttpSchema,
   discoverLocationCommandSchema,
   resourceIdSchema,
   setActorLocationCommandSchema,
@@ -13,6 +17,10 @@ import {
   type TravelCommand,
   type ActorTravelCommandRequest,
   type ActorTravelCommandResponse,
+  type CampaignNpcHttp,
+  type CreateCampaignNpcHttpRequest,
+  type NpcRelationshipCommandHttpRequest,
+  type NpcRelationshipHttp,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
 
@@ -41,6 +49,9 @@ export type MutationReceipt = {
 };
 export type ActorTravelResult=Omit<ActorTravelCommandResponse,"receipt">&{campaignId:string;sessionId:string;
   receipt:{commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string}};
+export type NpcMutationReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
+export type CreateNpcResult={campaignId:string;npc:CampaignNpcHttp;receipt:NpcMutationReceipt};
+export type NpcRelationshipResult={campaignId:string;npcId:string;relationship:NpcRelationshipHttp;receipt:NpcMutationReceipt};
 
 /** Lifecycle and runtime services required by world command handlers. */
 export interface WorldWriteContext extends WorldDependencies {
@@ -65,6 +76,8 @@ export interface WorldWriteRepository {
   createNpc(principalId: string, input: unknown): { npcId: string; campaignId: string };
   /** Changes an actor's faction reputation. */
   changeReputation(principalId: string, sessionId: string, input: unknown): MutationReceipt;
+  createCampaignNpc(principalId:string,campaignId:string,input:CreateCampaignNpcHttpRequest):CreateNpcResult;
+  changeNpcRelationship(principalId:string,npcId:string,input:NpcRelationshipCommandHttpRequest):NpcRelationshipResult;
 }
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -117,6 +130,30 @@ export function createWorldWriteRepository(
     db.prepare("UPDATE world_mutation_revisions_v28 SET revision=?,updated_at=? WHERE campaign_id=? AND session_id=?").run(mutation.after, mutation.at, command.campaignId, sessionId);
   }
   const receipt = (mutation: any, idempotencyKey: string): MutationReceipt => ({ receipt: { commandId: mutation.commandId, idempotencyKey, revisionBefore: mutation.before, revisionAfter: mutation.after, occurredAt: mutation.at } });
+  function narrativeBegin(principalId:string,campaignId:string,type:string,requestValue:object,expectedRevision:number,idempotencyKey:string){
+    if(!gm(principalId,campaignId))throw new WorldAuthorizationError("GM authority is required");
+    const request=canonical(requestValue),replay=db.prepare(`SELECT command.command_type,command.canonical_request_json,
+      receipt.canonical_result_json FROM world_narrative_commands_v32 command JOIN world_narrative_receipts_v32 receipt
+      USING(campaign_id,command_id) WHERE command.campaign_id=? AND command.idempotency_key=?`)
+      .get(campaignId,idempotencyKey) as any;
+    if(replay){if(replay.command_type!==type||replay.canonical_request_json!==request)
+      throw new WorldConflictError("idempotency key was reused");return {replay:JSON.parse(replay.canonical_result_json)};}
+    const before=(db.prepare("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?").get(campaignId) as any)?.revision??0;
+    if(before!==expectedRevision)throw new WorldStaleError("world narrative revision is stale");
+    return {replay:null,request,before,after:before+1,at:now(),commandId:id()};
+  }
+  function narrativeRecord(campaignId:string,resourceId:string,type:string,idempotencyKey:string,mutation:any,result:any,eventType:string,event:any){
+    if(!db.prepare("SELECT 1 FROM world_narrative_revisions_v32 WHERE campaign_id=?").get(campaignId))
+      db.prepare("INSERT INTO world_narrative_revisions_v32 VALUES(?,0,?)").run(campaignId,mutation.at);
+    db.prepare("INSERT INTO world_narrative_commands_v32 VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .run(campaignId,mutation.commandId,resourceId,type,idempotencyKey,mutation.request,digest(JSON.parse(mutation.request)),mutation.before,mutation.after,mutation.at);
+    db.prepare("INSERT INTO world_narrative_receipts_v32 VALUES(?,?,?,?,?,?)")
+      .run(campaignId,mutation.commandId,mutation.after,canonical(result),digest(result),mutation.at);
+    db.prepare("INSERT INTO world_narrative_events_v32 VALUES(?,?,?,?,?,?,?)")
+      .run(id(),campaignId,mutation.commandId,mutation.after,eventType,canonical(event),mutation.at);
+    db.prepare("UPDATE world_narrative_revisions_v32 SET revision=?,updated_at=? WHERE campaign_id=?")
+      .run(mutation.after,mutation.at,campaignId);
+  }
 
   function setActorLocation(principalId: string, sessionId: string, raw: unknown): MutationReceipt {
     context.guard(); return db.transaction(() => { const mutation = begin(principalId, sessionId, setActorLocationCommandSchema.parse(raw), "set_actor_location", () => requireGm(principalId, (raw as any).campaignId)); if (mutation.replay) return JSON.parse(mutation.replay.canonical_result_json); const command = mutation.command;
@@ -211,10 +248,70 @@ export function createWorldWriteRepository(
       if (!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(command.campaignId, command.actorId) || !db.prepare("SELECT 1 FROM campaign_factions_v28 WHERE campaign_id=? AND faction_id=?").get(command.campaignId, command.factionId)) throw new WorldUnavailableError("reputation subject is unavailable"); const reputationLedgerEntryId = command.reputationLedgerEntryId ?? id(); const result = { reputationLedgerEntryId, ...receipt(mutation, command.idempotencyKey) }; record(command, sessionId, "change_reputation", command.actorId, mutation, result, "reputation_changed", { actorId: command.actorId, factionId: command.factionId, delta: command.delta }); db.prepare("INSERT INTO campaign_reputation_ledger_v28 VALUES(?,?,?,?,?,?,?,?,?)").run(reputationLedgerEntryId, command.campaignId, sessionId, command.actorId, command.factionId, command.delta, command.reason, mutation.commandId, mutation.at); return result;
     }).immediate();
   }
+  function createCampaignNpc(principalId:string,campaignIdInput:string,input:CreateCampaignNpcHttpRequest):CreateNpcResult{
+    context.guard();const campaignId=resourceIdSchema.parse(campaignIdInput),intent=createCampaignNpcHttpRequestSchema.parse(input);
+    return db.transaction(()=>{
+      const requestValue={type:"create_npc",campaignId,...intent};
+      const mutation=narrativeBegin(principalId,campaignId,"create_npc",requestValue,intent.expectedRevision,intent.idempotencyKey);
+      if(mutation.replay)return mutation.replay;
+      const persona=db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(intent.personaId) as any;
+      if(!persona||persona.fictional_confirmed!==1||persona.is_real_person!==0)
+        throw new WorldUnavailableError("NPC persona must be fictional and confirmed");
+      if(db.prepare(`SELECT 1 FROM campaign_actors actor JOIN campaign_characters character
+        ON character.id=actor.campaign_character_id AND character.campaign_id=actor.campaign_id
+        WHERE actor.campaign_id=? AND character.character_id=?`).get(campaignId,intent.personaId))
+        throw new WorldConflictError("a campaign character cannot be NPC-controlled");
+      if(db.prepare("SELECT 1 FROM campaign_npcs_v28 WHERE campaign_id=? AND persona_id=?").get(campaignId,intent.personaId))
+        throw new WorldConflictError("persona is already bound to a campaign NPC");
+      const npcId=id();
+      db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)")
+        .run(npcId,campaignId,intent.personaId,"manual",intent.publicState.name,mutation.at);
+      db.prepare("INSERT INTO campaign_npc_private_state_v28 VALUES(?,?,?,?,?)")
+        .run(campaignId,npcId,intent.privateState.goals,intent.privateState.gmNotes,
+          intent.privateState.merchantState===null?null:canonical(intent.privateState.merchantState));
+      db.prepare("INSERT INTO campaign_npc_metadata_v32 VALUES(?,?,?,?,?,?)")
+        .run(npcId,campaignId,canonical(intent.publicState),canonical(intent.privateState),mutation.commandId,mutation.at);
+      const npc=campaignNpcHttpSchema.parse({npcId,personaId:intent.personaId,publicState:intent.publicState,
+        privateState:intent.privateState,createdAt:mutation.at});
+      const result={campaignId,npc,receipt:{commandId:mutation.commandId,idempotencyKey:intent.idempotencyKey,
+        revisionBefore:mutation.before,revisionAfter:mutation.after,occurredAt:mutation.at}};
+      narrativeRecord(campaignId,npcId,"create_npc",intent.idempotencyKey,mutation,result,"npc_created",{npcId});return result;
+    }).immediate();
+  }
+  function changeNpcRelationship(principalId:string,npcIdInput:string,input:NpcRelationshipCommandHttpRequest):NpcRelationshipResult{
+    context.guard();const npcId=resourceIdSchema.parse(npcIdInput),intent=npcRelationshipCommandHttpRequestSchema.parse(input);
+    return db.transaction(()=>{
+      const npc=db.prepare("SELECT campaign_id FROM campaign_npcs_v28 WHERE npc_id=?").get(npcId) as {campaign_id:string}|undefined;
+      if(!npc)throw new WorldUnavailableError("NPC is unavailable");
+      const requestValue={type:"change_npc_relationship",npcId,...intent};
+      const mutation=narrativeBegin(principalId,npc.campaign_id,"change_npc_relationship",requestValue,
+        intent.expectedRevision,intent.idempotencyKey);if(mutation.replay)return mutation.replay;
+      if(!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(npc.campaign_id,intent.subjectActorId))
+        throw new WorldUnavailableError("relationship actor is unavailable");
+      const prior=db.prepare(`SELECT affinity,trust,fear FROM campaign_npc_relationships_v32
+        WHERE campaign_id=? AND npc_id=? AND actor_id=?`).get(npc.campaign_id,npcId,intent.subjectActorId) as any;
+      const legacy=prior?undefined:db.prepare(`SELECT disposition FROM campaign_npc_relationships_v28
+        WHERE campaign_id=? AND npc_id=? AND actor_id=?`).get(npc.campaign_id,npcId,intent.subjectActorId) as any;
+      const affinity=(prior?.affinity??legacy?.disposition??0)+intent.affinityDelta,trust=(prior?.trust??0)+intent.trustDelta,
+        fear=(prior?.fear??0)+intent.fearDelta;
+      if([affinity,trust,fear].some((value)=>value < -1000||value>1000))
+        throw new WorldConflictError("relationship bounds would be exceeded");
+      db.prepare(`INSERT INTO campaign_npc_relationships_v32(campaign_id,npc_id,actor_id,affinity,trust,fear,last_command_id,updated_at)
+        VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(campaign_id,npc_id,actor_id) DO UPDATE SET affinity=excluded.affinity,
+        trust=excluded.trust,fear=excluded.fear,last_command_id=excluded.last_command_id,updated_at=excluded.updated_at`)
+        .run(npc.campaign_id,npcId,intent.subjectActorId,affinity,trust,fear,mutation.commandId,mutation.at);
+      const relationship=npcRelationshipHttpSchema.parse({npcId,subjectActorId:intent.subjectActorId,affinity,trust,fear,updatedAt:mutation.at});
+      const result={campaignId:npc.campaign_id,npcId,relationship,receipt:{commandId:mutation.commandId,
+        idempotencyKey:intent.idempotencyKey,revisionBefore:mutation.before,revisionAfter:mutation.after,occurredAt:mutation.at}};
+      narrativeRecord(npc.campaign_id,npcId,"change_npc_relationship",intent.idempotencyKey,mutation,result,
+        "npc_relationship_changed",{relationship,reason:intent.reason});return result;
+    }).immediate();
+  }
   function createLocation(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); const locationId = input.locationId ?? id(); db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?,?)").run(locationId, campaignId, input.parentLocationId ?? null, String(input.name).trim(), String(input.description ?? ""), input.visibility === "hidden" ? "gm" : "public", now()); return { locationId, campaignId }; }
   function createLocationConnection(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); const locationConnectionId = input.locationConnectionId ?? id(); db.prepare("INSERT INTO campaign_location_connections_v28(connection_id,campaign_id,from_location_id,to_location_id,visibility,route_state,requirement_kind,required_faction_id,minimum_reputation,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").run(locationConnectionId, campaignId, input.fromLocationId, input.toLocationId, input.visibility === "hidden" ? "gm" : "public", input.routeState ?? "open", input.requirementKind ?? "none", input.requiredFactionId ?? null, input.minimumReputation ?? null, now()); return { locationConnectionId, campaignId }; }
   function createNpc(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); if (input.speechControl !== undefined && input.speechControl !== "manual") throw new WorldUnavailableError("NPC AI speech is unavailable"); const persona = db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(input.personaId) as any; if (!persona || persona.fictional_confirmed !== 1 || persona.is_real_person !== 0) throw new WorldUnavailableError("NPC persona must be fictional and confirmed"); if (db.prepare("SELECT 1 FROM campaign_actors a JOIN campaign_characters cc ON cc.id=a.campaign_character_id AND cc.campaign_id=a.campaign_id WHERE a.campaign_id=? AND cc.character_id=?").get(campaignId, input.personaId)) throw new WorldConflictError("a campaign character cannot be NPC-controlled"); const npcId = input.npcId ?? id(); db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)").run(npcId, campaignId, input.personaId, "manual", String(input.name).trim(), now()); return { npcId, campaignId }; }
   function executeWorldCommand(principalId: string, sessionId: string, input: unknown): WorldReceipt | MutationReceipt { const command = worldCommandSchema.parse(input); switch (command.type) { case "travel": return travel(principalId, sessionId, command); case "set_actor_location": return setActorLocation(principalId, sessionId, command); case "discover_location": return discoverLocation(principalId, sessionId, command); case "change_reputation": return changeReputation(principalId, sessionId, command); } }
 
-  return { executeWorldCommand, travel,travelActor, setActorLocation, createLocation, createLocationConnection, createNpc, changeReputation };
+  return { executeWorldCommand, travel,travelActor, setActorLocation, createLocation, createLocationConnection, createNpc,
+    changeReputation,createCampaignNpc,changeNpcRelationship };
 }

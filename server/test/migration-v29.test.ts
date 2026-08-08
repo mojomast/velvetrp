@@ -36,7 +36,7 @@ describe("schema v29 character-column removal", () => {
     createRepository({ dataDir: migrated }).close();
 
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "31" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "32" });
     expect((db.prepare("PRAGMA table_info(characters)").all() as Array<{ name: string }>).map((column) => column.name)).not.toContain("safe_word");
     expect(db.prepare("SELECT id FROM characters WHERE id=?").get(character.id)).toEqual({ id: character.id });
     expect(db.prepare("SELECT character_id FROM sessions WHERE id='preserved-session'").get()).toEqual({ character_id: character.id });

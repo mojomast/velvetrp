@@ -139,6 +139,7 @@ export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Data
 
 /** Remove additive v31 lifecycle sidecars before dropping their v27 parents. */
 export function removeFutureEncounterLifecycleV31(db:import("better-sqlite3").Database):void{
+  removeFutureWorldNarrativeV32(db);
   db.exec(`DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_immutable_delete;
     DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_immutable_update;
     DROP TRIGGER IF EXISTS encounter_enemy_provenance_v31_exact_combatant;
@@ -149,6 +150,16 @@ export function removeFutureEncounterLifecycleV31(db:import("better-sqlite3").Da
     DROP INDEX IF EXISTS idx_encounter_lifecycle_v31_campaign;
     DROP TABLE IF EXISTS encounter_enemy_provenance_v31;
     DROP TABLE IF EXISTS encounter_lifecycle_v31;`);
+}
+
+/** Remove additive v32 narrative state before historical world parents. */
+export function removeFutureWorldNarrativeV32(db:import("better-sqlite3").Database):void{
+  const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v32' OR name GLOB '*_v32_*')").all() as Array<{name:string}>;
+  for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
+  const tables=["campaign_faction_reputation_v32","campaign_faction_metadata_v32","campaign_npc_relationships_v32",
+    "campaign_npc_metadata_v32","world_narrative_events_v32","world_narrative_receipts_v32",
+    "world_narrative_commands_v32","world_narrative_revisions_v32"];
+  for(const table of tables)db.exec(`DROP TABLE IF EXISTS ${table}`);
 }
 
 /** Remove every v28 world/travel artifact before constructing a historical fixture. */

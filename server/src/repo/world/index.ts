@@ -4,6 +4,7 @@ export {
   type WorldReadContext,
   type WorldReadRepository,
   type WorldCampaignHttpSnapshot,
+  type CampaignNpcsSnapshot,
 } from "./worldReadRepo.js";
 export {
   createWorldWriteRepository,
@@ -17,4 +18,6 @@ export {
   type WorldWriteContext,
   type WorldWriteRepository,
   type ActorTravelResult,
+  type CreateNpcResult,
+  type NpcRelationshipResult,
 } from "./worldWriteRepo.js";
