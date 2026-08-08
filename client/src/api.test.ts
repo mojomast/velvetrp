@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext, validateContentPackDraft } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext, validateContentPackDraft } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -145,6 +145,24 @@ describe("HTTP runtime contracts", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("follows every opaque publication cursor and rejects cursor cycles", async () => {
+    const second = { ...catalogPublication, packVersion: "2.0.0" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [catalogPublication], nextCursor: "page_two" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [catalogPublication, second], nextCursor: null }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listAllContentPackPublications()).resolves.toEqual({ publications: [catalogPublication, second], nextCursor: null });
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      "/api/rpg/v1/content-packs?limit=100",
+      "/api/rpg/v1/content-packs?cursor=page_two&limit=100",
+    ]);
+
+    fetchMock.mockReset()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [], nextCursor: "cycle" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [], nextCursor: "cycle" }), { status: 200 }));
+    await expect(listAllContentPackPublications()).rejects.toThrow(/repeated a cursor/);
+  });
+
   it("validates in memory then binds one exact immutable publication POST", async () => {
     const counts = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template"].map((kind) => ({ kind, count: kind === "race" ? 1 : 0 }));
     const report = { valid: true, issues: [], normalizedSummary: { totalDefinitions: 1, counts, digest: catalogDigest } };
@@ -162,6 +180,18 @@ describe("HTTP runtime contracts", () => {
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ catalog: ownerCatalog }), { status: 200 }));
     await expect(publishContentPack({ ...draft, idempotencyKey: "publish-three" })).rejects.toThrow(/documented status/);
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("binds canonical definition content independently of response ordering", async () => {
+    const skill = { reference: { packId: catalogManifest.packId, packVersion: catalogManifest.packVersion, definitionId: "skill", kind: "skill" as const }, name: "Skill", description: "Description", tags: [], mechanics: { attribute: "insight" as const } };
+    const input = { idempotencyKey: "canonical-one", manifest: catalogManifest, definitions: [catalogDefinition, skill] };
+    const reordered = { ...ownerCatalog, definitions: [skill, catalogDefinition] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ catalog: reordered }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ catalog: { ...reordered, definitions: [{ ...skill, name: "Changed" }, catalogDefinition] } }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(publishContentPack(input)).resolves.toEqual({ catalog: reordered });
+    await expect(publishContentPack({ ...input, idempotencyKey: "canonical-two" })).rejects.toThrow(/did not match/);
   });
 
   it("reads and binds one revision-safe complete campaign pin PUT", async () => {

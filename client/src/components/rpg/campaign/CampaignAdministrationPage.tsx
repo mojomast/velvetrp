@@ -30,7 +30,7 @@ import {
   getCampaignDetail,
   listCampaignCheckpoints,
   listCampaignMemberships,
-  listContentPackPublications,
+  listAllContentPackPublications,
   listCampaignTimelines,
   removeCampaignAdministrationMembership,
   updateCampaignAdministration,
@@ -166,7 +166,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
           ? listCampaignMemberships(requestedCampaignId) : Promise.resolve({ memberships: [] }),
         getCampaignDetail(requestedCampaignId),
         getCampaignContent(requestedCampaignId),
-        listContentPackPublications({ limit: 100 }),
+        listAllContentPackPublications(),
       ]);
       if (membershipResult.status === "rejected") throw membershipResult.reason;
       if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId

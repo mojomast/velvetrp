@@ -46,7 +46,9 @@ export const contentCatalogHttpRoutes: FastifyPluginAsync<ContentCatalogHttpOpti
     noStore(reply); const blocked = gate(request, reply); if (blocked) return blocked;
     if (hasQuery(request)) return invalid(request, reply, "Content catalog validation does not accept query parameters"); if (!json(request)) return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Content catalog validation requires application/json");
     const body = contentCatalogHttpValidationRequestSchema.safeParse(request.body); if (!body.success) return invalid(request, reply);
-    try { return reply.send(contentCatalogHttpValidationResponseSchema.parse({ report: options.contentCatalogRepositoryAccessor().validateContentCatalog(body.data) })); } catch (error) { return failure(request, reply, error); }
+    // The pure validator consumes the publication contract. Supply a fixed,
+    // route-owned key so browser-memory validation never needs a mutation key.
+    try { return reply.send(contentCatalogHttpValidationResponseSchema.parse({ report: options.contentCatalogRepositoryAccessor().validateContentCatalog({ ...body.data, idempotencyKey: "http-validation-only" }) })); } catch (error) { return failure(request, reply, error); }
   });
   app.post<{ Querystring: Record<string, unknown>; Body: unknown }>("/content-packs", { exposeHeadRoute: false, errorHandler: bodyError }, async (request, reply) => {
     noStore(reply); const blocked = gate(request, reply); if (blocked) return blocked;

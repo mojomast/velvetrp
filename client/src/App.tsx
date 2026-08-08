@@ -4,7 +4,7 @@ import {
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
   createCharacter, deleteCharacter, deleteSession, exportCharacter, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listContentPackPublications, publishContentPack, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  listAllContentPackPublications, publishContentPack, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -31,7 +31,7 @@ function isExactRequestedSoloSession(session: Session, characterId: string): boo
 }
 
 const contentPackLibraryApi: ContentPackLibraryApi = {
-  list: listContentPackPublications,
+  list: listAllContentPackPublications,
   detail: getContentPackPublication,
   validate: validateContentPackDraft,
   publish: publishContentPack,
@@ -66,6 +66,7 @@ export default function App() {
   const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
   const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [contentHeadingFocusRequest, setContentHeadingFocusRequest] = useState<number | null>(null);
+  const [contentReturnFocusRequest, setContentReturnFocusRequest] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -337,8 +338,8 @@ export default function App() {
   if (view === "create" || view === "edit") return <main className="page"><CharacterForm character={view === "edit" ? activeCharacter : null} busy={busy} error={error} onCancel={goHome} onSave={saveCharacter} /></main>;
   if (view === "memory" && activeCharacter) return <main className="page"><MemoryManager character={activeCharacter} onClose={goHome} /></main>;
   if (view === "lore") return <main className="page"><LoreManager characters={characters} onClose={goHome} /></main>;
-  if (view === "content-packs" && contentStudioAvailable) return <ContentPackLibraryPage api={contentPackLibraryApi} focusHeadingRequest={contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined} onHeadingFocused={(request) => setContentHeadingFocusRequest((current) => current === request ? null : current)} onBack={goHome} />;
-  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={(campaignId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId, chatReturnCampaignId: "" }; setChatReturnCampaignId(""); campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(campaignId); setView("campaign-detail"); }} />;
+  if (view === "content-packs" && contentStudioAvailable) return <ContentPackLibraryPage api={contentPackLibraryApi} backLabel="← Campaigns" focusHeadingRequest={contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined} onHeadingFocused={(request) => setContentHeadingFocusRequest((current) => current === request ? null : current)} onBack={() => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; setContentReturnFocusRequest(request); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setView("campaigns"); }} />;
+  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} focusContentPacksRequest={contentReturnFocusRequest ?? undefined} onContentPacksFocused={(request) => setContentReturnFocusRequest((current) => current === request ? null : current)} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={(campaignId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId, chatReturnCampaignId: "" }; setChatReturnCampaignId(""); campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(campaignId); setView("campaign-detail"); }} />;
   if (view === "campaign-detail" && campaignLibraryAvailable && activeCampaignId) {
     const focusRequest = campaignHeadingFocusRequest?.campaignId === activeCampaignId
       && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { createCampaign, listCampaigns, type CampaignAccess } from "../api";
 
-export interface CampaignLibraryPageProps { onBack: () => void; onOpen?: (campaignId: string) => void; onContentPacks?: () => void; }
+export interface CampaignLibraryPageProps { onBack: () => void; onOpen?: (campaignId: string) => void; onContentPacks?: () => void; focusContentPacksRequest?: number; onContentPacksFocused?: (request: number) => void; }
 
 function roleLabel(role: CampaignAccess["actorRole"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-export function CampaignLibraryPage({ onBack, onOpen, onContentPacks }: CampaignLibraryPageProps) {
+export function CampaignLibraryPage({ onBack, onOpen, onContentPacks, focusContentPacksRequest, onContentPacksFocused = () => undefined }: CampaignLibraryPageProps) {
   const [campaigns, setCampaigns] = useState<CampaignAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -21,6 +21,8 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks }: Campaign
   const mountedRef = useRef(true);
   const listGenerationRef = useRef(0);
   const campaignElements = useRef(new Map<string, HTMLLIElement>());
+  const contentPacksRef = useRef<HTMLButtonElement>(null);
+  const focusedContentPacksRequestRef = useRef<number | undefined>(undefined);
   const load = useCallback(async (): Promise<"success" | "failure" | "stale"> => {
     const generation = ++listGenerationRef.current;
     if (!mountedRef.current) return "stale";
@@ -55,6 +57,11 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks }: Campaign
       setFocusCampaignId(null);
     }
   }, [campaigns, focusCampaignId]);
+  useEffect(() => {
+    if (loading || focusContentPacksRequest === undefined || focusedContentPacksRequestRef.current === focusContentPacksRequest) return;
+    focusedContentPacksRequestRef.current = focusContentPacksRequest;
+    queueMicrotask(() => { contentPacksRef.current?.focus(); onContentPacksFocused(focusContentPacksRequest); });
+  }, [focusContentPacksRequest, loading, onContentPacksFocused]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +97,7 @@ export function CampaignLibraryPage({ onBack, onOpen, onContentPacks }: Campaign
   }
 
   return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-heading">
-    <header className="library-header"><div><button className="back-link" onClick={onBack}>← Character library</button><p className="eyebrow">TRUSTED LOCAL LIBRARY</p><h1 className="title" id="campaign-heading">Campaigns</h1><p className="subtitle">Campaigns available to this local installation.</p></div>{onContentPacks && <button className="ghost" onClick={onContentPacks}>Content packs</button>}</header>
+    <header className="library-header"><div><button className="back-link" onClick={onBack}>← Character library</button><p className="eyebrow">TRUSTED LOCAL LIBRARY</p><h1 className="title" id="campaign-heading">Campaigns</h1><p className="subtitle">Campaigns available to this local installation.</p></div>{onContentPacks && <button ref={contentPacksRef} className="ghost" onClick={onContentPacks}>Content packs</button>}</header>
     <form className="campaign-create" onSubmit={(event) => void submit(event)} aria-busy={submitting}>
       <div><label htmlFor="campaign-name">Campaign name</label><input id="campaign-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={200} required disabled={submitting} /></div>
       <button className="primary" type="submit" disabled={submitting}>{submitting ? "Creating…" : "Create campaign"}</button>

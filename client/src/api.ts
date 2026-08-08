@@ -1158,6 +1158,25 @@ export async function listContentPackPublications(query: ContentCatalogHttpPubli
   return response;
 }
 
+/** Follows opaque cursors to a safely bounded complete publication snapshot. */
+export async function listAllContentPackPublications(): Promise<ContentCatalogHttpPublicationsResponse> {
+  const publications: ContentCatalogHttpPublicationsResponse["publications"] = [];
+  const exactKeys = new Set<string>();
+  const cursors = new Set<string>();
+  let cursor: string | undefined;
+  for (let page = 0; page < 100; page += 1) {
+    const response = await listContentPackPublications({ limit: 100, ...(cursor === undefined ? {} : { cursor }) });
+    for (const publication of response.publications) {
+      const key = `${publication.packId}\0${publication.packVersion}`;
+      if (!exactKeys.has(key)) { exactKeys.add(key); publications.push(publication); }
+    }
+    if (response.nextCursor === null) return { publications, nextCursor: null };
+    if (cursors.has(response.nextCursor)) throw new Error("Content pack publication pagination repeated a cursor");
+    cursors.add(response.nextCursor); cursor = response.nextCursor;
+  }
+  throw new Error("Content pack publication pagination exceeded the safe page limit");
+}
+
 /** Reads the owner-only complete projection for one exact sealed version. */
 export async function getContentPackPublication(packId: string, packVersion: string): Promise<ContentCatalogHttpOwnerDetailResponse> {
   const target = contentPackPath(packId, packVersion);
@@ -1179,6 +1198,18 @@ export async function validateContentPackDraft(input: ContentCatalogHttpValidati
 }
 
 /** Issues one immutable publication POST. Callers must never automatically retry it. */
+function canonicalWireValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalWireValue);
+  if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right)).map(([key, entry]) => [key, canonicalWireValue(entry)]));
+  return value;
+}
+
+function canonicalDefinitionSet(definitions: ContentCatalogHttpPublicationRequest["definitions"]): string {
+  return JSON.stringify([...definitions].sort((left, right) => left.reference.kind.localeCompare(right.reference.kind)
+    || left.reference.definitionId.localeCompare(right.reference.definitionId)).map(canonicalWireValue));
+}
+
 export async function publishContentPack(input: ContentCatalogHttpPublicationRequest): Promise<ContentCatalogHttpPublicationResponse> {
   const body = parseApiInput(() => contentCatalogHttpPublicationRequestSchema.parse(input));
   const success = await requestResponse<unknown>("/rpg/v1/content-packs", { method: "POST", body: JSON.stringify(body) });
@@ -1191,7 +1222,7 @@ export async function publishContentPack(input: ContentCatalogHttpPublicationReq
     || JSON.stringify(publication.tags) !== JSON.stringify(body.manifest.tags)
     || JSON.stringify(publication.compatibility) !== JSON.stringify(body.manifest.compatibility)
     || JSON.stringify(response.catalog.provenance) !== JSON.stringify(body.manifest.provenance)
-    || JSON.stringify(response.catalog.definitions) !== JSON.stringify(body.definitions)) {
+    || canonicalDefinitionSet(response.catalog.definitions) !== canonicalDefinitionSet(body.definitions)) {
     throw new Error("Content pack publication response did not match the request");
   }
   return response;

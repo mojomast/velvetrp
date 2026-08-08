@@ -39,4 +39,14 @@ describe("CampaignContentPicker", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
     expect(screen.getByRole("alert").textContent).toMatch(/No write will be retried/);
   });
+
+  it("keeps inspect as an associated sibling action outside the radio label", () => {
+    const onInspect = vi.fn();
+    render(<CampaignContentPicker actorRole="owner" current={current} publications={[publication("1.0.0"), publication("2.0.0")]} expectedRevision={4} onInspect={onInspect} onApply={vi.fn()} onRefresh={vi.fn()} />);
+    const inspect = screen.getByRole("button", { name: "Inspect definitions for core @ 2.0.0" });
+    expect(inspect.closest("label")).toBeNull();
+    fireEvent.click(inspect);
+    expect(onInspect).toHaveBeenCalledWith("core", "2.0.0");
+    expect((screen.getByRole("radio", { name: /1.0.0/ }) as HTMLInputElement).checked).toBe(true);
+  });
 });

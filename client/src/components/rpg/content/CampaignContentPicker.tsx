@@ -73,11 +73,15 @@ export function CampaignContentPicker({ actorRole, current, publications, expect
           return <fieldset key={packId} disabled={busy || mutationLocked || versions.length === 0}>
             <legend><label className="pin-toggle"><input type="checkbox" checked={Boolean(active)} onChange={(event) => include(packId, event.target.checked, versions)} /> <span>{packId}</span></label></legend>
             {unavailableCurrent && <p className="content-warning">Current exact version {currentPin.packVersion} is not in the compatible publication page. It remains in the old pin review.</p>}
-            {versions.map((version) => <label className="version-option" key={keyFor(version)}>
-              <input type="radio" name={`pack-${packId}`} checked={active?.packVersion === version.packVersion} onChange={() => choose(packId, version.packVersion)} />
-              <span><strong>{version.packVersion}</strong>{currentPin?.packVersion === version.packVersion && <small>Current exact version</small>}<small>{version.description}</small><code>{version.digest}</code></span>
-              <button type="button" className="ghost" onClick={(event) => { event.preventDefault(); onInspect(packId, version.packVersion); }}>Inspect definitions</button>
-            </label>)}
+            {versions.map((version) => {
+              const id = `version-${packId}-${version.packVersion}`.replace(/[^a-zA-Z0-9_-]/g, "-");
+              const descriptionId = `${id}-description`;
+              return <div className="version-option" key={keyFor(version)}>
+                <input id={id} type="radio" name={`pack-${packId}`} checked={active?.packVersion === version.packVersion} aria-describedby={descriptionId} onChange={() => choose(packId, version.packVersion)} />
+                <label htmlFor={id}><strong>{version.packVersion}</strong><span id={descriptionId}>{currentPin?.packVersion === version.packVersion && <small>Current exact version</small>}<small>{version.description}</small><code>{version.digest}</code></span></label>
+                <button type="button" className="ghost" aria-describedby={descriptionId} aria-label={`Inspect definitions for ${packId} @ ${version.packVersion}`} onClick={() => onInspect(packId, version.packVersion)}>Inspect definitions</button>
+              </div>;
+            })}
           </fieldset>;
         })}
       </div>

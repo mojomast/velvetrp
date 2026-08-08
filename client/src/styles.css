@@ -205,6 +205,8 @@ body {
 .definition-kind { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: rgba(31,30,39,.6); }
 .definition-kind h4 { margin: 0; text-transform: capitalize; }
 .definition-kind h4 span { color: var(--muted); font-size: 12px; }
+.definition-kind-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.definition-fields { display: grid; gap: 13px; padding: 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); }
 .definition-json { display: grid; gap: 8px; color: var(--muted); font-size: 12px; }
 .definition-json textarea { width: 100%; min-height: 180px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .content-empty { margin: 0; color: var(--muted); }
@@ -224,7 +226,7 @@ body {
 .pin-toggle { display: flex; align-items: center; min-height: 44px; gap: 9px; font-weight: 700; }
 .pin-toggle input, .version-option input, .pin-confirm input { width: 18px; height: 18px; accent-color: var(--accent); }
 .version-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 60px; margin-top: 8px; padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
-.version-option > span { display: grid; gap: 4px; min-width: 0; }
+.version-option > label, .version-option > label > span { display: grid; gap: 4px; min-width: 0; cursor: pointer; }
 .version-option small { color: var(--muted); }
 .version-option code { color: #a98aef; font-size: 10px; }
 .pin-review { display: grid; gap: 15px; padding: 17px; border: 1px solid #514263; border-radius: 10px; background: rgba(117,70,216,.07); }
@@ -725,6 +727,8 @@ button:disabled {
   .content-editor-grid { grid-template-columns: 1fr; }
   .content-editor-wide { grid-column: auto; }
   .content-validate { width: 100%; }
+  .definition-kind-heading { align-items: stretch; flex-direction: column; }
+  .definition-kind-heading button, .definition-fields .button-row button { width: 100%; }
   .version-option { grid-template-columns: auto minmax(0, 1fr); }
   .version-option button { grid-column: 1 / -1; width: 100%; }
   .pin-review-columns { grid-template-columns: 1fr; }

@@ -195,8 +195,10 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.getByText(/No sealed content packs yet/)).toBeTruthy();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("content-packs"));
-    fireEvent.click(screen.getByRole("button", { name: "← Character library" }));
-    await screen.findByRole("heading", { name: "Characters" });
+    fireEvent.click(screen.getByRole("button", { name: "← Campaigns" }));
+    const contentPacks = await screen.findByRole("button", { name: "Content packs" });
+    await waitFor(() => expect(document.activeElement).toBe(contentPacks));
+    expect(screen.getByRole("heading", { name: "Campaigns" })).toBeTruthy();
   });
 
   it("falls home when restored content studio mechanics are unavailable", async () => {

@@ -12,6 +12,21 @@ afterEach(() => {
 });
 
 describe("integrated RPG HTTP lanes", () => {
+  it("validates a complete browser-memory publication draft without a caller mutation key", async () => {
+    process.env.FEATURE_RPG_CAMPAIGN = "true";
+    process.env.FEATURE_RPG_MECHANICS = "true";
+    const repository = createRepository();
+    const app = buildApp({ campaignRepositoryFactory: () => repository });
+    const { idempotencyKey: _publicationKey, ...draft } = MECHANICS_STARTER_CATALOG;
+
+    const response = await app.inject({ method: "POST", url: "/api/rpg/v1/content-packs/validate",
+      headers: { "content-type": "application/json" }, payload: draft });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().report).toMatchObject({ valid: true, issues: [], normalizedSummary: { totalDefinitions: 17 } });
+    await app.close();
+  });
+
   it("shares the lazy real repository across draft, progression, and administration lanes", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";

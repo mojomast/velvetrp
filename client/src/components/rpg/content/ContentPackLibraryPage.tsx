@@ -6,17 +6,16 @@ import type {
   ContentCatalogHttpOwnerDetailResponse,
   ContentCatalogHttpPublicationRequest,
   ContentCatalogHttpPublicationResponse,
-  ContentCatalogHttpPublicationsQuery,
   ContentCatalogHttpPublicationsResponse,
   ContentCatalogHttpValidationRequest,
   ContentCatalogHttpValidationResponse,
   OwnerCatalogProjection,
 } from "@velvet/contracts";
-import { ContentPackEditor, type ContentPackDraft } from "./ContentPackEditor";
+import { ContentPackEditor, createCompleteContentPackDraft, replaceDraftIdentity, type ContentPackDraft } from "./ContentPackEditor";
 import { PackValidationReport } from "./PackValidationReport";
 
 export interface ContentPackLibraryApi {
-  list: (query?: ContentCatalogHttpPublicationsQuery) => Promise<ContentCatalogHttpPublicationsResponse>;
+  list: () => Promise<ContentCatalogHttpPublicationsResponse>;
   detail: (packId: string, packVersion: string) => Promise<ContentCatalogHttpOwnerDetailResponse>;
   validate: (draft: ContentCatalogHttpValidationRequest) => Promise<ContentCatalogHttpValidationResponse>;
   publish: (input: ContentCatalogHttpPublicationRequest) => Promise<ContentCatalogHttpPublicationResponse>;
@@ -25,31 +24,26 @@ export interface ContentPackLibraryApi {
 export interface ContentPackLibraryPageProps {
   api: ContentPackLibraryApi;
   onBack: () => void;
+  backLabel?: string;
   focusHeadingRequest?: number;
   onHeadingFocused?: (request: number) => void;
 }
 
-type PublicationLock = { phase: "writing" | "uncertain"; message: string };
+type PublicationLock = { token: symbol; draft: ContentPackDraft; phase: "writing" | "uncertain"; message: string };
 const publicationLocks = new Map<string, PublicationLock>();
+const publicationLockListeners = new Set<(key: string, lock: PublicationLock | null) => void>();
 const KINDS: CatalogDefinitionKind[] = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template"];
 const exactKey = (packId: string, packVersion: string) => `${packId}\0${packVersion}`;
 const operationKey = () => `ui-publish-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
 export function resetContentPackLibraryPageModuleStateForTests(): void {
   publicationLocks.clear();
+  publicationLockListeners.clear();
 }
 
-function newDraft(): ContentPackDraft {
-  const now = new Date().toISOString();
-  return {
-    manifest: {
-      packId: "local-pack", packVersion: "0.1.0", name: "Local content pack", description: "An editable local draft.", tags: [], digest: "0".repeat(64),
-      rulesProfile: { name: "Local rules profile", description: "A Velvet starter-compatible profile.", tags: [] },
-      compatibility: { rulesEngine: "velvet-starter-v1", rulesProfileId: "local-rules", catalogFormat: "validated-v1" },
-      provenance: { authorship: "original", author: "Local author", authoredAt: now, reviewedBy: "Local reviewer", reviewedAt: now, declaration: "This pack contains original work.", thirdPartyData: false },
-    },
-    definitions: [{ reference: { packId: "local-pack", packVersion: "0.1.0", definitionId: "local-race", kind: "race" }, name: "Local ancestry", description: "A local draft ancestry.", tags: [], mechanics: { speed: 30, attributeBonuses: {}, abilityRefs: [] } }],
-  };
+function publishLock(key: string, lock: PublicationLock | null): void {
+  if (lock) publicationLocks.set(key, lock); else publicationLocks.delete(key);
+  for (const listener of publicationLockListeners) listener(key, lock);
 }
 
 function groupedDefinitions(definitions: CatalogDefinition[]) {
@@ -61,10 +55,10 @@ function isKnownNonCommit(error: unknown): boolean {
 }
 
 /** Local draft workflow and read-only sealed catalog browser. */
-export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHeadingFocused = () => undefined }: ContentPackLibraryPageProps) {
+export function ContentPackLibraryPage({ api, onBack, backLabel = "← Character library", focusHeadingRequest, onHeadingFocused = () => undefined }: ContentPackLibraryPageProps) {
   const [publications, setPublications] = useState<ContentCatalogHttpPublicationsResponse["publications"]>([]);
   const [selected, setSelected] = useState<OwnerCatalogProjection | null>(null);
-  const [draft, setDraft] = useState<ContentPackDraft>(newDraft);
+  const [draft, setDraft] = useState<ContentPackDraft>(() => [...publicationLocks.values()].at(-1)?.draft ?? createCompleteContentPackDraft());
   const [report, setReport] = useState<CatalogValidationReport | null>(null);
   const [validatedDraft, setValidatedDraft] = useState("");
   const [focusPath, setFocusPath] = useState<string | null>(null);
@@ -94,15 +88,33 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
     if (explicit) setRefreshing(true); else setLoading(true);
     setLoadError("");
     try {
-      const response = await api.list({ limit: 100 });
+      const response = await api.list();
       if (!mountedRef.current || generation !== generationRef.current) return;
       setPublications(response.publications);
       setLoading(false); setRefreshing(false);
       if (explicit) {
         const latestDraft = draftRef.current;
         const key = exactKey(latestDraft.manifest.packId, latestDraft.manifest.packVersion);
-        publicationLocks.delete(key); setPublicationLock(null);
-        setNotice("Authoritative sealed publications were refreshed. No publication was retried.");
+        const lock = publicationLocks.get(key);
+        if (lock?.phase === "uncertain") {
+          const exact = response.publications.find((publication) => exactKey(publication.packId, publication.packVersion) === key);
+          if (!exact) {
+            publishLock(key, { ...lock, message: "The complete authoritative publication list does not contain this exact version. Its prior outcome remains uncertain and publication stays blocked; no POST was retried." });
+            setNotice(""); queueMicrotask(() => statusRef.current?.focus()); return;
+          }
+          try {
+            const detail = await api.detail(exact.packId, exact.packVersion);
+            if (!mountedRef.current || generation !== generationRef.current) return;
+            setSelected(detail.catalog); publishLock(key, null);
+            setNotice("Authoritative exact publication was found and reconciled across the complete catalog. No publication was retried.");
+          } catch {
+            if (!mountedRef.current || generation !== generationRef.current) return;
+            publishLock(key, { ...lock, message: "The exact version was listed, but its authoritative detail could not be reconciled. Publication stays blocked; no POST was retried." });
+            setNotice("");
+          }
+        } else {
+          setNotice("Authoritative sealed publications were refreshed. No publication was retried.");
+        }
         queueMicrotask(() => statusRef.current?.focus());
       }
     } catch {
@@ -114,8 +126,13 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
 
   useEffect(() => {
     mountedRef.current = true;
+    const listener = (key: string, lock: PublicationLock | null) => {
+      const active = draftRef.current;
+      if (key === exactKey(active.manifest.packId, active.manifest.packVersion)) setPublicationLock(lock);
+    };
+    publicationLockListeners.add(listener);
     void load();
-    return () => { mountedRef.current = false; generationRef.current += 1; validationRef.current += 1; detailRef.current += 1; };
+    return () => { mountedRef.current = false; generationRef.current += 1; validationRef.current += 1; detailRef.current += 1; publicationLockListeners.delete(listener); };
   }, [load]);
 
   useEffect(() => {
@@ -149,9 +166,12 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
     try {
       const response = await api.validate(snapshot);
       if (!mountedRef.current || request !== validationRef.current) return;
-      const normalized = response.report.normalizedSummary.digest
-        ? { ...snapshot, manifest: { ...snapshot.manifest, digest: response.report.normalizedSummary.digest } }
-        : snapshot;
+      const digest = response.report.normalizedSummary.digest;
+      const normalized = digest ? replaceDraftIdentity(
+        { ...snapshot, manifest: { ...snapshot.manifest, digest } },
+        snapshot.manifest.packId,
+        `${snapshot.manifest.packVersion.split("+")[0]}+${digest.slice(0, 12)}`,
+      ) : snapshot;
       setDraft(normalized); setReport(response.report); setValidatedDraft(response.report.valid ? JSON.stringify(normalized) : "");
       setPublicationReview(false); setPublicationConfirmed(false);
     } catch { if (mountedRef.current && request === validationRef.current) setNotice("Draft validation could not be completed. Nothing was published."); }
@@ -162,30 +182,30 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
     const key = exactKey(draft.manifest.packId, draft.manifest.packVersion);
     if (publishingRef.current || publicationLocks.has(key) || !report?.valid || validatedDraft !== JSON.stringify(draft) || !publicationConfirmed) return;
     publishingRef.current = true;
-    const lock = { phase: "writing" as const, message: "Publication is in progress. Duplicate submission is blocked." };
-    publicationLocks.set(key, lock); setPublicationLock(lock); setNotice("");
+    const lock = { token: Symbol(key), draft, phase: "writing" as const, message: "Publication is in progress. Duplicate submission is blocked." };
+    publishLock(key, lock); setNotice("");
     try {
       const response = await api.publish({ ...draft, idempotencyKey: operationKey() });
       if (!mountedRef.current) {
-        publicationLocks.set(key, { phase: "uncertain", message: "Publication returned after this view closed. Refresh authoritative publications before another attempt." });
+        publishLock(key, { ...lock, phase: "uncertain", message: "Publication returned after this view closed. Refresh authoritative publications before another attempt." });
         return;
       }
       setSelected(response.catalog);
       setPublications((current) => current.some((entry) => exactKey(entry.packId, entry.packVersion) === key) ? current : [response.catalog.publication, ...current]);
-      publicationLocks.delete(key); setPublicationLock(null); setPublicationReview(false); setPublicationConfirmed(false);
+      publishLock(key, null); setPublicationReview(false); setPublicationConfirmed(false);
       setNotice(`Published ${response.catalog.publication.packId} @ ${response.catalog.publication.packVersion}. This exact version is now sealed and immutable.`);
       queueMicrotask(() => statusRef.current?.focus());
     } catch (error) {
       if (!mountedRef.current) {
-        publicationLocks.set(key, { phase: "uncertain", message: "Publication failed after this view closed. Refresh authoritative publications before another attempt; no POST will be retried." });
+        publishLock(key, { ...lock, phase: "uncertain", message: "Publication failed after this view closed. Refresh authoritative publications before another attempt; no POST will be retried." });
         return;
       }
       if (isKnownNonCommit(error)) {
-        publicationLocks.delete(key); setPublicationLock(null);
+        publishLock(key, null);
         setNotice("Publication was rejected before commit. Correct and validate the local draft again.");
       } else {
-        const uncertain = { phase: "uncertain" as const, message: "Publication is stale or its outcome is uncertain. Duplicate submission is blocked until authoritative refresh; no POST will be retried automatically." };
-        publicationLocks.set(key, uncertain); setPublicationLock(uncertain);
+        const uncertain = { ...lock, phase: "uncertain" as const, message: "Publication is stale or its outcome is uncertain. Duplicate submission is blocked until authoritative exact refresh; no POST will be retried automatically." };
+        publishLock(key, uncertain);
       }
       queueMicrotask(() => statusRef.current?.focus());
     } finally { publishingRef.current = false; }
@@ -193,7 +213,7 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
 
   const exactValidated = Boolean(report?.valid && validatedDraft === JSON.stringify(draft));
   return <main className="page library-page campaign-page content-studio-page"><section className="content-studio-shell" aria-labelledby="content-pack-library-heading">
-    <header className="library-header"><div><button className="back-link" disabled={publicationLock?.phase === "writing"} onClick={onBack}>← Character library</button><p className="eyebrow">LOCAL CONTENT STUDIO</p><h1 ref={headingRef} tabIndex={-1} className="title" id="content-pack-library-heading">Content pack studio</h1><p className="subtitle">Edit local memory drafts and inspect sealed exact versions.</p></div><button className="ghost" disabled={refreshing || publicationLock?.phase === "writing"} onClick={() => void load(true)}>{refreshing ? "Refreshing…" : "Refresh sealed packs"}</button></header>
+    <header className="library-header"><div><button className="back-link" disabled={publicationLock?.phase === "writing"} onClick={onBack}>{backLabel}</button><p className="eyebrow">LOCAL CONTENT STUDIO</p><h1 ref={headingRef} tabIndex={-1} className="title" id="content-pack-library-heading">Content pack studio</h1><p className="subtitle">Edit local memory drafts and inspect sealed exact versions.</p></div><button className="ghost" disabled={refreshing || publicationLock?.phase === "writing"} onClick={() => void load(true)}>{refreshing ? "Refreshing…" : "Refresh sealed packs"}</button></header>
     {(notice || publicationLock) && <div ref={statusRef} tabIndex={-1} className={`admin-status ${publicationLock?.phase === "uncertain" ? "is-error" : ""}`} role={publicationLock?.phase === "uncertain" ? "alert" : "status"}><p>{publicationLock?.message ?? notice}</p>{publicationLock?.phase === "uncertain" && <button className="primary" disabled={refreshing} onClick={() => void load(true)}>Refresh authoritative publications</button>}</div>}
     <div className="content-studio-layout">
       <aside className="library-panel sealed-library" aria-labelledby="sealed-packs-heading" aria-busy={loading || detailBusy}>
