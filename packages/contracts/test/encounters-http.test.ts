@@ -3,6 +3,8 @@ import {
   encounterCreateRequestSchema,
   encounterCreateResponseSchema,
   encounterStartCommandResponseSchema,
+  combatLogQuerySchema,
+  combatLogResponseSchema,
 } from "../src/index.js";
 
 const at="2035-01-01T00:00:00.000Z";
@@ -30,5 +32,16 @@ describe("encounter HTTP contracts",()=>{
     expect(encounterStartCommandResponseSchema.parse(response)).toEqual(response);
     expect(encounterStartCommandResponseSchema.safeParse({...response,receipt:{...response.receipt,revisionAfter:3}}).success).toBe(false);
     expect(encounterStartCommandResponseSchema.safeParse({...response,combat:{...combat,currentCombatant:"other"}}).success).toBe(false);
+  });
+
+  it("validates bounded append-only combat log pages",()=>{
+    expect(combatLogQuerySchema.parse({afterSequence:"0",limit:"50"})).toEqual({afterSequence:0,limit:50});
+    expect(combatLogQuerySchema.safeParse({afterSequence:0,limit:101}).success).toBe(false);
+    const entries=[{logEntryId:"log-1",sequence:1,occurredAt:at,event:{kind:"encounter_created" as const}},
+      {logEntryId:"log-2",sequence:2,occurredAt:at,event:{kind:"combatant_state_changed" as const,
+        combatantId:"combatant",hitPoints:8,status:"active" as const}}];
+    expect(combatLogResponseSchema.parse({entries,nextAfterSequence:2})).toEqual({entries,nextAfterSequence:2});
+    expect(combatLogResponseSchema.safeParse({entries:[...entries].reverse(),nextAfterSequence:null}).success).toBe(false);
+    expect(combatLogResponseSchema.safeParse({entries,nextAfterSequence:1}).success).toBe(false);
   });
 });

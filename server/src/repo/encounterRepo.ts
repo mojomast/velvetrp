@@ -19,6 +19,7 @@ export {
 export type {
   EncounterDependencies,
   EncounterCombatSnapshot,
+  CombatLogPage,
   EncounterLifecycleSnapshot,
   EncounterReceipt,
   EncounterResult,

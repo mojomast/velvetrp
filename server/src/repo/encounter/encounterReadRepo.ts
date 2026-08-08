@@ -6,6 +6,7 @@ import {
   legalCombatActionAllowlistSchema,
   utcIsoTimestampSchema,
   type CombatState,
+  type CombatLogEntry,
   type EncounterPublic,
   type LegalCombatActionAllowlist,
 } from "@velvet/contracts";
@@ -17,6 +18,12 @@ export interface EncounterReadDependencies { clock: Clock; }
 
 export type EncounterLifecycleSnapshot = EncounterPublic & { campaignId: string };
 export type EncounterCombatSnapshot = CombatState & { campaignId: string; encounterId: string };
+export type CombatLogPage = {
+  campaignId: string;
+  encounterId: string;
+  entries: CombatLogEntry[];
+  nextAfterSequence: number | null;
+};
 
 /** Actor-authorized, non-mutating encounter operations. */
 export interface EncounterReadRepository {
@@ -24,6 +31,8 @@ export interface EncounterReadRepository {
   listEncounters(principal: string, campaignId: string): EncounterLifecycleSnapshot[] | null;
   /** Returns authoritative public combat state by its globally unique encounter-backed identity. */
   getCombatState(principal: string, combatId: string): EncounterCombatSnapshot | null;
+  /** Returns a stable append-only page, or null when the combat is absent or concealed. */
+  listCombatLogPage(principal: string, combatId: string, afterSequence: number, limit: number): CombatLogPage | null;
   /** Returns actions currently available to the principal's active combatant. */
   getLegalCombatActionAllowlist(principal: string, campaignId: string, encounterId: string): LegalCombatActionAllowlist | null;
   /** Returns validated public combat-log entries when the principal may view the encounter. */
@@ -126,6 +135,21 @@ export function createEncounterReadRepository(
     });
     return { campaignId: encounter.campaign_id, encounterId: encounter.encounter_id, ...combat };
   };
+  const listCombatLogPage = (principal: string, combatId: string, afterSequence: number, limit: number): CombatLogPage | null => {
+    const encounter = db.prepare("SELECT campaign_id FROM encounter WHERE encounter_id=? AND status<>'preparing'").get(combatId) as any;
+    if (!encounter || !member(principal, encounter.campaign_id)) return null;
+    const rows = db.prepare(`SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=?
+      ORDER BY occurred_at,log_ordinal,log_id`).all(combatId) as CombatLogRow[];
+    const remaining = projectCombatLogRows(rows, encounter.campaign_id, combatId)
+      .filter((entry) => entry.sequence > afterSequence);
+    const entries = remaining.slice(0, limit);
+    return {
+      campaignId: encounter.campaign_id,
+      encounterId: combatId,
+      entries,
+      nextAfterSequence: remaining.length > entries.length ? entries.at(-1)!.sequence : null,
+    };
+  };
   /** Builds the authoritative action projection for a principal's current combatant. */
   const getLegalCombatActionAllowlist = (principal: string, campaignId: string, encounterId: string): LegalCombatActionAllowlist | null => {
     if (!member(principal, campaignId)) return null;
@@ -144,5 +168,5 @@ export function createEncounterReadRepository(
     const rows = db.prepare("SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=? ORDER BY occurred_at,log_ordinal,log_id").all(encounterId) as CombatLogRow[];
     return combatLogSchema.parse(projectCombatLogRows(rows, campaignId, encounterId));
   };
-  return { listEncounters, getCombatState, getLegalCombatActionAllowlist, listCombatLog };
+  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog };
 }

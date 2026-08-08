@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { enemyTemplateCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
-import { combatTeamSchema, encounterStatusSchema } from "./encounters.js";
+import { combatLogEventSchema, combatTeamSchema, encounterStatusSchema } from "./encounters.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema } from "./rpg-characters.js";
 
@@ -154,6 +154,56 @@ export const encounterStartCommandResponseSchema = z.object({
   receipt: encounterCommandReceiptPublicSchema,
 }).strict();
 
+/** Combat identity is route-owned on reads and remains explicit in start responses. */
+export const combatReadResponseSchema = z.object({
+  round: z.number().int().min(1).max(1_000_000),
+  currentCombatant: resourceIdSchema.nullable(),
+  combatants: z.array(combatantStateSchema).min(1).max(128),
+  legalActions: z.array(combatLegalActionSchema).max(128),
+  revision: revisionSchema,
+}).strict().superRefine((combat, context) => {
+  const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
+  if (new Set(combatantIds).size !== combatantIds.length) {
+    context.addIssue({ code: "custom", message: "combatants must be unique", path: ["combatants"] });
+  }
+  if (combat.currentCombatant !== null && !combatantIds.includes(combat.currentCombatant)) {
+    context.addIssue({ code: "custom", message: "current combatant must belong to combat", path: ["currentCombatant"] });
+  }
+  const legalActionIds = combat.legalActions.map((action) => action.legalActionId);
+  if (new Set(legalActionIds).size !== legalActionIds.length) {
+    context.addIssue({ code: "custom", message: "legal actions must be unique", path: ["legalActions"] });
+  }
+  if (combat.legalActions.some((action) => action.targetIds.some((targetId) => !combatantIds.includes(targetId)))) {
+    context.addIssue({ code: "custom", message: "legal action targets must belong to combat", path: ["legalActions"] });
+  }
+});
+
+export const combatLogQuerySchema = z.object({
+  afterSequence: z.coerce.number().int().min(0).max(1_000_000),
+  limit: z.coerce.number().int().min(1).max(100),
+}).strict();
+
+export const combatLogEntryPublicSchema = z.object({
+  logEntryId: resourceIdSchema,
+  sequence: z.number().int().min(1).max(1_000_000),
+  occurredAt: utcIsoTimestampSchema,
+  event: combatLogEventSchema,
+}).strict();
+
+export const combatLogResponseSchema = z.object({
+  entries: z.array(combatLogEntryPublicSchema).max(100),
+  nextAfterSequence: z.number().int().min(1).max(1_000_000).nullable(),
+}).strict().superRefine((response, context) => {
+  if (response.entries.some((entry, index) => index > 0
+      && entry.sequence <= response.entries[index - 1]!.sequence)) {
+    context.addIssue({ code: "custom", message: "combat log entries must be ordered by sequence", path: ["entries"] });
+  }
+  if (response.nextAfterSequence !== null
+      && response.nextAfterSequence !== response.entries.at(-1)?.sequence) {
+    context.addIssue({ code: "custom", message: "next sequence must match the final entry", path: ["nextAfterSequence"] });
+  }
+});
+
 export type EncounterCreateRequest = z.infer<typeof encounterCreateRequestSchema>;
 export type EncounterCombatantPublic = z.infer<typeof encounterCombatantPublicSchema>;
 export type EncounterPublic = z.infer<typeof encounterPublicSchema>;
@@ -161,3 +211,7 @@ export type CombatantState = z.infer<typeof combatantStateSchema>;
 export type CombatLegalAction = z.infer<typeof combatLegalActionSchema>;
 export type CombatState = z.infer<typeof combatStateSchema>;
 export type EncounterStartCommandRequest = z.infer<typeof encounterStartCommandRequestSchema>;
+export type CombatReadResponse = z.infer<typeof combatReadResponseSchema>;
+export type CombatLogQuery = z.infer<typeof combatLogQuerySchema>;
+export type CombatLogEntryPublic = z.infer<typeof combatLogEntryPublicSchema>;
+export type CombatLogResponse = z.infer<typeof combatLogResponseSchema>;

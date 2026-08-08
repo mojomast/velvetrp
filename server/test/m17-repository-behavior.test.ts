@@ -54,6 +54,13 @@ describe("M1.7 encounter repository",()=>{
       combatId:created.encounter.encounterId,round:1,currentCombatant:created.encounter.combatants[0]!.combatantId,
       revision:2});
     expect(repo.startEncounter("local-owner",created.encounter.encounterId,start)).toEqual(started);
+    expect(repo.listCombatLogPage("local-owner",created.encounter.encounterId,0,1)).toMatchObject({
+      campaignId:campaign.id,encounterId:created.encounter.encounterId,entries:[{sequence:1,event:{kind:"encounter_created"}}],
+      nextAfterSequence:1,
+    });
+    expect(repo.listCombatLogPage("local-owner",created.encounter.encounterId,1,1)).toMatchObject({
+      entries:[{sequence:2,event:{kind:"initiative_resolved"}}],nextAfterSequence:null,
+    });
     expect(repo.listEncounters("local-owner",campaign.id)?.[0]).toMatchObject({status:"active",
       combatId:created.encounter.encounterId,revision:2});
     expect(()=>repo.startEncounter("local-owner",created.encounter.encounterId,
