@@ -74,13 +74,17 @@ export const questHttpRoutes: FastifyPluginAsync<QuestHttpRoutesOptions> = async
     if (!campaignId.success) return missing(request, reply); if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Quest creation request is invalid");
     try {
       const result = options.questRepositoryAccessor().createCampaignQuest(OWNER, campaignId.data, body.data);
-      const projection = options.questRepositoryAccessor().listCampaignQuests(OWNER, campaignId.data);
-      if (!projection) throw new Error("quest creation projection is unavailable");
       if (result.campaignId !== campaignId.data || result.quest.campaignId !== campaignId.data || result.quest.questId !== body.data.quest.questId
-        || !("storylineId" in result.quest) || result.quest.storylineId !== body.data.quest.storylineId || result.quest.title !== body.data.quest.title
+        || result.definition.questId !== result.quest.questId || !("storylineId" in result.quest) || result.quest.storylineId !== result.definition.storylineId
+        || result.quest.title !== result.definition.title || result.quest.description !== result.definition.description
+        || result.revision !== result.receipt.revisionAfter
+        || !result.projection.quests.some((quest) => quest.questId === result.quest.questId && quest.campaignId === campaignId.data)
+        || result.projection.objectives.some((objective) => !result.projection.quests.some((quest) => quest.questId === objective.questId))
+        || result.projection.journal.some((entry) => !result.projection.quests.some((quest) => quest.questId === entry.questId))
         || result.receipt.idempotencyKey !== body.data.idempotencyKey || result.receipt.revisionBefore !== body.data.expectedRevision
         || result.receipt.revisionAfter !== body.data.expectedRevision + 1) throw new Error("quest creation binding is invalid");
-      return reply.code(201).send(createCampaignQuestHttpResponseSchema.parse({ quest: result.quest, definition: body.data.quest, projection: { quests: projection.quests, objectives: projection.objectives, journal: projection.journal }, receipt: {
+      return reply.code(201).send(createCampaignQuestHttpResponseSchema.parse({ quest: result.quest, definition: result.definition,
+        projection: result.projection, revision:result.revision, receipt: {
         idempotencyKey: result.receipt.idempotencyKey, revisionBefore: result.receipt.revisionBefore,
         revisionAfter: result.receipt.revisionAfter, occurredAt: result.receipt.occurredAt,
       } }));

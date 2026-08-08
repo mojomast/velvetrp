@@ -41,6 +41,11 @@ describe("M2.10 quest domain repository", () => {
     expect(repo.createCampaignQuest("local-owner", campaign.id, request)).toEqual(created);
     expect(() => repo.createCampaignQuest("local-owner", campaign.id, { ...request, expectedRevision: 1 })).toThrow(QuestConflictError);
     expect(created).toMatchObject({ quest: { questId: "gate", status: "offered" }, receipt: { revisionBefore: 0, revisionAfter: 1 } });
+    expect(created.definition).toEqual(request.quest);
+    expect(created.revision).toBe(created.receipt.revisionAfter);
+    expect(created.projection).toMatchObject({ quests:[{questId:"gate"}],objectives:[
+      {objectiveId:"sigils",dependencyObjectiveIds:[]},{objectiveId:"door",dependencyObjectiveIds:["sigils"]},{objectiveId:"gm-step",dependencyObjectiveIds:[]}],
+      journal:[{questId:"gate",text:"A sealed gate waits."}] });
     const mixedVisibility = { ...request, quest: { ...request.quest, questId: "mixed", objectives: [
       { objectiveId: "secret-dependency", description: "Secret", targetProgress: 1, dependencyObjectiveIds: [], visibility: "gm" as const },
       { objectiveId: "public-middle", description: "Middle", targetProgress: 1, dependencyObjectiveIds: ["secret-dependency"], visibility: "public" as const },

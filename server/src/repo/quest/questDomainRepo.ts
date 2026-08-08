@@ -33,10 +33,15 @@ export interface CampaignQuestSnapshot {
   journal: QuestJournalEntryHttp[];
 }
 export interface QuestMutationResult { campaignId: string; quest: CampaignQuestProjectionHttp; receipt: InternalReceipt }
+export interface QuestCreateMutationResult extends QuestMutationResult {
+  definition: CreateCampaignQuestHttpRequest["quest"];
+  projection: Omit<CampaignQuestSnapshot, "campaignId" | "revision">;
+  revision: number;
+}
 
 export interface QuestDomainRepository {
   listCampaignQuests(principalId: string, campaignId: string): CampaignQuestSnapshot | null;
-  createCampaignQuest(principalId: string, campaignId: string, input: CreateCampaignQuestHttpRequest): QuestMutationResult;
+  createCampaignQuest(principalId: string, campaignId: string, input: CreateCampaignQuestHttpRequest): QuestCreateMutationResult;
   executeQuestCommand(principalId: string, questId: string, input: QuestCommandHttpRequest): QuestMutationResult;
 }
 export interface QuestDomainContext { clock: { now(): Date }; ids: { nextId(): string }; guard(): void }
@@ -139,6 +144,31 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
     return { campaignId, revision: revision(campaignId), quests: questRows.map((row) => projectQuest(row, privileged)), objectives, journal };
   }
 
+  /** Reconstructs the immutable creation definition exclusively from durable v29/v33 rows. */
+  function durableDefinition(campaignId: string, questId: string): CreateCampaignQuestHttpRequest["quest"] {
+    const quest = db.prepare(`SELECT quest.*,definition.visibility,definition.created_command_id FROM quests quest
+      JOIN quest_definitions_v33 definition ON definition.campaign_id=quest.campaign_id AND definition.quest_id=quest.id
+      WHERE quest.campaign_id=? AND quest.id=?`).get(campaignId, questId) as any;
+    if (!quest) throw new QuestDomainUnavailableError("persisted quest definition is unavailable");
+    const objectiveRows = db.prepare(`SELECT * FROM quest_objectives_v33 WHERE campaign_id=? AND quest_id=? ORDER BY sort_order,objective_id`)
+      .all(campaignId, questId) as any[];
+    const dependency = db.prepare(`SELECT dependency_objective_id FROM quest_objective_dependencies_v33
+      WHERE campaign_id=? AND quest_id=? AND objective_id=? ORDER BY dependency_objective_id`);
+    const rewardRows = db.prepare(`SELECT reward.id,reward.kind,reward.amount,reward.label,definition.visibility
+      FROM quest_rewards reward JOIN quest_reward_definitions_v33 definition
+        ON definition.campaign_id=reward.campaign_id AND definition.quest_id=reward.quest_id AND definition.reward_id=reward.id
+      WHERE reward.campaign_id=? AND reward.quest_id=? ORDER BY reward.created_at,reward.id`).all(campaignId, questId) as any[];
+    const journal = db.prepare(`SELECT text FROM quest_journal_v33 WHERE campaign_id=? AND quest_id=? AND command_id=?
+      ORDER BY occurred_at,entry_id LIMIT 1`).get(campaignId, questId, quest.created_command_id) as { text: string } | undefined;
+    return createCampaignQuestHttpRequestSchema.shape.quest.parse({ questId, storylineId:quest.storyline_id,title:quest.title,
+      description:quest.description,visibility:quest.visibility,
+      objectives:objectiveRows.map((objective)=>({objectiveId:objective.objective_id,description:objective.description,
+        targetProgress:objective.target_progress,visibility:objective.visibility,
+        dependencyObjectiveIds:(dependency.all(campaignId,questId,objective.objective_id) as Array<{dependency_objective_id:string}>).map((row)=>row.dependency_objective_id)})),
+      rewards:rewardRows.map((reward)=>({rewardId:reward.id,kind:reward.kind,amount:reward.amount,label:reward.label,visibility:reward.visibility})),
+      journalText:journal?.text });
+  }
+
   function roleSafeResult(result: QuestMutationResult, privileged: boolean): QuestMutationResult {
     if (privileged) return result;
     const visibleRewardIds = new Set((db.prepare(`SELECT reward_id FROM quest_reward_definitions_v33
@@ -222,7 +252,7 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
         if (!db.prepare("SELECT 1 FROM quest_storylines WHERE campaign_id=? AND id=?").get(campaignId, input.quest.storylineId))
           throw new QuestDomainUnavailableError("storyline is unavailable");
         const mutation = begin(principalId, campaignId, input.quest.questId, "create", requestValue, input.expectedRevision, input.idempotencyKey, true);
-        if (mutation.replay) return mutation.replay;
+        if (mutation.replay) return mutation.replay as QuestCreateMutationResult;
         if (db.prepare("SELECT 1 FROM quests WHERE id=?").get(input.quest.questId)) throw new QuestConflictError("quest ID already exists");
         db.prepare("INSERT INTO quest_domain_revisions_v33 VALUES(?,0,?) ON CONFLICT DO NOTHING").run(campaignId, mutation.at);
         db.prepare("INSERT INTO quest_domain_commands_v33 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(campaignId, mutation.commandId,
@@ -247,11 +277,15 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
             .run(campaignId, input.quest.questId, reward.rewardId, reward.visibility, mutation.commandId);
         });
         addJournal(mutation, input.quest.journalText, input.quest.visibility);
-        const result: QuestMutationResult = { campaignId, quest: projectQuest(db.prepare("SELECT * FROM quests WHERE id=?").get(input.quest.questId), true), receipt: receipt(mutation) };
-        db.prepare("INSERT INTO quest_domain_receipts_v33 VALUES(?,?,?,?,?,?)").run(campaignId, mutation.commandId, mutation.after, canonical(result), digest(result), mutation.at);
         db.prepare("INSERT INTO quest_domain_events_v33 VALUES(?,?,?,?,?,?,?)").run(id(), campaignId, mutation.commandId,
           mutation.after, "quest-created", canonical({ questId: input.quest.questId, kind: "create" }), mutation.at);
         db.prepare("UPDATE quest_domain_revisions_v33 SET revision=?,updated_at=? WHERE campaign_id=?").run(mutation.after, mutation.at, campaignId);
+        const durableSnapshot=snapshot(principalId,campaignId);if(!durableSnapshot)throw new QuestAuthorizationError("campaign membership is required");
+        const {campaignId:_campaignId,revision:durableRevision,...projection}=durableSnapshot;
+        const result: QuestCreateMutationResult = { campaignId, quest: projectQuest(db.prepare("SELECT * FROM quests WHERE id=?").get(input.quest.questId), true),
+          definition:durableDefinition(campaignId,input.quest.questId),projection,revision:durableRevision,receipt:receipt(mutation) };
+        if(result.revision!==result.receipt.revisionAfter)throw new QuestConflictError("persisted quest projection revision is inconsistent");
+        db.prepare("INSERT INTO quest_domain_receipts_v33 VALUES(?,?,?,?,?,?)").run(campaignId, mutation.commandId, mutation.after, canonical(result), digest(result), mutation.at);
         return result;
       }).immediate();
     },

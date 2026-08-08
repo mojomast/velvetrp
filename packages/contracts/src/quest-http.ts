@@ -154,8 +154,10 @@ export const createCampaignQuestHttpResponseSchema = z.object({
   quest: campaignQuestHttpSchema,
   definition: newCampaignQuestSchema,
   projection: gmCampaignQuestsHttpResponseSchema,
+  revision: revisionSchema,
   receipt: questCommandReceiptHttpSchema,
-}).strict();
+}).strict().refine((response) => response.revision === response.receipt.revisionAfter,
+  { message: "persisted projection revision must equal the receipt revision", path: ["revision"] });
 
 const commandEnvelope = {
   expectedRevision: expectedRevisionSchema,

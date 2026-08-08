@@ -106,13 +106,13 @@ describe("persistence and multi-character frontend", () => {
   });
 
   it.each(["player","observer"] as const)("clears GM cast records before rendering a downgraded %s projection",async(nextRole)=>{
-    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));let detailReads=0;
+    installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-cast",campaignId:campaignAccess.id}));localStorage.setItem("velvet.narrative-mutation.v3:campaign-one:npc",JSON.stringify({campaignId:"campaign-one",lane:"npc",operation:"Create NPC",idempotencyKey:"safe-key",expectedRevision:0,phase:"confirmed",startedAt:campaignAccess.createdAt,refresh:"partial",result:{gmNotes:"REGISTRY SECRET"}}));let detailReads=0;
     routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json({campaign:{...configuredCampaignDetail.campaign,actorRole:++detailReads===1?"gm":nextRole}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify(detailReads===1?{npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"SECRET GOAL",gmNotes:"SECRET NOTE",merchantState:null},createdAt:campaignAccess.createdAt}],relationships:[]}:{npcs:[],relationships:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"1"}})},
     );
-    render(<App/>);await screen.findByText("SECRET GOAL");if(nextRole==="observer")fireEvent.focus(window);else fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await screen.findByText("No visible NPCs.");expect(document.body.textContent).not.toContain("SECRET");expect(screen.queryByRole("heading",{name:"Create NPC definition"})).toBeNull();
+    render(<App/>);await screen.findByText("SECRET GOAL");if(nextRole==="observer")fireEvent.focus(window);else fireEvent.click(screen.getByRole("button",{name:"Reauthorize & refresh"}));await screen.findByText("No visible NPCs.");expect(document.body.textContent).not.toContain("SECRET");expect(localStorage.getItem("velvet.narrative-mutation.v3:campaign-one:npc")).not.toContain("REGISTRY SECRET");expect(screen.queryByRole("heading",{name:"Create NPC definition"})).toBeNull();
   });
 
   it("clears a GM studio and leaves campaign navigation when reauthorization becomes unavailable",async()=>{

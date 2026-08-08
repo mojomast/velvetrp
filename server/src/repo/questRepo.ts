@@ -30,7 +30,7 @@ export {
 } from "./quest/index.js";
 export {
   QuestAuthorizationError, QuestConflictError, QuestDomainUnavailableError, QuestStaleError,
-  type CampaignQuestSnapshot, type QuestMutationResult,
+   type CampaignQuestSnapshot, type QuestMutationResult, type QuestCreateMutationResult,
 } from "./quest/index.js";
 type Database = DatabaseDriver.Database;
 

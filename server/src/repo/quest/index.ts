@@ -31,4 +31,5 @@ export {
   type CampaignQuestSnapshot,
   type QuestDomainRepository,
   type QuestMutationResult,
+  type QuestCreateMutationResult,
 } from "./questDomainRepo.js";
