@@ -19,6 +19,7 @@ export {
   type EncounterDependencies,
   type EncounterReceipt,
   type EncounterResult,
+  type EncounterRewardGrantSnapshot,
   type EncounterWriteDependencies,
   type EncounterWriteRepository,
 } from "./encounterWriteRepo.js";

@@ -184,6 +184,8 @@ export const combatLogEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("initiative_resolved"), combatantId: combatantIdSchema }).strict(),
   z.object({ kind: z.literal("round_advanced"), round: z.number().int().min(1).max(100_000) }).strict(),
   z.object({ kind: z.literal("turn_advanced"), combatantId: combatantIdSchema }).strict(),
+  z.object({ kind: z.literal("combat_terminal") }).strict(),
+  z.object({ kind: z.literal("encounter_completed") }).strict(),
   z.object({ kind: z.literal("action_resolved"), actionId: combatActionIdSchema, action: combatActionKindSchema }).strict(),
   z.object({
     kind: z.literal("combatant_state_changed"),
@@ -191,6 +193,7 @@ export const combatLogEventSchema = z.discriminatedUnion("kind", [
     hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
     status: z.enum(["active", "defeated", "fled", "removed"]),
   }).strict(),
+  z.object({ kind: z.literal("rewards_granted"), rewardBundleIds: z.array(rewardBundleIdSchema).max(128) }).strict(),
   z.object({ kind: z.literal("reward_claimed"), rewardClaimId: rewardClaimIdSchema }).strict(),
 ]);
 export const combatLogEntrySchema = z.object({

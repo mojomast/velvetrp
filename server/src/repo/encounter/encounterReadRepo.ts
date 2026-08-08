@@ -12,6 +12,7 @@ import {
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
+import { buildCombatActionPlans } from "./combatActionPlan.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
@@ -50,11 +51,6 @@ export function createEncounterReadRepository(
   const controls = (principal: string, campaignId: string, actorId: string): boolean => Boolean(
     db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(campaignId, actorId, principal),
   );
-  const gameMaster = (principal: string, campaignId: string): boolean => Boolean(
-    db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')")
-      .get(campaignId, principal),
-  );
-
   const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,
     provenance.pack_id provenance_pack_id,provenance.pack_version provenance_pack_version,
     provenance.definition_id provenance_definition_id
@@ -108,18 +104,10 @@ export function createEncounterReadRepository(
     const rows = combatantRows(combatId);
     const active = rows.filter((row) => row.status === "active");
     const current = active.find((row) => row.combatant_id === encounter.current_turn_combatant_id) ?? null;
-    const mayAct = current !== null && (gameMaster(principal, encounter.campaign_id)
-      || (current.actor_id !== null && controls(principal, encounter.campaign_id, current.actor_id)));
-    const targets = current === null ? [] : active
-      .filter((row) => row.team !== current.team)
-      .map((row) => row.combatant_id)
-      .sort();
-    const legalActions = mayAct ? [
-      ...(targets.length > 0 ? [{ legalActionId: "attack:basic", kind: "attack" as const, targetIds: targets }] : []),
-      { legalActionId: "defend", kind: "defend" as const, targetIds: [] },
-      { legalActionId: "flee", kind: "flee" as const, targetIds: [] },
-      { legalActionId: "end-turn", kind: "end-turn" as const, targetIds: [] },
-    ] : [];
+    const legalActions = buildCombatActionPlans(db, principal, encounter.campaign_id, combatId,
+      encounter.current_turn_combatant_id).map((plan) => ({
+        legalActionId: plan.legalActionId, kind: plan.kind, targetIds: plan.targetIds,
+      }));
     const combat = combatStateSchema.parse({
       combatId,
       round: encounter.round_number,
@@ -157,7 +145,7 @@ export function createEncounterReadRepository(
     const current = encounter?.current_turn_combatant_id && db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(encounterId, encounter.current_turn_combatant_id) as any;
     if (!current?.actor_id || !controls(principal, campaignId, current.actor_id)) return null;
     const targets = (db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id").all(encounterId, current.team) as any[]).map((row) => row.combatant_id);
-    const actions: any[] = [{ kind: "defend" }, { kind: "flee" }, { kind: "end-turn" }];
+    const actions: any[] = [{ kind: "flee" }, { kind: "end-turn" }];
     if (targets.length) actions.unshift({ kind: "attack", attackId: "basic_attack", targetCombatantIds: targets });
     const revision = (db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId) as any)?.revision;
     return legalCombatActionAllowlistSchema.parse({ campaignId, encounterId, combatantId: current.combatant_id, revision: revision ?? 0, issuedAt: utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()), actions });

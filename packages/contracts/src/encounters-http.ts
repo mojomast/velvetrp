@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { enemyTemplateCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
-import { combatLogEventSchema, combatTeamSchema, encounterStatusSchema } from "./encounters.js";
+import {
+  combatLogEventSchema,
+  combatTeamSchema,
+  encounterRewardSchema,
+  encounterStatusSchema,
+  rewardBundleIdSchema,
+} from "./encounters.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema } from "./rpg-characters.js";
 
@@ -204,6 +210,102 @@ export const combatLogResponseSchema = z.object({
   }
 });
 
+/** The starter combat vocabulary currently has no caller-selected action choices. */
+export const combatActionCommandRequestSchema = z.object({
+  legalActionId: resourceIdSchema,
+  targetIds: z.array(resourceIdSchema).max(1),
+  choices: z.tuple([]),
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("damage"),
+    targetId: resourceIdSchema,
+    damageType: z.literal("physical"),
+    requested: z.literal(1),
+    applied: z.number().int().min(0).max(1),
+    hitPointsBefore: z.number().int().min(0).max(1_000_000),
+    hitPointsAfter: z.number().int().min(0).max(1_000_000),
+    statusBefore: z.literal("active"),
+    statusAfter: z.enum(["active", "defeated"]),
+  }).strict(),
+  z.object({
+    kind: z.literal("status"),
+    targetId: resourceIdSchema,
+    statusBefore: z.literal("active"),
+    statusAfter: z.literal("fled"),
+  }).strict(),
+]);
+
+export const combatActionResolutionSchema = z.object({
+  actionId: resourceIdSchema,
+  legalActionId: resourceIdSchema,
+  kind: z.enum(["attack", "flee", "end-turn"]),
+  actingCombatantId: resourceIdSchema,
+  targetIds: z.array(resourceIdSchema).max(1),
+  outcomes: z.array(combatActionOutcomeSchema).max(1),
+  roundBefore: z.number().int().min(1).max(1_000_000),
+  roundAfter: z.number().int().min(1).max(1_000_000),
+  currentCombatantBefore: resourceIdSchema,
+  currentCombatantAfter: resourceIdSchema.nullable(),
+}).strict().superRefine((resolution, context) => {
+  if (resolution.kind === "attack") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || outcome?.kind !== "damage"
+        || outcome.targetId !== resolution.targetIds[0]
+        || outcome.applied !== outcome.hitPointsBefore - outcome.hitPointsAfter) {
+      context.addIssue({ code: "custom", message: "attack resolution must contain one exact damage outcome" });
+    }
+  } else if (resolution.kind === "flee") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 0 || outcome?.kind !== "status"
+        || outcome.targetId !== resolution.actingCombatantId) {
+      context.addIssue({ code: "custom", message: "flee resolution must contain the acting combatant status outcome" });
+    }
+  } else if (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0) {
+    context.addIssue({ code: "custom", message: "end turn cannot contain targets or outcomes" });
+  }
+});
+
+export const combatActionCommandResponseSchema = z.object({
+  resolution: combatActionResolutionSchema,
+  combat: combatStateSchema,
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict().refine((response) => response.combat.revision === response.receipt.revisionAfter,
+  { message: "combat revision must match the command receipt", path: ["combat", "revision"] });
+
+export const combatEndCommandRequestSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+export const combatRewardGrantPublicSchema = z.object({
+  rewardBundleId: rewardBundleIdSchema,
+  recipientActorId: actorIdSchema,
+  createdAt: utcIsoTimestampSchema,
+  rewards: z.array(encounterRewardSchema).min(1).max(128),
+}).strict();
+
+export const combatEndCommandResponseSchema = z.object({
+  encounter: encounterPublicSchema,
+  rewards: z.array(combatRewardGrantPublicSchema).max(32),
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict().superRefine((response, context) => {
+  if (response.encounter.status !== "completed") {
+    context.addIssue({ code: "custom", message: "ended combat must be completed", path: ["encounter", "status"] });
+  }
+  if (response.encounter.revision !== response.receipt.revisionAfter) {
+    context.addIssue({ code: "custom", message: "encounter revision must match the command receipt", path: ["encounter", "revision"] });
+  }
+  const bundles=response.rewards.map((reward)=>reward.rewardBundleId);
+  const recipients=response.rewards.map((reward)=>reward.recipientActorId);
+  if(new Set(bundles).size!==bundles.length||new Set(recipients).size!==recipients.length){
+    context.addIssue({code:"custom",message:"reward bundles and recipients must be unique",path:["rewards"]});
+  }
+});
+
 export type EncounterCreateRequest = z.infer<typeof encounterCreateRequestSchema>;
 export type EncounterCombatantPublic = z.infer<typeof encounterCombatantPublicSchema>;
 export type EncounterPublic = z.infer<typeof encounterPublicSchema>;
@@ -215,3 +317,9 @@ export type CombatReadResponse = z.infer<typeof combatReadResponseSchema>;
 export type CombatLogQuery = z.infer<typeof combatLogQuerySchema>;
 export type CombatLogEntryPublic = z.infer<typeof combatLogEntryPublicSchema>;
 export type CombatLogResponse = z.infer<typeof combatLogResponseSchema>;
+export type CombatActionCommandRequest = z.infer<typeof combatActionCommandRequestSchema>;
+export type CombatActionResolution = z.infer<typeof combatActionResolutionSchema>;
+export type CombatActionCommandResponse = z.infer<typeof combatActionCommandResponseSchema>;
+export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSchema>;
+export type CombatRewardGrantPublic = z.infer<typeof combatRewardGrantPublicSchema>;
+export type CombatEndCommandResponse = z.infer<typeof combatEndCommandResponseSchema>;

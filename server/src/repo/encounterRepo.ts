@@ -23,6 +23,7 @@ export type {
   EncounterLifecycleSnapshot,
   EncounterReceipt,
   EncounterResult,
+  EncounterRewardGrantSnapshot,
 } from "./encounter/index.js";
 
 /** Public encounter facade composed from command handling and read projections. */

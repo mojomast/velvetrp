@@ -2,11 +2,22 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   encounterCommandSchema,
+  combatActionCommandRequestSchema,
+  combatActionCommandResponseSchema,
+  combatActionResolutionSchema,
+  combatEndCommandRequestSchema,
+  combatEndCommandResponseSchema,
   encounterCreateRequestSchema,
   encounterStartCommandRequestSchema,
+  enemyTemplateCatalogDefinitionSchema,
+  MECHANICS_STARTER_IDENTITY,
   resourceIdSchema,
   utcIsoTimestampSchema,
   type EncounterCommand,
+  type CombatActionCommandRequest,
+  type CombatActionResolution,
+  type CombatEndCommandRequest,
+  type CombatRewardGrantPublic,
   type EncounterCreateRequest,
   type EncounterStartCommandRequest,
   type LegalCombatActionAllowlist,
@@ -20,10 +31,12 @@ import {
   EncounterUnavailableError,
 } from "./encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot, EncounterReadRepository } from "./encounterReadRepo.js";
+import { buildCombatActionPlans } from "./combatActionPlan.js";
 
 export type EncounterDependencies={clock:Clock;ids:IdGenerator;rng:RandomNumberGenerator};
 export type EncounterReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
 export type EncounterResult<T extends object>=T&{receipt:EncounterReceipt};
+export type EncounterRewardGrantSnapshot=CombatRewardGrantPublic&{campaignId:string;encounterId:string};
 
 const canonical=(v:unknown)=>JSON.stringify(v,(_k,x)=>x&&typeof x==="object"&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const digest=(v:unknown)=>createHash("sha256").update(canonical(v)).digest("hex");
@@ -32,7 +45,7 @@ const now=(d:EncounterDependencies)=>utcIsoTimestampSchema.parse(d.clock.now().t
 const member=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(c,p));
 const gm=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(c,p));
 const controls=(db:DatabaseDriver.Database,p:string,c:string,a:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(c,a,p));
-const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"?"grant_rewards":"resolve_action";
+const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"||t==="end_combat"?"grant_rewards":"resolve_action";
 const actionTypes=new Set(["attack","power","item","defend","flee","end-turn"]);
 
 /** Dependencies required by transactional encounter commands. */
@@ -45,6 +58,8 @@ export interface EncounterWriteDependencies extends EncounterDependencies {
 export interface EncounterWriteRepository {
   createEncounter(principal:string,campaignId:string,input:EncounterCreateRequest):EncounterResult<{campaignId:string;encounter:EncounterLifecycleSnapshot}>;
   startEncounter(principal:string,encounterId:string,input:EncounterStartCommandRequest):EncounterResult<{campaignId:string;encounterId:string;combat:EncounterCombatSnapshot}>;
+  resolveCombatAction(principal:string,combatId:string,input:CombatActionCommandRequest):EncounterResult<{campaignId:string;encounterId:string;resolution:CombatActionResolution;combat:EncounterCombatSnapshot}>;
+  endCombat(principal:string,combatId:string,input:CombatEndCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot;rewards:EncounterRewardGrantSnapshot[]}>;
   executeEncounterCommand(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   mutateEncounter(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
 }
@@ -164,6 +179,169 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
     }).immediate();
   };
 
+  const resolveCombatAction=(p:string,combatIdInput:string,input:CombatActionCommandRequest):EncounterResult<{campaignId:string;encounterId:string;resolution:CombatActionResolution;combat:EncounterCombatSnapshot}>=>{
+    deps.assertFactoryMutation();
+    const combatId=resourceIdSchema.parse(combatIdInput),command=combatActionCommandRequestSchema.parse(input),request=canonical(command);
+    return db.transaction(()=>{
+      const encounter=db.prepare("SELECT * FROM encounter WHERE encounter_id=?").get(combatId) as any;
+      if(!encounter)throw new EncounterUnavailableError("combat unavailable");
+      if(!member(db,p,encounter.campaign_id))throw new EncounterAuthorizationError("combat unavailable");
+      const isGm=gm(db,p,encounter.campaign_id);
+      const replay=db.prepare(`SELECT command.command_type,command.actor_id,command.canonical_request_json,
+        receipt.canonical_result_json FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt
+          ON receipt.encounter_id=command.encounter_id AND receipt.command_id=command.command_id
+        WHERE command.encounter_id=? AND command.idempotency_key=?`).get(combatId,command.idempotencyKey) as any;
+      if(replay){
+        if(!isGm&&(!replay.actor_id||!controls(db,p,encounter.campaign_id,replay.actor_id)))
+          throw new EncounterAuthorizationError("combat action unavailable");
+        if(replay.command_type!=="resolve_action"||replay.canonical_request_json!==request)
+          throw new EncounterConflictError("idempotency key was reused");
+        return JSON.parse(replay.canonical_result_json);
+      }
+      const root=db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(combatId) as any;
+      if(!root||root.revision!==command.expectedRevision)throw new EncounterStaleError("combat revision is stale");
+      if(encounter.status!=="active"||encounter.current_turn_combatant_id===null)
+        throw new EncounterTurnError("combat has no current turn");
+      const current=db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
+        .get(combatId,encounter.current_turn_combatant_id) as any;
+      if(!current)throw new EncounterTurnError("combat has no current combatant");
+      if(!isGm&&(!current.actor_id||!controls(db,p,encounter.campaign_id,current.actor_id)))
+        throw new EncounterAuthorizationError("combat action unavailable");
+      const plan=buildCombatActionPlans(db,p,encounter.campaign_id,combatId,current.combatant_id)
+        .find((candidate)=>candidate.legalActionId===command.legalActionId);
+      if(!plan)throw new EncounterConflictError("combat action is not legal");
+      if((plan.kind==="attack"&&(command.targetIds.length!==1||!plan.targetIds.includes(command.targetIds[0]!)))
+          ||(plan.kind!=="attack"&&command.targetIds.length!==0))
+        throw new EncounterConflictError("combat action targets are not legal");
+
+      let outcome:any=null;
+      if(plan.kind==="attack"){
+        const target=db.prepare("SELECT hit_points,status FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
+          .get(combatId,command.targetIds[0]!) as any;
+        if(!target)throw new EncounterConflictError("combat target is unavailable");
+        const hitPointsAfter=Math.max(0,target.hit_points-1);
+        outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:"physical",requested:1,
+          applied:target.hit_points-hitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
+          statusBefore:"active",statusAfter:hitPointsAfter===0?"defeated":"active"};
+      }else if(plan.kind==="flee"){
+        outcome={kind:"status",targetId:current.combatant_id,statusBefore:"active",statusAfter:"fled"};
+      }
+      const before=root.revision,after=before+1,at=now(deps),commandId=id(deps),actionId=id(deps);
+      const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
+      beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
+        {kind:"action_resolved",actionId,action:plan.kind},"action",0);
+      if(outcome?.kind==="damage")state(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
+      else if(outcome?.kind==="status")state(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
+      advanceOrTerminal(db,deps,combatId,encounter,current.combatant_id,at,commandId,after);
+      advanceRevision(db,combatId,after,at);
+      const combat=deps.reads.getCombatState(p,combatId);
+      if(!combat)throw new Error("resolved combat projection is unavailable");
+      const resolution=combatActionResolutionSchema.parse({actionId,legalActionId:plan.legalActionId,kind:plan.kind,
+        actingCombatantId:current.combatant_id,targetIds:command.targetIds,outcomes:outcome?[outcome]:[],
+        roundBefore:encounter.round_number,roundAfter:combat.round,currentCombatantBefore:current.combatant_id,
+        currentCombatantAfter:combat.currentCombatant});
+      const receipt={commandId,idempotencyKey:command.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at};
+      combatActionCommandResponseSchema.parse({resolution,combat:{combatId:combat.combatId,round:combat.round,
+        currentCombatant:combat.currentCombatant,combatants:combat.combatants,legalActions:combat.legalActions,revision:combat.revision},
+        receipt:{idempotencyKey:receipt.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at}});
+      const result={campaignId:encounter.campaign_id,encounterId:combatId,resolution,combat,receipt};
+      if(canonical(result).length>32_768)throw new EncounterConflictError("combat action result exceeds receipt bounds");
+      sealReceipt(db,combatId,commandId,after,at,result);
+      return result;
+    }).immediate();
+  };
+
+  const endCombat=(p:string,combatIdInput:string,input:CombatEndCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot;rewards:EncounterRewardGrantSnapshot[]}>=>{
+    deps.assertFactoryMutation();
+    const combatId=resourceIdSchema.parse(combatIdInput),command=combatEndCommandRequestSchema.parse(input),request=canonical(command);
+    return db.transaction(()=>{
+      const row=db.prepare("SELECT * FROM encounter WHERE encounter_id=?").get(combatId) as any;
+      if(!row)throw new EncounterUnavailableError("combat unavailable");
+      if(!gm(db,p,row.campaign_id))throw new EncounterAuthorizationError("combat end requires GM authority");
+      const replay=db.prepare(`SELECT command.command_type,command.canonical_request_json,receipt.canonical_result_json
+        FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt
+          ON receipt.encounter_id=command.encounter_id AND receipt.command_id=command.command_id
+        WHERE command.encounter_id=? AND command.idempotency_key=?`).get(combatId,command.idempotencyKey) as any;
+      if(replay){
+        if(replay.command_type!=="grant_rewards"||replay.canonical_request_json!==request)
+          throw new EncounterConflictError("idempotency key was reused");
+        return JSON.parse(replay.canonical_result_json);
+      }
+      const root=db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(combatId) as any;
+      if(!root||root.revision!==command.expectedRevision)throw new EncounterStaleError("combat revision is stale");
+      const teams=(db.prepare("SELECT count(DISTINCT team) count FROM combatant WHERE encounter_id=? AND status='active'")
+        .get(combatId) as {count:number}).count;
+      if(row.status!=="active"||row.current_turn_combatant_id!==null||teams>=2)
+        throw new EncounterConflictError("combat is not terminal");
+
+      const activeTeam=(db.prepare("SELECT team FROM combatant WHERE encounter_id=? AND status='active' LIMIT 1")
+        .get(combatId) as {team:string}|undefined)?.team??null;
+      const recipients=activeTeam==="allies"?(db.prepare(`SELECT DISTINCT actor_id FROM combatant
+        WHERE encounter_id=? AND team='allies' AND actor_id IS NOT NULL AND status IN ('active','defeated') ORDER BY actor_id`)
+        .all(combatId) as Array<{actor_id:string}>).map((value)=>value.actor_id):[];
+      const defeatedEnemies=db.prepare(`SELECT provenance.pack_id,provenance.pack_version,provenance.definition_id,
+        definition.definition_json FROM combatant combatant
+        JOIN encounter_enemy_provenance_v31 provenance ON provenance.combatant_id=combatant.combatant_id
+        JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id
+          AND definition.pack_version=provenance.pack_version AND definition.kind='enemy-template'
+          AND definition.definition_id=provenance.definition_id
+        WHERE combatant.encounter_id=? AND combatant.team='enemies' AND combatant.status='defeated'
+        ORDER BY combatant.combatant_id`).all(combatId) as any[];
+      const defeatedCount=(db.prepare(`SELECT count(*) count FROM combatant WHERE encounter_id=?
+        AND combatant_kind='enemy' AND team='enemies' AND status='defeated'`).get(combatId) as {count:number}).count;
+      if(activeTeam==="allies"&&defeatedEnemies.length!==defeatedCount)
+        throw new EncounterConflictError("defeated enemy provenance is incomplete");
+      let rewardAmount=0;
+      for(const enemy of defeatedEnemies){
+        const definition=enemyTemplateCatalogDefinitionSchema.parse(JSON.parse(enemy.definition_json));
+        if(definition.reference.packId!==enemy.pack_id||definition.reference.packVersion!==enemy.pack_version
+            ||definition.reference.definitionId!==enemy.definition_id)throw new EncounterConflictError("enemy reward provenance is invalid");
+        rewardAmount+=definition.mechanics.tier;
+      }
+      const rewardCurrency=recipients.length>0&&rewardAmount>0?ensureRewardCurrency(db,row.campaign_id):null;
+      const before=root.revision,after=before+1,at=now(deps),commandId=id(deps);
+      const bundleIds=rewardCurrency?recipients.map(()=>id(deps)):[];
+      const internal={type:"end_combat",encounterId:combatId,idempotencyKey:command.idempotencyKey};
+      beginProtocol(db,deps,internal,request,commandId,null,before,after,at,"encounter_state_changed",
+        {kind:"encounter_completed"},"encounter_state",0);
+      db.prepare(`UPDATE encounter SET status='completed',current_turn_combatant_id=NULL,
+        state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(at,combatId);
+      const rewardEventId=id(deps),rewardEvent={kind:"rewards_granted",rewardBundleIds:bundleIds};
+      db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(rewardEventId,combatId,commandId,after,
+        "rewards_granted",canonical(rewardEvent),at);
+      db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(id(deps),combatId,null,rewardEventId,1,
+        "reward",canonical(rewardEvent),at);
+      const rewards:EncounterRewardGrantSnapshot[]=[];
+      if(rewardCurrency){
+        recipients.forEach((recipientActorId,index)=>{
+          const rewardBundleId=bundleIds[index]!;
+          db.prepare(`INSERT INTO reward_bundle(reward_bundle_id,campaign_id,encounter_id,source_event_id,
+            recipient_actor_id,created_at) VALUES(?,?,?,?,?,?)`).run(rewardBundleId,row.campaign_id,combatId,rewardEventId,recipientActorId,at);
+          db.prepare(`INSERT INTO reward_entry_v27(reward_entry_id,campaign_id,reward_bundle_id,entry_ordinal,
+            reward_kind,amount_minor,currency_code,currency_pack_id,currency_pack_version,currency_kind,
+            currency_definition_id,created_at) VALUES(?,?,?,0,'currency',?,?,?,?, 'currency',?,?)`)
+            .run(id(deps),row.campaign_id,rewardBundleId,rewardAmount,rewardCurrency.code,rewardCurrency.reference.packId,
+              rewardCurrency.reference.packVersion,rewardCurrency.reference.definitionId,at);
+          rewards.push({campaignId:row.campaign_id,encounterId:combatId,rewardBundleId,recipientActorId,createdAt:at,
+            rewards:[{kind:"currency",currency:rewardCurrency.reference,amount:rewardAmount}]});
+        });
+      }
+      advanceRevision(db,combatId,after,at);
+      const encounter=deps.reads.listEncounters(p,row.campaign_id)?.find((value)=>value.encounterId===combatId);
+      if(!encounter)throw new Error("completed encounter projection is unavailable");
+      const receipt={commandId,idempotencyKey:command.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at};
+      combatEndCommandResponseSchema.parse({encounter:{encounterId:encounter.encounterId,sessionId:encounter.sessionId,
+        name:encounter.name,status:encounter.status,combatId:encounter.combatId,combatants:encounter.combatants,
+        revision:encounter.revision,createdAt:encounter.createdAt,updatedAt:encounter.updatedAt},
+        rewards:rewards.map(({campaignId:_campaignId,encounterId:_encounterId,...reward})=>reward),
+        receipt:{idempotencyKey:receipt.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at}});
+      const result={campaignId:row.campaign_id,encounterId:combatId,encounter,rewards,receipt};
+      if(canonical(result).length>32_768)throw new EncounterConflictError("combat end result exceeds receipt bounds");
+      sealReceipt(db,combatId,commandId,after,at,result);
+      return result;
+    }).immediate();
+  };
+
   const execute=(p:string,input:EncounterCommand):EncounterResult<{encounterId:string;status:string}>=>{
     deps.assertFactoryMutation(); const command=encounterCommandSchema.parse(input), request=canonical(command);
     return db.transaction(()=>{
@@ -204,7 +382,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       advanceRevision(db,command.encounterId,after,at); return result;
     }).immediate();
   };
-  return {createEncounter:createLifecycleEncounter,startEncounter:startLifecycleEncounter,executeEncounterCommand:execute,mutateEncounter:execute};
+  return {createEncounter:createLifecycleEncounter,startEncounter:startLifecycleEncounter,resolveCombatAction,endCombat,
+    executeEncounterCommand:execute,mutateEncounter:execute};
 }
 
 function replayAuthority(db:DatabaseDriver.Database,p:string,c:any,row:any){
@@ -283,7 +462,65 @@ function damage(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,targ
 function next(db:DatabaseDriver.Database,e:string,current:string,round:number){const rows=db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' ORDER BY initiative DESC,initiative_tiebreaker,combatant_id").all(e) as any[];const i=rows.findIndex(x=>x.combatant_id===current),n=rows[(i+1+rows.length)%rows.length];return n&&{combatantId:n.combatant_id,round:i===rows.length-1?round+1:round};}
 function turn(db:DatabaseDriver.Database,e:string,encounter:any,current:string,at:string){const n=next(db,e,current,encounter.round_number);if(n)db.prepare("UPDATE encounter SET current_turn_combatant_id=?,round_number=?,state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(n.combatantId,n.round,at,e);}
 function complete(db:DatabaseDriver.Database,e:string,at:string){db.prepare("UPDATE encounter SET status='completed',current_turn_combatant_id=NULL,state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(at,e);}
-function finishOrTurn(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,encounter:any,current:string,at:string,commandId:string,revision:number){const alive=db.prepare("SELECT count(DISTINCT team) count FROM combatant WHERE encounter_id=? AND status='active'").get(e) as any;if(alive.count<2){const eventId=id(d),event={kind:"turn_advanced",combatantId:current};db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(eventId,e,commandId,revision,"encounter_state_changed",canonical(event),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(id(d),e,null,eventId,2,"encounter_state",canonical(event),at);complete(db,e,at);return;}const n=next(db,e,current,encounter.round_number);if(!n)return;const eventId=id(d),event={kind:"turn_advanced",combatantId:n.combatantId};db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(eventId,e,commandId,revision,"encounter_state_changed",canonical(event),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(id(d),e,null,eventId,2,"turn",canonical(event),at);db.prepare("UPDATE encounter SET current_turn_combatant_id=?,round_number=?,state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(n.combatantId,n.round,at,e);}
+function finishOrTurn(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,encounter:any,current:string,at:string,commandId:string,revision:number){advanceOrTerminal(db,d,e,encounter,current,at,commandId,revision);}
+
+function advanceOrTerminal(db:DatabaseDriver.Database,d:EncounterDependencies,encounterId:string,encounter:any,currentId:string,at:string,commandId:string,revision:number){
+  const activeTeams=(db.prepare("SELECT count(DISTINCT team) count FROM combatant WHERE encounter_id=? AND status='active'")
+    .get(encounterId) as {count:number}).count;
+  let event:any,nextId:string|null=null,round=encounter.round_number;
+  if(activeTeams<2){
+    event={kind:"combat_terminal"};
+  }else{
+    const order=db.prepare(`SELECT combatant_id,status FROM combatant WHERE encounter_id=?
+      ORDER BY initiative DESC,initiative_tiebreaker,combatant_id`).all(encounterId) as Array<{combatant_id:string;status:string}>;
+    const currentIndex=order.findIndex((value)=>value.combatant_id===currentId);
+    if(currentIndex<0)throw new EncounterTurnError("current combatant is outside turn order");
+    for(let step=1;step<=order.length;step+=1){
+      const index=(currentIndex+step)%order.length,candidate=order[index]!;
+      if(candidate.status==="active"){
+        nextId=candidate.combatant_id;
+        if(index<=currentIndex)round+=1;
+        break;
+      }
+    }
+    event=nextId===null?{kind:"combat_terminal"}:{kind:"turn_advanced",combatantId:nextId};
+  }
+  const eventId=id(d);
+  db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)")
+    .run(eventId,encounterId,commandId,revision,"encounter_state_changed",canonical(event),at);
+  db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)")
+    .run(id(d),encounterId,null,eventId,2,"encounter_state",canonical(event),at);
+  db.prepare(`UPDATE encounter SET current_turn_combatant_id=?,round_number=?,
+    state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(nextId,round,at,encounterId);
+}
+
+function ensureRewardCurrency(db:DatabaseDriver.Database,campaignId:string):{code:string;reference:{kind:"currency";packId:string;packVersion:string;definitionId:string}}{
+  const reference={kind:"currency" as const,packId:MECHANICS_STARTER_IDENTITY.packId,
+    packVersion:MECHANICS_STARTER_IDENTITY.packVersion,definitionId:"velvet:mechanics:currency:glimmer"};
+  const pinned=db.prepare(`SELECT 1 FROM campaign_catalog_current_pins pin JOIN rpg_catalog_definitions definition
+    ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=?
+      AND definition.kind='currency' AND definition.definition_id=?`)
+    .get(campaignId,reference.packId,reference.packVersion,reference.definitionId);
+  if(!pinned)throw new EncounterConflictError("combat reward currency is unavailable");
+  if(!db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25 WHERE campaign_id=? AND pack_id=?
+      AND pack_version=? AND kind='currency' AND definition_id=?`)
+    .get(campaignId,reference.packId,reference.packVersion,reference.definitionId)){
+    db.prepare(`INSERT INTO rpg_campaign_catalog_definitions_v25
+      (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,'currency',?)`)
+      .run(campaignId,reference.packId,reference.packVersion,reference.definitionId);
+  }
+  const existing=db.prepare(`SELECT currency_code FROM rpg_currency_references_v25 WHERE campaign_id=?
+    AND pack_id=? AND pack_version=? AND kind='currency' AND definition_id=?`)
+    .get(campaignId,reference.packId,reference.packVersion,reference.definitionId) as {currency_code:string}|undefined;
+  if(existing)return {code:existing.currency_code,reference};
+  if(db.prepare("SELECT 1 FROM rpg_currency_references_v25 WHERE campaign_id=? AND currency_code='GLM'").get(campaignId))
+    throw new EncounterConflictError("combat reward currency code is unavailable");
+  db.prepare(`INSERT INTO rpg_currency_references_v25
+    (campaign_id,currency_code,pack_id,pack_version,kind,definition_id) VALUES(?,'GLM',?,?,'currency',?)`)
+    .run(campaignId,reference.packId,reference.packVersion,reference.definitionId);
+  return {code:"GLM",reference};
+}
 
 function enemyDefinition(db:DatabaseDriver.Database,campaignId:string,template:{packId:string;packVersion:string;definitionId:string}):{maximumHitPoints:number}|null{
   let row=db.prepare(`SELECT definition.definition_json FROM rpg_campaign_catalog_definitions_v25 pin

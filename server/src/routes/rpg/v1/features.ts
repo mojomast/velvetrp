@@ -112,6 +112,7 @@ import type { EffectRepository } from "../../../repo/effectRepo.js";
 import { encounterLifecycleHttpRoutes } from "./encounterLifecycle.js";
 import type { EncounterRepository } from "../../../repo/encounterRepo.js";
 import { combatReadsHttpRoutes } from "./combatReads.js";
+import { combatCommandsHttpRoutes } from "./combatCommands.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
@@ -134,6 +135,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">>,
+  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -239,6 +241,7 @@ type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useA
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
 type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">;
+type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -368,6 +371,10 @@ function assertCombatReadRepository(repository: CampaignListRepository): asserts
     throw new UnsupportedCampaignRepositoryError();
   }
 }
+function assertCombatCommandRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
+  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function")
+    throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -490,6 +497,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCombatReadRepository(repository);
     return repository;
   };
+  const combatCommandRepositoryAccessor = (): CombatCommandLaneRepository => {
+    const repository=getCampaignRepository();assertCombatCommandRepository(repository);return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -516,6 +526,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(actorEffectsHttpRoutes, { effectRepositoryAccessor });
   await app.register(encounterLifecycleHttpRoutes, { encounterRepositoryAccessor });
   await app.register(combatReadsHttpRoutes, { combatRepositoryAccessor });
+  await app.register(combatCommandsHttpRoutes, { combatCommandRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };
