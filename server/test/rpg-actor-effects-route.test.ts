@@ -11,7 +11,9 @@ const snapshot:ActorEffectSnapshot={campaignId:"campaign",actorId:"actor",effect
   modifiers:[{kind:"flat",appliesToId:"defense",amount:2}],duration:{kind:"rounds",remaining:2},
   recovery:"none",concentration:{kind:"required",concentrationId:"focus"},appliedAt:"2035-01-01T00:00:00.000Z",
 }],revision:3};
-function repository(read:(principal:string,actorId:string)=>unknown){return {getActorEffectSnapshot:read,close(){},listCampaigns:()=>[]} as unknown as CampaignListRepository;}
+function repository(read:(principal:string,actorId:string)=>unknown,mutate:((principal:string,actorId:string,input:unknown)=>unknown)=()=>{throw new Error("not implemented");}){
+  return {getActorEffectSnapshot:read,mutateActorEffect:mutate,close(){},listCampaigns:()=>[]} as unknown as CampaignListRepository;
+}
 
 describe("GET /api/rpg/v1/actors/:actorId/effects",()=>{
   it("uses fixed local ownership and returns only reviewed no-store mechanics",async()=>{
@@ -40,5 +42,29 @@ describe("GET /api/rpg/v1/actors/:actorId/effects",()=>{
     }
     const failed=buildApp({campaignRepositoryFactory:()=>repository(()=>{throw new Error("private SQL");})});const response=await failed.inject({method:"GET",url:"/api/rpg/v1/actors/actor/effects"});
     expect(response.statusCode).toBe(500);expect(response.body).not.toContain("private SQL");await failed.close();
+  });
+});
+
+describe("POST /api/rpg/v1/actors/:actorId/effect-commands",()=>{
+  const body={kind:"apply",effect:{source:null,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}],duration:{kind:"rounds",remaining:2},recovery:"none",stacking:{kind:"coexists"}},expectedRevision:0,idempotencyKey:"apply"};
+  it("uses the fixed principal and returns a strictly projected result",async()=>{
+    enable();const calls:any[]=[];
+    const app=buildApp({campaignRepositoryFactory:()=>repository(()=>snapshot,(...args)=>{calls.push(args);return {campaignId:"campaign",actorId:"actor",effects:[{...snapshot.effects[0],source:null,concentration:{kind:"none"},appliedAt:"2035-01-01T00:00:01.000Z"}],receipt:{commandId:"private",idempotencyKey:"apply",revisionBefore:0,revisionAfter:1,occurredAt:"2035-01-01T00:00:01.000Z"}};})});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/effect-commands",headers:{"content-type":"application/json",authorization:"Bearer attacker","x-principal-id":"attacker"},payload:body});
+    expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");
+    expect(calls).toEqual([["local-owner","actor",body]]);
+    expect(response.json()).toEqual({effects:[{effectId:"effect",source:null,modifiers:body.effect.modifiers,duration:body.effect.duration,recovery:"none",stacking:"coexists",appliedAt:"2035-01-01T00:00:01.000Z"}],receipt:{idempotencyKey:"apply",revisionBefore:0,revisionAfter:1,occurredAt:"2035-01-01T00:00:01.000Z"}});
+    expect(response.body).not.toContain("commandId");await app.close();
+  });
+
+  it("applies route gates, media and strict request guards",async()=>{
+    let calls=0;const app=buildApp({campaignRepositoryFactory:()=>repository(()=>snapshot,()=>{calls++;throw new Error();})});
+    expect((await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/effect-commands",headers:{"content-type":"application/json"},payload:body})).statusCode).toBe(404);
+    enable();
+    expect((await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/effect-commands?x=1",headers:{"content-type":"application/json"},payload:body})).statusCode).toBe(400);
+    expect((await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/effect-commands",payload:JSON.stringify(body)})).statusCode).toBe(415);
+    expect((await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/effect-commands",headers:{"content-type":"application/json"},payload:{...body,appliedAt:"2035-01-01T00:00:00.000Z"}})).statusCode).toBe(400);
+    expect((await app.inject({method:"HEAD",url:"/api/rpg/v1/actors/actor/effect-commands"})).statusCode).toBe(404);
+    expect(calls).toBe(0);await app.close();
   });
 });

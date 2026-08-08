@@ -11,6 +11,7 @@ describe("M1.6 repository composition", () => {
     expect(typeof repository.resolveCheck).toBe("function");
     expect(typeof repository.usePower).toBe("function");
     expect(typeof repository.mutateEffect).toBe("function");
+    expect(typeof repository.mutateActorEffect).toBe("function");
     expect(()=>repository.listActiveEffects("missing","campaign","actor")).not.toThrow();
     expect(repository.listActiveEffects("missing","campaign","actor")).toEqual([]);
     repository.close();

@@ -62,7 +62,7 @@ function fixture() {
     db.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)").run(campaign.id, power.packId, power.packVersion, power.kind, power.definitionId);
   }
   db.close();
-  return { repo, campaign: campaign.id, source, opponent, advance: (milliseconds: number) => { now = new Date(now.getTime() + milliseconds); } };
+  return { repo, campaign: campaign.id, source, opponent, idCount:()=>id, advance: (milliseconds: number) => { now = new Date(now.getTime() + milliseconds); } };
 }
 
 describe("M1.6 repository behavior", () => {
@@ -213,6 +213,52 @@ describe("M1.6 repository behavior", () => {
     expect(() => f.repo.mutateEffect("local-owner", { ...command, expectedRevision: 1 })).toThrow(M16ConflictError);
     expect(() => f.repo.mutateEffect("local-owner", { ...command, idempotencyKey: "stale" })).toThrow(M16StaleError);
     expect(() => f.repo.mutateEffect("not-a-member", { ...command, idempotencyKey: "forbidden" })).toThrow(M16AuthorizationError);
+    f.repo.close();
+  });
+
+  it("executes strict actor-only GM effect intents with server identity, time, and exact replay",()=>{
+    const f=fixture();
+    const apply={kind:"apply" as const,effect:{source:ability,modifiers:[{kind:"flat" as const,appliesToId:"defense",amount:2}],duration:{kind:"rounds" as const,remaining:2},recovery:"none" as const,stacking:{kind:"concentration" as const,concentrationId:"focus"}},expectedRevision:0,idempotencyKey:"http-apply"};
+    const first=f.repo.mutateActorEffect("local-owner",f.source,apply);
+    expect(first.effects).toEqual([expect.objectContaining({effectId:expect.stringMatching(/^m16-/),campaignId:f.campaign,actorId:f.source,appliedAt:timestamp,concentration:{kind:"required",concentrationId:"focus"}})]);
+    const generatedId=first.effects[0]!.effectId;
+    const replacement=f.repo.mutateActorEffect("local-owner",f.source,{...apply,effect:{...apply.effect,source:null,modifiers:[{kind:"advantage",appliesToId:"might"}],stacking:{kind:"concentration",concentrationId:"focus"}},expectedRevision:1,idempotencyKey:"replacement"});
+    expect(replacement.effects).toHaveLength(1);expect(replacement.effects[0]!.effectId).not.toBe(generatedId);
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)!.effects).toEqual(replacement.effects);
+    const replacementId=replacement.effects[0]!.effectId;
+    const expired=f.repo.mutateActorEffect("local-owner",f.source,{kind:"advance-duration",effectId:replacementId,rounds:2,expectedRevision:2,idempotencyKey:"expire"});
+    expect(expired.effects).toEqual([]);
+    const beforeReplayIds=f.idCount();
+    expect(f.repo.mutateActorEffect("local-owner",f.source,apply)).toEqual(first);
+    expect(f.idCount()).toBe(beforeReplayIds);
+    expect(()=>f.repo.mutateActorEffect("local-owner",f.source,{...apply,effect:{...apply.effect,recovery:"short_rest"}})).toThrow(M16ConflictError);
+    expect(()=>f.repo.mutateActorEffect("local-owner",f.source,{...apply,expectedRevision:0,idempotencyKey:"stale-http"})).toThrow(M16StaleError);
+    expect(()=>f.repo.mutateActorEffect("local-owner",f.source,{kind:"remove",effectId:replacementId,expectedRevision:3,idempotencyKey:"inactive"})).toThrow();
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)).toMatchObject({revision:3,effects:[]});
+    f.repo.close();
+  });
+
+  it("limits actor-only effect commands to canonical owner/GM authority and rolls back conflicts",()=>{
+    const f=fixture();
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    for(const [id,label,role] of [["effects-gm","GM","gm"],["effects-player","Player","player"],["effects-observer","Observer","observer"]] as const){
+      db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(id,label);
+      db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)").run(f.campaign,id,role,timestamp);
+    }
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='effects-player' WHERE campaign_id=? AND actor_id=?").run(f.campaign,f.source);db.close();
+    const immunity={kind:"apply" as const,effect:{source:null,modifiers:[{kind:"immunity" as const,appliesToId:"poison"}],duration:{kind:"until_removed" as const},recovery:"none" as const,stacking:{kind:"coexists" as const}},expectedRevision:0,idempotencyKey:"gm-immunity"};
+    const beforeDenied=f.idCount();
+    expect(()=>f.repo.mutateActorEffect("effects-player",f.source,immunity)).toThrow(M16AuthorizationError);
+    expect(()=>f.repo.mutateActorEffect("effects-observer",f.source,immunity)).toThrow(M16AuthorizationError);
+    expect(f.idCount()).toBe(beforeDenied);
+    const applied=f.repo.mutateActorEffect("effects-gm",f.source,immunity),effectId=applied.effects[0]!.effectId;
+    const poison={kind:"apply" as const,effect:{...immunity.effect,modifiers:[{kind:"flat" as const,appliesToId:"poison",amount:1}]},expectedRevision:1,idempotencyKey:"immune-conflict"};
+    expect(()=>f.repo.mutateActorEffect("effects-gm",f.source,poison)).toThrow(EffectImmuneError);
+    expect(()=>f.repo.mutateActorEffect("effects-gm",f.source,{kind:"advance-duration",effectId,rounds:1,expectedRevision:1,idempotencyKey:"wrong-duration"})).toThrow();
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)).toMatchObject({revision:1,effects:[{effectId}]});
+    expect(f.repo.mutateActorEffect("effects-gm",f.source,{kind:"remove",effectId,expectedRevision:1,idempotencyKey:"remove"}).effects).toEqual([]);
+    expect(()=>f.repo.mutateActorEffect("effects-gm",f.source,{...immunity,effect:{...immunity.effect,source:{...ability,definitionId:"not-pinned"}},expectedRevision:2,idempotencyKey:"bad-source"})).toThrow();
+    expect(f.repo.getActorEffectSnapshot("local-owner",f.source)).toMatchObject({revision:2,effects:[]});
     f.repo.close();
   });
 });

@@ -37,6 +37,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/actors\/[^/]+\/effects$/.test(path)) {
     return "/api/rpg/v1/actors/:actorId/effects";
   }
+  if (/^\/api\/rpg\/v1\/actors\/[^/]+\/effect-commands$/.test(path)) {
+    return "/api/rpg/v1/actors/:actorId/effect-commands";
+  }
   if (path === "/api/rpg/v1/content-packs" || path === "/api/rpg/v1/content-packs/validate") return path;
   if (/^\/api\/rpg\/v1\/content-packs\/[^/]+\/versions\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/content-packs/:packId/versions/:packVersion";

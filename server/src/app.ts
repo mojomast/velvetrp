@@ -75,11 +75,16 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
-  if (/^\/api\/rpg\/v1\/actors\/[^/]+\/effects$/.test(instance)) {
+  if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:effects|effect-commands)$/.test(instance)) {
+    const command = instance.endsWith("/effect-commands");
     return {
-      instance: "/api/rpg/v1/actors/:actorId/effects",
+      instance: command
+        ? "/api/rpg/v1/actors/:actorId/effect-commands"
+        : "/api/rpg/v1/actors/:actorId/effects",
       hasQuery,
-      queryDetail: method === "GET" ? "Actor effects do not accept query parameters" : null,
+      queryDetail: command
+        ? method === "POST" ? "Actor effect commands do not accept query parameters" : null
+        : method === "GET" ? "Actor effects do not accept query parameters" : null,
       mechanics: true,
       noStore: true,
     };
@@ -380,7 +385,8 @@ export function buildApp(options: {
         const isActorCheck = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/check-commands";
         const isActorPowers = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/powers"
           || normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/power-commands";
-        const isActorEffects = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/effects";
+        const isActorEffects = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/effects"
+          || normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/effect-commands";
         return sendApiProblem(request, reply, 404,
           isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
           isActorCheck ? "Actor check state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
@@ -451,16 +457,18 @@ export function buildApp(options: {
         instance: "/api/rpg/v1/campaign-imports/:importId/apply",
       });
     }
-    if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers|power-commands|effects)$/.test(instance)) {
+    if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers|power-commands|effects|effect-commands)$/.test(instance)) {
       reply.header("cache-control", "no-store");
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
-        instance: instance.endsWith("/effects")
-          ? "/api/rpg/v1/actors/:actorId/effects"
-          : instance.endsWith("/power-commands")
-          ? "/api/rpg/v1/actors/:actorId/power-commands"
-          : instance.endsWith("/powers")
-            ? "/api/rpg/v1/actors/:actorId/powers"
-            : "/api/rpg/v1/actors/:actorId/check-commands",
+        instance: instance.endsWith("/effect-commands")
+          ? "/api/rpg/v1/actors/:actorId/effect-commands"
+          : instance.endsWith("/effects")
+            ? "/api/rpg/v1/actors/:actorId/effects"
+            : instance.endsWith("/power-commands")
+              ? "/api/rpg/v1/actors/:actorId/power-commands"
+              : instance.endsWith("/powers")
+                ? "/api/rpg/v1/actors/:actorId/powers"
+                : "/api/rpg/v1/actors/:actorId/check-commands",
       });
     }
     return reply.code(404).send({

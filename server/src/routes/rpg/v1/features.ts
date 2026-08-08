@@ -128,7 +128,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
   Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
-  Partial<Pick<EffectRepository, "getActorEffectSnapshot">>,
+  Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -231,7 +231,7 @@ type RestLaneRepository = Pick<RestRepository, "takeRest">;
 type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
-type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot">;
+type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -349,7 +349,8 @@ function assertPowerRepository(repository: CampaignListRepository): asserts repo
     || typeof repository.useActorPower !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertEffectRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EffectLaneRepository {
-  if (typeof repository.getActorEffectSnapshot !== "function") throw new UnsupportedCampaignRepositoryError();
+  if (typeof repository.getActorEffectSnapshot !== "function"
+    || typeof repository.mutateActorEffect !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
