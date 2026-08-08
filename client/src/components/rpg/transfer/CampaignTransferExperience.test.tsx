@@ -48,6 +48,22 @@ describe("campaign import and export experience", () => {
     render(<CampaignImportWizard api={api} />); expect(screen.getByText(/earlier Apply outcome is unknown/)).toBeTruthy(); expect(api.apply).toHaveBeenCalledOnce();
   });
 
+  it("ignores a stale File.text completion and invalidates every earlier dry run", async () => {
+    let resolveFirst!: (value: string) => void; const firstText = new Promise<string>((resolve) => { resolveFirst = resolve; });
+    const api: CampaignImportApi = { dryRun: vi.fn().mockResolvedValue(report), apply: vi.fn() };
+    render(<CampaignImportWizard api={api} />); const input = screen.getByLabelText("Local Velvet export JSON");
+    const first = new File(["pending"], "first.json", { type: "application/json" }); Object.defineProperty(first, "text", { value: () => firstText });
+    const secondDocument = { ...documentValue, package: { ...documentValue.package, campaign: { ...documentValue.package.campaign, name: "Second" } } };
+    const second = new File([JSON.stringify(secondDocument)], "second.json", { type: "application/json" }); Object.defineProperty(second, "text", { value: () => Promise.resolve(JSON.stringify(secondDocument)) });
+    fireEvent.change(input, { target: { files: [first] } }); fireEvent.change(input, { target: { files: [second] } });
+    await screen.findByText("Selected: second.json"); resolveFirst(JSON.stringify(documentValue)); await Promise.resolve();
+    expect(screen.queryByText("Selected: first.json")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Create fresh dry-run/ })); await screen.findByText("Dry-run report ready");
+    const third = new File([JSON.stringify(documentValue)], "third.json", { type: "application/json" }); Object.defineProperty(third, "text", { value: () => Promise.resolve(JSON.stringify(documentValue)) });
+    fireEvent.change(input, { target: { files: [third] } }); await screen.findByText("Selected: third.json");
+    expect(screen.queryByText("Dry-run report ready")).toBeNull(); expect(screen.queryByRole("button", { name: "Apply as fresh campaign" })).toBeNull();
+  });
+
   it("shows the complete export review before fetching", async () => {
     const exportApi = { export: vi.fn().mockResolvedValue(documentValue) };
     vi.stubGlobal("URL", { createObjectURL: vi.fn(() => "blob:export"), revokeObjectURL: vi.fn() }); vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);

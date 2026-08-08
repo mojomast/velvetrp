@@ -8,6 +8,7 @@ import {
   campaignHistoryHttpEventsResponseSchema,
   campaignHistoryHttpForkRequestSchema,
   campaignHistoryHttpForkResponseSchema,
+  campaignHistoryHttpPublicReceiptResponseSchema,
   campaignHistoryHttpRecapRequestSchema,
   campaignHistoryHttpRecapResponseSchema,
   campaignHistoryHttpRecapSchema,
@@ -31,7 +32,7 @@ const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.
 type CampaignHistoryRepository = Pick<CampaignAdministrationRepository,
   "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents">;
+  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt">;
 
 export interface CampaignHistoryHttpOptions {
   campaignHistoryRepositoryAccessor: () => CampaignHistoryRepository;
@@ -134,9 +135,29 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
     const campaignId = prepare(request, reply, false, ["campaignId", "commandId"]); if (campaignId === null) return reply;
     if ((request.raw.url ?? request.url).includes("?")) return invalid(request, reply, "Campaign history does not accept query parameters");
     try {
-      const receipt = options.campaignHistoryRepositoryAccessor().getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
-      if (receipt === null) return unavailable(request, reply);
-      return reply.send({ receipt: publicReceipt(receipt, campaignId, request.params.commandId) });
+      const repository = options.campaignHistoryRepositoryAccessor();
+      // The command repository performs campaign membership and owner binding
+      // before returning its role-safe actor mechanic receipt.
+      const mechanic = repository.getCommandReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
+      if (mechanic !== null) {
+        const [event] = mechanic.events;
+        if (mechanic.campaignId !== campaignId || mechanic.commandId !== request.params.commandId
+          || mechanic.events.length !== 1 || !event || event.campaignId !== campaignId
+          || event.commandId !== request.params.commandId || event.revision !== mechanic.revisionAfter) {
+          throw new Error("mechanic receipt does not match request");
+        }
+        return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({ receipt: {
+          kind: "mechanic", revisionBefore: mechanic.revisionBefore, revisionAfter: mechanic.revisionAfter,
+          occurredAt: event.occurredAt, event: { type: event.type, data: event.data },
+        } }));
+      }
+      const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
+      if (administration === null) return unavailable(request, reply);
+      const safe = publicReceipt(administration, campaignId, request.params.commandId);
+      return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({ receipt: {
+        kind: "administration", type: safe.type, revisionBefore: safe.revisionBefore,
+        revisionAfter: safe.revisionAfter, occurredAt: safe.occurredAt,
+      } }));
     } catch (error) { return failure(request, reply, error); }
   });
 

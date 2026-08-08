@@ -92,7 +92,7 @@ import { campaignTransferHttpRoutes } from "./campaignTransfer.js";
 import type { CharacterBuilderRepository } from "../../../repo/characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../../../repo/characterProgressionRepo.js";
 import type { CampaignAdministrationRepository } from "../../../repo/campaignAdministrationRepo.js";
-import type { CampaignEventPage } from "../../../repo/campaign/campaignTypes.js";
+import type { CampaignEventPage, Repository } from "../../../repo/campaign/campaignTypes.js";
 import { questHttpRoutes } from "./questRoutes.js";
 import type { QuestRepository } from "../../../repo/questRepo.js";
 import { storyHttpRoutes } from "./storyRoutes.js";
@@ -152,7 +152,7 @@ export interface CampaignListRepository extends
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
   listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
-  getCommandReceipt?(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
+  getCommandReceipt?: Repository["getCommandReceipt"];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -235,7 +235,7 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps" | "getCampaignAdministrationReceipt"> & {
   listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
-  getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
+  getCommandReceipt: Repository["getCommandReceipt"];
 };
 type QuestLaneRepository = Pick<QuestRepository,
   "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;

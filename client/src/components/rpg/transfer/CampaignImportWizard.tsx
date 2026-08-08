@@ -21,20 +21,22 @@ export function CampaignImportWizard({ api, onImported = () => undefined }: Camp
   const [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [ambiguous, setAmbiguousState] = useState(ambiguousImport), [now, setNow] = useState(Date.now());
   const fileRef = useRef<HTMLInputElement>(null), dryRunRef = useRef<HTMLButtonElement>(null), statusRef = useRef<HTMLDivElement>(null);
-  const mounted = useRef(true), operation = useRef(0);
+  const mounted = useRef(true), operation = useRef(0), selectedFile = useRef<File | null>(null);
   useEffect(() => { mounted.current = true; const timer = window.setInterval(() => setNow(Date.now()), 15_000); return () => { mounted.current = false; operation.current += 1; window.clearInterval(timer); }; }, []);
   const expired = report !== null && now - report.createdAt > REPORT_MAX_AGE_MS;
   const applicable = report !== null && !expired && report.result.report.valid && report.result.report.conflicts.length === 0 && report.result.report.missingReferences.length === 0 && !ambiguous;
 
   async function chooseFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]; operation.current += 1; setPack(null); setReport(null); setFileName(""); setError(""); setNotice("");
+    const file = event.target.files?.[0]; const token = ++operation.current; selectedFile.current = file ?? null;
+    setPack(null); setReport(null); setFileName(""); setError(""); setNotice(""); setBusy(null);
     if (!file) return;
     if (file.size === 0 || file.size > MAX_CAMPAIGN_IMPORT_BYTES) { setError(`Choose a non-empty Velvet JSON export no larger than ${Math.floor(MAX_CAMPAIGN_IMPORT_BYTES / 1_000_000)} MB.`); queueMicrotask(() => fileRef.current?.focus()); return; }
     try {
       const parsed = campaignTransferHttpExportDocumentSchema.safeParse(JSON.parse(await file.text()) as unknown);
       if (!parsed.success) throw new Error("shape");
-      if (!mounted.current) return; setPack(parsed.data.package); setFileName(file.name); setNotice("Local file validated. Create a fresh dry-run report before Apply is available."); queueMicrotask(() => dryRunRef.current?.focus());
-    } catch { if (mounted.current) { setError("This file is not a valid, bounded Velvet campaign export document. Nothing was uploaded or changed."); queueMicrotask(() => fileRef.current?.focus()); } }
+      if (!mounted.current || token !== operation.current || selectedFile.current !== file) return;
+      setPack(parsed.data.package); setFileName(file.name); setNotice("Local file validated. Create a fresh dry-run report before Apply is available."); queueMicrotask(() => dryRunRef.current?.focus());
+    } catch { if (mounted.current && token === operation.current && selectedFile.current === file) { setError("This file is not a valid, bounded Velvet campaign export document. Nothing was uploaded or changed."); queueMicrotask(() => fileRef.current?.focus()); } }
   }
   async function dryRun() {
     if (!pack || busy) return; const token = ++operation.current; setBusy("dry-run"); setReport(null); setError(""); setNotice("");
@@ -57,7 +59,7 @@ export function CampaignImportWizard({ api, onImported = () => undefined }: Camp
       else { setError("The Apply outcome is unknown. It will not be replayed automatically, including after reload. Reconcile with the campaign library before clearing this lock."); queueMicrotask(() => statusRef.current?.focus()); }
     }
   }
-  function reconcile() { setAmbiguous(false); setAmbiguousState(false); setReport(null); setError("Import lock cleared after explicit reconciliation. Select the file and create a new dry run before another Apply."); if (fileRef.current) fileRef.current.value = ""; setPack(null); setFileName(""); queueMicrotask(() => fileRef.current?.focus()); }
+  function reconcile() { setAmbiguous(false); setAmbiguousState(false); setReport(null); setError("Import lock cleared after explicit reconciliation. Select the file and create a new dry run before another Apply."); if (fileRef.current) fileRef.current.value = ""; selectedFile.current = null; setPack(null); setFileName(""); queueMicrotask(() => fileRef.current?.focus()); }
   const result = report?.result.report;
   return <section className="transfer-panel" aria-labelledby="import-heading">
     <div className="admin-section-heading"><div><p className="eyebrow">FRESH CAMPAIGN ONLY</p><h2 id="import-heading">Import campaign</h2></div></div>

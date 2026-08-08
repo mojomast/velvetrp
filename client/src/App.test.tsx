@@ -89,6 +89,20 @@ describe("persistence and multi-character frontend", () => {
     render(<App/>);await screen.findByRole("heading",{name:"World explorer"});expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}")).toMatchObject({view:"campaign-world",campaignId:campaignAccess.id});fireEvent.click(screen.getByRole("button",{name:"← Campaign"}));await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(document.activeElement).toBe(screen.getByRole("button",{name:"World"})));
   });
 
+  it("restores campaign transfer and scopes Back focus to the destination campaign heading", async () => {
+    installFetch([aria], [], true, true, true); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-transfer", campaignId: campaignAccess.id }));
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/, handler: () => json(appCreationOptions) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ rooms: [], eligible: [] }) },
+    );
+    render(<App />); await screen.findByRole("heading", { name: "Import and export" }); fireEvent.click(screen.getByRole("button", { name: "← Campaign" }));
+    const destination = await screen.findByRole("heading", { name: campaignAccess.name }); await waitFor(() => expect(document.activeElement).toBe(destination));
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id });
+  });
+
   it("falls restored narrative studios back to campaign detail when the studio rollout is off",async()=>{
     installFetch([aria],[],true,true,false);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-story",campaignId:campaignAccess.id}));routes.push({method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)});render(<App/>);await screen.findByRole("heading",{name:campaignAccess.name});await waitFor(()=>expect(JSON.parse(localStorage.getItem("velvet.navigation.v1")??"{}").view).toBe("campaign-detail"));expect(screen.queryByRole("button",{name:"Story studio"})).toBeNull();
   });

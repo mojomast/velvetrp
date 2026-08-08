@@ -64,6 +64,39 @@ export const campaignHistoryHttpCommandReceiptSchema = z.object({
   }
 });
 
+/**
+ * A receipt opened from the history log. Unlike mutation receipts, this
+ * projection contains no command/event/campaign/actor/source-turn identities
+ * and no generic administration payload. Only reviewed mechanic result data
+ * or administration metadata crosses the read boundary.
+ */
+export const campaignHistoryHttpPublicMechanicEventSchema = z.discriminatedUnion("type", [
+  actorAttributeSetEventSchema.pick({ type: true, data: true }),
+  actorResourceInitializedEventSchema.pick({ type: true, data: true }),
+  actorDiceRolledEventSchema.pick({ type: true, data: true }),
+]);
+export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("mechanic"),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+    event: campaignHistoryHttpPublicMechanicEventSchema,
+  }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
+    "receipt revision must advance once"),
+  z.object({
+    kind: z.literal("administration"),
+    type: campaignAdministrationEventTypeSchema,
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+  }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
+    "receipt revision must advance once"),
+]);
+export const campaignHistoryHttpPublicReceiptResponseSchema = z.object({
+  receipt: campaignHistoryHttpPublicReceiptSchema,
+}).strict();
+
 export const campaignHistoryHttpCheckpointSchema = campaignCheckpointSchema.omit({ campaignId: true });
 export const campaignHistoryHttpCheckpointRequestSchema = createCampaignCheckpointInputSchema;
 export const campaignHistoryHttpCheckpointResponseSchema = z.object({
@@ -91,6 +124,8 @@ export type CampaignHistoryHttpEventsQuery = z.infer<typeof campaignHistoryHttpE
 export type CampaignHistoryHttpEventsResponse = z.infer<typeof campaignHistoryHttpEventsResponseSchema>;
 export type CampaignHistoryHttpAdministrationEvent = z.infer<typeof campaignHistoryHttpAdministrationEventSchema>;
 export type CampaignHistoryHttpCommandReceipt = z.infer<typeof campaignHistoryHttpCommandReceiptSchema>;
+export type CampaignHistoryHttpPublicReceipt = z.infer<typeof campaignHistoryHttpPublicReceiptSchema>;
+export type CampaignHistoryHttpPublicReceiptResponse = z.infer<typeof campaignHistoryHttpPublicReceiptResponseSchema>;
 export type CampaignHistoryHttpCheckpoint = z.infer<typeof campaignHistoryHttpCheckpointSchema>;
 export type CampaignHistoryHttpCheckpointRequest = z.infer<typeof campaignHistoryHttpCheckpointRequestSchema>;
 export type CampaignHistoryHttpCheckpointResponse = z.infer<typeof campaignHistoryHttpCheckpointResponseSchema>;

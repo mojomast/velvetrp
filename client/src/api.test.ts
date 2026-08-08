@@ -2,9 +2,27 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
 import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog, getCombatState, resolveCombatAction } from "./api";
 import { commandQuest, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
+import { getCampaignCommandReceipt } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M3.8 public campaign receipt API binding", () => {
+  it("reads an exact no-store mechanic receipt projection", async () => {
+    const receipt = { kind: "mechanic", revisionBefore: 0, revisionAfter: 1,
+      occurredAt: "2030-01-01T00:00:00.000Z", event: { type: "actor_attribute_set",
+        data: { attributeId: "strength", valueBefore: 10, valueAfter: 12 } } };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ receipt }), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignCommandReceipt("campaign", "command")).resolves.toEqual({ receipt });
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign/commands/command/receipt", expect.objectContaining({ cache: "no-store" }));
+  });
+  it("rejects generic or identity-bearing receipt success bodies", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ receipt: { kind: "mechanic", commandId: "command",
+      revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z",
+      event: { type: "actor_attribute_set", data: { attributeId: "strength", valueBefore: 10, valueAfter: 12 } } } }), { status: 200 })));
+    await expect(getCampaignCommandReceipt("campaign", "command")).rejects.toThrow();
+  });
 });
 
 describe("M2.10 world, cast, quest, and story API bindings",()=>{

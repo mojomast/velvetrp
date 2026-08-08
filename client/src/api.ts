@@ -14,7 +14,6 @@ import {
   campaignHistoryHttpCheckpointRequestSchema,
   campaignHistoryHttpCheckpointResponseSchema,
   campaignHistoryHttpCheckpointSchema,
-  campaignHistoryHttpCommandReceiptSchema,
   campaignHistoryHttpEventsQuerySchema,
   campaignHistoryHttpEventsResponseSchema,
   campaignHistoryHttpForkRequestSchema,
@@ -22,6 +21,7 @@ import {
   campaignHistoryHttpRecapRequestSchema,
   campaignHistoryHttpRecapResponseSchema,
   campaignHistoryHttpRecapSchema,
+  campaignHistoryHttpPublicReceiptResponseSchema,
   campaignHistoryHttpTimelinesResponseSchema,
   campaignTransferHttpApplyRequestSchema,
   campaignTransferHttpApplyResponseSchema,
@@ -43,7 +43,6 @@ import type {
   CampaignHistoryHttpCheckpoint,
   CampaignHistoryHttpCheckpointRequest,
   CampaignHistoryHttpCheckpointResponse,
-  CampaignHistoryHttpCommandReceipt,
   CampaignHistoryHttpEventsQuery,
   CampaignHistoryHttpEventsResponse,
   CampaignHistoryHttpForkRequest,
@@ -51,6 +50,7 @@ import type {
   CampaignHistoryHttpRecap,
   CampaignHistoryHttpRecapRequest,
   CampaignHistoryHttpRecapResponse,
+  CampaignHistoryHttpPublicReceiptResponse,
   CampaignHistoryHttpTimelinesResponse,
   CampaignTransferHttpApplyRequest,
   CampaignTransferHttpApplyResponse,
@@ -1631,18 +1631,12 @@ export async function listCampaignEvents(
   return response;
 }
 
-export async function getCampaignCommandReceipt(campaignId: string, commandId: string): Promise<{ receipt: CampaignHistoryHttpCommandReceipt }> {
+export async function getCampaignCommandReceipt(campaignId: string, commandId: string): Promise<CampaignHistoryHttpPublicReceiptResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const command = parseApiInput(() => resourceIdSchema.parse(commandId));
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/commands/${encodeURIComponent(command)}/receipt`, { cache: "no-store" });
   if (success.status !== 200) throw new Error("Campaign receipt response did not use the documented status");
-  const value = success.body;
-  if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).join(",") !== "receipt") {
-    throw new Error("Campaign receipt response was malformed");
-  }
-  const receipt = campaignHistoryHttpCommandReceiptSchema.parse((value as { receipt: unknown }).receipt);
-  if (receipt.commandId !== command || receipt.events[0].commandId !== command) throw new Error("Campaign receipt did not match the requested command");
-  return { receipt };
+  return campaignHistoryHttpPublicReceiptResponseSchema.parse(success.body);
 }
 
 export async function listCampaignRecaps(campaignId: string): Promise<{ recaps: CampaignHistoryHttpRecap[] }> {
