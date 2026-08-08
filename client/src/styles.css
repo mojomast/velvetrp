@@ -193,6 +193,22 @@ body {
 .validation-issues button { width: 100%; min-height: 44px; display: grid; gap: 6px; text-align: left; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
 .validation-issues code { color: #d2bdfd; overflow-wrap: anywhere; }
 .validation-ready { margin: 0; color: #94e0b5; }
+.content-pack-editor { display: grid; gap: 20px; }
+.content-pack-editor fieldset { margin: 0; padding: 17px; border: 1px solid var(--border); border-radius: 10px; }
+.content-pack-editor legend { padding: 0 7px; font-weight: 700; }
+.content-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.content-editor-wide { grid-column: 1 / -1; }
+.content-editor-wide .field { width: 100%; }
+.locked-value { margin: 14px 0 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.definition-editor { display: grid; gap: 13px; }
+.definition-editor > h3 { margin: 0; }
+.definition-kind { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: rgba(31,30,39,.6); }
+.definition-kind h4 { margin: 0; text-transform: capitalize; }
+.definition-kind h4 span { color: var(--muted); font-size: 12px; }
+.definition-json { display: grid; gap: 8px; color: var(--muted); font-size: 12px; }
+.definition-json textarea { width: 100%; min-height: 180px; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.content-empty { margin: 0; color: var(--muted); }
+.content-validate { min-height: 44px; justify-self: start; }
 .starter-setup { display: grid; gap: 16px; margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
 .starter-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .starter-heading h2 { margin: 0; font-size: 20px; }
@@ -648,6 +664,9 @@ button:disabled {
   .membership-list select, .membership-list button, .checkpoint-list button, .admin-status button { width: 100%; }
   .content-studio-heading { flex-direction: column; }
   .validation-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .content-editor-grid { grid-template-columns: 1fr; }
+  .content-editor-wide { grid-column: auto; }
+  .content-validate { width: 100%; }
   .roster-open { width: 100%; }
   .dice-form { grid-template-columns: 1fr; }
   .dice-form .primary { width: 100%; }
