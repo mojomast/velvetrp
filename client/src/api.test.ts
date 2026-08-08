@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
 import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog, getCombatState, resolveCombatAction } from "./api";
-import { commandQuest, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
+import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
 
 afterEach(() => {
@@ -25,6 +25,82 @@ describe("M3.8 public campaign receipt API binding", () => {
   });
 });
 
+describe("missing audited RPG command wrappers", () => {
+  const occurredAt = "2030-01-01T00:00:00.000Z";
+  const terms = [
+    { kind: "roll", roll: { expression: "1d20", normalized: { count: 1, sides: 20, selection: { type: "all" }, modifier: 0 }, terms: [{ value: 10, kept: true }], modifier: 0, total: 10 } },
+    { kind: "flat", sourceId: null, value: 3 },
+  ];
+
+  it("submits and binds ability, skill, save, attack, and opposed checks", async () => {
+    const inputs = [
+      { kind: "ability" as const, skillOrAttribute: "might", difficultyRef: "hard" as const, expectedRevision: 0, idempotencyKey: "ability" },
+      { kind: "skill" as const, skillOrAttribute: "lore", expectedRevision: 1, idempotencyKey: "skill" },
+      { kind: "save" as const, skillOrAttribute: "resolve", expectedRevision: 2, idempotencyKey: "save" },
+      { kind: "attack" as const, skillOrAttribute: "blade", targetActorId: "target", expectedRevision: 3, idempotencyKey: "attack" },
+      { kind: "opposed" as const, skillOrAttribute: "insight", targetActorId: "target", expectedRevision: 4, idempotencyKey: "opposed" },
+    ];
+    const fetchMock = vi.fn();
+    for (const input of inputs) fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+      check: { terms, modifier: 3, total: 13, target: input.kind === "opposed" ? { kind: "opposed_total", actorId: "target", value: 12 } : { kind: "difficulty_class", value: 12 }, outcome: "success" },
+      receipt: { idempotencyKey: input.idempotencyKey, revisionBefore: input.expectedRevision, revisionAfter: input.expectedRevision + 1, occurredAt },
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    for (const input of inputs) await expect(commandActorCheck("source:actor", input)).resolves.toMatchObject({ receipt: { idempotencyKey: input.idempotencyKey } });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    for (const [url, init] of fetchMock.mock.calls) {
+      expect(url).toBe("/api/rpg/v1/actors/source%3Aactor/check-commands");
+      expect(init).toEqual(expect.objectContaining({ method: "POST", cache: "no-store" }));
+    }
+    expect(JSON.parse((fetchMock.mock.calls[4]?.[1] as RequestInit).body as string)).toEqual(inputs[4]);
+  });
+
+  it("rejects malformed, actor-target/revision/idempotency mismatched, and non-200 check results", async () => {
+    const input = { kind: "opposed" as const, skillOrAttribute: "insight", targetActorId: "target", expectedRevision: 4, idempotencyKey: "opposed" };
+    const response = { check: { terms, modifier: 3, total: 13, target: { kind: "opposed_total", actorId: "other", value: 12 }, outcome: "success" }, receipt: { idempotencyKey: "other", revisionBefore: 3, revisionAfter: 4, occurredAt } };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...response, check: { ...response.check, target: { kind: "opposed_total", actorId: "target", value: 12 } }, receipt: { ...response.receipt, idempotencyKey: "opposed", revisionBefore: 4, revisionAfter: 5 } }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(commandActorCheck("source", input)).rejects.toThrow(/did not match/);
+    await expect(commandActorCheck("source", input)).rejects.toThrow(/documented status/);
+    await expect(commandActorCheck("bad/id", input)).rejects.toBeInstanceOf(ApiInputError);
+    await expect(commandActorCheck("source", { ...input, extra: true } as typeof input)).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  function detachResponse(sessionId: string, revisionBefore = 7) {
+    const receipt = { commandId: "command", campaignId: "campaign", type: "room_detached", revisionBefore, revisionAfter: revisionBefore + 1, occurredAt,
+      events: [{ eventId: "event", commandId: "command", campaignId: "campaign", type: "room_detached", revision: revisionBefore + 1, occurredAt, data: { sessionId } }] };
+    return { attachment: { sessionId, attachedAt: occurredAt }, receipt };
+  }
+
+  it("detaches an opaque session with exact path/body and audited event binding", async () => {
+    const sessionId = "room/%2F exact";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(detachResponse(sessionId)), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(detachCampaignRoom("campaign", sessionId, { expectedRevision: 7, idempotencyKey: "detach-key" })).resolves.toMatchObject({ attachment: { sessionId } });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("/api/rpg/v1/campaigns/campaign/rooms/room%2F%252F%20exact");
+    expect(init).toEqual(expect.objectContaining({ method: "DELETE", cache: "no-store" }));
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ expectedRevision: 7, idempotencyKey: "detach-key" });
+  });
+
+  it("rejects malformed detach input/body, mismatched path receipt, and non-200 success", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(detachResponse("other")), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(detachResponse("room")), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...detachResponse("room"), extra: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(detachCampaignRoom("campaign", "room", { expectedRevision: 7, idempotencyKey: "detach-key" })).rejects.toThrow(/did not match/);
+    await expect(detachCampaignRoom("campaign", "room", { expectedRevision: 7, idempotencyKey: "detach-key" })).rejects.toThrow(/documented status/);
+    await expect(detachCampaignRoom("campaign", "room", { expectedRevision: 7, idempotencyKey: "detach-key" })).rejects.toThrow();
+    await expect(detachCampaignRoom("campaign", "", { expectedRevision: 7, idempotencyKey: "detach-key" })).rejects.toBeInstanceOf(ApiInputError);
+    await expect(detachCampaignRoom("campaign", "room", { expectedRevision: -1, idempotencyKey: "detach-key" })).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe("M2.10 world, cast, quest, and story API bindings",()=>{
   const at="2030-01-01T00:00:00.000Z";
   it("requires no-store role-union reads and authoritative revision headers",async()=>{const fetchMock=vi.fn()
@@ -33,7 +109,7 @@ describe("M2.10 world, cast, quest, and story API bindings",()=>{
     .mockResolvedValueOnce(new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"4"}}))
     .mockResolvedValueOnce(new Response(JSON.stringify({quests:[],objectives:[],journal:[]}),{status:200,headers:{"x-quest-revision":"5"}}))
     .mockResolvedValueOnce(new Response(JSON.stringify({visibleNodes:[],discoveredClues:[]}),{status:200,headers:{"x-story-revision":"6"}}));vi.stubGlobal("fetch",fetchMock);
-    await getCampaignWorld("campaign");await listCampaignNpcs("campaign","player");await listCampaignFactions("campaign","player");await listCampaignQuests("campaign");await getCampaignStory("campaign");
+    await getCampaignWorld("campaign");await listCampaignNpcs("campaign","player");await listCampaignFactions("campaign","player");await listCampaignQuests("campaign","player");await getCampaignStory("campaign","player");
     expect(fetchMock.mock.calls.map(([path,init])=>[path,(init as RequestInit).cache])).toEqual([["/api/rpg/v1/campaigns/campaign/world","no-store"],["/api/rpg/v1/campaigns/campaign/npcs","no-store"],["/api/rpg/v1/campaigns/campaign/factions","no-store"],["/api/rpg/v1/campaigns/campaign/quests","no-store"],["/api/rpg/v1/campaigns/campaign/story","no-store"]]);
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200})));await expect(listCampaignNpcs("campaign","player")).rejects.toThrow(/x-world-revision/);
   });
@@ -44,6 +120,7 @@ describe("M2.10 world, cast, quest, and story API bindings",()=>{
   });
   it("constructs player previews with private union fields structurally absent",()=>{const npc=projectNpcsForPlayers({npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"secret",gmNotes:"secret",merchantState:null},createdAt:at}],relationships:[]});expect(npc.npcs[0]).toEqual({npcId:"npc",publicState:{name:"Mira"},createdAt:at});const faction=projectFactionsForPlayers({factions:[{factionId:"f",name:"Hidden",publicState:{description:"secret"},privateState:{gmNotes:"secret",visibility:"gm"},createdAt:at}],standings:[]});expect(faction.factions).toEqual([]);const quests=projectQuestsForPlayers({quests:[{questId:"q",campaignId:"campaign",storylineId:"secret",title:"Known",description:null,status:"active",rewards:[],createdAt:at,updatedAt:at}],objectives:[],journal:[]});expect(quests.quests[0]).not.toHaveProperty("storylineId");const story=projectStoryForPlayers({storylines:[{storylineId:"line",campaignId:"campaign",title:"Private",summary:null,status:"active",createdAt:at,updatedAt:at}],nodes:[{nodeId:"node",storylineId:"line",title:"Hidden",description:null,gmNotes:"secret",status:"hidden",revealThreshold:1,createdAt:at,updatedAt:at}],edges:[],plotPoints:[],clues:[]});expect(story).toEqual({visibleNodes:[],discoveredClues:[]});});
   it("selects NPC and faction empty-array audience from authorization instead of union guessing",async()=>{const gmNpc={npcs:[{npcId:"npc",personaId:"persona",publicState:{name:"Mira"},privateState:{goals:"",gmNotes:"",merchantState:null},createdAt:at}],relationships:[]};vi.stubGlobal("fetch",vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify(gmNpc),{status:200,headers:{"x-world-revision":"1"}}))));await expect(listCampaignNpcs("campaign","player")).rejects.toThrow();await expect(listCampaignNpcs("campaign","gm")).resolves.toMatchObject({data:gmNpc});});
+  it("requires authoritative audience for ambiguous quest/story reads and GM story writes",async()=>{const gmQuests={quests:[{questId:"quest",campaignId:"campaign",storylineId:"line",title:"Quest",description:null,status:"active",rewards:[],createdAt:at,updatedAt:at}],objectives:[],journal:[]};const gmStory={storylines:[{storylineId:"line",campaignId:"campaign",title:"Arc",summary:null,status:"active",createdAt:at,updatedAt:at}],nodes:[],edges:[],plotPoints:[{plotPointId:"point",storylineId:"line",nodeId:"node",question:"Who?",answer:"Mira",gmNotes:null,answered:true,playerAnswer:"Tala",answeredAt:at}],clues:[]};const receipt={idempotencyKey:"answer",revisionBefore:2,revisionAfter:3,occurredAt:at};const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(gmQuests),{status:200,headers:{"x-quest-revision":"2"}})).mockResolvedValueOnce(new Response(JSON.stringify(gmStory),{status:200,headers:{"x-story-revision":"2"}})).mockResolvedValueOnce(new Response(JSON.stringify({story:gmStory,receipt}),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify({story:{visibleNodes:[],discoveredClues:[]},receipt}),{status:200}));vi.stubGlobal("fetch",fetchMock);await expect(listCampaignQuests("campaign","gm")).resolves.toMatchObject({data:gmQuests});await expect(getCampaignStory("campaign","gm")).resolves.toMatchObject({data:gmStory});const input={kind:"answer-plot-point" as const,targetId:"point",data:{answer:"Tala"},expectedRevision:2,idempotencyKey:"answer"};await expect(commandStoryline("line",input)).resolves.toMatchObject({story:gmStory});await expect(commandStoryline("line",input)).rejects.toThrow();expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/rpg/v1/storylines/line/commands");});
   it("deeply binds complete quest and story creation definitions",async()=>{const receipt={idempotencyKey:"create",revisionBefore:0,revisionAfter:1,occurredAt:at};const questRequest={quest:{questId:"quest",storylineId:"line",title:"Gate",description:"Desc",visibility:"public" as const,objectives:[{objectiveId:"objective",description:"Open",targetProgress:2,dependencyObjectiveIds:[],visibility:"public" as const}],rewards:[{rewardId:"reward",kind:"xp" as const,amount:10,label:"XP",visibility:"public" as const}],journalText:"Started"},expectedRevision:0,idempotencyKey:"create"};const quest={questId:"quest",campaignId:"campaign",storylineId:"line",title:"Gate",description:"Desc",status:"offered",rewards:[{rewardId:"reward",kind:"xp",amount:10,label:"XP",claimedByActorId:null,claimedAt:null}],createdAt:at,updatedAt:at};const projection={quests:[quest],objectives:[{objectiveId:"objective",questId:"quest",description:"Open",targetProgress:2,progress:0,dependencyObjectiveIds:[],completedAt:null}],journal:[{entryId:"entry",questId:"quest",text:"Started",occurredAt:at}]};const storyRequest={storyline:{storylineId:"line",title:"Arc",summary:"Summary",nodes:[{nodeId:"node",title:"Gate",description:"Visible",gmNotes:"Secret",revealThreshold:0}],edges:[],plotPoints:[],clues:[]},expectedRevision:0,idempotencyKey:"create"};const storyline={storylineId:"line",campaignId:"campaign",title:"Arc",summary:"Summary",status:"active",createdAt:at,updatedAt:at};const story={storylines:[storyline],nodes:[{...storyRequest.storyline.nodes[0],storylineId:"line",status:"hidden",createdAt:at,updatedAt:at}],edges:[],plotPoints:[],clues:[]};const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({quest,definition:questRequest.quest,projection,revision:1,receipt}),{status:201})).mockResolvedValueOnce(new Response(JSON.stringify({storyline,story,receipt}),{status:201}));vi.stubGlobal("fetch",fetchMock);await expect(createCampaignQuest("campaign",questRequest)).resolves.toMatchObject({projection});await expect(createCampaignStoryline("campaign",storyRequest)).resolves.toMatchObject({story});expect(fetchMock).toHaveBeenCalledTimes(2)});
 });
 
@@ -130,6 +207,14 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
     const body = { resolution: { actionId: "resolved", legalActionId: "other", kind: "attack", actingCombatantId: "one", targetIds: ["two"], outcomes: [{ kind: "damage", targetId: "two", damageType: "physical", requested: 1, applied: 1, hitPointsBefore: 2, hitPointsAfter: 1, statusBefore: "active", statusAfter: "active" }], roundBefore: 1, roundAfter: 1, currentCombatantBefore: "one", currentCombatantAfter: "two" }, combat: { combatId: "combat", ...combat, revision: 3 }, receipt: { idempotencyKey: "key", revisionBefore: 2, revisionAfter: 3, occurredAt: "2030-01-01T00:00:00.000Z" } };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })));
     await expect(resolveCombatAction("combat", { legalActionId: "attack", targetIds: ["two"], choices: [], expectedRevision: 2, idempotencyKey: "key" })).rejects.toThrow(/did not match/);
+  });
+
+  it("accepts an exact successful combat action wire result", async () => {
+    const body = { resolution: { actionId: "resolved", legalActionId: "attack", kind: "attack", actingCombatantId: "one", targetIds: ["two"], outcomes: [{ kind: "damage", targetId: "two", damageType: "physical", requested: 1, applied: 1, hitPointsBefore: 2, hitPointsAfter: 1, statusBefore: "active", statusAfter: "active" }], roundBefore: 1, roundAfter: 1, currentCombatantBefore: "one", currentCombatantAfter: "two" }, combat: { combatId: "combat", ...combat, revision: 3 }, receipt: { idempotencyKey: "key", revisionBefore: 2, revisionAfter: 3, occurredAt: "2030-01-01T00:00:00.000Z" } };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(resolveCombatAction("combat", { legalActionId: "attack", targetIds: ["two"], choices: [], expectedRevision: 2, idempotencyKey: "key" })).resolves.toEqual(body);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/combats/combat/action-commands", expect.objectContaining({ method: "POST", cache: "no-store" }));
   });
 
   it("rejects malformed success statuses before accepting a body", async () => {
@@ -772,6 +857,24 @@ describe("HTTP runtime contracts", () => {
     expect(fetch).toHaveBeenCalledOnce();
   });
 
+  it("directly binds administration update and destructive archive wrappers", async () => {
+    const at = "2030-01-02T00:00:00.000Z";
+    const settings = { maxPlayers: 6, allowPlayerDice: true, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } as const;
+    const receipt = { commandId: "command-one", campaignId: "campaign-one", type: "administration_updated", revisionBefore: 4, revisionAfter: 5, occurredAt: at,
+      events: [{ eventId: "event-one", commandId: "command-one", campaignId: "campaign-one", type: "administration_updated", revision: 5, occurredAt: at, data: {} }] };
+    const campaign = { id: "campaign-one", status: "paused", activeTimelineId: "timeline", revision: 5, updatedAt: at, actorRole: "owner", settings };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ campaign, receipt }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ campaign: { ...campaign, status: "archived" }, receipt }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(updateCampaignAdministration("campaign-one", { status: "paused", expectedRevision: 4, idempotencyKey: "pause" })).resolves.toMatchObject({ campaign: { status: "paused" } });
+    await expect(archiveCampaignAdministration("campaign-one", { confirmationName: "Road", expectedRevision: 4, idempotencyKey: "archive" })).resolves.toMatchObject({ campaign: { status: "archived" } });
+    expect(fetchMock.mock.calls.map(([path, init]) => [path, (init as RequestInit).method, (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/campaigns/campaign-one/administration", "PATCH", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign-one/administration", "DELETE", "no-store"],
+    ]);
+  });
+
   it("binds membership role and exact operation receipts and distinguishes invalid local input", async () => {
     const at = "2030-01-02T00:00:00.000Z";
     const receipt = (type: "membership_added" | "membership_role_changed") => ({
@@ -781,6 +884,7 @@ describe("HTTP runtime contracts", () => {
     });
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ membership: { principalId: "member-one", role: "player", createdAt: at }, receipt: receipt("membership_added") }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ membership: { principalId: "member-one", role: "gm", createdAt: at }, receipt: receipt("membership_added") }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ membership: { principalId: "member-one", role: "gm", createdAt: at }, receipt: receipt("membership_added") }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -788,9 +892,12 @@ describe("HTTP runtime contracts", () => {
       .rejects.toThrow(/did not match/);
     await expect(updateCampaignAdministrationMembership("campaign-one", "member-one", { role: "gm", expectedRevision: 4, idempotencyKey: "role-one" }))
       .rejects.toThrow(/did not match/);
+    await expect(addCampaignAdministrationMembership("campaign-one", { principalId: "member-one", role: "gm", expectedRevision: 4, idempotencyKey: "add-one" }))
+      .resolves.toMatchObject({ membership: { principalId: "member-one", role: "gm" }, receipt: { type: "membership_added" } });
     await expect(addCampaignAdministrationMembership("campaign-one", { principalId: "bad/id", role: "gm", expectedRevision: 4, idempotencyKey: "bad" }))
       .rejects.toBeInstanceOf(ApiInputError);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({ method: "POST", cache: "no-store" }));
   });
 
   it("requires a strict checkpoint envelope and binds checkpoint resource and event data", async () => {
@@ -803,12 +910,15 @@ describe("HTTP runtime contracts", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoints: [], extra: true }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint: { ...checkpoint, createdAt: "2030-01-03T00:00:00.000Z" }, receipt }), { status: 201 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint, receipt: { ...receipt, events: [{ ...receipt.events[0], data: { ...receipt.events[0].data, label: "Wrong" } }] } }), { status: 201 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint, receipt: { ...receipt, events: [{ ...receipt.events[0], data: { ...receipt.events[0].data, label: "Wrong" } }] } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint, receipt }), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listCampaignCheckpoints("campaign-one")).rejects.toThrow(/malformed/);
     await expect(createCampaignCheckpoint("campaign-one", input)).rejects.toThrow(/did not match/);
     await expect(createCampaignCheckpoint("campaign-one", input)).rejects.toThrow(/did not match/);
+    await expect(createCampaignCheckpoint("campaign-one", input)).resolves.toEqual({ checkpoint, receipt });
+    expect(fetchMock.mock.calls[3]?.[1]).toEqual(expect.objectContaining({ method: "POST", cache: "no-store" }));
   });
 
   it("binds a fork receipt to the requested checkpoint and exact timeline ancestry", async () => {
@@ -822,13 +932,15 @@ describe("HTTP runtime contracts", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ timeline, receipt }), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ timeline: { ...timeline, parentTimelineId: checkpoint.timelineId }, receipt: { ...receipt,
-        events: [{ ...receipt.events[0], data: { checkpointId: "checkpoint-other" } }] } }), { status: 201 }));
+        events: [{ ...receipt.events[0], data: { checkpointId: "checkpoint-other" } }] } }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ timeline: { ...timeline, parentTimelineId: checkpoint.timelineId }, receipt }), { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(forkCampaignTimeline("campaign-one", input, checkpoint)).rejects.toThrow(/did not match/);
     await expect(forkCampaignTimeline("campaign-one", input, checkpoint)).rejects.toThrow(/did not match/);
+    await expect(forkCampaignTimeline("campaign-one", input, checkpoint)).resolves.toMatchObject({ timeline: { parentTimelineId: "timeline-one", active: true } });
     await expect(forkCampaignTimeline("campaign-one", input, { ...checkpoint, id: "checkpoint-other" })).rejects.toBeInstanceOf(ApiInputError);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("decodes structured API problems without breaking legacy fields", async () => {

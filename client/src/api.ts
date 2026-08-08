@@ -9,6 +9,8 @@ import {
   campaignAdministrationHttpMembershipListResponseSchema,
   campaignAdministrationHttpMembershipMutationResponseSchema,
   campaignAdministrationHttpMembershipUpdateRequestSchema,
+  campaignAdministrationHttpRoomDetachRequestSchema,
+  campaignAdministrationHttpRoomDetachResponseSchema,
   campaignAdministrationHttpPatchRequestSchema,
   campaignAdministrationHttpPatchResponseSchema,
   campaignHistoryHttpCheckpointRequestSchema,
@@ -37,6 +39,8 @@ import type {
   CampaignAdministrationHttpMembershipListResponse,
   CampaignAdministrationHttpMembershipMutationResponse,
   CampaignAdministrationHttpMembershipUpdateRequest,
+  CampaignAdministrationHttpRoomDetachRequest,
+  CampaignAdministrationHttpRoomDetachResponse,
   CampaignAdministrationHttpPatchRequest,
   CampaignAdministrationHttpPatchResponse,
   CampaignAdministrationHttpResponse,
@@ -59,7 +63,8 @@ import type {
   CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
 import {
-  actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, campaignQuestsHttpResponseSchema, campaignStoryHttpResponseSchema,
+  actorCheckCommandRequestSchema, actorCheckCommandResponseSchema,
+  actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, gmCampaignQuestsHttpResponseSchema, gmCampaignStoryHttpResponseSchema,
   campaignWorldHttpResponseSchema, createCampaignFactionHttpRequestSchema, createCampaignFactionHttpResponseSchema,
   createCampaignNpcHttpRequestSchema, createCampaignNpcHttpResponseSchema, createCampaignQuestHttpRequestSchema,
   createCampaignQuestHttpResponseSchema, createCampaignStorylineHttpRequestSchema,
@@ -71,7 +76,8 @@ import {
   storylineCommandHttpRequestSchema, storylineCommandHttpResponseSchema,
 } from "@velvet/contracts";
 import type {
-  ActorTravelCommandRequest, ActorTravelCommandResponse, CampaignQuestsHttpResponse, CampaignStoryHttpResponse,
+  ActorCheckCommandRequest, ActorCheckCommandResponse, ActorTravelCommandRequest, ActorTravelCommandResponse,
+  CampaignQuestsHttpResponse, CampaignStoryHttpResponse,
   CampaignWorldHttpResponse, CreateCampaignFactionHttpRequest, CreateCampaignNpcHttpRequest,
   CreateCampaignQuestHttpRequest, CreateCampaignStorylineHttpRequest, FactionReputationCommandHttpRequest,
   NpcRelationshipCommandHttpRequest, QuestCommandHttpRequest, StorylineCommandHttpRequest,
@@ -80,6 +86,10 @@ import type {
 
 export type CampaignNpcsHttpResponse = GmCampaignNpcsHttpResponse | PlayerCampaignNpcsHttpResponse;
 export type CampaignFactionsHttpResponse = GmCampaignFactionsHttpResponse | PlayerCampaignFactionsHttpResponse;
+export type GmCampaignQuestsHttpResponse = ReturnType<typeof gmCampaignQuestsHttpResponseSchema.parse>;
+export type PlayerCampaignQuestsHttpResponse = ReturnType<typeof playerCampaignQuestsHttpResponseSchema.parse>;
+export type GmCampaignStoryHttpResponse = ReturnType<typeof gmCampaignStoryHttpResponseSchema.parse>;
+export type PlayerCampaignStoryHttpResponse = ReturnType<typeof playerCampaignStoryHttpResponseSchema.parse>;
 import {
   actorEffectCommandRequestSchema,
   actorEffectCommandResponseSchema,
@@ -410,7 +420,11 @@ export async function errorFromResponse(res: Response): Promise<ApiError> {
   return new ApiError(res.status, message, violations, sessionStopped, problem, res.headers.get("x-request-id"));
 }
 
-async function requestResponse<T>(path: string, init?: RequestInit): Promise<{ body: T; status: number; headers: Headers }> {
+async function requestResponse<T>(
+  path: string,
+  init?: RequestInit,
+  expected?: { status: number; message: string },
+): Promise<{ body: T; status: number; headers: Headers }> {
   const headers = new Headers(init?.headers);
   if (init?.body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
@@ -423,6 +437,9 @@ async function requestResponse<T>(path: string, init?: RequestInit): Promise<{ b
   if (!res.ok) {
     throw await errorFromResponse(res);
   }
+  // Mutations may require status confirmation before touching an untrusted
+  // success body. This still uses the shared fetch/error/header boundary.
+  if (expected !== undefined && res.status !== expected.status) throw new Error(expected.message);
 
   return { body: (await res.json()) as T, status: res.status, headers: res.headers };
 }
@@ -866,31 +883,39 @@ export async function getFeatures(): Promise<FeatureFlags> {
 }
 
 export async function getRpgFeatures(): Promise<RpgFeatures> {
-  return rpgFeatureFlagsSchema.parse(await request<unknown>("/rpg/v1/features"));
+  const success = await requestResponse<unknown>("/rpg/v1/features", { cache: "no-store" });
+  requireStatus(success, 200, "RPG feature read");
+  return rpgFeatureFlagsSchema.parse(success.body);
 }
 
 export async function listCampaigns(): Promise<CampaignListResponse> {
-  return campaignListResponseSchema.parse(await request<unknown>("/rpg/v1/campaigns"));
+  const success = await requestResponse<unknown>("/rpg/v1/campaigns", { cache: "no-store" });
+  requireStatus(success, 200, "Campaign list");
+  return campaignListResponseSchema.parse(success.body);
 }
 
 export async function getCampaignDetail(campaignId: string): Promise<CampaignDetailResponse> {
   // Validate before interpolation; IDs are opaque and are never normalized or trimmed.
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const response = campaignDetailResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`,
     { cache: "no-store" },
-  ));
+  );
+  requireStatus(success, 200, "Campaign detail");
+  const response = campaignDetailResponseSchema.parse(success.body);
   if (response.campaign.id !== validCampaignId) throw new Error("Campaign detail response did not match the request");
   return response;
 }
 
 /** Reads the bounded safe room projection. Opaque session IDs must not be rendered. */
 export async function listCampaignRooms(campaignId: string): Promise<CampaignRoomLinkingResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  return campaignRoomLinkingResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`,
     { cache: "no-store" },
-  ));
+  );
+  requireStatus(success, 200, "Campaign room list");
+  return campaignRoomLinkingResponseSchema.parse(success.body);
 }
 
 /** Issues one PUT with the exact opaque ID. This function intentionally never retries. */
@@ -898,11 +923,11 @@ export async function attachCampaignRoom(
   campaignId: string,
   input: CampaignRoomAttachRequest,
 ): Promise<CampaignRoomAttachResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const exactInput = campaignRoomAttachRequestSchema.parse(input);
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const exactInput = parseApiInput(() => campaignRoomAttachRequestSchema.parse(input));
   const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms`,
-    { method: "PUT", body: JSON.stringify(exactInput) },
+    { method: "PUT", cache: "no-store", body: JSON.stringify(exactInput) },
   );
   if (success.status !== 200) throw new Error("Campaign room attachment response did not use the committed status");
   const response = campaignRoomAttachResponseSchema.parse(success.body);
@@ -912,13 +937,50 @@ export async function attachCampaignRoom(
   return response;
 }
 
+/** Detaches one exact opaque room path and accepts only its audited administration receipt. */
+export async function detachCampaignRoom(
+  campaignId: string,
+  sessionId: string,
+  input: CampaignAdministrationHttpRoomDetachRequest,
+): Promise<CampaignAdministrationHttpRoomDetachResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  // Session IDs belong to the legacy room namespace. Validate without trimming
+  // or resource-ID normalization, then encode this raw value exactly once.
+  const validSessionId = parseApiInput(() => campaignRoomAttachRequestSchema.parse({ sessionId }).sessionId);
+  const body = parseApiInput(() => campaignAdministrationHttpRoomDetachRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/rooms/${encodeURIComponent(validSessionId)}`,
+    { method: "DELETE", cache: "no-store", body: JSON.stringify(body) },
+  );
+  requireStatus(success, 200, "Campaign room detachment");
+  const response = campaignAdministrationHttpRoomDetachResponseSchema.parse(success.body);
+  const [event] = response.receipt.events;
+  if (response.attachment.sessionId !== validSessionId
+    || response.receipt.campaignId !== validCampaignId
+    || response.receipt.type !== "room_detached"
+    || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1
+    || event.campaignId !== validCampaignId
+    || event.commandId !== response.receipt.commandId
+    || event.type !== "room_detached"
+    || event.revision !== response.receipt.revisionAfter
+    || event.occurredAt !== response.receipt.occurredAt
+    || Object.keys(event.data).join(",") !== "sessionId"
+    || event.data.sessionId !== validSessionId) {
+    throw new Error("Campaign room detachment receipt did not match the request");
+  }
+  return response;
+}
+
 /** Reads the strict ID-free latest campaign dice projection without caching. */
 export async function getCampaignDiceHistory(campaignId: string): Promise<CampaignDiceHistoryResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  return campaignDiceHistoryResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/dice-rolls`,
     { cache: "no-store" },
-  ));
+  );
+  requireStatus(success, 200, "Campaign dice history");
+  return campaignDiceHistoryResponseSchema.parse(success.body);
 }
 
 /** Issues one non-idempotent roll POST; callers reconcile every outcome by GET. */
@@ -926,11 +988,11 @@ export async function rollCampaignDice(
   campaignId: string,
   input: CampaignDiceRollRequest,
 ): Promise<CampaignDiceRollResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const normalized = campaignDiceRollRequestSchema.parse(input);
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const normalized = parseApiInput(() => campaignDiceRollRequestSchema.parse(input));
   const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/dice-rolls`,
-    { method: "POST", body: JSON.stringify(normalized) },
+    { method: "POST", cache: "no-store", body: JSON.stringify(normalized) },
   );
   // Only the documented status plus a strict, request-bound body is a receipt-
   // derived success. Any other 2xx is malformed and remains commit-ambiguous.
@@ -946,10 +1008,13 @@ export async function rollCampaignDice(
 
 /** Reads the strict public roster projection. Callers must not render its opaque IDs. */
 export async function listCampaignCharacters(campaignId: string): Promise<CampaignCharacterListResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  return campaignCharacterListResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters`,
-  ));
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Campaign character list");
+  return campaignCharacterListResponseSchema.parse(success.body);
 }
 
 /** Reads the strict ID-free display workspace for one roster entry. */
@@ -958,12 +1023,14 @@ export async function getCampaignCharacterWorkspace(
   campaignCharacterId: string,
 ): Promise<CampaignCharacterWorkspaceResponse> {
   // IDs stay opaque: validate without trimming, then encode both path segments.
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const validCampaignCharacterId = resourceIdSchema.parse(campaignCharacterId);
-  return campaignCharacterWorkspaceResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const validCampaignCharacterId = parseApiInput(() => resourceIdSchema.parse(campaignCharacterId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters/${encodeURIComponent(validCampaignCharacterId)}/workspace`,
     { cache: "no-store" },
-  ));
+  );
+  requireStatus(success, 200, "Campaign character workspace");
+  return campaignCharacterWorkspaceResponseSchema.parse(success.body);
 }
 
 type CharacterDraftHttpMutation = { draft: CharacterDraftHttpView; receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft"> };
@@ -1157,6 +1224,27 @@ export async function getActorEffects(actorId: string): Promise<ActorEffectsResp
   const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effects`, { cache: "no-store" });
   requireStatus(success, 200, "Actor effects read");
   return actorEffectsResponseSchema.parse(success.body);
+}
+
+/** Resolves one server-owned check and binds its discriminant, target, and receipt. */
+export async function commandActorCheck(actorId: string, input: ActorCheckCommandRequest): Promise<ActorCheckCommandResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorCheckCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/check-commands`, {
+    method: "POST", cache: "no-store", body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Actor check command");
+  const response = actorCheckCommandResponseSchema.parse(success.body);
+  const targetMatches = body.kind === "opposed"
+    ? response.check.target.kind === "opposed_total" && response.check.target.actorId === body.targetActorId
+    : response.check.target.kind === "difficulty_class";
+  if (!targetMatches
+    || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+    throw new Error("Actor check response did not match the request");
+  }
+  return response;
 }
 
 export async function getActorPowers(actorId: string): Promise<ActorPowersResponse> {
@@ -1367,10 +1455,13 @@ export async function grantCharacterXp(campaignId: string, campaignCharacterId: 
 
 /** Reads only the strict, path-bound fixed-starter creation projection. */
 export async function getCampaignCharacterCreationOptions(campaignId: string): Promise<CampaignCharacterCreationOptionsResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const response = campaignCharacterCreationOptionsResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters/creation-options`,
-  ));
+    { cache: "no-store" },
+  );
+  requireStatus(success, 200, "Campaign character creation options");
+  const response = campaignCharacterCreationOptionsResponseSchema.parse(success.body);
   if (response.campaignId !== validCampaignId) throw new Error("Campaign character creation options did not match the request");
   return response;
 }
@@ -1383,12 +1474,14 @@ export async function createOriginalStarterCampaignCharacter(
   campaignId: string,
   input: CampaignCharacterCreateRequest,
 ): Promise<CampaignCharacterCreateResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const normalized = campaignCharacterCreateRequestSchema.parse(input);
-  const response = campaignCharacterCreateResponseSchema.parse(await request<unknown>(
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const normalized = parseApiInput(() => campaignCharacterCreateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/characters`,
-    { method: "POST", body: JSON.stringify(normalized) },
-  ));
+    { method: "POST", cache: "no-store", body: JSON.stringify(normalized) },
+  );
+  requireStatus(success, 201, "Campaign character creation");
+  const response = campaignCharacterCreateResponseSchema.parse(success.body);
   if (response.character.characterId !== normalized.characterId) {
     throw new Error("Campaign character creation response did not match the request");
   }
@@ -1396,22 +1489,26 @@ export async function createOriginalStarterCampaignCharacter(
 }
 
 export async function createCampaign(input: CampaignCreateRequest): Promise<CampaignCreateResponse> {
-  const normalized = campaignCreateRequestSchema.parse(input);
-  return campaignCreateResponseSchema.parse(await request<unknown>("/rpg/v1/campaigns", {
-    method: "POST",
+  const normalized = parseApiInput(() => campaignCreateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/campaigns", {
+    method: "POST", cache: "no-store",
     body: JSON.stringify(normalized),
-  }));
+  });
+  requireStatus(success, 201, "Campaign creation");
+  return campaignCreateResponseSchema.parse(success.body);
 }
 
 export async function renameCampaign(campaignId: string, input: CampaignRenameRequest): Promise<CampaignRenameResponse> {
   // Validate and normalize before interpolation or network I/O. In addition to
   // the strict wire schema, bind the minimal response to this exact operation.
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const normalized = campaignRenameRequestSchema.parse(input);
-  const response = campaignRenameResponseSchema.parse(await request<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`, {
-    method: "PATCH",
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const normalized = parseApiInput(() => campaignRenameRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}`, {
+    method: "PATCH", cache: "no-store",
     body: JSON.stringify(normalized),
-  }));
+  });
+  requireStatus(success, 200, "Campaign rename");
+  const response = campaignRenameResponseSchema.parse(success.body);
   if (
     response.campaign.id !== validCampaignId
     || response.campaign.name !== normalized.name
@@ -1423,13 +1520,15 @@ export async function renameCampaign(campaignId: string, input: CampaignRenameRe
 }
 
 export async function setupOriginalStarter(campaignId: string): Promise<CampaignDetailResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
   // This function intentionally accepts no caller-selected starter or content.
-  const body = campaignStarterSetupRequestSchema.parse({ starterId: ORIGINAL_STARTER_ID });
-  const response = campaignDetailResponseSchema.parse(await request<unknown>(
+  const body = parseApiInput(() => campaignStarterSetupRequestSchema.parse({ starterId: ORIGINAL_STARTER_ID }));
+  const success = await requestResponse<unknown>(
     `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/starter-setup`,
-    { method: "PUT", body: JSON.stringify(body) },
-  ));
+    { method: "PUT", cache: "no-store", body: JSON.stringify(body) },
+  );
+  requireStatus(success, 200, "Campaign starter setup");
+  const response = campaignDetailResponseSchema.parse(success.body);
   const content = response.campaign.content;
   if (
     response.campaign.id !== validCampaignId
@@ -1447,16 +1546,16 @@ export async function setupOriginalStarter(campaignId: string): Promise<Campaign
 
 /** Issues exactly one fixed mechanics setup PUT and never retries it. */
 export async function setupMechanicsStarter(campaignId: string): Promise<CampaignDetailResponse> {
-  const validCampaignId = resourceIdSchema.parse(campaignId);
-  const body = campaignMechanicsStarterSetupRequestSchema.parse({ starterId: MECHANICS_STARTER_ID });
-  const result = await fetch(
-    `/api/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
-    { method: "PUT", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => campaignMechanicsStarterSetupRequestSchema.parse({ starterId: MECHANICS_STARTER_ID }));
+  const result = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
+    { method: "PUT", cache: "no-store", body: JSON.stringify(body) },
+    { status: 200, message: "Campaign mechanics starter setup response did not use the committed status" },
   );
-  if (!result.ok) throw await errorFromResponse(result);
   // Check the operation status before attempting to parse any success body.
-  if (result.status !== 200) throw new Error("Campaign mechanics starter setup response did not use the committed status");
-  const response = campaignMechanicsStarterSetupResponseSchema.parse(await result.json() as unknown);
+  requireStatus(result, 200, "Campaign mechanics starter setup");
+  const response = campaignMechanicsStarterSetupResponseSchema.parse(result.body);
   const content = response.campaign.content;
   if (response.campaign.id !== validCampaignId
     || response.campaign.actorRole !== "owner"
@@ -1493,7 +1592,9 @@ function assertAdministrationReceipt(
 /** Reads the strict role-specific administration projection without caching. */
 export async function getCampaignAdministration(campaignId: string): Promise<CampaignAdministrationHttpResponse> {
   const { id, path } = campaignAdministrationPath(campaignId);
-  const response = campaignAdministrationHttpGetResponseSchema.parse(await request<unknown>(path, { cache: "no-store" }));
+  const success = await requestResponse<unknown>(path, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign administration read");
+  const response = campaignAdministrationHttpGetResponseSchema.parse(success.body);
   if (response.campaign.id !== id) throw new Error("Campaign administration response did not match the request");
   return response;
 }
@@ -1505,7 +1606,7 @@ export async function updateCampaignAdministration(
 ): Promise<CampaignAdministrationHttpPatchResponse> {
   const { id, path } = campaignAdministrationPath(campaignId);
   const body = parseApiInput(() => campaignAdministrationHttpPatchRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(path, { method: "PATCH", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(path, { method: "PATCH", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign administration response did not use the committed status");
   const response = campaignAdministrationHttpPatchResponseSchema.parse(success.body);
   assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
@@ -1522,7 +1623,7 @@ export async function archiveCampaignAdministration(
 ): Promise<CampaignAdministrationHttpArchiveResponse> {
   const { id, path } = campaignAdministrationPath(campaignId);
   const body = parseApiInput(() => campaignAdministrationHttpArchiveRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(path, { method: "DELETE", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(path, { method: "DELETE", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign archive response did not use the committed status");
   const response = campaignAdministrationHttpArchiveResponseSchema.parse(success.body);
   assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
@@ -1541,7 +1642,9 @@ function membershipPath(campaignId: string, principalId?: string): { campaignId:
 
 export async function listCampaignMemberships(campaignId: string): Promise<CampaignAdministrationHttpMembershipListResponse> {
   const { path } = membershipPath(campaignId);
-  return campaignAdministrationHttpMembershipListResponseSchema.parse(await request<unknown>(path, { cache: "no-store" }));
+  const success = await requestResponse<unknown>(path, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign membership list");
+  return campaignAdministrationHttpMembershipListResponseSchema.parse(success.body);
 }
 
 async function membershipMutation(
@@ -1573,7 +1676,7 @@ export async function addCampaignAdministrationMembership(
   const body = parseApiInput(() => campaignAdministrationHttpMembershipCreateRequestSchema.parse(input));
   const target = membershipPath(campaignId);
   return membershipMutation(target.campaignId, body.principalId, target.path,
-    { method: "POST", body: JSON.stringify(body) }, body.expectedRevision, "membership_added", body.role);
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_added", body.role);
 }
 
 export async function updateCampaignAdministrationMembership(
@@ -1584,7 +1687,7 @@ export async function updateCampaignAdministrationMembership(
   const body = parseApiInput(() => campaignAdministrationHttpMembershipUpdateRequestSchema.parse(input));
   const target = membershipPath(campaignId, principalId);
   return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
-    { method: "PATCH", body: JSON.stringify(body) }, body.expectedRevision, "membership_role_changed", body.role);
+    { method: "PATCH", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_role_changed", body.role);
 }
 
 export async function removeCampaignAdministrationMembership(
@@ -1595,13 +1698,14 @@ export async function removeCampaignAdministrationMembership(
   const body = parseApiInput(() => campaignAdministrationHttpMembershipDeleteRequestSchema.parse(input));
   const target = membershipPath(campaignId, principalId);
   return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
-    { method: "DELETE", body: JSON.stringify(body) }, body.expectedRevision, "membership_removed");
+    { method: "DELETE", cache: "no-store", body: JSON.stringify(body) }, body.expectedRevision, "membership_removed");
 }
 
 export async function listCampaignTimelines(campaignId: string): Promise<CampaignHistoryHttpTimelinesResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const response = campaignHistoryHttpTimelinesResponseSchema.parse(await request<unknown>(
-    `/rpg/v1/campaigns/${encodeURIComponent(id)}/timelines`, { cache: "no-store" }));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timelines`, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign timeline list");
+  const response = campaignHistoryHttpTimelinesResponseSchema.parse(success.body);
   if (!response.timelines.some((timeline) => timeline.id === response.activeTimelineId && timeline.active)) {
     throw new Error("Campaign timeline response did not identify its active timeline");
   }
@@ -1651,7 +1755,7 @@ export async function listCampaignRecaps(campaignId: string): Promise<{ recaps: 
 export async function createCampaignRecap(campaignId: string, input: CampaignHistoryHttpRecapRequest): Promise<CampaignHistoryHttpRecapResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => campaignHistoryHttpRecapRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { method: "POST", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 201) throw new Error("Campaign recap response did not use the committed status");
   const response = campaignHistoryHttpRecapResponseSchema.parse(success.body);
   const event = response.receipt.events[0];
@@ -1671,7 +1775,9 @@ export async function createCampaignRecap(campaignId: string, input: CampaignHis
 
 export async function listCampaignCheckpoints(campaignId: string): Promise<{ checkpoints: CampaignHistoryHttpCheckpoint[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
-  const body = await request<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, { cache: "no-store" });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign checkpoint list");
+  const body = success.body;
   if (typeof body !== "object" || body === null || Array.isArray(body)
     || Object.keys(body).length !== 1 || !("checkpoints" in body)) {
     throw new Error("Campaign checkpoint response was malformed");
@@ -1686,7 +1792,7 @@ export async function createCampaignCheckpoint(
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = parseApiInput(() => campaignHistoryHttpCheckpointRequestSchema.parse(input));
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`,
-    { method: "POST", body: JSON.stringify(body) });
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 201) throw new Error("Campaign checkpoint response did not use the committed status");
   const response = campaignHistoryHttpCheckpointResponseSchema.parse(success.body);
   const [event] = response.receipt.events;
@@ -1710,7 +1816,7 @@ export async function forkCampaignTimeline(
   const body = parseApiInput(() => campaignHistoryHttpForkRequestSchema.parse(input));
   if (checkpoint.id !== body.checkpointId) throw new ApiInputError("Fork checkpoint identity is invalid");
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timeline-forks`,
-    { method: "POST", body: JSON.stringify(body) });
+    { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 201) throw new Error("Campaign timeline fork response did not use the committed status");
   const response = campaignHistoryHttpForkResponseSchema.parse(success.body);
   const [event] = response.receipt.events;
@@ -1728,7 +1834,7 @@ export async function forkCampaignTimeline(
 /** Runs validation only. This stores a report but does not alter campaign state. */
 export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequest): Promise<CampaignTransferHttpDryRunResponse> {
   const body = parseApiInput(() => campaignTransferHttpDryRunRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign import report response did not use the documented status");
   return campaignTransferHttpDryRunResponseSchema.parse(success.body);
 }
@@ -1737,7 +1843,7 @@ export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequ
 export async function applyCampaignImport(importId: string, input: CampaignTransferHttpApplyRequest): Promise<CampaignTransferHttpApplyResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(importId));
   const body = parseApiInput(() => campaignTransferHttpApplyRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(`/rpg/v1/campaign-imports/${encodeURIComponent(id)}/apply`, { method: "POST", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-imports/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign import apply response did not use the committed status");
   const response = campaignTransferHttpApplyResponseSchema.parse(success.body);
   const event = response.receipt.events[0];
@@ -1819,7 +1925,7 @@ export async function getContentPackPublication(packId: string, packVersion: str
 /** Validates only the supplied in-memory draft; this method never publishes. */
 export async function validateContentPackDraft(input: ContentCatalogHttpValidationRequest): Promise<ContentCatalogHttpValidationResponse> {
   const body = parseApiInput(() => contentCatalogHttpValidationRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/content-packs/validate", { method: "POST", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs/validate", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Content pack validation");
   return contentCatalogHttpValidationResponseSchema.parse(success.body);
 }
@@ -1839,7 +1945,7 @@ function canonicalDefinitionSet(definitions: ContentCatalogHttpPublicationReques
 
 export async function publishContentPack(input: ContentCatalogHttpPublicationRequest): Promise<ContentCatalogHttpPublicationResponse> {
   const body = parseApiInput(() => contentCatalogHttpPublicationRequestSchema.parse(input));
-  const success = await requestResponse<unknown>("/rpg/v1/content-packs", { method: "POST", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 201, "Content pack publication");
   const response = contentCatalogHttpPublicationResponseSchema.parse(success.body);
   const publication = response.catalog.publication;
@@ -1872,7 +1978,7 @@ export async function getCampaignContent(campaignId: string): Promise<ContentCat
 export async function configureCampaignContent(campaignId: string, input: ContentCatalogHttpCampaignContentPutRequest): Promise<ContentCatalogHttpCampaignContentPutResponse> {
   const target = campaignContentPath(campaignId);
   const body = parseApiInput(() => contentCatalogHttpCampaignContentPutRequestSchema.parse(input));
-  const success = await requestResponse<unknown>(target.path, { method: "PUT", body: JSON.stringify(body) });
+  const success = await requestResponse<unknown>(target.path, { method: "PUT", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Campaign content configuration");
   const response = contentCatalogHttpCampaignContentPutResponseSchema.parse(success.body);
   const expectedPins = JSON.stringify(body.contentPacks);
@@ -1954,14 +2060,20 @@ export async function listCampaignFactions(campaignId:string,audience:"gm"|"play
 export async function createCampaignFaction(campaignId:string,input:CreateCampaignFactionHttpRequest):Promise<ReturnType<typeof createCampaignFactionHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignFactionHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"factions"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Faction creation");const response=createCampaignFactionHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction creation");if(response.faction.name!==body.name||JSON.stringify(canonicalWireValue(response.faction.publicState))!==JSON.stringify(canonicalWireValue(body.publicState))||JSON.stringify(canonicalWireValue(response.faction.privateState))!==JSON.stringify(canonicalWireValue(body.privateState)))throw new Error("Faction creation response did not match the request");return response;}
 export async function commandFactionReputation(factionId:string,input:FactionReputationCommandHttpRequest):Promise<ReturnType<typeof factionReputationCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(factionId));const body=parseApiInput(()=>factionReputationCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("factions",id,"reputation-commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Faction reputation command");const response=factionReputationCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Faction reputation command");if(response.standing.factionId!==id||response.standing.subjectActorId!==body.subjectActorId)throw new Error("Faction reputation response did not match the request");return response;}
 
-export async function listCampaignQuests(campaignId:string):Promise<Revisioned<CampaignQuestsHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"quests"),{cache:"no-store"});requireStatus(success,200,"Campaign quest read");const data=campaignQuestsHttpResponseSchema.parse(success.body);if(data.quests.some((quest)=>quest.campaignId!==validCampaignId))throw new Error("Campaign quest response did not match the request");return{data,revision:revisionFrom(success.headers,"x-quest-revision")};}
+export async function listCampaignQuests(campaignId:string,audience:"gm"):Promise<Revisioned<GmCampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(campaignId:string,audience:"player"):Promise<Revisioned<PlayerCampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignQuestsHttpResponse>>;
+export async function listCampaignQuests(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignQuestsHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"quests"),{cache:"no-store"});requireStatus(success,200,"Campaign quest read");const data=audience==="gm"?gmCampaignQuestsHttpResponseSchema.parse(success.body):playerCampaignQuestsHttpResponseSchema.parse(success.body);if(data.quests.some((quest)=>quest.campaignId!==validCampaignId))throw new Error("Campaign quest response did not match the request");return{data,revision:revisionFrom(success.headers,"x-quest-revision")};}
 export async function createCampaignQuest(campaignId:string,input:CreateCampaignQuestHttpRequest):Promise<ReturnType<typeof createCampaignQuestHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignQuestHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"quests"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Quest creation");const response=createCampaignQuestHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest creation");const createdObjectives=response.projection.objectives.filter((item)=>item.questId===body.quest.questId).map(({objectiveId,description,targetProgress,dependencyObjectiveIds})=>({objectiveId,description,targetProgress,dependencyObjectiveIds}));const expectedObjectives=body.quest.objectives.map(({objectiveId,description,targetProgress,dependencyObjectiveIds})=>({objectiveId,description,targetProgress,dependencyObjectiveIds}));const createdRewards=response.quest.rewards.map(({rewardId,kind,amount,label})=>({rewardId,kind,amount,label}));const expectedRewards=body.quest.rewards.map(({rewardId,kind,amount,label})=>({rewardId,kind,amount,label}));const journal=response.projection.journal.filter((item)=>item.questId===body.quest.questId);if(JSON.stringify(canonicalWireValue(response.definition))!==JSON.stringify(canonicalWireValue(body.quest))||response.quest.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.quest.questId!==body.quest.questId||response.quest.storylineId!==body.quest.storylineId||response.quest.title!==body.quest.title||response.quest.description!==body.quest.description||JSON.stringify(canonicalWireValue(createdObjectives))!==JSON.stringify(canonicalWireValue(expectedObjectives))||JSON.stringify(canonicalWireValue(createdRewards))!==JSON.stringify(canonicalWireValue(expectedRewards))||journal.length!==1||journal[0]?.text!==body.quest.journalText)throw new Error("Quest creation response did not match the complete submitted definition");return response;}
 /** Advance-objective responses expose no objective outcome; callers must retain the receipt and require an authoritative quest-list refresh. */
 export async function commandQuest(questId:string,input:QuestCommandHttpRequest):Promise<ReturnType<typeof questCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(questId));const body=parseApiInput(()=>questCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("quests",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Quest command");const response=questCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Quest command");if(response.quest.questId!==id||(body.kind==="accept"&&response.quest.status!=="active")||(body.kind==="abandon"&&response.quest.status!=="abandoned")||(body.kind==="claim-reward"&&!response.quest.rewards.some((reward)=>reward.rewardId===body.rewardId&&reward.claimedByActorId===body.actorId)))throw new Error("Quest command response did not match the request");return response;}
 
-export async function getCampaignStory(campaignId:string):Promise<Revisioned<CampaignStoryHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"story"),{cache:"no-store"});requireStatus(success,200,"Campaign story read");const data=campaignStoryHttpResponseSchema.parse(success.body);if("storylines"in data&&data.storylines.some((storyline)=>storyline.campaignId!==validCampaignId))throw new Error("Campaign story response did not match the request");return{data,revision:revisionFrom(success.headers,"x-story-revision")};}
+export async function getCampaignStory(campaignId:string,audience:"gm"):Promise<Revisioned<GmCampaignStoryHttpResponse>>;
+export async function getCampaignStory(campaignId:string,audience:"player"):Promise<Revisioned<PlayerCampaignStoryHttpResponse>>;
+export async function getCampaignStory(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignStoryHttpResponse>>;
+export async function getCampaignStory(campaignId:string,audience:"gm"|"player"):Promise<Revisioned<CampaignStoryHttpResponse>>{const validCampaignId=parseApiInput(()=>resourceIdSchema.parse(campaignId));const success=await requestResponse<unknown>(campaignLane(validCampaignId,"story"),{cache:"no-store"});requireStatus(success,200,"Campaign story read");const data=audience==="gm"?gmCampaignStoryHttpResponseSchema.parse(success.body):playerCampaignStoryHttpResponseSchema.parse(success.body);if("storylines"in data&&data.storylines.some((storyline)=>storyline.campaignId!==validCampaignId))throw new Error("Campaign story response did not match the request");return{data,revision:revisionFrom(success.headers,"x-story-revision")};}
 export async function createCampaignStoryline(campaignId:string,input:CreateCampaignStorylineHttpRequest):Promise<ReturnType<typeof createCampaignStorylineHttpResponseSchema.parse>>{const body=parseApiInput(()=>createCampaignStorylineHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(campaignLane(campaignId,"storylines"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,201,"Storyline creation");const response=createCampaignStorylineHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Storyline creation");const storylineId=body.storyline.storylineId;const nodes=response.story.nodes.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,status,createdAt,updatedAt,...item})=>item);const edges=response.story.edges.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,...item})=>item);const plotPoints=response.story.plotPoints.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,answered,playerAnswer,answeredAt,...item})=>item);const clues=response.story.clues.filter((item)=>item.storylineId===storylineId).map(({storylineId:_,revealed,revealedAt,...item})=>item);if(response.storyline.campaignId!==parseApiInput(()=>resourceIdSchema.parse(campaignId))||response.storyline.storylineId!==storylineId||response.storyline.title!==body.storyline.title||response.storyline.summary!==body.storyline.summary||JSON.stringify(canonicalWireValue(nodes))!==JSON.stringify(canonicalWireValue(body.storyline.nodes))||JSON.stringify(canonicalWireValue(edges))!==JSON.stringify(canonicalWireValue(body.storyline.edges))||JSON.stringify(canonicalWireValue(plotPoints))!==JSON.stringify(canonicalWireValue(body.storyline.plotPoints))||JSON.stringify(canonicalWireValue(clues))!==JSON.stringify(canonicalWireValue(body.storyline.clues)))throw new Error("Storyline creation response did not match the complete submitted graph");return response;}
-export async function commandStoryline(storylineId:string,input:StorylineCommandHttpRequest):Promise<ReturnType<typeof storylineCommandHttpResponseSchema.parse>>{const id=parseApiInput(()=>resourceIdSchema.parse(storylineId));const body=parseApiInput(()=>storylineCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("storylines",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Storyline command");const response=storylineCommandHttpResponseSchema.parse(success.body);bindReceipt(response.receipt,body,"Storyline command");const story=response.story;const targetMatches="storylines"in story?(body.kind==="reveal-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="revealed"):body.kind==="resolve-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="resolved"):body.kind==="reveal-clue"?story.clues.some((clue)=>clue.storylineId===id&&clue.clueId===body.targetId&&clue.revealed):story.plotPoints.some((point)=>point.storylineId===id&&point.plotPointId===body.targetId&&point.answered&&point.playerAnswer===body.data.answer)):(body.kind==="reveal-node"||body.kind==="resolve-node"?story.visibleNodes.some((node)=>node.nodeId===body.targetId):body.kind==="reveal-clue"?story.discoveredClues.some((clue)=>clue.clueId===body.targetId):false);if(!targetMatches)throw new Error("Storyline command response did not match the exact target");return response;}
+export async function commandStoryline(storylineId:string,input:StorylineCommandHttpRequest):Promise<{story:GmCampaignStoryHttpResponse;receipt:ReturnType<typeof storylineCommandHttpResponseSchema.parse>["receipt"]}>{const id=parseApiInput(()=>resourceIdSchema.parse(storylineId));const body=parseApiInput(()=>storylineCommandHttpRequestSchema.parse(input));const success=await requestResponse<unknown>(resourceLane("storylines",id,"commands"),{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Storyline command");const envelope=storylineCommandHttpResponseSchema.parse(success.body);const response={...envelope,story:gmCampaignStoryHttpResponseSchema.parse(envelope.story)};bindReceipt(response.receipt,body,"Storyline command");const story=response.story;const targetMatches=body.kind==="reveal-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="revealed"):body.kind==="resolve-node"?story.nodes.some((node)=>node.storylineId===id&&node.nodeId===body.targetId&&node.status==="resolved"):body.kind==="reveal-clue"?story.clues.some((clue)=>clue.storylineId===id&&clue.clueId===body.targetId&&clue.revealed):story.plotPoints.some((point)=>point.storylineId===id&&point.plotPointId===body.targetId&&point.answered&&point.playerAnswer===body.data.answer);if(!targetMatches)throw new Error("Storyline command response did not match the exact target");return response;}
 
 /** Explicit GM-to-player previews pass through the public schemas and return newly allocated, secret-free structures. */
 export function projectNpcsForPlayers(value:GmCampaignNpcsHttpResponse):PlayerCampaignNpcsHttpResponse{return playerCampaignNpcsHttpResponseSchema.parse({npcs:value.npcs.map(({npcId,publicState,createdAt})=>({npcId,publicState,createdAt})),relationships:value.relationships});}
