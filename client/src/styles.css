@@ -180,6 +180,19 @@ body {
 .import-report-result h3 { margin-bottom: 12px; }
 .import-report-result section { margin-top: 15px; }
 .import-report-result ul { display: grid; gap: 7px; margin: 8px 0 0; padding-left: 22px; color: var(--muted); }
+.pack-validation { display: grid; gap: 16px; padding: 18px; border: 1px solid #6d4549; border-radius: 11px; background: rgba(229,72,77,.06); }
+.pack-validation.is-valid { border-color: #456b55; background: rgba(74,164,111,.07); }
+.content-studio-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.content-studio-heading h2 { margin: 0; font-size: 20px; }
+.content-studio-help { margin: 0; color: var(--muted); line-height: 1.55; }
+.validation-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.validation-counts div { min-width: 0; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.validation-counts dt { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.validation-counts dd { margin: 5px 0 0; font-weight: 700; }
+.validation-issues { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.validation-issues button { width: 100%; min-height: 44px; display: grid; gap: 6px; text-align: left; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); }
+.validation-issues code { color: #d2bdfd; overflow-wrap: anywhere; }
+.validation-ready { margin: 0; color: #94e0b5; }
 .starter-setup { display: grid; gap: 16px; margin-top: 22px; padding-top: 22px; border-top: 1px solid var(--border); }
 .starter-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .starter-heading h2 { margin: 0; font-size: 20px; }
@@ -633,6 +646,8 @@ button:disabled {
   .admin-settings-form button, .membership-add button, .checkpoint-create button { width: 100%; }
   .membership-list li, .checkpoint-list li, .admin-status { align-items: stretch; flex-direction: column; }
   .membership-list select, .membership-list button, .checkpoint-list button, .admin-status button { width: 100%; }
+  .content-studio-heading { flex-direction: column; }
+  .validation-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .roster-open { width: 100%; }
   .dice-form { grid-template-columns: 1fr; }
   .dice-form .primary { width: 100%; }
