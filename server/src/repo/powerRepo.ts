@@ -6,6 +6,9 @@ import {
   powerUseCommandSchema,
   resourceIdSchema,
   spellCatalogDefinitionSchema,
+  type ActorPowerCommandRequest,
+  type ActorPowerResolution,
+  type ActorPowerActorState,
   type ActorPowerAvailabilityReason,
   type ActorPowersResponse,
   type PowerReference,
@@ -14,15 +17,18 @@ import {
 import { createCharacterProgressionReadRepository } from "./characterProgression/index.js";
 import { runM16Mutation, type M16Dependencies, type M16Result } from "./effectRepo.js";
 import { m15Authorized } from "./actorResourceRepo.js";
+import { useActorPower as executeActorPower, ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError } from "./actorPowerUseRepo.js";
 
 export class PowerUnavailableError extends Error { readonly code="POWER_UNAVAILABLE"; }
 export class PowerInsufficientResourceError extends Error { readonly code="POWER_INSUFFICIENT_RESOURCE"; }
+export { ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError };
 
 /** Internal path binding is retained only long enough for the HTTP adapter to verify it. */
 export interface ActorPowerSnapshot extends ActorPowersResponse { campaignId:string; actorId:string; }
 export interface PowerRepository {
   getActorPowerSnapshot(principal:string,actorId:string):ActorPowerSnapshot|null;
   usePower(principal:string,command:PowerUseCommand):M16Result<{powerUseId:string}>;
+  useActorPower(principal:string,actorId:string,input:ActorPowerCommandRequest):M16Result<{resolution:ActorPowerResolution;actorStates:ActorPowerActorState[]}>;
 }
 
 type DefinitionState = {
@@ -129,5 +135,5 @@ export function createPowerRepository(db:DatabaseDriver.Database,deps:M16Depende
       const powerUseId=resourceIdSchema.parse(deps.ids.nextId());
       return {result:{powerUseId},persist:()=>{for(const cost of command.costs){const name=cost.kind==="resource"?cost.resourceId:cost.kind==="slot"?cost.slotId:cost.chargeId;if(cost.kind==="charge")db.prepare("UPDATE rpg_actor_resource_charges_v25 SET current_charges=current_charges-? WHERE campaign_id=? AND actor_id=? AND resource_name=?").run(cost.amount,command.campaignId,command.actorId,name);else db.prepare("UPDATE rpg_actor_resources SET current=current-? WHERE campaign_id=? AND actor_id=? AND name=?").run(cost.amount,command.campaignId,command.actorId,name);}db.prepare("INSERT INTO rpg_power_uses_v26(power_use_id,campaign_id,actor_id,command_id,resulting_revision,power_pack_id,power_pack_version,power_kind,power_definition_id,slot_kind,slot_level,target_actor_id,use_json,used_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(powerUseId,command.campaignId,command.actorId,id,after,command.power.packId,command.power.packVersion,command.power.kind,command.power.definitionId,"slot",slotLevel,command.targetActorId,JSON.stringify(command),now);const insertCost=db.prepare("INSERT INTO rpg_power_use_costs_v26 VALUES(?,?,?,?,?)");command.costs.forEach((cost,index)=>insertCost.run(powerUseId,index,cost.kind,cost.kind==="resource"?cost.resourceId:cost.kind==="slot"?cost.slotId:cost.chargeId,cost.amount));}};
     }});
-  }};
+  },useActorPower:(principal,actorId,input)=>executeActorPower(db,deps,guard,principal,actorId,input)};
 }

@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { recoverySchema } from "./content-catalog.js";
+import { actorResourceSchema } from "./actor-resources.js";
+import { effectDurationSchema, effectModifierSchema } from "./effects.js";
+import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
+import { diceRollResultSchema } from "./rpg-dice.js";
+import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { powerReferenceSchema } from "./powers.js";
-import { revisionSchema } from "./rpg-commands.js";
 
 const boundedPowerCountSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
@@ -82,3 +86,106 @@ export const actorPowersResponseSchema = z.object({
 
 export type ActorPowersResponse = z.infer<typeof actorPowersResponseSchema>;
 export type ActorPowerAvailabilityReason = z.infer<typeof actorPowerAvailabilityReasonSchema>;
+
+/** The starter catalog has no caller-selected activation choices. */
+export const actorPowerChoicesSchema = z.tuple([]);
+export const actorPowerCommandRequestSchema = z.object({
+  powerRef: powerReferenceSchema,
+  targetIds: z.array(resourceIdSchema).max(32).superRefine((ids, context) => {
+    if (new Set(ids).size !== ids.length) context.addIssue({ code: "custom", message: "target IDs must be unique" });
+  }),
+  choices: actorPowerChoicesSchema,
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+/** Costs are derived from the pinned definition, never accepted from a caller. */
+export const actorPowerResolvedCostSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("ability-use"), amount: z.literal(1) }).strict(),
+  z.object({ kind: z.literal("slot"), slotId: z.string().regex(/^slot-(?:[1-9])$/), amount: z.literal(1) }).strict(),
+]);
+
+export const actorPowerEffectOutcomeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("damage"), targetId: resourceIdSchema, damageType: z.enum(["physical", "fire", "frost", "storm", "radiant", "shadow"]), roll: diceRollResultSchema, adjustment: z.enum(["none", "resistance", "vulnerability", "immunity"]), applied: boundedPowerCountSchema }).strict(),
+  z.object({ kind: z.literal("healing"), targetId: resourceIdSchema, roll: diceRollResultSchema, applied: boundedPowerCountSchema }).strict(),
+  z.object({ kind: z.literal("resource"), targetId: resourceIdSchema, resourceId: resourceIdSchema, requested: z.number().int().min(-10_000).max(10_000), applied: z.number().int().min(-10_000).max(10_000) }).strict(),
+  z.object({ kind: z.literal("modifier"), targetId: resourceIdSchema, effectId: resourceIdSchema.nullable(), statistic: resourceIdSchema, amount: z.number().int().min(-10_000).max(10_000), duration: z.enum(["instant", "turn", "round", "encounter", "permanent"]) }).strict(),
+  z.object({ kind: z.literal("condition"), targetId: resourceIdSchema, effectId: resourceIdSchema, condition: resourceIdSchema, durationRounds: z.number().int().min(1).max(20) }).strict(),
+]);
+
+export const actorPowerStateDeltaSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("resource"), actorId: resourceIdSchema, resourceId: resourceIdSchema, before: boundedPowerCountSchema, after: boundedPowerCountSchema }).strict(),
+  z.object({ kind: z.literal("effect-applied"), actorId: resourceIdSchema, effectId: resourceIdSchema }).strict(),
+  z.object({ kind: z.literal("effect-replaced"), actorId: resourceIdSchema, effectId: resourceIdSchema }).strict(),
+]);
+
+export const actorPowerResolutionSchema = z.object({
+  powerUseId: resourceIdSchema,
+  powerRef: powerReferenceSchema,
+  targetIds: z.array(resourceIdSchema).max(32),
+  costs: z.array(actorPowerResolvedCostSchema).max(1),
+  outcomes: z.array(actorPowerEffectOutcomeSchema).max(512),
+  stateDeltas: z.array(actorPowerStateDeltaSchema).max(512),
+}).strict().superRefine((resolution, context) => {
+  if (new Set(resolution.targetIds).size !== resolution.targetIds.length) {
+    context.addIssue({ code: "custom", message: "resolved target IDs must be unique", path: ["targetIds"] });
+  }
+  resolution.outcomes.forEach((outcome, index) => {
+    if (!resolution.targetIds.includes(outcome.targetId)) context.addIssue({ code: "custom", message: "outcome target must be resolved", path: ["outcomes", index, "targetId"] });
+    if (outcome.kind === "damage" && outcome.applied > Math.max(0, outcome.roll.total) * 2) {
+      context.addIssue({ code: "custom", message: "applied damage cannot exceed bounded vulnerability", path: ["outcomes", index, "applied"] });
+    }
+    if (outcome.kind === "healing" && outcome.applied > Math.max(0, outcome.roll.total)) {
+      context.addIssue({ code: "custom", message: "applied healing cannot exceed the rolled amount", path: ["outcomes", index, "applied"] });
+    }
+    if (outcome.kind === "resource" && (Math.abs(outcome.applied) > Math.abs(outcome.requested)
+      || (outcome.applied !== 0 && Math.sign(outcome.applied) !== Math.sign(outcome.requested)))) {
+      context.addIssue({ code: "custom", message: "applied resource change must be a bounded part of the request", path: ["outcomes", index, "applied"] });
+    }
+  });
+});
+
+/** Public effect projection deliberately omits command and campaign provenance. */
+export const actorPowerActiveEffectSummarySchema = z.object({
+  effectId: resourceIdSchema,
+  source: powerReferenceSchema,
+  modifiers: z.array(effectModifierSchema).min(1).max(64),
+  duration: effectDurationSchema,
+  concentration: z.boolean(),
+}).strict();
+export const actorPowerActorStateSchema = z.object({
+  actorId: resourceIdSchema,
+  resources: z.array(actorResourceSchema).max(128).superRefine((resources, context) => {
+    const ids=resources.map(resource=>resource.resourceId);
+    if(new Set(ids).size!==ids.length||ids.some((id,index)=>index>0&&id<=ids[index-1]!))context.addIssue({code:"custom",message:"resources must be unique and stably ordered"});
+  }),
+  activeEffects: z.array(actorPowerActiveEffectSummarySchema).max(128),
+  revision: revisionSchema,
+}).strict();
+export const actorPowerCommandReceiptSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  revisionBefore: revisionSchema,
+  revisionAfter: revisionSchema,
+  occurredAt: utcIsoTimestampSchema,
+}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, "a power command advances exactly one source revision");
+export const actorPowerCommandResponseSchema = z.object({
+  resolution: actorPowerResolutionSchema,
+  actorStates: z.array(actorPowerActorStateSchema).min(1).max(33),
+  receipt: actorPowerCommandReceiptSchema,
+}).strict().superRefine((response, context) => {
+  const stateIds=response.actorStates.map(state=>state.actorId),selfTarget=response.resolution.targetIds.length===1&&response.resolution.targetIds[0]===stateIds[0];
+  if(new Set(stateIds).size!==stateIds.length)context.addIssue({code:"custom",message:"actor states must be unique",path:["actorStates"]});
+  if ((!selfTarget && (response.actorStates.length!==response.resolution.targetIds.length+1
+      || response.resolution.targetIds.some((id,index)=>id!==stateIds[index+1])))
+      || (selfTarget&&response.actorStates.length!==1)) {
+    context.addIssue({ code: "custom", message: "changed actor states must follow source and target order", path: ["actorStates"] });
+  }
+  response.resolution.stateDeltas.forEach((delta,index)=>{
+    if(!stateIds.includes(delta.actorId))context.addIssue({code:"custom",message:"state delta actor must have an authoritative projection",path:["resolution","stateDeltas",index,"actorId"]});
+  });
+});
+
+export type ActorPowerCommandRequest = z.infer<typeof actorPowerCommandRequestSchema>;
+export type ActorPowerCommandResponse = z.infer<typeof actorPowerCommandResponseSchema>;
+export type ActorPowerResolution = z.infer<typeof actorPowerResolutionSchema>;
+export type ActorPowerActorState = z.infer<typeof actorPowerActorStateSchema>;

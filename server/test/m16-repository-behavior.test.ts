@@ -22,7 +22,7 @@ function fixture() {
     dataDir: process.env.VELVET_DATA_DIR!,
     clock: { now: () => now },
     ids: { nextId: () => `m16-${++id}` },
-    rng: { integer: () => 10 },
+    rng: { integer: (_minimum, maximum) => maximum === 21 ? 10 : Math.min(4, maximum - 1) },
   });
   const campaign = repo.createCampaign("local-owner", { name: "M1.6 behavior fixture" });
   repo.installMechanicsStarterCatalog("local-owner");
@@ -52,6 +52,7 @@ function fixture() {
     db.prepare("INSERT OR IGNORE INTO rpg_character_proficiencies(campaign_id,sheet_id,position,category,proficiency_id) VALUES(?,?,?,?,?)").run(campaign.id, sheet.sheet_id, position, category, key);
   }
   for (const [name, current, max] of [["focus", 2, 4], ["slot-1", 1, 1], ["health", 8, 10], ["wand", 1, 1]] as const) db.prepare("INSERT OR REPLACE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?)").run(campaign.id, source, name, current, max);
+  db.prepare("INSERT OR REPLACE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?)").run(campaign.id, opponent, "health", 10, 10);
   db.prepare("INSERT OR REPLACE INTO rpg_actor_resource_charges_v25(campaign_id,actor_id,resource_name,current_charges,maximum_charges) VALUES(?,?,?,?,?)").run(campaign.id, source, "wand", 1, 1);
   // These are the same catalog references granted by the selected class. Seed
   // their immutable progression records explicitly so the fixture exercises
@@ -155,6 +156,31 @@ describe("M1.6 repository behavior", () => {
     expect(after.prepare("SELECT name,current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(f.campaign, f.source)).toEqual(before);
     expect(after.prepare("SELECT current_charges FROM rpg_actor_resource_charges_v25 WHERE campaign_id=? AND actor_id=? AND resource_name='wand'").get(f.campaign, f.source)).toEqual(chargesBefore);
     after.close(); f.repo.close();
+  });
+
+  it("executes actor-only powers with server costs, deterministic effects, target revisions, and exact replay",()=>{
+    const f=fixture();
+    const strike={powerRef:ability,targetIds:[f.opponent],choices:[] as [],expectedRevision:0,idempotencyKey:"actor-strike"};
+    const first=f.repo.useActorPower("local-owner",f.source,strike);
+    expect(first.resolution).toMatchObject({powerRef:ability,targetIds:[f.opponent],costs:[],outcomes:[{kind:"damage",targetId:f.opponent,applied:6}]});
+    expect(first.actorStates).toEqual([
+      expect.objectContaining({actorId:f.source,revision:1}),
+      expect.objectContaining({actorId:f.opponent,revision:1,resources:expect.arrayContaining([expect.objectContaining({resourceId:"health",current:4,capacity:10})])}),
+    ]);
+    expect(f.repo.useActorPower("local-owner",f.source,strike)).toEqual(first);
+    const glow=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:1,idempotencyKey:"actor-glow"});
+    expect(glow.resolution.costs).toEqual([{kind:"slot",slotId:"slot-1",amount:1}]);
+    expect(glow.resolution.outcomes).toEqual([expect.objectContaining({kind:"modifier",targetId:f.opponent,statistic:"defense",amount:2})]);
+    expect(glow.actorStates[0]!.resources).toContainEqual({resourceId:"slot-1",current:0,capacity:1});
+    expect(glow.actorStates[1]!.activeEffects).toEqual([expect.objectContaining({source:spell,concentration:true,modifiers:[{kind:"flat",appliesToId:"defense",amount:2}]})]);
+    const replenish=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    replenish.prepare("UPDATE rpg_actor_resources SET current=1 WHERE campaign_id=? AND actor_id=? AND name='slot-1'").run(f.campaign,f.source);replenish.close();
+    const replacement=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:2,idempotencyKey:"actor-glow-replacement"});
+    expect(replacement.actorStates[1]!.activeEffects).toHaveLength(1);
+    expect(replacement.resolution.stateDeltas.map(delta=>delta.kind)).toEqual(["resource","effect-replaced","effect-applied"]);
+    expect(()=>f.repo.useActorPower("local-owner",f.source,{...strike,idempotencyKey:"stale"})).toThrow(M16StaleError);
+    expect(()=>f.repo.useActorPower("local-owner",f.source,{...strike,targetIds:[],expectedRevision:3,idempotencyKey:"bad-target"})).toThrow();
+    f.repo.close();
   });
 
   it("stacks effects, replaces concentration atomically, applies immunity, and expires duration at query time", () => {

@@ -125,7 +125,7 @@ export interface CampaignListRepository extends
   Partial<Pick<RestRepository, "takeRest">>,
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
-  Partial<Pick<PowerRepository, "getActorPowerSnapshot">>,
+  Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -227,7 +227,7 @@ type InventoryLaneRepository = Pick<InventoryRepository,
 type RestLaneRepository = Pick<RestRepository, "takeRest">;
 type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
-type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot">;
+type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -341,7 +341,8 @@ function assertCheckRepository(repository: CampaignListRepository): asserts repo
   if (typeof repository.resolveActorCheck !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertPowerRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & PowerLaneRepository {
-  if (typeof repository.getActorPowerSnapshot !== "function") throw new UnsupportedCampaignRepositoryError();
+  if (typeof repository.getActorPowerSnapshot !== "function"
+    || typeof repository.useActorPower !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
