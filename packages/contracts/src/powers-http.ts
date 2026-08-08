@@ -48,6 +48,35 @@ export const actorPowerLegalNowSchema = z.object({
   if (entry.legal !== (entry.reasons.length === 0)) context.addIssue({ code: "custom", message: "legal must exactly reflect resource availability reasons", path: ["legal"] });
 });
 
+export const actorPowerLegalTargetSchema = z.object({
+  actorId: resourceIdSchema,
+  label: z.string().trim().min(1).max(200).optional(),
+}).strict();
+
+/** A complete server-planned command preview; callers select only identities from this projection. */
+export const actorPowerLegalCommandSchema = z.object({
+  powerRef: powerReferenceSchema,
+  targeting: z.enum(["self", "single", "area"]),
+  validTargets: z.array(actorPowerLegalTargetSchema).max(128),
+  costs: z.array(z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("ability-use"), amount: z.literal(1) }).strict(),
+    z.object({ kind: z.literal("slot"), slotId: z.string().regex(/^slot-(?:[1-9])$/), amount: z.literal(1) }).strict(),
+  ])).max(1),
+  concentration: z.boolean(),
+  effectKinds: z.array(z.enum(["damage", "healing", "resource", "modifier", "condition"])).min(1).max(5),
+}).strict().superRefine((command, context) => {
+  const ids = command.validTargets.map((target) => target.actorId);
+  if (new Set(ids).size !== ids.length || ids.some((id, index) => index > 0 && id <= ids[index - 1]!)) {
+    context.addIssue({ code: "custom", message: "legal power targets must be unique and stably ordered", path: ["validTargets"] });
+  }
+  if (command.targeting === "self" ? ids.length !== 1 : ids.length === 0) {
+    context.addIssue({ code: "custom", message: "legal power targets must match targeting cardinality", path: ["validTargets"] });
+  }
+  if (new Set(command.effectKinds).size !== command.effectKinds.length) {
+    context.addIssue({ code: "custom", message: "effect kinds must be unique", path: ["effectKinds"] });
+  }
+});
+
 const referenceKey = (reference: z.infer<typeof powerReferenceSchema>) =>
   `${reference.kind}\0${reference.packId}\0${reference.packVersion}\0${reference.definitionId}`;
 
@@ -62,6 +91,7 @@ export const actorPowersResponseSchema = z.object({
   slots: z.array(actorPowerSlotSchema).max(20),
   uses: z.array(actorPowerUseStateSchema),
   legalNow: z.array(actorPowerLegalNowSchema),
+  legalCommands: z.array(actorPowerLegalCommandSchema),
   revision: revisionSchema,
 }).strict().superRefine((response, context) => {
   const keys = response.known.map(referenceKey);
@@ -81,6 +111,12 @@ export const actorPowersResponseSchema = z.object({
   if (response.legalNow.length !== response.known.length
       || response.legalNow.some((entry, index) => referenceKey(entry.powerRef) !== keys[index])) {
     context.addIssue({ code: "custom", message: "legalNow must contain exactly one ordered entry per known power", path: ["legalNow"] });
+  }
+  const legalCommandKeys = response.legalCommands.map((entry) => referenceKey(entry.powerRef));
+  if (new Set(legalCommandKeys).size !== legalCommandKeys.length
+      || legalCommandKeys.some((key, index) => index > 0 && key <= legalCommandKeys[index - 1]!)
+      || legalCommandKeys.some((key) => !keys.includes(key))) {
+    context.addIssue({ code: "custom", message: "legalCommands must be unique, ordered known powers", path: ["legalCommands"] });
   }
 });
 

@@ -7,7 +7,8 @@ import type { CampaignListRepository } from "../src/routes/rpg/v1/features.js";
 afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;});
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";};
 const ability={kind:"ability" as const,packId:"pack",packVersion:"1.0.0",definitionId:"ability"};
-const snapshot:ActorPowerSnapshot={campaignId:"campaign",actorId:"actor",known:[ability],prepared:[ability],slots:[],uses:[],legalNow:[{powerRef:ability,legal:true,reasons:[]}],revision:2};
+const legalCommand={powerRef:ability,targeting:"single" as const,validTargets:[{actorId:"target",label:"Target"}],costs:[],concentration:false,effectKinds:["damage" as const]};
+const snapshot:ActorPowerSnapshot={campaignId:"campaign",actorId:"actor",known:[ability],prepared:[ability],slots:[],uses:[],legalNow:[{powerRef:ability,legal:true,reasons:[]}],legalCommands:[legalCommand],revision:2};
 function repository(read:(principal:string,actorId:string)=>unknown,use:((principal:string,actorId:string,input:unknown)=>unknown)=()=>{throw new Error("unsupported");}){return {getActorPowerSnapshot:read,useActorPower:use,close(){},listCampaigns:()=>[]} as unknown as CampaignListRepository;}
 
 describe("GET /api/rpg/v1/actors/:actorId/powers",()=>{
@@ -16,7 +17,7 @@ describe("GET /api/rpg/v1/actors/:actorId/powers",()=>{
     const app=buildApp({campaignRepositoryFactory:()=>repository((principal,actorId)=>{calls.push([principal,actorId]);return snapshot;})});
     const response=await app.inject({method:"GET",url:"/api/rpg/v1/actors/actor/powers",headers:{authorization:"Bearer caller","x-principal-id":"attacker"}});
     expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.json()).toEqual({known:[ability],prepared:[ability],slots:[],uses:[],legalNow:[{powerRef:ability,legal:true,reasons:[]}],revision:2});
+    expect(response.json()).toEqual({known:[ability],prepared:[ability],slots:[],uses:[],legalNow:[{powerRef:ability,legal:true,reasons:[]}],legalCommands:[legalCommand],revision:2});
     expect(calls).toEqual([["local-owner","actor"]]);expect(response.body).not.toContain("campaign");
     await app.close();
   });

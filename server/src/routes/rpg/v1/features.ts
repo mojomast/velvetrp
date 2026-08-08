@@ -144,7 +144,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">>,
-  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat">>,
+  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
@@ -255,7 +255,7 @@ type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useA
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
 type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">;
-type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat">;
+type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult">;
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
@@ -393,7 +393,7 @@ function assertCombatReadRepository(repository: CampaignListRepository): asserts
   }
 }
 function assertCombatCommandRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
-  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function")
+  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function")
     throw new UnsupportedCampaignRepositoryError();
 }
 function assertWorldHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&WorldHttpLaneRepository{

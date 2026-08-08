@@ -70,6 +70,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/combats\/[^/]+\/end-commands$/.test(path)) {
     return "/api/rpg/v1/combats/:combatId/end-commands";
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/combats\/[^/]+\/command-results\/[^/]+$/.test(path)) {
+    return "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey";
+  }
   if (path === "/api/rpg/v1/content-packs" || path === "/api/rpg/v1/content-packs/validate") return path;
   if (/^\/api\/rpg\/v1\/content-packs\/[^/]+\/versions\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/content-packs/:packId/versions/:packVersion";

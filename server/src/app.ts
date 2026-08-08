@@ -122,6 +122,11 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       queryDetail: method === "POST" ? "Storyline commands do not accept query parameters" : null,
       mechanics: true, noStore: true };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/combats\/[^/]+\/command-results\/[^/]+$/.test(instance)) {
+    return { instance: "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey", hasQuery,
+      queryDetail: method === "GET" ? "Combat command result does not accept query parameters" : null,
+      mechanics: true, combat: true, noStore: true };
+  }
   if (/^\/api\/rpg\/v1\/combats\/[^/]+(?:\/(?:log|action-commands|end-commands))?$/.test(instance)) {
     const log=instance.endsWith("/log"),action=instance.endsWith("/action-commands"),end=instance.endsWith("/end-commands");
     return {
@@ -479,7 +484,8 @@ export function buildApp(options: {
         const isCombat = normalizedRoute.instance === "/api/rpg/v1/combats/:combatId"
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/log"
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/action-commands"
-          || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/end-commands";
+          || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/end-commands"
+          || normalizedRoute.instance === "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey";
         return sendApiProblem(request, reply, 404,
           isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorWorld ? "RPG_ACTOR_WORLD_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isEncounter ? "RPG_ENCOUNTER_NOT_FOUND" : isNpc ? "RPG_NPC_NOT_FOUND" : isFaction ? "RPG_FACTION_NOT_FOUND" : isQuest ? "RPG_QUEST_NOT_FOUND" : isStoryline ? "RPG_STORYLINE_NOT_FOUND" : isCampaignFactions ? "RPG_CAMPAIGN_FACTIONS_NOT_FOUND" : isCombat ? "RPG_COMBAT_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
           isActorCheck ? "Actor check state not found" : isActorWorld ? "Actor world state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isEncounter ? "Encounter not found" : isNpc ? "NPC not found" : isFaction ? "Faction not found" : isQuest ? "Quest not found" : isStoryline ? "Storyline not found" : isCampaignFactions ? "Campaign factions not found" : isCombat ? "Combat not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {

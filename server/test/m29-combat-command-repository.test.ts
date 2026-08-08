@@ -75,6 +75,12 @@ describe("M2.9 combat command repository",()=>{
     expect(ended.rewards[0]).toMatchObject({recipientActorId:actorId,rewards:[{kind:"currency",amount:1,
       currency:{kind:"currency",definitionId:"velvet:mechanics:currency:glimmer"}}]});
     expect(repo.endCombat("local-owner",combat.combatId,endBody)).toEqual(ended);
+    expect(repo.getCombatCommandResult("local-owner",campaign.id,combat.combatId,endBody.idempotencyKey)).toEqual({operation:"end",result:{
+      encounter:Object.fromEntries(Object.entries(ended.encounter).filter(([key])=>key!=="campaignId")),
+      rewards:ended.rewards.map(({campaignId:_campaignId,encounterId:_encounterId,...reward})=>reward),
+      receipt:{idempotencyKey:ended.receipt.idempotencyKey,revisionBefore:ended.receipt.revisionBefore,revisionAfter:ended.receipt.revisionAfter,occurredAt:ended.receipt.occurredAt},
+    }});
+    expect(repo.getCombatCommandResult("local-owner","other-campaign",combat.combatId,endBody.idempotencyKey)).toBeNull();
     expect(()=>repo.endCombat("local-owner",combat.combatId,{...endBody,expectedRevision:endBody.expectedRevision+1}))
       .toThrow(EncounterConflictError);
     expect(()=>repo.endCombat("local-owner",combat.combatId,{expectedRevision:combat.revision,idempotencyKey:"stale-end"}))

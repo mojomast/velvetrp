@@ -1,15 +1,16 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
-  abilityCatalogDefinitionSchema, actorPowerActorStateSchema, actorPowerCommandRequestSchema,
+  actorPowerActorStateSchema, actorPowerCommandRequestSchema,
   actorPowerCommandResponseSchema, actorPowerResolutionSchema, resourceIdSchema,
-  spellCatalogDefinitionSchema, utcIsoTimestampSchema, type ActorPowerActorState,
+  utcIsoTimestampSchema, type ActorPowerActorState,
   type ActorPowerCommandRequest, type ActorPowerResolution,
 } from "@velvet/contracts";
 import { evaluateDiceExpression } from "../dice.js";
 import type { M16Dependencies, M16Result } from "./effectRepo.js";
 import { M16AuthorizationError, M16ConflictError, M16StaleError } from "./effectRepo.js";
 import { m15Authorized } from "./actorResourceRepo.js";
+import { planActorPowerCommands, plannedPowerSelection } from "./actorPowerCommandPlanner.js";
 
 export class ActorPowerNotFoundError extends Error { readonly code="ACTOR_POWER_NOT_FOUND"; }
 export class ActorPowerConflictError extends Error { readonly code="ACTOR_POWER_CONFLICT"; }
@@ -52,37 +53,15 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     const sourceRoot=db.prepare("SELECT revision FROM rpg_m16_mutation_revisions_v26 WHERE campaign_id=? AND actor_id=?").get(campaignId,actorId) as {revision:number}|undefined;
     const before=sourceRoot?.revision??0;if(before!==intent.expectedRevision)throw new M16StaleError("actor power revision stale");
 
-    const definitionRow=db.prepare(`SELECT visibility.public_definition_json FROM campaign_actors actor
-      JOIN character_known_powers_v23 known ON known.campaign_character_id=actor.campaign_character_id AND known.kind=? AND known.pack_id=? AND known.pack_version=? AND known.definition_id=?
-      JOIN campaign_catalog_current_pins pin ON pin.campaign_id=actor.campaign_id AND pin.pack_id=known.pack_id AND pin.pack_version=known.pack_version
-      JOIN rpg_catalog_definition_visibility visibility ON visibility.pack_id=known.pack_id AND visibility.pack_version=known.pack_version AND visibility.kind=known.kind AND visibility.definition_id=known.definition_id AND visibility.publicly_reachable=1
-      JOIN rpg_campaign_catalog_definitions_v25 execution ON execution.campaign_id=actor.campaign_id AND execution.pack_id=known.pack_id AND execution.pack_version=known.pack_version AND execution.kind=known.kind AND execution.definition_id=known.definition_id
-      WHERE actor.campaign_id=? AND actor.id=?`).get(intent.powerRef.kind,intent.powerRef.packId,intent.powerRef.packVersion,intent.powerRef.definitionId,campaignId,actorId) as {public_definition_json:string}|undefined;
-    if(!definitionRow)throw new ActorPowerConflictError("power is not currently known and executable");
-    const definition:any=intent.powerRef.kind==="ability"?abilityCatalogDefinitionSchema.parse(JSON.parse(definitionRow.public_definition_json)):spellCatalogDefinitionSchema.parse(JSON.parse(definitionRow.public_definition_json));
-    if(refKey(definition.reference)!==refKey(intent.powerRef))throw new ActorPowerConflictError("power identity mismatch");
-
-    const targetKind:string=definition.mechanics.target;
-    const targetIds=targetKind==="self"?[actorId]:[...intent.targetIds];
-    if((targetKind==="self"&&intent.targetIds.length!==0)||(targetKind==="area"&&targetIds.length===0)
-      ||(!["self","area"].includes(targetKind)&&(targetIds.length!==1||targetIds[0]===actorId)))throw new ActorPowerConflictError("illegal power target selection");
-    for(const targetId of targetIds){if((targetKind!=="self"&&targetId===actorId)||!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(campaignId,targetId))throw new ActorPowerConflictError("power target unavailable");}
-    const persistentCount=definition.mechanics.effects.filter((effect:any)=>effect.type==="condition"||(effect.type==="modifier"&&effect.duration!=="instant")).length;
-    if(persistentCount>1)throw new ActorPowerConflictError("catalog effect set cannot be represented atomically");
-
-    const costs:any[]=[];
-    if(intent.powerRef.kind==="ability"&&definition.mechanics.uses>0){
-      let recoveredAt:string|null=null;const recovery=definition.mechanics.recovery;
-      if(recovery==="short-rest"||recovery==="long-rest"){const kinds=recovery==="short-rest"?["short","long"]:["long"];recoveredAt=(db.prepare(`SELECT max(occurred_at) occurred_at FROM rpg_rest_receipts_v25 WHERE campaign_id=? AND actor_id=? AND rest_kind IN (${kinds.map(()=>"?").join(",")})`).get(campaignId,actorId,...kinds) as any).occurred_at;}
-      else if(recovery==="encounter")recoveredAt=(db.prepare("SELECT max(encounter.updated_at) occurred_at FROM encounter JOIN combatant ON combatant.encounter_id=encounter.encounter_id AND combatant.campaign_id=encounter.campaign_id WHERE encounter.campaign_id=? AND combatant.actor_id=? AND encounter.status='completed'").get(campaignId,actorId) as any).occurred_at;
-      const used=(db.prepare(`SELECT count(*) count FROM rpg_power_uses_v26 power JOIN rpg_m16_receipts_v26 receipt ON receipt.campaign_id=power.campaign_id AND receipt.actor_id=power.actor_id AND receipt.command_id=power.command_id WHERE power.campaign_id=? AND power.actor_id=? AND power.power_kind=? AND power.power_pack_id=? AND power.power_pack_version=? AND power.power_definition_id=? AND (? IS NULL OR receipt.occurred_at>?)`).get(campaignId,actorId,intent.powerRef.kind,intent.powerRef.packId,intent.powerRef.packVersion,intent.powerRef.definitionId,recoveredAt,recoveredAt) as any).count;
-      if(used>=definition.mechanics.uses)throw new ActorPowerInsufficientError("finite uses exhausted");costs.push({kind:"ability-use",amount:1});
-    }
-    if(intent.powerRef.kind==="spell"&&definition.mechanics.level>0){const slotId=`slot-${definition.mechanics.level}`,slot=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?").get(campaignId,actorId,slotId) as any;if(!slot||slot.current<1)throw new ActorPowerInsufficientError("spell slot unavailable");costs.push({kind:"slot",slotId,amount:1});}
+    const plan=planActorPowerCommands(db,campaignId,actorId).find((candidate)=>refKey(candidate.powerRef)===refKey(intent.powerRef));
+    if(!plan)throw new ActorPowerConflictError("power is not currently legal");
+    const targetIds=plannedPowerSelection(plan,actorId,intent);
+    if(!targetIds)throw new ActorPowerConflictError("illegal power target selection");
+    const definition:any=plan.definition,costs:any[]=plan.costs;
 
     const states=new Map<string,Resource[]>();const load=(id:string)=>{let value=states.get(id);if(!value){value=(db.prepare("SELECT name resourceId,current,max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(campaignId,id) as Resource[]).map(row=>({...row}));states.set(id,value);}return value;};
-    // Validate every required resource before consuming RNG or allocating IDs.
-    for(const id of targetIds)for(const effect of definition.mechanics.effects){const resourceId=effect.type==="damage"||effect.type==="healing"?"health":effect.type==="resource"?(effect.resource==="spell-slot"&&intent.powerRef.kind==="spell"&&definition.mechanics.level>0?`slot-${definition.mechanics.level}`:effect.resource):null;if(resourceId&&(!load(id).some(row=>row.resourceId===resourceId)||resourceId==="spell-slot"))throw new ActorPowerConflictError("effect resource unavailable");}
+    // The shared planner checked required resources. Re-read into this transaction's mutable working set.
+    targetIds.forEach(load);
     const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),powerUseId=resourceIdSchema.parse(deps.ids.nextId());
     const outcomes:any[]=[],deltas:any[]=[],newEffects=new Map<string,NewEffect>(),replacements=new Map<string,string>();
     const change=(id:string,name:string,amount:number)=>{const row=load(id).find(item=>item.resourceId===name)!;const prior=row.current;row.current=Math.max(0,Math.min(row.capacity,prior+amount));if(prior!==row.current)deltas.push({kind:"resource",actorId:id,resourceId:name,before:prior,after:row.current});return row.current-prior;};

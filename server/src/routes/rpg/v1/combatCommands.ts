@@ -3,6 +3,8 @@ import {
   combatActionCommandResponseSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
+  combatCommandResultResponseSchema,
+  idempotencyKeySchema,
   resourceIdSchema,
   type CombatState,
   type EncounterPublic,
@@ -21,7 +23,7 @@ import {
 
 const LOCAL_OWNER="local-owner";
 const APPLICATION_JSON=/^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"endCombat">;
+type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"endCombat"|"getCombatCommandResult">;
 export interface CombatCommandsHttpOptions{combatCommandRepositoryAccessor:()=>CombatCommandRepository;}
 
 function enabled():boolean{const flags=readRpgFeatureFlags();return flags.campaign&&flags.mechanics&&flags.combat;}
@@ -42,6 +44,28 @@ function publicEncounter(value:ReturnType<CombatCommandRepository["endCombat"]>[
 }
 
 export const combatCommandsHttpRoutes:FastifyPluginAsync<CombatCommandsHttpOptions>=async(app,options)=>{
+  app.get<{Params:{campaignId:string;combatId:string;idempotencyKey:string};Querystring:Record<string,unknown>}>(
+    "/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey",{exposeHeadRoute:false,onRequest:async(request,reply)=>{
+      reply.header("cache-control","no-store");
+      if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0)
+        await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat command result does not accept query parameters");
+    }},async(request,reply)=>{
+      const campaignId=resourceIdSchema.safeParse(request.params.campaignId),combatId=resourceIdSchema.safeParse(request.params.combatId),key=idempotencyKeySchema.safeParse(request.params.idempotencyKey);
+      if(!campaignId.success||!combatId.success||!key.success)return notFound(request,reply);
+      try{
+        const result=options.combatCommandRepositoryAccessor().getCombatCommandResult("local-owner",campaignId.data,combatId.data,key.data);
+        if(result===null)return notFound(request,reply);
+        const response=combatCommandResultResponseSchema.parse(result);
+        const bound=response.operation==="action"?response.result.combat.combatId===combatId.data&&response.result.receipt.idempotencyKey===key.data
+          :response.result.encounter.encounterId===combatId.data&&response.result.receipt.idempotencyKey===key.data;
+        if(!bound)throw new Error("combat command result binding is invalid");
+        return reply.code(200).send(response);
+      }catch{
+        request.log.error({operation:"combat-command-result",method:request.method,route:request.routeOptions.url},"RPG combat command result read failed");
+        return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Combat command result could not be loaded");
+      }
+    });
   app.post<{Params:{combatId:string};Querystring:Record<string,unknown>;Body:unknown}>("/combats/:combatId/action-commands",{
     onRequest:async(request,reply)=>{
       reply.header("cache-control","no-store");

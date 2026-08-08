@@ -7,7 +7,8 @@ const spell={kind:"spell" as const,packId:"pack",packVersion:"1.0.0",definitionI
 describe("actor powers HTTP contract",()=>{
   const valid={known:[ability,spell],prepared:[ability,spell],slots:[{slotId:"slot-1",level:1,current:1,max:2}],
     uses:[{powerRef:ability,current:0,max:1,recovery:"short-rest" as const}],
-    legalNow:[{powerRef:ability,legal:false,reasons:["finite-uses-exhausted" as const]},{powerRef:spell,legal:true,reasons:[]}],revision:4};
+    legalNow:[{powerRef:ability,legal:false,reasons:["finite-uses-exhausted" as const]},{powerRef:spell,legal:true,reasons:[]}],
+    legalCommands:[{powerRef:spell,targeting:"single" as const,validTargets:[{actorId:"target",label:"Target"}],costs:[{kind:"slot" as const,slotId:"slot-1",amount:1 as const}],concentration:true,effectKinds:["damage" as const]}],revision:4};
 
   it("accepts the strict, bound starter projection",()=>{
     expect(actorPowersResponseSchema.parse(valid)).toEqual(valid);

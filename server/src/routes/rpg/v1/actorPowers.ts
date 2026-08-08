@@ -35,14 +35,14 @@ export const actorPowersHttpRoutes:FastifyPluginAsync<ActorPowersHttpOptions>=as
       try{
         const snapshot=options.powerRepositoryAccessor().getActorPowerSnapshot(LOCAL_OWNER,actorId.data);
         if(snapshot===null)return notFound(request,reply);
-        const allowed=new Set(["campaignId","actorId","known","prepared","slots","uses","legalNow","revision"]);
+        const allowed=new Set(["campaignId","actorId","known","prepared","slots","uses","legalNow","legalCommands","revision"]);
         if(typeof snapshot!=="object"||Object.keys(snapshot).some((key)=>!allowed.has(key)))
           throw new Error("actor power snapshot shape is invalid");
         if(snapshot.actorId!==actorId.data||!resourceIdSchema.safeParse(snapshot.campaignId).success)
           throw new Error("actor power snapshot binding is invalid");
         return reply.code(200).send(actorPowersResponseSchema.parse({
           known:snapshot.known,prepared:snapshot.prepared,slots:snapshot.slots,
-          uses:snapshot.uses,legalNow:snapshot.legalNow,revision:snapshot.revision,
+          uses:snapshot.uses,legalNow:snapshot.legalNow,legalCommands:snapshot.legalCommands,revision:snapshot.revision,
         }));
       }catch{
         request.log.error({operation:"actor-powers-read",method:request.method,route:request.routeOptions.url},"RPG actor powers read failed");

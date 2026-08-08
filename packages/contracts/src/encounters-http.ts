@@ -306,6 +306,12 @@ export const combatEndCommandResponseSchema = z.object({
   }
 });
 
+/** Immutable receipt lookup result. This endpoint never executes a command. */
+export const combatCommandResultResponseSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("action"), result: combatActionCommandResponseSchema }).strict(),
+  z.object({ operation: z.literal("end"), result: combatEndCommandResponseSchema }).strict(),
+]);
+
 export type EncounterCreateRequest = z.infer<typeof encounterCreateRequestSchema>;
 export type EncounterCombatantPublic = z.infer<typeof encounterCombatantPublicSchema>;
 export type EncounterPublic = z.infer<typeof encounterPublicSchema>;
@@ -323,3 +329,4 @@ export type CombatActionCommandResponse = z.infer<typeof combatActionCommandResp
 export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSchema>;
 export type CombatRewardGrantPublic = z.infer<typeof combatRewardGrantPublicSchema>;
 export type CombatEndCommandResponse = z.infer<typeof combatEndCommandResponseSchema>;
+export type CombatCommandResultResponse = z.infer<typeof combatCommandResultResponseSchema>;

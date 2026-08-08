@@ -2,6 +2,9 @@ import type DatabaseDriver from "better-sqlite3";
 import {
   combatStateSchema,
   combatLogSchema,
+  combatActionCommandResponseSchema,
+  combatCommandResultResponseSchema,
+  combatEndCommandResponseSchema,
   encounterPublicSchema,
   legalCombatActionAllowlistSchema,
   utcIsoTimestampSchema,
@@ -9,6 +12,7 @@ import {
   type CombatLogEntry,
   type EncounterPublic,
   type LegalCombatActionAllowlist,
+  type CombatCommandResultResponse,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
@@ -36,6 +40,8 @@ export interface EncounterReadRepository {
   listCombatLogPage(principal: string, combatId: string, afterSequence: number, limit: number): CombatLogPage | null;
   /** Returns actions currently available to the principal's active combatant. */
   getLegalCombatActionAllowlist(principal: string, campaignId: string, encounterId: string): LegalCombatActionAllowlist | null;
+  /** Reads an existing immutable HTTP command result without executing or replaying it. */
+  getCombatCommandResult(principal: string, campaignId: string, combatId: string, idempotencyKey: string): CombatCommandResultResponse | null;
   /** Returns validated public combat-log entries when the principal may view the encounter. */
   listCombatLog(principal: string, campaignId: string, encounterId: string): unknown[];
 }
@@ -50,6 +56,9 @@ export function createEncounterReadRepository(
   );
   const controls = (principal: string, campaignId: string, actorId: string): boolean => Boolean(
     db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(campaignId, actorId, principal),
+  );
+  const gm = (principal: string, campaignId: string): boolean => Boolean(
+    db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(campaignId, principal),
   );
   const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,
     provenance.pack_id provenance_pack_id,provenance.pack_version provenance_pack_version,
@@ -156,5 +165,32 @@ export function createEncounterReadRepository(
     const rows = db.prepare("SELECT log_id,log_json,occurred_at FROM combat_log WHERE encounter_id=? ORDER BY occurred_at,log_ordinal,log_id").all(encounterId) as CombatLogRow[];
     return combatLogSchema.parse(projectCombatLogRows(rows, campaignId, encounterId));
   };
-  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog };
+  const getCombatCommandResult = (principal: string, campaignId: string, combatId: string, idempotencyKey: string): CombatCommandResultResponse | null => {
+    const encounter = db.prepare("SELECT campaign_id FROM encounter WHERE encounter_id=? AND campaign_id=?").get(combatId, campaignId) as { campaign_id: string } | undefined;
+    if (!encounter || !member(principal, campaignId)) return null;
+    const row = db.prepare(`SELECT command.command_type,command.actor_id,receipt.canonical_result_json
+      FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt USING(encounter_id,command_id)
+      WHERE command.encounter_id=? AND command.idempotency_key=? AND command.command_type IN ('resolve_action','grant_rewards')`)
+      .get(combatId, idempotencyKey) as { command_type: "resolve_action" | "grant_rewards"; actor_id: string | null; canonical_result_json: string } | undefined;
+    if (!row) return null;
+    if (row.command_type === "resolve_action" && !gm(principal, campaignId)
+      && (row.actor_id === null || !controls(principal, campaignId, row.actor_id))) return null;
+    if (row.command_type === "grant_rewards" && !gm(principal, campaignId)) return null;
+    const internal = JSON.parse(row.canonical_result_json) as any;
+    if (internal.campaignId !== campaignId || internal.encounterId !== combatId) throw new Error("combat command receipt binding is invalid");
+    if (row.command_type === "resolve_action") {
+      const combat = internal.combat;
+      const result = combatActionCommandResponseSchema.parse({ resolution: internal.resolution,
+        combat: { combatId, round: combat.round, currentCombatant: combat.currentCombatant, combatants: combat.combatants, legalActions: combat.legalActions, revision: combat.revision },
+        receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
+      return combatCommandResultResponseSchema.parse({ operation: "action", result });
+    }
+    const encounterResult = internal.encounter;
+    const result = combatEndCommandResponseSchema.parse({ encounter: { encounterId: combatId, sessionId: encounterResult.sessionId, name: encounterResult.name,
+      status: encounterResult.status, combatId: encounterResult.combatId, combatants: encounterResult.combatants, revision: encounterResult.revision,
+      createdAt: encounterResult.createdAt, updatedAt: encounterResult.updatedAt }, rewards: internal.rewards.map(({ campaignId: _campaign, encounterId: _encounter, ...reward }: any) => reward),
+      receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
+    return combatCommandResultResponseSchema.parse({ operation: "end", result });
+  };
+  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult };
 }

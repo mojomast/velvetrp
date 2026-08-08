@@ -27,10 +27,17 @@ function repository(overrides:Record<string,unknown>={}){
     receipt:{commandId:"private",idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}),
   endCombat:()=>({campaignId:"campaign",encounterId:"combat",encounter,rewards:[reward],
     receipt:{commandId:"private",idempotencyKey:"end",revisionBefore:3,revisionAfter:4,occurredAt:at}}),
+  getCombatCommandResult:()=>({operation:"action",result:{resolution,combat:Object.fromEntries(Object.entries(combat).filter(([key])=>key!=="campaignId"&&key!=="encounterId")),receipt:{idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}}),
   close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;
 }
 
 describe("M2.9 combat command routes",()=>{
+  it("reads an existing campaign-scoped command result without executing a command",async()=>{
+    enable();let reads=0;const app=buildApp({campaignRepositoryFactory:()=>repository({getCombatCommandResult:(...args:any[])=>{reads++;expect(args).toEqual(["local-owner","campaign","combat","attack"]);return {operation:"action",result:{resolution,combat:Object.fromEntries(Object.entries(combat).filter(([key])=>key!=="campaignId"&&key!=="encounterId")),receipt:{idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}};}})});
+    const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/combats/combat/command-results/attack"});
+    expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");expect(response.json()).toMatchObject({operation:"action",result:{resolution:{actionId:"action"}}});expect(reads).toBe(1);
+    expect((await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/combats/combat/command-results/attack?x=1"})).statusCode).toBe(400);await app.close();
+  });
   it("uses fixed local ownership and returns strict action and reward projections",async()=>{
     enable();const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repository({
       resolveCombatAction:(...args:any[])=>{calls.push(["action",...args]);return {campaignId:"campaign",encounterId:"combat",

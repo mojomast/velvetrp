@@ -18,6 +18,7 @@ import { createCharacterProgressionReadRepository } from "./characterProgression
 import { runM16Mutation, type M16Dependencies, type M16Result } from "./effectRepo.js";
 import { m15Authorized } from "./actorResourceRepo.js";
 import { useActorPower as executeActorPower, ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError } from "./actorPowerUseRepo.js";
+import { planActorPowerCommands } from "./actorPowerCommandPlanner.js";
 
 export class PowerUnavailableError extends Error { readonly code="POWER_UNAVAILABLE"; }
 export class PowerInsufficientResourceError extends Error { readonly code="POWER_INSUFFICIENT_RESOURCE"; }
@@ -118,7 +119,8 @@ export function createPowerRepository(db:DatabaseDriver.Database,deps:M16Depende
     });
     const revision=(db.prepare("SELECT revision FROM rpg_m16_mutation_revisions_v26 WHERE campaign_id=? AND actor_id=?")
       .get(actor.campaign_id,parsedActor) as {revision:number}|undefined)?.revision??0;
-    const response=actorPowersResponseSchema.parse({known,prepared:known,slots,uses,legalNow,revision});
+    const legalCommands=planActorPowerCommands(db,actor.campaign_id,parsedActor).map(({definition:_definition,...command})=>command);
+    const response=actorPowersResponseSchema.parse({known,prepared:known,slots,uses,legalNow,legalCommands,revision});
     return {...response,campaignId:actor.campaign_id,actorId:parsedActor};
   }).deferred();
 

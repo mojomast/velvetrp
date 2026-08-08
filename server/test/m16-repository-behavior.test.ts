@@ -76,6 +76,10 @@ describe("M1.6 repository behavior", () => {
     expect(initial!.slots).toContainEqual({slotId:"slot-1",level:1,current:1,max:1});
     expect(initial!.uses.every((state) => state.current>=0&&state.current<=state.max)).toBe(true);
     expect(initial!.legalNow).toHaveLength(initial!.known.length);
+    expect(initial!.legalCommands).toEqual(expect.arrayContaining([
+      expect.objectContaining({powerRef:ability,targeting:"single",validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[],effectKinds:["damage"]}),
+      expect.objectContaining({powerRef:spell,targeting:"single",validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"slot",slotId:"slot-1",amount:1}],concentration:true,effectKinds:["modifier"]}),
+    ]));
     const accessDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     for(const [principal,label] of [["powers-gm","GM"],["powers-controller","Controller"],["powers-observer","Observer"],["powers-unrelated","Unrelated"]])
       accessDb.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,label);
@@ -106,6 +110,7 @@ describe("M1.6 repository behavior", () => {
     const exhausted=f.repo.getActorPowerSnapshot("local-owner",f.source)!;
     expect(exhausted.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(0);
     expect(exhausted.legalNow.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.reasons).toContain("finite-uses-exhausted");
+    expect(exhausted.legalCommands.some((command)=>command.powerRef.definitionId===finite.powerRef.definitionId)).toBe(false);
     f.repo.takeRest("local-owner",{type:"take_long_rest",campaignId:f.campaign,actorId:f.source,expectedRevision:0,idempotencyKey:"recover"});
     expect(f.repo.getActorPowerSnapshot("local-owner",f.source)!.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(finite.max);
     expect(f.repo.getActorPowerSnapshot("local-owner",f.source)?.revision).toBe(1);
