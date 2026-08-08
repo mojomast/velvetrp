@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-history", "campaign-transfer", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -107,6 +107,14 @@ describe("navigation persistence", () => {
     expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "bad/id" })).toEqual({ view: "campaigns", selectedIds: [] });
     expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "campaign-one" }))
       .toEqual({ view: "campaign-administration", campaignId: "campaign-one", selectedIds: [] });
+  });
+
+  it("restores campaign history and transfer only with a strict campaign identity", () => {
+    for (const view of ["campaign-history", "campaign-transfer"] as const) {
+      expect(parseStoredNavigation({ view })).toEqual({ view: "campaigns", selectedIds: [] });
+      expect(parseStoredNavigation({ view, campaignId: "bad/id" })).toEqual({ view: "campaigns", selectedIds: [] });
+      expect(parseStoredNavigation({ view, campaignId: "campaign-one" })).toEqual({ view, campaignId: "campaign-one", selectedIds: [] });
+    }
   });
 
   it("restores combat only inside a campaign and preserves a safe return origin", () => {

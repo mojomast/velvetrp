@@ -14,11 +14,20 @@ import {
   campaignHistoryHttpCheckpointRequestSchema,
   campaignHistoryHttpCheckpointResponseSchema,
   campaignHistoryHttpCheckpointSchema,
+  campaignHistoryHttpCommandReceiptSchema,
+  campaignHistoryHttpEventsQuerySchema,
+  campaignHistoryHttpEventsResponseSchema,
   campaignHistoryHttpForkRequestSchema,
   campaignHistoryHttpForkResponseSchema,
+  campaignHistoryHttpRecapRequestSchema,
+  campaignHistoryHttpRecapResponseSchema,
+  campaignHistoryHttpRecapSchema,
   campaignHistoryHttpTimelinesResponseSchema,
+  campaignTransferHttpApplyRequestSchema,
+  campaignTransferHttpApplyResponseSchema,
   campaignTransferHttpDryRunRequestSchema,
   campaignTransferHttpDryRunResponseSchema,
+  campaignTransferHttpExportDocumentSchema,
 } from "@velvet/contracts";
 import type {
   CampaignAdministrationHttpArchiveRequest,
@@ -34,11 +43,20 @@ import type {
   CampaignHistoryHttpCheckpoint,
   CampaignHistoryHttpCheckpointRequest,
   CampaignHistoryHttpCheckpointResponse,
+  CampaignHistoryHttpCommandReceipt,
+  CampaignHistoryHttpEventsQuery,
+  CampaignHistoryHttpEventsResponse,
   CampaignHistoryHttpForkRequest,
   CampaignHistoryHttpForkResponse,
+  CampaignHistoryHttpRecap,
+  CampaignHistoryHttpRecapRequest,
+  CampaignHistoryHttpRecapResponse,
   CampaignHistoryHttpTimelinesResponse,
+  CampaignTransferHttpApplyRequest,
+  CampaignTransferHttpApplyResponse,
   CampaignTransferHttpDryRunRequest,
   CampaignTransferHttpDryRunResponse,
+  CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
 import {
   actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, campaignQuestsHttpResponseSchema, campaignStoryHttpResponseSchema,
@@ -1590,6 +1608,73 @@ export async function listCampaignTimelines(campaignId: string): Promise<Campaig
   return response;
 }
 
+/** Reads one bounded, stable history page using a revision cursor. */
+export async function listCampaignEvents(
+  campaignId: string,
+  query: CampaignHistoryHttpEventsQuery,
+): Promise<CampaignHistoryHttpEventsResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const input = parseApiInput(() => campaignHistoryHttpEventsQuerySchema.parse(query));
+  const params = new URLSearchParams({ timelineId: input.timelineId, afterRevision: String(input.afterRevision), limit: String(input.limit) });
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/events?${params}`, { cache: "no-store" });
+  if (success.status !== 200) throw new Error("Campaign event page response did not use the documented status");
+  const response = campaignHistoryHttpEventsResponseSchema.parse(success.body);
+  let previous = input.afterRevision;
+  for (const event of response.events) {
+    if (event.timelineId !== input.timelineId || event.revision <= previous) throw new Error("Campaign event page was not bound to its cursor");
+    previous = event.revision;
+  }
+  if (response.events.length > input.limit
+    || (response.nextAfterRevision !== null && response.nextAfterRevision !== previous)) {
+    throw new Error("Campaign event page returned an invalid cursor");
+  }
+  return response;
+}
+
+export async function getCampaignCommandReceipt(campaignId: string, commandId: string): Promise<{ receipt: CampaignHistoryHttpCommandReceipt }> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const command = parseApiInput(() => resourceIdSchema.parse(commandId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/commands/${encodeURIComponent(command)}/receipt`, { cache: "no-store" });
+  if (success.status !== 200) throw new Error("Campaign receipt response did not use the documented status");
+  const value = success.body;
+  if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).join(",") !== "receipt") {
+    throw new Error("Campaign receipt response was malformed");
+  }
+  const receipt = campaignHistoryHttpCommandReceiptSchema.parse((value as { receipt: unknown }).receipt);
+  if (receipt.commandId !== command || receipt.events[0].commandId !== command) throw new Error("Campaign receipt did not match the requested command");
+  return { receipt };
+}
+
+export async function listCampaignRecaps(campaignId: string): Promise<{ recaps: CampaignHistoryHttpRecap[] }> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { cache: "no-store" });
+  if (success.status !== 200) throw new Error("Campaign recap response did not use the documented status");
+  const value = success.body;
+  if (typeof value !== "object" || value === null || Array.isArray(value) || Object.keys(value).join(",") !== "recaps") throw new Error("Campaign recap response was malformed");
+  return { recaps: campaignHistoryHttpRecapSchema.array().max(1000).parse((value as { recaps: unknown }).recaps) };
+}
+
+export async function createCampaignRecap(campaignId: string, input: CampaignHistoryHttpRecapRequest): Promise<CampaignHistoryHttpRecapResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => campaignHistoryHttpRecapRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/recaps`, { method: "POST", body: JSON.stringify(body) });
+  if (success.status !== 201) throw new Error("Campaign recap response did not use the committed status");
+  const response = campaignHistoryHttpRecapResponseSchema.parse(success.body);
+  const event = response.receipt.events[0];
+  if (response.recap.timelineId !== body.timelineId || response.recap.throughRevision !== body.throughRevision
+    || response.recap.visibility !== body.visibility || response.recap.text !== body.text
+    || JSON.stringify(response.recap.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds)
+    || response.recap.createdAt !== response.receipt.occurredAt
+    || response.receipt.type !== "recap_created" || response.receipt.revisionBefore !== body.expectedRevision
+    || event.type !== "recap_created" || event.commandId !== response.receipt.commandId
+    || event.data.timelineId !== body.timelineId || event.data.throughRevision !== body.throughRevision
+    || event.data.visibility !== body.visibility || JSON.stringify(event.data.selectedSessionIds) !== JSON.stringify(body.selectedSessionIds)
+    || "text" in event.data) {
+    throw new Error("Campaign recap receipt did not match the request");
+  }
+  return response;
+}
+
 export async function listCampaignCheckpoints(campaignId: string): Promise<{ checkpoints: CampaignHistoryHttpCheckpoint[] }> {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   const body = await request<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, { cache: "no-store" });
@@ -1652,6 +1737,34 @@ export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequ
   const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign import report response did not use the documented status");
   return campaignTransferHttpDryRunResponseSchema.parse(success.body);
+}
+
+/** Applies exactly one server-stored dry run. Callers must not replay this write. */
+export async function applyCampaignImport(importId: string, input: CampaignTransferHttpApplyRequest): Promise<CampaignTransferHttpApplyResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(importId));
+  const body = parseApiInput(() => campaignTransferHttpApplyRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-imports/${encodeURIComponent(id)}/apply`, { method: "POST", body: JSON.stringify(body) });
+  if (success.status !== 200) throw new Error("Campaign import apply response did not use the committed status");
+  const response = campaignTransferHttpApplyResponseSchema.parse(success.body);
+  const event = response.receipt.events[0];
+  if (response.campaign.actorRole !== "owner" || response.receipt.type !== "import_applied"
+    || response.receipt.campaignId !== response.campaign.id || event.campaignId !== response.campaign.id
+    || event.type !== "import_applied" || event.commandId !== response.receipt.commandId
+    || event.revision !== response.receipt.revisionAfter || event.occurredAt !== response.receipt.occurredAt
+    || event.data.importId !== id) {
+    throw new Error("Campaign import receipt did not match the imported campaign");
+  }
+  return response;
+}
+
+/** Fetches and validates the exact portable export document without caching. */
+export async function getCampaignExport(campaignId: string, includeMessages: boolean): Promise<CampaignTransferHttpExportDocument> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/export?includeMessages=${includeMessages ? "true" : "false"}`, { cache: "no-store" });
+  if (success.status !== 200) throw new Error("Campaign export response did not use the documented status");
+  const document = campaignTransferHttpExportDocumentSchema.parse(success.body);
+  if (document.messages.included !== includeMessages) throw new Error("Campaign export did not match the message choice");
+  return document;
 }
 
 function contentPackPath(packId: string, packVersion: string): { packId: string; packVersion: string; path: string } {

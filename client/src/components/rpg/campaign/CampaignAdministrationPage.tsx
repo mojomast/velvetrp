@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   CampaignAdministration,
   CampaignAdministrationHttpMembership,
@@ -6,14 +6,12 @@ import type {
   CampaignHistoryHttpCheckpoint,
   CampaignHistoryHttpCommandReceipt,
   CampaignHistoryHttpTimeline,
-  CampaignImportReport,
   ContentCatalogHttpCampaignContent,
   ContentCatalogHttpCampaignContentReceipt,
   ContentCatalogHttpCampaignPack,
   PublicationSummary,
   CampaignLifecycleStatus,
   CampaignMemberRole,
-  CampaignTransferPackage,
 } from "@velvet/contracts";
 import {
   ApiError,
@@ -22,7 +20,6 @@ import {
   archiveCampaignAdministration,
   createCampaignCheckpoint,
   configureCampaignContent,
-  dryRunCampaignImport,
   forkCampaignTimeline,
   getCampaignAdministration,
   getCampaignContent,
@@ -46,6 +43,8 @@ export interface CampaignAdministrationPageProps {
   campaignName?: string;
   onBack: () => void;
   onUnavailable: () => void;
+  onOpenHistory?: () => void;
+  onOpenTransfer?: () => void;
   focusHeadingRequest?: number;
   onHeadingFocused?: (request: number) => void;
 }
@@ -105,7 +104,7 @@ function definitionsByKind(catalog: ContentCatalogHttpCampaignPack) {
   return [...groups.entries()];
 }
 
-export function CampaignAdministrationPage({ campaignId, campaignName: initialName = "", onBack, onUnavailable, focusHeadingRequest, onHeadingFocused = () => undefined }: CampaignAdministrationPageProps) {
+export function CampaignAdministrationPage({ campaignId, campaignName: initialName = "", onBack, onUnavailable, onOpenHistory = () => window.dispatchEvent(new CustomEvent("velvet:open-campaign-history")), onOpenTransfer = () => window.dispatchEvent(new CustomEvent("velvet:open-campaign-transfer", { detail: { campaignName: initialName } })), focusHeadingRequest, onHeadingFocused = () => undefined }: CampaignAdministrationPageProps) {
   const [campaign, setCampaign] = useState<CampaignAdministration | null>(null);
   const [campaignName, setCampaignName] = useState<string | null>(null);
   const [campaignNameLoading, setCampaignNameLoading] = useState(false);
@@ -119,10 +118,6 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   const [mutationEntry, setMutationEntry] = useState<CampaignMutationEntry | null>(() => campaignMutationRegistry.get(campaignId) ?? null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [importBusy, setImportBusy] = useState(false);
-  const [importError, setImportError] = useState("");
-  const [importReport, setImportReport] = useState<CampaignImportReport | null>(null);
-  const [importPackage, setImportPackage] = useState<CampaignTransferPackage | null>(null);
   const [catalogContent, setCatalogContent] = useState<ContentCatalogHttpCampaignContent | null>(null);
   const [catalogPublications, setCatalogPublications] = useState<PublicationSummary[]>([]);
   const [catalogPack, setCatalogPack] = useState<ContentCatalogHttpCampaignPack | null>(null);
@@ -227,7 +222,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
     activeCampaignRef.current = campaignId;
     setCampaign(null); setMemberships([]); setTimelines([]); setCheckpoints([]);
     setCampaignName(null); setCampaignNameLoading(false);
-    setNotice(""); setError(""); setImportReport(null); setImportPackage(null); setImportError("");
+    setNotice(""); setError("");
     setCatalogContent(null); setCatalogPublications([]); setCatalogPack(null); setCatalogError(""); setCatalogInspecting(false);
     const currentEntry = campaignMutationRegistry.get(campaignId) ?? null;
     setMutationEntry(currentEntry);
@@ -325,29 +320,6 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
     }
   }
 
-  async function chooseImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    setImportReport(null); setImportPackage(null); setImportError("");
-    if (!file) return;
-    if (file.size > 1_000_000) { setImportError("Import packages must be 1 MB or smaller."); return; }
-    try {
-      const value = JSON.parse(await file.text()) as unknown;
-      if (typeof value !== "object" || value === null || !("package" in value)) throw new Error("missing package");
-      setImportPackage((value as { package: CampaignTransferPackage }).package);
-    } catch { setImportError("Choose a Velvet campaign export JSON document."); }
-  }
-
-  async function inspectImport() {
-    if (!importPackage || importBusy) return;
-    setImportBusy(true); setImportError(""); setImportReport(null);
-    try {
-      const result = await dryRunCampaignImport({ package: importPackage, mode: "dry-run" });
-      if (mountedRef.current) setImportReport(result.report);
-    } catch (reportError) {
-      if (mountedRef.current) setImportError(errorMessage(reportError, "The import report could not be created. No campaign state was changed."));
-    } finally { if (mountedRef.current) setImportBusy(false); }
-  }
-
   async function inspectCampaignPack(packId: string, packVersion: string): Promise<void> {
     if (catalogInspecting) return;
     const requestedCampaignId = campaignId;
@@ -376,7 +348,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   const owner = campaign.actorRole === "owner";
   const expectedRevision = campaign.revision;
   return <main className="page library-page campaign-page administration-page"><section className="campaign-shell" aria-labelledby="administration-heading">
-    <header className="library-header"><div><button className="back-link" disabled={busy} onClick={onBack}>← Campaign</button><p className="eyebrow">TRUSTED LOCAL · {campaign.actorRole.toUpperCase()} VIEW</p><h1 ref={headingRef} tabIndex={-1} className="title" id="administration-heading">Campaign administration</h1><p className="subtitle">{campaignName ?? (initialName || "Current campaign")}</p></div><button className="ghost" disabled={busy || refreshing} onClick={() => void load(true, true)}>{refreshing ? "Refreshing…" : "Refresh"}</button></header>
+    <header className="library-header"><div><button className="back-link" disabled={busy} onClick={onBack}>← Campaign</button><p className="eyebrow">TRUSTED LOCAL · {campaign.actorRole.toUpperCase()} VIEW</p><h1 ref={headingRef} tabIndex={-1} className="title" id="administration-heading">Campaign administration</h1><p className="subtitle">{campaignName ?? (initialName || "Current campaign")}</p></div><div className="button-row">{onOpenHistory&&<button className="ghost" disabled={busy} onClick={onOpenHistory}>History & recaps</button>}{owner&&onOpenTransfer&&<button className="ghost" disabled={busy} onClick={onOpenTransfer}>Import / export</button>}<button className="ghost" disabled={busy || refreshing} onClick={() => void load(true, true)}>{refreshing ? "Refreshing…" : "Refresh"}</button></div></header>
 
     {(notice || error || mutationEntry) && <div ref={statusRef} tabIndex={-1} className={`admin-status ${error || uncertain ? "is-error" : "is-success"}`} role={error || uncertain ? "alert" : "status"}>
       <p>{error || mutationEntry?.message || notice}</p>
@@ -408,18 +380,6 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         {catalogPack && <section className="campaign-pack-inspection" aria-labelledby="campaign-pack-inspection-heading"><div className="content-studio-heading"><div><p className="eyebrow">ROLE-FILTERED EXACT VERSION</p><h3 id="campaign-pack-inspection-heading">{catalogPack.publication.name}</h3></div><span className="status-pill">Read only</span></div><code>{catalogPack.publication.packId} @ {catalogPack.publication.packVersion}</code>{definitionsByKind(catalogPack).map(([kind, definitions]) => <section key={kind}><h4>{kind} <span>{definitions.length}</span></h4><ul>{definitions.map((definition) => <li key={definition.reference.definitionId}><strong>{definition.name}</strong><p>{definition.description}</p></li>)}</ul></section>)}</section>}
       </section>}
 
-      {owner && <section className="admin-section import-report" aria-labelledby="import-report-heading">
-        <div className="admin-section-heading"><div><p className="eyebrow">TRANSFER REVIEW</p><h2 id="import-report-heading">Inspect an import report</h2></div></div>
-        <p className="admin-help">A dry run validates a local Velvet export without changing campaign state. Applying imports is a separate operation.</p>
-        <label className="field"><span>Velvet campaign export JSON</span><input type="file" accept="application/json,.json" disabled={importBusy} onChange={(event) => void chooseImportFile(event)} /></label>
-        <button className="primary" disabled={!importPackage || importBusy} onClick={() => void inspectImport()}>{importBusy ? "Inspecting…" : "Create dry-run report"}</button>
-        {importError && <p className="form-error" role="alert">{importError}</p>}
-        {importReport && <div className={`import-report-result ${importReport.valid ? "is-valid" : "is-invalid"}`} role="status">
-          <h3>{importReport.valid ? "Import package is valid" : "Import package needs attention"}</h3>
-          <dl>{Object.entries(importReport.counts).map(([label, count]) => <div key={label}><dt>{label.replace(/([A-Z])/g, " $1")}</dt><dd>{count}</dd></div>)}</dl>
-          {(["conflicts", "missingReferences", "warnings"] as const).map((kind) => importReport[kind].length > 0 && <section key={kind}><h4>{kind.replace(/([A-Z])/g, " $1")}</h4><ul>{importReport[kind].map((entry, index) => <li key={`${kind}-${index}`}>{entry}</li>)}</ul></section>)}
-        </div>}
-      </section>}
     </div>
   </section></main>;
 }

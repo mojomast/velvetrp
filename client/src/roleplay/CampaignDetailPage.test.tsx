@@ -1696,6 +1696,7 @@ describe("CampaignAdministrationPage role projections", () => {
     expect(screen.queryByRole("heading", { name: "Memberships" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Create checkpoint" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Import / export" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Inspect an import report" })).toBeNull();
     expect(listCampaignMemberships).not.toHaveBeenCalled();
   });
@@ -1729,7 +1730,7 @@ describe("CampaignAdministrationPage role projections", () => {
     expect(listCampaignMemberships).not.toHaveBeenCalled();
   });
 
-  it("renders owner-only lifecycle, membership, checkpoint, archive, and import-report controls", async () => {
+  it("renders owner-only lifecycle, membership, checkpoint, archive, and transfer navigation", async () => {
     vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
       id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id,
       revision: 4, updatedAt: timestamp,
@@ -1749,7 +1750,7 @@ describe("CampaignAdministrationPage role projections", () => {
     expect((screen.getByRole("button", { name: "Archive campaign" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("heading", { name: "Memberships" })).toBeTruthy();
     expect((screen.getByRole("button", { name: "Create checkpoint" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole("heading", { name: "Inspect an import report" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Import / export" })).toBeTruthy();
     expect(screen.getByDisplayValue("Private canon")).toBeTruthy();
   });
 
