@@ -230,9 +230,8 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   getCommandReceipt(actorPrincipalId: string, campaignId: string, commandId: string): unknown;
 };
 type QuestLaneRepository = Pick<QuestRepository,
-  "listStorylines" | "createStoryline" | "getStoryline" | "updateStoryline" | "listQuests" | "createQuest"
-  | "getQuestDetail" | "updateQuest" | "createClue" | "markClueDiscovered" | "createReward" | "grantReward"
-  | "completeObjective">;
+  "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand" | "listCampaignStorylines"
+  | "createCampaignStoryline" | "getCampaignStoryline" | "updateCampaignStoryline">;
 type ContentCatalogLaneRepository = Pick<ContentCatalogRepository,
   "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage"
   | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog"
@@ -334,9 +333,8 @@ function assertCampaignHistoryRepository(
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
   const methods: Array<keyof QuestLaneRepository> = [
-    "listStorylines", "createStoryline", "getStoryline", "updateStoryline", "listQuests", "createQuest",
-    "getQuestDetail", "updateQuest", "createClue", "markClueDiscovered", "createReward", "grantReward",
-    "completeObjective",
+    "listCampaignQuests", "createCampaignQuest", "executeQuestCommand", "listCampaignStorylines",
+    "createCampaignStoryline", "getCampaignStoryline", "updateCampaignStoryline",
   ];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }

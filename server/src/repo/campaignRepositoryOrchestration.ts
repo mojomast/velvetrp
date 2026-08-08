@@ -686,8 +686,8 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
   const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.8 mutation cannot run inside a repository transaction");});
   const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
-    assertOpen(); if (transactionDepth > 0) throw new Error("M2.1 mutation cannot run inside a repository transaction");
-  });
+    assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
+  }, dependencies);
   const questRepository = new Proxy(rawQuestRepository, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);

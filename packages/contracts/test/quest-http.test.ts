@@ -1,0 +1,40 @@
+import { describe, expect, it } from "vitest";
+import {
+  campaignQuestsHttpResponseSchema,
+  createCampaignQuestHttpRequestSchema,
+  questCommandHttpRequestSchema,
+} from "../src/index.js";
+
+const envelope = { expectedRevision: 0, idempotencyKey: "quest-key" };
+const quest = { questId: "quest", storylineId: "story", title: "The Gate", description: null,
+  visibility: "public" as const, journalText: "A gate bars the road.",
+  objectives: [{ objectiveId: "open", description: "Open it", targetProgress: 1,
+    dependencyObjectiveIds: [], visibility: "public" as const }],
+  rewards: [{ rewardId: "gold", kind: "currency" as const, amount: 10, label: "Gold", visibility: "public" as const }] };
+
+describe("M2.10 quest HTTP contracts", () => {
+  it("accepts strict quest definitions and rejects dependency mistakes", () => {
+    expect(createCampaignQuestHttpRequestSchema.parse({ quest, ...envelope })).toEqual({ quest, ...envelope });
+    expect(createCampaignQuestHttpRequestSchema.safeParse({ quest, ...envelope, extra: true }).success).toBe(false);
+    expect(createCampaignQuestHttpRequestSchema.safeParse({ quest: { ...quest, objectives: [
+      { ...quest.objectives[0], dependencyObjectiveIds: ["missing"] },
+    ] }, ...envelope }).success).toBe(false);
+    expect(createCampaignQuestHttpRequestSchema.safeParse({ quest: { ...quest, objectives: [
+      { ...quest.objectives[0], objectiveId: "secret", visibility: "gm" },
+      { ...quest.objectives[0], objectiveId: "middle", dependencyObjectiveIds: ["secret"] },
+      { ...quest.objectives[0], objectiveId: "public", dependencyObjectiveIds: ["middle"] },
+    ] }, ...envelope }).success).toBe(false);
+  });
+
+  it("requires command-specific IDs, including actor and reward for claims", () => {
+    expect(questCommandHttpRequestSchema.safeParse({ kind: "accept", ...envelope }).success).toBe(true);
+    expect(questCommandHttpRequestSchema.safeParse({ kind: "advance-objective", ...envelope }).success).toBe(false);
+    expect(questCommandHttpRequestSchema.safeParse({ kind: "claim-reward", rewardId: "gold", ...envelope }).success).toBe(false);
+    expect(questCommandHttpRequestSchema.safeParse({ kind: "claim-reward", actorId: "actor", rewardId: "gold", ...envelope }).success).toBe(true);
+  });
+
+  it("binds the exact list body and rejects internal provenance", () => {
+    expect(campaignQuestsHttpResponseSchema.safeParse({ quests: [], objectives: [], journal: [] }).success).toBe(true);
+    expect(campaignQuestsHttpResponseSchema.safeParse({ quests: [], objectives: [], journal: [], revision: 0 }).success).toBe(false);
+  });
+});

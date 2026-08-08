@@ -1,13 +1,11 @@
 import type DatabaseDriver from "better-sqlite3";
+import type { Clock, IdGenerator } from "../runtime.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import {
   createQuestReadRepository,
   type QuestReadRepository,
 } from "./quest/index.js";
-import {
-  createQuestWriteRepository,
-  type QuestWriteRepository,
-} from "./quest/index.js";
+import { createQuestDomainRepository, type QuestDomainRepository } from "./quest/index.js";
 
 export {
   getQuest,
@@ -31,22 +29,13 @@ export {
   type UpdateStorylineInput,
 } from "./quest/index.js";
 export {
-  addClue,
-  addReward,
-  completeObjective,
-  createQuest,
-  createStoryline,
-  grantReward,
-  markClueDiscovered,
-  reorderQuests,
-  updateQuestStatus,
-  updateStorylineStatus,
+  QuestAuthorizationError, QuestConflictError, QuestDomainUnavailableError, QuestStaleError,
+  type CampaignQuestSnapshot, type QuestMutationResult,
 } from "./quest/index.js";
-
 type Database = DatabaseDriver.Database;
 
-/** Public quest facade combining authorized projections and mutations. */
-export interface QuestRepository extends QuestReadRepository, QuestWriteRepository {}
+/** Public quest facade: legacy reads plus the sole authoritative mutation lane. */
+export interface QuestRepository extends QuestReadRepository, QuestDomainRepository {}
 
 /**
  * Creates the trusted-local quest facade.
@@ -58,8 +47,11 @@ export function createQuestRepository(
   db: Database,
   principalId = LOCAL_OWNER_PRINCIPAL_ID,
   assertCanMutate: () => void = () => undefined,
+  dependencies?: { clock: Clock; ids: IdGenerator },
 ): QuestRepository {
   const reads = createQuestReadRepository(db, principalId);
-  const writes = createQuestWriteRepository(db, principalId, assertCanMutate);
-  return { ...reads, ...writes };
+  const domain = createQuestDomainRepository(db, dependencies === undefined ? undefined : {
+    clock: dependencies.clock, ids: dependencies.ids, guard: assertCanMutate,
+  });
+  return { ...reads, ...domain };
 }

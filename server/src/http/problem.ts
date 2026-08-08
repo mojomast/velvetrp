@@ -52,6 +52,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/api\/rpg\/v1\/factions\/[^/]+\/reputation-commands$/.test(path)) {
     return "/api/rpg/v1/factions/:factionId/reputation-commands";
   }
+  if (/^\/api\/rpg\/v1\/quests\/[^/]+\/commands$/.test(path)) {
+    return "/api/rpg/v1/quests/:questId/commands";
+  }
   if (/^\/api\/rpg\/v1\/combats\/[^/]+$/.test(path)) {
     return "/api/rpg/v1/combats/:combatId";
   }

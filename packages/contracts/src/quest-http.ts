@@ -1,115 +1,170 @@
 import { z } from "zod";
-import {
-  QuestClueSchema,
-  QuestObjectiveCompletionSchema,
-  QuestRewardSchema,
-  QuestSchema,
-  StorylineSchema,
-} from "./quest.js";
+import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
+import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
+import { actorIdSchema, campaignIdSchema } from "./rpg-characters.js";
+import { questRewardKindSchema, storylineIdSchema, StorylineSchema } from "./quest.js";
 
+const titleSchema = z.string().trim().min(1).max(200);
+const textSchema = z.string().max(4_000);
+const visibilitySchema = z.enum(["public", "gm"]);
+
+// Storyline endpoints remain the ancestry-management boundary for quest creation.
 export const createStorylineRequestSchema = z.object({
   title: StorylineSchema.shape.title,
   description: StorylineSchema.shape.description.optional(),
   status: StorylineSchema.shape.status.optional(),
 }).strict();
-
-export const createStorylineResponseSchema = z.object({
-  storyline: StorylineSchema,
-}).strict();
-
-export const updateStorylineStatusRequestSchema = z.object({
-  status: StorylineSchema.shape.status,
-}).strict();
-
+export const createStorylineResponseSchema = z.object({ storyline: StorylineSchema }).strict();
+export const updateStorylineStatusRequestSchema = z.object({ status: StorylineSchema.shape.status }).strict();
 export const updateStorylineStatusResponseSchema = createStorylineResponseSchema;
 
-export const createQuestRequestSchema = z.object({
-  storylineId: QuestSchema.shape.storylineId,
-  title: QuestSchema.shape.title,
-  description: QuestSchema.shape.description.optional(),
-  status: QuestSchema.shape.status.optional(),
-  sortOrder: QuestSchema.shape.sortOrder.optional(),
+export const questLifecycleStatusSchema = z.enum(["offered", "active", "completed", "abandoned"]);
+
+export const questRewardDefinitionHttpSchema = z.object({
+  rewardId: resourceIdSchema,
+  kind: questRewardKindSchema,
+  amount: z.number().int().safe().nullable(),
+  label: titleSchema,
+  claimedByActorId: actorIdSchema.nullable(),
+  claimedAt: utcIsoTimestampSchema.nullable(),
 }).strict();
 
-export const createQuestResponseSchema = z.object({
-  quest: QuestSchema,
+export const campaignQuestHttpSchema = z.object({
+  questId: resourceIdSchema,
+  campaignId: campaignIdSchema,
+  storylineId: storylineIdSchema,
+  title: titleSchema,
+  description: textSchema.nullable(),
+  status: questLifecycleStatusSchema,
+  rewards: z.array(questRewardDefinitionHttpSchema).max(100),
+  createdAt: utcIsoTimestampSchema,
+  updatedAt: utcIsoTimestampSchema,
 }).strict();
 
-export const updateQuestStatusRequestSchema = z.object({
-  status: QuestSchema.shape.status,
+export const questObjectiveHttpSchema = z.object({
+  objectiveId: resourceIdSchema,
+  questId: resourceIdSchema,
+  description: textSchema.refine((value) => value.trim().length > 0, "description must not be blank"),
+  targetProgress: z.number().int().min(1).max(1_000_000),
+  progress: z.number().int().min(0).max(1_000_000),
+  dependencyObjectiveIds: z.array(resourceIdSchema).max(100),
+  completedAt: utcIsoTimestampSchema.nullable(),
+}).strict().refine((objective) => objective.progress <= objective.targetProgress, "objective progress cannot exceed its target");
+
+export const questJournalEntryHttpSchema = z.object({
+  entryId: resourceIdSchema,
+  questId: resourceIdSchema,
+  text: textSchema.refine((value) => value.trim().length > 0, "journal text must not be blank"),
+  occurredAt: utcIsoTimestampSchema,
 }).strict();
 
-export const updateQuestStatusResponseSchema = createQuestResponseSchema;
-
-export const listQuestsQuerySchema = z.object({
-  storylineId: QuestSchema.shape.storylineId.optional(),
+export const campaignQuestsHttpResponseSchema = z.object({
+  quests: z.array(campaignQuestHttpSchema).max(10_000),
+  objectives: z.array(questObjectiveHttpSchema).max(100_000),
+  journal: z.array(questJournalEntryHttpSchema).max(100_000),
 }).strict();
 
-export const listQuestsResponseSchema = z.object({
-  quests: z.array(QuestSchema),
+const newObjectiveSchema = z.object({
+  objectiveId: resourceIdSchema,
+  description: textSchema.refine((value) => value.trim().length > 0, "description must not be blank"),
+  targetProgress: z.number().int().min(1).max(1_000_000),
+  dependencyObjectiveIds: z.array(resourceIdSchema).max(100),
+  visibility: visibilitySchema,
 }).strict();
 
-export const questDetailResponseSchema = z.object({
-  quest: QuestSchema,
-  clues: z.array(QuestClueSchema),
-  rewards: z.array(QuestRewardSchema),
-  objectiveCompletions: z.array(QuestObjectiveCompletionSchema),
+const newRewardSchema = z.object({
+  rewardId: resourceIdSchema,
+  kind: questRewardKindSchema,
+  amount: z.number().int().safe().nullable(),
+  label: titleSchema,
+  visibility: visibilitySchema,
 }).strict();
 
-export const createQuestClueRequestSchema = z.object({
-  content: QuestClueSchema.shape.content,
-  discoveredByCharacterId: QuestClueSchema.shape.discoveredByCharacterId.unwrap().optional(),
+export const newCampaignQuestSchema = z.object({
+  questId: resourceIdSchema,
+  storylineId: storylineIdSchema,
+  title: titleSchema,
+  description: textSchema.nullable(),
+  visibility: visibilitySchema,
+  objectives: z.array(newObjectiveSchema).min(1).max(100),
+  rewards: z.array(newRewardSchema).max(100),
+  journalText: textSchema.refine((value) => value.trim().length > 0, "journal text must not be blank"),
+}).strict().superRefine((quest, context) => {
+  const objectiveIds = quest.objectives.map((objective) => objective.objectiveId);
+  if (new Set(objectiveIds).size !== objectiveIds.length) {
+    context.addIssue({ code: "custom", message: "objective IDs must be unique", path: ["objectives"] });
+  }
+  const ids = new Set(objectiveIds);
+  quest.objectives.forEach((objective, index) => {
+    if (new Set(objective.dependencyObjectiveIds).size !== objective.dependencyObjectiveIds.length) {
+      context.addIssue({ code: "custom", message: "objective dependencies must be unique", path: ["objectives", index, "dependencyObjectiveIds"] });
+    }
+    if (objective.dependencyObjectiveIds.includes(objective.objectiveId)) {
+      context.addIssue({ code: "custom", message: "an objective cannot depend on itself", path: ["objectives", index, "dependencyObjectiveIds"] });
+    }
+    if (objective.dependencyObjectiveIds.some((dependencyId) => !ids.has(dependencyId))) {
+      context.addIssue({ code: "custom", message: "objective dependencies must belong to this quest", path: ["objectives", index, "dependencyObjectiveIds"] });
+    }
+  });
+  const objectiveById = new Map(quest.objectives.map((objective) => [objective.objectiveId, objective]));
+  quest.objectives.forEach((objective, index) => {
+    if (objective.visibility !== "public") return;
+    const pending = [...objective.dependencyObjectiveIds], seen = new Set<string>();
+    while (pending.length > 0) {
+      const dependencyId = pending.pop()!; if (seen.has(dependencyId)) continue; seen.add(dependencyId);
+      const dependency = objectiveById.get(dependencyId); if (!dependency) continue;
+      if (dependency.visibility !== "public") {
+        context.addIssue({ code: "custom", message: "public objectives cannot depend on GM objectives",
+          path: ["objectives", index, "dependencyObjectiveIds"] });
+        break;
+      }
+      pending.push(...dependency.dependencyObjectiveIds);
+    }
+  });
+  const rewardIds = quest.rewards.map((reward) => reward.rewardId);
+  if (new Set(rewardIds).size !== rewardIds.length) {
+    context.addIssue({ code: "custom", message: "reward IDs must be unique", path: ["rewards"] });
+  }
+});
+
+export const createCampaignQuestHttpRequestSchema = z.object({
+  quest: newCampaignQuestSchema,
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
 }).strict();
 
-export const createQuestClueResponseSchema = z.object({
-  clue: QuestClueSchema,
+export const questCommandReceiptHttpSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  revisionBefore: revisionSchema,
+  revisionAfter: revisionSchema,
+  occurredAt: utcIsoTimestampSchema,
+}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, "a quest command advances exactly one revision");
+
+export const createCampaignQuestHttpResponseSchema = z.object({
+  quest: campaignQuestHttpSchema,
+  receipt: questCommandReceiptHttpSchema,
 }).strict();
 
-export const discoverQuestClueRequestSchema = z.object({
-  characterId: QuestClueSchema.shape.discoveredByCharacterId.unwrap(),
+const commandEnvelope = {
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+};
+export const questCommandHttpRequestSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("accept"), ...commandEnvelope }).strict(),
+  z.object({ kind: z.literal("advance-objective"), objectiveId: resourceIdSchema, ...commandEnvelope }).strict(),
+  z.object({ kind: z.literal("abandon"), ...commandEnvelope }).strict(),
+  z.object({ kind: z.literal("claim-reward"), actorId: actorIdSchema, rewardId: resourceIdSchema, ...commandEnvelope }).strict(),
+]);
+
+export const questCommandHttpResponseSchema = z.object({
+  quest: campaignQuestHttpSchema,
+  receipt: questCommandReceiptHttpSchema,
 }).strict();
 
-export const discoverQuestClueResponseSchema = createQuestClueResponseSchema;
-
-export const createQuestRewardRequestSchema = z.object({
-  kind: QuestRewardSchema.shape.kind,
-  amount: QuestRewardSchema.shape.amount.optional(),
-  label: QuestRewardSchema.shape.label,
-}).strict();
-
-export const createQuestRewardResponseSchema = z.object({
-  reward: QuestRewardSchema,
-}).strict();
-
-export const grantQuestRewardRequestSchema = z.object({
-  characterId: QuestRewardSchema.shape.grantedToCharacterId.unwrap(),
-}).strict();
-
-export const grantQuestRewardResponseSchema = createQuestRewardResponseSchema;
-
-export const completeQuestObjectiveRequestSchema = z.object({
-  description: QuestObjectiveCompletionSchema.shape.description,
-  characterId: QuestObjectiveCompletionSchema.shape.completedByCharacterId.unwrap().optional(),
-}).strict();
-
-export const completeQuestObjectiveResponseSchema = z.object({
-  objectiveCompletion: QuestObjectiveCompletionSchema,
-}).strict();
-
-export type CreateStorylineRequest = z.infer<typeof createStorylineRequestSchema>;
-export type CreateStorylineResponse = z.infer<typeof createStorylineResponseSchema>;
-export type UpdateStorylineStatusRequest = z.infer<typeof updateStorylineStatusRequestSchema>;
-export type CreateQuestRequest = z.infer<typeof createQuestRequestSchema>;
-export type CreateQuestResponse = z.infer<typeof createQuestResponseSchema>;
-export type UpdateQuestStatusRequest = z.infer<typeof updateQuestStatusRequestSchema>;
-export type ListQuestsQuery = z.infer<typeof listQuestsQuerySchema>;
-export type ListQuestsResponse = z.infer<typeof listQuestsResponseSchema>;
-export type QuestDetailResponse = z.infer<typeof questDetailResponseSchema>;
-export type CreateQuestClueRequest = z.infer<typeof createQuestClueRequestSchema>;
-export type CreateQuestClueResponse = z.infer<typeof createQuestClueResponseSchema>;
-export type DiscoverQuestClueRequest = z.infer<typeof discoverQuestClueRequestSchema>;
-export type CreateQuestRewardRequest = z.infer<typeof createQuestRewardRequestSchema>;
-export type CreateQuestRewardResponse = z.infer<typeof createQuestRewardResponseSchema>;
-export type GrantQuestRewardRequest = z.infer<typeof grantQuestRewardRequestSchema>;
-export type CompleteQuestObjectiveRequest = z.infer<typeof completeQuestObjectiveRequestSchema>;
-export type CompleteQuestObjectiveResponse = z.infer<typeof completeQuestObjectiveResponseSchema>;
+export type CampaignQuestHttp = z.infer<typeof campaignQuestHttpSchema>;
+export type QuestObjectiveHttp = z.infer<typeof questObjectiveHttpSchema>;
+export type QuestJournalEntryHttp = z.infer<typeof questJournalEntryHttpSchema>;
+export type CampaignQuestsHttpResponse = z.infer<typeof campaignQuestsHttpResponseSchema>;
+export type CreateCampaignQuestHttpRequest = z.infer<typeof createCampaignQuestHttpRequestSchema>;
+export type QuestCommandHttpRequest = z.infer<typeof questCommandHttpRequestSchema>;
+export type QuestCommandReceiptHttp = z.infer<typeof questCommandReceiptHttpSchema>;

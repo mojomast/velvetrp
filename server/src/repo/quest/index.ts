@@ -23,16 +23,12 @@ export {
   type UpdateStorylineInput,
 } from "./questReadRepo.js";
 export {
-  addClue,
-  addReward,
-  completeObjective,
-  createQuest,
-  createQuestWriteRepository,
-  createStoryline,
-  grantReward,
-  markClueDiscovered,
-  reorderQuests,
-  updateQuestStatus,
-  updateStorylineStatus,
-  type QuestWriteRepository,
-} from "./questWriteRepo.js";
+  createQuestDomainRepository,
+  QuestAuthorizationError,
+  QuestConflictError,
+  QuestDomainUnavailableError,
+  QuestStaleError,
+  type CampaignQuestSnapshot,
+  type QuestDomainRepository,
+  type QuestMutationResult,
+} from "./questDomainRepo.js";

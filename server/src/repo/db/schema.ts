@@ -5,12 +5,12 @@ type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
   | "assertCampaignContentPacksHaveExactSealedPacks" | "assertCampaignImportStagingV30"
   | "assertEncounterLifecycleV31"
-  | "assertWorldNarrativeV32"
+  | "assertWorldNarrativeV32" | "assertQuestDomainV33"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
   | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28"
   | "createCampaignAdministrationV15" | "createCampaignContentPackSealedPinTriggers" | "createCampaignEventMatchingTriggerV14"
-  | "createCampaignImportStagingV30" | "createEncounterLifecycleV31" | "createWorldNarrativeV32"
+  | "createCampaignImportStagingV30" | "createEncounterLifecycleV31" | "createWorldNarrativeV32" | "createQuestDomainV33"
   | "createCharacterBuilderIntegrityV21" | "createCharacterBuilderIntegrityV22" | "createCharacterBuilderProvenanceV20"
   | "createCharacterBuilderV19" | "createCharacterLayoutV29" | "createCharacterProgressionIntegrityV24"
   | "createCharacterProgressionV23" | "createChecksPowersEffectsV26" | "createCombatFoundationV27"
@@ -21,7 +21,7 @@ type SchemaDependencies = Record<
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -39,24 +39,24 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "32";
+export const SCHEMA_VERSION = "33";
 export const SCHEMA_REVISION = "1";
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
     createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20, createCharacterBuilderV19,
     createCharacterLayoutV29, createCharacterProgressionIntegrityV24, createCharacterProgressionV23,
     createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16, createContentCatalogV17,
-    createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
+    createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
     createSchemaV11, createTimelineRevisionV12, createWorldTravelNpcFactionV28, migrate2to3, migrate3to4,
     migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10, migrate10to11,
     migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17, migrate17to18,
     migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24, migrate24to25,
-    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, validateCharacterProgressionV23,
+    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, validateCharacterProgressionV23,
     validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25,
     validateM16PersistenceV26, validateV20DraftAudit, validateWorldTravelNpcFactionV28,
   } = getSchemaDependencies();
@@ -96,7 +96,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
            createQuestsV29r2(db);
            createCampaignImportStagingV30(db);
            createEncounterLifecycleV31(db);
-           createWorldNarrativeV32(db);
+            createWorldNarrativeV32(db);
+            createQuestDomainV33(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -111,6 +112,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertCampaignImportStagingV30(db);
     assertEncounterLifecycleV31(db);
     assertWorldNarrativeV32(db);
+    assertQuestDomainV33(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -209,6 +211,26 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
       DROP TABLE campaign_npc_relationships_v32;DROP TABLE campaign_npc_metadata_v32;
       DROP TABLE world_narrative_events_v32;DROP TABLE world_narrative_receipts_v32;
       DROP TABLE world_narrative_commands_v32;DROP TABLE world_narrative_revisions_v32;`);
+  }
+  const futureQuestArtifact=Number(version)<33&&db.prepare("SELECT 1 FROM sqlite_master WHERE name='quest_domain_revisions_v33'").get();
+  if(futureQuestArtifact){
+    const count=(db.prepare("SELECT count(*) count FROM quest_domain_commands_v33").get() as {count:number}).count;
+    if(count>0)throw new Error(`schema marker ${version} cannot contain populated future v33 quest artifacts`);
+    db.exec(`DROP TRIGGER IF EXISTS quest_domain_layout_attestation_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_domain_layout_attestation_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_journal_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_journal_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_reward_claims_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_reward_claims_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_reward_definitions_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_reward_definitions_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_objective_dependencies_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_objective_dependencies_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_objectives_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_objectives_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_definitions_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_definitions_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_domain_events_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_domain_events_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_domain_receipts_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_domain_receipts_v33_immutable_update;
+      DROP TRIGGER IF EXISTS quest_domain_commands_v33_immutable_delete;DROP TRIGGER IF EXISTS quest_domain_commands_v33_immutable_update;
+      DROP TABLE quest_domain_layout_attestation_v33;DROP TABLE quest_journal_v33;DROP TABLE quest_reward_claims_v33;
+      DROP TABLE quest_reward_definitions_v33;DROP TABLE quest_objective_progress_v33;DROP TABLE quest_objective_dependencies_v33;
+      DROP TABLE quest_objectives_v33;DROP TABLE quest_definitions_v33;DROP TABLE quest_domain_events_v33;
+      DROP TABLE quest_domain_receipts_v33;DROP TABLE quest_domain_commands_v33;DROP TABLE quest_domain_revisions_v33;
+      DROP INDEX IF EXISTS uq_quest_reward_ancestry_v33;DROP INDEX IF EXISTS uq_quest_campaign_id_v33;`);
   }
   if(Number(version)<18&&db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='campaign_catalog_command_provenance_v18'").get()){
     // Historical fixtures can rewind only their target marker. A genuine
@@ -382,6 +404,13 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     version = "31";
   }
   if(version==="31"){migrate31to32(db);version="32";}
+  if(version==="32"){
+    // Very old historical fixtures acquire the additive v29r2 quest tables
+    // through revision repair rather than migrate28to29 itself. V33 builds
+    // ancestry constraints on those tables, so establish them first.
+    ensureSchemaRevisionV29(db);
+    migrate32to33(db);version="33";
+  }
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -398,6 +427,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertCampaignImportStagingV30(db);
   assertEncounterLifecycleV31(db);
   assertWorldNarrativeV32(db);
+  assertQuestDomainV33(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

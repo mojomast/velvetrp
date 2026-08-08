@@ -2,55 +2,36 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import {
-  addClue, addReward, completeObjective, createQuest, createStoryline, getQuest, getStoryline,
-  grantReward, listClues, listObjectiveCompletions, listQuests, listRewards, listStorylines,
-  markClueDiscovered, reorderQuests, updateQuestStatus, updateStorylineStatus,
-} from "../src/repo/questRepo.js";
+import { getQuest, getStoryline, listClues, listObjectiveCompletions, listQuests, listRewards, listStorylines } from "../src/repo/questRepo.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
+const at = "2035-01-01T00:00:00.000Z";
 
-describe("quest repository", () => {
-  it("manages storylines, quests, clues, rewards, and objectives", async () => {
+describe("legacy quest read compatibility", () => {
+  it("reads preserved v29 rows without exposing a production mutation bypass", async () => {
     const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! });
-    const campaign = repo.createCampaign("local-owner", { name: "Quest fixture" });
-    const character = repo.createCharacter({ name: "Scout", age: 27, archetype: "Ranger", boundaries: "", fictionalConfirmed: true });
-    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
-    db.pragma("foreign_keys = ON");
+    const campaign = repo.createCampaign("local-owner", { name: "Legacy quest fixture" });
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite")); db.pragma("foreign_keys=ON");
+    db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,description,status,created_at) VALUES(?,?,?,?,?,?)")
+      .run("storyline", campaign.id, "Missing Star", "Find it.", "active", at);
+    db.prepare("INSERT INTO quests VALUES(?,?,?,?,?,?,?,?,?)").run("quest", "storyline", campaign.id,
+      "Find chart", null, "open", 0, at, at);
+    db.prepare("INSERT INTO quest_clues VALUES(?,?,?,?,?,?,?)").run("clue", "quest", campaign.id, "Moon seal", null, null, at);
+    db.prepare("INSERT INTO quest_rewards(id,quest_id,campaign_id,kind,amount,label,created_at) VALUES(?,?,?,?,?,?,?)")
+      .run("reward", "quest", campaign.id, "xp", 100, "Astronomer XP", at);
+    db.prepare("INSERT INTO quest_objective_completions VALUES(?,?,?,?,?)").run("completion", "quest", "Decode", null, at);
 
-    const storyline = await createStoryline(db, campaign.id, { id: "storyline", title: "Missing Star", description: "Find it." });
-    expect(await listStorylines(db, campaign.id)).toEqual([storyline]);
-    expect(await getStoryline(db, storyline.id)).toEqual(storyline);
-    await updateStorylineStatus(db, storyline.id, "completed");
-    expect((await getStoryline(db, storyline.id))?.status).toBe("completed");
-
-    const first = await createQuest(db, storyline.id, campaign.id, { id: "quest-1", title: "Find chart", sortOrder: 2 });
-    const second = await createQuest(db, storyline.id, campaign.id, { id: "quest-2", title: "Visit observatory", status: "active", sortOrder: 1 });
-    expect(await listQuests(db, campaign.id, storyline.id)).toMatchObject([{ id: second.id }, { id: first.id }]);
-    await updateQuestStatus(db, first.id, "completed");
-    expect((await getQuest(db, first.id))?.status).toBe("completed");
-    await reorderQuests(db, [first.id, second.id]);
-    expect((await listQuests(db, campaign.id)).map((quest) => quest.id)).toEqual([first.id, second.id]);
-
-    const clue = await addClue(db, first.id, campaign.id, "The chart bears a moon seal.");
-    expect(await listClues(db, first.id)).toMatchObject([{ id: clue.id, discoveredAt: null }]);
-    await markClueDiscovered(db, clue.id, character.id);
-    expect((await listClues(db, first.id))[0]).toMatchObject({ discoveredByCharacterId: character.id });
-
-    const reward = await addReward(db, first.id, campaign.id, { id: "reward", kind: "xp", amount: 100, label: "Astronomer XP" });
-    expect(await listRewards(db, first.id)).toMatchObject([{ id: reward.id, grantedAt: null }]);
-    await grantReward(db, reward.id, character.id);
-    expect((await listRewards(db, first.id))[0]).toMatchObject({ grantedToCharacterId: character.id });
-
-    await completeObjective(db, first.id, "Decode the chart", character.id);
-    expect(await listObjectiveCompletions(db, first.id)).toMatchObject([{ description: "Decode the chart", completedByCharacterId: character.id }]);
-
-    db.prepare("DELETE FROM quest_storylines WHERE id=?").run(storyline.id);
-    expect(await listQuests(db, campaign.id)).toEqual([]);
-    expect(await listClues(db, first.id)).toEqual([]);
-    expect(await listRewards(db, first.id)).toEqual([]);
-    db.close();
-    repo.close();
+    expect(await listStorylines(db, campaign.id)).toMatchObject([{ id: "storyline" }]);
+    expect(await getStoryline(db, "storyline")).toMatchObject({ campaignId: campaign.id });
+    expect(await listQuests(db, campaign.id)).toMatchObject([{ id: "quest" }]);
+    expect(await getQuest(db, "quest")).toMatchObject({ title: "Find chart" });
+    expect(await listClues(db, "quest")).toMatchObject([{ id: "clue" }]);
+    expect(await listRewards(db, "quest")).toMatchObject([{ id: "reward" }]);
+    expect(await listObjectiveCompletions(db, "quest")).toMatchObject([{ id: "completion" }]);
+    for (const method of ["createQuest", "updateQuest", "createReward", "grantReward", "completeObjective", "createClue"]) {
+      expect(method in repo).toBe(false);
+    }
+    db.close(); repo.close();
   });
 });
