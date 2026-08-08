@@ -41,7 +41,12 @@ import type {
   CampaignTransferHttpDryRunResponse,
 } from "@velvet/contracts";
 import {
+  actorEffectCommandRequestSchema,
+  actorEffectCommandResponseSchema,
   actorEffectsResponseSchema,
+  actorPowerCommandRequestSchema,
+  actorPowerCommandResponseSchema,
+  actorPowersResponseSchema,
   actorResourcesHttpChangeCommandRequestSchema,
   actorResourcesHttpChangeCommandResponseSchema,
   actorResourcesHttpGetResponseSchema,
@@ -56,7 +61,12 @@ import {
   restHttpResponseSchema,
 } from "@velvet/contracts";
 import type {
+  ActorEffectCommandRequest,
+  ActorEffectCommandResponse,
   ActorEffectsResponse,
+  ActorPowerCommandRequest,
+  ActorPowerCommandResponse,
+  ActorPowersResponse,
   ActorResourcesHttpChangeCommandRequest,
   ActorResourcesHttpChangeCommandResponse,
   ActorResourcesHttpGetResponse,
@@ -69,6 +79,32 @@ import type {
   InventoryHttpGetResponse,
   RestHttpRequest,
   RestHttpResponse,
+} from "@velvet/contracts";
+import {
+  combatActionCommandRequestSchema,
+  combatActionCommandResponseSchema,
+  combatEndCommandRequestSchema,
+  combatEndCommandResponseSchema,
+  combatLogQuerySchema,
+  combatLogResponseSchema,
+  combatReadResponseSchema,
+  encounterCreateRequestSchema,
+  encounterCreateResponseSchema,
+  encounterListResponseSchema,
+  encounterStartCommandRequestSchema,
+  encounterStartCommandResponseSchema,
+} from "@velvet/contracts";
+import type {
+  CombatActionCommandRequest,
+  CombatActionCommandResponse,
+  CombatEndCommandRequest,
+  CombatEndCommandResponse,
+  CombatLogQuery,
+  CombatLogResponse,
+  CombatReadResponse,
+  EncounterCreateRequest,
+  EncounterPublic,
+  EncounterStartCommandRequest,
 } from "@velvet/contracts";
 import {
   characterDraftHttpFinalizationResultSchema,
@@ -1079,6 +1115,142 @@ export async function getActorEffects(actorId: string): Promise<ActorEffectsResp
   const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effects`, { cache: "no-store" });
   requireStatus(success, 200, "Actor effects read");
   return actorEffectsResponseSchema.parse(success.body);
+}
+
+export async function getActorPowers(actorId: string): Promise<ActorPowersResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/powers`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor powers read");
+  return actorPowersResponseSchema.parse(success.body);
+}
+
+/** Issues one revision-bound power intent. This wrapper never retries a write. */
+export async function commandActorPower(actorId: string, input: ActorPowerCommandRequest): Promise<ActorPowerCommandResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorPowerCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/power-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor power command");
+  const response = actorPowerCommandResponseSchema.parse(success.body);
+  if (response.actorStates[0]?.actorId !== validActorId
+    || JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef)
+    || JSON.stringify(response.resolution.targetIds) !== JSON.stringify(body.targetIds)
+    || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+    throw new Error("Actor power response did not match the request");
+  }
+  return response;
+}
+
+/** Issues one exact effect mutation and binds its receipt; no automatic retry. */
+export async function commandActorEffect(actorId: string, input: ActorEffectCommandRequest): Promise<ActorEffectCommandResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorEffectCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/effect-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor effect command");
+  const response = actorEffectCommandResponseSchema.parse(success.body);
+  if (response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1
+    || (body.kind === "remove" && response.effects.some((effect) => effect.effectId === body.effectId))) {
+    throw new Error("Actor effect response did not match the request");
+  }
+  return response;
+}
+
+function combatPath(combatId: string): { id: string; path: string } {
+  const id = parseApiInput(() => resourceIdSchema.parse(combatId));
+  return { id, path: `/rpg/v1/combats/${encodeURIComponent(id)}` };
+}
+
+export async function listCampaignEncounters(campaignId: string): Promise<{ encounters: EncounterPublic[] }> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, { cache: "no-store" });
+  requireStatus(success, 200, "Encounter list");
+  return encounterListResponseSchema.parse(success.body);
+}
+
+/** Creates one encounter intent and requires its route-bound preparing projection. */
+export async function createCampaignEncounter(campaignId: string, input: EncounterCreateRequest): Promise<EncounterPublic> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => encounterCreateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 201, "Encounter creation");
+  const { encounter } = encounterCreateResponseSchema.parse(success.body);
+  const requestedCombatants = body.combatants.map((entry) => entry.kind === "actor"
+    ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
+    : { kind: entry.kind, template: entry.template, team: entry.team });
+  const returnedCombatants = encounter.combatants.map((entry) => entry.kind === "actor"
+    ? { kind: entry.kind, actorId: entry.actorId, team: entry.team }
+    : { kind: entry.kind, template: entry.template, team: entry.team });
+  if (encounter.sessionId !== body.sessionId || encounter.name !== body.name || encounter.status !== "preparing"
+    || encounter.combatId !== null || encounter.revision !== 1
+    || JSON.stringify(returnedCombatants) !== JSON.stringify(requestedCombatants)) {
+    throw new Error("Encounter creation response did not match the request");
+  }
+  return encounter;
+}
+
+export async function startEncounter(encounterId: string, input: EncounterStartCommandRequest) {
+  const id = parseApiInput(() => resourceIdSchema.parse(encounterId));
+  const body = parseApiInput(() => encounterStartCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/encounters/${encodeURIComponent(id)}/start-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Encounter start");
+  const response = encounterStartCommandResponseSchema.parse(success.body);
+  if (response.combat.combatId !== id || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== body.expectedRevision + 1
+    || response.combat.revision !== response.receipt.revisionAfter) throw new Error("Encounter start response did not match the request");
+  return response;
+}
+
+export async function getCombatState(combatId: string): Promise<CombatReadResponse> {
+  const target = combatPath(combatId);
+  const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
+  requireStatus(success, 200, "Combat state read");
+  return combatReadResponseSchema.parse(success.body);
+}
+
+export async function getCombatLog(combatId: string, query: CombatLogQuery): Promise<CombatLogResponse> {
+  const target = combatPath(combatId);
+  const input = parseApiInput(() => combatLogQuerySchema.parse(query));
+  const params = new URLSearchParams({ afterSequence: String(input.afterSequence), limit: String(input.limit) });
+  const success = await requestResponse<unknown>(`${target.path}/log?${params}`, { cache: "no-store" });
+  requireStatus(success, 200, "Combat log read");
+  const response = combatLogResponseSchema.parse(success.body);
+  if (response.entries.length > input.limit || response.entries.some((entry) => entry.sequence <= input.afterSequence)) {
+    throw new Error("Combat log response did not match the requested page");
+  }
+  return response;
+}
+
+/** Resolves one server-issued legal action ID exactly once. */
+export async function resolveCombatAction(combatId: string, input: CombatActionCommandRequest): Promise<CombatActionCommandResponse> {
+  const target = combatPath(combatId);
+  const body = parseApiInput(() => combatActionCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/action-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Combat action");
+  const response = combatActionCommandResponseSchema.parse(success.body);
+  if (response.combat.combatId !== target.id || response.resolution.legalActionId !== body.legalActionId
+    || JSON.stringify(response.resolution.targetIds) !== JSON.stringify(body.targetIds)
+    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.combat.revision !== response.receipt.revisionAfter) {
+    throw new Error("Combat action response did not match the request");
+  }
+  return response;
+}
+
+export async function endCombat(combatId: string, input: CombatEndCommandRequest): Promise<CombatEndCommandResponse> {
+  const target = combatPath(combatId);
+  const body = parseApiInput(() => combatEndCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/end-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Combat end");
+  const response = combatEndCommandResponseSchema.parse(success.body);
+  if (response.encounter.encounterId !== target.id || response.encounter.combatId !== target.id
+    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.encounter.revision !== response.receipt.revisionAfter) {
+    throw new Error("Combat end response did not match the request");
+  }
+  return response;
 }
 
 export async function getCharacterProgression(campaignId: string, campaignCharacterId: string): Promise<CharacterProgressionHttpState> {

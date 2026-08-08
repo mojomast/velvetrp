@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, attachCampaignRoom, branchMessage, cancelGeneration, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
+import { getActorPowers, getCombatLog, getCombatState, resolveCombatAction } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -61,6 +62,38 @@ describe("M2.7 actor API bindings", () => {
     await expect(commandActorInventory("campaign", "actor", { kind: "consume", entryId: "entry", item, quantity: 2, expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { quantity: 2 } });
     await expect(commandActorInventory("campaign", "actor", { kind: "gift", recipientActorId: "recipient", entryId: "entry", item, quantity: 1, expectedRevision: 4, idempotencyKey: "key" })).resolves.toMatchObject({ receipt: { recipientActorId: "recipient" } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("M2.8 and M2.9 combat workspace API bindings", () => {
+  const combat = { round: 1, currentCombatant: "one", combatants: [
+    { combatantId: "one", kind: "actor", team: "allies", actorId: "actor", hitPoints: 3, maximumHitPoints: 3, status: "active" },
+    { combatantId: "two", kind: "enemy", team: "enemies", template: null, hitPoints: 2, maximumHitPoints: 2, status: "active" },
+  ], legalActions: [{ legalActionId: "attack", kind: "attack", targetIds: ["two"] }], revision: 2 };
+
+  it("uses strict no-store paths and binds the exact log query cursor", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ known: [], prepared: [], slots: [], uses: [], legalNow: [], revision: 0 }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(combat), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ entries: [{ logEntryId: "log", sequence: 8, occurredAt: "2030-01-01T00:00:00.000Z", event: { kind: "turn_advanced", combatantId: "one" } }], nextAfterSequence: 8 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await getActorPowers("actor"); await getCombatState("combat"); await getCombatLog("combat", { afterSequence: 7, limit: 25 });
+    expect(fetchMock.mock.calls.map(([url, init]) => [String(url), (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/actors/actor/powers", "no-store"],
+      ["/api/rpg/v1/combats/combat", "no-store"],
+      ["/api/rpg/v1/combats/combat/log?afterSequence=7&limit=25", "no-store"],
+    ]);
+  });
+
+  it("rejects a combat receipt not bound to the submitted legal action", async () => {
+    const body = { resolution: { actionId: "resolved", legalActionId: "other", kind: "attack", actingCombatantId: "one", targetIds: ["two"], outcomes: [{ kind: "damage", targetId: "two", damageType: "physical", requested: 1, applied: 1, hitPointsBefore: 2, hitPointsAfter: 1, statusBefore: "active", statusAfter: "active" }], roundBefore: 1, roundAfter: 1, currentCombatantBefore: "one", currentCombatantAfter: "two" }, combat: { combatId: "combat", ...combat, revision: 3 }, receipt: { idempotencyKey: "key", revisionBefore: 2, revisionAfter: 3, occurredAt: "2030-01-01T00:00:00.000Z" } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 })));
+    await expect(resolveCombatAction("combat", { legalActionId: "attack", targetIds: ["two"], choices: [], expectedRevision: 2, idempotencyKey: "key" })).rejects.toThrow(/did not match/);
+  });
+
+  it("rejects malformed success statuses before accepting a body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(combat), { status: 201 })));
+    await expect(getCombatState("combat")).rejects.toThrow(/documented status/);
   });
 });
 

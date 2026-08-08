@@ -33,6 +33,9 @@ export interface RpgCharacterSheetPageProps {
   onBack: () => void;
   onUnavailable: () => void;
   focusHeadingRequest?: number;
+  onOpenCombat?: () => void;
+  focusCombatRequest?: number;
+  onCombatFocused?: (request: number) => void;
 }
 
 type ConfirmedResult =
@@ -78,7 +81,7 @@ function ReceiptDetails({ result, currencies }: { result: ConfirmedResult; curre
   return <section className="receipt-details"><h3>Economy receipt and server result</h3><dl className="command-detail-list"><div><dt>Command</dt><dd>{receipt.type}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div>{response.type === "request_purchase_quote" && <><div><dt>Quote</dt><dd>{response.quote.quoteId} · expires {response.quote.expiresAt}</dd></div><div><dt>Exact total</dt><dd>{formatMinorUnits(response.quote.total.minorUnits, response.quote.total.currency, currencies.get(catalogReferenceKey(response.quote.total.currency)))}</dd></div></>}{response.type === "purchase_from_shop" && <><div><dt>Purchase</dt><dd>{response.purchase.purchaseId} · quote {response.purchase.quoteId} · {response.purchase.quantity} items</dd></div><div><dt>Exact paid total</dt><dd>{formatMinorUnits(response.purchase.total.minorUnits, response.purchase.total.currency, currencies.get(catalogReferenceKey(response.purchase.total.currency)))}</dd></div><div><dt>Purchased at</dt><dd>{response.purchase.purchasedAt}</dd></div></>}{response.type === "propose_bilateral_trade" && <div><dt>Trade</dt><dd>{response.trade.tradeId} · {response.trade.status}</dd></div>}</dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(response, null, 2)}</pre></details></section>;
 }
 
-export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, onBack, onUnavailable, focusHeadingRequest }: RpgCharacterSheetPageProps) {
+export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, onBack, onUnavailable, focusHeadingRequest, onOpenCombat, focusCombatRequest, onCombatFocused }: RpgCharacterSheetPageProps) {
   const [sheet, setSheet] = useState<CharacterSheetHttpResponse | null>(null);
   const storageKey = markerKey(campaignId, campaignCharacterId);
   const restoredMarker = useMemo(() => readMarker(storageKey, campaignId), [campaignId, storageKey]);
@@ -110,6 +113,7 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, on
   const retryRef = useRef<HTMLButtonElement>(null);
   const actorCorrectionRef = useRef<HTMLButtonElement>(null);
   const actorInputRef = useRef<HTMLInputElement>(null);
+  const combatButtonRef = useRef<HTMLButtonElement>(null);
   const actorIdRef = useRef(actorId);
   actorIdRef.current = actorId;
   const activeRef = useRef({ campaignId, campaignCharacterId });
@@ -191,6 +195,11 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, on
     if (!correctionFocusPending || phase !== "ready") return;
     actorCorrectionRef.current?.focus(); setCorrectionFocusPending(false);
   }, [correctionFocusPending, phase]);
+
+  useEffect(() => {
+    if (phase !== "ready" || focusCombatRequest === undefined || !onOpenCombat) return;
+    queueMicrotask(() => { if (mountedRef.current) { combatButtonRef.current?.focus(); onCombatFocused?.(focusCombatRequest); } });
+  }, [focusCombatRequest, onCombatFocused, onOpenCombat, phase]);
 
   const setDurableMarker = (next: Marker | null) => { writeMarker(storageKey, next); if (mountedRef.current) setMarker(next); };
   async function connectActor() {
@@ -283,7 +292,7 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, on
   ] as const : [], [sheet]);
 
   return <main className="page library-page campaign-page actor-sheet-page"><section className="actor-sheet-shell" aria-labelledby="actor-sheet-heading">
-    <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Character workspace</button><p className="eyebrow">CHARACTER SHEET // SERVER STATE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="actor-sheet-heading"><bdi dir="auto">{sheet?.sheet.name ?? "Character sheet"}</bdi></h1></div>{phase === "ready" && <button className="ghost" type="button" onClick={() => void load()} disabled={Boolean(marker)}>Refresh sheet</button>}</header>
+    <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Character workspace</button><p className="eyebrow">CHARACTER SHEET // SERVER STATE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="actor-sheet-heading"><bdi dir="auto">{sheet?.sheet.name ?? "Character sheet"}</bdi></h1></div>{phase === "ready" && <div className="button-row">{onOpenCombat && <button ref={combatButtonRef} className="primary" type="button" onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" type="button" onClick={() => void load()} disabled={Boolean(marker)}>Refresh sheet</button></div>}</header>
     {phase === "loading" && <section className="library-panel actor-loading" role="status">Loading authoritative character state…</section>}
     {phase === "failed" && <section className="library-panel actor-loading" role="alert"><p>Character sheet could not be loaded.</p><button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>Retry</button></section>}
     {phase === "ready" && sheet && <div className="actor-sheet-layout">

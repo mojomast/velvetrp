@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "content-packs"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -107,6 +107,14 @@ describe("navigation persistence", () => {
     expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "bad/id" })).toEqual({ view: "campaigns", selectedIds: [] });
     expect(parseStoredNavigation({ view: "campaign-administration", campaignId: "campaign-one" }))
       .toEqual({ view: "campaign-administration", campaignId: "campaign-one", selectedIds: [] });
+  });
+
+  it("restores combat only inside a campaign and preserves a safe return origin", () => {
+    expect(parseStoredNavigation({ view: "campaign-combat" })).toEqual({ view: "campaigns", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-detail" }))
+      .toMatchObject({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-detail" });
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-character-sheet" }).combatReturnView).toBe("campaign-detail");
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", campaignCharacterId: "character-one", combatReturnView: "campaign-character-sheet" }).combatReturnView).toBe("campaign-character-sheet");
   });
 
   it("requires both strict workspace IDs and falls back to the nearest safe campaign view", () => {

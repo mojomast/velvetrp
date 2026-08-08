@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-sheet" | "campaign-character-builder" | "campaign-administration" | "content-packs";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-character-sheet" | "campaign-character-builder" | "campaign-administration" | "campaign-combat" | "content-packs";
 
 export interface StoredNavigation {
   view: View;
@@ -10,6 +10,7 @@ export interface StoredNavigation {
   primaryId?: string;
   campaignId?: string;
   campaignCharacterId?: string;
+  combatReturnView?: "campaign-detail" | "campaign-character-sheet";
   /** Draft identities are campaign-scoped so one campaign can never load another campaign's draft. */
   characterDraftIds?: Record<string, string>;
   chatReturnCampaignId?: string;
@@ -17,7 +18,7 @@ export interface StoredNavigation {
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "content-packs"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-combat", "content-packs"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };
@@ -53,12 +54,15 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
     && resourceIdSchema.safeParse(candidate.chatReturnCampaignId).success) {
     navigation.chatReturnCampaignId = candidate.chatReturnCampaignId;
   }
+  if (navigation.view === "campaign-combat" && (candidate.combatReturnView === "campaign-detail" || candidate.combatReturnView === "campaign-character-sheet")) {
+    navigation.combatReturnView = candidate.combatReturnView;
+  }
   navigation.selectedIds = Array.isArray(candidate.selectedIds)
     ? [...new Set(candidate.selectedIds.filter((id): id is string => typeof id === "string" && id.length > 0))]
     : [];
   if (navigation.view === "chat" && !navigation.sessionId) navigation.view = "home";
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
-  if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration") && !navigation.campaignId) navigation.view = "campaigns";
+  if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration" || navigation.view === "campaign-combat") && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character-builder" && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character" || navigation.view === "campaign-character-sheet") {
     if (!navigation.campaignId) {
@@ -68,6 +72,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
       navigation.view = "campaign-detail";
     }
   }
+  if (navigation.view === "campaign-combat" && navigation.combatReturnView === "campaign-character-sheet" && !navigation.campaignCharacterId) navigation.combatReturnView = "campaign-detail";
   return navigation;
 }
 
