@@ -31,6 +31,7 @@ export interface CharacterProgressionReadRepository {
   getAuthorized(actorPrincipalId: string, campaignCharacterId: string): ProgressionRootRow | null;
   getState(row: ProgressionRootRow, pendingOverride?: ProgressionPreview["pendingChoices"]): ProgressionState;
   getPreview(row: ProgressionRootRow, selections?: ProgressionSelection[]): ProgressionPreview;
+  getValidatedKnownPowers(row: ProgressionRootRow): ReturnType<typeof readKnownPowerReferences>;
   getCharacterProgression(actorPrincipalId: string, campaignCharacterId: string): ProgressionState | null;
   previewCharacterProgression(actorPrincipalId: string, campaignCharacterId: string, selections?: ProgressionSelection[]): ProgressionPreview | null;
   getCharacterProgressionReceipt(actorPrincipalId: string, campaignCharacterId: string, commandId: string): ProgressionReceipt | null;
@@ -82,11 +83,15 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
       if (!source || power.source_kind !== source.sourceKind || power.source_reference_json !== canonicalCatalogJson(source.sourceReference) || power.source_digest !== progressionCatalogDigest(source.sourceReference)) throw new Error("known power exact source provenance is inconsistent");
     }
   };
+  /** Reuses the progression projection's exact provenance closure for consumers. */
+  const getValidatedKnownPowers = (row: ProgressionRootRow): ReturnType<typeof readKnownPowerReferences> => {
+    assertPowerProvenance(row);
+    return readKnownPowerReferences(db, row.campaign_character_id);
+  };
   /** Builds and validates the current authoritative progression state. */
   const getState = (row: ProgressionRootRow, pendingOverride?: ProgressionPreview["pendingChoices"]): ProgressionState => {
     loadCanonicalProgressionProfile(db, row.profile_id);
-    assertPowerProvenance(row);
-    const refs = readKnownPowerReferences(db, row.campaign_character_id);
+    const refs = getValidatedKnownPowers(row);
     return progressionStateSchema.parse({ campaignCharacterId: row.campaign_character_id, campaignId: row.campaign_id, sheetId: row.sheet_id, actorId: row.actor_id,
       profile: loadCanonicalProgressionProfile(db, row.profile_id), classRef: { kind: "class", packId: row.class_pack_id, packVersion: row.class_pack_version, definitionId: row.class_definition_id },
       level: row.level, totalXp: row.total_xp, milestoneCount: row.milestone_count, revision: row.revision, pendingChoices: pendingOverride ?? pendingFor(row),
@@ -118,5 +123,5 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
     if (!row) return [];
     return (db.prepare("SELECT event_id,command_id,type,revision,occurred_at,public_data FROM character_progression_events_v24 WHERE campaign_character_id=? ORDER BY revision").all(row.campaign_character_id) as Array<any>).map((event) => progressionEventSchema.parse({ eventId: event.event_id, commandId: event.command_id, campaignCharacterId: row.campaign_character_id, type: event.type, revision: event.revision, occurredAt: event.occurred_at, publicData: JSON.parse(event.public_data) }));
   };
-  return { rootFor, authority, getAuthorized, getState, getPreview, getCharacterProgression, previewCharacterProgression, getCharacterProgressionReceipt, listCharacterProgressionEvents };
+  return { rootFor, authority, getAuthorized, getState, getPreview, getValidatedKnownPowers, getCharacterProgression, previewCharacterProgression, getCharacterProgressionReceipt, listCharacterProgressionEvents };
 }

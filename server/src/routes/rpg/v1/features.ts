@@ -105,6 +105,8 @@ import { actorEconomyHttpRoutes } from "./actorEconomy.js";
 import type { EconomyRepository } from "../../../repo/economyRepo.js";
 import { actorChecksHttpRoutes } from "./actorChecks.js";
 import type { CheckRepository } from "../../../repo/checkRepo.js";
+import { actorPowersHttpRoutes } from "./actorPowers.js";
+import type { PowerRepository } from "../../../repo/powerRepo.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
@@ -123,6 +125,7 @@ export interface CampaignListRepository extends
   Partial<Pick<RestRepository, "takeRest">>,
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
+  Partial<Pick<PowerRepository, "getActorPowerSnapshot">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -224,6 +227,7 @@ type InventoryLaneRepository = Pick<InventoryRepository,
 type RestLaneRepository = Pick<RestRepository, "takeRest">;
 type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
+type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -336,6 +340,9 @@ function assertEconomyRepository(repository: CampaignListRepository): asserts re
 function assertCheckRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CheckLaneRepository {
   if (typeof repository.resolveActorCheck !== "function") throw new UnsupportedCampaignRepositoryError();
 }
+function assertPowerRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & PowerLaneRepository {
+  if (typeof repository.getActorPowerSnapshot !== "function") throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -438,6 +445,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCheckRepository(repository);
     return repository;
   };
+  const powerRepositoryAccessor = (): PowerLaneRepository => {
+    const repository = getCampaignRepository();
+    assertPowerRepository(repository);
+    return repository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -460,6 +472,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(actorRestHttpRoutes, { restRepositoryAccessor });
   await app.register(actorEconomyHttpRoutes, { economyRepositoryAccessor });
   await app.register(actorChecksHttpRoutes, { checkRepositoryAccessor });
+  await app.register(actorPowersHttpRoutes, { powerRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };

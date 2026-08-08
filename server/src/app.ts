@@ -61,6 +61,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/actors\/[^/]+\/powers$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/actors/:actorId/powers",
+      hasQuery,
+      queryDetail: method === "GET" ? "Actor powers do not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
 
   if (/^\/api\/rpg\/v1\/campaign-imports\/[^/]+\/apply$/.test(instance)) {
     return {
@@ -355,9 +364,10 @@ export function buildApp(options: {
         );
         const isShop = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/shops\/[^/]+$/.test(normalizedRoute.instance);
         const isActorCheck = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/check-commands";
+        const isActorPowers = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/powers";
         return sendApiProblem(request, reply, 404,
-          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isActorCheck ? "Actor check state not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
+          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isActorCheck ? "Actor check state not found" : isActorPowers ? "Actor powers not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }
@@ -425,10 +435,12 @@ export function buildApp(options: {
         instance: "/api/rpg/v1/campaign-imports/:importId/apply",
       });
     }
-    if (/^\/api\/rpg\/v1\/actors\/[^/]+\/check-commands$/.test(instance)) {
+    if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers)$/.test(instance)) {
       reply.header("cache-control", "no-store");
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
-        instance: "/api/rpg/v1/actors/:actorId/check-commands",
+        instance: instance.endsWith("/powers")
+          ? "/api/rpg/v1/actors/:actorId/powers"
+          : "/api/rpg/v1/actors/:actorId/check-commands",
       });
     }
     return reply.code(404).send({

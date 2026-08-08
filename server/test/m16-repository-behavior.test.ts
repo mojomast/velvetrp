@@ -65,6 +65,47 @@ function fixture() {
 }
 
 describe("M1.6 repository behavior", () => {
+  it("reads an actor-only authoritative powers snapshot with progression provenance and M1.6 revision", () => {
+    const f=fixture();
+    const initial=f.repo.getActorPowerSnapshot("local-owner",f.source);
+    expect(initial).not.toBeNull();
+    expect(initial).toMatchObject({campaignId:f.campaign,actorId:f.source,revision:0});
+    expect(initial!.known).toEqual(initial!.prepared);
+    expect(initial!.known.map((power) => power.kind)).toEqual([...initial!.known.map((power) => power.kind)].sort());
+    expect(initial!.slots).toContainEqual({slotId:"slot-1",level:1,current:1,max:1});
+    expect(initial!.uses.every((state) => state.current>=0&&state.current<=state.max)).toBe(true);
+    expect(initial!.legalNow).toHaveLength(initial!.known.length);
+    const accessDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    for(const [principal,label] of [["powers-gm","GM"],["powers-controller","Controller"],["powers-observer","Observer"],["powers-unrelated","Unrelated"]])
+      accessDb.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,label);
+    accessDb.close();
+    f.advance(1_000);
+    f.repo.addCampaignMembership("local-owner",f.campaign,{principalId:"powers-gm",role:"gm"});
+    f.repo.addCampaignMembership("local-owner",f.campaign,{principalId:"powers-controller",role:"player"});
+    f.repo.addCampaignMembership("local-owner",f.campaign,{principalId:"powers-observer",role:"observer"});
+    const controllerDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    controllerDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='powers-controller' WHERE campaign_id=? AND actor_id=?").run(f.campaign,f.source);
+    controllerDb.prepare("INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json) VALUES(?,?,?,?,?)")
+      .run(f.campaign,f.source,"focus","ability-recovery",JSON.stringify({recovery:"long-rest"}));
+    const finite=initial!.uses[0]!;
+    controllerDb.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)")
+      .run(f.campaign,finite.powerRef.packId,finite.powerRef.packVersion,finite.powerRef.kind,finite.powerRef.definitionId);
+    controllerDb.close();
+    expect(f.repo.getActorPowerSnapshot("powers-gm",f.source)).not.toBeNull();
+    expect(f.repo.getActorPowerSnapshot("powers-controller",f.source)).not.toBeNull();
+    expect(f.repo.getActorPowerSnapshot("powers-observer",f.source)).toBeNull();
+    expect(f.repo.getActorPowerSnapshot("powers-unrelated",f.source)).toBeNull();
+    expect(f.repo.getActorPowerSnapshot("local-owner","missing")).toBeNull();
+    f.repo.usePower("local-owner",{type:"use_power",campaignId:f.campaign,actorId:f.source,power:finite.powerRef,targetActorId:null,costs:[],expectedRevision:0,idempotencyKey:"finite",usedAt:timestamp});
+    const exhausted=f.repo.getActorPowerSnapshot("local-owner",f.source)!;
+    expect(exhausted.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(0);
+    expect(exhausted.legalNow.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.reasons).toContain("finite-uses-exhausted");
+    f.repo.takeRest("local-owner",{type:"take_long_rest",campaignId:f.campaign,actorId:f.source,expectedRevision:0,idempotencyKey:"recover"});
+    expect(f.repo.getActorPowerSnapshot("local-owner",f.source)!.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(finite.max);
+    expect(f.repo.getActorPowerSnapshot("local-owner",f.source)?.revision).toBe(1);
+    f.repo.close();
+  });
+
   it("accepts only server-derived checks and resolves deterministic ability, skill, save, attack, and opposed terms", () => {
     const f = fixture();
     // A check command contains intent only. Resolution and timestamps are server-owned.
