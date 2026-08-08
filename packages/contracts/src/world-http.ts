@@ -94,3 +94,28 @@ export type CampaignNpcHttp=z.infer<typeof campaignNpcHttpSchema>;
 export type NpcRelationshipHttp=z.infer<typeof npcRelationshipHttpSchema>;
 export type CreateCampaignNpcHttpRequest=z.infer<typeof createCampaignNpcHttpRequestSchema>;
 export type NpcRelationshipCommandHttpRequest=z.infer<typeof npcRelationshipCommandHttpRequestSchema>;
+
+export const factionPublicStateHttpSchema=z.object({description:z.string().max(4_000)}).strict();
+export const factionPrivateStateHttpSchema=z.object({gmNotes:z.string().max(8_000),
+  visibility:z.enum(["public","discovered","gm"])}).strict();
+export const campaignFactionHttpSchema=z.object({factionId:resourceIdSchema,name:z.string().trim().min(1).max(200),
+  publicState:factionPublicStateHttpSchema,privateState:factionPrivateStateHttpSchema.optional(),createdAt:utcIsoTimestampSchema}).strict();
+export const factionStandingHttpSchema=z.object({factionId:resourceIdSchema,subjectActorId:actorIdSchema,
+  reputation:z.number().int().safe(),updatedAt:utcIsoTimestampSchema}).strict();
+export const campaignFactionsHttpResponseSchema=z.object({factions:z.array(campaignFactionHttpSchema).max(1_000),
+  standings:z.array(factionStandingHttpSchema).max(10_000)}).strict();
+export const createCampaignFactionHttpRequestSchema=z.object({name:z.string().trim().min(1).max(200),
+  publicState:factionPublicStateHttpSchema,privateState:factionPrivateStateHttpSchema,
+  expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict()
+  .refine((request)=>request.privateState.visibility!=="discovered",{message:"new factions require authoritative visibility",path:["privateState","visibility"]});
+export const createCampaignFactionHttpResponseSchema=z.object({faction:campaignFactionHttpSchema,receipt:worldCommandReceiptHttpSchema}).strict();
+export const factionReputationCommandHttpRequestSchema=z.object({subjectActorId:actorIdSchema,
+  delta:z.number().int().min(-10_000).max(10_000),reason:z.string().trim().min(1).max(500),
+  expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict()
+  .refine((request)=>request.delta!==0,"reputation delta must not be zero");
+export const factionReputationCommandHttpResponseSchema=z.object({standing:factionStandingHttpSchema,
+  receipt:worldCommandReceiptHttpSchema}).strict();
+export type CampaignFactionHttp=z.infer<typeof campaignFactionHttpSchema>;
+export type FactionStandingHttp=z.infer<typeof factionStandingHttpSchema>;
+export type CreateCampaignFactionHttpRequest=z.infer<typeof createCampaignFactionHttpRequestSchema>;
+export type FactionReputationCommandHttpRequest=z.infer<typeof factionReputationCommandHttpRequestSchema>;

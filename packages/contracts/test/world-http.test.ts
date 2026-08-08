@@ -1,7 +1,8 @@
 import {describe,expect,it} from "vitest";
 import {actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignNpcsHttpResponseSchema,
   campaignWorldHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
-  npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema} from "../src/index.js";
+  npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema,campaignFactionsHttpResponseSchema,
+  createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema} from "../src/index.js";
 
 const at="2035-01-01T00:00:00.000Z";
 describe("world HTTP contracts",()=>{
@@ -45,5 +46,16 @@ describe("world HTTP contracts",()=>{
     const request={personaId:"persona",publicState:{name:"Marrow"},privateState:{goals:"",gmNotes:"",
       merchantState:{payload:"x".repeat(16_000)}},expectedRevision:0,idempotencyKey:"create-npc"};
     expect(createCampaignNpcHttpRequestSchema.safeParse(request).success).toBe(false);
+  });
+  it("keeps faction projections and reputation commands strict",()=>{
+    const faction={factionId:"guild",name:"Guild",publicState:{description:"Traders"},createdAt:at};
+    expect(campaignFactionsHttpResponseSchema.parse({factions:[faction],standings:[]})).toBeTruthy();
+    expect(campaignFactionsHttpResponseSchema.safeParse({factions:[{...faction,gmNotes:"leak"}],standings:[]}).success).toBe(false);
+    const create={name:"Guild",publicState:{description:"Traders"},privateState:{gmNotes:"Secret",visibility:"public" as const},expectedRevision:0,idempotencyKey:"guild"};
+    expect(createCampaignFactionHttpRequestSchema.parse(create)).toEqual(create);
+    expect(createCampaignFactionHttpRequestSchema.safeParse({...create,privateState:{...create.privateState,visibility:"discovered"}}).success).toBe(false);
+    const reputation={subjectActorId:"actor",delta:2,reason:"Helped",expectedRevision:1,idempotencyKey:"standing"};
+    expect(factionReputationCommandHttpRequestSchema.parse(reputation)).toEqual(reputation);
+    expect(factionReputationCommandHttpRequestSchema.safeParse({...reputation,delta:0}).success).toBe(false);
   });
 });

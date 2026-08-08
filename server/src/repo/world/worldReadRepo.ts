@@ -1,6 +1,6 @@
 import type DatabaseDriver from "better-sqlite3";
-import { campaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
-  type CampaignNpcHttp,type CampaignWorldHttpResponse,type NpcRelationshipHttp,type WorldProjection } from "@velvet/contracts";
+import { campaignFactionsHttpResponseSchema,campaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
+  type CampaignFactionHttp,type CampaignNpcHttp,type CampaignWorldHttpResponse,type FactionStandingHttp,type NpcRelationshipHttp,type WorldProjection } from "@velvet/contracts";
 import { WorldConflictError } from "./worldWriteRepo.js";
 
 /** Context required to run a world projection. */
@@ -15,9 +15,11 @@ export interface WorldReadRepository {
   getWorldProjection(principalId: string, campaignId: string, sessionId: string): WorldProjection | null;
   getCampaignWorld(principalId:string,campaignId:string):WorldCampaignHttpSnapshot|null;
   listCampaignNpcs(principalId:string,campaignId:string):CampaignNpcsSnapshot|null;
+  listCampaignFactions(principalId:string,campaignId:string):CampaignFactionsSnapshot|null;
 }
 export type WorldCampaignHttpSnapshot=CampaignWorldHttpResponse&{campaignId:string;sessionId:string;revision:number};
 export type CampaignNpcsSnapshot={campaignId:string;revision:number;npcs:CampaignNpcHttp[];relationships:NpcRelationshipHttp[]};
+export type CampaignFactionsSnapshot={campaignId:string;revision:number;factions:CampaignFactionHttp[];standings:FactionStandingHttp[]};
 
 /** Creates database-backed world projections with their required lifecycle guard. */
 export function createWorldReadRepository(
@@ -128,6 +130,28 @@ export function createWorldReadRepository(
       affinity:row.affinity,trust:row.trust,fear:row.fear,updatedAt:row.updated_at}));
     const response=campaignNpcsHttpResponseSchema.parse({npcs,relationships});return {campaignId,revision,...response};
   };
+  const listCampaignFactions=(principalId:string,campaignId:string):CampaignFactionsSnapshot|null=>{
+    context.guard();if(!member(principalId,campaignId))return null;const isGm=gm(principalId,campaignId);
+    const revision=(db.prepare("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?").get(campaignId) as any)?.revision??0;
+    const rows=db.prepare(`SELECT faction.*,metadata.public_state_json,metadata.private_state_json,private.gm_notes
+      FROM campaign_factions_v28 faction LEFT JOIN campaign_faction_metadata_v32 metadata
+        ON metadata.campaign_id=faction.campaign_id AND metadata.faction_id=faction.faction_id
+      LEFT JOIN campaign_faction_private_state_v28 private ON private.campaign_id=faction.campaign_id AND private.faction_id=faction.faction_id
+      WHERE faction.campaign_id=? ORDER BY faction.faction_id`).all(campaignId) as any[];
+    const visible=rows.filter((row)=>isGm||row.visibility==="public");const visibleIds=new Set(visible.map((row)=>row.faction_id));
+    const factions=visible.map((row)=>{const base={factionId:row.faction_id,name:row.public_name,
+      publicState:row.public_state_json?JSON.parse(row.public_state_json):{description:""},createdAt:row.created_at};
+      return isGm?{...base,privateState:row.private_state_json?JSON.parse(row.private_state_json):{gmNotes:row.gm_notes??"",visibility:row.visibility}}:base;});
+    const ledger=db.prepare(`SELECT faction_id,actor_id,sum(delta) reputation,max(recorded_at) updated_at FROM (
+      SELECT faction_id,actor_id,delta,occurred_at recorded_at FROM campaign_reputation_ledger_v28 WHERE campaign_id=?
+      UNION ALL SELECT faction_id,actor_id,delta,recorded_at FROM campaign_faction_reputation_v32 WHERE campaign_id=?)
+      GROUP BY faction_id,actor_id ORDER BY faction_id,actor_id`).all(campaignId,campaignId) as any[];
+    const controlled=isGm?null:new Set((db.prepare(`SELECT actor_id FROM campaign_actor_private_state
+      WHERE campaign_id=? AND controller_principal_id=?`).all(campaignId,principalId) as any[]).map((row)=>row.actor_id));
+    const standings=ledger.filter((row)=>visibleIds.has(row.faction_id)&&(isGm||controlled!.has(row.actor_id))).map((row)=>({
+      factionId:row.faction_id,subjectActorId:row.actor_id,reputation:row.reputation,updatedAt:row.updated_at}));
+    const response=campaignFactionsHttpResponseSchema.parse({factions,standings});return {campaignId,revision,...response};
+  };
 
-  return { getWorldProjection,getCampaignWorld,listCampaignNpcs };
+  return { getWorldProjection,getCampaignWorld,listCampaignNpcs,listCampaignFactions };
 }

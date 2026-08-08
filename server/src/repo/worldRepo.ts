@@ -20,6 +20,9 @@ export {
   type CampaignNpcsSnapshot,
   type CreateNpcResult,
   type NpcRelationshipResult,
+  type CampaignFactionsSnapshot,
+  type CreateFactionResult,
+  type FactionReputationResult,
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */

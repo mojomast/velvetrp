@@ -216,4 +216,29 @@ describe("M1.8 world repository", () => {
     expect(f.repo.listCampaignNpcs("local-owner",f.campaignId)!.relationships).toEqual([changed.relationship]);
     f.db.close();f.repo.close();
   });
+  it("creates factions and accumulates exact-retry reputation on the shared narrative stream",async()=>{
+    const f=await fixture();const create={name:"Wayfarers",publicState:{description:"Road wardens"},
+      privateState:{gmNotes:"Compromised",visibility:"public" as const},expectedRevision:0,idempotencyKey:"create-wayfarers"};
+    const faction=f.repo.createCampaignFaction("local-owner",f.campaignId,create);expect(f.repo.createCampaignFaction("local-owner",f.campaignId,create)).toEqual(faction);
+    const command={subjectActorId:f.player.actorId,delta:7,reason:"Saved caravan",expectedRevision:1,idempotencyKey:"rep-seven"};
+    const first=f.repo.changeFactionReputation("local-owner",faction.faction.factionId,command);
+    expect(first.standing.reputation).toBe(7);expect(f.repo.changeFactionReputation("local-owner",faction.faction.factionId,command)).toEqual(first);
+    expect(()=>f.repo.changeFactionReputation("local-owner",faction.faction.factionId,{...command,delta:8})).toThrow(WorldConflictError);
+    expect(f.repo.listCampaignFactions("local-owner",f.campaignId)).toMatchObject({revision:2,factions:[{privateState:{gmNotes:"Compromised"}}],standings:[{reputation:7}]});
+    const player=f.repo.listCampaignFactions("world-player",f.campaignId)!;expect(player.factions[0]).not.toHaveProperty("privateState");
+    expect(player.standings.map((standing)=>standing.subjectActorId)).toEqual([f.player.actorId]);
+    const hidden=f.repo.createCampaignFaction("local-owner",f.campaignId,{...create,name:"Circle",privateState:{gmNotes:"Hidden",visibility:"gm"},expectedRevision:2,idempotencyKey:"hidden"});
+    expect(f.repo.listCampaignFactions("world-player",f.campaignId)!.factions.map((value)=>value.factionId)).not.toContain(hidden.faction.factionId);
+    f.db.close();f.repo.close();
+  });
+  it("enforces v32 faction reputation through the legacy travel command entry point",async()=>{
+    const f=await fixture();const faction=f.repo.createCampaignFaction("local-owner",f.campaignId,{name:"Gatekeepers",
+      publicState:{description:"Guard the road"},privateState:{gmNotes:"",visibility:"public"},expectedRevision:0,idempotencyKey:"gatekeepers"});
+    f.db.prepare("UPDATE campaign_location_connections_v28 SET requirement_kind='faction_reputation',required_faction_id=?,minimum_reputation=5 WHERE campaign_id=? AND connection_id='road'")
+      .run(faction.faction.factionId,f.campaignId);
+    const travel:any={type:"travel",campaignId:f.campaignId,travelId:"gated",locationConnectionId:"road",selectedPartyActorIds:[f.owner.actorId],expectedRevision:0,idempotencyKey:"gated"};
+    expect(()=>f.repo.travel("local-owner",f.sessionId,travel)).toThrow(WorldUnavailableError);
+    f.repo.changeFactionReputation("local-owner",faction.faction.factionId,{subjectActorId:f.owner.actorId,delta:5,reason:"Earned passage",expectedRevision:1,idempotencyKey:"passage"});
+    expect(f.repo.travel("local-owner",f.sessionId,travel)).toMatchObject({destinationLocationId:"destination"});f.db.close();f.repo.close();
+  });
 });

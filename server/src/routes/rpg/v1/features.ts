@@ -116,6 +116,7 @@ import { combatCommandsHttpRoutes } from "./combatCommands.js";
 import { worldHttpRoutes } from "./worldRoutes.js";
 import type { WorldRepository } from "../../../repo/worldRepo.js";
 import {npcHttpRoutes} from "./npcRoutes.js";
+import {factionHttpRoutes} from "./factionRoutes.js";
 
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
@@ -141,6 +142,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
+  Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -249,6 +251,7 @@ type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "li
 type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat">;
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
+type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -388,6 +391,9 @@ function assertWorldHttpRepository(repository:CampaignListRepository):asserts re
 function assertNpcHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&NpcHttpLaneRepository{
   if(typeof repository.listCampaignNpcs!=="function"||typeof repository.createCampaignNpc!=="function"||typeof repository.changeNpcRelationship!=="function")throw new UnsupportedCampaignRepositoryError();
 }
+function assertFactionHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&FactionHttpLaneRepository{
+  if(typeof repository.listCampaignFactions!=="function"||typeof repository.createCampaignFaction!=="function"||typeof repository.changeFactionReputation!=="function")throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -515,6 +521,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   };
   const worldRepositoryAccessor=():WorldHttpLaneRepository=>{const repository=getCampaignRepository();assertWorldHttpRepository(repository);return repository;};
   const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
+  const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -544,6 +551,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(combatCommandsHttpRoutes, { combatCommandRepositoryAccessor });
   await app.register(worldHttpRoutes,{worldRepositoryAccessor});
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
+  await app.register(factionHttpRoutes,{factionRepositoryAccessor});
 
   app.get<{
     Params: { campaignId: string };
