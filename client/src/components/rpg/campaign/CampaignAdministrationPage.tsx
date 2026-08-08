@@ -7,6 +7,10 @@ import type {
   CampaignHistoryHttpCommandReceipt,
   CampaignHistoryHttpTimeline,
   CampaignImportReport,
+  ContentCatalogHttpCampaignContent,
+  ContentCatalogHttpCampaignContentReceipt,
+  ContentCatalogHttpCampaignPack,
+  PublicationSummary,
   CampaignLifecycleStatus,
   CampaignMemberRole,
   CampaignTransferPackage,
@@ -17,12 +21,16 @@ import {
   addCampaignAdministrationMembership,
   archiveCampaignAdministration,
   createCampaignCheckpoint,
+  configureCampaignContent,
   dryRunCampaignImport,
   forkCampaignTimeline,
   getCampaignAdministration,
+  getCampaignContent,
+  getCampaignContentPack,
   getCampaignDetail,
   listCampaignCheckpoints,
   listCampaignMemberships,
+  listContentPackPublications,
   listCampaignTimelines,
   removeCampaignAdministrationMembership,
   updateCampaignAdministration,
@@ -31,6 +39,7 @@ import {
 import { CampaignSettingsForm } from "./CampaignSettingsForm";
 import { MembershipManager } from "./MembershipManager";
 import { TimelineCheckpointPanel } from "./TimelineCheckpointPanel";
+import { CampaignContentPicker } from "../content/CampaignContentPicker";
 
 export interface CampaignAdministrationPageProps {
   campaignId: string;
@@ -41,8 +50,8 @@ export interface CampaignAdministrationPageProps {
   onHeadingFocused?: (request: number) => void;
 }
 
-type MutationKind = "settings" | "lifecycle" | "archive" | "membership" | "checkpoint" | "fork";
-type Receipt = CampaignAdministrationReceipt | CampaignHistoryHttpCommandReceipt;
+type MutationKind = "settings" | "lifecycle" | "archive" | "membership" | "checkpoint" | "fork" | "content";
+type Receipt = CampaignAdministrationReceipt | CampaignHistoryHttpCommandReceipt | ContentCatalogHttpCampaignContentReceipt;
 interface CampaignMutationEntry {
   token: symbol;
   kind: MutationKind;
@@ -86,7 +95,14 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 function receiptSummary(receipt: Receipt): string {
-  return `Confirmed by receipt at revision ${receipt.revisionAfter} on ${new Date(receipt.occurredAt).toLocaleString()}.`;
+  const occurredAt = "occurredAt" in receipt ? receipt.occurredAt : receipt.configuredAt;
+  return `Confirmed by receipt at revision ${receipt.revisionAfter} on ${new Date(occurredAt).toLocaleString()}.`;
+}
+
+function definitionsByKind(catalog: ContentCatalogHttpCampaignPack) {
+  const groups = new Map<string, ContentCatalogHttpCampaignPack["definitions"]>();
+  for (const definition of catalog.definitions) groups.set(definition.reference.kind, [...(groups.get(definition.reference.kind) ?? []), definition] as ContentCatalogHttpCampaignPack["definitions"]);
+  return [...groups.entries()];
 }
 
 export function CampaignAdministrationPage({ campaignId, campaignName: initialName = "", onBack, onUnavailable, focusHeadingRequest, onHeadingFocused = () => undefined }: CampaignAdministrationPageProps) {
@@ -107,6 +123,11 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   const [importError, setImportError] = useState("");
   const [importReport, setImportReport] = useState<CampaignImportReport | null>(null);
   const [importPackage, setImportPackage] = useState<CampaignTransferPackage | null>(null);
+  const [catalogContent, setCatalogContent] = useState<ContentCatalogHttpCampaignContent | null>(null);
+  const [catalogPublications, setCatalogPublications] = useState<PublicationSummary[]>([]);
+  const [catalogPack, setCatalogPack] = useState<ContentCatalogHttpCampaignPack | null>(null);
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogInspecting, setCatalogInspecting] = useState(false);
   const mountedRef = useRef(true);
   const activeCampaignRef = useRef(campaignId);
   const generationRef = useRef(0);
@@ -140,10 +161,12 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         listCampaignTimelines(requestedCampaignId),
         listCampaignCheckpoints(requestedCampaignId),
       ]);
-      const [membershipResult, detailResult] = await Promise.allSettled([
+      const [membershipResult, detailResult, contentResult, publicationsResult] = await Promise.allSettled([
         administration.campaign.actorRole === "owner"
           ? listCampaignMemberships(requestedCampaignId) : Promise.resolve({ memberships: [] }),
         getCampaignDetail(requestedCampaignId),
+        getCampaignContent(requestedCampaignId),
+        listContentPackPublications({ limit: 100 }),
       ]);
       if (membershipResult.status === "rejected") throw membershipResult.reason;
       if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
@@ -155,7 +178,17 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       setTimelines(timelineData.timelines);
       setActiveTimelineId(timelineData.activeTimelineId);
       setCheckpoints(checkpointData.checkpoints);
+      setCatalogContent(contentResult.status === "fulfilled" ? contentResult.value.content : null);
+      setCatalogPublications(publicationsResult.status === "fulfilled" ? publicationsResult.value.publications : []);
+      setCatalogError((contentResult.status === "rejected" && !(contentResult.reason instanceof ApiError && contentResult.reason.status === 404))
+        || (publicationsResult.status === "rejected" && !(publicationsResult.reason instanceof ApiError && publicationsResult.reason.status === 404))
+        ? "Campaign content could not be loaded. Refresh authoritative administration before changing pins." : "");
       setLoading(false); setRefreshing(false);
+      if (refreshEntry?.kind === "content" && (contentResult.status !== "fulfilled" || publicationsResult.status !== "fulfilled")) {
+        setError("Authoritative campaign pins and sealed publications could not both be refreshed. Content writes remain locked; no PUT was retried.");
+        queueScoped(requestedCampaignId, generation, () => statusRef.current?.focus());
+        return false;
+      }
       if (detailResult.status === "rejected" && (explicitRefresh || preserveCurrent)) {
         setError("Authoritative campaign state loaded, but the campaign name could not be verified. Archive and further writes remain locked; retry the full authoritative refresh.");
         queueScoped(requestedCampaignId, generation, () => statusRef.current?.focus());
@@ -195,6 +228,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
     setCampaign(null); setMemberships([]); setTimelines([]); setCheckpoints([]);
     setCampaignName(null); setCampaignNameLoading(false);
     setNotice(""); setError(""); setImportReport(null); setImportPackage(null); setImportError("");
+    setCatalogContent(null); setCatalogPublications([]); setCatalogPack(null); setCatalogError(""); setCatalogInspecting(false);
     const currentEntry = campaignMutationRegistry.get(campaignId) ?? null;
     setMutationEntry(currentEntry);
     if (currentEntry?.phase === "uncertain") setError(currentEntry.message);
@@ -248,7 +282,10 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       queueScoped(requestedCampaignId, generationRef.current, () => statusRef.current?.focus());
     } catch (mutationError) {
       if (campaignMutationRegistry.get(requestedCampaignId)?.token !== token) return;
-      if (isKnownNonCommit(mutationError)) {
+      if (kind === "content" && mutationError instanceof ApiError && mutationError.status === 409) {
+        publishMutation(requestedCampaignId, { token, kind, phase: "uncertain",
+          message: "Campaign pins are stale or conflict with current state. Duplicate submission is locked until authoritative campaign content is refreshed; the PUT will not be retried." });
+      } else if (isKnownNonCommit(mutationError)) {
         clearMutation(requestedCampaignId, token);
         if (mountedRef.current && activeCampaignRef.current === requestedCampaignId) {
           setError(errorMessage(mutationError, "The change was rejected. Refresh before editing stale state."));
@@ -311,6 +348,24 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
     } finally { if (mountedRef.current) setImportBusy(false); }
   }
 
+  async function inspectCampaignPack(packId: string, packVersion: string): Promise<void> {
+    if (catalogInspecting) return;
+    const requestedCampaignId = campaignId;
+    const generation = generationRef.current;
+    setCatalogInspecting(true); setCatalogError("");
+    try {
+      const response = await getCampaignContentPack(requestedCampaignId, packId, packVersion);
+      if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId || generationRef.current !== generation) return;
+      setCatalogPack(response.catalog);
+    } catch {
+      if (mountedRef.current && activeCampaignRef.current === requestedCampaignId && generationRef.current === generation) {
+        setCatalogError("That exact campaign pack projection could not be loaded.");
+      }
+    } finally {
+      if (mountedRef.current && activeCampaignRef.current === requestedCampaignId && generationRef.current === generation) setCatalogInspecting(false);
+    }
+  }
+
   const busy = mutationEntry?.phase === "writing" || mutationEntry?.phase === "reconciling";
   const uncertain = mutationEntry?.phase === "uncertain" ? mutationEntry : null;
   const mutationLocked = mutationEntry !== null;
@@ -343,6 +398,15 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       <TimelineCheckpointPanel timelines={timelines} activeTimelineId={activeTimelineId} checkpoints={checkpoints} canMutate={owner} busy={busy} mutationLocked={mutationLocked}
         onCreateCheckpoint={(label, timelineId, timelineRevision) => void mutate("checkpoint", () => createCampaignCheckpoint(campaignId, { label, timelineId, timelineRevision, expectedRevision, idempotencyKey: idempotencyKey("checkpoint") }))}
         onFork={(checkpoint) => void mutate("fork", () => forkCampaignTimeline(campaignId, { checkpointId: checkpoint.id, expectedRevision, idempotencyKey: idempotencyKey("fork") }, checkpoint))} />
+
+      {(catalogContent || catalogError) && <section className="admin-section campaign-catalog-section">
+        {catalogContent && <CampaignContentPicker actorRole={campaign.actorRole} current={catalogContent} publications={catalogPublications} expectedRevision={expectedRevision} busy={busy || catalogInspecting} mutationLocked={mutationLocked}
+          onInspect={(packId, packVersion) => void inspectCampaignPack(packId, packVersion)}
+          onApply={(input) => void mutate("content", () => configureCampaignContent(campaignId, input))}
+          onRefresh={() => void load(true, true)} />}
+        {catalogError && <p className="form-error" role="alert">{catalogError}</p>}
+        {catalogPack && <section className="campaign-pack-inspection" aria-labelledby="campaign-pack-inspection-heading"><div className="content-studio-heading"><div><p className="eyebrow">ROLE-FILTERED EXACT VERSION</p><h3 id="campaign-pack-inspection-heading">{catalogPack.publication.name}</h3></div><span className="status-pill">Read only</span></div><code>{catalogPack.publication.packId} @ {catalogPack.publication.packVersion}</code>{definitionsByKind(catalogPack).map(([kind, definitions]) => <section key={kind}><h4>{kind} <span>{definitions.length}</span></h4><ul>{definitions.map((definition) => <li key={definition.reference.definitionId}><strong>{definition.name}</strong><p>{definition.description}</p></li>)}</ul></section>)}</section>}
+      </section>}
 
       {owner && <section className="admin-section import-report" aria-labelledby="import-report-heading">
         <div className="admin-section-heading"><div><p className="eyebrow">TRANSFER REVIEW</p><h2 id="import-report-heading">Inspect an import report</h2></div></div>

@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -84,11 +84,12 @@ describe("navigation persistence", () => {
     expect(parseStoredNavigation({ view: "chat", chatReturnCampaignId: "campaign-one" })).toEqual({ view: "home", selectedIds: [] });
   });
 
-  it("accepts unguarded home, create, lore, and campaign views without IDs", () => {
+  it("accepts unguarded home, create, lore, campaign, and content studio views without IDs", () => {
     expect(parseStoredNavigation({ view: "home" })).toEqual({ view: "home", selectedIds: [] });
     expect(parseStoredNavigation({ view: "create" })).toEqual({ view: "create", selectedIds: [] });
     expect(parseStoredNavigation({ view: "lore" })).toEqual({ view: "lore", selectedIds: [] });
     expect(parseStoredNavigation({ view: "campaigns" })).toEqual({ view: "campaigns", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "content-packs" })).toEqual({ view: "content-packs", selectedIds: [] });
   });
 
   it("requires a contract-valid detail campaign ID without normalizing it", () => {

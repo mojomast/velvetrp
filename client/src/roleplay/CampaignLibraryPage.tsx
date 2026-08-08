@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { createCampaign, listCampaigns, type CampaignAccess } from "../api";
 
-export interface CampaignLibraryPageProps { onBack: () => void; onOpen?: (campaignId: string) => void; }
+export interface CampaignLibraryPageProps { onBack: () => void; onOpen?: (campaignId: string) => void; onContentPacks?: () => void; }
 
 function roleLabel(role: CampaignAccess["actorRole"]): string {
   return role.charAt(0).toUpperCase() + role.slice(1);
 }
 
-export function CampaignLibraryPage({ onBack, onOpen }: CampaignLibraryPageProps) {
+export function CampaignLibraryPage({ onBack, onOpen, onContentPacks }: CampaignLibraryPageProps) {
   const [campaigns, setCampaigns] = useState<CampaignAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -90,7 +90,7 @@ export function CampaignLibraryPage({ onBack, onOpen }: CampaignLibraryPageProps
   }
 
   return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-heading">
-    <header className="library-header"><div><button className="back-link" onClick={onBack}>← Character library</button><p className="eyebrow">TRUSTED LOCAL LIBRARY</p><h1 className="title" id="campaign-heading">Campaigns</h1><p className="subtitle">Campaigns available to this local installation.</p></div></header>
+    <header className="library-header"><div><button className="back-link" onClick={onBack}>← Character library</button><p className="eyebrow">TRUSTED LOCAL LIBRARY</p><h1 className="title" id="campaign-heading">Campaigns</h1><p className="subtitle">Campaigns available to this local installation.</p></div>{onContentPacks && <button className="ghost" onClick={onContentPacks}>Content packs</button>}</header>
     <form className="campaign-create" onSubmit={(event) => void submit(event)} aria-busy={submitting}>
       <div><label htmlFor="campaign-name">Campaign name</label><input id="campaign-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={200} required disabled={submitting} /></div>
       <button className="primary" type="submit" disabled={submitting}>{submitting ? "Creating…" : "Create campaign"}</button>

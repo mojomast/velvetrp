@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 
-export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-administration";
+export type View = "home" | "create" | "edit" | "memory" | "lore" | "chat" | "campaigns" | "campaign-detail" | "campaign-character" | "campaign-administration" | "content-packs";
 
 export interface StoredNavigation {
   view: View;
@@ -15,7 +15,7 @@ export interface StoredNavigation {
 
 export const NAV_KEY = "velvet.navigation.v1";
 
-const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration"]);
+const VIEWS = new Set<View>(["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-administration", "content-packs"]);
 
 export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { view: "home" };

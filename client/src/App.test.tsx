@@ -182,6 +182,30 @@ describe("persistence and multi-character frontend", () => {
     await screen.findByRole("heading", { name: "Characters" });
   });
 
+  it("opens, focuses, persists, and exits the content pack studio through campaigns", async () => {
+    installFetch([aria], [], true, true);
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/content-packs\?limit=100$/, handler: () => json({ publications: [], nextCursor: null }) },
+    );
+    await openLibrary();
+    fireEvent.click(screen.getByRole("button", { name: "Campaigns" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Content packs" }));
+    const heading = await screen.findByRole("heading", { name: "Content pack studio" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(screen.getByText(/No sealed content packs yet/)).toBeTruthy();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("content-packs"));
+    fireEvent.click(screen.getByRole("button", { name: "← Character library" }));
+    await screen.findByRole("heading", { name: "Characters" });
+  });
+
+  it("falls home when restored content studio mechanics are unavailable", async () => {
+    installFetch([aria], [], true, false);
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "content-packs" }));
+    await openLibrary();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home"));
+  });
+
   it("retains mechanics discovery separately and passes it only to authorized campaign detail", async () => {
     installFetch([aria], [], true, true);
     routes.push(

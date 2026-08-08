@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignDetail, getCampaignDiceHistory, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext, validateContentPackDraft } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -119,6 +119,68 @@ describe("opaque legacy URL path segments", () => {
 });
 
 describe("HTTP runtime contracts", () => {
+  const catalogAt = "2030-01-01T00:00:00.000Z";
+  const catalogDigest = "a".repeat(64);
+  const catalogDefinition = { reference: { packId: "pack:one", packVersion: "1.0.0+build.1", definitionId: "race", kind: "race" as const }, name: "Race", description: "Description", tags: [], mechanics: { speed: 30, attributeBonuses: {}, abilityRefs: [] } };
+  const catalogProvenance = { authorship: "original" as const, author: "Author", authoredAt: catalogAt, reviewedBy: "Reviewer", reviewedAt: catalogAt, declaration: "Original", thirdPartyData: false as const };
+  const catalogManifest = { packId: "pack:one", packVersion: "1.0.0+build.1", name: "Pack", description: "Description", tags: ["starter"], rulesProfile: { name: "Rules", description: "Rules", tags: [] }, compatibility: { rulesEngine: "velvet-starter-v1" as const, rulesProfileId: "rules", catalogFormat: "validated-v1" as const }, digest: catalogDigest, provenance: catalogProvenance };
+  const catalogPublication = { packId: catalogManifest.packId, packVersion: catalogManifest.packVersion, name: catalogManifest.name, description: catalogManifest.description, tags: catalogManifest.tags, compatibility: catalogManifest.compatibility, digest: catalogDigest, validationLevel: "validated-v1" as const, publishedAt: catalogAt };
+  const ownerCatalog = { publication: catalogPublication, provenance: catalogProvenance, definitions: [catalogDefinition] };
+
+  it("strictly reads and encodes all sealed content pack projections without caching", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [catalogPublication], nextCursor: null }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ catalog: ownerCatalog }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ catalog: { publication: catalogPublication, definitions: [catalogDefinition] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(listContentPackPublications({ cursor: "next_page", limit: 2 })).resolves.toMatchObject({ publications: [catalogPublication] });
+    await expect(getContentPackPublication("pack:one", "1.0.0+build.1")).resolves.toEqual({ catalog: ownerCatalog });
+    await expect(getCampaignContentPack("campaign:one", "pack:one", "1.0.0+build.1")).resolves.toMatchObject({ catalog: { publication: catalogPublication } });
+    expect(fetchMock.mock.calls.map(([url, init]) => [String(url), (init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/content-packs?cursor=next_page&limit=2", "no-store"],
+      ["/api/rpg/v1/content-packs/pack%3Aone/versions/1.0.0%2Bbuild.1", "no-store"],
+      ["/api/rpg/v1/campaigns/campaign%3Aone/content-packs/pack%3Aone/versions/1.0.0%2Bbuild.1", "no-store"],
+    ]);
+    await expect(getContentPackPublication("bad/id", "1.0.0")).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("validates in memory then binds one exact immutable publication POST", async () => {
+    const counts = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template"].map((kind) => ({ kind, count: kind === "race" ? 1 : 0 }));
+    const report = { valid: true, issues: [], normalizedSummary: { totalDefinitions: 1, counts, digest: catalogDigest } };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ report }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ catalog: ownerCatalog }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const draft = { manifest: catalogManifest, definitions: [catalogDefinition] };
+    await expect(validateContentPackDraft(draft)).resolves.toEqual({ report });
+    await expect(publishContentPack({ ...draft, idempotencyKey: "publish-one" })).resolves.toEqual({ catalog: ownerCatalog });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/content-packs/validate", expect.objectContaining({ method: "POST", body: JSON.stringify(draft) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/content-packs", expect.objectContaining({ method: "POST" }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ catalog: { ...ownerCatalog, publication: { ...catalogPublication, packVersion: "2.0.0" } } }), { status: 201 }));
+    await expect(publishContentPack({ ...draft, idempotencyKey: "publish-two" })).rejects.toThrow(/did not match/);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ catalog: ownerCatalog }), { status: 200 }));
+    await expect(publishContentPack({ ...draft, idempotencyKey: "publish-three" })).rejects.toThrow(/documented status/);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("reads and binds one revision-safe complete campaign pin PUT", async () => {
+    const content = { compatible: true, rulesProfileId: "rules", contentPacks: [{ packId: "pack:one", packVersion: "1.0.0+build.1", digest: catalogDigest }], issues: [] };
+    const input = { rulesProfileId: "rules", contentPacks: [{ packId: "pack:one", packVersion: "1.0.0+build.1" }], expectedRevision: 4, idempotencyKey: "configure-one" };
+    const receipt = { commandId: "command", idempotencyKey: input.idempotencyKey, revisionBefore: 4, revisionAfter: 5, configuredAt: catalogAt, content };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ content }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ content, receipt }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignContent("campaign:one")).resolves.toEqual({ content });
+    await expect(configureCampaignContent("campaign:one", input)).resolves.toEqual({ content, receipt });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/campaigns/campaign%3Aone/content", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/campaigns/campaign%3Aone/content", expect.objectContaining({ method: "PUT", body: JSON.stringify(input) }));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ content, receipt: { ...receipt, idempotencyKey: "other" } }), { status: 200 }));
+    await expect(configureCampaignContent("campaign:one", input)).rejects.toThrow(/did not match/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("validates the legacy feature response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ voice: false, images: true }), {
       status: 200,

@@ -40,6 +40,33 @@ import type {
   CampaignTransferHttpDryRunRequest,
   CampaignTransferHttpDryRunResponse,
 } from "@velvet/contracts";
+import {
+  contentCatalogHttpCampaignContentGetResponseSchema,
+  contentCatalogHttpCampaignContentPutRequestSchema,
+  contentCatalogHttpCampaignContentPutResponseSchema,
+  contentCatalogHttpCampaignPackDetailResponseSchema,
+  contentCatalogHttpOwnerDetailResponseSchema,
+  contentCatalogHttpPublicationRequestSchema,
+  contentCatalogHttpPublicationResponseSchema,
+  contentCatalogHttpPublicationsQuerySchema,
+  contentCatalogHttpPublicationsResponseSchema,
+  contentCatalogHttpValidationRequestSchema,
+  contentCatalogHttpValidationResponseSchema,
+  contentPackVersionSchema,
+} from "@velvet/contracts";
+import type {
+  ContentCatalogHttpCampaignContentGetResponse,
+  ContentCatalogHttpCampaignContentPutRequest,
+  ContentCatalogHttpCampaignContentPutResponse,
+  ContentCatalogHttpCampaignPackDetailResponse,
+  ContentCatalogHttpOwnerDetailResponse,
+  ContentCatalogHttpPublicationRequest,
+  ContentCatalogHttpPublicationResponse,
+  ContentCatalogHttpPublicationsQuery,
+  ContentCatalogHttpPublicationsResponse,
+  ContentCatalogHttpValidationRequest,
+  ContentCatalogHttpValidationResponse,
+} from "@velvet/contracts";
 
 export type FeatureFlags = RoleplayFeatureFlags;
 export type CampaignAccess = ContractCampaignAccess;
@@ -1105,6 +1132,112 @@ export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequ
   const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", body: JSON.stringify(body) });
   if (success.status !== 200) throw new Error("Campaign import report response did not use the documented status");
   return campaignTransferHttpDryRunResponseSchema.parse(success.body);
+}
+
+function contentPackPath(packId: string, packVersion: string): { packId: string; packVersion: string; path: string } {
+  const validPackId = parseApiInput(() => resourceIdSchema.parse(packId));
+  const validPackVersion = parseApiInput(() => contentPackVersionSchema.parse(packVersion));
+  return { packId: validPackId, packVersion: validPackVersion,
+    path: `/rpg/v1/content-packs/${encodeURIComponent(validPackId)}/versions/${encodeURIComponent(validPackVersion)}` };
+}
+
+function requireStatus(success: { status: number }, status: number, operation: string): void {
+  if (success.status !== status) throw new Error(`${operation} response did not use the documented status`);
+}
+
+/** Reads one strict page of sealed publications without caching. */
+export async function listContentPackPublications(query: ContentCatalogHttpPublicationsQuery = {}): Promise<ContentCatalogHttpPublicationsResponse> {
+  const input = parseApiInput(() => contentCatalogHttpPublicationsQuerySchema.parse(query));
+  const params = new URLSearchParams();
+  if (input.cursor !== undefined) params.set("cursor", input.cursor);
+  if (input.limit !== undefined) params.set("limit", String(input.limit));
+  const success = await requestResponse<unknown>(`/rpg/v1/content-packs${params.size ? `?${params}` : ""}`, { cache: "no-store" });
+  requireStatus(success, 200, "Content pack publication list");
+  const response = contentCatalogHttpPublicationsResponseSchema.parse(success.body);
+  if (input.limit !== undefined && response.publications.length > input.limit) throw new Error("Content pack publication page exceeded the requested limit");
+  return response;
+}
+
+/** Reads the owner-only complete projection for one exact sealed version. */
+export async function getContentPackPublication(packId: string, packVersion: string): Promise<ContentCatalogHttpOwnerDetailResponse> {
+  const target = contentPackPath(packId, packVersion);
+  const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
+  requireStatus(success, 200, "Content pack detail");
+  const response = contentCatalogHttpOwnerDetailResponseSchema.parse(success.body);
+  if (response.catalog.publication.packId !== target.packId || response.catalog.publication.packVersion !== target.packVersion) {
+    throw new Error("Content pack detail response did not match the request");
+  }
+  return response;
+}
+
+/** Validates only the supplied in-memory draft; this method never publishes. */
+export async function validateContentPackDraft(input: ContentCatalogHttpValidationRequest): Promise<ContentCatalogHttpValidationResponse> {
+  const body = parseApiInput(() => contentCatalogHttpValidationRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs/validate", { method: "POST", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Content pack validation");
+  return contentCatalogHttpValidationResponseSchema.parse(success.body);
+}
+
+/** Issues one immutable publication POST. Callers must never automatically retry it. */
+export async function publishContentPack(input: ContentCatalogHttpPublicationRequest): Promise<ContentCatalogHttpPublicationResponse> {
+  const body = parseApiInput(() => contentCatalogHttpPublicationRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/content-packs", { method: "POST", body: JSON.stringify(body) });
+  requireStatus(success, 201, "Content pack publication");
+  const response = contentCatalogHttpPublicationResponseSchema.parse(success.body);
+  const publication = response.catalog.publication;
+  if (publication.packId !== body.manifest.packId || publication.packVersion !== body.manifest.packVersion
+    || publication.name !== body.manifest.name || publication.description !== body.manifest.description
+    || publication.digest !== body.manifest.digest
+    || JSON.stringify(publication.tags) !== JSON.stringify(body.manifest.tags)
+    || JSON.stringify(publication.compatibility) !== JSON.stringify(body.manifest.compatibility)
+    || JSON.stringify(response.catalog.provenance) !== JSON.stringify(body.manifest.provenance)
+    || JSON.stringify(response.catalog.definitions) !== JSON.stringify(body.definitions)) {
+    throw new Error("Content pack publication response did not match the request");
+  }
+  return response;
+}
+
+function campaignContentPath(campaignId: string): { campaignId: string; path: string } {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  return { campaignId: validCampaignId, path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/content` };
+}
+
+/** Reads the exact authoritative campaign pin set without caching. */
+export async function getCampaignContent(campaignId: string): Promise<ContentCatalogHttpCampaignContentGetResponse> {
+  const target = campaignContentPath(campaignId);
+  const success = await requestResponse<unknown>(target.path, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign content");
+  return contentCatalogHttpCampaignContentGetResponseSchema.parse(success.body);
+}
+
+/** Issues one revision-bound exact-pin PUT and never retries it. */
+export async function configureCampaignContent(campaignId: string, input: ContentCatalogHttpCampaignContentPutRequest): Promise<ContentCatalogHttpCampaignContentPutResponse> {
+  const target = campaignContentPath(campaignId);
+  const body = parseApiInput(() => contentCatalogHttpCampaignContentPutRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(target.path, { method: "PUT", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Campaign content configuration");
+  const response = contentCatalogHttpCampaignContentPutResponseSchema.parse(success.body);
+  const expectedPins = JSON.stringify(body.contentPacks);
+  if (response.content.rulesProfileId !== body.rulesProfileId || JSON.stringify(response.content.contentPacks.map(({ packId, packVersion }) => ({ packId, packVersion }))) !== expectedPins
+    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.receipt.content.rulesProfileId !== body.rulesProfileId
+    || JSON.stringify(response.receipt.content) !== JSON.stringify(response.content)) {
+    throw new Error("Campaign content configuration response did not match the request");
+  }
+  return response;
+}
+
+/** Reads one role-filtered campaign pack projection at an exact version. */
+export async function getCampaignContentPack(campaignId: string, packId: string, packVersion: string): Promise<ContentCatalogHttpCampaignPackDetailResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const target = contentPackPath(packId, packVersion);
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/content-packs/${encodeURIComponent(target.packId)}/versions/${encodeURIComponent(target.packVersion)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign content pack detail");
+  const response = contentCatalogHttpCampaignPackDetailResponseSchema.parse(success.body);
+  if (response.catalog.publication.packId !== target.packId || response.catalog.publication.packVersion !== target.packVersion) {
+    throw new Error("Campaign content pack detail response did not match the request");
+  }
+  return response;
 }
 
 export interface HarnessSettings {

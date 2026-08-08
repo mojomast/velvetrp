@@ -149,10 +149,10 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
     try {
       const response = await api.validate(snapshot);
       if (!mountedRef.current || request !== validationRef.current) return;
-      const normalized = response.report.normalizedSummary.digest && response.report.valid
+      const normalized = response.report.normalizedSummary.digest
         ? { ...snapshot, manifest: { ...snapshot.manifest, digest: response.report.normalizedSummary.digest } }
         : snapshot;
-      setDraft(normalized); setReport(response.report); setValidatedDraft(JSON.stringify(normalized));
+      setDraft(normalized); setReport(response.report); setValidatedDraft(response.report.valid ? JSON.stringify(normalized) : "");
       setPublicationReview(false); setPublicationConfirmed(false);
     } catch { if (mountedRef.current && request === validationRef.current) setNotice("Draft validation could not be completed. Nothing was published."); }
     finally { if (mountedRef.current && request === validationRef.current) setValidating(false); }
@@ -176,7 +176,10 @@ export function ContentPackLibraryPage({ api, onBack, focusHeadingRequest, onHea
       setNotice(`Published ${response.catalog.publication.packId} @ ${response.catalog.publication.packVersion}. This exact version is now sealed and immutable.`);
       queueMicrotask(() => statusRef.current?.focus());
     } catch (error) {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) {
+        publicationLocks.set(key, { phase: "uncertain", message: "Publication failed after this view closed. Refresh authoritative publications before another attempt; no POST will be retried." });
+        return;
+      }
       if (isKnownNonCommit(error)) {
         publicationLocks.delete(key); setPublicationLock(null);
         setNotice("Publication was rejected before commit. Correct and validate the local draft again.");

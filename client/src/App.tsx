@@ -2,9 +2,9 @@ import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect,
 import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  createCharacter, deleteCharacter, deleteSession, exportCharacter, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
+  createCharacter, deleteCharacter, deleteSession, exportCharacter, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateHarness, updateProvider, updateSessionContext,
+  listContentPackPublications, publishContentPack, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCharacter, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -15,6 +15,7 @@ import { CampaignLibraryPage } from "./roleplay/CampaignLibraryPage";
 import { CampaignDetailPage } from "./roleplay/CampaignDetailPage";
 import { CampaignCharacterWorkspacePage } from "./roleplay/CampaignCharacterWorkspacePage";
 import { CampaignAdministrationPage } from "./components/rpg/campaign/CampaignAdministrationPage";
+import { ContentPackLibraryPage, type ContentPackLibraryApi } from "./components/rpg/content/ContentPackLibraryPage";
 import { readNavigation, writeNavigation, type StoredNavigation, type View } from "./roleplay/navigation";
 
 function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
@@ -28,6 +29,13 @@ function isExactRequestedSoloSession(session: Session, characterId: string): boo
   // it, but whenever it is present it must bind to the same requested solo.
   return !("characterId" in session) || session.characterId === characterId;
 }
+
+const contentPackLibraryApi: ContentPackLibraryApi = {
+  list: listContentPackPublications,
+  detail: getContentPackPublication,
+  validate: validateContentPackDraft,
+  publish: publishContentPack,
+};
 
 export default function App() {
   const stored = useRef(readNavigation()).current;
@@ -53,9 +61,11 @@ export default function App() {
   const chatEntryRef = useRef(0);
   const campaignDetailEntryRef = useRef(0);
   const campaignAdministrationEntryRef = useRef(0);
+  const contentStudioEntryRef = useRef(0);
   const [campaignHeadingFocusRequest, setCampaignHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [workspaceHeadingFocusRequest, setWorkspaceHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
   const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
+  const [contentHeadingFocusRequest, setContentHeadingFocusRequest] = useState<number | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +77,7 @@ export default function App() {
   // Mechanics discovery is retained independently from campaign navigation so
   // an optional/legacy RPG endpoint never stalls the legacy application.
   const [campaignMechanicsAvailable, setCampaignMechanicsAvailable] = useState(false);
+  const [contentStudioAvailable, setContentStudioAvailable] = useState(false);
   const [provider, setProvider] = useState<ProviderSettings | null>(null);
   const [harness, setHarness] = useState<HarnessSettings | null>(null);
   const currentNavigationRef = useRef({ view, campaignId: activeCampaignId, chatReturnCampaignId });
@@ -114,6 +125,7 @@ export default function App() {
         campaignAvailabilityRef.current = rpgFeatureData.campaign;
         setCampaignLibraryAvailable(rpgFeatureData.campaign);
         setCampaignMechanicsAvailable(rpgFeatureData.mechanics);
+        setContentStudioAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics);
         const current = currentNavigationRef.current;
         const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-administration"
           || current.view === "campaign-character" || (current.view === "chat" && Boolean(current.chatReturnCampaignId));
@@ -125,6 +137,11 @@ export default function App() {
           setChatReturnCampaignId("");
           setSession(null);
           setMessages([]);
+          setView("home");
+        }
+        if (current.view === "content-packs" && !(rpgFeatureData.campaign && rpgFeatureData.mechanics)) {
+          cancelRoomOpenForNavigation();
+          currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" };
           setView("home");
         }
       });
@@ -320,7 +337,8 @@ export default function App() {
   if (view === "create" || view === "edit") return <main className="page"><CharacterForm character={view === "edit" ? activeCharacter : null} busy={busy} error={error} onCancel={goHome} onSave={saveCharacter} /></main>;
   if (view === "memory" && activeCharacter) return <main className="page"><MemoryManager character={activeCharacter} onClose={goHome} /></main>;
   if (view === "lore") return <main className="page"><LoreManager characters={characters} onClose={goHome} /></main>;
-  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} onOpen={(campaignId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId, chatReturnCampaignId: "" }; setChatReturnCampaignId(""); campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(campaignId); setView("campaign-detail"); }} />;
+  if (view === "content-packs" && contentStudioAvailable) return <ContentPackLibraryPage api={contentPackLibraryApi} focusHeadingRequest={contentHeadingFocusRequest === contentStudioEntryRef.current ? contentHeadingFocusRequest : undefined} onHeadingFocused={(request) => setContentHeadingFocusRequest((current) => current === request ? null : current)} onBack={goHome} />;
+  if (view === "campaigns" && campaignLibraryAvailable) return <CampaignLibraryPage onBack={goHome} onContentPacks={contentStudioAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; contentStudioEntryRef.current = request; setContentHeadingFocusRequest(request); currentNavigationRef.current = { view: "content-packs", campaignId: "", chatReturnCampaignId: "" }; setView("content-packs"); } : undefined} onOpen={(campaignId) => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId, chatReturnCampaignId: "" }; setChatReturnCampaignId(""); campaignDetailEntryRef.current = ++transitionRequestRef.current; setActiveCampaignId(campaignId); setView("campaign-detail"); }} />;
   if (view === "campaign-detail" && campaignLibraryAvailable && activeCampaignId) {
     const focusRequest = campaignHeadingFocusRequest?.campaignId === activeCampaignId
       && campaignHeadingFocusRequest.request === campaignDetailEntryRef.current ? campaignHeadingFocusRequest.request : undefined;
