@@ -204,6 +204,34 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("home"));
   });
 
+  it("restores persisted campaign administration and authoritatively loads its campaign name", async () => {
+    installFetch([aria], [], true);
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-administration", campaignId: campaignAccess.id }));
+    const at = "2030-01-02T00:00:00.000Z";
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/administration$/, handler: () => json({ campaign: {
+        id: campaignAccess.id, actorRole: "owner", status: "published", activeTimelineId: "timeline-one", revision: 4, updatedAt: at,
+        settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
+      } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/timelines$/, handler: () => json({ activeTimelineId: "timeline-one", timelines: [
+        { id: "timeline-one", parentTimelineId: null, forkedFromRevision: null, revision: 7, createdAt: at, active: true },
+      ] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/checkpoints$/, handler: () => json({ checkpoints: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/memberships$/, handler: () => json({ memberships: [
+        { principalId: "local-owner", role: "owner", createdAt: at },
+      ] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
+    );
+
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "Campaign administration" })).toBeTruthy();
+    expect(screen.getByText(campaignAccess.name)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Archive campaign" })).toBeTruthy();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({
+      view: "campaign-administration", campaignId: campaignAccess.id,
+    }));
+  });
+
   it("opens campaign detail, persists it, and returns to campaigns", async () => {
     installFetch([aria], [], true);
     routes.push(

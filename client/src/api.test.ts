@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, activateMessage, attachCampaignRoom, branchMessage, cancelGeneration, continueRoom, continueSession, createCampaign, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignDetail, getCampaignDiceHistory, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignRooms, listCampaigns, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateSessionContext } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, attachCampaignRoom, branchMessage, cancelGeneration, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, encodeOpaquePathSegment, errorFromResponse, forkCampaignTimeline, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignDetail, getCampaignDiceHistory, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministrationMembership, updateSessionContext } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -459,6 +459,65 @@ describe("HTTP runtime contracts", () => {
     await expect(setupMechanicsStarter("campaign-one")).rejects.toThrow(/committed status/);
     expect(jsonSpy).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("binds membership role and exact operation receipts and distinguishes invalid local input", async () => {
+    const at = "2030-01-02T00:00:00.000Z";
+    const receipt = (type: "membership_added" | "membership_role_changed") => ({
+      commandId: "command-one", campaignId: "campaign-one", type, revisionBefore: 4, revisionAfter: 5, occurredAt: at,
+      events: [{ eventId: "event-one", commandId: "command-one", campaignId: "campaign-one", type, revision: 5, occurredAt: at,
+        data: { principalId: "member-one", role: "gm" } }],
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ membership: { principalId: "member-one", role: "player", createdAt: at }, receipt: receipt("membership_added") }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ membership: { principalId: "member-one", role: "gm", createdAt: at }, receipt: receipt("membership_added") }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(addCampaignAdministrationMembership("campaign-one", { principalId: "member-one", role: "gm", expectedRevision: 4, idempotencyKey: "add-one" }))
+      .rejects.toThrow(/did not match/);
+    await expect(updateCampaignAdministrationMembership("campaign-one", "member-one", { role: "gm", expectedRevision: 4, idempotencyKey: "role-one" }))
+      .rejects.toThrow(/did not match/);
+    await expect(addCampaignAdministrationMembership("campaign-one", { principalId: "bad/id", role: "gm", expectedRevision: 4, idempotencyKey: "bad" }))
+      .rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires a strict checkpoint envelope and binds checkpoint resource and event data", async () => {
+    const at = "2030-01-02T00:00:00.000Z";
+    const checkpoint = { id: "checkpoint-one", timelineId: "timeline-one", timelineRevision: 7, label: "Before the gate", createdAt: at };
+    const receipt = { commandId: "command-one", type: "checkpoint_created", revisionBefore: 4, revisionAfter: 5, occurredAt: at,
+      events: [{ eventId: "event-one", commandId: "command-one", type: "checkpoint_created", revision: 5, occurredAt: at,
+        data: { timelineId: "timeline-one", timelineRevision: 7, label: "Before the gate" } }] };
+    const input = { timelineId: "timeline-one", timelineRevision: 7, label: "Before the gate", expectedRevision: 4, idempotencyKey: "checkpoint-command" };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoints: [], extra: true }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint: { ...checkpoint, createdAt: "2030-01-03T00:00:00.000Z" }, receipt }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ checkpoint, receipt: { ...receipt, events: [{ ...receipt.events[0], data: { ...receipt.events[0].data, label: "Wrong" } }] } }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listCampaignCheckpoints("campaign-one")).rejects.toThrow(/malformed/);
+    await expect(createCampaignCheckpoint("campaign-one", input)).rejects.toThrow(/did not match/);
+    await expect(createCampaignCheckpoint("campaign-one", input)).rejects.toThrow(/did not match/);
+  });
+
+  it("binds a fork receipt to the requested checkpoint and exact timeline ancestry", async () => {
+    const at = "2030-01-02T00:00:00.000Z";
+    const checkpoint = { id: "checkpoint-one", timelineId: "timeline-one", timelineRevision: 7 };
+    const input = { checkpointId: checkpoint.id, expectedRevision: 4, idempotencyKey: "fork-command" };
+    const receipt = { commandId: "command-one", type: "timeline_forked", revisionBefore: 4, revisionAfter: 5, occurredAt: at,
+      events: [{ eventId: "event-one", commandId: "command-one", type: "timeline_forked", revision: 5, occurredAt: at,
+        data: { checkpointId: checkpoint.id } }] };
+    const timeline = { id: "timeline-two", parentTimelineId: "wrong-parent", forkedFromRevision: 7, revision: 7, createdAt: at, active: true };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ timeline, receipt }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ timeline: { ...timeline, parentTimelineId: checkpoint.timelineId }, receipt: { ...receipt,
+        events: [{ ...receipt.events[0], data: { checkpointId: "checkpoint-other" } }] } }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(forkCampaignTimeline("campaign-one", input, checkpoint)).rejects.toThrow(/did not match/);
+    await expect(forkCampaignTimeline("campaign-one", input, checkpoint)).rejects.toThrow(/did not match/);
+    await expect(forkCampaignTimeline("campaign-one", input, { ...checkpoint, id: "checkpoint-other" })).rejects.toBeInstanceOf(ApiInputError);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("decodes structured API problems without breaking legacy fields", async () => {

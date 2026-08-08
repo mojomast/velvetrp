@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
+import type { CampaignAdministrationReceipt } from "@velvet/contracts";
+import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
-import { CampaignAdministrationPage } from "../components/rpg/campaign/CampaignAdministrationPage";
+import { CampaignAdministrationPage, resetCampaignAdministrationPageModuleStateForTests } from "../components/rpg/campaign/CampaignAdministrationPage";
 
 vi.mock("../api", async (importOriginal) => ({
   ...await importOriginal<typeof import("../api")>(),
@@ -47,7 +48,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-afterEach(() => { cleanup(); resetCampaignDetailPageModuleStateForTests(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); resetCampaignDetailPageModuleStateForTests(); resetCampaignAdministrationPageModuleStateForTests(); vi.resetAllMocks(); });
 
 describe("CampaignDetailPage", () => {
   // Most legacy detail tests exercise servers from before the optional roster
@@ -1670,10 +1671,14 @@ describe("CampaignDetailPage", () => {
 describe("CampaignAdministrationPage role projections", () => {
   const timestamp = "2030-04-05T00:00:00.000Z";
   const timeline = { id: "timeline-main", parentTimelineId: null, forkedFromRevision: null, revision: 7, createdAt: timestamp, active: true };
+  const receipt: CampaignAdministrationReceipt = { commandId: "command-one", campaignId: "campaign-one", type: "administration_updated",
+    revisionBefore: 4, revisionAfter: 5, occurredAt: timestamp, events: [{ eventId: "event-one", commandId: "command-one",
+      campaignId: "campaign-one", type: "administration_updated", revision: 5, occurredAt: timestamp, data: { settings: {} } }] };
 
   beforeEach(() => {
     vi.mocked(listCampaignTimelines).mockResolvedValue({ activeTimelineId: timeline.id, timelines: [timeline] });
     vi.mocked(listCampaignCheckpoints).mockResolvedValue({ checkpoints: [] });
+    vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
   });
 
   it("structurally omits owner and privileged controls from a player projection", async () => {
@@ -1695,6 +1700,35 @@ describe("CampaignAdministrationPage role projections", () => {
     expect(listCampaignMemberships).not.toHaveBeenCalled();
   });
 
+  it("shows GM notes but structurally omits every owner mutation from a GM projection", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "gm", status: "paused", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "GM-only canon" },
+    } });
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    expect(await screen.findByText("GM-only canon")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Resume campaign" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Memberships" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create checkpoint" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Inspect an import report" })).toBeNull();
+  });
+
+  it("omits privileged notes and every mutation from an observer projection", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "observer", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members" },
+    } });
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: "Campaign settings" })).toBeTruthy();
+    expect(screen.queryByText("GM notes")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save settings" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create checkpoint" })).toBeNull();
+    expect(listCampaignMemberships).not.toHaveBeenCalled();
+  });
+
   it("renders owner-only lifecycle, membership, checkpoint, archive, and import-report controls", async () => {
     vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
       id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id,
@@ -1707,7 +1741,10 @@ describe("CampaignAdministrationPage role projections", () => {
     ] });
     render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
-    expect(await screen.findByRole("button", { name: "Save settings" })).toBeTruthy();
+    const saveSettings = await screen.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    expect(saveSettings.disabled).toBe(true);
+    fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
+    expect(saveSettings.disabled).toBe(false);
     expect(screen.getByRole("button", { name: "Pause campaign" })).toBeTruthy();
     expect((screen.getByRole("button", { name: "Archive campaign" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole("heading", { name: "Memberships" })).toBeTruthy();
@@ -1728,6 +1765,7 @@ describe("CampaignAdministrationPage role projections", () => {
     render(<CampaignAdministrationPage campaignId="campaign-one" campaignName="The Long Road" onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
     const save = await screen.findByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+    fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
     fireEvent.click(save);
     const refresh = await screen.findByRole("button", { name: "Refresh authoritative state" });
     const lockedSave = screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement;
@@ -1736,7 +1774,113 @@ describe("CampaignAdministrationPage role projections", () => {
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
 
     fireEvent.click(refresh);
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
     expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps restored archive unavailable until an explicit campaign-name retry succeeds", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
+    } });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(getCampaignDetail).mockRejectedValueOnce(new Error("detail unavailable"));
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    const retry = await screen.findByRole("button", { name: "Retry campaign name" });
+    expect(screen.queryByRole("button", { name: "Archive campaign" })).toBeNull();
+    vi.mocked(getCampaignDetail).mockResolvedValueOnce({ campaign: ownerUnconfigured });
+    fireEvent.click(retry);
+    expect(await screen.findByRole("heading", { name: "Archive campaign" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Archive campaign" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("requires settings review and treats local invalid input as a certain non-commit", async () => {
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: {
+      id: "campaign-one", actorRole: "owner", status: "published", activeTimelineId: timeline.id, revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict", recapVisibility: "gm-only", gmNotes: "" },
+    } });
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(updateCampaignAdministration).mockRejectedValueOnce(new ApiInputError());
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    const save = await screen.findByRole("button", { name: "Save settings" });
+    fireEvent.click(save);
+    expect(updateCampaignAdministration).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
+    fireEvent.click(save);
+    await screen.findByText("The change was rejected. Refresh before editing stale state.");
+    expect(screen.queryByRole("button", { name: "Refresh authoritative state" })).toBeNull();
+    expect((save.closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false);
+  });
+
+  it("retains a settled write across unmount and blocks reopening until authoritative refresh", async () => {
+    const administration = { campaign: {
+      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "" },
+    } };
+    const write = deferred<Awaited<ReturnType<typeof updateCampaignAdministration>>>();
+    vi.mocked(getCampaignAdministration).mockResolvedValue(administration);
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(updateCampaignAdministration).mockReturnValue(write.promise);
+    const first = render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const save = await screen.findByRole("button", { name: "Save settings" });
+    fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
+    fireEvent.click(save);
+    first.unmount();
+
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Campaign settings" });
+    expect(screen.queryByRole("button", { name: "Refresh authoritative state" })).toBeNull();
+    expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(true);
+    await act(async () => { write.resolve({ campaign: { ...administration.campaign, revision: 5 }, receipt }); await write.promise; });
+    const refresh = await screen.findByRole("button", { name: "Refresh authoritative state" });
+    expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
+    fireEvent.click(refresh);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
+    expect(updateCampaignAdministration).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocks only after a receipt-backed write receives successful authoritative reconciliation", async () => {
+    const before = { campaign: {
+      id: "campaign-one", actorRole: "owner" as const, status: "published" as const, activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: true, safetyMode: "strict" as const, recapVisibility: "gm-only" as const, gmNotes: "" },
+    } };
+    const after = { campaign: { ...before.campaign, revision: 5, updatedAt: "2030-04-05T00:00:01.000Z" } };
+    vi.mocked(getCampaignAdministration).mockResolvedValueOnce(before).mockResolvedValue(after);
+    vi.mocked(listCampaignMemberships).mockResolvedValue({ memberships: [{ principalId: "local-owner", role: "owner", createdAt: timestamp }] });
+    vi.mocked(updateCampaignAdministration).mockResolvedValue({ campaign: after.campaign, receipt });
+    render(<CampaignAdministrationPage campaignId="campaign-one" onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    const save = await screen.findByRole("button", { name: "Save settings" });
+    fireEvent.click(screen.getByLabelText("I reviewed these policy and visibility settings and confirm this change."));
+    fireEvent.click(save);
+    await screen.findByText(/Confirmed by receipt at revision 5/);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save settings" }).closest("fieldset") as HTMLFieldSetElement).disabled).toBe(false));
+    expect(getCampaignAdministration).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("button", { name: "Refresh authoritative state" })).toBeNull();
+  });
+
+  it("does not let stale cross-campaign loads publish or claim queued heading focus", async () => {
+    const campaignA = deferred<Awaited<ReturnType<typeof getCampaignAdministration>>>();
+    const observer = (id: string) => ({ campaign: {
+      id, actorRole: "observer" as const, status: "published" as const, activeTimelineId: timeline.id,
+      revision: 4, updatedAt: timestamp,
+      settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard" as const, recapVisibility: "members" as const },
+    } });
+    vi.mocked(getCampaignAdministration).mockImplementation((id) => id === "campaign-a" ? campaignA.promise : Promise.resolve(observer(id)));
+    vi.mocked(getCampaignDetail).mockImplementation((id) => Promise.resolve({ campaign: { ...unconfigured, id, name: id === "campaign-a" ? "First" : "Second" } }));
+    const focused = vi.fn();
+    const view = render(<CampaignAdministrationPage campaignId="campaign-a" focusHeadingRequest={1} onHeadingFocused={focused} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    view.rerender(<CampaignAdministrationPage campaignId="campaign-b" focusHeadingRequest={2} onHeadingFocused={focused} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    expect(await screen.findByText("Second")).toBeTruthy();
+    await waitFor(() => expect(focused).toHaveBeenCalledWith(2));
+    await act(async () => { campaignA.resolve(observer("campaign-a")); await campaignA.promise; });
+    expect(screen.getByText("Second")).toBeTruthy();
+    expect(screen.queryByText("First")).toBeNull();
+    expect(focused).not.toHaveBeenCalledWith(1);
   });
 });

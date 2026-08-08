@@ -1,5 +1,45 @@
 import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema } from "@velvet/contracts";
 import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
+import {
+  campaignAdministrationHttpArchiveRequestSchema,
+  campaignAdministrationHttpArchiveResponseSchema,
+  campaignAdministrationHttpGetResponseSchema,
+  campaignAdministrationHttpMembershipCreateRequestSchema,
+  campaignAdministrationHttpMembershipDeleteRequestSchema,
+  campaignAdministrationHttpMembershipListResponseSchema,
+  campaignAdministrationHttpMembershipMutationResponseSchema,
+  campaignAdministrationHttpMembershipUpdateRequestSchema,
+  campaignAdministrationHttpPatchRequestSchema,
+  campaignAdministrationHttpPatchResponseSchema,
+  campaignHistoryHttpCheckpointRequestSchema,
+  campaignHistoryHttpCheckpointResponseSchema,
+  campaignHistoryHttpCheckpointSchema,
+  campaignHistoryHttpForkRequestSchema,
+  campaignHistoryHttpForkResponseSchema,
+  campaignHistoryHttpTimelinesResponseSchema,
+  campaignTransferHttpDryRunRequestSchema,
+  campaignTransferHttpDryRunResponseSchema,
+} from "@velvet/contracts";
+import type {
+  CampaignAdministrationHttpArchiveRequest,
+  CampaignAdministrationHttpArchiveResponse,
+  CampaignAdministrationHttpMembershipCreateRequest,
+  CampaignAdministrationHttpMembershipDeleteRequest,
+  CampaignAdministrationHttpMembershipListResponse,
+  CampaignAdministrationHttpMembershipMutationResponse,
+  CampaignAdministrationHttpMembershipUpdateRequest,
+  CampaignAdministrationHttpPatchRequest,
+  CampaignAdministrationHttpPatchResponse,
+  CampaignAdministrationHttpResponse,
+  CampaignHistoryHttpCheckpoint,
+  CampaignHistoryHttpCheckpointRequest,
+  CampaignHistoryHttpCheckpointResponse,
+  CampaignHistoryHttpForkRequest,
+  CampaignHistoryHttpForkResponse,
+  CampaignHistoryHttpTimelinesResponse,
+  CampaignTransferHttpDryRunRequest,
+  CampaignTransferHttpDryRunResponse,
+} from "@velvet/contracts";
 
 export type FeatureFlags = RoleplayFeatureFlags;
 export type CampaignAccess = ContractCampaignAccess;
@@ -129,6 +169,19 @@ export class ApiError extends Error {
     this.code = problem?.code ?? null;
     this.requestId = problem?.requestId ?? requestId;
   }
+}
+
+/** A request was rejected by the local wire contract before network I/O. */
+export class ApiInputError extends Error {
+  constructor(message = "API request input is invalid") {
+    super(message);
+    this.name = "ApiInputError";
+  }
+}
+
+function parseApiInput<T>(parse: () => T): T {
+  try { return parse(); }
+  catch { throw new ApiInputError(); }
 }
 
 export async function errorFromResponse(res: Response): Promise<ApiError> {
@@ -850,6 +903,208 @@ export async function setupMechanicsStarter(campaignId: string): Promise<Campaig
     throw new Error("Campaign mechanics starter setup response did not match the request");
   }
   return response;
+}
+
+function campaignAdministrationPath(campaignId: string): { id: string; path: string } {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  return { id, path: `/rpg/v1/campaigns/${encodeURIComponent(id)}/administration` };
+}
+
+function assertAdministrationReceipt(
+  receipt: CampaignAdministrationHttpPatchResponse["receipt"],
+  campaignId: string,
+  type: CampaignAdministrationHttpPatchResponse["receipt"]["type"],
+  expectedRevision: number,
+): void {
+  const [event] = receipt.events;
+  if (receipt.campaignId !== campaignId || receipt.type !== type
+    || receipt.revisionBefore !== expectedRevision || receipt.revisionAfter !== expectedRevision + 1
+    || event.campaignId !== campaignId || event.commandId !== receipt.commandId || event.type !== type
+    || event.revision !== receipt.revisionAfter || event.occurredAt !== receipt.occurredAt) {
+    throw new Error("Campaign administration receipt did not match the request");
+  }
+}
+
+/** Reads the strict role-specific administration projection without caching. */
+export async function getCampaignAdministration(campaignId: string): Promise<CampaignAdministrationHttpResponse> {
+  const { id, path } = campaignAdministrationPath(campaignId);
+  const response = campaignAdministrationHttpGetResponseSchema.parse(await request<unknown>(path, { cache: "no-store" }));
+  if (response.campaign.id !== id) throw new Error("Campaign administration response did not match the request");
+  return response;
+}
+
+/** Issues one revision-bound PATCH. Callers must never automatically retry it. */
+export async function updateCampaignAdministration(
+  campaignId: string,
+  input: CampaignAdministrationHttpPatchRequest,
+): Promise<CampaignAdministrationHttpPatchResponse> {
+  const { id, path } = campaignAdministrationPath(campaignId);
+  const body = parseApiInput(() => campaignAdministrationHttpPatchRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(path, { method: "PATCH", body: JSON.stringify(body) });
+  if (success.status !== 200) throw new Error("Campaign administration response did not use the committed status");
+  const response = campaignAdministrationHttpPatchResponseSchema.parse(success.body);
+  assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
+  if (response.campaign.id !== id || response.receipt.revisionAfter !== response.campaign.revision) {
+    throw new Error("Campaign administration receipt did not match the request");
+  }
+  return response;
+}
+
+/** Archives through one confirmed DELETE and requires an exact receipt. */
+export async function archiveCampaignAdministration(
+  campaignId: string,
+  input: CampaignAdministrationHttpArchiveRequest,
+): Promise<CampaignAdministrationHttpArchiveResponse> {
+  const { id, path } = campaignAdministrationPath(campaignId);
+  const body = parseApiInput(() => campaignAdministrationHttpArchiveRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(path, { method: "DELETE", body: JSON.stringify(body) });
+  if (success.status !== 200) throw new Error("Campaign archive response did not use the committed status");
+  const response = campaignAdministrationHttpArchiveResponseSchema.parse(success.body);
+  assertAdministrationReceipt(response.receipt, id, "administration_updated", body.expectedRevision);
+  if (response.campaign.id !== id || response.campaign.status !== "archived"
+    || response.receipt.revisionAfter !== response.campaign.revision) {
+    throw new Error("Campaign archive receipt did not match the request");
+  }
+  return response;
+}
+
+function membershipPath(campaignId: string, principalId?: string): { campaignId: string; path: string } {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const suffix = principalId === undefined ? "" : `/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(principalId)))}`;
+  return { campaignId: validCampaignId, path: `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/memberships${suffix}` };
+}
+
+export async function listCampaignMemberships(campaignId: string): Promise<CampaignAdministrationHttpMembershipListResponse> {
+  const { path } = membershipPath(campaignId);
+  return campaignAdministrationHttpMembershipListResponseSchema.parse(await request<unknown>(path, { cache: "no-store" }));
+}
+
+async function membershipMutation(
+  campaignId: string,
+  principalId: string,
+  path: string,
+  init: RequestInit,
+  expectedRevision: number,
+  operation: "membership_added" | "membership_role_changed" | "membership_removed",
+  expectedRole?: CampaignAdministrationHttpMembershipMutationResponse["membership"]["role"],
+): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
+  const success = await requestResponse<unknown>(path, init);
+  if (success.status !== 200) throw new Error("Campaign membership response did not use the committed status");
+  const response = campaignAdministrationHttpMembershipMutationResponseSchema.parse(success.body);
+  assertAdministrationReceipt(response.receipt, campaignId, operation, expectedRevision);
+  const [event] = response.receipt.events;
+  if (response.membership.principalId !== principalId
+    || event.data.principalId !== principalId
+    || (expectedRole !== undefined && (response.membership.role !== expectedRole || event.data.role !== expectedRole))) {
+    throw new Error("Campaign membership receipt did not match the request");
+  }
+  return response;
+}
+
+export async function addCampaignAdministrationMembership(
+  campaignId: string,
+  input: CampaignAdministrationHttpMembershipCreateRequest,
+): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
+  const body = parseApiInput(() => campaignAdministrationHttpMembershipCreateRequestSchema.parse(input));
+  const target = membershipPath(campaignId);
+  return membershipMutation(target.campaignId, body.principalId, target.path,
+    { method: "POST", body: JSON.stringify(body) }, body.expectedRevision, "membership_added", body.role);
+}
+
+export async function updateCampaignAdministrationMembership(
+  campaignId: string,
+  principalId: string,
+  input: CampaignAdministrationHttpMembershipUpdateRequest,
+): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
+  const body = parseApiInput(() => campaignAdministrationHttpMembershipUpdateRequestSchema.parse(input));
+  const target = membershipPath(campaignId, principalId);
+  return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
+    { method: "PATCH", body: JSON.stringify(body) }, body.expectedRevision, "membership_role_changed", body.role);
+}
+
+export async function removeCampaignAdministrationMembership(
+  campaignId: string,
+  principalId: string,
+  input: CampaignAdministrationHttpMembershipDeleteRequest,
+): Promise<CampaignAdministrationHttpMembershipMutationResponse> {
+  const body = parseApiInput(() => campaignAdministrationHttpMembershipDeleteRequestSchema.parse(input));
+  const target = membershipPath(campaignId, principalId);
+  return membershipMutation(target.campaignId, parseApiInput(() => resourceIdSchema.parse(principalId)), target.path,
+    { method: "DELETE", body: JSON.stringify(body) }, body.expectedRevision, "membership_removed");
+}
+
+export async function listCampaignTimelines(campaignId: string): Promise<CampaignHistoryHttpTimelinesResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const response = campaignHistoryHttpTimelinesResponseSchema.parse(await request<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(id)}/timelines`, { cache: "no-store" }));
+  if (!response.timelines.some((timeline) => timeline.id === response.activeTimelineId && timeline.active)) {
+    throw new Error("Campaign timeline response did not identify its active timeline");
+  }
+  return response;
+}
+
+export async function listCampaignCheckpoints(campaignId: string): Promise<{ checkpoints: CampaignHistoryHttpCheckpoint[] }> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = await request<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`, { cache: "no-store" });
+  if (typeof body !== "object" || body === null || Array.isArray(body)
+    || Object.keys(body).length !== 1 || !("checkpoints" in body)) {
+    throw new Error("Campaign checkpoint response was malformed");
+  }
+  return { checkpoints: campaignHistoryHttpCheckpointSchema.array().max(1000).parse((body as { checkpoints: unknown }).checkpoints) };
+}
+
+export async function createCampaignCheckpoint(
+  campaignId: string,
+  input: CampaignHistoryHttpCheckpointRequest,
+): Promise<CampaignHistoryHttpCheckpointResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => campaignHistoryHttpCheckpointRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/checkpoints`,
+    { method: "POST", body: JSON.stringify(body) });
+  if (success.status !== 201) throw new Error("Campaign checkpoint response did not use the committed status");
+  const response = campaignHistoryHttpCheckpointResponseSchema.parse(success.body);
+  const [event] = response.receipt.events;
+  const eventKeys = Object.keys(event.data).sort().join(",");
+  if (response.checkpoint.timelineId !== body.timelineId || response.checkpoint.timelineRevision !== body.timelineRevision
+    || response.checkpoint.label !== body.label || response.checkpoint.createdAt !== response.receipt.occurredAt
+    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.type !== "checkpoint_created"
+    || event.type !== "checkpoint_created" || event.occurredAt !== response.receipt.occurredAt
+    || eventKeys !== "label,timelineId,timelineRevision"
+    || event.data.timelineId !== body.timelineId || event.data.timelineRevision !== body.timelineRevision
+    || event.data.label !== body.label) throw new Error("Campaign checkpoint receipt did not match the request");
+  return response;
+}
+
+export async function forkCampaignTimeline(
+  campaignId: string,
+  input: CampaignHistoryHttpForkRequest,
+  checkpoint: Pick<CampaignHistoryHttpCheckpoint, "id" | "timelineId" | "timelineRevision">,
+): Promise<CampaignHistoryHttpForkResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => campaignHistoryHttpForkRequestSchema.parse(input));
+  if (checkpoint.id !== body.checkpointId) throw new ApiInputError("Fork checkpoint identity is invalid");
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/timeline-forks`,
+    { method: "POST", body: JSON.stringify(body) });
+  if (success.status !== 201) throw new Error("Campaign timeline fork response did not use the committed status");
+  const response = campaignHistoryHttpForkResponseSchema.parse(success.body);
+  const [event] = response.receipt.events;
+  if (!response.timeline.active || response.timeline.parentTimelineId !== checkpoint.timelineId
+    || response.timeline.forkedFromRevision !== checkpoint.timelineRevision
+    || response.timeline.revision !== checkpoint.timelineRevision || response.timeline.createdAt !== response.receipt.occurredAt
+    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.type !== "timeline_forked"
+    || event.type !== "timeline_forked" || event.occurredAt !== response.receipt.occurredAt
+    || Object.keys(event.data).join(",") !== "checkpointId" || event.data.checkpointId !== body.checkpointId) {
+    throw new Error("Campaign timeline fork receipt did not match the request");
+  }
+  return response;
+}
+
+/** Runs validation only. This stores a report but does not alter campaign state. */
+export async function dryRunCampaignImport(input: CampaignTransferHttpDryRunRequest): Promise<CampaignTransferHttpDryRunResponse> {
+  const body = parseApiInput(() => campaignTransferHttpDryRunRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/campaign-imports", { method: "POST", body: JSON.stringify(body) });
+  if (success.status !== 200) throw new Error("Campaign import report response did not use the documented status");
+  return campaignTransferHttpDryRunResponseSchema.parse(success.body);
 }
 
 export interface HarnessSettings {

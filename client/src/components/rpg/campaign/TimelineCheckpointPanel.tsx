@@ -9,7 +9,7 @@ export interface TimelineCheckpointPanelProps {
   busy: boolean;
   mutationLocked: boolean;
   onCreateCheckpoint: (label: string, timelineId: string, timelineRevision: number) => void;
-  onFork: (checkpointId: string) => void;
+  onFork: (checkpoint: CampaignHistoryHttpCheckpoint) => void;
 }
 
 export function TimelineCheckpointPanel({ timelines, activeTimelineId, checkpoints, canMutate, busy, mutationLocked, onCreateCheckpoint, onFork }: TimelineCheckpointPanelProps) {
@@ -38,7 +38,7 @@ export function TimelineCheckpointPanel({ timelines, activeTimelineId, checkpoin
       {ordered.map((checkpoint) => <li key={checkpoint.id}>
         <div><strong>{checkpoint.label}</strong><small>Timeline revision {checkpoint.timelineRevision} · {new Date(checkpoint.createdAt).toLocaleString()}</small></div>
         {canMutate && <button className="ghost" disabled={busy || mutationLocked} onClick={() => {
-          if (window.confirm(`Fork from “${checkpoint.label}”? Current history remains unchanged.`)) onFork(checkpoint.id);
+          if (window.confirm(`Fork from “${checkpoint.label}”? Current history remains unchanged.`)) onFork(checkpoint);
         }}>Fork from checkpoint</button>}
       </li>)}
     </ol>}
