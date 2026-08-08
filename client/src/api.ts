@@ -41,7 +41,7 @@ import type {
   CampaignTransferHttpDryRunResponse,
 } from "@velvet/contracts";
 import {
-  characterDraftFinalizationResultSchema,
+  characterDraftHttpFinalizationResultSchema,
   characterDraftHttpMutationResultSchema,
   characterDraftHttpViewSchema,
   characterProgressionHttpApplyRequestSchema,
@@ -57,7 +57,7 @@ import {
   updateCharacterDraftHttpInputSchema,
 } from "@velvet/contracts";
 import type {
-  CharacterDraftFinalizationResult,
+  CharacterDraftHttpFinalizationResult,
   CharacterDraftHttpView,
   CharacterDraftMutationReceipt,
   CharacterProgressionHttpApplyRequest,
@@ -908,17 +908,15 @@ export async function updateCharacterDraft(campaignId: string, draftId: string, 
   return response;
 }
 
-/** Finalizes once using the current M2.6 internal receipt projection; callers then refresh the public sheet. */
-export async function finalizeCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftFinalizationResult> {
+/** Finalizes once and accepts only the strict public M2.6 receipt projection. */
+export async function finalizeCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftHttpFinalizationResult> {
   const target = characterDraftPath(campaignId, draftId);
   const body = parseApiInput(() => finalizeCharacterDraftHttpInputSchema.parse(input));
   const success = await requestResponse<unknown>(`${target.path}/finalize`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
-  requireStatus(success, 200, "Character draft finalization");
-  const response = characterDraftFinalizationResultSchema.parse(success.body);
-  if (response.draft.campaignId !== target.campaignId || response.draft.id !== target.draftId
-    || response.draft.status !== "finalized" || response.receipt.draftId !== target.draftId
-    || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
-    || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.draft.revision !== response.receipt.revisionAfter) {
+  requireStatus(success, 201, "Character draft finalization");
+  const response = characterDraftHttpFinalizationResultSchema.parse(success.body);
+  if (response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
     throw new Error("Character draft finalization response did not match the request");
   }
   return response;
@@ -958,15 +956,21 @@ export async function previewCharacterProgression(campaignId: string, campaignCh
 }
 
 /** Applies one opaque server preview exactly once; no failed request is replayed. */
-export async function applyCharacterProgression(campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpApplyRequest): Promise<CharacterProgressionHttpApplyResponse> {
+export async function applyCharacterProgression(campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpApplyRequest, expectedPreview: CharacterProgressionHttpPreview): Promise<CharacterProgressionHttpApplyResponse> {
   const target = campaignCharacterPath(campaignId, campaignCharacterId);
   const body = parseApiInput(() => characterProgressionHttpApplyRequestSchema.parse(input));
+  if (expectedPreview.campaignId !== target.campaignId || expectedPreview.campaignCharacterId !== target.characterId
+    || expectedPreview.previewRevision !== body.previewRevision || expectedPreview.previewToken !== body.previewToken) {
+    throw new ApiInputError("Progression apply preview does not match the request");
+  }
   const success = await requestResponse<unknown>(`${target.path}/progression/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Character progression apply");
   const response = characterProgressionHttpApplyResponseSchema.parse(success.body);
   if (response.progression.campaignId !== target.campaignId || response.progression.campaignCharacterId !== target.characterId
     || response.receipt.campaignCharacterId !== target.characterId || response.receipt.idempotencyKey !== body.idempotencyKey
-    || response.receipt.revisionBefore !== body.previewRevision || response.receipt.revisionAfter !== response.progression.revision) {
+    || response.receipt.revisionBefore !== body.previewRevision || response.receipt.revisionAfter !== response.progression.revision
+    || JSON.stringify(response.receipt.appliedLevels) !== JSON.stringify(expectedPreview.levels)
+    || response.progression.level !== expectedPreview.eligibleLevel) {
     throw new Error("Character progression apply response did not match the request");
   }
   return response;

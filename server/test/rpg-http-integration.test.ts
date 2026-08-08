@@ -55,8 +55,11 @@ describe("integrated RPG HTTP lanes", () => {
         expectedRevision: 0, idempotencyKey: "http-draft-update", selections: { race, background, class: klass, starterGrant: "kit" },
       } });
     expect(updated.statusCode).toBe(200);
-    const finalized = repository.finalizeCharacterDraft("local-owner", draft.id, { expectedRevision: 1, idempotencyKey: "http-finalize" });
-    const characterId = finalized.receipt.campaignCharacterId;
+    const finalized = await app.inject({ method: "POST", url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.id}/finalize`,
+      headers: { "content-type": "application/json" }, payload: { expectedRevision: 1, idempotencyKey: "http-finalize" } });
+    expect(finalized.statusCode, finalized.body).toBe(201);
+    expect(finalized.body).not.toMatch(/controllerPrincipalId|commandId|eventId|actorId|campaignId|characterId|sheetId|draftId/);
+    const characterId = finalized.json().character.id;
 
     const progression = await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${characterId}/progression` });
     expect(progression.statusCode).toBe(200);

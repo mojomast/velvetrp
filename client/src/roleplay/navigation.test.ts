@@ -123,10 +123,12 @@ describe("navigation persistence", () => {
 
   it("restores a campaign-bound builder draft and drops malformed identities", () => {
     expect(parseStoredNavigation({ view: "campaign-character-builder" })).toEqual({ view: "campaigns", selectedIds: [] });
-    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "draft-one" }))
-      .toEqual({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "draft-one", selectedIds: [] });
-    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "bad/id" }))
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" } }))
+      .toEqual({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" }, selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "bad/id": "draft", "campaign-one": "bad/id" } }))
       .toEqual({ view: "campaign-character-builder", campaignId: "campaign-one", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftId: "legacy-draft" }))
+      .toMatchObject({ characterDraftIds: { "campaign-one": "legacy-draft" } });
   });
 
   it("ignores unknown fields", () => {

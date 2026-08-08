@@ -51,6 +51,9 @@ describe("character builder HTTP projections", () => {
       ...finalization,
       receipt: { ...finalization.receipt, actorId: "actor-1" },
     }).success).toBe(false);
+    for (const privateField of ["draft", "controllerPrincipalId", "role", "commandId", "eventId", "actorId", "campaignId", "characterId", "sheetId"] as const) {
+      expect(characterDraftHttpFinalizationResultSchema.safeParse({ ...finalization, [privateField]: "private" }).success).toBe(false);
+    }
   });
 
   it("requires the initialized health resource to match derived HP", () => {

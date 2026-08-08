@@ -10,7 +10,8 @@ export interface StoredNavigation {
   primaryId?: string;
   campaignId?: string;
   campaignCharacterId?: string;
-  characterDraftId?: string;
+  /** Draft identities are campaign-scoped so one campaign can never load another campaign's draft. */
+  characterDraftIds?: Record<string, string>;
   chatReturnCampaignId?: string;
 }
 
@@ -35,7 +36,18 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (typeof candidate.campaignCharacterId === "string" && resourceIdSchema.safeParse(candidate.campaignCharacterId).success) {
     navigation.campaignCharacterId = candidate.campaignCharacterId;
   }
-  if (typeof candidate.characterDraftId === "string" && resourceIdSchema.safeParse(candidate.characterDraftId).success) navigation.characterDraftId = candidate.characterDraftId;
+  const draftIds: Record<string, string> = {};
+  if (typeof candidate.characterDraftIds === "object" && candidate.characterDraftIds !== null && !Array.isArray(candidate.characterDraftIds)) {
+    for (const [campaignId, draftId] of Object.entries(candidate.characterDraftIds as Record<string, unknown>).slice(0, 100)) {
+      if (resourceIdSchema.safeParse(campaignId).success && typeof draftId === "string" && resourceIdSchema.safeParse(draftId).success) draftIds[campaignId] = draftId;
+    }
+  }
+  // One-way safe migration from the initial unscoped M3.3 navigation shape.
+  if (navigation.view === "campaign-character-builder" && navigation.campaignId
+    && typeof candidate.characterDraftId === "string" && resourceIdSchema.safeParse(candidate.characterDraftId).success) {
+    draftIds[navigation.campaignId] = candidate.characterDraftId;
+  }
+  if (Object.keys(draftIds).length) navigation.characterDraftIds = draftIds;
   if (navigation.view === "chat" && navigation.sessionId
     && typeof candidate.chatReturnCampaignId === "string"
     && resourceIdSchema.safeParse(candidate.chatReturnCampaignId).success) {
@@ -47,7 +59,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (navigation.view === "chat" && !navigation.sessionId) navigation.view = "home";
   if ((navigation.view === "edit" || navigation.view === "memory") && !navigation.characterId) navigation.view = "home";
   if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration") && !navigation.campaignId) navigation.view = "campaigns";
-  if (navigation.view === "campaign-character-builder" && !navigation.campaignId) { navigation.view = "campaigns"; delete navigation.characterDraftId; }
+  if (navigation.view === "campaign-character-builder" && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character") {
     if (!navigation.campaignId) {
       navigation.view = "campaigns";

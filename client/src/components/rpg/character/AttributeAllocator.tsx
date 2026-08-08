@@ -1,7 +1,10 @@
 import { useState } from "react";
 import {
   CHARACTER_BUILDER_ATTRIBUTE_IDS,
+  CHARACTER_BUILDER_POINT_BUY_BUDGET,
   CHARACTER_BUILDER_STANDARD_ARRAY,
+  characterBuilderAllocationRequestSchema,
+  characterBuilderPointBuyCost,
   type CharacterBuilderAllocationRequest,
   type CharacterBuilderAttributeScores,
 } from "@velvet/contracts";
@@ -26,9 +29,11 @@ export function AttributeAllocator({ disabled = false, onContinue }: AttributeAl
     setScores((current) => ({ ...current, [id]: value }));
   }
 
-  function submit() {
-    onContinue(method === "server-roll" ? { method } : { method, scores } as CharacterBuilderAllocationRequest);
-  }
+  const candidate = method === "server-roll" ? { method } : { method, scores };
+  const parsed = characterBuilderAllocationRequestSchema.safeParse(candidate);
+  const pointCost = method === "point-buy" ? characterBuilderPointBuyCost(scores) : null;
+
+  function submit() { if (parsed.success) onContinue(parsed.data); }
 
   return <section className="builder-section attribute-allocator" aria-labelledby="allocation-heading">
     <div className="builder-section-heading"><div><p className="eyebrow">STEP 1</p><h2 id="allocation-heading">Allocate attributes</h2></div></div>
@@ -42,7 +47,7 @@ export function AttributeAllocator({ disabled = false, onContinue }: AttributeAl
         </label>)}
       </div>
     </fieldset>
-    {method !== "server-roll" ? <fieldset className="attribute-grid" disabled={disabled}>
+    {method !== "server-roll" ? <fieldset className="attribute-grid" disabled={disabled} aria-describedby={!parsed.success ? "allocation-error" : undefined}>
       <legend>Attribute scores</legend>
       {CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => <label className="field" key={id}>
         <span>{labels[id]}</span>
@@ -52,6 +57,8 @@ export function AttributeAllocator({ disabled = false, onContinue }: AttributeAl
         {method === "standard-array" && <small>Use each array value once. Position {index + 1}.</small>}
       </label>)}
     </fieldset> : <p className="builder-callout">The server will make and persist one auditable 4d6 roll for each attribute when the draft is created.</p>}
-    <button className="primary" type="button" disabled={disabled} onClick={submit}>Create draft with this allocation</button>
+    {method === "point-buy" && <p className="builder-help">Point-buy budget: {pointCost ?? "invalid"} / {CHARACTER_BUILDER_POINT_BUY_BUDGET} points.</p>}
+    {!parsed.success && <p className="form-error" id="allocation-error" role="alert">{method === "standard-array" ? "Assign each standard-array value exactly once." : method === "point-buy" ? `Spend exactly ${CHARACTER_BUILDER_POINT_BUY_BUDGET} points using scores from 8 through 15.` : "Enter a score from 3 through 20 for every attribute."}</p>}
+    <button className="primary" type="button" disabled={disabled || !parsed.success} onClick={submit}>Create draft with this allocation</button>
   </section>;
 }

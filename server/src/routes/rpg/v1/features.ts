@@ -26,7 +26,9 @@ import type {
   Campaign,
   CampaignAccess,
   CampaignCharacterCreationOptionsResponse,
+  CampaignCharacterRead,
   CampaignDetail,
+  ActorResource,
   CampaignRenameRequest,
   CreateCampaignInput,
 } from "@velvet/contracts";
@@ -171,6 +173,8 @@ export interface CampaignListRepository extends
     campaignId: string,
     campaignCharacterId: string,
   ): import("../../../repo/index.js").CampaignCharacterSheetSnapshot | null;
+  getCampaignCharacter?(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
+  listActorResources?(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
   resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
   installMechanicsStarterCatalog?: MechanicsStarterSetupRepository["installMechanicsStarterCatalog"];
@@ -213,7 +217,8 @@ function logCampaignOperationFailure(
 }
 
 type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
-  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
+  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">
+  & Required<Pick<CampaignListRepository, "getCampaignCharacter" | "listActorResources">>;
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
 type CharacterSheetLaneRepository = Required<Pick<CampaignListRepository, "getCampaignCharacterSheetSnapshot">>;
@@ -268,7 +273,9 @@ function assertCharacterBuilderRepository(
   if (typeof repository.createCharacterDraft !== "function"
     || typeof repository.getCharacterDraft !== "function"
     || typeof repository.updateCharacterDraft !== "function"
-    || typeof repository.finalizeCharacterDraft !== "function") {
+    || typeof repository.finalizeCharacterDraft !== "function"
+    || typeof repository.getCampaignCharacter !== "function"
+    || typeof repository.listActorResources !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
 }

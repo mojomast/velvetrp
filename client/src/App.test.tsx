@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { CharacterBuilderPage, resetCharacterBuilderPageModuleStateForTests } from "./components/rpg/character/CharacterBuilderPage";
 import { LevelUpWizard, resetLevelUpWizardModuleStateForTests } from "./components/rpg/character/LevelUpWizard";
+import { AttributeAllocator } from "./components/rpg/character/AttributeAllocator";
 import { ApiError } from "./api";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_PACK, ORIGINAL_STARTER_RACE, ORIGINAL_STARTER_RULES_PROFILE } from "@velvet/contracts";
 
@@ -1099,7 +1100,7 @@ describe("character builder and advancement safety flows", () => {
     startingGrants: complete ? [{ kind: "item", reference: ref("item", "bedroll"), quantity: 1, source: "background-kit" }] : [], createdAt: at, updatedAt: at }; }
   const sheet = { sheet: { name: "Persona", race: { name: "Race", description: "Race." }, background: { name: "Guide", description: "Guide." }, classes: [{ name: "Warden", description: "Warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] }, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
 
-  beforeEach(() => { resetCharacterBuilderPageModuleStateForTests(); resetLevelUpWizardModuleStateForTests(); });
+  beforeEach(() => { resetCharacterBuilderPageModuleStateForTests(); resetLevelUpWizardModuleStateForTests(); localStorage.removeItem("velvet.character-builder.ambiguous-creates.v1"); });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
   it("focus-links issues and preserves an ambiguous autosave lock across unmount until explicit refresh", async () => {
@@ -1135,8 +1136,37 @@ describe("character builder and advancement safety flows", () => {
     expect(screen.queryByText("Race draft-one")).toBeNull();
   });
 
+  it("restores only the active campaign draft and clears it on explicit new-builder reopen", async () => {
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" } }));
+    installFetch([aria], [], true, true);
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-drafts\/draft-one$/, handler: () => json({ ...draft(), campaignId: "campaign-one", personaId: aria.id }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    );
+    render(<App />); expect(await screen.findByText("Race draft-one")).toBeTruthy();
+    expect(vi.mocked(fetch).mock.calls.some(([input]) => String(input).includes("draft-two"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "← Back to campaign" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Build playable character" }));
+    expect(await screen.findByRole("heading", { name: "Choose an existing persona" })).toBeTruthy();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").characterDraftIds).toEqual({ "campaign-two": "draft-two" }));
+    expect(vi.mocked(fetch).mock.calls.filter(([input]) => String(input).endsWith("/character-drafts/draft-one"))).toHaveLength(1);
+  });
+
+  it.each(["finalized", "missing"] as const)("routes a %s restored draft to an explicit new draft", async (outcome) => {
+    const clear = vi.fn();
+    const api = { create: vi.fn(), get: outcome === "finalized" ? vi.fn().mockResolvedValue({ ...draft(), status: "finalized" }) : vi.fn().mockRejectedValue(new ApiError(404, "masked")), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onDraftIdentity={clear} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    if (outcome === "finalized") fireEvent.click(await screen.findByRole("button", { name: "Start a new draft" }));
+    else await screen.findByText(/saved draft is no longer available/i);
+    expect(await screen.findByRole("heading", { name: "Choose an existing persona" })).toBeTruthy();
+    expect(clear).toHaveBeenCalledWith(null); expect(api.finalize).not.toHaveBeenCalled();
+  });
+
   it("shows exact grants before confirmation, finalizes once, and refreshes the sheet", async () => {
-    const final = { draft: { ...draft("draft-one", true), controllerPrincipalId: "local-owner", role: "owner", status: "finalized", revision: 2 }, receipt: { draftId: "draft-one", commandId: "command", eventId: "event", idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, campaignCharacterId: "character", sheetId: "sheet", actorId: "actor", derived, startingGrants: [] } };
+    const final = { character: { id: "character", createdAt: at, updatedAt: at }, sheet: { id: "sheet", race: ref("race", "race"), background: ref("background", "background"), classes: [{ class: ref("class", "class"), level: 1 }], attributes: [], proficiencies: [], choices: [], createdAt: at, updatedAt: at }, resources: [{ name: "health", current: 10, max: 10 }], receipt: { idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, derived, startingGrants: [] } };
     const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft("draft-one", true)), update: vi.fn(), finalize: vi.fn().mockResolvedValue(final), getSheet: vi.fn().mockResolvedValue(sheet) } as any;
     render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
     expect(await screen.findByText(/1 × item/)).toBeTruthy();
@@ -1144,6 +1174,48 @@ describe("character builder and advancement safety flows", () => {
     fireEvent.click(screen.getByRole("checkbox")); await waitFor(() => expect((finalize as HTMLButtonElement).disabled).toBe(false)); fireEvent.click(finalize);
     expect(await screen.findByText(/Finalization receipt confirmed/)).toBeTruthy();
     expect(api.finalize).toHaveBeenCalledTimes(1); expect(api.getSheet).toHaveBeenCalledWith("campaign", "character");
+  });
+
+  it("preserves the public finalization receipt when only the sheet refresh fails", async () => {
+    const final = { character: { id: "created-character", createdAt: at, updatedAt: at }, sheet: { id: "sheet", race: ref("race", "race"), background: ref("background", "background"), classes: [{ class: ref("class", "class"), level: 1 }], attributes: [], proficiencies: [], choices: [], createdAt: at, updatedAt: at }, resources: [{ name: "health", current: 10, max: 10 }], receipt: { idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, derived, startingGrants: [] } };
+    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft("draft-one", true)), update: vi.fn(), finalize: vi.fn().mockResolvedValue(final), getSheet: vi.fn().mockRejectedValueOnce(new TypeError("offline")).mockResolvedValueOnce(sheet) } as any;
+    const open = vi.fn(); const clearDraft = vi.fn();
+    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onDraftIdentity={clearDraft} onEditPersona={vi.fn()} onOpenCharacter={open} />);
+    await screen.findByText(/1 × item/); fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(await screen.findByRole("button", { name: "Finalize playable character once" }));
+    expect(await screen.findByText(/character was created and confirmed by receipt/)).toBeTruthy();
+    expect(screen.getByText(/Created character/).textContent).toContain("created-character");
+    expect(api.finalize).toHaveBeenCalledTimes(1); expect(clearDraft).toHaveBeenCalledWith(null);
+    fireEvent.click(screen.getByRole("button", { name: "Open created character" })); expect(open).toHaveBeenCalledWith("created-character");
+    fireEvent.click(screen.getByRole("button", { name: "Retry authoritative sheet GET" }));
+    await screen.findByText(/Authoritative character sheet refreshed/); expect(api.finalize).toHaveBeenCalledTimes(1); expect(api.getSheet).toHaveBeenCalledTimes(2);
+  });
+
+  it("persists an ambiguous create intent across a simulated document reload without replay", async () => {
+    const api = { create: vi.fn().mockRejectedValue(new TypeError("connection lost")), get: vi.fn(), update: vi.fn(), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    const props = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], api, onBack: vi.fn(), onUnavailable: vi.fn(), onReviewCampaignRoster: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn(), focusHeadingRequest: 9 };
+    render(<CharacterBuilderPage {...props} />);
+    const heading = screen.getByRole("heading", { name: "Character builder" }); await waitFor(() => expect(document.activeElement).toBe(heading));
+    fireEvent.click(screen.getByRole("button", { name: "Create draft with this allocation" }));
+    expect(await screen.findByText(/outcome is uncertain/)).toBeTruthy(); expect(api.create).toHaveBeenCalledTimes(1);
+    const marker = localStorage.getItem("velvet.character-builder.ambiguous-creates.v1"); expect(marker).toContain("idempotencyKey");
+    cleanup(); resetCharacterBuilderPageModuleStateForTests();
+    render(<CharacterBuilderPage {...props} focusHeadingRequest={10} />);
+    expect(await screen.findByRole("heading", { name: "Review unresolved draft creation" })).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Create draft with this allocation" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(api.create).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Review authoritative campaign roster" })); expect(props.onReviewCampaignRoster).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("checkbox")); fireEvent.click(screen.getByRole("button", { name: "Clear reviewed lock without replaying POST" }));
+    expect(localStorage.getItem("velvet.character-builder.ambiguous-creates.v1")).toBe("{}"); expect(api.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("validates standard-array uniqueness and point-buy budget before create", async () => {
+    const onContinue = vi.fn(); render(<AttributeAllocator onContinue={onContinue} />);
+    const create = screen.getByRole("button", { name: "Create draft with this allocation" }); expect((create as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "14" } });
+    expect(await screen.findByText(/Assign each standard-array value exactly once/)).toBeTruthy(); expect((create as HTMLButtonElement).disabled).toBe(true); fireEvent.click(create); expect(onContinue).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("radio", { name: "Point Buy" }));
+    expect(await screen.findByText(/Point-buy budget: 25 \/ 27/)).toBeTruthy(); expect((create as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "15" } }); fireEvent.click(create); expect(onContinue).toHaveBeenCalledWith({ method: "point-buy", scores });
   });
 
   it("renders every crossed level and leaves the reviewed preview after one rejected apply", async () => {
@@ -1155,6 +1227,8 @@ describe("character builder and advancement safety flows", () => {
     render(<LevelUpWizard campaignId="campaign" campaignCharacterId="character" api={api} />);
     expect(await screen.findByRole("heading", { name: "Level 2" })).toBeTruthy(); expect(screen.getByRole("heading", { name: "Level 3" })).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "pack:1:moon-step" } });
+    expect(screen.queryByRole("button", { name: "Apply reviewed levels once" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Level 3" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Calculate exact changes" }));
     await screen.findByText("Exact advancement changes are ready for review.");
     fireEvent.click(screen.getByRole("button", { name: "Apply reviewed levels once" }));

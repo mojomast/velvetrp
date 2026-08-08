@@ -44,34 +44,40 @@ describe("M2.6 character API bindings", () => {
   });
 
   it("path/status/binds finalization, sheet, progression preview, apply, and XP routes", async () => {
-    const completeDraft = { ...draft, controllerPrincipalId: "local-owner", role: "owner", status: "finalized", revision: 2,
-      selections: { race: reference("race", "race"), background: reference("background", "background"), class: reference("class", "class"), starterGrant: "kit" },
-      completion: { complete: true, issues: [] }, derivedPreview: derived };
-    const finalReceipt = { draftId: "draft", commandId: "command", eventId: "event", idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at,
-      campaignCharacterId: "character", sheetId: "sheet", actorId: "actor", derived, startingGrants: [] };
+    const finalReceipt = { idempotencyKey: "final-key", revisionBefore: 1, revisionAfter: 2, occurredAt: at, derived, startingGrants: [] };
+    const finalization = { character: { id: "character", createdAt: at, updatedAt: at }, sheet: { id: "sheet", race: reference("race", "race"), background: reference("background", "background"), classes: [{ class: reference("class", "class"), level: 1 }], attributes: [], proficiencies: [], choices: [], createdAt: at, updatedAt: at }, resources: [{ name: "health", current: 10, max: 10 }], receipt: finalReceipt };
     const workspace = { name: "Persona", race: { name: "Avelune", description: "Moonlit." }, background: { name: "Guide", description: "A guide." }, classes: [{ name: "Warden", description: "A warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] };
     const sheet = { sheet: workspace, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
     const profile = { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 1, thresholds: [{ level: 1, xp: 0 }] };
     const progression = { campaignId: "campaign", campaignCharacterId: "character", profile, classRef: reference("class", "class"), level: 1, totalXp: 0, milestoneCount: 0, revision: 2, pendingChoices: [], knownAbilities: [], knownSpells: [], derived, updatedAt: at };
-    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 2, previewToken: "b".repeat(64), mode: "xp", currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [] };
+    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 2, previewToken: "b".repeat(64), mode: "xp" as const, currentLevel: 1, eligibleLevel: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [], levels: [] };
     const applyReceipt = { campaignCharacterId: "character", idempotencyKey: "apply-key", type: "apply-levels", revisionBefore: 2, revisionAfter: 3, occurredAt: at, appliedLevels: [] };
     const xpReceipt = { ...applyReceipt, idempotencyKey: "xp-key", type: "grant-xp" };
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ draft: completeDraft, receipt: finalReceipt }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(finalization), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(sheet), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ progression }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ preview }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ progression: { ...progression, revision: 3 }, receipt: applyReceipt }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ progression: { ...progression, revision: 3, totalXp: 10 }, receipt: xpReceipt }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    await expect(finalizeCharacterDraft("campaign", "draft", { expectedRevision: 1, idempotencyKey: "final-key" })).resolves.toMatchObject({ receipt: { campaignCharacterId: "character" } });
+    await expect(finalizeCharacterDraft("campaign", "draft", { expectedRevision: 1, idempotencyKey: "final-key" })).resolves.toEqual(finalization);
     await expect(getCharacterSheet("campaign", "character")).resolves.toEqual(sheet);
     await expect(getCharacterProgression("campaign", "character")).resolves.toMatchObject({ revision: 2 });
     await expect(previewCharacterProgression("campaign", "character", { selections: [] })).resolves.toEqual(preview);
-    await expect(applyCharacterProgression("campaign", "character", { previewRevision: 2, previewToken: "b".repeat(64), selections: [], idempotencyKey: "apply-key" })).resolves.toMatchObject({ receipt: { revisionAfter: 3 } });
+    await expect(applyCharacterProgression("campaign", "character", { previewRevision: 2, previewToken: "b".repeat(64), selections: [], idempotencyKey: "apply-key" }, preview)).resolves.toMatchObject({ receipt: { revisionAfter: 3 } });
     await expect(grantCharacterXp("campaign", "character", { amount: 10, reason: "Quest", expectedRevision: 2, idempotencyKey: "xp-key" })).resolves.toMatchObject({ progression: { totalXp: 10 } });
     expect(fetchMock).toHaveBeenCalledTimes(6);
     for (const [, init] of fetchMock.mock.calls) expect((init as RequestInit).cache).toBe("no-store");
+  });
+
+  it("rejects an apply receipt whose calculated changes differ from the displayed preview", async () => {
+    const level = { level: 2, hp: { maxBefore: 10, maxAfter: 15, currentBefore: 10, currentAfter: 15, gain: 5 }, proficiency: { before: 2, after: 2 }, resources: [], fixedAbilities: [], selectedAbilities: [], spells: [], derivedBefore: derived, derivedAfter: { ...derived, maxHp: 15 } };
+    const preview = { campaignId: "campaign", campaignCharacterId: "character", previewRevision: 2, previewToken: "b".repeat(64), mode: "xp" as const, currentLevel: 1, eligibleLevel: 2, totalXp: 10, milestoneCount: 0, pendingChoices: [], levels: [level] };
+    const progression = { campaignId: "campaign", campaignCharacterId: "character", profile: { profileId: "profile", rulesProfileId: "rules", mode: "xp", maxLevel: 2, thresholds: [{ level: 1, xp: 0 }, { level: 2, xp: 10 }] }, classRef: reference("class", "class"), level: 2, totalXp: 10, milestoneCount: 0, revision: 3, pendingChoices: [], knownAbilities: [], knownSpells: [], derived: level.derivedAfter, updatedAt: at };
+    const response = { progression, receipt: { campaignCharacterId: "character", idempotencyKey: "apply-key", type: "apply-levels", revisionBefore: 2, revisionAfter: 3, occurredAt: at, appliedLevels: [] } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 })));
+    await expect(applyCharacterProgression("campaign", "character", { previewRevision: 2, previewToken: "b".repeat(64), selections: [], idempotencyKey: "apply-key" }, preview as any)).rejects.toThrow(/did not match/);
   });
 });
 

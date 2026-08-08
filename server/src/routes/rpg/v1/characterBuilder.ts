@@ -7,15 +7,18 @@ import {
   type CharacterBuilderRepository,
 } from "../../../repo/characterBuilderRepo.js";
 import {
-  characterDraftFinalizationResultSchema, characterDraftHttpViewSchema, characterDraftHttpMutationResultSchema,
+  characterDraftFinalizationResultSchema, characterDraftHttpFinalizationResultSchema, characterDraftHttpViewSchema, characterDraftHttpMutationResultSchema,
   createCharacterDraftHttpInputSchema, updateCharacterDraftHttpInputSchema,
-  createCharacterDraftInputSchema, finalizeCharacterDraftInputSchema,
-  resourceIdSchema,
+  createCharacterDraftInputSchema, finalizeCharacterDraftHttpInputSchema,
+  resourceIdSchema, type ActorResource, type CampaignCharacterRead,
 } from "@velvet/contracts";
 
 export interface CharacterBuilderHttpRoutesOptions {
   characterBuilderRepositoryAccessor: () => Pick<CharacterBuilderRepository,
-    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">;
+    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft"> & {
+      getCampaignCharacter(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
+      listActorResources(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
+    };
   featureFlags?: () => { campaign?: boolean; mechanics: boolean };
 }
 
@@ -131,7 +134,7 @@ export const characterBuilderHttpRoutes: FastifyPluginAsync<CharacterBuilderHttp
     onRequest: async (req, rep) => { await before(req, rep, true); },
     errorHandler: (_error, req, rep) => problem(req, rep, 400, "RPG_INVALID_REQUEST", "Character draft finalization request is invalid"),
   }, async (request, reply) => {
-    const body = finalizeCharacterDraftInputSchema.safeParse(request.body);
+    const body = finalizeCharacterDraftHttpInputSchema.safeParse(request.body);
     if (!body.success) return problem(request, reply, 400, "RPG_INVALID_REQUEST", "Character draft finalization request is invalid");
     try {
       const repository = options.characterBuilderRepositoryAccessor();
@@ -143,7 +146,36 @@ export const characterBuilderHttpRoutes: FastifyPluginAsync<CharacterBuilderHttp
       );
       if (!result.success || result.data.draft.campaignId !== request.params.campaignId || result.data.draft.id !== request.params.draftId
         || result.data.receipt.draftId !== request.params.draftId) throw new Error("invalid character draft finalization projection");
-      return reply.send(result.data);
+      const aggregate = repository.getCampaignCharacter(
+        LOCAL_OWNER, request.params.campaignId, result.data.receipt.campaignCharacterId,
+      );
+      if (!aggregate) throw new Error("finalized character is unavailable");
+      const { campaignCharacter, sheet, actor } = aggregate.projection;
+      if (campaignCharacter.id !== result.data.receipt.campaignCharacterId
+        || sheet.id !== result.data.receipt.sheetId || actor.id !== result.data.receipt.actorId) {
+        throw new Error("finalized character does not match receipt");
+      }
+      const health = repository.listActorResources(LOCAL_OWNER, request.params.campaignId, actor.id)
+        .find((resource) => resource.name === "health");
+      const projected = characterDraftHttpFinalizationResultSchema.safeParse({
+        character: { id: campaignCharacter.id, createdAt: campaignCharacter.createdAt, updatedAt: campaignCharacter.updatedAt },
+        sheet: {
+          id: sheet.id, race: sheet.race, background: sheet.background, classes: sheet.classes,
+          attributes: sheet.attributes, proficiencies: sheet.proficiencies, choices: sheet.choices,
+          createdAt: sheet.createdAt, updatedAt: sheet.updatedAt,
+        },
+        resources: health ? [{ name: health.name, current: health.current, max: health.max }] : [],
+        receipt: {
+          idempotencyKey: result.data.receipt.idempotencyKey,
+          revisionBefore: result.data.receipt.revisionBefore,
+          revisionAfter: result.data.receipt.revisionAfter,
+          occurredAt: result.data.receipt.occurredAt,
+          derived: result.data.receipt.derived,
+          startingGrants: result.data.receipt.startingGrants,
+        },
+      });
+      if (!projected.success) throw new Error("invalid public character finalization projection");
+      return reply.code(201).send(projected.data);
     } catch (error) { return mapFailure(request, reply, error); }
   });
 };
