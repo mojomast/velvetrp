@@ -1,19 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, RoleSafeToolProposal } from "@velvet/contracts";
+import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnHttpProposal } from "@velvet/contracts";
+import type { AdventureTurnClientBinding } from "../../../api";
 
 /** Narrow confirmation and reconciliation lane required by the banner. */
 export interface ConfirmationBannerApi {
-  confirmAdventureTurn: (turnId: string, input: AdventureTurnConfirmRequest) => Promise<{ turn: AdventureTurnGetResponse["turn"]; resumeToken?: string }>;
-  getAdventureTurn: (turnId: string) => Promise<AdventureTurnGetResponse>;
+  confirmAdventureTurn: (turnId: string, input: AdventureTurnConfirmRequest, expected: AdventureTurnClientBinding) => Promise<{ turn: AdventureTurnGetResponse["turn"]; resumeToken?: string }>;
+  getAdventureTurn: (turnId: string, expected: AdventureTurnClientBinding) => Promise<AdventureTurnGetResponse>;
 }
 
 /** Props for one exact pending proposal batch. */
 export interface ConfirmationBannerProps {
   turnId: string;
   revision: number;
-  proposals: readonly RoleSafeToolProposal[];
+  proposals: readonly AdventureTurnHttpProposal[];
   proposalIds: readonly string[];
   expiresAt: string;
+  binding: AdventureTurnClientBinding;
   api: ConfirmationBannerApi;
   onReconciled: (turn: AdventureTurnGetResponse, resumeToken?: string) => void;
   restoreFocusRef?: React.RefObject<HTMLElement>;
@@ -28,7 +30,7 @@ const batchFingerprint = (ids: readonly string[]) => {
 };
 
 /** Renders a non-executable AI proposal review and performs one locked batch decision. */
-export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, expiresAt, api, onReconciled, restoreFocusRef }: ConfirmationBannerProps) {
+export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, expiresAt, binding, api, onReconciled, restoreFocusRef }: ConfirmationBannerProps) {
   const pending = useMemo(() => proposals.filter((proposal) => proposalIds.includes(proposal.proposalId)), [proposalIds, proposals]);
   const [selected, setSelected] = useState(() => new Set(proposalIds));
   const [phase, setPhase] = useState<"ready" | "sending" | "ambiguous">("ready");
@@ -49,17 +51,17 @@ export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, e
     } catch { /* the in-memory lock still prevents duplicate delivery */ }
     setPhase("sending"); setMessage("Recording your decision…");
     try {
-      const result = await api.confirmAdventureTurn(turnId, { proposalIds: exactIds, decision, expectedRevision: revision, idempotencyKey });
-      const reconciled = await api.getAdventureTurn(turnId);
+      const result = await api.confirmAdventureTurn(turnId, { proposalIds: exactIds, decision, expectedRevision: revision, idempotencyKey }, binding);
+      const reconciled = await api.getAdventureTurn(turnId, binding);
       try { localStorage.removeItem(storageKey(turnId)); } catch { /* optional persistence */ }
       onReconciled(reconciled, result.resumeToken); restoreFocusRef?.current?.focus();
     } catch {
       // A write failure is commit-ambiguous. Reconcile once by GET; never replay POST.
       setPhase("ambiguous"); setMessage("Decision outcome is uncertain; checking the durable turn without retrying…");
       try {
-        const reconciled = await api.getAdventureTurn(turnId);
+        const reconciled = await api.getAdventureTurn(turnId, binding);
         if (reconciled.confirmation.state !== "pending") { try { localStorage.removeItem(storageKey(turnId)); } catch { /* optional */ }
-          onReconciled(reconciled); restoreFocusRef?.current?.focus(); return; }
+          onReconciled(reconciled, reconciled.resumeToken); restoreFocusRef?.current?.focus(); return; }
       } catch { /* retain the lock and explicit ambiguous state */ }
       setMessage("Decision is still uncertain. Refresh or reconcile this turn; it will not be submitted again automatically.");
     }

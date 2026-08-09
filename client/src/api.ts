@@ -66,7 +66,10 @@ import {
   adventureTurnConfirmRequestSchema,
   adventureTurnConfirmResponseSchema,
   adventureTurnGetResponseSchema,
+  adventureTurnInitialReconcileRequestSchema,
+  adventureTurnInitialReconcileResponseSchema,
   adventureTurnInitialStreamRequestSchema,
+  adventureTurnNarrationVariantStreamRequestSchema,
   adventureTurnResumeStreamRequestSchema,
   adventureTurnStreamEventSchema,
   campaignPlayBootstrapSchema,
@@ -75,6 +78,7 @@ import {
 import type {
   AdventureTurnConfirmRequest,
   AdventureTurnGetResponse,
+  AdventureTurnInitialReconcileRequest,
   AdventureTurnStreamEvent,
   CampaignPlayBootstrap,
 } from "@velvet/contracts";
@@ -914,7 +918,18 @@ export interface AdventureTurnClientStreamHandle {
 /** Closed initial or server-token continuation input accepted by the client stream method. */
 export type AdventureTurnClientStreamRequest =
   | { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; expectedRevision: number; idempotencyKey: string }
-  | { kind: "resume"; resumeToken: string };
+  | { kind: "resume"; resumeToken: string; expected: AdventureTurnClientBinding }
+  | { kind: "narration-retry" | "narration-swipe"; campaignId: string; sessionId: string; actorId: string;
+    priorTurnId: string; expectedRevision: number; idempotencyKey: string };
+
+/** Exact active play identity required for every durable turn response. */
+export interface AdventureTurnClientBinding {
+  campaignId: string;
+  sessionId: string;
+  actorId: string;
+  turnId?: string;
+  priorTurnId?: string | null;
+}
 
 /** Incremental strict parser used only for the M2.11 adventure-turn vocabulary. */
 export interface AdventureTurnSseParser {
@@ -926,8 +941,10 @@ export interface AdventureTurnSseParser {
  * Parses CRLF or LF SSE framing across arbitrary chunks, validates every event,
  * and requires one final terminal envelope without silently dropping data.
  */
-export function createAdventureTurnSseParser(onEvent: (event: AdventureTurnStreamEvent) => void): AdventureTurnSseParser {
-  let buffer = ""; let terminal = false; let lastSequence = -1;
+export function createAdventureTurnSseParser(onEvent: (event: AdventureTurnStreamEvent) => void,
+  streamKind: "initial" | "resume" | "variant" = "resume"): AdventureTurnSseParser {
+  let buffer = ""; let terminal = false; let lastSequence = -1; let count = 0; let confirmationRequired = false;
+  let mechanicsSeen = false; let narrationSeen = false;
   const consume = (final: boolean) => {
     let separator = buffer.match(/\r\n\r\n|\n\n|\r\r/);
     while (separator?.index !== undefined || (final && buffer.length > 0)) {
@@ -950,7 +967,33 @@ export function createAdventureTurnSseParser(onEvent: (event: AdventureTurnStrea
       if (event.type !== eventName) throw new Error("Adventure turn stream event name did not match its envelope");
       if (event.sequence !== lastSequence + 1) throw new Error("Adventure turn stream sequence was not contiguous");
       if (terminal) throw new Error("Adventure turn stream emitted data after its terminal event");
-      lastSequence = event.sequence; if (event.type === "terminal") terminal = true; onEvent(event);
+      if (count === 0) {
+        if ((streamKind === "initial" || streamKind === "variant") && (event.type !== "turn_started" || event.sequence !== 0)) {
+          throw new Error("Adventure turn creation stream did not start with turn_started sequence zero");
+        }
+        if (streamKind === "resume" && event.type !== "agent_status") throw new Error("Adventure turn resume stream had an illegal first event");
+      }
+      if (event.type === "turn_started" && (count !== 0 || streamKind === "resume")) throw new Error("Adventure turn stream emitted turn_started illegally");
+      if (event.type === "tool_proposed" && (streamKind !== "initial" || confirmationRequired || mechanicsSeen || narrationSeen)) {
+        throw new Error("Adventure turn stream proposed a tool out of order");
+      }
+      if (confirmationRequired && event.type !== "terminal") throw new Error("Adventure turn confirmation boundary was not immediately terminal");
+      if (event.type === "confirmation_required") {
+        if (streamKind === "variant" || mechanicsSeen || narrationSeen) throw new Error("Adventure turn confirmation boundary was illegal");
+        confirmationRequired = true;
+      }
+      if (event.type === "mechanics_committed") {
+        if (mechanicsSeen || narrationSeen) throw new Error("Adventure turn mechanics were emitted out of order"); mechanicsSeen = true;
+      }
+      if (event.type === "narration_delta") narrationSeen = true;
+      if (event.type === "terminal") {
+        if (event.payload.receipts.length > 0 && !mechanicsSeen) throw new Error("Adventure turn narration omitted its mechanics event");
+        if (confirmationRequired && (event.payload.outcome !== "aborted" || event.payload.turn.state !== "awaiting-confirmation")) {
+          throw new Error("Adventure turn confirmation terminal was illegal");
+        }
+        if (!confirmationRequired && event.payload.turn.state === "awaiting-confirmation") throw new Error("Adventure turn terminal omitted its confirmation boundary");
+      }
+      lastSequence = event.sequence; count += 1; if (event.type === "terminal") terminal = true; onEvent(event);
     }
     if (final && !terminal) throw new Error("Adventure turn stream ended without exactly one terminal event");
   };
@@ -972,24 +1015,49 @@ export function streamAdventureTurn(requestInput: AdventureTurnClientStreamReque
   const request = requestInput.kind === "initial"
     ? parseApiInput(() => adventureTurnInitialStreamRequestSchema.parse({ campaignId: requestInput.campaignId, sessionId: requestInput.sessionId,
       actorId: requestInput.actorId, declaration: requestInput.declaration, expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }))
-    : parseApiInput(() => adventureTurnResumeStreamRequestSchema.parse({ resumeToken: requestInput.resumeToken }));
+    : requestInput.kind === "resume"
+      ? parseApiInput(() => adventureTurnResumeStreamRequestSchema.parse({ resumeToken: requestInput.resumeToken }))
+      : parseApiInput(() => adventureTurnNarrationVariantStreamRequestSchema.parse({ variant: requestInput.kind,
+        campaignId: requestInput.campaignId, sessionId: requestInput.sessionId, actorId: requestInput.actorId,
+        priorTurnId: requestInput.priorTurnId, expectedRevision: requestInput.expectedRevision, idempotencyKey: requestInput.idempotencyKey }));
   const controller = new AbortController(); let resolveTurn!: (turnId: string) => void; let rejectTurn!: (error: unknown) => void;
   const turnId = new Promise<string>((resolve, reject) => { resolveTurn = resolve; rejectTurn = reject; });
+  // Consumers commonly await `done` first; mark the correlated identity
+  // rejection handled while preserving rejection semantics for explicit awaits.
+  void turnId.catch(() => undefined);
   const done = (async () => {
     try {
       const response = await fetch("/api/rpg/v1/adventure-turns/stream", { method: "POST", cache: "no-store", signal: controller.signal,
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" }, body: JSON.stringify(request) });
       if (!response.ok) throw await errorFromResponse(response);
-      if (response.status !== 200 || !response.headers.get("content-type")?.toLowerCase().startsWith("text/event-stream")
-        || !response.headers.get("cache-control")?.toLowerCase().includes("no-store")) throw new Error("Adventure turn stream response headers were invalid");
-      const headerTurnId = resourceIdSchema.parse(response.headers.get("x-adventure-turn-id")); resolveTurn(headerTurnId);
+      const contentType = response.headers.get("content-type") ?? "";
+      const cache = (response.headers.get("cache-control") ?? "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+      if (response.status !== 200 || !/^text\/event-stream(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i.test(contentType)
+        || cache.length !== 3 || new Set(cache).size !== 3 || !["private", "no-store", "no-transform"].every((directive) => cache.includes(directive))) {
+        throw new Error("Adventure turn stream response headers were invalid");
+      }
+      const headerTurnId = resourceIdSchema.parse(response.headers.get("x-adventure-turn-id"));
       if (!response.body) throw new Error("Adventure turn stream response had no body");
+      const expected: AdventureTurnClientBinding = requestInput.kind === "resume" ? requestInput.expected
+        : { campaignId: requestInput.campaignId, sessionId: requestInput.sessionId, actorId: requestInput.actorId,
+          ...(requestInput.kind === "initial" ? { priorTurnId: null } : { priorTurnId: requestInput.priorTurnId }) };
+      if (expected.turnId && expected.turnId !== headerTurnId) throw new Error("Adventure turn stream header did not match the expected turn");
+      resolveTurn(headerTurnId);
       const parser = createAdventureTurnSseParser((event) => {
         if ((event.type === "turn_started" || event.type === "terminal") && event.payload.turn.turnId !== headerTurnId) throw new Error("Adventure turn stream was bound to another turn");
-        if (requestInput.kind === "initial" && event.type === "turn_started" && (event.payload.turn.campaignId !== requestInput.campaignId
-          || event.payload.turn.sessionId !== requestInput.sessionId || event.payload.turn.actorId !== requestInput.actorId || event.payload.turn.declaration !== requestInput.declaration)) throw new Error("Adventure turn stream did not match the initial request");
+        if (event.type === "turn_started" || event.type === "terminal") {
+          const turn = event.payload.turn;
+          if (turn.campaignId !== expected.campaignId || turn.sessionId !== expected.sessionId || turn.actorId !== expected.actorId
+            || (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)) throw new Error("Adventure turn stream did not match active play identity");
+          if (requestInput.kind === "initial" && (turn.declaration !== requestInput.declaration || turn.mode !== "original" || turn.priorTurnId !== null)) {
+            throw new Error("Adventure turn stream did not match the initial request");
+          }
+          if (requestInput.kind !== "initial" && requestInput.kind !== "resume" && turn.mode !== requestInput.kind) {
+            throw new Error("Adventure turn stream did not match the narration variant");
+          }
+        }
         onEvent(event);
-      });
+      }, requestInput.kind === "initial" ? "initial" : requestInput.kind === "resume" ? "resume" : "variant");
       const reader = response.body.getReader(); const decoder = new TextDecoder();
       try { while (true) { const next = await reader.read(); if (next.done) break; parser.push(decoder.decode(next.value, { stream: true })); }
         parser.push(decoder.decode()); parser.finish(); } finally { void reader.cancel().catch(() => undefined); }
@@ -999,19 +1067,39 @@ export function streamAdventureTurn(requestInput: AdventureTurnClientStreamReque
 }
 
 /** Reconciles one strict path-bound durable adventure turn. */
-export async function getAdventureTurn(turnId: string): Promise<AdventureTurnGetResponse> {
+export async function getAdventureTurn(turnId: string, expected: AdventureTurnClientBinding): Promise<AdventureTurnGetResponse> {
   const id = parseApiInput(() => resourceIdSchema.parse(turnId));
   const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}`, { cache: "no-store" }); requireStatus(success, 200, "Adventure turn read");
-  const response = adventureTurnGetResponseSchema.parse(success.body); if (response.turn.turnId !== id) throw new Error("Adventure turn response did not match the request"); return response;
+  const response = adventureTurnGetResponseSchema.parse(success.body); assertAdventureTurnBinding(response.turn, { ...expected, turnId: id }); return response;
+}
+
+function assertAdventureTurnBinding(turn: AdventureTurnGetResponse["turn"], expected: AdventureTurnClientBinding): void {
+  if ((expected.turnId !== undefined && turn.turnId !== expected.turnId) || turn.campaignId !== expected.campaignId
+    || turn.sessionId !== expected.sessionId || turn.actorId !== expected.actorId
+    || (expected.priorTurnId !== undefined && turn.priorTurnId !== expected.priorTurnId)) {
+    throw new Error("Adventure turn response did not match active play identity");
+  }
+}
+
+/** Performs one read-only exact initial-key lookup; a null result remains commit-ambiguous. */
+export async function reconcileInitialAdventureTurn(input: AdventureTurnInitialReconcileRequest): Promise<AdventureTurnGetResponse | null> {
+  const locator = parseApiInput(() => adventureTurnInitialReconcileRequestSchema.parse(input));
+  const query = new URLSearchParams(locator);
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/reconcile-initial?${query.toString()}`, { cache: "no-store" });
+  requireStatus(success, 200, "Initial adventure turn reconciliation");
+  const response = adventureTurnInitialReconcileResponseSchema.parse(success.body);
+  if (response.result) assertAdventureTurnBinding(response.result.turn, locator);
+  return response.result;
 }
 
 /** Sends one exact confirmation batch without retry and requires turn/revision/token binding. */
-export async function confirmAdventureTurn(turnId: string, input: AdventureTurnConfirmRequest): Promise<ReturnType<typeof adventureTurnConfirmResponseSchema.parse>> {
+export async function confirmAdventureTurn(turnId: string, input: AdventureTurnConfirmRequest,
+  expected: AdventureTurnClientBinding): Promise<ReturnType<typeof adventureTurnConfirmResponseSchema.parse>> {
   const id = parseApiInput(() => resourceIdSchema.parse(turnId)); const body = parseApiInput(() => adventureTurnConfirmRequestSchema.parse(input));
   const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}/confirm`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Adventure turn confirmation"); const response = adventureTurnConfirmResponseSchema.parse(success.body);
-  if (response.turn.turnId !== id || response.turn.revision !== body.expectedRevision + 1
-    || (body.decision === "approve") !== (response.resumeToken !== undefined)) throw new Error("Adventure turn confirmation response did not match the request");
+  assertAdventureTurnBinding(response.turn, { ...expected, turnId: id });
+  if (response.turn.revision !== body.expectedRevision + 1) throw new Error("Adventure turn confirmation response did not match the request");
   return response;
 }
 

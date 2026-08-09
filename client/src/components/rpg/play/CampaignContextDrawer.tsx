@@ -20,6 +20,7 @@ export interface CampaignContextDrawerApi {
 /** Props for the independently loading role-safe campaign context drawer. */
 export interface CampaignContextDrawerProps {
   campaignId: string;
+  sessionId: string;
   selectedActorId: string | null;
   playableActorIds: readonly string[];
   audience: Audience;
@@ -37,7 +38,7 @@ function status<T>(load: Load<T>, empty: boolean, label: string) {
 }
 
 /** Loads and renders only server projections; it performs no authoritative calculations. */
-export function CampaignContextDrawer({ campaignId, selectedActorId, playableActorIds, audience, authorizationGeneration, api }: CampaignContextDrawerProps) {
+export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, playableActorIds, audience, authorizationGeneration, api }: CampaignContextDrawerProps) {
   const [world, setWorld] = useState<Load<CampaignWorldHttpResponse>>({ state: "loading" });
   const [npcs, setNpcs] = useState<Load<NamedNpc[]>>({ state: "loading" });
   const [objectives, setObjectives] = useState<Load<Objective[]>>({ state: "loading" });
@@ -49,9 +50,9 @@ export function CampaignContextDrawer({ campaignId, selectedActorId, playableAct
     let current = true;
     // Replace prior role data immediately. GM response objects are never retained;
     // only public names are projected into state.
-    setWorld((old) => ({ state: "loading", ...(old.state === "ready" ? { stale: old.value } : {}) }));
+    setWorld({ state: "loading" });
     setNpcs({ state: "loading" }); setObjectives({ state: "loading" });
-    setResources({ state: "loading" }); setEncounters((old) => ({ state: "loading", ...(old.state === "ready" ? { stale: old.value } : {}) }));
+    setResources({ state: "loading" }); setEncounters({ state: "loading" });
     void api.getCampaignWorld(campaignId).then((value) => { if (current) setWorld({ state: "ready", value: value.data }); }).catch(() => { if (current) setWorld((old) => { const stale = old.state === "ready" ? old.value : old.stale; return { state: "error", ...(stale ? { stale } : {}) }; }); });
     void api.listCampaignNpcs(campaignId, audience).then((value) => { if (current) setNpcs({ state: "ready", value: value.data.npcs.map((npc) => ({ id: npc.npcId, name: npc.publicState.name })) }); }).catch(() => { if (current) setNpcs({ state: "error" }); });
     void api.listCampaignQuests(campaignId, audience).then((value) => { if (!current) return; const active = new Set(value.data.quests.filter((quest) => quest.status === "active").map((quest) => quest.questId));
@@ -60,13 +61,14 @@ export function CampaignContextDrawer({ campaignId, selectedActorId, playableAct
     if (actorEligible && selectedActorId) void api.getActorResources(campaignId, selectedActorId).then((value) => { if (current) setResources({ state: "ready", value }); }).catch(() => { if (current) setResources({ state: "error" }); });
     else setResources({ state: "ready", value: null });
     void api.listCampaignEncounters(campaignId).then(async ({ encounters: rows }) => {
-      const active = rows.find((entry) => entry.status === "active" && entry.combatId !== null);
+      const roomRows = rows.filter((entry) => entry.sessionId === sessionId);
+      const active = roomRows.find((entry) => entry.status === "active" && entry.combatId !== null);
       let activeCombat: EncounterView["activeCombat"] = null;
       if (active?.combatId) try { const combat = await api.getCombatState(active.combatId); activeCombat = { round: combat.round, currentCombatant: combat.currentCombatant }; } catch { /* encounter status remains independently useful */ }
-      if (current) setEncounters({ state: "ready", value: { encounters: rows, activeCombat } });
+      if (current) setEncounters({ state: "ready", value: { encounters: roomRows, activeCombat } });
     }).catch(() => { if (current) setEncounters((old) => { const stale = old.state === "ready" ? old.value : old.stale; return { state: "error", ...(stale ? { stale } : {}) }; }); });
     return () => { current = false; };
-  }, [api, campaignId, selectedActorId, actorEligible, audience, authorizationGeneration]);
+  }, [api, campaignId, sessionId, selectedActorId, actorEligible, audience, authorizationGeneration]);
 
   const worldValue = world.state === "ready" ? world.value : world.stale;
   const actorLocation = actorEligible ? worldValue?.currentLocations.find((entry) => entry.actorId === selectedActorId) : undefined;
@@ -77,7 +79,7 @@ export function CampaignContextDrawer({ campaignId, selectedActorId, playableAct
   const resourceValue = resources.state === "ready" ? resources.value : resources.stale;
   const encounterValue = encounters.state === "ready" ? encounters.value : encounters.stale;
 
-  return <aside className="campaign-context-drawer" aria-label="Campaign context"><details open><summary>Campaign context</summary>
+  return <aside className="campaign-context-drawer" aria-label="Campaign context" aria-live="polite"><details open><summary>Campaign context</summary>
     <section><h2>Current location</h2>{status(world, !location, "visible location")}{location && <><p><strong>{location.name}</strong></p><p>{location.description}</p><h3>Visible exits from this location</h3>{exits.length ? <ul>{exits.map((exit) => <li key={exit.connectionId}>{worldValue?.visibleLocations.find((entry) => entry.locationId === exit.toLocationId)?.name ?? "Visible destination"}</li>)}</ul> : <p>No server-visible exits from this origin.</p>}</>}</section>
     <section><h2>Visible NPC roster</h2><p className="context-honesty">NPC location or presence is not tracked by the backend; this is a campaign-visible roster, not “NPCs here.”</p>{status(npcs, !npcValue?.length, "visible NPCs")}{npcValue?.length ? <ul>{npcValue.map((npc) => <li key={npc.id}>{npc.name}</li>)}</ul> : null}</section>
     <section><h2>Active objectives</h2>{status(objectives, !objectiveValue?.length, "active objectives")}{objectiveValue?.length ? <ul>{objectiveValue.map((objective) => <li key={objective.id}>{objective.description} <span>{objective.progress} / {objective.target}</span></li>)}</ul> : null}</section>

@@ -63,7 +63,7 @@ export function MechanicReceiptCard({ campaignId, links, api }: MechanicReceiptC
   }, [api, campaignId, unique]);
   if (unique.length === 0) return null;
   return <section className="mechanic-receipts" aria-label="Committed mechanics">
-    <h2><span aria-hidden="true">✓ </span>Committed mechanics</h2><span className="sr-only">Committed mechanics</span>
+    <h2><span aria-hidden="true">✓ </span>Committed mechanics</h2>
     {unique.map((link) => { const load = loads[link.commandId]; return <article className="mechanic-receipt-card" key={`${link.commandId}:${link.proposalId}`}>
       {!load || load.state === "loading" ? <p role="status">Loading committed mechanic…</p>
         : load.state === "error" ? <p role="alert">Committed mechanic could not be displayed. The durable turn remains authoritative.</p>

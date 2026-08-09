@@ -417,6 +417,46 @@ describe("persistence and multi-character frontend", () => {
     const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
   });
 
+  it("restores a persisted adventure turn through the play page and preserves its locator", async () => {
+    const playBootstrap = { campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    const turn = { turnId: "restored-turn", campaignId: campaignAccess.id, sessionId: baseSession.id, actorId: "actor", mode: "original", priorTurnId: null,
+      declaration: "Listen", state: "completed", revision: 2, createdAt: campaignAccess.createdAt, updatedAt: campaignAccess.updatedAt };
+    installFetch([aria], [baseSession], true, true); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id,
+      sessionId: baseSession.id, adventureTurnId: "restored-turn", playSelectedActorId: "actor" }));
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
+      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/, handler: () => json({ turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Restored adventure narration" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
+    );
+    render(<App />); await screen.findByText("Restored adventure narration");
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Adventure room" })));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", adventureTurnId: "restored-turn" }));
+  });
+
+  it("clears play locators and restores campaign focus when mechanics disappear", async () => {
+    installFetch([aria], [baseSession], true, false); localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id,
+      sessionId: baseSession.id, adventureTurnId: "old-turn", playSelectedActorId: "actor" }));
+    localStorage.setItem(`velvet.campaign-play.v1:${campaignAccess.id}:${baseSession.id}`, JSON.stringify({ turnId: "old-turn", selectedActorId: "actor", streamPhase: "terminal" }));
+    routes.push(
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/, handler: () => json(appCreationOptions) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/, handler: () => json({ characters: [], rolls: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    );
+    render(<App />); const heading = await screen.findByRole("heading", { name: campaignAccess.name });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(localStorage.getItem(`velvet.campaign-play.v1:${campaignAccess.id}:${baseSession.id}`)).toBeNull();
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").adventureTurnId).toBeUndefined();
+  });
+
   it("opens an attached opaque room and keeps read and send calls on its exact encoded segment", async () => {
     const opaqueId = " room/%?#雪 ";
     const encodedId = encodeURIComponent(opaqueId);

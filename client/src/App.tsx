@@ -5,7 +5,7 @@ import {
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
   applyCampaignImport, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, resolveCombatAction, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, resolveCombatAction, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -79,7 +79,7 @@ const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignS
 const campaignHistoryApi: CampaignHistoryApi = { administration: getCampaignAdministration, timelines: listCampaignTimelines, checkpoints: listCampaignCheckpoints, events: listCampaignEvents, recaps: listCampaignRecaps, receipt: getCampaignCommandReceipt, createRecap: createCampaignRecap };
 const campaignImportApi: CampaignImportApi = { dryRun: dryRunCampaignImport, apply: applyCampaignImport };
 const campaignExportApi: CampaignExportApi = { export: getCampaignExport };
-const campaignPlayApi: CampaignPlayApi = { getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, confirmAdventureTurn,
+const campaignPlayApi: CampaignPlayApi = { getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, reconcileInitialAdventureTurn, confirmAdventureTurn,
   getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources,
   listCampaignEncounters, getCombatState };
 
@@ -92,6 +92,15 @@ function CampaignAuthorizationGate({campaignId,onUnavailable,children}:{campaign
    if(failed)return <main className="studio-page"><section className="studio-shell" role="alert"><h1>Campaign unavailable</h1><p>Campaign authority could not be refreshed.</p><button onClick={onUnavailable}>Return to campaign</button></section></main>;
   if(authorization===null)return <main className="studio-page"><section className="studio-shell" role="status">Checking campaign role…</section></main>;
   return <StudioAuthorizationProvider value={authorization}>{children(authorization)}</StudioAuthorizationProvider>;
+}
+
+function clearCampaignPlayPersistence(campaignId: string, sessionId?: string, turnId?: string): void {
+  if (!sessionId) return;
+  try {
+    localStorage.removeItem(`velvet.campaign-play.v1:${campaignId}:${sessionId}`);
+    localStorage.removeItem(`velvet.campaign-play-submit.v1:${campaignId}:${sessionId}`);
+    if (turnId) localStorage.removeItem(`velvet.adventure-confirm.v1:${turnId}`);
+  } catch { /* optional safe locator persistence */ }
 }
 
 export default function App() {
@@ -146,6 +155,7 @@ export default function App() {
   const [features, setFeatures] = useState<FeatureFlags>({ voice: false, images: false });
   const [campaignLibraryAvailable, setCampaignLibraryAvailable] = useState(false);
   const campaignAvailabilityRef = useRef<boolean | null>(null);
+  const mechanicsAvailabilityRef = useRef<boolean | null>(null);
   // Mechanics discovery is retained independently from campaign navigation so
   // an optional/legacy RPG endpoint never stalls the legacy application.
   const [campaignMechanicsAvailable, setCampaignMechanicsAvailable] = useState(false);
@@ -216,6 +226,7 @@ export default function App() {
       .then((rpgFeatureData) => {
         if (!mounted) return;
         campaignAvailabilityRef.current = rpgFeatureData.campaign;
+        mechanicsAvailabilityRef.current = rpgFeatureData.mechanics;
         setCampaignLibraryAvailable(rpgFeatureData.campaign);
         setCampaignMechanicsAvailable(rpgFeatureData.mechanics);
         setCombatAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics && rpgFeatureData.combat);
@@ -244,7 +255,10 @@ export default function App() {
           setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
         if (current.view === "campaign-play" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
+          clearCampaignPlayPersistence(current.campaignId, currentSessionRef.current?.id ?? stored.sessionId, playTurnId); setPlayTurnId(""); setPlaySelectedActorId("");
           currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request;
+          if (current.campaignId) setCampaignHeadingFocusRequest({ campaignId: current.campaignId, request });
           setSession(null); setMessages([]); setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
         if (current.view === "campaign-character-sheet" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
@@ -271,7 +285,8 @@ export default function App() {
         const validSelected = selectedIds.filter((id) => valid.has(id));
         setSelectedIds(validSelected); setPrimaryId(validSelected.includes(primaryId) ? primaryId : validSelected[0] ?? "");
         if (activeCharacterId && !valid.has(activeCharacterId)) { setActiveCharacterId(""); if (["edit", "memory"].includes(view)) setView("home"); }
-        if (stored.sessionId && library.sessions.some((item) => item.id === stored.sessionId) && (stored.view === "chat" || stored.view === "campaign-play")) {
+        if (stored.sessionId && library.sessions.some((item) => item.id === stored.sessionId) && (stored.view === "chat" || stored.view === "campaign-play")
+          && !(stored.view === "campaign-play" && mechanicsAvailabilityRef.current === false)) {
           const restorationEpoch = navigationEpochRef.current;
           try {
             const hydrated = await getSession(stored.sessionId);
@@ -509,15 +524,15 @@ export default function App() {
   }
   if (view === "campaign-play" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && session) {
     const entryToken = chatEntryRef.current;
-    const returnToCampaign = () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
+    const returnToCampaign = () => { clearCampaignPlayPersistence(activeCampaignId, session.id, playTurnId); cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
       setRoomsRefreshRequest({ campaignId: activeCampaignId, request }); setPlayTurnId(""); setPlaySelectedActorId("");
       currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" };
       setSession(null); setMessages([]); setView("campaign-detail"); };
     const replaceCurrentSession = (next: Session) => { if (currentNavigationRef.current.view !== "campaign-play" || chatEntryRef.current !== entryToken
       || currentSessionRef.current?.id !== session.id || next.id !== session.id) return; currentSessionRef.current = next; setSession(next); };
     return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
-      <CampaignPlayPage campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
-        initialSelectedActorId={playSelectedActorId} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
+      <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
+        authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
         onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading onBack={returnToCampaign} onUnavailable={returnToCampaign}>
         <Chat embedded key={`${session.id}:${entryToken}`} session={session} initialMessages={messages} provider={provider} harness={harness} features={features}
           externalError={error} navigationBusy={busy} onSessionChange={replaceCurrentSession} onProviderChange={setProvider} onHarnessChange={setHarness}

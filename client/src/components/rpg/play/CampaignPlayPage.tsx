@@ -1,6 +1,9 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { adventureTurnResumeTokenSchema, resourceIdSchema } from "@velvet/contracts";
-import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnStreamEvent, CampaignPlayBootstrap } from "@velvet/contracts";
+import { adventureTurnResumeTokenSchema, idempotencyKeySchema, resourceIdSchema } from "@velvet/contracts";
+import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnInitialReconcileRequest,
+  AdventureTurnStreamEvent, CampaignPlayBootstrap } from "@velvet/contracts";
+import type { AdventureTurnClientBinding } from "../../../api";
+import { ApiError } from "../../../api";
 import { AdventureActionComposer } from "./AdventureActionComposer";
 import { CampaignContextDrawer, type CampaignContextDrawerApi } from "./CampaignContextDrawer";
 import { ConfirmationBanner } from "./ConfirmationBanner";
@@ -13,13 +16,19 @@ export interface AdventureTurnStreamHandle {
   cancelDelivery: () => void;
 }
 
+type PlayStreamRequest =
+  | { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; expectedRevision: number; idempotencyKey: string }
+  | { kind: "resume"; resumeToken: string; expected: AdventureTurnClientBinding }
+  | { kind: "narration-retry" | "narration-swipe"; campaignId: string; sessionId: string; actorId: string; priorTurnId: string;
+    expectedRevision: number; idempotencyKey: string };
+
 /** Narrow API required by the durable campaign play shell. */
 export interface CampaignPlayApi extends CampaignContextDrawerApi, MechanicReceiptApi {
   getCampaignPlayBootstrap: (campaignId: string, sessionId: string) => Promise<CampaignPlayBootstrap>;
-  streamAdventureTurn: (request: { kind: "initial"; campaignId: string; sessionId: string; actorId: string; declaration: string; expectedRevision: number; idempotencyKey: string }
-    | { kind: "resume"; resumeToken: string }, onEvent: (event: AdventureTurnStreamEvent) => void) => AdventureTurnStreamHandle;
-  getAdventureTurn: (turnId: string) => Promise<AdventureTurnGetResponse>;
-  confirmAdventureTurn: (turnId: string, input: AdventureTurnConfirmRequest) => Promise<{ turn: AdventureTurnGetResponse["turn"]; resumeToken?: string }>;
+  streamAdventureTurn: (request: PlayStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void) => AdventureTurnStreamHandle;
+  getAdventureTurn: (turnId: string, expected: AdventureTurnClientBinding) => Promise<AdventureTurnGetResponse>;
+  reconcileInitialAdventureTurn: (input: AdventureTurnInitialReconcileRequest) => Promise<AdventureTurnGetResponse | null>;
+  confirmAdventureTurn: (turnId: string, input: AdventureTurnConfirmRequest, expected: AdventureTurnClientBinding) => Promise<{ turn: AdventureTurnGetResponse["turn"]; resumeToken?: string }>;
 }
 
 /** Props for the campaign play layout surrounding the existing room Chat child. */
@@ -34,13 +43,17 @@ export interface CampaignPlayPageProps {
   onSelectedActorChange?: (actorId: string | null) => void;
   onTurnIdChange?: (turnId: string | null) => void;
   initialSelectedActorId?: string;
+  initialTurnId?: string;
+  authorizationCanAct?: boolean;
   focusHeading?: boolean;
 }
 
 type StreamPhase = "idle" | "streaming" | "awaiting-confirmation" | "ambiguous" | "terminal";
 type SafeState = { turnId?: string; selectedActorId?: string; resumeToken?: string; streamPhase: StreamPhase };
+type PendingInitial = { campaignId: string; sessionId: string; actorId: string; idempotencyKey: string };
 const stateKey = (campaignId: string, sessionId: string) => `velvet.campaign-play.v1:${campaignId}:${sessionId}`;
 const lockKey = (campaignId: string, sessionId: string) => `velvet.campaign-play-submit.v1:${campaignId}:${sessionId}`;
+const confirmationKey = (turnId: string) => `velvet.adventure-confirm.v1:${turnId}`;
 const idempotency = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `turn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function readSafeState(campaignId: string, sessionId: string): SafeState {
@@ -56,82 +69,206 @@ function readSafeState(campaignId: string, sessionId: string): SafeState {
   } catch { return { streamPhase: "idle" }; }
 }
 
-/** Coordinates bootstrap, durable GET reconciliation, SSE delivery, confirmation, and the accessible play grid. */
+function readPendingInitial(campaignId: string, sessionId: string): PendingInitial | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(lockKey(campaignId, sessionId)) ?? "null") as Record<string, unknown> | null;
+    if (!value || value.campaignId !== campaignId || value.sessionId !== sessionId
+      || typeof value.actorId !== "string" || !resourceIdSchema.safeParse(value.actorId).success
+      || typeof value.idempotencyKey !== "string" || !idempotencyKeySchema.safeParse(value.idempotencyKey).success) return null;
+    return { campaignId, sessionId, actorId: value.actorId, idempotencyKey: value.idempotencyKey };
+  } catch { return null; }
+}
+
+/** Coordinates bootstrap, exact durable reconciliation, SSE delivery, confirmation, and the accessible play grid. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, children, onBack, onUnavailable,
-  onSelectedActorChange, onTurnIdChange, initialSelectedActorId, focusHeading }: CampaignPlayPageProps) {
+  onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading }: CampaignPlayPageProps) {
+  if (!authorizationCanAct) {
+    try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
+      if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
+  }
   const initial = useRef(readSafeState(campaignId, sessionId)).current;
   const [bootstrap, setBootstrap] = useState<CampaignPlayBootstrap | null>(null);
   const [selectedActorId, setSelectedActorId] = useState(initialSelectedActorId ?? initial.selectedActorId ?? "");
+  const selectedActorRef = useRef(selectedActorId); selectedActorRef.current = selectedActorId;
   const [turn, setTurn] = useState<AdventureTurnGetResponse | null>(null);
-  const [phase, setPhase] = useState<StreamPhase>(initial.streamPhase);
+  const turnRef = useRef(turn); turnRef.current = turn;
+  const [phase, setPhase] = useState<StreamPhase>(() => readPendingInitial(campaignId, sessionId) ? "ambiguous" : initial.streamPhase);
   const [resumeToken, setResumeToken] = useState(initial.resumeToken);
+  const [pendingInitial, setPendingInitial] = useState<PendingInitial | null>(() => readPendingInitial(campaignId, sessionId));
   const [error, setError] = useState<string | null>(null);
   const streamRef = useRef<AdventureTurnStreamHandle | null>(null);
+  const activeRef = useRef(true);
   const headingRef = useRef<HTMLHeadingElement>(null); const composerRef = useRef<HTMLTextAreaElement>(null);
+  const headingFocusedRef = useRef(false);
   const unavailableRef = useRef(onUnavailable); const selectedChangeRef = useRef(onSelectedActorChange); const turnChangeRef = useRef(onTurnIdChange);
   unavailableRef.current = onUnavailable; selectedChangeRef.current = onSelectedActorChange; turnChangeRef.current = onTurnIdChange;
 
-  const persist = useCallback((next: SafeState) => { try { localStorage.setItem(stateKey(campaignId, sessionId), JSON.stringify(next)); } catch { /* durable server state remains authoritative */ } }, [campaignId, sessionId]);
-  const reconcile = useCallback(async (turnId: string) => {
-    const value = await api.getAdventureTurn(turnId); setTurn(value); turnChangeRef.current?.(turnId);
-    const nextPhase: StreamPhase = value.confirmation.state === "pending" ? "awaiting-confirmation"
-      : ["completed", "cancelled", "failed"].includes(value.turn.state) ? "terminal" : "ambiguous";
-    setPhase(nextPhase); persist({ turnId, selectedActorId: value.turn.actorId, ...(resumeToken ? { resumeToken } : {}), streamPhase: nextPhase });
-    if (nextPhase === "terminal") try { localStorage.removeItem(lockKey(campaignId, sessionId)); } catch { /* optional */ }
-    return value;
-  }, [api, campaignId, persist, resumeToken, sessionId]);
+  const persist = useCallback((next: SafeState) => { try { localStorage.setItem(stateKey(campaignId, sessionId), JSON.stringify(next)); } catch { /* server state remains authoritative */ } }, [campaignId, sessionId]);
+  const clearLock = useCallback(() => { setPendingInitial(null); try { localStorage.removeItem(lockKey(campaignId, sessionId)); } catch { /* optional */ } }, [campaignId, sessionId]);
+  const clearAdventureState = useCallback(() => {
+    streamRef.current?.cancelDelivery(); streamRef.current = null;
+    if (turnRef.current) try { localStorage.removeItem(confirmationKey(turnRef.current.turn.turnId)); } catch { /* optional */ }
+    setTurn(null); setResumeToken(undefined); setPhase("idle"); setSelectedActorId(""); selectedActorRef.current = ""; setError(null); clearLock();
+    turnChangeRef.current?.(null); selectedChangeRef.current?.(null);
+    try { localStorage.removeItem(stateKey(campaignId, sessionId)); } catch { /* optional */ }
+  }, [campaignId, clearLock, sessionId]);
 
-  useEffect(() => { let current = true; setBootstrap(null); setTurn(null); setError(null);
-    void api.getCampaignPlayBootstrap(campaignId, sessionId).then((value) => { if (!current) return; setBootstrap(value);
-      const candidate = [selectedActorId, initialSelectedActorId].find((id) => id && value.playableActors.some((actor) => actor.actorId === id));
-      const selected = candidate ?? value.playableActors[0]?.actorId ?? ""; setSelectedActorId(selected); selectedChangeRef.current?.(selected || null);
-    }).catch(() => { if (current) unavailableRef.current(); }); return () => { current = false; };
-  }, [api, authorizationGeneration, campaignId, initialSelectedActorId, sessionId]);
-  useEffect(() => { if (focusHeading) headingRef.current?.focus(); }, [focusHeading]);
-  const initialReconciledRef = useRef(false);
-  useEffect(() => { if (initial.turnId && !initialReconciledRef.current) { initialReconciledRef.current = true; void reconcile(initial.turnId).catch(() => { setPhase("ambiguous"); setError("The durable turn could not be reconciled."); }); } }, [initial.turnId, reconcile]);
+  const refreshBootstrap = useCallback(async (): Promise<CampaignPlayBootstrap> => {
+    const value = await api.getCampaignPlayBootstrap(campaignId, sessionId);
+    if (!activeRef.current) throw new DOMException("Play page is unavailable", "AbortError");
+    const allowed = authorizationCanAct && value.session.adventureEligible && value.session.active && value.principal.role !== "observer" && value.playableActors.length > 0;
+    if (!allowed) { setBootstrap(value); clearAdventureState(); return value; }
+    const previous = selectedActorRef.current || initialSelectedActorId;
+    if (previous && !value.playableActors.some((actor) => actor.actorId === previous)) { setBootstrap(value); clearAdventureState(); return value; }
+    const candidate = [selectedActorRef.current, initialSelectedActorId].find((id) => id && value.playableActors.some((actor) => actor.actorId === id));
+    const selected = candidate ?? value.playableActors[0]!.actorId;
+    setBootstrap(value); setSelectedActorId(selected); selectedActorRef.current = selected; selectedChangeRef.current?.(selected);
+    return value;
+  }, [api, authorizationCanAct, campaignId, clearAdventureState, initialSelectedActorId, sessionId]);
+
+  const applyReconciled = useCallback(async (value: AdventureTurnGetResponse, allowResumeToken: boolean) => {
+    if (!activeRef.current) return;
+    setTurn(value); turnChangeRef.current?.(value.turn.turnId); clearLock();
+    const token = allowResumeToken ? value.resumeToken : undefined; setResumeToken(token);
+    const nextPhase: StreamPhase = value.confirmation.state === "pending" ? "awaiting-confirmation"
+      : token ? "ambiguous" : ["completed", "cancelled", "failed"].includes(value.turn.state) ? "terminal" : "ambiguous";
+    setPhase(nextPhase); persist({ turnId: value.turn.turnId, selectedActorId: value.turn.actorId, ...(token ? { resumeToken: token } : {}), streamPhase: nextPhase });
+    await refreshBootstrap().catch(() => undefined);
+  }, [clearLock, persist, refreshBootstrap]);
+
+  const reconcile = useCallback(async (turnId: string, actorId: string, allowResumeToken = true, priorTurnId?: string | null) => {
+    const value = await api.getAdventureTurn(turnId, { campaignId, sessionId, actorId, turnId, ...(priorTurnId !== undefined ? { priorTurnId } : {}) });
+    await applyReconciled(value, allowResumeToken); return value;
+  }, [api, applyReconciled, campaignId, sessionId]);
+
+  useEffect(() => {
+    activeRef.current = true; setBootstrap(null); setTurn(null); setResumeToken(undefined); setError(null);
+    streamRef.current?.cancelDelivery(); streamRef.current = null;
+    void refreshBootstrap().catch(() => { if (activeRef.current) { clearAdventureState(); unavailableRef.current(); } });
+    return () => { activeRef.current = false; streamRef.current?.cancelDelivery(); streamRef.current = null; };
+  }, [authorizationGeneration, clearAdventureState, refreshBootstrap]);
+  useEffect(() => { if (focusHeading && bootstrap && !headingFocusedRef.current) { headingFocusedRef.current = true; headingRef.current?.focus(); } }, [bootstrap, focusHeading]);
+
+  const initialReconciledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!bootstrap || !selectedActorId || bootstrap.principal.role === "observer") return;
+    const candidate = initialTurnId ?? initial.turnId; if (!candidate || initialReconciledRef.current === candidate) return;
+    initialReconciledRef.current = candidate;
+    void reconcile(candidate, selectedActorId).catch(() => {
+      if (!activeRef.current) return; setTurn(null); setResumeToken(undefined); setPhase(pendingInitial ? "ambiguous" : "idle");
+      turnChangeRef.current?.(null); try { localStorage.removeItem(stateKey(campaignId, sessionId)); } catch { /* optional */ }
+      setError("The saved turn did not match this campaign room and actor, so its locator was removed.");
+    });
+  }, [bootstrap, campaignId, initial.turnId, initialTurnId, pendingInitial, reconcile, selectedActorId, sessionId]);
 
   const receive = useCallback((event: AdventureTurnStreamEvent) => {
-    if (event.type === "turn_started") { const id = event.payload.turn.turnId; setPhase("streaming"); turnChangeRef.current?.(id); persist({ turnId: id, selectedActorId: event.payload.turn.actorId, streamPhase: "streaming" }); }
+    if (!activeRef.current) return;
+    if (event.type === "turn_started") {
+      const id = event.payload.turn.turnId; clearLock(); setPhase("streaming"); turnChangeRef.current?.(id);
+      persist({ turnId: id, selectedActorId: event.payload.turn.actorId, streamPhase: "streaming" });
+    }
     if (event.type === "confirmation_required") setPhase("awaiting-confirmation");
-    if (event.type === "terminal") { setPhase(event.payload.turn.state === "awaiting-confirmation" ? "awaiting-confirmation" : "terminal"); void reconcile(event.payload.turn.turnId).catch(() => setPhase("ambiguous")); }
-  }, [persist, reconcile]);
+    if (event.type === "terminal") {
+      setResumeToken(undefined);
+      void reconcile(event.payload.turn.turnId, event.payload.turn.actorId, false, event.payload.turn.priorTurnId).catch(() => {
+        if (activeRef.current) { setPhase("ambiguous"); setError("The terminal delivery could not be reconciled authoritatively."); }
+      });
+    }
+  }, [clearLock, persist, reconcile]);
 
-  const openStream = useCallback((request: Parameters<CampaignPlayApi["streamAdventureTurn"]>[0]) => {
+  const openStream = useCallback((request: PlayStreamRequest) => {
     setError(null); setPhase("streaming"); const handle = api.streamAdventureTurn(request, receive); streamRef.current = handle;
-    void handle.turnId.then((turnId) => { turnChangeRef.current?.(turnId); persist({ turnId, selectedActorId, ...(request.kind === "resume" ? { resumeToken: request.resumeToken } : {}), streamPhase: "streaming" }); }).catch(() => undefined);
-    void handle.done.catch(() => handle.turnId.then((turnId) => reconcile(turnId)).catch(() => { setPhase("ambiguous"); setError("Stream delivery ended before the durable outcome could be reconciled. The declaration will not be replayed."); }))
-      .finally(() => { if (streamRef.current === handle) streamRef.current = null; });
-  }, [api, persist, receive, reconcile, selectedActorId]);
+    let knownTurnId: string | null = request.kind === "resume" ? request.expected.turnId ?? null : null;
+    void handle.turnId.then((turnId) => { knownTurnId = turnId; if (!activeRef.current) return; turnChangeRef.current?.(turnId);
+      const actorId = request.kind === "resume" ? request.expected.actorId : request.actorId;
+      persist({ turnId, selectedActorId: actorId, ...(request.kind === "resume" ? { resumeToken: request.resumeToken } : {}), streamPhase: "streaming" });
+    }).catch(() => undefined);
+    void handle.done.catch(async (failure: unknown) => {
+      if (!activeRef.current || (failure instanceof Error && failure.name === "AbortError")) return;
+      const actorId = request.kind === "resume" ? request.expected.actorId : request.actorId;
+      if (knownTurnId) {
+        const prior = request.kind === "resume" ? request.expected.priorTurnId : request.kind === "initial" ? null : request.priorTurnId;
+        await reconcile(knownTurnId, actorId, request.kind === "resume", prior).catch(() => { setPhase("ambiguous"); setError("Stream delivery ended before the durable outcome could be reconciled."); });
+        return;
+      }
+      if (request.kind === "initial" && failure instanceof ApiError && failure.status >= 400 && failure.status < 500) {
+        clearLock(); setPhase("idle"); await refreshBootstrap().catch(() => undefined);
+        setError(failure.status === 409 ? "Campaign state changed. Latest play state is loaded; submit the declaration again explicitly."
+          : "The declaration was rejected before a turn was committed. Correct it and submit explicitly."); return;
+      }
+      setPhase("ambiguous"); setError(request.kind === "initial"
+        ? "No turn identity was received. Use authoritative reconciliation; the declaration will not be replayed."
+        : "No derivative turn identity was received. The narration request will not be replayed automatically.");
+    }).finally(() => { if (streamRef.current === handle) streamRef.current = null; });
+  }, [api, clearLock, persist, receive, reconcile, refreshBootstrap]);
 
-  // Only a server-issued token may reconnect automatically. Initial declaration
-  // bodies are never persisted and therefore cannot be replayed on reload.
   const resumedTokenRef = useRef<string | null>(null);
-  useEffect(() => { if (bootstrap && resumeToken && phase !== "terminal" && resumedTokenRef.current !== resumeToken) { resumedTokenRef.current = resumeToken; openStream({ kind: "resume", resumeToken }); } }, [bootstrap, openStream, phase, resumeToken]);
+  useEffect(() => {
+    if (!bootstrap || !resumeToken || !turn || bootstrap.principal.role === "observer" || resumedTokenRef.current === resumeToken) return;
+    resumedTokenRef.current = resumeToken;
+    openStream({ kind: "resume", resumeToken, expected: { campaignId, sessionId, actorId: turn.turn.actorId, turnId: turn.turn.turnId,
+      priorTurnId: turn.turn.priorTurnId } });
+  }, [bootstrap, campaignId, openStream, resumeToken, sessionId, turn]);
 
-  function submit(declaration: string) {
-    if (!bootstrap || phase === "streaming" || phase === "ambiguous" || phase === "awaiting-confirmation") return;
-    try { if (localStorage.getItem(lockKey(campaignId, sessionId))) { setPhase("ambiguous"); setError("A prior declaration is locked until its durable turn is reconciled."); return; } } catch { /* continue with in-memory lock */ }
-    const key = idempotency(); setResumeToken(undefined); resumedTokenRef.current = null;
-    try { localStorage.setItem(lockKey(campaignId, sessionId), JSON.stringify({ idempotencyKey: key, selectedActorId, submitted: true })); } catch { /* in-memory phase still locks */ }
-    openStream({ kind: "initial", campaignId, sessionId, actorId: selectedActorId, declaration, expectedRevision: bootstrap.expectedRevision, idempotencyKey: key });
+  async function submit(declaration: string) {
+    if (!selectedActorId || phase === "streaming" || phase === "ambiguous" || phase === "awaiting-confirmation") return;
+    setPhase("streaming");
+    try {
+      const latest = await refreshBootstrap();
+      if (!latest.playableActors.some((actor) => actor.actorId === selectedActorRef.current) || latest.principal.role === "observer") { clearAdventureState(); return; }
+      if (readPendingInitial(campaignId, sessionId)) { setPendingInitial(readPendingInitial(campaignId, sessionId)); setPhase("ambiguous");
+        setError("A prior declaration is locked until its exact durable key is reconciled."); return; }
+      const key = idempotency(); const locator = { campaignId, sessionId, actorId: selectedActorRef.current, idempotencyKey: key };
+      setResumeToken(undefined); resumedTokenRef.current = null; setPendingInitial(locator);
+      try { localStorage.setItem(lockKey(campaignId, sessionId), JSON.stringify(locator)); } catch { /* in-memory lock remains */ }
+      openStream({ kind: "initial", ...locator, declaration, expectedRevision: latest.expectedRevision });
+    } catch { setPhase("idle"); setError("Latest campaign play state could not be loaded. Nothing was submitted."); }
   }
 
-  const setActor = (actorId: string) => { if (!bootstrap?.playableActors.some((actor) => actor.actorId === actorId)) return; setSelectedActorId(actorId); selectedChangeRef.current?.(actorId); persist({ ...(turn ? { turnId: turn.turn.turnId } : {}), selectedActorId: actorId, ...(resumeToken ? { resumeToken } : {}), streamPhase: phase }); };
+  async function reconcilePendingInitial() {
+    const locator = pendingInitial ?? readPendingInitial(campaignId, sessionId); if (!locator || phase === "streaming") return;
+    setError(null);
+    try {
+      const found = await api.reconcileInitialAdventureTurn(locator);
+      if (!found) { setPhase("ambiguous"); setError("No committed turn is visible for this exact key. A race is still possible; the declaration remains locked and will not be replayed.");
+        await refreshBootstrap().catch(() => undefined); return; }
+      await applyReconciled(found, true);
+    } catch { setPhase("ambiguous"); setError("Authoritative initial-turn reconciliation is unavailable. The declaration remains locked."); }
+  }
+
+  async function narrateVariant(kind: "narration-retry" | "narration-swipe") {
+    if (!turn || !["completed", "cancelled", "failed"].includes(turn.turn.state) || phase === "streaming" || !selectedActorId) return;
+    setPhase("streaming");
+    try {
+      const latest = await refreshBootstrap();
+      openStream({ kind, campaignId, sessionId, actorId: selectedActorId, priorTurnId: turn.turn.turnId,
+        expectedRevision: latest.expectedRevision, idempotencyKey: idempotency() });
+    } catch { setPhase("terminal"); setError("Latest play state could not be loaded. No narration variant was submitted."); }
+  }
+
+  const setActor = (actorId: string) => { if (!bootstrap?.playableActors.some((actor) => actor.actorId === actorId)) return;
+    setSelectedActorId(actorId); selectedActorRef.current = actorId; selectedChangeRef.current?.(actorId);
+    persist({ ...(turn ? { turnId: turn.turn.turnId } : {}), selectedActorId: actorId, ...(resumeToken ? { resumeToken } : {}), streamPhase: phase }); };
   const pending = turn?.confirmation.state === "pending" ? turn.confirmation : null;
   const confirmationApi = useMemo(() => ({ confirmAdventureTurn: api.confirmAdventureTurn, getAdventureTurn: api.getAdventureTurn }), [api]);
+  const activeBinding = turn ? { campaignId, sessionId, actorId: turn.turn.actorId, turnId: turn.turn.turnId, priorTurnId: turn.turn.priorTurnId } : null;
   if (!bootstrap) return <main className="campaign-play-page"><p role="status">Opening campaign play…</p></main>;
+  const audience = bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player";
   return <main className="campaign-play-page"><header className="campaign-play-header"><div><button className="back-link" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CAMPAIGN PLAY</p><h1 ref={headingRef} tabIndex={-1}>Adventure room</h1></div>
     <p className="play-phase" role="status">{phase.replace("-", " ")}</p></header>
     {error && <p className="play-error" role="alert">{error}</p>}
-    <div className="campaign-play-grid"><CampaignContextDrawer campaignId={campaignId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player"} authorizationGeneration={authorizationGeneration} api={api} />
+    {pendingInitial && phase === "ambiguous" && <div className="play-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button className="primary" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
+    <div className="campaign-play-grid"><CampaignContextDrawer key={`${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} api={api} />
       <section className="campaign-play-center" aria-label="Campaign room conversation"><div className="embedded-room-chat">{children}</div>
         {turn?.narrationStatus.text && <article className="adventure-narration"><h2>Adventure narration</h2><p>{turn.narrationStatus.text}</p>{turn.receipts.length === 0 && <p className="no-tools-label">No mechanics committed (no tools). The current response does not identify whether narration used a fallback.</p>}</article>}
-        {pending && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} api={confirmationApi} restoreFocusRef={composerRef}
-          onReconciled={(value, token) => { setTurn(value); if (token) { setResumeToken(token); persist({ turnId: value.turn.turnId, selectedActorId, resumeToken: token, streamPhase: "streaming" }); } else { setPhase(value.confirmation.state === "pending" ? "awaiting-confirmation" : "terminal"); } }} />}
+        {pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
+          onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} />}
         {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} />}
+        {turn && ["completed", "cancelled", "failed"].includes(turn.turn.state) && <div className="adventure-variant-controls" aria-label="Adventure narration alternatives">
+          <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
+          <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
         <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={bootstrap.principal.role} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
-          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} onActorChange={setActor} onSubmit={submit} composerRef={composerRef} />
+          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} onActorChange={setActor} onSubmit={(declaration) => void submit(declaration)} composerRef={composerRef} />
       </section></div>
     {streamRef.current && <button className="ghost cancel-delivery" onClick={() => streamRef.current?.cancelDelivery()}>Stop receiving live updates</button>}
   </main>;
