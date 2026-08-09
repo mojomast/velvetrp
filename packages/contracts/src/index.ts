@@ -51,6 +51,8 @@ export * from "./quest.js";
 export * from "./quest-http.js";
 export * from "./story.js";
 export * from "./story-http.js";
+export * from "./adventure-turns.js";
+export * from "./generation-drafts.js";
 
 export {
   addCampaignMembershipInputSchema,
