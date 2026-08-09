@@ -47,4 +47,15 @@ describe("API problem instances", () => {
     expect(problem.instance).toBe(instance);
     expect(JSON.stringify(problem)).not.toMatch(/concrete-marker|%zz-marker|id-marker|lookalike-marker|query-marker/);
   });
+
+  it("preserves the static initial-turn reconciliation instance before dynamic turn matching", () => {
+    const request = {
+      id: "problem-initial-reconcile",
+      url: "/api/rpg/v1/adventure-turns/reconcile-initial?campaignId=private-campaign",
+    } as FastifyRequest;
+
+    const problem = createApiProblem(request, 400, "RPG_INVALID_REQUEST", "Initial turn reconciliation locator is invalid");
+    expect(problem.instance).toBe("/api/rpg/v1/adventure-turns/reconcile-initial");
+    expect(JSON.stringify(problem)).not.toContain("private-campaign");
+  });
 });

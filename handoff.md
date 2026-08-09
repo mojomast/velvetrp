@@ -1,5 +1,5 @@
 # Handoff
-## Completed: Minimal campaign play bootstrap support
+## Completed: Normalize initial adventure-turn reconciliation problem instances
 ## Next Task: M3.7 Campaign Play Shell
-## Context: Added a strict role-safe bootstrap contract, one-statement authorization-rooted campaign/session/participant read, and fixed-local GET route gated by campaign and mechanics flags. The read preserves opaque room IDs, uses administration revision, limits actors by owner/GM/player/observer control, and null-masks unavailable resources while treating authorized graph corruption as a redacted 500. No schema migration was added. M2.11 adventure-turn routes now exist, so the stale blocked wording in the older M3.7 plan entry should be reassessed when that full UI task starts.
-## Files Modified: packages/contracts/src/campaign-play-http.ts, server/src/repo/campaign/campaignPlayReadRepo.ts, server/src/routes/rpg/v1/campaignPlay.ts, route/repository barrels and orchestration, app/problem normalization, focused contract/repository/route tests
+## Context: The fixed `/api/rpg/v1/adventure-turns/reconcile-initial` route now precedes dynamic turn matching in route registration and all problem normalization paths. Malformed query, internal failure, unsupported method, and query-redaction coverage confirms every structured problem uses the static safe instance. No API docs or unrelated implementation were changed.
+## Files Modified: server/src/http/problem.ts, server/src/app.ts, server/src/routes/rpg/v1/adventureTurns.ts, server/test/problem.test.ts, server/test/rpg-adventure-turn-route.test.ts, devplan.md, handoff.md

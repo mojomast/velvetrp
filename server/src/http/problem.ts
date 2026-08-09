@@ -25,7 +25,8 @@ function safeProblemInstance(requestTarget: string): string {
   const queryIndex = requestTarget.indexOf("?");
   const path = queryIndex === -1 ? requestTarget : requestTarget.slice(0, queryIndex);
   const campaignPrefix = "/api/rpg/v1/campaigns/";
-  if (path === "/api/rpg/v1/adventure-turns/stream") return path;
+  if (path === "/api/rpg/v1/adventure-turns/stream"
+    || path === "/api/rpg/v1/adventure-turns/reconcile-initial") return path;
   if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+\/confirm$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId/confirm";
   if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId";
   if (path === "/api/rpg/v1/generation-drafts") return path;

@@ -53,6 +53,9 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
   const instance = queryIndex === -1 ? rawUrl : rawUrl.slice(0, queryIndex);
   const hasQuery = queryIndex !== -1;
 
+  if (instance === "/api/rpg/v1/adventure-turns/reconcile-initial") {
+    return { instance, hasQuery, queryDetail: null, mechanics: true, noStore: true };
+  }
   if (instance === "/api/rpg/v1/adventure-turns/stream") {
     return { instance, hasQuery, queryDetail: method === "POST" ? "Adventure turn streams do not accept query parameters" : null,
       mechanics: true, noStore: true };
@@ -582,6 +585,10 @@ export function buildApp(options: {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
         instance: "/api/rpg/v1/campaign-imports/:importId/apply",
       });
+    }
+    if (instance === "/api/rpg/v1/adventure-turns/reconcile-initial") {
+      reply.header("cache-control", "private, no-store");
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", { instance });
     }
     if (instance === "/api/rpg/v1/adventure-turns/stream" || /^\/api\/rpg\/v1\/adventure-turns\/[^/]+(?:\/confirm)?$/.test(instance)) {
       reply.header("cache-control", "no-store");

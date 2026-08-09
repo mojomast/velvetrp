@@ -215,4 +215,40 @@ describe("M2.11 adventure turn routes", () => {
     });
     await app.close();
   });
+
+  it("uses the static safe instance for initial reconciliation failures and unsupported methods", async () => {
+    enable();
+    const repo = createRepository();
+    const app = buildApp({ campaignRepositoryFactory: () => repo });
+    const instance = "/api/rpg/v1/adventure-turns/reconcile-initial";
+
+    const malformed = await app.inject({
+      method: "GET",
+      url: `${instance}?campaignId=query-secret&sessionId=session&actorId=actor`,
+    });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json()).toMatchObject({ code: "RPG_INVALID_REQUEST", instance });
+    expect(malformed.body).not.toContain("query-secret");
+
+    const unsupported = await app.inject({
+      method: "POST",
+      url: `${instance}?idempotencyKey=unsupported-secret`,
+    });
+    expect(unsupported.statusCode).toBe(404);
+    expect(unsupported.json()).toMatchObject({ code: "RPG_ROUTE_NOT_FOUND", instance });
+    expect(unsupported.body).not.toContain("unsupported-secret");
+
+    repo.getAdventureTurnByInitialIdempotencyKey = () => { throw new Error("repository failed"); };
+    const failed = await app.inject({
+      method: "GET",
+      url: `${instance}?${new URLSearchParams({
+        campaignId: "campaign", sessionId: "session", actorId: "actor", idempotencyKey: "internal-secret",
+      })}`,
+    });
+    expect(failed.statusCode).toBe(500);
+    expect(failed.json()).toMatchObject({ code: "RPG_INTERNAL_ERROR", instance });
+    expect(failed.body).not.toContain("internal-secret");
+
+    await app.close();
+  });
 });

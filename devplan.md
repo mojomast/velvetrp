@@ -31,5 +31,6 @@
 - [✅] M3.5 Powers and Combat Workspace
 - [✅] M3.6 World, Cast, and Journal Studio
 - [✅] Minimal campaign play bootstrap contract, repository read, and HTTP route
+- [✅] Normalize initial adventure-turn reconciliation problem instances
 - [ ] M3.7 Campaign Play Shell: blocked pending M2.11 adventure-turn streaming; intentionally deferred and not attempted
 - [✅] M3.8 Event Log, recap, import, and export experience

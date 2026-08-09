@@ -232,15 +232,8 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
     } catch (error) { return fail(request, reply, error); }
   });
 
-  app.get<{ Params: { turnId: string }; Querystring: Record<string, unknown> }>("/adventure-turns/:turnId", { exposeHeadRoute: false,
-    onRequest: async (request, reply) => { reply.header("cache-control", "no-store"); if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
-      if (hasQuery(request)) await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Adventure turn reads do not accept query parameters"); },
-  }, async (request, reply) => {
-    const turnId = resourceIdSchema.safeParse(request.params.turnId); if (!turnId.success) return sendApiProblem(request, reply, 404, "RPG_ADVENTURE_TURN_NOT_FOUND", "Adventure turn not found");
-    try { return reply.send(reconcile(options.adventureTurnRepositoryAccessor(), requirePrivate(options.adventureTurnRepositoryAccessor().getAdventureTurn(OWNER, turnId.data)))); }
-    catch (error) { return fail(request, reply, error); }
-  });
-
+  // Register the fixed reconciliation locator before the turn-ID resource so
+  // every route and error path retains its reviewed static identity.
   app.get<{ Querystring: Record<string, unknown> }>("/adventure-turns/reconcile-initial", { exposeHeadRoute: false,
     onRequest: async (request, reply) => { reply.header("cache-control", "private, no-store"); if (!enabled()) {
       await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; } },
@@ -254,6 +247,15 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       const result = found ? reconcile(repo, requirePrivate(found)) : null;
       return reply.send(adventureTurnInitialReconcileResponseSchema.parse({ result }));
     } catch (error) { return fail(request, reply, error); }
+  });
+
+  app.get<{ Params: { turnId: string }; Querystring: Record<string, unknown> }>("/adventure-turns/:turnId", { exposeHeadRoute: false,
+    onRequest: async (request, reply) => { reply.header("cache-control", "no-store"); if (!enabled()) { await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; }
+      if (hasQuery(request)) await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Adventure turn reads do not accept query parameters"); },
+  }, async (request, reply) => {
+    const turnId = resourceIdSchema.safeParse(request.params.turnId); if (!turnId.success) return sendApiProblem(request, reply, 404, "RPG_ADVENTURE_TURN_NOT_FOUND", "Adventure turn not found");
+    try { return reply.send(reconcile(options.adventureTurnRepositoryAccessor(), requirePrivate(options.adventureTurnRepositoryAccessor().getAdventureTurn(OWNER, turnId.data)))); }
+    catch (error) { return fail(request, reply, error); }
   });
 
   app.post<{ Params: { turnId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/adventure-turns/:turnId/confirm", {
