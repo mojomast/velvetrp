@@ -16,7 +16,7 @@ describe("schema v32 world narrative",()=>{
   it("has fresh and migrated parity",()=>{const migrated=dir();createRepository({dataDir:migrated}).close();rewind(migrated);
     createRepository({dataDir:migrated}).close();const fresh=dir();createRepository({dataDir:fresh}).close();
     expect(layout(migrated)).toEqual(layout(fresh));const db=new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"35"});db.close();});
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"36"});db.close();});
   it("rolls back when the marker cannot advance",()=>{const value=dir();createRepository({dataDir:value}).close();rewind(value);
     const db=new DatabaseDriver(file(value));db.exec("CREATE TRIGGER reject_v32 BEFORE UPDATE OF value ON meta WHEN NEW.value='32' BEGIN SELECT RAISE(ABORT,'reject v32'); END;");db.close();
     expect(()=>createRepository({dataDir:value})).toThrow("reject v32");const verify=new DatabaseDriver(file(value));

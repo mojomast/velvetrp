@@ -19,6 +19,11 @@ function schema(databaseFile: string): unknown[] {
 }
 
 function rewindToV34(db: DatabaseDriver.Database): void {
+  const v36 = db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v36*'").all() as Array<{ type: string; name: string }>;
+  for (const row of v36) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
+  for (const table of ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36", "turn_mechanics_links_v36",
+    "adventure_coordination_receipts_v36", "adventure_coordination_events_v36", "adventure_coordination_commands_v36"]) db.exec(`DROP TABLE IF EXISTS "${table}"`);
+  for (const row of v36) if (row.type === "index") db.exec(`DROP INDEX IF EXISTS "${row.name}"`);
   const managed = db.prepare(`SELECT type,name FROM sqlite_master WHERE name GLOB '*v35*' OR name IN
     ('adventure_turns','tool_proposals','confirmation_decisions','provider_call_metadata','generation_drafts','review_decisions','final_receipt_links')`).all() as Array<{ type: string; name: string }>;
   for (const row of managed) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
@@ -41,7 +46,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
 
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "35" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "36" });
     expect(migrated.prepare("SELECT title FROM quest_storylines WHERE id='legacy-story'").get()).toEqual({ title: "Legacy story" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM adventure_generation_layout_attestation_v35").get()).toEqual({ length: 64 });
     for (const table of tables) expect(migrated.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });

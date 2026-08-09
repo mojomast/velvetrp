@@ -33,10 +33,10 @@ describe("M1.10 generation-draft contracts", () => {
 
   it("structurally separates safe metadata from staged generated content", () => {
     const privateDraft = { ...base, principalId: "gm", stagedContent: { gmSecret: "hidden", enemies: [] },
-      validation: { valid: true, issues: [], validatedAt: at }, reviewDecision: null, receiptLinks: [] } as const;
+      validation: { valid: true, issues: [], validatedAt: at }, reviewDecision: null, receiptLinks: [], applyReceipt: null } as const;
     expect(privateGenerationDraftSchema.parse(privateDraft)).toEqual(privateDraft);
     expect(roleSafeGenerationDraftSchema.safeParse(privateDraft).success).toBe(false);
-    const safe = { ...base, validationSummary: { valid: true, errorCount: 0, warningCount: 0 }, receiptLinks: [] } as const;
+    const safe = { ...base, validationSummary: { valid: true, errorCount: 0, warningCount: 0 }, receiptLinks: [], applyReceiptId: null } as const;
     expect(roleSafeGenerationDraftSchema.parse(safe)).toEqual(safe);
     expect(JSON.stringify(safe)).not.toContain("gmSecret");
   });

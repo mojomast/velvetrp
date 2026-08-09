@@ -2,6 +2,8 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
+import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -28,6 +30,16 @@ function createRepresentativeV8(dir: string): string {
   const dbPath = path.join(dir, "velvet.sqlite");
   const db = new DatabaseDriver(dbPath);
     db.pragma("foreign_keys = OFF");
+    // Remove exact empty future adventure layouts before intentionally dismantling their v9 parents.
+    for (const inventory of [ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ADVENTURE_GENERATION_V35_MANAGED_OBJECTS]) {
+      const names = inventory.map(([, name]) => name);
+      const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL ORDER BY type,name`)
+        .all(...names) as Array<{ type: string; name: string }>;
+      for (const object of objects) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
+      for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
+      const tables = objects.filter((object) => object.type === "table").map((object) => object.name).reverse();
+      for (const table of tables) db.exec(`DROP TABLE "${table}"`);
+    }
     removeFutureCharacterBuilderSchema(db);
     db.exec(`
     DROP TRIGGER campaign_timeline_events_immutable_delete; DROP TRIGGER campaign_timeline_events_require_native_event;
@@ -138,7 +150,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     const db = new DatabaseDriver(path.join(dir, "velvet.sqlite"));
     db.pragma("foreign_keys = ON");
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
     expect(db.prepare("SELECT * FROM principals").all()).toEqual([{
       id: "local-owner",
       display_name: "Local owner",
@@ -252,7 +264,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(snapshotV8(dbPath)).toEqual(before);
     const db = new DatabaseDriver(dbPath, { readonly: true });
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
     expect(db.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([]);
@@ -310,7 +322,7 @@ describe("schema v9 campaign foundation", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
     expect(migrated.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     migrated.close();
   });

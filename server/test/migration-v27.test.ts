@@ -30,7 +30,7 @@ describe("additive schema v27r1 combat foundation migration", () => {
     rewindToV26(migrated);
     createRepository({ dataDir: migrated }).close();
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "35" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "36" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM combat_foundation_layout_attestation_v27").get()).toEqual({
       prior_layout_digest: "7e3fe64f425173022d119f156f60eb36b26af2c97f29d40975f5579caa660f6a",
       current_layout_digest: "5ff782cab830d8c7e934edbae69fde1398b7482531d6b77c7ced8696798737be",

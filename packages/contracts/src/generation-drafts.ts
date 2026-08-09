@@ -51,6 +51,10 @@ export const generationReviewDecisionSchema = z.object({
   decidedAt: utcIsoTimestampSchema,
 }).strict();
 
+/** Immutable receipt produced specifically by applying one reviewed draft. */
+export const generationDraftApplyReceiptSchema = z.object({ receiptId: resourceIdSchema, draftId: resourceIdSchema,
+  reviewDecisionId: resourceIdSchema, principalId: principalIdSchema, result: z.record(z.string(), z.unknown()), appliedAt: utcIsoTimestampSchema }).strict();
+
 const draftBase = {
   draftId: resourceIdSchema, campaignId: campaignIdSchema, timelineId: resourceIdSchema, sessionId: resourceIdSchema.nullable(),
   kind: generationDraftKindSchema, state: generationDraftStateSchema, reviewState: generationDraftReviewStateSchema,
@@ -64,7 +68,11 @@ export const roleSafeGenerationDraftSchema = z.object({
   validationSummary: z.object({ valid: z.boolean(), errorCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES),
     warningCount: z.number().int().min(0).max(MAX_GENERATION_VALIDATION_ISSUES) }).strict(),
   receiptLinks: z.array(finalReceiptLinkSchema).max(256),
-}).strict();
+  applyReceiptId: resourceIdSchema.nullable(),
+}).strict().superRefine((value, context) => {
+  if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceiptId !== null)) context.addIssue({ code: "custom", path: ["applyState"], message: "applied state requires a draft-specific receipt" });
+  if ((value.reviewState === "approved") !== (value.state === "approved" || value.state === "applied")) context.addIssue({ code: "custom", path: ["reviewState"], message: "review and lifecycle state are inconsistent" });
+});
 
 /** Authorized owner/GM projection with staged content, validation, review, and apply receipts. */
 export const privateGenerationDraftSchema = z.object({
@@ -74,7 +82,24 @@ export const privateGenerationDraftSchema = z.object({
   validation: generationDraftValidationSchema,
   reviewDecision: generationReviewDecisionSchema.nullable(),
   receiptLinks: z.array(finalReceiptLinkSchema).max(256),
-}).strict();
+  applyReceipt: generationDraftApplyReceiptSchema.nullable(),
+}).strict().superRefine((value, context) => {
+  if ((value.state === "applied") !== (value.applyState === "applied" && value.applyReceipt !== null)) context.addIssue({ code: "custom", path: ["applyState"], message: "applied state requires a draft-specific receipt" });
+  if (value.applyReceipt && value.reviewDecision?.decision !== "approved") context.addIssue({ code: "custom", path: ["applyReceipt"], message: "only an approved review can be applied" });
+});
+
+/** Strict input for creating a generated-content draft. */
+export const createGenerationDraftInputSchema = z.object({ campaignId: campaignIdSchema, timelineId: resourceIdSchema,
+  sessionId: resourceIdSchema.nullable().optional(), kind: generationDraftKindSchema, stagedContent: stagedGenerationContentSchema,
+  validation: generationDraftValidationSchema, expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema }).strict();
+/** Strict optimistic envelope for a draft mutation. */
+export const draftMutationInputSchema = z.object({ draftId: resourceIdSchema, expectedDraftRevision: revisionSchema.max(Number.MAX_SAFE_INTEGER - 1),
+  expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema }).strict();
+/** Strict human review input. */
+export const reviewGenerationDraftInputSchema = draftMutationInputSchema.extend({ decision: reviewDecisionKindSchema,
+  notes: z.string().max(4_000).nullable().optional() }).strict();
+/** Strict draft-specific apply input; it never accepts an unrelated campaign command receipt. */
+export const applyGenerationDraftInputSchema = draftMutationInputSchema.extend({ result: z.record(z.string(), z.unknown()) }).strict();
 
 /** Generated draft content kind. */
 export type GenerationDraftKind = z.infer<typeof generationDraftKindSchema>;
@@ -96,3 +121,13 @@ export type GenerationReviewDecision = z.infer<typeof generationReviewDecisionSc
 export type RoleSafeGenerationDraft = z.infer<typeof roleSafeGenerationDraftSchema>;
 /** Authorized private generation draft. */
 export type PrivateGenerationDraft = z.infer<typeof privateGenerationDraftSchema>;
+/** Draft-specific immutable apply receipt. */
+export type GenerationDraftApplyReceipt = z.infer<typeof generationDraftApplyReceiptSchema>;
+/** Strict draft creation input. */
+export type CreateGenerationDraftInput = z.infer<typeof createGenerationDraftInputSchema>;
+/** Strict optimistic draft mutation envelope. */
+export type DraftMutationInput = z.infer<typeof draftMutationInputSchema>;
+/** Strict draft review input. */
+export type ReviewGenerationDraftInput = z.infer<typeof reviewGenerationDraftInputSchema>;
+/** Strict draft apply input. */
+export type ApplyGenerationDraftInput = z.infer<typeof applyGenerationDraftInputSchema>;
