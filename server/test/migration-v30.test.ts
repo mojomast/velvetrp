@@ -29,7 +29,7 @@ describe("schema v30 campaign import staging", () => {
     const fresh = makeDir(); createRepository({ dataDir: fresh }).close();
     expect(layout(migrated)).toEqual(layout(fresh));
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "34" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "35" });
     db.close();
   });
 

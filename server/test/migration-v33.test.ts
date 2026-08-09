@@ -41,7 +41,7 @@ describe("schema v33 quest domain", () => {
     db.close(); repo.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "34" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "35" });
     expect(migrated.prepare("SELECT title FROM quests WHERE id='legacy'").get()).toEqual({ title: "Legacy quest" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM quest_domain_layout_attestation_v33").get()).toEqual({ length: 64 });
     migrated.close();

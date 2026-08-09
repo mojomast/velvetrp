@@ -217,7 +217,7 @@ describe("schema v11 campaign sheets and actors", () => {
 
     for (const dbPath of [migratedPath, databasePath(freshDir)]) {
       const db = new DatabaseDriver(dbPath, { readonly: true });
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("34");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
       expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string }).value).toBe("1");
       for (const table of V11_TABLES) {
         expect((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count).toBe(0);
@@ -296,7 +296,7 @@ describe("schema v11 campaign sheets and actors", () => {
     expect(clockNow).not.toHaveBeenCalled();
     expect(nextId).not.toHaveBeenCalled();
     const repaired = new DatabaseDriver(dbPath, { readonly: true });
-    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "34" });
+    expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "35" });
     expect(repaired.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     repaired.close();
     expect(v11Schema(dbPath)).not.toEqual(baselineV11Schema);
@@ -572,7 +572,7 @@ describe("schema v11 campaign sheets and actors", () => {
     const retried = createRepository({ dataDir: dir });
     retried.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("34");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
     expect(migrated.pragma("foreign_key_check")).toEqual([]);
     migrated.close();
   });
@@ -598,7 +598,7 @@ describe("schema v11 campaign sheets and actors", () => {
     const retried = createRepository({ dataDir: dir });
     retried.close();
     const fresh = new DatabaseDriver(dbPath, { readonly: true });
-    expect((fresh.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("34");
+    expect((fresh.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("35");
     expect(fresh.pragma("foreign_key_check")).toEqual([]);
     fresh.close();
   });
