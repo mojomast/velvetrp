@@ -63,6 +63,13 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       hasQuery, queryDetail: confirm ? method === "POST" ? "Adventure turn confirmation does not accept query parameters" : null
         : method === "GET" ? "Adventure turn reads do not accept query parameters" : null, mechanics: true, noStore: true };
   }
+  if (/^\/api\/rpg\/v1\/generation-drafts(?:\/[^/]+(?:\/apply)?)?$/.test(instance)) {
+    const collection = instance === "/api/rpg/v1/generation-drafts", apply = instance.endsWith("/apply");
+    return { instance: collection ? instance : apply ? "/api/rpg/v1/generation-drafts/:draftId/apply" : "/api/rpg/v1/generation-drafts/:draftId",
+      hasQuery, queryDetail: collection ? method === "POST" ? "Generation draft creation does not accept query parameters" : null
+        : apply ? method === "POST" ? "Generation draft apply does not accept query parameters" : null
+          : method === "GET" ? "Generation draft reads do not accept query parameters" : null, mechanics: true, noStore: true };
+  }
 
   if (/^\/api\/rpg\/v1\/actors\/[^/]+\/check-commands$/.test(instance)) {
     return {
@@ -572,6 +579,13 @@ export function buildApp(options: {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
         instance: instance === "/api/rpg/v1/adventure-turns/stream" ? instance
           : instance.endsWith("/confirm") ? "/api/rpg/v1/adventure-turns/:turnId/confirm" : "/api/rpg/v1/adventure-turns/:turnId",
+      });
+    }
+    if (/^\/api\/rpg\/v1\/generation-drafts(?:\/[^/]+(?:\/apply)?)?$/.test(instance)) {
+      reply.header("cache-control", "no-store");
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
+        instance: instance === "/api/rpg/v1/generation-drafts" ? instance
+          : instance.endsWith("/apply") ? "/api/rpg/v1/generation-drafts/:draftId/apply" : "/api/rpg/v1/generation-drafts/:draftId",
       });
     }
     if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers|power-commands|effects|effect-commands)$/.test(instance)) {

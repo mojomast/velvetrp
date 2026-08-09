@@ -101,6 +101,7 @@ import { contentCatalogHttpRoutes } from "./contentCatalog.js";
 import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.js";
 import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js";
 import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
+import { generationDraftsHttpRoutes } from "./generationDrafts.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
 import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 import { actorInventoryHttpRoutes } from "./actorInventory.js";
@@ -157,6 +158,11 @@ export interface CampaignListRepository extends
   waitForToolConfirmation?: AdventureTurnRepository["waitForToolConfirmation"];
   decideToolProposal?: AdventureTurnRepository["decideToolProposal"];
   updateAdventureTurnNarration?: AdventureTurnRepository["updateAdventureTurnNarration"];
+  getGenerationDraft?: AdventureTurnRepository["getGenerationDraft"];
+  getGenerationDraftByIdempotencyKey?: AdventureTurnRepository["getGenerationDraftByIdempotencyKey"];
+  createGenerationDraft?: AdventureTurnRepository["createGenerationDraft"];
+  reviewGenerationDraft?: AdventureTurnRepository["reviewGenerationDraft"];
+  applyGenerationDraft?: AdventureTurnRepository["applyGenerationDraft"];
   getCampaign?(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
@@ -270,6 +276,9 @@ type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampai
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "createAdventureTurn"
   | "waitForToolConfirmation" | "decideToolProposal" | "updateAdventureTurnNarration"> & Required<Pick<CampaignListRepository, "getCampaign">>;
+type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
+  | "createGenerationDraft" | "reviewGenerationDraft" | "applyGenerationDraft">
+  & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -421,6 +430,11 @@ function assertAdventureTurnRepository(repository: CampaignListRepository): asse
     "waitForToolConfirmation", "decideToolProposal", "updateAdventureTurnNarration", "getCampaign"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
+function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
+  const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
+    "reviewGenerationDraft", "applyGenerationDraft", "getCampaign", "getCampaignAdministration"];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -551,6 +565,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
   const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
   const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository; };
+  const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -583,6 +598,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});
   await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor });
+  await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };

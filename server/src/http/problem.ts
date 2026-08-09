@@ -28,6 +28,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (path === "/api/rpg/v1/adventure-turns/stream") return path;
   if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+\/confirm$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId/confirm";
   if (/^\/api\/rpg\/v1\/adventure-turns\/[^/]+$/.test(path)) return "/api/rpg/v1/adventure-turns/:turnId";
+  if (path === "/api/rpg/v1/generation-drafts") return path;
+  if (/^\/api\/rpg\/v1\/generation-drafts\/[^/]+\/apply$/.test(path)) return "/api/rpg/v1/generation-drafts/:draftId/apply";
+  if (/^\/api\/rpg\/v1\/generation-drafts\/[^/]+$/.test(path)) return "/api/rpg/v1/generation-drafts/:draftId";
   if (/^\/api\/rpg\/v1\/actors\/[^/]+\/check-commands$/.test(path)) {
     return "/api/rpg/v1/actors/:actorId/check-commands";
   }
