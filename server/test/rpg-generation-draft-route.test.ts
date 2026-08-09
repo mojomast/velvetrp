@@ -17,7 +17,7 @@ describe("M2.11 generation draft routes", () => {
       "content-type": "application/json", authorization: "outsider", "x-principal-id": "outsider",
     }, payload: create });
     expect(created.statusCode, created.body).toBe(201); expect(created.headers["cache-control"]).toBe("no-store");
-    expect(created.json()).toMatchObject({ provenance: { source: "user-brief", method: "deterministic-fallback" },
+    expect(created.json()).toMatchObject({ provenance: { source: "user-brief", method: "deterministic-fallback", applicationScope: "draft-review" },
       changes: [{ changeId: "brief", content: { brief: create.brief, constraints: create.constraints } }], validationIssues: [] });
     expect(created.body).not.toMatch(/provider|model|prompt|generatedBy/);
     const duplicate = await app.inject({ method: "POST", url: "/api/rpg/v1/generation-drafts", headers: { "content-type": "application/json" }, payload: create });
@@ -30,8 +30,9 @@ describe("M2.11 generation draft routes", () => {
     const apply = { selectedChanges: ["brief"], expectedRevision: 0, idempotencyKey: "draft-apply" };
     const applied = await app.inject({ method: "POST", url: `/api/rpg/v1/generation-drafts/${draftId}/apply`, headers: { "content-type": "application/json" }, payload: apply });
     expect(applied.statusCode, applied.body).toBe(200); expect(applied.json()).toMatchObject({ draft: { draftId, state: "applied", revision: 2 },
-      receipts: [{ selectedChanges: ["brief"] }] });
+      application: { scope: "draft-only", campaignDomainMutated: false }, receipts: [{ scope: "draft-only", selectedChanges: ["brief"] }] });
     expect(applied.body).not.toContain("commandId");
+    expect(applied.body).not.toContain("receiptLinks");
     const repeated = await app.inject({ method: "POST", url: `/api/rpg/v1/generation-drafts/${draftId}/apply`, headers: { "content-type": "application/json" }, payload: apply });
     expect(repeated.json()).toEqual(applied.json());
     await app.close();

@@ -29,9 +29,10 @@ export const generationDraftHttpChangeSchema = z.object({
 export const generationDraftHttpProvenanceSchema = z.object({
   source: z.literal("user-brief"),
   method: z.literal("deterministic-fallback"),
+  applicationScope: z.literal("draft-review"),
 }).strict();
 
-/** Role-safe durable draft metadata. */
+/** Role-safe durable draft metadata; `applied` seals review selection only and never proves a campaign mutation. */
 export const generationDraftHttpProjectionSchema = z.object({
   draftId: resourceIdSchema,
   campaignId: campaignIdSchema,
@@ -63,6 +64,7 @@ export const generationDraftApplyRequestSchema = z.object({
 export const generationDraftHttpReceiptSchema = z.object({
   receiptId: resourceIdSchema,
   reviewDecisionId: resourceIdSchema,
+  scope: z.literal("draft-only"),
   selectedChanges: z.array(resourceIdSchema).min(1).max(MAX_GENERATION_DRAFT_CHANGES),
   appliedAt: utcIsoTimestampSchema,
 }).strict();
@@ -70,6 +72,7 @@ export const generationDraftHttpReceiptSchema = z.object({
 /** Exact apply response with only draft-specific receipts. */
 export const generationDraftApplyResponseSchema = z.object({
   draft: generationDraftHttpProjectionSchema,
+  application: z.object({ scope: z.literal("draft-only"), campaignDomainMutated: z.literal(false) }).strict(),
   receipts: z.tuple([generationDraftHttpReceiptSchema]),
 }).strict();
 

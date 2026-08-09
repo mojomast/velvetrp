@@ -19,6 +19,7 @@ type Repo = Pick<AdventureTurnRepository, "createGenerationDraft" | "getGenerati
   getCampaign(actorPrincipalId: string, campaignId: string): { activeTimelineId: string } | null;
   getCampaignAdministration(actorPrincipalId: string, campaignId: string): { revision: number } | null;
 };
+/** Narrow durable repository lane required by generation-draft HTTP routes. */
 export interface GenerationDraftsHttpOptions { generationDraftRepositoryAccessor: () => Repo }
 
 const enabled = () => { const flags = readRpgFeatureFlags(); return flags.campaign && flags.mechanics; };
@@ -29,7 +30,8 @@ const canonical = (value: unknown): string => JSON.stringify(value, (_key, neste
   ? Object.fromEntries(Object.entries(nested as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))) : nested);
 
 function staged(input: GenerationDraftCreateRequest) {
-  return { provenance: { source: "user-brief" as const, method: "deterministic-fallback" as const },
+  return { provenance: { source: "user-brief" as const, method: "deterministic-fallback" as const,
+      applicationScope: "draft-review" as const },
     changes: [{ changeId: "brief", summary: `Review the user-authored ${input.kind} brief`,
       content: { brief: input.brief, constraints: input.constraints } }] };
 }
@@ -54,6 +56,7 @@ function fail(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[
   return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Generation draft status is unknown; reconcile with GET before retrying and do not automatically retry");
 }
 
+/** Registers deterministic draft-review create, read, and draft-only apply routes. */
 export const generationDraftsHttpRoutes: FastifyPluginAsync<GenerationDraftsHttpOptions> = async (app, options) => {
   app.post<{ Querystring: Record<string, unknown>; Body: unknown }>("/generation-drafts", {
     onRequest: async (request, reply) => { reply.header("cache-control", "no-store");
@@ -109,17 +112,19 @@ export const generationDraftsHttpRoutes: FastifyPluginAsync<GenerationDraftsHttp
       const repo = options.generationDraftRepositoryAccessor(); const before = requirePrivate(repo.getGenerationDraft(OWNER, draftId.data));
       const known = new Set(view(before).changes.map(({ changeId }) => changeId));
       if (body.data.selectedChanges.some((changeId) => !known.has(changeId))) throw new AdventureTurnConflictError();
+      const application = { applicationScope: "draft-only", selectedChanges: body.data.selectedChanges };
       const reviewed = repo.reviewGenerationDraft(OWNER, { draftId: draftId.data, decision: "approved",
-        notes: null, expectedDraftRevision: body.data.expectedRevision, expectedCampaignRevision: before.campaignRevision,
+        notes: canonical(application), expectedDraftRevision: body.data.expectedRevision, expectedCampaignRevision: before.campaignRevision,
         idempotencyKey: commandKey("http-review", body.data.idempotencyKey) });
       const applied = repo.applyGenerationDraft(OWNER, { draftId: draftId.data, expectedDraftRevision: body.data.expectedRevision + 1,
         expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: commandKey("http-apply", body.data.idempotencyKey),
-        result: { selectedChanges: body.data.selectedChanges } });
+        result: application });
       if (!applied.applyReceipt || applied.applyReceipt.draftId !== draftId.data
-          || canonical(applied.applyReceipt.result) !== canonical({ selectedChanges: body.data.selectedChanges })) throw new Error("draft apply response is ambiguously bound");
-      return reply.send(generationDraftApplyResponseSchema.parse({ draft: draftProjection(applied), receipts: [{
+          || canonical(applied.applyReceipt.result) !== canonical(application)) throw new Error("draft apply response is ambiguously bound");
+      return reply.send(generationDraftApplyResponseSchema.parse({ draft: draftProjection(applied),
+        application: { scope: "draft-only", campaignDomainMutated: false }, receipts: [{
         receiptId: applied.applyReceipt.receiptId, reviewDecisionId: applied.applyReceipt.reviewDecisionId,
-        selectedChanges: body.data.selectedChanges, appliedAt: applied.applyReceipt.appliedAt,
+        scope: "draft-only", selectedChanges: body.data.selectedChanges, appliedAt: applied.applyReceipt.appliedAt,
       }] }));
     } catch (error) { return fail(request, reply, error); }
   });
