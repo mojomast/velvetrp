@@ -1,6 +1,6 @@
-# Trending roleplay software features - August 2026 status
+# Roleplay product and feature snapshot - August 2026
 
-Non-explicit product/engineering trends adapted for Velvet MVP.
+Internal product and feature-planning snapshot for Velvet MVP. It records the team's dated framing of implemented and deferred capabilities; it is not cited external research, external provenance, or a current product contract. For current implementation status and dependency-ordered work, see the [RPG feature roadmap](ROADMAP.md).
 
 ## Implemented
 
@@ -16,13 +16,14 @@ Non-explicit product/engineering trends adapted for Velvet MVP.
 - Explicitly bounded room automation: 1-6 replies per round, progressive room SSE, and 0-3 client follow-up rounds.
 - Authoritative scene state combining highest-priority editable manual canon with a categorized model-synthesized factual snapshot.
 - Append-only usage ledger, configurable token pricing, `GET /api/usage`, and a lifetime usage/cost dashboard.
+- Shared `@velvet/contracts` workspace package with strict runtime schemas and inferred types consumed by server and client code.
 
-## High-impact trends intentionally deferred
+## High-impact features intentionally deferred
 
 - Full Character Card V2 PNG embedding: start with JSON passthrough, add PNG `tEXt` later.
 - Vector/RAG memory: keyword lore + summaries are safer and simpler for MVP.
 - Per-provider-type adapters (ollama/llamacpp/koboldcpp native APIs); everything currently speaks openai-compatible.
-- Shared server/client types package; coverage gates in CI.
+- Generated OpenAPI and contract-compatibility automation; automated coverage gates in CI.
 - Unbounded autonomous director loops; implemented room automation remains explicitly bounded, and single-character continuation is one explicit buffered turn.
 - Participant changes after session creation.
 - TTS/images: feature flags only; keep providers external and optional.

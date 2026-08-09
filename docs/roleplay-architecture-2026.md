@@ -2,13 +2,20 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current RPG persistence status
+## Current status (v37r1)
 
-- Current persistence is schema v29. V25 completes M1.5 actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops/finite stock/quotes/purchases, bilateral trade, and short/long rest without rewriting historical ledgers; later additive migrations preserve that history.
-- M1.1-M1.5 are repository/shared-contract capabilities. The trusted-local boundary remains exactly 21 operations using fixed `local-owner`: the historical 14 plus server-only builder create/read/update, progression read/preview, and administration GET/PATCH. M1.5 adds no HTTP routes or client/UI. This is not remote-safe authentication, and no client/UI exists for these seven routes.
+> **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
-- Fixed mechanics activation accepts only the shared exact identity, requires campaign plus mechanics flags before validation/repository work, and reuses publication/configuration repository methods as two transactions. The service owns revision/idempotency, exact active state converges, all existing other configurations conflict without replacement, and every client PUT outcome gets one fresh detail GET with no automatic PUT repeat.
-- The mechanics starter remains distinct from the metadata-only original starter and its current setup/create workflow. Builder/progression HTTP is now integrated as draft mutation plus read/preview; progression remains read-only and has no client/UI slice. M1.5 exact retries, revisions, and immutable receipts are factory-only; M1.6 checks, powers, and deterministic effects is next.
+The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
+
+- Current persistence is schema **v37 revision 1 (v37r1)**. The trusted-local RPG HTTP boundary exposes exactly **92 explicit operations through M2.11**, excluding the feature-discovery read, and uses fixed `local-owner`. It is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3 are complete**. **M4.1 campaign-aware context assembly is next**; later M4 milestones remain future work.
+- M2.11's delivered adventure-turn and generation-draft lanes are deterministic boundaries, not the future AI tool system. Ordinary turns use deterministic fallback narration; proposal, confirmation, mechanics, and choice stream events are conditional; no bounded provider tool bridge executes tools yet. Generation-draft creation is deterministic user-brief fallback, and apply only seals reviewed draft changes with `campaignDomainMutated: false`; provider-backed generation and campaign-domain application remain M4.2, M4.5, and M4.6 work.
+- The current backend has campaign-visible NPC records but no NPC location/presence model, and campaign NPCs are not implicitly Velvet session participants. Session participation remains the explicit legacy 1-12 character list. UI and context must say "campaign-visible NPC roster" rather than "present NPCs" unless a later authoritative presence/session link is implemented.
+
+## Point-in-time language
+
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v37r1 status or the normative sources above.
 
 ## Historical Slice 98 closeout
 
@@ -40,7 +47,11 @@ server/src/app.ts (Fastify composition root)
   `-- repo/index.ts (public persistence barrel)
         |-- named legacy domain repositories via repoContext.ts
         `-- composed Repository factory via campaignRepositoryOrchestration.ts and focused facades
-              `-- db.ts (connection lifecycle, schema, migrations, legacy import)
+              `-- db.ts (compatibility facade and wiring root)
+                    |-- db/connection.ts
+                    |-- db/schema.ts
+                    |-- db/migrations/*.ts
+                    `-- db/legacyImport.ts
 ```
 
 `app.ts` owns server-wide hooks, malformed-route compatibility, request IDs, logging redaction, dependency selection, and plugin registration. It does not own roleplay interaction or generation handlers. `interactions.ts` owns the legacy generation-facing routes; `generationService.ts` owns reusable buffered/streamed generation pipelines, SSE writing, context assembly, scene synthesis, and summary updates; `generationRegistry.ts` owns process-local concurrency and abort coordination and is shared by interaction and session-lifecycle routes.
@@ -88,7 +99,11 @@ Sessions have 1-12 participants through `session_characters`, plus a primary cha
 5. Authoritative shared context: editable manual canon plus synthesized current scene facts, with manual canon taking precedence.
 6. Recent dialogue window (active branch, last `harness.recentTurns`).
 
-## MVP implementation notes (current state, 2026-08-05)
+For the next RPG context work, the canonical authority order is: safety and actor control; human-authored campaign canon and explicit overrides; committed mechanics and campaign events; the current player declaration; visible normalized campaign state; approved memories and visible lore; recaps, summaries, and synthesized facts; then generated plans, suggestions, and narration. Lower layers cannot contradict or mutate higher layers.
+
+## Historical MVP implementation ledger (through 2026-08-05 checkpoints)
+
+The implementation notes below preserve their original checkpoint content. Any present-tense capability, exclusion, operation count, or "next" statement in this ledger is scoped to the slice/version named in that entry.
 
 - SQLite persistence (`better-sqlite3`, WAL) with versioned schema (`meta.schemaVersion = 29`) and one-way import of the retired `data/db.json` store. `server/src/repo/db.ts` exclusively owns connection lifecycle, exact schema/migrations, and legacy import. Named domain repositories use the private `repoContext.ts` bridge and `systemRuntime`; the factory repository owns an isolated closeable connection with injected clock/ID/RNG ports.
 - Malformed legacy JSON alone is quarantined. Legacy dependency/import failures propagate, transactional writes roll back, and valid `db.json` remains retryable; gameplay RNG and ordinary persistence behavior are unchanged.
@@ -218,7 +233,7 @@ Sessions have 1-12 participants through `session_characters`, plus a primary cha
 - Slice 96 final finding-remediation applies one exact `encodeURIComponent` helper to every opaque legacy session/message client path segment and makes campaign return/missing-room refresh tokens matching-campaign, acknowledgement-based, and one-shot across unmount/reopen. Verification passed 180 focused client tests across 5 files, all 207 client tests across 8 files, the contracts build, root contracts/server/client/E2E typecheck, production build with 133 modules, and the deterministic Playwright workflow. The unchanged latest full-suite baseline remains 126 contract tests and 1,641 server tests plus 1 skip across 72 files. No commit was created.
 - Authentication is user-directedly deferred during the local single-user phase. The literal `local-owner` is unauthenticated trusted local context, not multi-user authentication or security, and these endpoints must not be remotely exposed. Repository authorization remains intact; real authentication and an appropriate security model are required before remote or multi-user exposure.
 
-## Production v13 to v14 SQLite rollout
+## Historical production v13 to v14 SQLite rollout
 
 1. Resolve the live database path (`$VELVET_DATA_DIR/velvet.sqlite`, otherwise `data/velvet.sqlite`), enable maintenance mode, block new writes, and let in-flight writers drain. While the database remains open, use SQLite's online backup API: `sqlite3 "$DB" ".timeout 10000" ".backup '$BACKUP'"`.
 2. Verify the backup before rollout: `sqlite3 "$BACKUP" "PRAGMA quick_check; PRAGMA foreign_key_check; SELECT key,value FROM meta WHERE key IN ('schemaVersion','schemaRevision') ORDER BY key;"`. Require `quick_check` = `ok`, no foreign-key rows, and the expected v13 metadata. Stop every Velvet writer; never run v13 and v14 binaries concurrently. Repeat the backup if any write occurred after it.

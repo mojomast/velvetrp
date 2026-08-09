@@ -1,44 +1,23 @@
 # Development Plan
 
-- [✅] Explicit fixed mechanics-starter activation for previously unconfigured campaigns, end to end
-- [✅] Resolve independent mechanics-activation review findings and freshness races
-- [✅] Integrate character builder, progression read/preview, and campaign administration HTTP lanes
-- [✅] Correct character-draft PATCH campaign binding and current HTTP documentation
-- [✅] Correct typed progression errors and restrict administration HTTP methods
-- [✅] M1.5 resources, inventory, equipment, economy, and rest (repository/shared-contract layer)
-- [✅] M1.6 checks, powers, and deterministic effects
-- [✅] M1.7 encounters and turn-based combat (repository/shared-contract layer; schema v27r1)
-- [✅] M1.8 world, travel, NPCs, and factions (repository/shared-contract layer; schema v28r1; no HTTP/UI)
-- [✅] Task 4: Extract shared campaign content row mappers
-- [✅] Task 3c: Extract encounter command repository
-- [✅] Task 3d: Add encounter package barrel
-- [✅] Task 2: Remove unused legacy campaign content SQL helpers
-- [✅] Remove the safe-word feature across model, API/UI, persistence, generation, policy, tests, and documentation (schema v29)
-- [✅] Task 6: Extract actor-resource write repository
-- [✅] Task 7: Extract world read projection and inject required read context
-- [✅] M1.9 quests, storylines, clues, and rewards (repository/shared-contract layer; schema v29r2)
-- [✅] M1.10 Adventure turns, confirmations, and generation drafts
-- [✅] M2.4 campaign import dry-run, durable apply, and export routes
-- [✅] M2.5 content catalog and publication routes
-- [✅] M2.6 character builder and progression routes
-- [✅] M2.7 resource, inventory, economy, and rest routes
-- [✅] M2.8 actor checks, powers, and effects routes
-- [✅] M2.9 encounter and combat routes
-- [✅] M2.10 world, NPC, faction, quest, and story routes
-- [✅] M2.11 Adventure turn, confirmation, and generation routes
-- [✅] M3.1 Campaign Administration Studio
-- [✅] M3.2 Content Pack Studio
-- [✅] M3.3 Character Builder and Advancement Flow
-- [✅] M3.4 Character Sheet, Inventory, and Economy
-- [✅] M3.5 Powers and Combat Workspace
-- [✅] M3.6 World, Cast, and Journal Studio
-- [✅] Minimal campaign play bootstrap contract, repository read, and HTTP route
-- [✅] Normalize initial adventure-turn reconciliation problem instances
-- [✅] M3.7 Campaign Play Shell and mechanic receipts
-- [✅] M3.8 Event Log, recap, import, and export experience
-- [ ] M4.1 Campaign-aware context assembly
-- [ ] M4.2 Bounded tool loop and deterministic command bridge
-- [ ] M4.3 Durable confirmation and resume
-- [ ] M4.4 Receipt-aware narration and narrative consequence injection
-- [ ] M4.5 LLM encounter generation
-- [ ] M4.6 NPC stat derivation and campaign-content generation
+Current persistence is `v37r1`. The authoritative dependency order and acceptance criteria live in the [RPG roadmap](docs/ROADMAP.md). This file is only a compact completion ledger.
+
+## Complete
+
+- [x] M1.1-M1.10: RPG contracts, schema, repositories, deterministic mechanics, world/story state, and durable adventure coordination
+- [x] M2.1-M2.11: trusted-local campaign, content, character, mechanics, combat, world/story, transfer, and adventure HTTP surfaces
+- [x] M3.1-M3.8: administration, content, character, combat, world/story, campaign play, history, recap, import, and export client workflows
+
+## Next
+
+- [ ] M4.1: campaign-aware, bounded, role-filtered context assembly
+
+## Pending
+
+- [ ] M4.2: bounded tool loop and deterministic command bridge
+- [ ] M4.3: durable confirmation and resume
+- [ ] M4.4: receipt-aware narration and narrative consequence injection
+- [ ] M4.5: LLM encounter generation
+- [ ] M4.6: NPC stat derivation and campaign-content generation
+
+Deferred and out-of-scope work remains recorded in the [roadmap](docs/ROADMAP.md#out-of-scope--deferred).

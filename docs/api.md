@@ -20,7 +20,7 @@ Structured and normal HTTP responses include `X-Request-Id`. Intentionally prese
 
 `GET /rpg/v1/features` exposes the M0 RPG boundary as `{ campaign, mechanics, combat, studio, remoteAuthentication }`. Every flag defaults to `false` and is enabled only by the exact value `true` in `FEATURE_RPG_CAMPAIGN`, `FEATURE_RPG_MECHANICS`, `FEATURE_RPG_COMBAT`, `FEATURE_RPG_STUDIO`, or `FEATURE_REMOTE_AUTHENTICATION`. These are rollout controls, not authorization.
 
-Current persistence is schema v37 revision 1. Excluding `GET /rpg/v1/features`, the trusted-local RPG boundary exposes exactly 92 HTTP operations through M2.11. Campaign administration and transfer require the campaign feature; mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and generation-draft routes require campaign plus mechanics; encounter and combat routes require campaign plus mechanics plus combat.
+Current persistence is schema v37 revision 1. The trusted-local RPG boundary exposes exactly 92 HTTP operations through M2.11. This count means 92 explicit method-and-route registrations under `/api/rpg/v1`; it excludes the separately registered `GET /rpg/v1/features` discovery operation and every implicit `HEAD` alias. A path registered for two methods counts as two operations. The audit breakdown is 14 pre-M2 compatibility operations, 40 operations across M2.1-M2.3 and M2.5-M2.7, 3 in M2.4, 5 in M2.8, 8 in M2.9, 14 in M2.10, and 8 in M2.11. Campaign administration and transfer require the campaign feature; mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and generation-draft routes require campaign plus mechanics; encounter and combat routes require campaign plus mechanics plus combat.
 
 **Historical Slice 98 checkpoint:** exactly 98 M0 slices were complete at v14r1 and exactly 13 campaign HTTP operations. Slice 98 was documentation-only closeout and added no feature, code, test, contract, route, operation, schema, migration, dependency, backup, or commit. Its gate passed typecheck, build, 1,993 unit tests plus 1 skip, and 1 deterministic E2E; live E2E was not run. This preserved ledger describes that checkpoint, not current persistence.
 
@@ -85,7 +85,7 @@ Catalog events and receipts participate in the same contiguous campaign administ
 
 The separate built-in `velvet:mechanics-starter` catalog is original clean-room material, recursively frozen, digest-versioned, and installed/configured only through explicit repository methods. It is distinct from and does not modify the existing metadata-only `velvet:original-starter` or its current HTTP setup route. No catalog is installed automatically at startup.
 
-Schema v23 introduced the M1.4 single-class progression repository/shared contracts, v24r1 repaired its provenance/integrity graph, and v25r1 completed M1.5 repository behavior. M2.7-M2.11 now expose the reviewed resource, mechanics, combat, world, narrative, adventure-turn, and generation-draft HTTP lanes. No client workflow is included.
+Schema v23 introduced the M1.4 single-class progression repository/shared contracts, v24r1 repaired its provenance/integrity graph, and v25r1 completed M1.5 repository behavior. M2.7-M2.11 expose the reviewed resource, mechanics, combat, world, narrative, adventure-turn, and generation-draft HTTP lanes. Current browser client API adapters and workflows consume the RPG boundary; HTTP authority and validation remain server-owned.
 
 Unknown well-formed routes under `/rpg/v1` return structured problems. Pre-routing malformed or overlong IDs are normalized only for reviewed exact campaign shapes, now including both workspace parameters. Feature denial remains first; supported methods return route-appropriate query 400 before path 404, while unsupported methods remain absent. Problem instances retain safe templates only. Malformed unknown, lookalike, and legacy paths retain raw JSON/code/status compatibility and the effective 128-character parameter cap: 101–128 character legacy values still reach existing handlers and 129 remains the same raw 414. A larger internal router allowance exists only so exact nested workspace shapes can strictly normalize either ID before an early compatibility hook restores every other cap response.
 
@@ -105,11 +105,111 @@ POST requires exact JSON `{ "character": { "position": integer, "name": string }
 
 The Slice 94 client accepts only that strict request-bound 201 as commit confirmation. It reports latest-history refresh separately and never identifies a particular identity-free entry as that roll or requires its presence. Network, 500, malformed 2xx/body, and other untyped outcomes remain ambiguous regardless of identical history projections. Exact `RPG_CAMPAIGN_DICE_BINDING_CONFLICT` 409 and `RPG_CAMPAIGN_NOT_FOUND` 404 are consumed as known non-commits because the documented service ordering classifies them before execution. Every issued POST still owns one fresh GET, and persistent status offers only a separate GET-only Refresh rolls action. Rapid manual Retry or Refresh pointer/key activation is synchronously limited to one GET until settlement without affecting reconciliation. This is client consumption of the existing statuses and does not change any HTTP semantics.
 
-## M2.4 and M2.8-M2.11 RPG routes
+## M2.1-M2.11 RPG routes
+
+The route tables below are the current registrations, not the earlier roadmap proposal. All use fixed trusted-local principal `local-owner`; authorization and identity headers are ignored, while body fields that purport to select the caller principal are rejected as unknown fields. All listed operations set `Cache-Control: no-store` on successes and scoped problems, reject unknown object fields, and use strict 1-128 character resource IDs except where a legacy room/session ID is explicitly opaque. Feature denial is `404 RPG_ROUTE_NOT_FOUND` before query, path, media, body, or repository access. Unless a table names a query, any raw query delimiter, including bare `?`, is `400 RPG_INVALID_REQUEST`. JSON writes require `application/json` with at most one optional `charset`; otherwise they return `415 RPG_UNSUPPORTED_MEDIA_TYPE`. Malformed paths or unavailable/denied resources use the route's non-disclosing 404; malformed requests use 400; stale revisions and known conflicts use typed 409; validation-only catalog failure uses 422; unexpected repository or output failure is redacted `500 RPG_INTERNAL_ERROR`. GET registrations expose no implicit HEAD operation.
+
+Revision-bound writes use the caller's observed authoritative revision. An `idempotencyKey` identifies the exact canonical request: exact committed reuse converges on the immutable result, while changed reuse conflicts. No write is automatically retried. After a lost response or unexpected 500, reconcile through the named authoritative GET or receipt read before any deliberate user action; absence does not by itself prove non-commit where authorization, visibility, or an in-flight write is indistinguishable. Route parameters own campaign, draft, character, actor, pack, principal, room, checkpoint, and command identities; bodies cannot override them.
+
+### Campaign lifecycle and settings (M2.1, 3 operations)
+
+Requires `FEATURE_RPG_CAMPAIGN=true`. Reads are role-structured; repository authority decides the fixed principal's access. Administration mutations require the authorized campaign administration role and advance the campaign administration revision exactly once.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `GET` | `/rpg/v1/campaigns/:campaignId/administration` | No query/body | `200 { campaign }`, where campaign includes role-safe `status`, `settings`, `activeTimelineId`, `revision`, and `updatedAt` |
+| `PATCH` | `/rpg/v1/campaigns/:campaignId/administration` | `{ expectedRevision, idempotencyKey, status?, settings? }`; at least one actual change, settings are a strict partial | `200 { campaign, receipt }` |
+| `DELETE` | `/rpg/v1/campaigns/:campaignId/administration` | `{ expectedRevision, idempotencyKey, confirmationName }` | `200 { campaign, receipt }`; archives, never physically deletes |
+
+Lifecycle status is `draft`, `published`, `paused`, `completed`, or `archived`; illegal transitions are `RPG_CAMPAIGN_ADMINISTRATION_TRANSITION_CONFLICT`, other conflicts are `RPG_CAMPAIGN_ADMINISTRATION_CONFLICT`, and stale writes are `RPG_CAMPAIGN_ADMINISTRATION_STALE`. Receipts bind the campaign and one `administration_updated` event with `revisionAfter = revisionBefore + 1`. Reconcile either mutation with the administration GET; never repeat automatically.
+
+### Membership and room administration (M2.2, 5 operations)
+
+Requires `FEATURE_RPG_CAMPAIGN=true`. The fixed principal must have repository-authorized campaign administration access; mutations are owner-controlled and cannot remove or demote the sole canonical owner. These five operations supplement the separately documented room list/attach GET and PUT.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `GET` | `/rpg/v1/campaigns/:campaignId/memberships` | No query/body | `200 { memberships: [{ principalId, role, createdAt }] }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/memberships` | `{ principalId, role, expectedRevision, idempotencyKey }` | `200 { membership, receipt }` |
+| `PATCH` | `/rpg/v1/campaigns/:campaignId/memberships/:principalId` | `{ role, expectedRevision, idempotencyKey }`; principal is path-owned | `200 { membership, receipt }` |
+| `DELETE` | `/rpg/v1/campaigns/:campaignId/memberships/:principalId` | `{ expectedRevision, idempotencyKey }`; principal is path-owned | `200 { membership, receipt }` |
+| `DELETE` | `/rpg/v1/campaigns/:campaignId/rooms/:sessionId` | `{ expectedRevision, idempotencyKey }`; session ID is once-decoded opaque legacy identity | `200 { attachment, receipt }` |
+
+Membership writes emit `membership_added`, `membership_role_changed`, or `membership_removed`; detach emits `room_detached`. Stale state is `RPG_CAMPAIGN_ADMINISTRATION_STALE`, membership/state conflicts are `RPG_CAMPAIGN_MEMBERSHIP_CONFLICT`, and malformed/missing room identity is `RPG_CAMPAIGN_ROOM_NOT_FOUND`. Reconcile membership ambiguity with the membership GET and room-detach ambiguity with the authoritative room GET; do not retry automatically.
+
+### Timelines, checkpoints, events, and recaps (M2.3, 8 operations)
+
+Requires `FEATURE_RPG_CAMPAIGN=true`. Projections are role-safe for fixed `local-owner`; inaccessible campaigns, timelines, commands, and role-hidden records use the same non-disclosing campaign 404.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `GET` | `/rpg/v1/campaigns/:campaignId/timelines` | No query/body | `200 { activeTimelineId, timelines }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/events?timelineId=...&afterRevision=...&limit=...` | Exactly `timelineId`, integer `afterRevision >= 0`, and integer `limit` 1-100 | `200 { events, nextAfterRevision }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/commands/:commandId/receipt` | No query/body | `200 { receipt }`, discriminated as public `mechanic` or `administration` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/checkpoints` | No query/body | `200 { checkpoints }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/checkpoints` | `{ timelineId, timelineRevision, label, expectedRevision, idempotencyKey }` | `201 { checkpoint, receipt }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/timeline-forks` | `{ checkpointId, expectedRevision, idempotencyKey }` | `201 { timeline, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/recaps` | No query/body | `200 { recaps }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/recaps` | `{ timelineId, throughRevision, selectedSessionIds, visibility, text, expectedRevision, idempotencyKey }` | `201 { recap, receipt }` |
+
+Event pages are ascending after the supplied revision and return a nullable next cursor. Timeline, checkpoint, and recap collections are bounded; recap visibility is `members` or `gm-only`, session IDs remain opaque, and private command/campaign identities are omitted from the public receipt projection. Mutations advance administration revision once and use typed administration stale/conflict errors. Reconcile checkpoint, fork, or recap ambiguity with the corresponding list and, when the command ID is known, the immutable receipt GET; never retry automatically.
+
+### Content catalog and campaign pins (M2.5, 7 operations)
+
+Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`. Owner catalog operations use fixed application owner `local-owner`; campaign reads are role-structured and campaign configuration requires the canonical sole owner.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `GET` | `/rpg/v1/content-packs?cursor=...&limit=...` | Optional opaque `cursor` and integer `limit` 1-100 only; validated publications are fixed server-side | `200 { publications, nextCursor }` |
+| `GET` | `/rpg/v1/content-packs/:packId/versions/:packVersion` | No query/body; strict pack ID and content-pack version | `200 { catalog }` owner projection with publication, provenance, and definitions |
+| `POST` | `/rpg/v1/content-packs/validate` | `{ manifest, definitions }`; no client idempotency key | `200 { report: { valid, issues, normalizedSummary } }`; no persistence |
+| `POST` | `/rpg/v1/content-packs` | `{ idempotencyKey, manifest, definitions }` | `201 { catalog }` after validated immutable publication |
+| `GET` | `/rpg/v1/campaigns/:campaignId/content` | No query/body | `200 { content }` with compatibility, exact pins/digests, and issues |
+| `PUT` | `/rpg/v1/campaigns/:campaignId/content` | `{ rulesProfileId, contentPacks: [{ packId, packVersion }], expectedRevision, idempotencyKey }`; 1-64 unique pack IDs | `200 { content, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/content-packs/:packId/versions/:packVersion` | No query/body | `200 { catalog }` using the caller role's GM, player, or observer projection |
+
+The manifest owns exact pack/version/digest, rules metadata, compatibility, provenance, and presentation metadata; definitions use the closed catalog vocabulary. Validation failures are `422 RPG_CONTENT_CATALOG_INVALID`, stale campaign pin writes are `RPG_CONTENT_CATALOG_STALE`, and identity, idempotency, sealing, compatibility, or selection conflicts are `RPG_CONTENT_CATALOG_CONFLICT`. Publication ambiguity is reconciled with exact owner detail; pin ambiguity with campaign content GET. Neither write is automatically retried.
+
+### Character builder and progression (M2.6, 9 operations)
+
+Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`. Fixed `local-owner` must be the canonical owner/GM or eligible player controller required by the repository. Draft paths bind both campaign and draft; character paths bind campaign and campaign-character.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `POST` | `/rpg/v1/campaigns/:campaignId/character-drafts` | `{ personaId, durability: "durable"|"expiring", allocation, idempotencyKey }`; allocation is `standard-array`, exact-budget `point-buy`, bounded `manual`, or result-free `server-roll` | `201 { draft, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/character-drafts/:draftId` | No query/body | `200` strict draft view |
+| `PATCH` | `/rpg/v1/campaigns/:campaignId/character-drafts/:draftId` | `{ expectedRevision, idempotencyKey, selections }`; nonempty strict partial race/background/class/starter grant | `200 { draft, receipt }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize` | `{ expectedRevision, idempotencyKey }` | `201 { character, sheet, resources: [{ name: "health", current, max }], receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/sheet` | No query/body | `200 { sheet, derived, progression }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression` | No query/body | `200 { progression }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression/preview` | `{ selections: [{ choiceId, ability }] }`, maximum 32; read-only, no key | `200 { preview }` with `previewRevision` and opaque `previewToken` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/xp-commands` | `{ amount, reason, expectedRevision, idempotencyKey }`; amount 1-1,000,000 | `200 { progression, receipt }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression/apply` | `{ previewRevision, previewToken, selections, idempotencyKey }`; token is the exact 64-hex preview proof | `200 { progression, receipt }` |
+
+Draft reads omit controller/role and private persona state; finalization omits persona, actor, command, and audit identities while proving derived stats and starting grants. Draft errors are `CHARACTER_DRAFT_NOT_FOUND`, `_STALE`, `_EXPIRED`, `_CONFLICT`, `_INCOMPLETE` 422, or `_UNAVAILABLE` 503. Sheet absence is `RPG_CAMPAIGN_CHARACTER_NOT_FOUND`; progression absence, stale, and conflict are `RPG_CHARACTER_PROGRESSION_NOT_FOUND`, `_STALE`, and `_CONFLICT`. Reconcile known draft mutations/finalization with draft GET and playable character reads, and progression writes with progression/sheet GET; no automatic retry.
+
+### Actor resources, inventory, economy, and rest (M2.7, 8 operations)
+
+Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`. Fixed `local-owner` is authorized by campaign membership and actor control rules. Campaign and source actor are path-owned; command bodies contain no principal or source actor override.
+
+| Method | Route | Strict request | Success envelope |
+| --- | --- | --- | --- |
+| `GET` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/resources` | No query/body | `200 { resources, revision }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/resource-commands` | `{ kind: "change", resourceName, amount, expectedRevision, idempotencyKey }`; signed nonzero integer amount | `200 { resources, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/inventory` | No query/body | `200 { entries, equipment, capacity, revision }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/inventory-commands` | `equip`, `unequip`, `consume`, `drop`, or `gift` discriminator with exact slot/entry/item/quantity/recipient fields plus revision/key | `200 { inventory, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/wallet` | No query/body | `200 { wallet, revision }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/shops/:shopId` | No query/body | `200 { shop: { name }, stock, currencies }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/economy-commands` | `request_purchase_quote { shopId, item, quantity, ... }`, `purchase_from_shop { quoteId, ... }`, or `propose_bilateral_trade { tradeId, recipientActorId, offered, requested, ... }`; every variant includes `expectedRevision`, `idempotencyKey` | `200` discriminated `{ type, quote|purchase|trade, receipt }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/actors/:actorId/rest-commands` | `{ type: "take_short_rest"|"take_long_rest", expectedRevision, idempotencyKey }` | `200 { actorState, receipt }` |
+
+All command receipts prove one revision advance and omit route-owned identities. Authorization/absence maps to domain-specific non-disclosing `RPG_ACTOR_RESOURCE_NOT_FOUND`, `RPG_ACTOR_INVENTORY_NOT_FOUND`, `RPG_ACTOR_ECONOMY_NOT_FOUND`, `RPG_SHOP_NOT_FOUND`, or `RPG_ACTOR_REST_NOT_FOUND`; stale and conflict codes use the corresponding domain prefix. Quote expiry, exhausted stock, inventory capacity/binding/slot failures, negative resource state, and illegal rest state are conflicts. Reconcile resource, inventory, economy, and rest ambiguity with fresh resources/inventory/wallet reads as applicable; a shop GET refreshes catalog stock but is not proof that a purchase did or did not commit. Never retry automatically.
+
+## M2.4 and M2.8-M2.11 details
 
 The routes in this section use strict resource IDs and strict JSON objects: unknown fields reject, JSON writes require `application/json` with at most one optional `charset`, and all routes send at least `Cache-Control: no-store` on successes and scoped problems. The adventure-turn initial-reconciliation read instead sends `private, no-store`, and a successful adventure stream sends `private, no-store, no-transform`. Except for the three explicitly documented GET query schemas (campaign export, combat log, and initial-turn reconciliation), a raw query delimiter, including bare `?`, rejects. GET routes expose no HEAD alias. Missing, unavailable, or unauthorized resources are non-disclosing 404s; stale revisions and known state conflicts are 409s; malformed requests are 400 and unsupported media types are 415.
 
-Every command request includes an `idempotencyKey`; every mutable existing aggregate also requires `expectedRevision`. An exact committed retry returns the immutable prior result/receipt without advancing revision or repeating effects. Changed key reuse conflicts. Receipts expose `{ idempotencyKey, revisionBefore, revisionAfter, occurredAt }`, with `revisionAfter = revisionBefore + 1`; encounter creation is the exception exposed without a receipt and creates revision 1. An unexpected 500 or lost response is commit-ambiguous: reconcile with the authoritative GET and never retry automatically. Route parameters own campaign, actor, encounter, combat, quest, faction, NPC, and storyline identity; bodies cannot select the trusted-local principal.
+For M2.8-M2.10, every command request includes an `idempotencyKey`, every mutable existing aggregate also requires `expectedRevision`, and command receipts expose `{ idempotencyKey, revisionBefore, revisionAfter, occurredAt }` with `revisionAfter = revisionBefore + 1`. Encounter creation is the exception exposed without a receipt and creates revision 1. M2.4 import apply instead returns the campaign-administration receipt projection, including command/campaign/type/event provenance; M2.11 adventure turns expose proposal-linked `{ commandId, proposalId, linkedAt }` receipts, while generation apply exposes its draft-only receipt projection. Across these lanes, an exact committed retry returns the immutable prior result or receipt without advancing revision or repeating effects, and changed key reuse conflicts. An unexpected 500 or lost response is commit-ambiguous: reconcile with the authoritative GET and never retry automatically. Route parameters own campaign, actor, encounter, combat, quest, faction, NPC, and storyline identity; bodies cannot select the trusted-local principal.
 
 ### Campaign transfer (M2.4)
 
@@ -132,7 +232,7 @@ Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`, with
 | Method | Route | Strict request | Success |
 | --- | --- | --- | --- |
 | `POST` | `/rpg/v1/actors/:actorId/check-commands` | Discriminated `{ kind, skillOrAttribute, difficultyRef?, targetActorId?, expectedRevision, idempotencyKey }` | `200 { check: { terms, modifier, total, target, outcome }, receipt }` |
-| `GET` | `/rpg/v1/actors/:actorId/powers` | No query/body | `200 { known, prepared, slots, uses, legalNow, revision }` |
+| `GET` | `/rpg/v1/actors/:actorId/powers` | No query/body | `200 { known, prepared, slots, uses, legalNow, legalCommands, revision }` |
 | `POST` | `/rpg/v1/actors/:actorId/power-commands` | `{ powerRef, targetIds, choices: [], expectedRevision, idempotencyKey }` | `200 { resolution, actorStates, receipt }` |
 | `GET` | `/rpg/v1/actors/:actorId/effects` | No query/body | `200 { effects, concentration, revision }` |
 | `POST` | `/rpg/v1/actors/:actorId/effect-commands` | Apply, remove, or advance-duration command plus revision/idempotency fields | `200 { effects, receipt }` |
@@ -170,10 +270,10 @@ Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`, with
 | `POST` | `/rpg/v1/npcs/:npcId/relationship-commands` | `{ subjectActorId, affinityDelta, trustDelta, fearDelta, reason, expectedRevision, idempotencyKey }` | `{ relationship, receipt }` |
 | `GET`, `POST` | `/rpg/v1/campaigns/:campaignId/factions` | GET: none; POST: `{ name, publicState, privateState, expectedRevision, idempotencyKey }` | `{ factions, standings }` or `201 { faction, receipt }` |
 | `POST` | `/rpg/v1/factions/:factionId/reputation-commands` | `{ subjectActorId, delta, reason, expectedRevision, idempotencyKey }` | `{ standing, receipt }` |
-| `GET`, `POST` | `/rpg/v1/campaigns/:campaignId/quests` | GET: none; POST: `{ quest, expectedRevision, idempotencyKey }` | `{ quests, objectives, journal }` or `201 { quest, receipt }` |
+| `GET`, `POST` | `/rpg/v1/campaigns/:campaignId/quests` | GET: none; POST: `{ quest, expectedRevision, idempotencyKey }` | `{ quests, objectives, journal }` or `201 { quest, definition, projection, revision, receipt }` |
 | `POST` | `/rpg/v1/quests/:questId/commands` | Accept, advance-objective, abandon, or claim-reward plus revision/idempotency fields | `{ quest, receipt }` |
 | `GET` | `/rpg/v1/campaigns/:campaignId/story` | No query/body | GM `{ storylines, nodes, edges, plotPoints, clues }` or player `{ visibleNodes, discoveredClues }` |
-| `POST` | `/rpg/v1/campaigns/:campaignId/storylines` | `{ storyline, expectedRevision, idempotencyKey }` | `201 { storyline, receipt }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/storylines` | `{ storyline, expectedRevision, idempotencyKey }` | `201 { storyline, story, receipt }` |
 | `POST` | `/rpg/v1/storylines/:storylineId/commands` | `{ kind, targetId, data, expectedRevision, idempotencyKey }` | `{ story, receipt }` |
 
 Travel parties contain 1-16 unique actor IDs and must include the path actor; the server validates one campaign/session, adjacency, discovery, and actor ancestry. NPC public state is `{ name }`; GM private state is `{ goals, gmNotes, merchantState }`. Relationship deltas are each -100 to 100 and at least one must be nonzero. Faction public state is `{ description }`; private state is `{ gmNotes, visibility }`, where creation requires `public` or `gm`; reputation delta is a nonzero integer from -10,000 to 10,000.
@@ -207,7 +307,7 @@ SSE opens with `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control:
 
 | Event | Exact payload | Conditionality |
 | --- | --- | --- |
-| `turn_started` | `{ turn }` using the exact public turn projection above | Initial streams only, after durable create or recovery; never replayed on resume |
+| `turn_started` | `{ turn }` using the exact public turn projection above | Initial and narration-derivative streams, after durable create or recovery; never emitted on resume |
 | `agent_status` | `{ status }`, where status is `planning`, `awaiting-confirmation`, `pending-mechanics`, or `narrating` | Coordination transitions actually reached by this connection; may occur more than once |
 | `tool_proposed` | `{ proposal }` using the exact role-structural proposal above | Once per durable proposal on an initial stream; never replayed on resume |
 | `confirmation_required` | `{ proposalIds, expiresAt }` | Only while one or more exact proposals are durably pending; followed by terminal `aborted` for that connection |
@@ -216,7 +316,7 @@ SSE opens with `Content-Type: text/event-stream; charset=utf-8`, `Cache-Control:
 | `choice` | `{ choiceId, label }` | Validated non-executable vocabulary reserved for an explicit next choice; the current deterministic fallback lane emits no choices |
 | `terminal` | `{ outcome, turn, narrationStatus, receipts }`, where outcome is `done`, `aborted`, or `error` | The single terminal event attempted for every opened connection; it may be undeliverable after disconnect |
 
-Conditional events are not promises that every stream contains every event. In particular, an ordinary no-tool fallback turn emits `turn_started`, planning and narrating `agent_status` events, `narration_delta`, and `terminal`; it does not emit proposal, confirmation, mechanics, or choice events. A resume does not replay `turn_started` or `tool_proposed`. If approved work has no durable mechanics receipt yet, the stream reports `pending-mechanics` and terminates `aborted` rather than executing a tool. M2.11 does not implement the actual bounded tool bridge.
+Conditional events are not promises that every stream contains every event. In particular, an ordinary no-tool fallback turn emits `turn_started`, planning and narrating `agent_status` events, `narration_delta`, and `terminal`; it does not emit proposal, confirmation, mechanics, or choice events. Initial and narration-derivative streams emit `turn_started`; a resume never emits `turn_started` and does not replay `tool_proposed`. If approved work has no durable mechanics receipt yet, the stream reports `pending-mechanics` and terminates `aborted` rather than executing a tool. M2.11 does not implement the actual bounded tool bridge.
 
 The server writes `: heartbeat` SSE comments every `VELVET_SSE_HEARTBEAT_MS`, defaulting to 15 seconds and falling back to that value when the configured interval is non-finite or non-positive. Delivery disconnect does not roll back or cancel deterministic durable orchestration; clients must use the no-store turn GET to reconcile. Durable turns, decisions, narration, and proposal-linked receipts survive process restart. Both confirmation POST and turn GET return the same optional `resumeToken` when an approved or rejected durable batch decision is resumable, allowing either lost confirmation outcome to be recovered after restart; the token is absent outside resumable states. The opaque bounded token is supplied only in the strict resume JSON variant, must never be placed in a URL or log, and must be treated as a secret continuation credential bound to the durable decision and fixed local principal. Resume can reconcile a crash-visible mechanics receipt link before narration without rerunning the mechanics command.
 

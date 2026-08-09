@@ -1,8 +1,21 @@
-# Velvet RPG Integration Plan
+# Velvet RPG Integration Plan (Original/Historical)
 
-## Purpose
+## Current status (v37r1)
 
-Current boundary note: the historical 13/14-operation ledgers in this plan remain historical checkpoints. The integrated server boundary is now 21 trusted-local operations, including character-draft create/read/update, progression read/preview, and campaign administration GET/PATCH. These lanes share the parent lazy repository lifecycle, use `local-owner`, and have no client/UI yet.
+> **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
+
+The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
+
+- Current persistence is schema **v37 revision 1 (v37r1)**. The trusted-local RPG HTTP boundary exposes exactly **92 explicit operations through M2.11**, excluding feature discovery, under fixed unauthenticated `local-owner` loopback-only authority.
+- Milestones **M1-M3 are complete**. **M4.1 campaign-aware context assembly is next**.
+- M2.11 deliberately stops at deterministic boundaries: ordinary turns use fallback narration; no bounded provider tool bridge executes tools; generation-draft creation is deterministic user-brief fallback; and draft apply seals review state only with `campaignDomainMutated: false`. Provider tool planning/command bridging and provider-backed campaign generation/application remain M4.2, M4.5, and M4.6 work.
+- A campaign NPC's persona reference is identity metadata. There is no campaign-NPC speech or session-participation bridge, and the current implementation has no NPC location/presence model. Current UI/API data can identify a campaign-visible NPC roster, not NPCs speaking in or present in an attached room.
+
+## Checkpoint language
+
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v37r1 status above.
+
+## Original purpose (historical)
 
 This plan adds the useful gameplay functionality of `mojomast/rpg-dm-bot` to Velvet while preserving Velvet's stronger chat, memory, lore, branching, streaming, prompt, provider, and persistence architecture.
 
@@ -21,7 +34,7 @@ This is a functionality port, not a source-level merge. The Python database, Fas
 
 The plan was built from parallel reviews of:
 
-- Velvet's schema-v8 handoff and current TypeScript implementation.
+- Velvet's schema-v8 `HANDOFF.md` and the TypeScript implementation at the original review checkpoint.
 - `rpg-dm-bot` at commit `60404539b10aecd0dae2b7e19016619e440c3689`.
 - The remote bot's character, inventory, progression, spell, combat, NPC, quest, world, content-pack, tool-calling, campaign-generation, and web UI behavior.
 
@@ -82,6 +95,8 @@ Primary reference-bot sources:
 
 ### Core Relationships
 
+The relationship names in this diagram are conceptual product-model names, not a current schema or API inventory.
+
 ```text
 Campaign
   -> active timeline
@@ -103,7 +118,7 @@ Campaign
 - Existing `/api/characters` and `/api/sessions` behavior stays compatible.
 - RPG state is additive and initially feature-flagged.
 - The same Velvet persona can participate in multiple campaigns with independent levels, equipment, relationships, and history.
-- NPCs that speak use campaign-managed Velvet character personas, allowing reuse of existing participant cards, memories, room routing, and speaker attribution.
+- Campaign NPC persona references are identity metadata only. They do not connect campaign NPCs to Velvet speech, memories, or session participation, and there is no campaign-NPC speech/session bridge or NPC location/presence model. Campaign visibility must not be interpreted as room participation or physical presence.
 - Ordinary enemy instances do not become Velvet characters unless promoted to recurring speaking NPCs.
 
 ## Architectural Decisions
@@ -112,14 +127,14 @@ Campaign
 
 From highest to lowest:
 
-2. Human GM edits and explicit campaign overrides.
+1. Safety, consent, and actor-control rules.
+2. Human-authored campaign canon, GM edits, and explicit overrides.
 3. Committed mechanics and campaign events.
-4. Current player declarations.
-5. Normalized campaign state.
+4. The current player declaration.
+5. Visible normalized campaign state.
 6. Approved character memories and visible lore.
-7. Session manual scene canon where it does not contradict campaign mechanics.
-8. Synthesized scene state and summaries.
-9. AI plans, suggestions, and narration.
+7. Campaign recaps, session summaries, and synthesized scene facts.
+8. AI plans, suggestions, and narration.
 
 The model may choose intentions, tactics, targets, tone, and narration. It may not invent dice outcomes, HP totals, inventory ownership, prices, XP, legal combat actions, or permissions.
 
@@ -193,21 +208,21 @@ The remote README claims MIT, but the repository has no detected `LICENSE` file 
 - Do not copy remote code or fantasy catalogs verbatim.
 - Create a clean Velvet starter pack with original content.
 
-## Prerequisite Refactors
+## Original Prerequisite Refactor Targets (Historical)
 
 The list below records the plan's prerequisite targets. Contracts, server route modules, repository/UoW boundaries, injectable runtime ports, request IDs/problems, and the local principal/campaign-role foundation now exist in the current implementation. Client decomposition remains incremental. This status note does not imply that the aspirational domain/agent layout or later RPG capabilities below are implemented.
 
-Complete these without changing current behavior:
+The original plan targeted the following refactors without changing behavior at that checkpoint:
 
-1. Create `packages/contracts` for runtime schemas and inferred server/client types.
-2. Split `server/src/app.ts` into Fastify plugins and route modules.
-3. Keep existing routes under a roleplay module and add RPG routes under `/api/rpg/v1`.
-4. Split `client/src/App.tsx` into navigation, roleplay pages, and feature modules.
-5. Add a shared transaction/unit-of-work boundary around `better-sqlite3`.
-6. Add injectable random-number and clock interfaces for deterministic testing.
-7. Add request IDs, structured API problems, command receipts, and consistent redaction.
-8. Add a local principal and campaign-role model before AI-controlled mutations. Existing installations receive one local owner principal.
-9. Preserve current deterministic and live E2E workflows as regression gates.
+1. A `packages/contracts` package for runtime schemas and inferred server/client types.
+2. Fastify plugins and route modules split out of `server/src/app.ts`.
+3. Existing routes retained under a roleplay module and RPG routes added under `/api/rpg/v1`.
+4. Navigation, roleplay pages, and feature modules split out of `client/src/App.tsx`.
+5. A shared transaction/unit-of-work boundary around `better-sqlite3`.
+6. Injectable random-number and clock interfaces for deterministic testing.
+7. Request IDs, structured API problems, command receipts, and consistent redaction.
+8. A local principal and campaign-role model preceding AI-controlled mutations, with one local owner principal for existing installations.
+9. Existing deterministic and live E2E workflows retained as regression gates.
 
 Proposed top-level server layout:
 
@@ -240,6 +255,8 @@ server/src/
 ```
 
 ## Domain Scope
+
+All capability labels and table names in this original domain design are conceptual unless the normative current architecture/API documents explicitly identify an implemented counterpart. They are not promises of literal table names or presently exposed routes.
 
 ### Campaigns And Membership
 
@@ -457,12 +474,12 @@ Invariants:
 
 Capabilities:
 
-- Campaign-managed NPC personas linked to Velvet characters.
+- Campaign-managed NPC identity metadata linked to Velvet characters.
 - Role, goals, secrets, disposition, location, faction, merchant, and companion state.
 - Per-character affinity, trust, fear, and relationship notes.
 - Factions, memberships, allies/enemies, party or individual reputation, standing tiers, and favor.
 - Promote an enemy into a persistent NPC when it becomes narratively important.
-- Add NPCs to sessions using existing multi-character participation.
+- Campaign NPC persona references remain identity metadata and do not create a speech, memory, or session-participation bridge; campaign visibility does not imply session participation or physical presence.
 
 Core tables:
 
@@ -476,7 +493,7 @@ Core tables:
 
 Invariants:
 
-- One Velvet character profile is the authoritative speaking persona for an NPC.
+- One Velvet character reference supplies the NPC's identity metadata; it does not make the NPC a Velvet session speaker.
 - NPC private state is never sent to unrelated agents or player-facing responses.
 - Relationship and reputation mutations are deterministic events, not inferred by parsing generated prose.
 - AI never voices a manually controlled player character.
@@ -544,6 +561,8 @@ Invariants:
 - Provider credentials, usage history, local paths, and secrets are excluded by default.
 
 ## AI Game Master And Agent Architecture
+
+The agent roles, module paths, tool categories, prompt-template names, limits, and pipeline below are conceptual targets. They do not describe the deterministic M2.11 fallback implementation or imply that the M4 tool bridge exists.
 
 ### Agent Roles
 
@@ -679,16 +698,16 @@ DM behavior:
 Extend the existing context basket without replacing it:
 
 1. Safety, consent, scene state, and actor-control rules.
-2. Target persona and participant identities.
-3. Human campaign canon and deterministic campaign state.
-4. Current location, visible actors, encounter, quests, and legal actions.
-5. Session manual scene canon.
+2. Human-authored campaign canon, explicit overrides, and authorized session manual canon.
+3. Committed mechanics and campaign events.
+4. Latest player declaration and final-phase contract.
+5. Visible normalized state: target persona/participants, location, visible actors, encounter, quests, and legal actions.
 6. Acting agent's private state, only when authorized.
 7. Approved memories and visible lore.
 8. Campaign recap and session summary.
 9. Synthesized session facts.
 10. Recent active-branch dialogue.
-11. Latest declaration and final phase contract.
+11. Generated plans, suggestions, and narration, which cannot override preceding layers.
 
 Use independent budgets for world, mechanics, quests, recap, lore, and memory. Do not dump full inventories, catalogs, enemy secrets, or story graphs into prompts.
 
@@ -728,7 +747,7 @@ Snapshot prices at call time rather than applying today's rate to all historical
 
 Keep existing APIs stable. New routes use `/api/rpg/v1`.
 
-Representative route groups:
+Conceptual representative route groups from the original plan (not a current route inventory):
 
 ```text
 /api/rpg/v1/campaigns
@@ -771,6 +790,8 @@ Contract requirements:
 - Generated OpenAPI document and contract compatibility checks.
 
 ## Frontend Plan
+
+All route labels, screen names, React component names, and directory paths in this section are conceptual original-plan targets unless the normative current sources say otherwise.
 
 ### Information Architecture
 
@@ -833,7 +854,7 @@ Key screens:
 ### Play Experience
 
 - Chat remains central but does not host every editor.
-- A compact campaign drawer shows location, exits, present NPCs, active objectives, party resources, and current encounter.
+- A compact campaign drawer shows location, exits, the campaign-visible NPC roster, active objectives, party resources, and current encounter. It must not label NPCs as present until an authoritative location/presence model exists.
 - Active combat uses a focused action tray while preserving narration.
 - Mechanic receipts are linked to messages and show rolls, modifiers, targets, outcomes, and state changes.
 - AI suggestions are visibly different from committed actions.
@@ -854,7 +875,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema v25 revision 1. The implemented migration sequence is:
+Velvet currently uses schema **v37 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
 
 | Version | Scope |
 |---|---|
@@ -870,12 +891,25 @@ Velvet currently uses schema v25 revision 1. The implemented migration sequence 
 | v23 | M1.4 single-class progression, XP/milestone ledgers, advancements, pending choices, powers, and receipts |
 | v24 | M1.4 provenance/integrity repair for bootstrap, pending snapshots, proposals, advancements, and power sources |
 | v25 | M1.5 actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops/finite stock/quotes/purchases, bilateral trade, and short/long rest |
+| v26 | M1.6 checks, powers, deterministic effects, and associated receipts |
+| v27 | M1.7 encounter and combat foundations |
+| v28 | M1.8 world, travel, NPC, faction, and reputation foundations |
+| v29r1 | Character-layout attestation |
+| v29r2 | Retained quest, storyline, clue, reward, and objective-completion compatibility tables; authoritative quest and story domains arrive in v33 and v34 |
+| v30 | Campaign import staging |
+| v31 | Encounter lifecycle hardening |
+| v32 | World and narrative integrity expansion |
+| v33 | Quest-domain persistence and integrity |
+| v34 | Story-domain persistence and integrity |
+| v35 | M1.10 durable adventure-turn and generation-draft foundation |
+| v36 | Adventure coordination and provenance hardening |
+| v37 | Exact server-owned proposal-to-mechanics execution bindings |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- Existing databases migrate sequentially to schema v25 revision 1, including explicit same-version corrective revisions where supported.
+- Existing databases migrate sequentially to schema v37 revision 1, including explicit same-version corrective revisions where supported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
@@ -890,17 +924,21 @@ Migration requirements:
 
 ## Implementation Progress
 
+### 2026-08-09: Current v37r1 boundary
+
+Current persistence is v37r1, 92 explicit trusted-local RPG operations are implemented through M2.11, M1-M3 are complete, and M4.1 is next. M2.11 provides deterministic adventure-turn fallback and draft-review persistence only: it does not execute the future bounded provider tool bridge, does not perform provider-backed campaign generation, and does not apply generated changes to campaign-domain state. See [ROADMAP.md](ROADMAP.md), [api.md](api.md), and [repo-architecture.md](repo-architecture.md) for the normative current descriptions.
+
 ### 2026-08-05: Schema v25 M1.5 Resources, Inventory, Economy, and Rest
 
-Current persistence is v25r1. M1.5 completes the repository/shared-contract layer for actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops with finite stock, quotes and purchases, bilateral trade, and short/long rest. Exact retries, revisions, and immutable receipts are factory-only behavior. V25 preserves historical v14 and later ledgers; its fixed canonical DDL digest is `a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7`.
+At this checkpoint persistence was v25r1. M1.5 completed the repository/shared-contract layer for actor resource sidecars, inventory/equipment, integer-minor wallets and currency ledgers, shops with finite stock, quotes and purchases, bilateral trade, and short/long rest. Exact retries, revisions, and immutable receipts were factory-only behavior. V25 preserved historical v14 and later ledgers; its fixed canonical DDL digest is `a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7`.
 
-M1.1-M1.5 are complete repository/shared-contract capabilities. The fixed-principal trusted-local boundary remains exactly 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. M1.5 adds no HTTP routes or client/UI. M1.6 checks, powers, and deterministic effects is next.
+At this checkpoint M1.1-M1.5 were complete repository/shared-contract capabilities. The fixed-principal trusted-local boundary was exactly 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. M1.5 added no HTTP routes or client/UI. M1.6 checks, powers, and deterministic effects was next.
 
 ### 2026-08-05: Schema v24 M1.4 Progression Integrity Repair
 
 Historical v24r1 introduced M1.4 progression at the repository/shared-contract boundary and repaired exact bootstrap and initial-power provenance, immutable pending snapshots for revision zero and every command, proposal/event/receipt binding, advancement power sources, and complete startup integrity validation. Migration reconstructed pending revisions from immutable command results. Its fixed canonical v24 DDL digest is `e056d9df1ec9f9c00cc1aba740f2acc91b40cc7b03a5716cb75e79ec8df6bec8`.
 
-At that point M1.1-M1.4 were complete repository/shared-contract capabilities. The current fixed-principal trusted-local boundary remains at 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. The mechanics starter remains distinct from the metadata-only original starter and cannot replace configured content. No client/UI exists for these routes.
+At that point M1.1-M1.4 were complete repository/shared-contract capabilities. The then-current fixed-principal trusted-local boundary was 21 operations: the historical 14 plus server-only builder draft create/read/update, progression read/preview, and administration GET/PATCH. The mechanics starter remained distinct from the metadata-only original starter and could not replace configured content. No client/UI existed for these routes.
 
 ### Historical 2026-08-05 M0 Slice 98 Deterministic Closeout
 
@@ -2010,7 +2048,7 @@ Final focused verification passed: contracts 14; server campaign-focused 147; co
 
 Final full gate: root typecheck/build passed; contracts 14; server 389 passed 1 skipped; client 41; deterministic E2E 1; live E2E not run because `VELVET_E2E_LIVE=1` was not enabled.
 
-At that historical checkpoint, twenty-nine slices were complete; the current engineering handoff is `HANDOFF.md`.
+At that historical checkpoint, twenty-nine slices were complete and the engineering handoff was `HANDOFF.md`.
 
 ### 2026-08-03: M0 Slice 29 - Owner-Authorized Campaign Rename
 
@@ -2850,9 +2888,11 @@ Remaining M0 work:
 - Expand runtime validation endpoint by endpoint and add generated OpenAPI/compatibility checks.
 - Preserve deterministic and opt-in live E2E as milestone regression gates.
 
-## Delivery Milestones
+## Original Delivery Phases M0-M9 (Superseded)
 
-### M0: Architecture Foundation
+These phase names and deliverables preserve the original plan and are superseded by the normative milestone structure in [ROADMAP.md](ROADMAP.md). They are not current status labels, literal component commitments, or evidence that similarly numbered current milestones are incomplete.
+
+### Original Phase M0: Architecture Foundation (Superseded)
 
 Deliver:
 
@@ -2867,7 +2907,7 @@ Acceptance:
 - Existing API responses and roleplay workflows remain compatible.
 - No new RPG feature is required to use existing Velvet.
 
-### M1: Campaigns And Content
+### Original Phase M1: Campaigns And Content (Superseded)
 
 Deliver:
 
@@ -2884,7 +2924,7 @@ Acceptance:
 - Invalid pack references block publication.
 - Existing standalone roleplay remains unchanged.
 
-### M2: Character Builder And Sheets
+### Original Phase M2: Character Builder And Sheets (Superseded)
 
 Deliver:
 
@@ -2899,7 +2939,7 @@ Acceptance:
 - Reloading reproduces identical derived values.
 - Character creation is one atomic finalization.
 
-### M3: Event Core, Inventory, Economy, And Resources
+### Original Phase M3: Event Core, Inventory, Economy, And Resources (Superseded)
 
 Deliver:
 
@@ -2914,7 +2954,7 @@ Acceptance:
 - Retry and reconnect never duplicate state.
 - Server and UI display the same authoritative resources.
 
-### M4: Dice, Progression, Powers, And Effects
+### Original Phase M4: Dice, Progression, Powers, And Effects (Superseded)
 
 Deliver:
 
@@ -2931,12 +2971,12 @@ Acceptance:
 - A failed power consumes no resource.
 - Effect clocks and concentration follow the selected rules profile.
 
-### M5: World, NPCs, Factions, Quests, And Story
+### Original Phase M5: World, NPCs, Factions, Quests, And Story (Superseded)
 
 Deliver:
 
 - Location hierarchy, connections, travel, and discovery.
-- Campaign-managed NPC personas, private state, relationships, companions, factions, and reputation.
+- Campaign-managed NPC identity metadata, private state, relationships, companions, factions, and reputation.
 - Quests, objectives, rewards, story graphs, plot points, and clues.
 - Player journal and GM world/story studio.
 
@@ -2944,11 +2984,11 @@ Acceptance:
 
 - Hidden GM data does not appear in player APIs or prompts.
 - Travel cannot bypass connection rules.
-- NPCs can join existing Velvet rooms and retain their persona/memory behavior.
+- Campaign NPC identity metadata does not establish Velvet speech, memory, room participation, or presence; no campaign-NPC speech/session bridge is part of this target.
 - Quest and reveal progression is deterministic and idempotent.
 - Current world state appears in bounded prompt context.
 
-### M6: Combat And Enemy AI
+### Original Phase M6: Combat And Enemy AI (Superseded)
 
 Deliver:
 
@@ -2966,7 +3006,7 @@ Acceptance:
 - Enemy provider failure cannot stall the encounter.
 - Rewards apply exactly once.
 
-### M7: AI DM And Agent Tools
+### Original Phase M7: AI DM And Agent Tools (Superseded)
 
 Deliver:
 
@@ -2986,7 +3026,7 @@ Acceptance:
 - Provider failure after commit returns factual fallback narration.
 - Prompt-injected lore cannot grant items, gold, XP, or permissions.
 
-### M8: Campaign Generation, Recaps, Checkpoints, And Transfer
+### Original Phase M8: Campaign Generation, Recaps, Checkpoints, And Transfer (Superseded)
 
 Deliver:
 
@@ -3005,7 +3045,7 @@ Acceptance:
 - Restore creates a child timeline and preserves original history.
 - Generated campaigns open in a playable starting location.
 
-### M9: Hardening And Multiplayer Readiness
+### Original Phase M9: Hardening And Multiplayer Readiness (Superseded)
 
 Deliver:
 
@@ -3023,7 +3063,9 @@ Acceptance:
 - Performance gates pass for large campaigns.
 - WCAG 2.2 AA automated and keyboard workflows pass.
 
-## Test Strategy
+## Original Test Strategy (Historical Target)
+
+This section and the acceptance, operations, observability, decision, deferred-scope, and completion sections that follow preserve original target criteria rather than current implementation status.
 
 ### Required Harnesses
 
@@ -3077,12 +3119,12 @@ Acceptance:
 - Player versus GM visibility.
 - Mobile layout, keyboard operation, focus management, reduced motion, and axe checks.
 
-### End-To-End Acceptance Scenario
+### Original End-To-End Acceptance Scenario (Historical Target Criteria)
 
 1. Create and publish a campaign with a pinned starter pack.
 2. Create a persona and complete an RPG sheet.
 3. Attach a multi-character Velvet session.
-4. Meet a persistent AI NPC and add it to the room.
+4. Meet a persistent AI NPC through campaign gameplay without treating its persona metadata as a Velvet room participant.
 5. Travel through a valid route and reject an invalid route.
 6. Accept a quest and discover a clue.
 7. Buy, equip, transfer, and consume items.
@@ -3096,7 +3138,7 @@ Acceptance:
 15. Create a checkpoint, fork the timeline, and verify both histories remain intact.
 16. Export and import the campaign into a clean database.
 
-## Security And Operations
+## Original Security And Operations (Historical Target Criteria)
 
 For local-only use, one backfilled local owner principal is sufficient initially. Before network or multi-user exposure, require:
 
@@ -3113,7 +3155,7 @@ For local-only use, one backfilled local owner principal is sufficient initially
 
 The current permissive `server/src/policy.ts` is not an authorization or tool-safety boundary.
 
-## Performance And Observability
+## Original Performance And Observability (Historical Target Criteria)
 
 - Propagate request, turn, command, and provider-call IDs.
 - Track command duration, conflicts, retries, provider latency, token usage, cost, and tool rejection.
@@ -3125,7 +3167,7 @@ The current permissive `server/src/policy.ts` is not an authorization or tool-sa
 - Establish fixture budgets for 100 NPCs, 500 items, 30 combatants, and long conversation histories.
 - Document SQLite's supported local/small-group concurrency envelope before hosted multiplayer work.
 
-## Decisions To Confirm Before M1
+## Original Decisions To Confirm Before M1 (Historical Target Criteria)
 
 Recommended defaults are shown here so work can start without blocking:
 
@@ -3146,7 +3188,7 @@ Recommended defaults are shown here so work can start without blocking:
 | Discord | Not part of the initial port; web gameplay is authoritative |
 | Proactive nudges | Deferred, opt-in, non-mutating, durable schedule |
 
-## Explicitly Deferred Until Core Completion
+## Originally Deferred Until Core Completion (Historical Target Criteria)
 
 - Tactical grid maps and line-of-sight simulation.
 - Unbounded autonomous AI parties or director loops.
@@ -3158,7 +3200,7 @@ Recommended defaults are shown here so work can start without blocking:
 - Cryptographically verifiable dice.
 - Fully system-neutral effect expression language before the first rules profile works end to end.
 
-## Definition Of Complete
+## Original Definition Of Complete (Historical Target Criteria)
 
 The integration is complete when a user can:
 

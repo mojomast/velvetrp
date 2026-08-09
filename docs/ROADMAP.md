@@ -66,7 +66,7 @@ Persist XP or milestone advancement, previews, pending choices, and atomic singl
 
 ### M1.5 Resources, inventory, equipment, economy, and rest
 
-**Status: Complete (schema v25r1; repository/shared-contract only; no HTTP routes or client/UI)**
+**Status: Complete (schema v25r1; at M1 completion, repository/shared-contract only with no HTTP routes or client/UI)**
 
 Expand minimal actor resources into transactional inventory, equipment, wallets, shops, trades, and profile-defined recovery.
 
@@ -94,7 +94,7 @@ Build server-calculated checks and power execution on the existing bounded dice 
 
 ### M1.7 Encounters and turn-based combat
 
-**Status: Complete (schema v27r1; repository/shared-contract only; no HTTP routes or client/UI)**
+**Status: Complete (schema v27r1; at M1 completion, repository/shared-contract only with no HTTP routes or client/UI)**
 
 Prepared and improvised encounters provide stable initiative, legal-action calculation, enemy instances, combat logs, and exactly-once recorded reward claims.
 
@@ -109,7 +109,7 @@ Prepared and improvised encounters provide stable initiative, legal-action calcu
 
 ### M1.8 World, travel, NPCs, and factions
 
-**Status: Complete (schema v28r1; repository/shared-contract only; no HTTP routes or client/UI)**
+**Status: Complete (schema v28r1; at M1 completion, repository/shared-contract only with no HTTP routes or client/UI)**
 
 Persist a visibility-aware location graph plus campaign NPC personas, private goals, relationships, factions, and reputation.
 
@@ -123,7 +123,7 @@ Persist a visibility-aware location graph plus campaign NPC personas, private go
 
 ### M1.9 Quests, storylines, clues, and rewards
 
-**Status: Complete (schema v29r2; repository/shared-contract only; no HTTP routes or client/UI)**
+**Status: Complete (schema v29r2; at M1 completion, repository/shared-contract only with no HTTP routes or client/UI)**
 
 Add explicit quest and story graphs whose state advances through commands rather than narration parsing.
 
@@ -157,7 +157,7 @@ Schema v35 provides the durable adventure-turn and generation-draft foundation, 
 
 **Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1 is next.**
 
-All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
+All routes below are delivered under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each request and response has a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
 ### M2.1 Campaign lifecycle and settings routes
 
@@ -168,9 +168,9 @@ Expose lifecycle and settings administration without overloading the current ren
 - **Complexity:** M
 - **Dependencies:** M1.1; current campaign HTTP contracts and scoped problem handling in `features.ts`.
 - **Acceptance criteria:**
-  - `GET /campaigns/:campaignId/administration` returns `{ campaign: { id, status, settings, activeTimelineId, revision, updatedAt } }` for owner/GM projections.
+  - `GET /campaigns/:campaignId/administration` returns `{ campaign: { id, status, activeTimelineId, revision, updatedAt, actorRole, settings } }`, discriminated by `actorRole`: owner/GM projections include full settings, while player/observer projections structurally omit GM-only settings.
   - `PATCH /campaigns/:campaignId/administration` accepts `{ expectedRevision, idempotencyKey, status?, settings? }` and returns `{ campaign, receipt }`; empty patches and illegal lifecycle transitions reject.
-  - `DELETE /campaigns/:campaignId` accepts `{ expectedRevision, idempotencyKey, confirmationName }` and archives rather than physically deleting, returning `{ campaign, receipt }`.
+  - `DELETE /campaigns/:campaignId/administration` accepts `{ expectedRevision, idempotencyKey, confirmationName }` and archives rather than physically deleting, returning `{ campaign, receipt }`.
   - Every method rejects caller-supplied identity, unknown fields, unsupported media types, and query parameters unless the contract explicitly names them.
 
 ### M2.2 Membership and room-administration routes
@@ -196,10 +196,10 @@ Expose canonical history and non-destructive restoration with bounded pagination
 - **Complexity:** M
 - **Dependencies:** M2.1; M1.1 timeline, checkpoint, recap, event, and receipt repositories.
 - **Acceptance criteria:**
-  - `GET /campaigns/:campaignId/timelines` returns `{ activeTimelineId, timelines: [{ id, parentTimelineId, forkedFromRevision, revision, createdAt }] }`.
+  - `GET /campaigns/:campaignId/timelines` returns `{ activeTimelineId, timelines: [{ id, parentTimelineId, forkedFromRevision, revision, createdAt, active }] }`.
   - `GET /campaigns/:campaignId/events?timelineId=&afterRevision=&limit=` returns `{ events, nextAfterRevision }`; `GET /campaigns/:campaignId/commands/:commandId/receipt` returns `{ receipt }` with public structured event data only.
-  - `POST /campaigns/:campaignId/checkpoints` accepts `{ timelineId, revision, label, idempotencyKey }`; `GET /campaigns/:campaignId/checkpoints` returns `{ checkpoints }`; `POST /campaigns/:campaignId/timeline-forks` accepts `{ checkpointId, expectedRevision, idempotencyKey }` and returns `{ timeline, receipt }`.
-  - `POST /campaigns/:campaignId/recaps` accepts `{ timelineId, throughRevision, selectedSessionIds, idempotencyKey }` and returns `{ recap }`; `GET /campaigns/:campaignId/recaps` returns bounded metadata and text permitted to the requesting role.
+  - `POST /campaigns/:campaignId/checkpoints` accepts `{ timelineId, timelineRevision, label, expectedRevision, idempotencyKey }`; `GET /campaigns/:campaignId/checkpoints` returns `{ checkpoints }`; `POST /campaigns/:campaignId/timeline-forks` accepts `{ checkpointId, expectedRevision, idempotencyKey }` and returns `{ timeline, receipt }`.
+  - `POST /campaigns/:campaignId/recaps` accepts `{ timelineId, throughRevision, selectedSessionIds, visibility, text, expectedRevision, idempotencyKey }` and returns `{ recap, receipt }`; `GET /campaigns/:campaignId/recaps` returns bounded metadata and text permitted to the requesting role.
 
 ### M2.4 Campaign import and export routes
 
@@ -210,7 +210,7 @@ Make transfer packages reviewable, versioned, and safe for local files without a
 - **Complexity:** L
 - **Dependencies:** M2.1-M2.3; M1.1 import/export repository support.
 - **Acceptance criteria:**
-  - `GET /campaigns/:campaignId/export?includeMessages=true|false` returns a download with `{ formatVersion, exportedAt, campaign, timelines, contentPins, records }` and no provider secrets, usage prices/history, or local paths.
+  - `GET /campaigns/:campaignId/export?includeMessages=true|false` returns a JSON attachment named `<campaignId>-campaign-export-v1.json` with `{ package, messages }`; `package` contains `{ formatVersion, exportedAt, campaign, timelines, activeTimelineSourceId, content, records, excluded }`, and messages are either explicitly excluded or contain the attached-room archive.
   - `POST /campaign-imports` accepts `{ package, mode: "dry-run" }` and returns `{ importId, report: { valid, conflicts, missingReferences, warnings, counts } }` without writes to campaign state.
   - `POST /campaign-imports/:importId/apply` accepts `{ idempotencyKey, conflictResolutions }` and returns `{ campaign, receipt }` only for an unchanged valid dry-run record.
   - Size, nesting, record-count, Unicode, ID, and schema-version limits are enforced before apply; malformed or stale imports leave no partial rows.
@@ -224,10 +224,10 @@ Expose validated immutable catalogs and exact campaign pin selection.
 - **Complexity:** M
 - **Dependencies:** M1.2; M2.1 authorization and revision conventions.
 - **Acceptance criteria:**
-  - `GET /content-packs?status=&cursor=&limit=` returns `{ packs, nextCursor }`; `GET /content-packs/:packId/versions/:packVersion` returns `{ pack, definitions }` with role-safe metadata.
-  - `POST /content-pack-validations` accepts `{ manifest, definitions }` and returns `{ valid, issues, normalizedSummary }` without persistence.
-  - `POST /content-packs` accepts `{ manifest, definitions, idempotencyKey }` and returns `201 { pack }` only after complete validation and atomic sealing; an existing different exact version conflicts.
-  - `PUT /campaigns/:campaignId/content` accepts `{ rulesProfileId, contentPacks, expectedRevision, idempotencyKey }` and returns `{ content, receipt }`; only sealed compatible exact versions can be pinned.
+  - `GET /content-packs?cursor=&limit=` returns `{ publications, nextCursor }`; `GET /content-packs/:packId/versions/:packVersion` returns owner-safe `{ catalog }` with publication, provenance, and definitions.
+  - `POST /content-packs/validate` accepts `{ manifest, definitions }` and returns `{ report: { valid, issues, normalizedSummary } }` without persistence.
+  - `POST /content-packs` accepts `{ idempotencyKey, manifest, definitions }` and returns `201 { catalog }` only after complete validation and atomic sealing; an existing different exact version conflicts.
+  - `GET /campaigns/:campaignId/content` returns `{ content }`; `PUT /campaigns/:campaignId/content` accepts `{ rulesProfileId, contentPacks, expectedRevision, idempotencyKey }` and returns `{ content, receipt }`; `GET /campaigns/:campaignId/content-packs/:packId/versions/:packVersion` returns role-safe `{ catalog }` for an exact campaign pin.
 
 ### M2.6 Character builder and progression routes
 
@@ -238,10 +238,10 @@ Provide general draft construction and atomic advancement alongside the current 
 - **Complexity:** L
 - **Dependencies:** M1.3-M1.4; M2.5 content lookup.
 - **Acceptance criteria:**
-  - `POST /campaigns/:campaignId/character-drafts` accepts `{ personaId, allocationMethod, idempotencyKey }` and returns `201 { draft, options, derivedPreview }`; `GET /character-drafts/:draftId` returns the same shape; `PATCH /character-drafts/:draftId` accepts `{ expectedRevision, selections }` and returns the updated shape.
+  - `POST /campaigns/:campaignId/character-drafts` accepts `{ personaId, durability, allocation, idempotencyKey }` and returns `201 { draft, receipt }`; `GET /campaigns/:campaignId/character-drafts/:draftId` returns the strict public draft; `PATCH` on that path accepts `{ expectedRevision, idempotencyKey, selections }` and returns `{ draft, receipt }`.
   - `POST /campaigns/:campaignId/character-drafts/:draftId/finalize` accepts `{ expectedRevision, idempotencyKey }` and returns `201 { character, sheet, resources, receipt }` only when every required choice is valid.
-  - `GET /characters/:campaignCharacterId/sheet` returns `{ sheet, derived, progression }`; `POST /characters/:campaignCharacterId/xp-commands` accepts `{ amount, reason, expectedRevision, idempotencyKey }` and returns `{ progression, receipt }`.
-  - `GET /characters/:campaignCharacterId/level-up-preview` returns `{ levels, choices, changes }`; `POST /characters/:campaignCharacterId/level-up-commands` accepts `{ previewRevision, choices, idempotencyKey }` and returns `{ sheet, progression, receipt }` atomically.
+  - `GET /campaigns/:campaignId/characters/:campaignCharacterId/sheet` returns `{ sheet, derived, progression }`; `GET /campaigns/:campaignId/characters/:campaignCharacterId/progression` returns `{ progression }`; `POST /campaigns/:campaignId/characters/:campaignCharacterId/xp-commands` accepts `{ amount, reason, expectedRevision, idempotencyKey }` and returns `{ progression, receipt }`.
+  - `POST /campaigns/:campaignId/characters/:campaignCharacterId/progression/preview` accepts `{ selections }` and returns `{ preview }` with `previewRevision` and `previewToken`; `POST /campaigns/:campaignId/characters/:campaignCharacterId/progression/apply` accepts `{ previewRevision, previewToken, selections, idempotencyKey }` and returns `{ progression, receipt }` atomically.
 
 ### M2.7 Resource, inventory, economy, and rest routes
 
@@ -252,10 +252,10 @@ Expose authoritative actor state and command receipts for common non-combat mech
 - **Complexity:** L
 - **Dependencies:** M1.5; M2.6 playable actors.
 - **Acceptance criteria:**
-  - `GET /actors/:actorId/resources` returns `{ resources, revision }`; `POST /actors/:actorId/resource-commands` accepts `{ kind, amount, resourceName, expectedRevision, idempotencyKey }` and returns `{ resources, receipt }`.
-  - `GET /actors/:actorId/inventory` returns `{ entries, equipment, capacity, revision }`; `POST /actors/:actorId/inventory-commands` accepts a discriminated `{ kind: "equip"|"unequip"|"consume"|"drop"|"gift", ...targets, expectedRevision, idempotencyKey }` and returns `{ inventory, receipt }`.
-  - `GET /campaigns/:campaignId/shops/:shopId` returns `{ shop, stock, currencies }`; `POST /shops/:shopId/quotes` accepts `{ actorId, lines }` and returns `{ quoteId, expiresAt, totals }`; `POST /shops/:shopId/purchase-commands` accepts `{ quoteId, expectedRevision, idempotencyKey }` and returns `{ wallet, inventory, stock, receipt }`.
-  - `POST /campaigns/:campaignId/trades` creates `{ trade }`; `POST /trades/:tradeId/accept-commands` settles `{ trade, actorStates, receipt }`; `POST /actors/:actorId/rest-commands` accepts `{ kind: "short"|"long", expectedRevision, idempotencyKey }` and returns `{ actorState, receipt }`.
+  - `GET /campaigns/:campaignId/actors/:actorId/resources` returns `{ resources, revision }`; `POST /campaigns/:campaignId/actors/:actorId/resource-commands` accepts `{ kind: "change", resourceName, amount, expectedRevision, idempotencyKey }` and returns `{ resources, receipt }`.
+  - `GET /campaigns/:campaignId/actors/:actorId/inventory` returns `{ entries, equipment, capacity, revision }`; `POST /campaigns/:campaignId/actors/:actorId/inventory-commands` accepts a discriminated `{ kind: "equip"|"unequip"|"consume"|"drop"|"gift", ...targets, expectedRevision, idempotencyKey }` and returns `{ inventory: { entries, equipment, capacity, revision }, receipt }`.
+  - `GET /campaigns/:campaignId/actors/:actorId/wallet` returns `{ wallet, revision }`; `GET /campaigns/:campaignId/shops/:shopId` returns `{ shop, stock, currencies }`; `POST /campaigns/:campaignId/actors/:actorId/economy-commands` accepts exactly one of `request_purchase_quote`, `purchase_from_shop`, or `propose_bilateral_trade` plus its typed fields, `expectedRevision`, and `idempotencyKey`, returning the matching `{ type, quote|purchase|trade, receipt }` envelope.
+  - `POST /campaigns/:campaignId/actors/:actorId/rest-commands` accepts `{ type: "take_short_rest"|"take_long_rest", expectedRevision, idempotencyKey }` and returns `{ actorState: { resources, revision }, receipt }`; all commands remain actor-control checked, revision checked, idempotent, and atomically settled. Ambiguous delivery requires fresh resource, inventory, and wallet reads as applicable; shop GET can refresh stock but cannot prove whether a purchase committed, and there is no automatic replay because the generic receipt route does not cover these commands.
 
 ### M2.8 Check, power, and effect routes
 
@@ -267,7 +267,7 @@ Expose deterministic resolution without allowing clients to supply authoritative
 - **Dependencies:** M1.6; M2.7 actor resources.
 - **Acceptance criteria:**
   - `POST /actors/:actorId/check-commands` accepts `{ kind, skillOrAttribute, targetActorId?, difficultyRef?, expectedRevision, idempotencyKey }` and returns `{ check: { terms, modifier, total, target, outcome }, receipt }` without a caller-supplied modifier or total.
-  - `GET /actors/:actorId/powers` returns `{ known, prepared, slots, uses, legalNow, revision }`; `POST /actors/:actorId/power-commands` accepts `{ powerRef, targetIds, choices, expectedRevision, idempotencyKey }` and returns `{ resolution, actorStates, receipt }`.
+  - `GET /actors/:actorId/powers` returns `{ known, prepared, slots, uses, legalNow, legalCommands, revision }`; `POST /actors/:actorId/power-commands` accepts `{ powerRef, targetIds, choices, expectedRevision, idempotencyKey }` and returns `{ resolution, actorStates, receipt }`.
   - `GET /actors/:actorId/effects` returns `{ effects, concentration, revision }`; `POST /actors/:actorId/effect-commands` accepts a GM-authorized discriminated apply/remove/advance-duration command and returns `{ effects, receipt }`.
   - Responses expose typed source, duration, stacking, modifiers, and state deltas; hidden enemy details and private DC sources are omitted from player projections.
 
@@ -284,6 +284,7 @@ Provide encounter preparation, legal turn actions, and an append-only combat log
   - `GET /combats/:combatId` returns `{ round, currentCombatant, combatants, legalActions, revision }`; `GET /combats/:combatId/log?afterSequence=&limit=` returns `{ entries, nextAfterSequence }`.
   - `POST /combats/:combatId/action-commands` accepts `{ legalActionId, targetIds, choices, expectedRevision, idempotencyKey }` and returns `{ resolution, combat, receipt }`; callers cannot submit arbitrary damage, DCs, or turn order.
   - `POST /combats/:combatId/end-commands` accepts `{ expectedRevision, idempotencyKey }` and returns `{ encounter, rewards, receipt }`, with reconnects unable to repeat actions or rewards.
+  - `GET /campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey` is a read-only reconciliation path returning `{ operation: "action", result: { resolution, combat, receipt } }` or `{ operation: "end", result: { encounter, rewards, receipt } }`; it never executes a command, preserves action-control/end-GM authorization, and a non-disclosing `404` never authorizes automatic replay.
 
 ### M2.10 World, NPC, faction, quest, and story routes
 
@@ -297,8 +298,8 @@ Expose separate player and GM projections for campaign world and narrative state
   - `GET /campaigns/:campaignId/world` returns `{ currentLocations, visibleLocations, visibleConnections }`; `POST /actors/:actorId/travel-commands` accepts `{ connectionId, partyActorIds, expectedRevision, idempotencyKey }` and returns `{ locations, discoveries, receipt }`.
   - `GET /campaigns/:campaignId/npcs` returns `{ npcs, relationships }`; `POST /campaigns/:campaignId/npcs` accepts `{ personaId, publicState, privateState, expectedRevision, idempotencyKey }` and returns `201 { npc, receipt }`; `POST /npcs/:npcId/relationship-commands` accepts `{ subjectActorId, affinityDelta, trustDelta, fearDelta, reason, expectedRevision, idempotencyKey }` and returns `{ relationship, receipt }`.
   - `GET /campaigns/:campaignId/factions` returns `{ factions, standings }`; `POST /campaigns/:campaignId/factions` accepts `{ name, publicState, privateState, expectedRevision, idempotencyKey }` and returns `201 { faction, receipt }`; `POST /factions/:factionId/reputation-commands` accepts `{ subjectActorId, delta, reason, expectedRevision, idempotencyKey }` and returns `{ standing, receipt }`.
-  - `GET /campaigns/:campaignId/quests` returns `{ quests, objectives, journal }`; `POST /campaigns/:campaignId/quests` accepts `{ quest, expectedRevision, idempotencyKey }` and returns `201 { quest, receipt }`; `POST /quests/:questId/commands` accepts a discriminated `{ kind: "accept"|"advance-objective"|"abandon"|"claim-reward", objectiveId?, actorId?, rewardId?, expectedRevision, idempotencyKey }` and returns `{ quest, receipt }`; `claim-reward` requires both `actorId` and `rewardId`.
-  - `GET /campaigns/:campaignId/story` returns player-safe `{ visibleNodes, discoveredClues }` or GM `{ storylines, nodes, edges, plotPoints, clues }`; `POST /campaigns/:campaignId/storylines` accepts `{ storyline, expectedRevision, idempotencyKey }` and returns `201 { storyline, receipt }`; `POST /storylines/:storylineId/commands` accepts `{ kind, targetId, data, expectedRevision, idempotencyKey }` and returns `{ story, receipt }`, rejecting cross-story or cross-campaign references.
+  - `GET /campaigns/:campaignId/quests` returns `{ quests, objectives, journal }`; `POST /campaigns/:campaignId/quests` accepts `{ quest, expectedRevision, idempotencyKey }` and returns `201 { quest, definition, projection, revision, receipt }`; `POST /quests/:questId/commands` accepts a discriminated `{ kind: "accept"|"advance-objective"|"abandon"|"claim-reward", objectiveId?, actorId?, rewardId?, expectedRevision, idempotencyKey }` and returns `{ quest, receipt }`; `claim-reward` requires both `actorId` and `rewardId`.
+  - `GET /campaigns/:campaignId/story` returns player-safe `{ visibleNodes, discoveredClues }` or GM `{ storylines, nodes, edges, plotPoints, clues }`; `POST /campaigns/:campaignId/storylines` accepts `{ storyline, expectedRevision, idempotencyKey }` and returns `201 { storyline, story, receipt }`; `POST /storylines/:storylineId/commands` accepts `{ kind, targetId, data, expectedRevision, idempotencyKey }` and returns `{ story, receipt }`, rejecting cross-story or cross-campaign references.
 
 ### M2.11 Adventure turn, confirmation, and generation routes
 
@@ -309,10 +310,12 @@ Add one streaming turn protocol plus durable confirmation and reviewable generat
 - **Complexity:** L
 - **Dependencies:** M1.10; all command routes M2.7-M2.10; existing roleplay SSE and request/problem infrastructure.
 - **Acceptance criteria:**
-  - `POST /adventure-turns/stream` accepts `{ campaignId, sessionId, actorId, declaration, expectedRevision, idempotencyKey }` and streams `turn_started`, `agent_status`, `tool_proposed`, `confirmation_required`, `mechanics_committed`, `narration_delta`, `choice`, and terminal events with validated payloads.
-  - `GET /adventure-turns/:turnId` returns `{ turn, proposals, confirmation, receipts, narrationStatus }`; `POST /adventure-turns/:turnId/confirm` accepts `{ proposalIds, decision: "approve"|"reject", expectedRevision, idempotencyKey }` and returns `{ turn }` or resumes the stream through a separately issued resume token.
-  - `POST /generation-drafts` accepts `{ campaignId, kind, brief, constraints, idempotencyKey }`; `GET /generation-drafts/:draftId` returns staged content and validation issues; `POST /generation-drafts/:draftId/apply` accepts `{ selectedChanges, expectedRevision, idempotencyKey }` and returns `{ draft, receipts }`.
-  - SSE disconnect, process restart, and duplicate confirmation requests preserve durable state; a committed turn always exposes receipts even if narration delivery fails.
+  - `GET /campaigns/:campaignId/rooms/:sessionId/play-bootstrap` returns role-safe `{ campaignId, sessionId, expectedRevision, session, principal, playableActors }`, with play eligibility and actor control derived authoritatively from the attached session and fixed local principal.
+  - `POST /adventure-turns/stream` accepts an initial `{ campaignId, sessionId, actorId, declaration, expectedRevision, idempotencyKey }`, a narration derivative `{ variant: "narration-retry"|"narration-swipe", campaignId, sessionId, actorId, priorTurnId, expectedRevision, idempotencyKey }`, or `{ resumeToken }`; it returns validated SSE events and identifies the durable turn in `X-Adventure-Turn-Id`.
+  - `GET /adventure-turns/reconcile-initial?campaignId=&sessionId=&actorId=&idempotencyKey=` is a read-only initial-turn locator returning `{ result: AdventureTurnGetResponse | null }`; null remains race-ambiguous and never proves non-commit or permits an automatic stream retry.
+  - `GET /adventure-turns/:turnId` returns `{ turn, proposals, confirmation, receipts, narrationStatus, resumeToken? }`; `POST /adventure-turns/:turnId/confirm` accepts `{ proposalIds, decision: "approve"|"reject", expectedRevision, idempotencyKey }` and returns `{ turn, resumeToken? }`, with the opaque token used only in the strict stream-resume body.
+  - `POST /generation-drafts` accepts `{ campaignId, kind, brief, constraints, idempotencyKey }` and returns `201 { draft, provenance, changes, validationIssues }`; `GET /generation-drafts/:draftId` returns the same staged projection; `POST /generation-drafts/:draftId/apply` accepts `{ selectedChanges, expectedRevision, idempotencyKey }` and returns `{ draft, application, receipts }`.
+  - SSE disconnect, process restart, duplicate confirmation, narration retry, and narration swipe preserve durable state and prior receipt identity; resume reconciles crash-visible mechanics before narration without rerunning commands, and a committed turn always exposes receipts even if narration delivery fails.
 
 #### Implementation notes
 
@@ -321,6 +324,8 @@ Proposal, confirmation, mechanics, and choice events are conditional because the
 ## Milestone 3 — Client UI
 
 ### M3.1 Campaign Administration Studio
+
+**Status: Complete (client UI)**
 
 Create `CampaignAdministrationPage`, `CampaignSettingsForm`, `MembershipManager`, and `TimelineCheckpointPanel` for lifecycle, roles, policies, and forks.
 
@@ -333,6 +338,8 @@ Create `CampaignAdministrationPage`, `CampaignSettingsForm`, `MembershipManager`
 
 ### M3.2 Content Pack Studio
 
+**Status: Complete (client UI)**
+
 Create `ContentPackLibraryPage`, `ContentPackEditor`, `PackValidationReport`, and `CampaignContentPicker` for local pack review, publication, and exact pinning.
 
 - **Complexity:** L
@@ -343,6 +350,8 @@ Create `ContentPackLibraryPage`, `ContentPackEditor`, `PackValidationReport`, an
   - The interface never accepts server filesystem paths and clearly distinguishes editable local drafts from sealed versions.
 
 ### M3.3 Character Builder and Advancement Flow
+
+**Status: Complete (client UI)**
 
 Create `CharacterBuilderPage`, `AttributeAllocator`, `ChoiceGroupEditor`, `DerivedStatsReview`, and `LevelUpWizard` for draft-to-play and progression.
 
@@ -355,6 +364,8 @@ Create `CharacterBuilderPage`, `AttributeAllocator`, `ChoiceGroupEditor`, `Deriv
 
 ### M3.4 Character Sheet, Inventory, and Economy
 
+**Status: Complete (client UI)**
+
 Create `RpgCharacterSheetPage`, `ResourceTrackers`, `InventoryPanel`, `EquipmentSlots`, `ShopBrowser`, `TradeReviewDialog`, and `RestDialog`.
 
 - **Complexity:** L
@@ -366,6 +377,8 @@ Create `RpgCharacterSheetPage`, `ResourceTrackers`, `InventoryPanel`, `Equipment
 
 ### M3.5 Powers and Combat Workspace
 
+**Status: Complete (client UI)**
+
 Create `PowerLibraryPanel`, `EffectList`, `CombatTrackerPage`, `InitiativeRail`, `LegalActionTray`, and `CombatLog`.
 
 - **Complexity:** L
@@ -376,6 +389,8 @@ Create `PowerLibraryPanel`, `EffectList`, `CombatTrackerPage`, `InitiativeRail`,
   - Mobile uses a full-screen combat layout with a bottom action tray, while keyboard users can operate a list equivalent to the initiative rail.
 
 ### M3.6 World, Cast, and Journal Studio
+
+**Status: Complete (client UI)**
 
 Create `WorldExplorerPage`, `LocationTree`, `TravelDialog`, `NpcRosterPage`, `FactionStandingPanel`, `QuestJournalPage`, and `StoryStudioPage`.
 
@@ -395,7 +410,7 @@ Create `CampaignPlayPage`, `CampaignContextDrawer`, `MechanicReceiptCard`, `Conf
 - **Complexity:** L
 - **Dependencies:** M2.11; M3.4-M3.6 gameplay views; existing session chat and room-opening behavior in `App.tsx`.
 - **Acceptance criteria:**
-  - Chat remains central while the drawer shows current location, exits, present NPCs, active objectives, party resources, and encounter status from role-filtered APIs.
+  - Chat remains central while the drawer shows current location, exits, the campaign-visible NPC roster, active objectives, party resources, and encounter status from role-filtered APIs; it explicitly does not claim NPC presence because no NPC location/presence model is delivered.
   - AI suggestions, pending confirmations, committed mechanics, and narration have distinct visual and screen-reader labels; receipt cards show rolls, modifiers, targets, outcomes, and state deltas.
   - Reloading or swiping narration preserves receipt identity and never implies that mechanics were rerun; committed turns remain inspectable when streaming narration fails.
 
@@ -404,6 +419,8 @@ Create `CampaignPlayPage`, `CampaignContextDrawer`, `MechanicReceiptCard`, `Conf
 Chat remains central, with role-filtered context, durable receipt recovery, and narration swipes. Because the backend has no NPC location/presence model, the drawer visibly labels and shows the campaign-visible NPC roster rather than claiming those NPCs are present. Receipt cards omit unavailable target or outcome fields and never infer them; provider-driven tools remain M4 work.
 
 ### M3.8 Event Log, recap, import, and export experience
+
+**Status: Complete (client UI)**
 
 Create `CampaignEventLogPage`, `RecapViewer`, `CheckpointTimeline`, `CampaignImportWizard`, and `CampaignExportDialog`.
 
