@@ -2,6 +2,7 @@ import { loreBlock } from "./lore.js";
 import type { PromptPreset } from "./presets.js";
 import type { Character, EpisodeSummary, HarnessSettings, LoreEntry, MemoryFact, Message, MessageRole, Session } from "./types.js";
 import { resolvePromptTemplate } from "./promptTemplates.js";
+import { bindCampaignAgentContextToTurn, campaignContextBasketText, type CampaignAgentContextBasket } from "./context.js";
 
 type OpenAIRole = "system" | "user" | "assistant";
 
@@ -54,6 +55,8 @@ export function buildOrchestratedMessages(input: {
   harness: HarnessSettings;
   userContent: string;
   sharedContext?: string;
+  /** Optional server-internal campaign layer; legacy session generations omit it unchanged. */
+  campaignContext?: CampaignAgentContextBasket;
 }): OrchestratedMessage[] {
   const { character, session, history, memories, summary, preset, lore, harness, userContent } = input;
   const participants = input.participants?.length ? input.participants : [character];
@@ -85,6 +88,12 @@ export function buildOrchestratedMessages(input: {
     : "";
 
   const loreText = resolvePromptTemplate("character.lore", overrides, { "lore.triggered": loreBlock(lore) });
+  if (input.campaignContext && targetCharacter.id !== character.id) {
+    throw new Error("campaign context target speaker does not match generation character");
+  }
+  const campaignContext = input.campaignContext
+    ? campaignContextBasketText(bindCampaignAgentContextToTurn(input.campaignContext, session.id, character.id, userContent))
+    : "";
 
   const memory = resolvePromptTemplate("character.memory", overrides, {
     "memory.approved": memoryBlock(memories, harness.memoryChars),
@@ -104,9 +113,10 @@ export function buildOrchestratedMessages(input: {
     { role: "system", content: constraints },
     ...(customSystem ? [{ role: "system" as const, content: customSystem }] : []),
     ...(editableStyle ? [{ role: "system" as const, content: editableStyle }] : []),
-    { role: "system", content: loreText },
-    { role: "system", content: memory },
-    { role: "system", content: sharedContext },
+    ...(campaignContext
+      ? [{ role: "system" as const, content: campaignContext }]
+      : [{ role: "system" as const, content: loreText }, { role: "system" as const, content: memory },
+        { role: "system" as const, content: sharedContext }]),
     ...(postHistory ? [{ role: "system" as const, content: postHistory }] : []),
     { role: "system", content: finalTurnContract },
     ...history.slice(-harness.recentTurns).map((m) => ({

@@ -6,6 +6,7 @@ import { buildRequestBody, fallbackRoomSpeakers, generateReply, streamReply, typ
 import { getPromptPreset } from "../src/presets.js";
 import type { Character, ProviderSettings, Session } from "../src/types.js";
 import { startFakeProvider, type FakeProvider } from "./helpers.js";
+import { assembleCampaignAgentContext } from "../src/context.js";
 
 const character: Character = {
   id: "c1",
@@ -113,6 +114,34 @@ describe("streamReply", () => {
     expect(result.usage).toMatchObject({ promptTokens: 120, completionTokens: 24, totalTokens: 144, source: "provider" });
     expect(deltas.length).toBeGreaterThan(3);
     expect(deltas.join("")).toBe(result.text);
+  });
+
+  it("passes optional campaign context to the provider without changing the final declaration", async () => {
+    fake = await startFakeProvider({ replyText: "Campaign-aware reply." });
+    const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model" };
+    const args = makeArgs(provider);
+    args.campaignContext = assembleCampaignAgentContext({
+      snapshot: { campaignId: "campaign", sessionId: session.id, audience: { kind: "player", actorId: "actor" },
+        authority: { role: "player", control: "controlled" }, speakerPersona: { characterId: character.id, displayName: character.name },
+        safetyControl: ["CAMPAIGN_SAFETY"], humanCanon: [],
+        committedMechanics: [], visibleWorld: [], visibleCast: [], visibleQuests: [], legalActions: [],
+        privateTargetFacts: [], synthesizedSummaryFacts: [], recap: [] },
+      declaration: "stale declaration",
+      approvedMemory: ["CAMPAIGN_ONLY_MEMORY"],
+    });
+    args.memories = [{ id: "legacy-memory", characterId: character.id, kind: "fact", content: "LEGACY_DUPLICATE_MEMORY",
+      sourceTurnId: "turn", createdAt: "", userApproved: true, forgottenAt: null }];
+    args.summary = { sessionId: session.id, summary: "LEGACY_DUPLICATE_SUMMARY", keyEvents: [], emotionalBeat: "", updatedAt: "" };
+    args.lore = [{ id: "legacy-lore", characterId: null, characterIds: [], keys: [], content: "LEGACY_DUPLICATE_LORE",
+      enabled: true, insertionOrder: 0, createdAt: "" }];
+    args.sharedContext = "LEGACY_DUPLICATE_SHARED";
+    await streamReply(args, () => undefined);
+    expect(fake.requests).toHaveLength(1);
+    expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN AGENT CONTEXT");
+    expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN_SAFETY");
+    expect(fake.requests[0]?.systemContent).toContain("CAMPAIGN_ONLY_MEMORY");
+    expect(fake.requests[0]?.systemContent).not.toMatch(/stale declaration|LEGACY_DUPLICATE|TRIGGERED LORE|RETRIEVED MEMORY|SHARED CONTEXT BASKET/);
+    expect(fake.requests[0]?.lastUserContent).toBe(args.userContent);
   });
 
   it("emits an unterminated final SSE line after a split UTF-8 character", async () => {

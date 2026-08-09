@@ -1,4 +1,5 @@
 import type { OrchestratedMessage } from "./prompt.js";
+import type { CampaignAgentContextBasket } from "./context.js";
 import { resolvePromptTemplate } from "./promptTemplates.js";
 import type { PromptPreset } from "./presets.js";
 import { buildOrchestratedMessages } from "./prompt.js";
@@ -86,6 +87,8 @@ export interface GenerationArgs {
   provider: ProviderSettings;
   userContent: string;
   sharedContext?: string;
+  /** Optional pre-authorized campaign context passed through without repository access. */
+  campaignContext?: CampaignAgentContextBasket;
 }
 
 type PreparedGeneration =
@@ -93,7 +96,7 @@ type PreparedGeneration =
   | { kind: "request"; url: string; headers: Record<string, string>; messages: OrchestratedMessage[] };
 
 function prepareGeneration(args: GenerationArgs): PreparedGeneration {
-  const { character, participants, session, history, memories, summary, preset, lore, harness, provider, userContent, sharedContext } = args;
+  const { character, participants, session, history, memories, summary, preset, lore, harness, provider, userContent, sharedContext, campaignContext } = args;
   const baseUrl = provider.baseUrl.replace(/\/+$/, "");
 
   const messages = buildOrchestratedMessages({
@@ -109,6 +112,7 @@ function prepareGeneration(args: GenerationArgs): PreparedGeneration {
     harness,
     userContent,
     ...(sharedContext ? { sharedContext } : {}),
+    ...(campaignContext ? { campaignContext } : {}),
   });
 
   if (provider.samplers.startReplyWith.trim()) {
@@ -459,9 +463,10 @@ export async function generateReply(
   userContent: string,
   participants?: Character[],
   sharedContext?: string,
+  campaignContext?: CampaignAgentContextBasket,
 ): Promise<GenerationResult> {
   return streamReply(
-    { character, ...(participants ? { participants } : {}), session, history, memories, summary, preset, lore, harness, provider, userContent, ...(sharedContext ? { sharedContext } : {}) },
+    { character, ...(participants ? { participants } : {}), session, history, memories, summary, preset, lore, harness, provider, userContent, ...(sharedContext ? { sharedContext } : {}), ...(campaignContext ? { campaignContext } : {}) },
     () => undefined,
   );
 }

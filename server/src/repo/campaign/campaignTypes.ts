@@ -7,6 +7,7 @@ import type {
   PublicCampaignCharacterSummary,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../../runtime.js";
+import type { CampaignAgentAudience, CampaignAgentContextSnapshot } from "../../context.js";
 import type {
   ActorResource,
   AddCampaignMembershipInput,
@@ -102,6 +103,9 @@ export interface RepositoryUnitOfWork {
   listCampaignSessionAttachments(actorPrincipalId: string, campaignId: string): CampaignSessionAttachment[];
   getCampaignSessionAttachment(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignSessionAttachment | null;
   getCampaignPlayBootstrap(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignPlayBootstrap | null;
+  /** Reads one role-derived, audience-filtered agent snapshot from the active repository snapshot. */
+  getCampaignAgentContextSnapshot(actorPrincipalId: string, campaignId: string, sessionId: string,
+    audience: CampaignAgentAudience): CampaignAgentContextSnapshot | null;
   getCampaignRoomLinkingSnapshot(actorPrincipalId: string, campaignId: string): CampaignRoomLinkingSnapshot | null;
   getCampaignContentConfiguration(actorPrincipalId: string, campaignId: string): CampaignContentConfiguration | null;
   getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;

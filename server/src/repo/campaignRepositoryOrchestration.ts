@@ -142,6 +142,7 @@ import { createCampaignMembershipReadRepository } from "./campaign/campaignMembe
 import { createCampaignSessionAttachmentReadRepository } from "./campaign/campaignSessionAttachmentReadRepo.js";
 import { createCampaignRoomLinkingSnapshotRepository } from "./campaign/campaignRoomLinkingSnapshotRepo.js";
 import { createCampaignPlayReadRepository } from "./campaign/campaignPlayReadRepo.js";
+import { createCampaignAgentContextReadRepository } from "./campaign/campaignAgentContextReadRepo.js";
 import { createCampaignRoomSessionLifecycleRepository } from "./campaign/campaignRoomSessionLifecycleRepo.js";
 import { createCampaignCharacterCreationOptionsRepository } from "./campaign/campaignCharacterCreationOptionsRepo.js";
 import {
@@ -316,6 +317,7 @@ function runTransaction<T>(
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
   const campaignPlayReadRepository = createCampaignPlayReadRepository(db);
+  const campaignAgentContextReadRepository = createCampaignAgentContextReadRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const campaignDetailReadRepository = createCampaignDetailReadRepository({
     getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
@@ -406,6 +408,12 @@ function runTransaction<T>(
     getCampaignPlayBootstrap: (actorPrincipalId, campaignId, sessionId) => {
       assertActive();
       return campaignPlayReadRepository.getCampaignPlayBootstrap(actorPrincipalId, campaignId, sessionId);
+    },
+    getCampaignAgentContextSnapshot: (actorPrincipalId, campaignId, sessionId, audience) => {
+      assertActive();
+      return campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(
+        actorPrincipalId, campaignId, sessionId, audience,
+      );
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -569,6 +577,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
   const campaignPlayReadRepository = createCampaignPlayReadRepository(db);
+  const campaignAgentContextReadRepository = createCampaignAgentContextReadRepository(db);
   const campaignRoomSessionLifecycleRepository = createCampaignRoomSessionLifecycleRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const campaignDetailReadRepository = createCampaignDetailReadRepository({
@@ -803,6 +812,14 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     getCampaignPlayBootstrap: (actorPrincipalId, campaignId, sessionId) => {
       assertOpen();
       return campaignPlayReadRepository.getCampaignPlayBootstrap(actorPrincipalId, campaignId, sessionId);
+    },
+    getCampaignAgentContextSnapshot: (actorPrincipalId, campaignId, sessionId, audience) => {
+      assertOpen();
+      // All authorization, target-control, and bounded projection reads share
+      // one deferred SQLite snapshot rather than racing across domain reads.
+      return db.transaction(() => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(
+        actorPrincipalId, campaignId, sessionId, audience,
+      )).deferred();
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertOpen();
