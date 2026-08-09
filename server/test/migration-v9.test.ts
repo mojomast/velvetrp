@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
 import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
+import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -31,7 +32,7 @@ function createRepresentativeV8(dir: string): string {
   const db = new DatabaseDriver(dbPath);
     db.pragma("foreign_keys = OFF");
     // Remove exact empty future adventure layouts before intentionally dismantling their v9 parents.
-    for (const [index, inventory] of [ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ADVENTURE_GENERATION_V35_MANAGED_OBJECTS].entries()) {
+    for (const [index, inventory] of [TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS, ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ADVENTURE_GENERATION_V35_MANAGED_OBJECTS].entries()) {
       const names = inventory.map(([, name]) => name);
       const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL ORDER BY type,name`)
         .all(...names) as Array<{ type: string; name: string }>;
@@ -39,7 +40,7 @@ function createRepresentativeV8(dir: string): string {
       for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
       const tables = objects.filter((object) => object.type === "table").map((object) => object.name).reverse();
       for (const table of tables) db.exec(`DROP TABLE "${table}"`);
-      if (index === 0) restoreAdventureGenerationV35Guards(db);
+      if (index === 1) restoreAdventureGenerationV35Guards(db);
     }
     removeFutureCharacterBuilderSchema(db);
     db.exec(`
@@ -151,7 +152,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     const db = new DatabaseDriver(path.join(dir, "velvet.sqlite"));
     db.pragma("foreign_keys = ON");
-      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
+      expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("37");
     expect(db.prepare("SELECT * FROM principals").all()).toEqual([{
       id: "local-owner",
       display_name: "Local owner",
@@ -265,7 +266,7 @@ describe("schema v9 campaign foundation", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(snapshotV8(dbPath)).toEqual(before);
     const db = new DatabaseDriver(dbPath, { readonly: true });
-    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
+    expect((db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("37");
     expect(db.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM application_owner").all()).toEqual([{ singleton: 1, principal_id: "local-owner" }]);
     expect(db.prepare("SELECT * FROM campaigns").all()).toEqual([]);
@@ -323,7 +324,7 @@ describe("schema v9 campaign foundation", () => {
     const repository = createRepository({ dataDir: dir });
     repository.close();
     const migrated = new DatabaseDriver(dbPath, { readonly: true });
-    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("36");
+    expect((migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string }).value).toBe("37");
     expect(migrated.prepare("SELECT id FROM principals").all()).toEqual([{ id: "local-owner" }]);
     migrated.close();
   });

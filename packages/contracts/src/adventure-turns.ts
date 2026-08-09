@@ -53,6 +53,16 @@ export const confirmationStateSchema = z.discriminatedUnion("state", [
 ]);
 
 /** Full private proposal including provider-bound tool arguments. */
+export const toolProposalExecutionBindingSchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  commandType: z.enum(["set_actor_attribute", "initialize_actor_resource", "roll_actor_dice"]),
+  campaignId: campaignIdSchema,
+  timelineId: resourceIdSchema,
+  actorId: actorIdSchema,
+  sourceTurnId: resourceIdSchema,
+}).strict();
+
+/** Full private proposal including provider-bound tool arguments and server-owned mechanics identity. */
 export const toolProposalSchema = z.object({
   proposalId: resourceIdSchema,
   position: z.number().int().min(0).max(MAX_ADVENTURE_TURN_TOOLS - 1),
@@ -62,11 +72,12 @@ export const toolProposalSchema = z.object({
     catch { return false; }
   }, "tool arguments must be a JSON object"),
   proposedAt: utcIsoTimestampSchema,
+  executionBinding: toolProposalExecutionBindingSchema,
   confirmation: confirmationStateSchema,
 }).strict();
 
-/** Role-safe proposal projection that structurally excludes tool arguments. */
-export const roleSafeToolProposalSchema = toolProposalSchema.omit({ argumentsJson: true });
+/** Role-safe proposal projection that structurally excludes arguments and private execution identity. */
+export const roleSafeToolProposalSchema = toolProposalSchema.omit({ argumentsJson: true, executionBinding: true });
 
 /** Durable bounded tool-call projection and its immutable mechanics links. */
 export const toolCallSchema = z.object({

@@ -25,11 +25,14 @@ describe("M1.10 adventure-turn contracts", () => {
       toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: later };
     expect(appendToolProposalInputSchema.parse(input)).toEqual(input);
     expect(appendToolProposalInputSchema.safeParse({ ...input, confirmationExpiresAt: null }).success).toBe(false);
+    expect(appendToolProposalInputSchema.safeParse({ ...input, executionBinding: { idempotencyKey: "caller-owned" } }).success).toBe(false);
     expect(appendToolProposalInputSchema.safeParse({ ...input, extra: true }).success).toBe(false);
   });
 
   it("bounds strict tool proposals and confirmation expiry", () => {
-    const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{}", proposedAt: at,
+    const executionBinding = { idempotencyKey: "mechanics-key", commandType: "roll_actor_dice" as const, campaignId: "campaign",
+      timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" };
+    const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{}", proposedAt: at, executionBinding,
       confirmation: { state: "pending", expiresAt: later } } as const;
     expect(toolProposalSchema.parse(proposal)).toEqual(proposal);
     for (const invalid of [{ ...proposal, position: MAX_ADVENTURE_TURN_TOOLS }, { ...proposal, argumentsJson: "[]" },
@@ -52,6 +55,7 @@ describe("M1.10 adventure-turn contracts", () => {
 
   it("structurally separates role-safe and private projections", () => {
     const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{\"secret\":true}", proposedAt: at,
+      executionBinding: { idempotencyKey: "private-key", commandType: "roll_actor_dice", campaignId: "campaign", timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" },
       confirmation: { state: "not-required" } } as const;
     const privateTurn = { ...base, declaration: "I inspect the seal", toolCalls: [{ proposal, status: "approved", receiptLinks: [] }],
       providerCalls: [], receiptLinks: [] } as const;
@@ -60,7 +64,7 @@ describe("M1.10 adventure-turn contracts", () => {
     const safe = { ...base, proposals: [{ proposalId: "proposal", position: 0, toolName: "roll", proposedAt: at,
       confirmation: { state: "not-required" } }], receiptLinks: [] } as const;
     expect(roleSafeAdventureTurnSchema.parse(safe)).toEqual(safe);
-    expect(JSON.stringify(safe)).not.toContain("secret");
+    expect(JSON.stringify(safe)).not.toMatch(/secret|private-key|executionBinding/);
   });
 
   it("allows only a strict subset of approved proposal receipts while confirmed", () => {
@@ -68,7 +72,8 @@ describe("M1.10 adventure-turn contracts", () => {
       proposalId, principalId: "principal", decision: "approved" as const, expectedTurnRevision: 2,
       idempotencyKey: `decision-${proposalId}`, expiresAt: later, decidedAt: at } });
     const proposal = (proposalId: string, position: number) => ({ proposalId, position, toolName: "roll", argumentsJson: "{}",
-      proposedAt: at, confirmation: decision(proposalId) });
+      proposedAt: at, executionBinding: { idempotencyKey: `key-${proposalId}`, commandType: "roll_actor_dice" as const,
+        campaignId: "campaign", timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" }, confirmation: decision(proposalId) });
     const link = (proposalId: string) => ({ linkId: `link-${proposalId}`, campaignId: "campaign", commandId: `command-${proposalId}`,
       proposalId, sourceTurnId: "turn", linkedAt: at });
     const firstLink = link("one");

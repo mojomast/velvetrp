@@ -37,9 +37,6 @@ const rootTurnId = (db: Database, campaignId: string, turnId: string): string =>
   }
 };
 
-const toolMatchesCommand = (toolName: string, commandType: string) => toolName === commandType
-  || (["roll", "roll-check", "roll_actor_dice"].includes(toolName) && commandType === "roll_actor_dice");
-
 const receipts = (db: Database, campaignId: string, turnId: string) => {
   const root = rootTurnId(db, campaignId, turnId);
   const linked = (db.prepare(`SELECT link_id,command_id,proposal_id,source_turn_id,linked_at FROM turn_mechanics_links_v36
@@ -50,25 +47,38 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
   const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
     .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
   if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
-  const proposals = db.prepare(`SELECT proposal.proposal_id,proposal.tool_name,proposal.position FROM tool_proposals proposal
+  const proposals = db.prepare(`SELECT proposal.proposal_id,proposal.position,binding.execution_idempotency_key FROM tool_proposals proposal
+    JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=proposal.campaign_id AND binding.turn_id=proposal.turn_id
+      AND binding.proposal_id=proposal.proposal_id
     LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id
       AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=? AND proposal.turn_id=?
       AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
-    .all(campaignId, root) as Array<{ proposal_id: string; tool_name: string; position: number }>;
+    .all(campaignId, root) as Array<{ proposal_id: string; position: number; execution_idempotency_key: string }>;
   const unbound = proposals.filter((proposal) => !linked.some((link) => link.proposalId === proposal.proposal_id));
-  const commands = db.prepare(`SELECT command.command_id,command.type,event.occurred_at FROM campaign_commands command
+  const invalidCommand = db.prepare(`SELECT command.command_id FROM campaign_commands command LEFT JOIN tool_proposal_execution_bindings_v37 binding
+      ON binding.campaign_id=command.campaign_id AND binding.execution_idempotency_key=command.idempotency_key
+      AND binding.source_turn_id=command.source_turn_id AND binding.timeline_id=command.timeline_id
+      AND binding.actor_id=command.actor_id AND binding.command_type=command.type
+    WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=? AND binding.proposal_id IS NULL LIMIT 1`)
+    .get(campaignId, rootRow.timeline_id, rootRow.actor_id, root) as { command_id: string } | undefined;
+  if (invalidCommand) throw new Error("source-turn command receipt has no exact proposal execution binding");
+  const commands = db.prepare(`SELECT command.command_id,event.occurred_at,binding.proposal_id FROM campaign_commands command
     JOIN command_receipts receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
     JOIN campaign_events event ON event.campaign_id=receipt.campaign_id AND event.event_id=receipt.event_id
-      AND event.command_id=receipt.command_id WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=?
+      AND event.command_id=receipt.command_id
+    JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=command.campaign_id
+        AND binding.execution_idempotency_key=command.idempotency_key AND binding.source_turn_id=command.source_turn_id
+        AND binding.timeline_id=command.timeline_id AND binding.actor_id=command.actor_id AND binding.command_type=command.type
+      WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=?
       AND command.source_turn_id=? AND event.timeline_id=? AND event.actor_id=? AND event.source_turn_id=?
       AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=command.campaign_id AND link.command_id=command.command_id)
     ORDER BY receipt.revision_after,command.command_id`).all(campaignId, rootRow.timeline_id, rootRow.actor_id, root,
-      rootRow.timeline_id, rootRow.actor_id, root) as Array<{ command_id: string; type: string; occurred_at: string }>;
+       rootRow.timeline_id, rootRow.actor_id, root) as Array<{ command_id: string; proposal_id: string; occurred_at: string }>;
   if (commands.length > unbound.length) throw new Error("source-turn command receipts exceed approved proposals");
   const recoverable = commands.map((entry) => {
-    const candidates = unbound.filter((proposal) => toolMatchesCommand(proposal.tool_name, entry.type));
-    if (candidates.length !== 1) throw new Error("source-turn command receipt proposal ancestry is ambiguous");
-    const proposal = candidates[0]!; unbound.splice(unbound.indexOf(proposal), 1);
+    const proposal = unbound.find((candidate) => candidate.proposal_id === entry.proposal_id);
+    if (!proposal) throw new Error("source-turn command receipt proposal execution binding is invalid");
+    unbound.splice(unbound.indexOf(proposal), 1);
     return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
       campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
   });
@@ -84,9 +94,13 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
   const canSeePrivateTurn = (principalId: string, row: any, role: string) => role === "owner" || role === "gm" || row.principal_id === principalId || Boolean(db.prepare(
     "SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?",
   ).get(row.campaign_id, row.actor_id, principalId));
-  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,decision.decision_id,decision.principal_id decision_principal_id,
+  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,binding.execution_idempotency_key,binding.command_type,
+    binding.source_turn_id binding_source_turn_id,binding.timeline_id binding_timeline_id,binding.actor_id binding_actor_id,
+    decision.decision_id,decision.principal_id decision_principal_id,
     decision.decision,decision.expected_turn_revision,decision.idempotency_key decision_key,decision.expires_at,decision.decided_at
-    FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
+    FROM tool_proposals proposal JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=proposal.campaign_id
+      AND binding.turn_id=proposal.turn_id AND binding.proposal_id=proposal.proposal_id
+      LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
       AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.turn_id=? ORDER BY proposal.position`).all(turnId) as any[];
   const confirmation = (row: any) => row.decision_id ? { state: "decided" as const, decision: { decisionId: row.decision_id,
     proposalId: row.proposal_id, principalId: row.decision_principal_id, decision: row.decision, expectedTurnRevision: row.expected_turn_revision,
@@ -128,6 +142,9 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
       return privateAdventureTurnSchema.parse({ ...common(row, effective), declaration: row.declaration,
         toolCalls: proposals.map((proposal) => { const proposalLinks = links.filter((link) => link.proposalId === proposal.proposal_id); return ({ proposal: { proposalId: proposal.proposal_id, position: proposal.position,
            toolName: proposal.tool_name, argumentsJson: proposal.arguments_json, proposedAt: proposal.proposed_at,
+           executionBinding: { idempotencyKey: proposal.execution_idempotency_key, commandType: proposal.command_type,
+             campaignId: proposal.campaign_id, timelineId: proposal.binding_timeline_id, actorId: proposal.binding_actor_id,
+             sourceTurnId: proposal.binding_source_turn_id },
            confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed" : proposal.decision ?? (proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),
         providerCalls, receiptLinks: links });
     },

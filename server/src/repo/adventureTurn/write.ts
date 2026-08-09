@@ -156,13 +156,18 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
     WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
     .all(row.campaign_id, row.id) as any[];
-  const toolMatchesCommand = (toolName: string, commandType: string) => toolName === commandType
-    || (["roll", "roll-check", "roll_actor_dice"].includes(toolName) && commandType === "roll_actor_dice");
+  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" => {
+    if (["roll", "roll-check", "roll_actor_dice"].includes(toolName)) return "roll_actor_dice";
+    if (toolName === "set_actor_attribute" || toolName === "initialize_actor_resource") return toolName;
+    throw new AdventureTurnConflictError("tool proposal has no supported mechanics command binding");
+  };
   const insertMechanicsLink = (row: any, proposalId: string, commandId: string, at: string) => {
     const authoritative = db.prepare(`SELECT 1 FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id WHERE command.campaign_id=?
-        AND command.command_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?`)
-      .get(row.campaign_id, commandId, row.timeline_id, row.actor_id, row.id);
+        AND command.command_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?
+        AND command.idempotency_key=(SELECT execution_idempotency_key FROM tool_proposal_execution_bindings_v37
+          WHERE campaign_id=? AND turn_id=? AND proposal_id=?)`)
+      .get(row.campaign_id, commandId, row.timeline_id, row.actor_id, row.id, row.campaign_id, row.id, proposalId);
     if (!authoritative) throw new AdventureTurnUnavailableError("mechanics receipt provenance is unavailable");
     const linkId = id();
     db.prepare(`INSERT INTO turn_mechanics_links_v36(link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at)
@@ -174,16 +179,19 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     const proposals = approvedProposals(row);
     const unlinked = proposals.filter((proposal) => !db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
       .get(row.campaign_id, row.id, proposal.proposal_id));
-    const commands = db.prepare(`SELECT command.command_id,command.type FROM campaign_commands command JOIN command_receipts receipt
+    const commands = db.prepare(`SELECT command.command_id,binding.proposal_id FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+      JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=command.campaign_id
+        AND binding.execution_idempotency_key=command.idempotency_key AND binding.turn_id=command.source_turn_id
+        AND binding.timeline_id=command.timeline_id AND binding.actor_id=command.actor_id AND binding.command_type=command.type
       WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?
         AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=command.campaign_id AND link.command_id=command.command_id)
-      ORDER BY receipt.revision_after,command.command_id`).all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{ command_id: string; type: string }>;
+      ORDER BY receipt.revision_after,command.command_id`).all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{ command_id: string; proposal_id: string }>;
     if (commands.length > unlinked.length) throw new AdventureTurnConflictError("source-turn commands exceed approved proposals");
     for (const entry of commands) {
-      const candidates = unlinked.filter((proposal) => toolMatchesCommand(proposal.tool_name, entry.type));
-      if (candidates.length !== 1) throw new AdventureTurnConflictError("source-turn command proposal ancestry is ambiguous");
-      const proposal = candidates[0]!; insertMechanicsLink(row, proposal.proposal_id, entry.command_id, at);
+      const proposal = unlinked.find((candidate) => candidate.proposal_id === entry.proposal_id);
+      if (!proposal) throw new AdventureTurnConflictError("source-turn command proposal execution binding is invalid");
+      insertMechanicsLink(row, proposal.proposal_id, entry.command_id, at);
       unlinked.splice(unlinked.indexOf(proposal), 1);
     }
     return commands.length;
@@ -229,6 +237,10 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       db.prepare(`INSERT INTO tool_proposals(proposal_id,campaign_id,turn_id,position,tool_name,arguments_json,requires_confirmation,confirmation_expires_at,idempotency_key,proposed_at)
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(proposalId, row.campaign_id, row.id, position, input.toolName, argumentsJson, input.requiresConfirmation ? 1 : 0,
           input.confirmationExpiresAt ?? null, input.idempotencyKey, at);
+      const executionKey = `mechanics:${createHash("sha256").update(proposalId).digest("hex").slice(0, 48)}`;
+      db.prepare(`INSERT INTO tool_proposal_execution_bindings_v37(proposal_id,campaign_id,turn_id,execution_idempotency_key,
+        command_type,source_turn_id,timeline_id,actor_id,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`)
+        .run(proposalId, row.campaign_id, row.id, executionKey, commandType(input.toolName), row.id, row.timeline_id, row.actor_id, at);
       physicalAdvance(row, "proposed", "none", at);
       return finish("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, "proposed", "none", at, () => privateTurn(principalId, row.id));
     }); },
@@ -282,12 +294,11 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           throw new AdventureTurnConflictError("confirmation proposal set does not match durable pending state");
         }
         if (selected.some((proposal) => at >= proposal.confirmation_expires_at)) throw new AdventureTurnExpiredError("confirmation expired");
-        for (const [index, proposal] of selected.entries()) {
+        for (const proposal of selected) {
           const decisionKey = `batch:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0, 48)}`;
           db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
             VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, proposal.proposal_id, principalId, input.decision,
               input.expectedTurnRevision, decisionKey, proposal.confirmation_expires_at, at);
-          if (index >= 31) throw new AdventureTurnConflictError("confirmation proposal bound exceeded");
         }
         const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=?
           AND proposal.requires_confirmation=1 AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision

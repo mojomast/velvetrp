@@ -35,7 +35,7 @@ describe("additive schema v26r1 checks, powers, and deterministic effects migrat
     rewindToV25(migrated);
     createRepository({ dataDir: migrated }).close();
     const db = new DatabaseDriver(file(migrated), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "36" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "37" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM rpg_checks_powers_effects_layout_attestation_v26").get()).toEqual({
       prior_layout_digest: "a5e3a58f8014978315d20440a0ac087871edac95323d059327faa2fe0a983ef7",
       current_layout_digest: "7e3fe64f425173022d119f156f60eb36b26af2c97f29d40975f5579caa660f6a",

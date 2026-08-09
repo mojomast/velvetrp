@@ -75,7 +75,7 @@ describe("M1.10 adventure turn repository", () => {
     expect(() => repo.decideToolProposal("player", { turnId: created.turnId, proposalId, decision: "rejected", expiresAt: EXPIRES,
       expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "different-decision" })).toThrow(AdventureTurnConflictError);
 
-    const receipt = repo.executeRollActorDice("local-owner", { commandId: "mechanics-command", idempotencyKey: "mechanics-command",
+    const receipt = repo.executeRollActorDice("local-owner", { commandId: "mechanics-command", idempotencyKey: proposed.toolCalls[0]!.proposal.executionBinding.idempotencyKey,
       campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0,
       sourceTurnId: created.turnId, command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
     const linked = repo.linkFinalMechanicsReceipt("player", { turnId: created.turnId, proposalId, commandId: receipt.commandId,
@@ -129,7 +129,7 @@ describe("M1.10 adventure turn repository", () => {
     const after = repo.createAdventureTurn("player", createInput(identity, "cancel-after"));
     const afterProposal = repo.appendToolProposal("player", { turnId: after.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
       idempotencyKey: "no-confirm", toolName: "roll", arguments: {}, requiresConfirmation: false });
-    const committed = repo.executeRollActorDice("local-owner", { commandId: "cancel-command", idempotencyKey: "cancel-command",
+    const committed = repo.executeRollActorDice("local-owner", { commandId: "cancel-command", idempotencyKey: afterProposal.toolCalls[0]!.proposal.executionBinding.idempotencyKey,
       campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: after.turnId,
       command: { type: "roll_actor_dice", payload: { expression: "1d6" } } });
     repo.linkFinalMechanicsReceipt("player", { turnId: after.turnId, proposalId: afterProposal.toolCalls[0]!.proposal.proposalId,
@@ -224,7 +224,7 @@ describe("M1.10 adventure turn repository", () => {
     const turn = repo.createAdventureTurn("player", createInput(identity, "crash-turn"));
     const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
       idempotencyKey: "crash-proposal", toolName: "roll", arguments: {}, requiresConfirmation: false });
-    repo.executeRollActorDice("local-owner", { commandId: "crash-command", idempotencyKey: "crash-command", campaignId: identity.campaignId,
+    repo.executeRollActorDice("local-owner", { commandId: "crash-command", idempotencyKey: proposed.toolCalls[0]!.proposal.executionBinding.idempotencyKey, campaignId: identity.campaignId,
       timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
       command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
     repo.close();
@@ -243,6 +243,45 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
+  it("recovers same-type proposal commands independently by exact execution key", () => {
+    const identity = seed(); let repo = factory();
+    const turn = repo.createAdventureTurn("player", createInput(identity, "independent-recovery"));
+    const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
+      idempotencyKey: "independent-one", toolName: "roll", arguments: { expression: "1d20" }, requiresConfirmation: true,
+      confirmationExpiresAt: EXPIRES });
+    const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
+      idempotencyKey: "independent-two", toolName: "roll", arguments: { expression: "1d6" }, requiresConfirmation: true,
+      confirmationExpiresAt: EXPIRES });
+    const firstProposal = first.toolCalls[0]!.proposal, secondProposal = second.toolCalls[1]!.proposal;
+    expect(firstProposal.executionBinding.idempotencyKey).not.toBe(secondProposal.executionBinding.idempotencyKey);
+    repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0,
+      idempotencyKey: "independent-wait" });
+    repo.decideToolProposals("player", { turnId: turn.turnId, proposalIds: [firstProposal.proposalId, secondProposal.proposalId],
+      decision: "approved", expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "independent-approve" });
+    repo.executeRollActorDice("local-owner", { commandId: "independent-command-one", idempotencyKey: firstProposal.executionBinding.idempotencyKey,
+      campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
+      command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
+    repo.close(); repo = factory();
+    const oneRecovered = repo.getAdventureTurn("player", turn.turnId)!;
+    expect(oneRecovered.receiptLinks).toMatchObject([{ commandId: "independent-command-one", proposalId: firstProposal.proposalId }]);
+    expect(oneRecovered.receiptLinks).toHaveLength(1);
+    const oneLinked = repo.reconcileAdventureTurnMechanics("player", { turnId: turn.turnId, expectedTurnRevision: 4,
+      expectedCampaignRevision: 0, idempotencyKey: "reconcile-one" });
+    expect(oneLinked.toolCalls.map(({ status }) => status)).toEqual(["committed", "approved"]);
+    repo.executeRollActorDice("local-owner", { commandId: "independent-command-two", idempotencyKey: secondProposal.executionBinding.idempotencyKey,
+      campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 1, sourceTurnId: turn.turnId,
+      command: { type: "roll_actor_dice", payload: { expression: "1d6" } } });
+    repo.close(); repo = factory();
+    expect(repo.getAdventureTurn("player", turn.turnId)!.receiptLinks.map(({ proposalId, commandId }) => ({ proposalId, commandId }))
+      .sort((left, right) => left.proposalId!.localeCompare(right.proposalId!)))
+      .toEqual([{ proposalId: firstProposal.proposalId, commandId: "independent-command-one" },
+        { proposalId: secondProposal.proposalId, commandId: "independent-command-two" }]);
+    const complete = repo.reconcileAdventureTurnMechanics("player", { turnId: turn.turnId, expectedTurnRevision: 5,
+      expectedCampaignRevision: 0, idempotencyKey: "reconcile-two" });
+    expect(complete.toolCalls.map(({ status }) => status)).toEqual(["committed", "committed"]);
+    repo.close();
+  });
+
   it("rejects unrelated command receipts and exact-key changed provider or narration values", () => {
     const identity = seed(); const repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "strict-turn"));
@@ -255,11 +294,11 @@ describe("M1.10 adventure turn repository", () => {
     expect(() => direct.prepare(`INSERT INTO turn_mechanics_links_v36
       (link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at) VALUES(?,?,?,?,?,?,?,?)`)
       .run("direct-unrelated", identity.campaignId, turn.turnId, turn.turnId, proposed.toolCalls[0]!.proposal.proposalId,
-        "unrelated-command", turn.turnId, AT)).toThrow("invalid mechanics receipt provenance");
+        "unrelated-command", turn.turnId, AT)).toThrow("exact proposal execution binding");
     expect(() => direct.prepare(`INSERT INTO turn_mechanics_links_v36
       (link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at) VALUES(?,?,?,?,?,?,?,?)`)
       .run("direct-wrong-source", identity.campaignId, turn.turnId, turn.turnId, proposed.toolCalls[0]!.proposal.proposalId,
-        "unrelated-command", "other-turn", AT)).toThrow("invalid mechanics receipt provenance");
+        "unrelated-command", "other-turn", AT)).toThrow("exact proposal execution binding");
     expect(direct.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 0 });
     direct.close();
     expect(() => repo.linkFinalMechanicsReceipt("player", { turnId: turn.turnId, proposalId: proposed.toolCalls[0]!.proposal.proposalId,
@@ -307,10 +346,10 @@ describe("M1.10 adventure turn repository", () => {
       { expected_revision: 3, resulting_revision: 4 }, { expected_revision: 4, resulting_revision: 5 },
     ]);
     db.close();
-    repo.executeRollActorDice("local-owner", { commandId: "plural-command-one", idempotencyKey: "plural-command-one",
+    repo.executeRollActorDice("local-owner", { commandId: "plural-command-one", idempotencyKey: first.toolCalls[0]!.proposal.executionBinding.idempotencyKey,
       campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0,
       sourceTurnId: turn.turnId, command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
-    repo.executeRollActorDice("local-owner", { commandId: "plural-command-two", idempotencyKey: "plural-command-two",
+    repo.executeRollActorDice("local-owner", { commandId: "plural-command-two", idempotencyKey: second.toolCalls[1]!.proposal.executionBinding.idempotencyKey,
       campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 1,
       sourceTurnId: turn.turnId, command: { type: "roll_actor_dice", payload: { expression: "1d6" } } });
     const firstInput = { turnId: turn.turnId, proposalId: first.toolCalls[0]!.proposal.proposalId, commandId: "plural-command-one",
@@ -340,21 +379,22 @@ describe("M1.10 adventure turn repository", () => {
   it("decides exact plural proposal sets atomically with whole-batch replay", () => {
     const identity = seed(); const repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "atomic-decisions"));
-    const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
-      idempotencyKey: "atomic-one", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
-    const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
-      idempotencyKey: "atomic-two", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
-    repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "atomic-wait" });
-    const proposalIds = [first.toolCalls[0]!.proposal.proposalId, second.toolCalls[1]!.proposal.proposalId];
-    const input = { turnId: turn.turnId, proposalIds, decision: "approved" as const, expectedTurnRevision: 3,
+    const proposalIds: string[] = [];
+    for (let index = 0; index < 32; index += 1) {
+      const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: index, expectedCampaignRevision: 0,
+        idempotencyKey: `atomic-${index}`, toolName: "roll", arguments: { index }, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      proposalIds.push(proposed.toolCalls[index]!.proposal.proposalId);
+    }
+    repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 32, expectedCampaignRevision: 0, idempotencyKey: "atomic-wait" });
+    const input = { turnId: turn.turnId, proposalIds, decision: "approved" as const, expectedTurnRevision: 33,
       expectedCampaignRevision: 0, idempotencyKey: "atomic-batch" };
     const decided = repo.decideToolProposals("player", input);
-    expect(decided).toMatchObject({ state: "confirmed", revision: 4 });
+    expect(decided).toMatchObject({ state: "confirmed", revision: 34 });
     expect(repo.decideToolProposals("player", { ...input, proposalIds: [...proposalIds].reverse() })).toEqual(decided);
     expect(() => repo.decideToolProposals("player", { ...input, proposalIds: [proposalIds[0]!] })).toThrow(AdventureTurnConflictError);
     const db = new DatabaseDriver(dbPath(), { readonly: true });
-    expect(db.prepare("SELECT expected_turn_revision FROM confirmation_decisions WHERE turn_id=?").all(turn.turnId))
-      .toEqual([{ expected_turn_revision: 3 }, { expected_turn_revision: 3 }]);
+    expect(db.prepare("SELECT count(*) count,min(expected_turn_revision) minimum,max(expected_turn_revision) maximum FROM confirmation_decisions WHERE turn_id=?").get(turn.turnId))
+      .toEqual({ count: 32, minimum: 33, maximum: 33 });
     expect(db.prepare(`SELECT count(*) count FROM adventure_coordination_commands_v36 WHERE aggregate_id=?
       AND mutation_type='confirmation-decisions'`).get(turn.turnId)).toEqual({ count: 1 });
     db.close(); repo.close();
@@ -399,7 +439,7 @@ describe("M1.10 adventure turn repository", () => {
     const turn = repo.createAdventureTurn("player", createInput(identity, "provider-retry"));
     const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
       idempotencyKey: "retry-proposal", toolName: "roll", arguments: {}, requiresConfirmation: false });
-    repo.executeRollActorDice("local-owner", { commandId: "retry-command", idempotencyKey: "retry-command", campaignId: identity.campaignId,
+    repo.executeRollActorDice("local-owner", { commandId: "retry-command", idempotencyKey: proposed.toolCalls[0]!.proposal.executionBinding.idempotencyKey, campaignId: identity.campaignId,
       timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
       command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
     const linked = repo.linkFinalMechanicsReceipt("player", { turnId: turn.turnId, proposalId: proposed.toolCalls[0]!.proposal.proposalId,

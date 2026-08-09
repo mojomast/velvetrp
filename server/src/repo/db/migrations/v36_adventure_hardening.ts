@@ -353,7 +353,17 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
   const badResult = (db.prepare(`SELECT command.aggregate_kind,command.mutation_type,receipt.command_id,receipt.result_json,event.resulting_state,event.narration_status
     FROM adventure_coordination_receipts_v36 receipt JOIN adventure_coordination_commands_v36 command ON command.command_id=receipt.command_id
     JOIN adventure_coordination_events_v36 event ON event.command_id=command.command_id WHERE command.mutation_type<>'migration-snapshot'`).all() as any[]).find((row) => {
-      try { const result = (row.aggregate_kind === "turn" ? privateAdventureTurnSchema : privateGenerationDraftSchema).parse(JSON.parse(row.result_json)) as any;
+      try { const parsed = JSON.parse(row.result_json) as any;
+        // v36 predates the additive private execution binding. Validate its immutable historical results
+        // against today's contract with a deterministic, non-persisted compatibility projection.
+        if (row.aggregate_kind === "turn" && Array.isArray(parsed.toolCalls)) for (const call of parsed.toolCalls) {
+          if (call?.proposal && !call.proposal.executionBinding) call.proposal.executionBinding = {
+            idempotencyKey: `mechanics:${createHash("sha256").update(call.proposal.proposalId).digest("hex").slice(0, 48)}`,
+            commandType: ["roll", "roll-check", "roll_actor_dice"].includes(call.proposal.toolName) ? "roll_actor_dice" : call.proposal.toolName,
+            campaignId: parsed.campaignId, timelineId: parsed.timelineId, actorId: parsed.actorId, sourceTurnId: parsed.turnId,
+          };
+        }
+        const result = (row.aggregate_kind === "turn" ? privateAdventureTurnSchema : privateGenerationDraftSchema).parse(parsed) as any;
         const crashRecoveredMechanics = row.aggregate_kind === "turn" && ["proposed", "confirmed"].includes(row.resulting_state)
           && result.state === "mechanics-committed" && result.receiptLinks.length > 0;
         return (!crashRecoveredMechanics && result.state !== row.resulting_state)

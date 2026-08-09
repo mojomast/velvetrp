@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
 import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
+import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -12,6 +13,12 @@ const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 const AT = "2035-01-01T00:00:00.000Z";
 
 function removeV36(db: DatabaseDriver.Database): void {
+  const v37Names = TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS.map(([, name]) => name);
+  const v37 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v37Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
+    .all(...v37Names) as Array<{ type: string; name: string }>;
+  for (const object of v37) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
+  for (const object of v37) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
+  db.exec("DROP TABLE IF EXISTS tool_execution_binding_layout_attestation_v37; DROP TABLE IF EXISTS tool_proposal_execution_bindings_v37");
   const objects = db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v36*'").all() as Array<{ type: string; name: string }>;
   for (const object of objects) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
   for (const table of ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36", "turn_mechanics_links_v36",
@@ -55,7 +62,7 @@ function createTurnReceipt(): { turnId: string } {
     actorId: "actor", declaration: "Roll", expectedCampaignRevision: 0, idempotencyKey: "turn" });
   const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
     idempotencyKey: "proposal", toolName: "roll", arguments: {}, requiresConfirmation: false });
-  repo.executeRollActorDice("local-owner", { commandId: "legacy-command", idempotencyKey: "legacy-command", campaignId: campaign.id,
+  repo.executeRollActorDice("local-owner", { commandId: "legacy-command", idempotencyKey: proposed.toolCalls[0]!.proposal.executionBinding.idempotencyKey, campaignId: campaign.id,
     timelineId: campaign.activeTimelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
     command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
   repo.linkFinalMechanicsReceipt("player", { turnId: turn.turnId, proposalId: proposed.toolCalls[0]!.proposal.proposalId,
@@ -71,7 +78,7 @@ describe("schema v36 adventure hardening", () => {
     expect(reopened.getGenerationDraft("local-owner", draft.draftId)).toMatchObject({ draftId: draft.draftId, state: "staged" });
     reopened.close();
     const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "36" });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "37" });
     expect(verify.prepare("SELECT mutation_type,expected_revision,resulting_revision FROM adventure_coordination_commands_v36").get())
       .toMatchObject({ mutation_type: "migration-snapshot", expected_revision: -1 });
     verify.close();

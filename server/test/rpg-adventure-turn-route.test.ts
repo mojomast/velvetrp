@@ -107,6 +107,7 @@ describe("M2.11 adventure turn routes", () => {
     expect(events(waiting.body).map(({ type }) => type)).toEqual([
       "turn_started", "agent_status", "tool_proposed", "confirmation_required", "terminal",
     ]);
+    expect(waiting.body).not.toMatch(/executionBinding|mechanics:[a-f0-9]+/);
     const proposalId = proposed.toolCalls[0]!.proposal.proposalId;
     const confirmed = await app.inject({ method: "POST", url: `/api/rpg/v1/adventure-turns/${turn.turnId}/confirm`, headers: { "content-type": "application/json" },
       payload: { proposalIds: [proposalId], decision: "approve", expectedRevision: 2, idempotencyKey: "full-confirm" } });
@@ -114,7 +115,7 @@ describe("M2.11 adventure turn routes", () => {
     await app.close();
 
     repo = createRepository();
-    repo.executeRollActorDice("local-owner", { commandId: "full-command", idempotencyKey: "full-command", campaignId: campaign.id,
+    repo.executeRollActorDice("local-owner", { commandId: "full-command", idempotencyKey: proposed.toolCalls[0]!.proposal.executionBinding.idempotencyKey, campaignId: campaign.id,
       timelineId: campaign.activeTimelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
       command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
     repo.close();

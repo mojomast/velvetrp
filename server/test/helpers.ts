@@ -7,6 +7,7 @@ import { afterEach, beforeEach } from "vitest";
 import { closeRepo } from "../src/repo/index.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
 import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
+import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 
 const tmpDirs: string[] = [];
 
@@ -80,7 +81,7 @@ export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").
   }
 }
 
-/** Removes exact empty v35/v36 adventure artifacts before destructive historical fixture rewinds. */
+/** Removes exact empty v35-v37 adventure artifacts before destructive historical fixture rewinds. */
 export function removeFutureAdventureCoordinationSchema(db: import("better-sqlite3").Database): void {
   const remove = (inventory: ReadonlyArray<readonly [string, string]>, tables: readonly string[]) => {
     const names = inventory.map(([, name]) => name);
@@ -90,6 +91,7 @@ export function removeFutureAdventureCoordinationSchema(db: import("better-sqlit
     for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
     for (const table of tables) db.exec(`DROP TABLE IF EXISTS "${table}"`);
   };
+  remove(TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS, ["tool_execution_binding_layout_attestation_v37", "tool_proposal_execution_bindings_v37"]);
   remove(ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36",
     "turn_mechanics_links_v36", "adventure_coordination_receipts_v36", "adventure_coordination_events_v36", "adventure_coordination_commands_v36"]);
   if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='adventure_turns'").get()) restoreAdventureGenerationV35Guards(db);

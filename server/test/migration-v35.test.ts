@@ -5,6 +5,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
+import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -20,6 +21,12 @@ function schema(databaseFile: string): unknown[] {
 }
 
 function rewindToV34(db: DatabaseDriver.Database): void {
+  const v37Names = TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS.map(([, name]) => name);
+  const v37 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v37Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
+    .all(...v37Names) as Array<{ type: string; name: string }>;
+  for (const row of v37) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
+  for (const row of v37) if (row.type === "index") db.exec(`DROP INDEX IF EXISTS "${row.name}"`);
+  db.exec("DROP TABLE IF EXISTS tool_execution_binding_layout_attestation_v37; DROP TABLE IF EXISTS tool_proposal_execution_bindings_v37");
   const v36 = db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v36*'").all() as Array<{ type: string; name: string }>;
   for (const row of v36) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
   for (const table of ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36", "turn_mechanics_links_v36",
@@ -48,7 +55,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
 
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "36" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "37" });
     expect(migrated.prepare("SELECT title FROM quest_storylines WHERE id='legacy-story'").get()).toEqual({ title: "Legacy story" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM adventure_generation_layout_attestation_v35").get()).toEqual({ length: 64 });
     for (const table of tables) expect(migrated.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });

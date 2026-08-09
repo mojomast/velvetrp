@@ -28,9 +28,17 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     expect(adventureTurnConfirmRequestSchema.parse(command)).toEqual(command);
     expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, proposalIds: ["one", "one"] }).success).toBe(false);
     expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, decision: "approved" }).success).toBe(false);
+    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command,
+      proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`) }).success).toBe(true);
+    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command,
+      proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`) }).success).toBe(false);
     const repositoryCommand = { turnId: "turn", proposalIds: ["one", "two"], decision: "approved",
       expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "confirm" };
     expect(decideToolProposalsInputSchema.parse(repositoryCommand)).toEqual(repositoryCommand);
     expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand, proposalIds: ["one", "one"] }).success).toBe(false);
+    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand,
+      proposalIds: Array.from({ length: 32 }, (_, index) => `proposal-${index}`) }).success).toBe(true);
+    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand,
+      proposalIds: Array.from({ length: 33 }, (_, index) => `proposal-${index}`) }).success).toBe(false);
   });
 });
