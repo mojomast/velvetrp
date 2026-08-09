@@ -5,6 +5,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach } from "vitest";
 import { closeRepo } from "../src/repo/index.js";
+import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
+import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 
 const tmpDirs: string[] = [];
 
@@ -36,6 +38,7 @@ export function useTmpDataDir(): void {
 
 /** Remove impossible future builder artifacts when constructing genuine historical fixtures. */
 export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").Database): void {
+  removeFutureAdventureCoordinationSchema(db);
   removeFutureCharacterProgressionSchema(db);
   const v20Triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger'
     AND (name GLOB '*_v20' OR name GLOB '*_v20_*' OR name GLOB '*_v21' OR name GLOB '*_v21_*'
@@ -75,6 +78,23 @@ export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").
     db.exec(`DROP TRIGGER IF EXISTS ${trigger}; CREATE TRIGGER ${trigger} BEFORE DELETE ON ${table}
       BEGIN SELECT RAISE(ABORT,'${message}'); END;`);
   }
+}
+
+/** Removes exact empty v35/v36 adventure artifacts before destructive historical fixture rewinds. */
+export function removeFutureAdventureCoordinationSchema(db: import("better-sqlite3").Database): void {
+  const remove = (inventory: ReadonlyArray<readonly [string, string]>, tables: readonly string[]) => {
+    const names = inventory.map(([, name]) => name);
+    const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
+      .all(...names) as Array<{ type: string; name: string }>;
+    for (const object of objects) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
+    for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
+    for (const table of tables) db.exec(`DROP TABLE IF EXISTS "${table}"`);
+  };
+  remove(ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36",
+    "turn_mechanics_links_v36", "adventure_coordination_receipts_v36", "adventure_coordination_events_v36", "adventure_coordination_commands_v36"]);
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='adventure_turns'").get()) restoreAdventureGenerationV35Guards(db);
+  remove(ADVENTURE_GENERATION_V35_MANAGED_OBJECTS, ["adventure_generation_layout_attestation_v35", "final_receipt_links", "review_decisions",
+    "generation_drafts", "provider_call_metadata", "confirmation_decisions", "tool_proposals", "adventure_turns"]);
 }
 
 /** Remove only v23 artifacts when a test needs a genuine v19-v22 fixture. */

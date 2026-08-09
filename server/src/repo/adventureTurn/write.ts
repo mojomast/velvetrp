@@ -128,7 +128,9 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
   };
   const finish = <T>(kind: AggregateKind, row: any, principalId: string, mutationType: string, input: any, expected: number,
     state: string, narration: string | null, at: string, read: () => T): T => {
-    const resulting = expected + 1, commandId = command(kind, row, principalId, mutationType, input, expected, resulting, at), eventId = id();
+    const resulting = expected + 1;
+    if (row.revision !== resulting) throw new AdventureTurnStaleError(`${kind} physical revision did not advance exactly once`);
+    const commandId = command(kind, row, principalId, mutationType, input, expected, resulting, at), eventId = id();
     db.prepare(`INSERT INTO adventure_coordination_events_v36(event_id,command_id,aggregate_kind,campaign_id,aggregate_id,principal_id,mutation_type,
       expected_revision,resulting_revision,resulting_state,narration_status,event_json,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(eventId, commandId, kind, row.campaign_id, row.id, principalId, mutationType, expected, resulting, state, narration, canonical({ state, narrationStatus: narration }), at);
@@ -151,6 +153,8 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
     WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
     .all(row.campaign_id, row.id) as any[];
+  const toolMatchesCommand = (toolName: string, commandType: string) => toolName === commandType
+    || (["roll", "roll-check", "roll_actor_dice"].includes(toolName) && commandType === "roll_actor_dice");
   const insertMechanicsLink = (row: any, proposalId: string, commandId: string, at: string) => {
     const authoritative = db.prepare(`SELECT 1 FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id WHERE command.campaign_id=?
@@ -167,13 +171,18 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     const proposals = approvedProposals(row);
     const unlinked = proposals.filter((proposal) => !db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
       .get(row.campaign_id, row.id, proposal.proposal_id));
-    const commands = db.prepare(`SELECT command.command_id FROM campaign_commands command JOIN command_receipts receipt
+    const commands = db.prepare(`SELECT command.command_id,command.type FROM campaign_commands command JOIN command_receipts receipt
       ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
       WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=? AND command.source_turn_id=?
         AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=command.campaign_id AND link.command_id=command.command_id)
-      ORDER BY receipt.revision_after,command.command_id`).all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{ command_id: string }>;
+      ORDER BY receipt.revision_after,command.command_id`).all(row.campaign_id, row.timeline_id, row.actor_id, row.id) as Array<{ command_id: string; type: string }>;
     if (commands.length > unlinked.length) throw new AdventureTurnConflictError("source-turn commands exceed approved proposals");
-    commands.forEach((entry, index) => insertMechanicsLink(row, unlinked[index]!.proposal_id, entry.command_id, at));
+    for (const entry of commands) {
+      const candidates = unlinked.filter((proposal) => toolMatchesCommand(proposal.tool_name, entry.type));
+      if (candidates.length !== 1) throw new AdventureTurnConflictError("source-turn command proposal ancestry is ambiguous");
+      const proposal = candidates[0]!; insertMechanicsLink(row, proposal.proposal_id, entry.command_id, at);
+      unlinked.splice(unlinked.indexOf(proposal), 1);
+    }
     return commands.length;
   };
   const mechanicsState = (row: any): "confirmed" | "mechanics-committed" => {
@@ -199,7 +208,8 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         if (!receipt || !["completed", "cancelled", "failed"].includes(priorState)) throw new AdventureTurnConflictError("narration retry requires a terminal post-mechanics ancestor");
         state = "mechanics-committed"; narration = "pending";
       }
-      const row = { id: id(), campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId } as any;
+      const row = { id: id(), campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId,
+        revision: 0 } as any;
       const at = now(), physicalMode = mode === "narration-fallback" ? "narration-retry" : mode;
       db.prepare(`INSERT INTO adventure_turns(id,campaign_id,timeline_id,session_id,actor_id,principal_id,declaration,mode,prior_turn_id,state,narration_status,
         revision,campaign_revision,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'declared','none',0,?,?,?,?)`)
@@ -242,9 +252,10 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, input.proposalId, principalId, input.decision, row.revision, input.idempotencyKey, input.expiresAt, at);
       const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
         AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id, row.id);
-      let state = "awaiting-confirmation";
+      let state = "awaiting-confirmation", physicalState = "awaiting-confirmation";
       if (!pending) { const approved = approvedProposals(row); state = approved.length > 0 ? "confirmed" : "cancelled";
-        physicalAdvance(row, approved.length > 0 ? "mechanics-committed" : "cancelled", approved.length > 0 ? "pending" : "none", at); }
+        physicalState = approved.length > 0 ? "mechanics-committed" : "cancelled"; }
+      physicalAdvance(row, physicalState, "none", at);
       return finish("turn", row, principalId, "confirmation-decision", input, input.expectedTurnRevision, state, "none", at, () => privateTurn(principalId, row.id));
     }); },
     recordProviderCallStart(principalId, raw) { const input = providerCallStartInputSchema.parse(raw); return immediate(() => {
@@ -255,10 +266,11 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       if (count >= 64 || db.prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=?").get(row.campaign_id, row.id, input.callId)) throw new AdventureTurnConflictError("provider call identity or bound is invalid");
       const at = now(); db.prepare(`INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
         VALUES(?,?,?,?,'started',?,?,?,NULL,NULL,NULL,?,?)`).run(id(), row.campaign_id, row.id, input.callId, input.provider, input.model, input.attempt, input.idempotencyKey, at);
-      const narrating = current.resulting_state === "mechanics-committed";
-      if (narrating && row.state !== "narrating") physicalAdvance(row, "narrating", "in-progress", at);
-      return finish("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, narrating ? "narrating" : current.resulting_state,
-        narrating ? "in-progress" : current.narration_status, at, () => privateTurn(principalId, row.id));
+      const narrating = current.resulting_state === "mechanics-committed" || current.resulting_state === "narrating";
+      const state = narrating ? "narrating" : current.resulting_state, narration = narrating ? "in-progress" : current.narration_status;
+      physicalAdvance(row, narrating ? "narrating" : row.state, narration, at);
+      return finish("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, state,
+        narration, at, () => privateTurn(principalId, row.id));
     }); },
     recordProviderCallOutcome(principalId, raw) { const input = providerCallOutcomeInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
@@ -271,8 +283,10 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, input.callId, input.outcome, input.provider, input.model, input.attempt,
           input.promptTokens ?? null, input.completionTokens ?? null, input.outcomeCode, input.idempotencyKey, at);
       const failedNarration = current.resulting_state === "narrating" && input.outcome !== "succeeded";
+      const narration = failedNarration ? "failed" : current.narration_status;
+      physicalAdvance(row, row.state, narration, at);
       return finish("turn", row, principalId, "provider-outcome", input, input.expectedTurnRevision, current.resulting_state,
-        failedNarration ? "failed" : current.narration_status, at, () => privateTurn(principalId, row.id));
+        narration, at, () => privateTurn(principalId, row.id));
     }); },
     linkFinalMechanicsReceipt(principalId, raw) { const input = linkTurnReceiptInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
@@ -280,7 +294,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot link mechanics");
       if (!approvedProposals(row).some((proposal) => proposal.proposal_id === input.proposalId)) throw new AdventureTurnConflictError("proposal is not approved");
       const at = now(); insertMechanicsLink(row, input.proposalId, input.commandId, at);
-      const state = mechanicsState(row); if (state === "mechanics-committed" && row.state === "proposed") physicalAdvance(row, "mechanics-committed", "pending", at);
+      const state = mechanicsState(row); physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
       return finish("turn", row, principalId, "mechanics-link", input, input.expectedTurnRevision, state, state === "mechanics-committed" ? "pending" : "none", at, () => privateTurn(principalId, row.id));
     }); },
     reconcileAdventureTurnMechanics(principalId, raw) { const input = turnMutationInputSchema.parse(raw); return immediate(() => {
@@ -288,7 +302,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const old = replay("turn", row, principalId, "mechanics-reconcile", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
       const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["proposed", "confirmed", "mechanics-committed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot reconcile mechanics");
       const at = now(), linked = reconcile(row, at); if (linked === 0) throw new AdventureTurnConflictError("no unlinked source-turn command receipts exist");
-      const state = mechanicsState(row); if (state === "mechanics-committed" && row.state === "proposed") physicalAdvance(row, "mechanics-committed", "pending", at);
+      const state = mechanicsState(row); physicalAdvance(row, "mechanics-committed", state === "mechanics-committed" ? "pending" : "none", at);
       return finish("turn", row, principalId, "mechanics-reconcile", input, input.expectedTurnRevision, state, state === "mechanics-committed" ? "pending" : "none", at, () => privateTurn(principalId, row.id));
     }); },
     updateAdventureTurnNarration(principalId, raw) { const input = updateTurnNarrationInputSchema.parse(raw); return immediate(() => {
@@ -307,7 +321,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         if (commandExists) throw new AdventureTurnConflictError("precommit cancellation cannot leave source-turn commands");
       }
       const physicalState = state === "confirmed" ? "mechanics-committed" : state;
-      if (physicalState !== row.state || input.narrationStatus !== row.narration_status) physicalAdvance(row, physicalState, input.narrationStatus, at);
+      physicalAdvance(row, physicalState, input.narrationStatus, at);
       return finish("turn", row, principalId, "narration-update", input, input.expectedTurnRevision, state, input.narrationStatus, at, () => privateTurn(principalId, row.id));
     }); },
     createGenerationDraft(principalId, raw) { const input = createGenerationDraftInputSchema.parse(raw); return immediate(() => {
@@ -317,7 +331,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         AND idempotency_key=? AND mutation_type='draft-create'`).get(input.campaignId, input.idempotencyKey) as any;
       if (existing) { const row = draft(existing.aggregate_id); const old = replay("draft", row, principalId, "draft-create", input, -1, privateGenerationDraftSchema); if (old) return old; }
       const content = stagedGenerationContentSchema.parse(input.stagedContent), validation = generationDraftValidationSchema.parse(input.validation), at = now();
-      const row = { id: id(), campaign_id: input.campaignId } as any;
+      const row = { id: id(), campaign_id: input.campaignId, revision: 0 } as any;
       db.prepare(`INSERT INTO generation_drafts(id,campaign_id,timeline_id,session_id,principal_id,kind,staged_content_json,validation_json,state,revision,campaign_revision,idempotency_key,created_at,updated_at)
         VALUES(?,?,?,?,?,?,?,?,'staged',0,?,?,?,?)`).run(row.id, input.campaignId, input.timelineId, input.sessionId ?? null, principalId,
           input.kind, canonical(content), canonical(validation), input.expectedCampaignRevision, input.idempotencyKey, at, at);
@@ -327,7 +341,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const row = draft(input.draftId); authority(principalId, row, input.expectedCampaignRevision, "draft");
       const old = replay("draft", row, principalId, "draft-review", input, input.expectedDraftRevision, privateGenerationDraftSchema); if (old) return old;
       const current = stale("draft", row, input.expectedDraftRevision); if (current.resulting_state !== "staged") throw new AdventureTurnConflictError("only staged drafts can be reviewed");
-      const at = now(); db.prepare("UPDATE generation_drafts SET state='in-review',revision=revision+1,updated_at=? WHERE id=? AND revision=?").run(at, row.id, row.revision); row.revision += 1;
+      const at = now();
       db.prepare(`INSERT INTO review_decisions(decision_id,campaign_id,draft_id,principal_id,decision,notes,expected_draft_revision,idempotency_key,decided_at)
         VALUES(?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, principalId, input.decision, input.notes ?? null, row.revision, input.idempotencyKey, at);
       db.prepare("UPDATE generation_drafts SET state=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?").run(input.decision, at, row.id, row.revision); row.revision += 1;

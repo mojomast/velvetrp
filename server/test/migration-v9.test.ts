@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
-import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS } from "../src/repo/db/migrations/v36_adventure_hardening.js";
+import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { deleteCampaignForCorruptionTest, makeTmpDataDir, removeFutureCharacterBuilderSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -31,7 +31,7 @@ function createRepresentativeV8(dir: string): string {
   const db = new DatabaseDriver(dbPath);
     db.pragma("foreign_keys = OFF");
     // Remove exact empty future adventure layouts before intentionally dismantling their v9 parents.
-    for (const inventory of [ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ADVENTURE_GENERATION_V35_MANAGED_OBJECTS]) {
+    for (const [index, inventory] of [ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, ADVENTURE_GENERATION_V35_MANAGED_OBJECTS].entries()) {
       const names = inventory.map(([, name]) => name);
       const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL ORDER BY type,name`)
         .all(...names) as Array<{ type: string; name: string }>;
@@ -39,6 +39,7 @@ function createRepresentativeV8(dir: string): string {
       for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
       const tables = objects.filter((object) => object.type === "table").map((object) => object.name).reverse();
       for (const table of tables) db.exec(`DROP TABLE "${table}"`);
+      if (index === 0) restoreAdventureGenerationV35Guards(db);
     }
     removeFutureCharacterBuilderSchema(db);
     db.exec(`

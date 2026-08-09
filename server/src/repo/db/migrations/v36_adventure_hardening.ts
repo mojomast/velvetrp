@@ -7,12 +7,15 @@ import {
   providerCallOutcomeInputSchema, providerCallStartInputSchema, reviewGenerationDraftInputSchema,
   stagedGenerationContentSchema, toolProposalSchema, turnMutationInputSchema, updateTurnNarrationInputSchema,
 } from "@velvet/contracts";
-import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS, assertAdventureGenerationV35 } from "./v35_adventure_generation.js";
+import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS, assertAdventureGenerationV35,
+  validateAdventureGenerationDataV35 } from "./v35_adventure_generation.js";
 
 /** Canonical digest of the committed, immutable v35r1 SQLite layout. */
 export const V35_ADVENTURE_GENERATION_CANONICAL_DIGEST = "e133d1bf2490232c9eef1d9cb9fbca669c2320385f35d28d8bb02c62b5a28133";
+/** Canonical digest of v35-owned objects after v36 supersedes four transition guards. */
+export const V35_ADVENTURE_GENERATION_HARDENED_DIGEST = "aabd25196bc51719e4b91754d729a3a7f95e2df2afee4a96c01b33e0ba832661";
 /** Canonical digest of the v36 hardening layout. Filled from the reviewed DDL, never from persisted attestation. */
-export const V36_ADVENTURE_HARDENING_CANONICAL_DIGEST = "682647023ae9ee9f6c575172a9d142a769641d5ba6649059e8cbf52b3fef5330";
+export const V36_ADVENTURE_HARDENING_CANONICAL_DIGEST = "b19c881dde8817ee7b82e767173ff3182b107a9f1cb498afd52408e051321bcb";
 
 const TABLES = ["adventure_coordination_commands_v36", "adventure_coordination_events_v36",
   "adventure_coordination_receipts_v36", "turn_mechanics_links_v36", "generation_draft_apply_receipts_v36",
@@ -25,6 +28,8 @@ const TRIGGERS = [
   "generation_draft_apply_receipts_validate_v36", "provider_call_metadata_bound_v36",
   "final_receipt_links_provenance_v36", "adventure_hardening_attestation_insert_v36",
   "adventure_hardening_attestation_update_v36", "adventure_hardening_attestation_delete_v36",
+  "adventure_turns_guard_update_v36", "confirmation_decisions_guard_insert_v36",
+  "generation_drafts_guard_update_v36", "review_decisions_guard_insert_v36",
   ...IMMUTABLE.flatMap((table) => [`${table}_insert_v36`, `${table}_update_v36`, `${table}_delete_v36`]),
 ] as const;
 
@@ -55,6 +60,13 @@ function assertInventory(db: DatabaseDriver.Database): void {
 
 /** Creates only additive ledgers, provenance sidecars, and guards over the immutable v35 schema. */
 export function createAdventureHardeningV36(db: DatabaseDriver.Database): void {
+  if (db.prepare("SELECT 1 FROM final_receipt_links WHERE turn_id IS NOT NULL LIMIT 1").get()) {
+    throw new Error("schema v35 turn receipt ancestry is ambiguous and cannot be migrated");
+  }
+  db.exec(`DROP TRIGGER adventure_turns_guard_update_v35;
+    DROP TRIGGER confirmation_decisions_guard_insert_v35;
+    DROP TRIGGER generation_drafts_guard_update_v35;
+    DROP TRIGGER review_decisions_guard_insert_v35;`);
   db.exec(`
     CREATE TABLE adventure_coordination_commands_v36(
       command_id TEXT PRIMARY KEY, aggregate_kind TEXT NOT NULL CHECK(aggregate_kind IN ('turn','draft')),
@@ -108,7 +120,11 @@ export function createAdventureHardeningV36(db: DatabaseDriver.Database): void {
       BEGIN SELECT RAISE(ABORT,'invalid adventure coordination command'); END;
     CREATE TRIGGER adventure_coordination_events_validate_v36 BEFORE INSERT ON adventure_coordination_events_v36 WHEN
       EXISTS(SELECT 1 FROM adventure_coordination_events_v36 old WHERE old.event_id=NEW.event_id OR old.command_id=NEW.command_id OR
-        (old.aggregate_kind=NEW.aggregate_kind AND old.campaign_id=NEW.campaign_id AND old.aggregate_id=NEW.aggregate_id AND old.resulting_revision=NEW.resulting_revision))
+        (old.aggregate_kind=NEW.aggregate_kind AND old.campaign_id=NEW.campaign_id AND old.aggregate_id=NEW.aggregate_id AND old.resulting_revision=NEW.resulting_revision)) OR
+      (NEW.aggregate_kind='turn' AND NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=NEW.campaign_id
+        AND turn.id=NEW.aggregate_id AND turn.revision=NEW.resulting_revision)) OR
+      (NEW.aggregate_kind='draft' AND NOT EXISTS(SELECT 1 FROM generation_drafts draft WHERE draft.campaign_id=NEW.campaign_id
+        AND draft.id=NEW.aggregate_id AND draft.revision=NEW.resulting_revision))
       BEGIN SELECT RAISE(ABORT,'invalid adventure coordination event'); END;
     CREATE TRIGGER adventure_coordination_receipts_validate_v36 BEFORE INSERT ON adventure_coordination_receipts_v36 WHEN
       EXISTS(SELECT 1 FROM adventure_coordination_receipts_v36 old WHERE old.command_id=NEW.command_id OR old.event_id=NEW.event_id) OR
@@ -120,7 +136,17 @@ export function createAdventureHardeningV36(db: DatabaseDriver.Database): void {
       EXISTS(SELECT 1 FROM turn_mechanics_links_v36 old WHERE old.link_id=NEW.link_id OR (old.campaign_id=NEW.campaign_id AND (old.command_id=NEW.command_id OR (old.turn_id=NEW.turn_id AND old.proposal_id=NEW.proposal_id)))) OR
       NEW.turn_id<>NEW.root_turn_id OR NEW.source_turn_id<>NEW.root_turn_id OR
       NOT EXISTS(SELECT 1 FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
-        WHERE proposal.campaign_id=NEW.campaign_id AND proposal.turn_id=NEW.turn_id AND proposal.proposal_id=NEW.proposal_id AND (proposal.requires_confirmation=0 OR decision.decision='approved'))
+        WHERE proposal.campaign_id=NEW.campaign_id AND proposal.turn_id=NEW.turn_id AND proposal.proposal_id=NEW.proposal_id AND
+          (proposal.requires_confirmation=0 OR decision.decision='approved')) OR
+      NOT EXISTS(SELECT 1 FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id AND campaign.active_timeline_id=turn.timeline_id
+        JOIN campaign_commands command ON command.campaign_id=turn.campaign_id AND command.command_id=NEW.command_id
+          AND command.timeline_id=turn.timeline_id AND command.actor_id=turn.actor_id AND command.source_turn_id=turn.id
+        JOIN command_receipts receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+        JOIN campaign_events event ON event.campaign_id=receipt.campaign_id AND event.command_id=receipt.command_id AND event.event_id=receipt.event_id
+          AND event.timeline_id=turn.timeline_id AND event.actor_id=turn.actor_id AND event.source_turn_id=turn.id
+        JOIN tool_proposals proposal ON proposal.campaign_id=turn.campaign_id AND proposal.turn_id=turn.id AND proposal.proposal_id=NEW.proposal_id
+        WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND NEW.source_turn_id=turn.id AND
+          (proposal.tool_name=command.type OR (proposal.tool_name IN ('roll','roll-check','roll_actor_dice') AND command.type='roll_actor_dice')))
       BEGIN SELECT RAISE(ABORT,'invalid mechanics receipt provenance'); END;
     CREATE TRIGGER generation_draft_apply_receipts_validate_v36 BEFORE INSERT ON generation_draft_apply_receipts_v36 WHEN
       EXISTS(SELECT 1 FROM generation_draft_apply_receipts_v36 old WHERE old.receipt_id=NEW.receipt_id OR (old.campaign_id=NEW.campaign_id AND old.draft_id=NEW.draft_id)) OR
@@ -136,6 +162,36 @@ export function createAdventureHardeningV36(db: DatabaseDriver.Database): void {
       NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 sidecar WHERE sidecar.link_id=NEW.link_id AND sidecar.campaign_id=NEW.campaign_id
         AND sidecar.turn_id=NEW.turn_id AND sidecar.command_id=NEW.command_id)
       BEGIN SELECT RAISE(ABORT,'final receipt link requires v36 provenance'); END;
+
+    CREATE TRIGGER adventure_turns_guard_update_v36 BEFORE UPDATE ON adventure_turns WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
+      NEW.timeline_id<>OLD.timeline_id OR NEW.session_id<>OLD.session_id OR NEW.actor_id<>OLD.actor_id OR NEW.principal_id<>OLD.principal_id OR
+      NEW.declaration<>OLD.declaration OR NEW.mode<>OLD.mode OR NEW.prior_turn_id IS NOT OLD.prior_turn_id OR NEW.idempotency_key<>OLD.idempotency_key OR
+      NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT (
+        (OLD.state='declared' AND NEW.state IN ('declared','proposed','narrating','cancelled','failed')) OR
+        (OLD.state='proposed' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
+        (OLD.state='awaiting-confirmation' AND NEW.state IN ('awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
+        (OLD.state='mechanics-committed' AND NEW.state IN ('mechanics-committed','narrating','completed','cancelled','failed')) OR
+        (OLD.state='narrating' AND NEW.state IN ('narrating','completed','cancelled','failed')))
+      BEGIN SELECT RAISE(ABORT,'invalid adventure turn transition'); END;
+    CREATE TRIGGER confirmation_decisions_guard_insert_v36 BEFORE INSERT ON confirmation_decisions WHEN EXISTS(SELECT 1 FROM confirmation_decisions old
+      WHERE old.decision_id=NEW.decision_id OR (old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id AND
+        (old.proposal_id=NEW.proposal_id OR old.idempotency_key=NEW.idempotency_key))) OR
+      NOT EXISTS(SELECT 1 FROM adventure_turns turn JOIN tool_proposals proposal ON proposal.campaign_id=turn.campaign_id AND proposal.turn_id=turn.id
+        WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND proposal.proposal_id=NEW.proposal_id AND proposal.requires_confirmation=1
+          AND proposal.confirmation_expires_at=NEW.expires_at AND turn.state='awaiting-confirmation' AND turn.revision=NEW.expected_turn_revision)
+      BEGIN SELECT RAISE(ABORT,'invalid or duplicate confirmation decision'); END;
+    CREATE TRIGGER generation_drafts_guard_update_v36 BEFORE UPDATE ON generation_drafts WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
+      NEW.timeline_id<>OLD.timeline_id OR NEW.session_id IS NOT OLD.session_id OR NEW.principal_id<>OLD.principal_id OR NEW.kind<>OLD.kind OR
+      NEW.idempotency_key<>OLD.idempotency_key OR NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR
+      NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT ((OLD.state='staged' AND NEW.state IN ('staged','in-review','approved','rejected','cancelled')) OR
+      (OLD.state='in-review' AND NEW.state IN ('in-review','approved','rejected','cancelled')) OR (OLD.state='approved' AND NEW.state IN ('approved','applied','cancelled')))
+      BEGIN SELECT RAISE(ABORT,'invalid generation draft transition'); END;
+    CREATE TRIGGER review_decisions_guard_insert_v36 BEFORE INSERT ON review_decisions WHEN EXISTS(SELECT 1 FROM review_decisions old
+      WHERE old.decision_id=NEW.decision_id OR (old.campaign_id=NEW.campaign_id AND old.draft_id=NEW.draft_id)) OR
+      NOT EXISTS(SELECT 1 FROM generation_drafts draft WHERE draft.campaign_id=NEW.campaign_id AND draft.id=NEW.draft_id
+        AND draft.state IN ('staged','in-review') AND draft.revision=NEW.expected_draft_revision) OR NOT EXISTS(SELECT 1 FROM campaign_memberships member
+        WHERE member.campaign_id=NEW.campaign_id AND member.principal_id=NEW.principal_id AND member.role IN ('owner','gm'))
+      BEGIN SELECT RAISE(ABORT,'invalid or duplicate review decision'); END;
   `);
   for (const table of IMMUTABLE) db.exec(`CREATE TRIGGER ${table}_insert_v36 BEFORE INSERT ON ${table} WHEN EXISTS(SELECT 1 FROM ${table} old WHERE old.rowid=NEW.rowid) BEGIN SELECT RAISE(ABORT,'${table} records are immutable'); END;
     CREATE TRIGGER ${table}_update_v36 BEFORE UPDATE ON ${table} BEGIN SELECT RAISE(ABORT,'${table} records are immutable'); END;
@@ -146,17 +202,6 @@ export function createAdventureHardeningV36(db: DatabaseDriver.Database): void {
   assertInventory(db);
   db.prepare("INSERT INTO adventure_hardening_layout_attestation_v36 VALUES(1,?,?)").run(V35_ADVENTURE_GENERATION_CANONICAL_DIGEST, layoutDigest(db));
 
-  // Prove and preserve every v35 mechanics link rather than trusting its formerly broad command-receipt FK.
-  for (const turn of db.prepare("SELECT * FROM adventure_turns WHERE mode='original' ORDER BY campaign_id,created_at,id").all() as any[]) {
-    const proposals = db.prepare(`SELECT proposal.proposal_id FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
-      ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
-      WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
-      .all(turn.campaign_id, turn.id) as Array<{ proposal_id: string }>;
-    const links = db.prepare("SELECT * FROM final_receipt_links WHERE campaign_id=? AND turn_id=? ORDER BY linked_at,link_id").all(turn.campaign_id, turn.id) as any[];
-    if (links.length > proposals.length) throw new Error(`schema v35 turn has receipts without approved proposals (${turn.id})`);
-    links.forEach((link, index) => db.prepare(`INSERT INTO turn_mechanics_links_v36(link_id,campaign_id,turn_id,root_turn_id,proposal_id,command_id,source_turn_id,linked_at)
-      VALUES(?,?,?,?,?,?,?,?)`).run(link.link_id, turn.campaign_id, turn.id, turn.id, proposals[index]!.proposal_id, link.command_id, turn.id, link.linked_at));
-  }
   // Legacy applied drafts are upgraded to a draft-specific receipt tied to their exact approved review.
   for (const draft of db.prepare("SELECT * FROM generation_drafts WHERE state='applied' ORDER BY campaign_id,created_at,id").all() as any[]) {
     const review = db.prepare("SELECT * FROM review_decisions WHERE campaign_id=? AND draft_id=? AND decision='approved'").get(draft.campaign_id, draft.id) as any;
@@ -223,6 +268,29 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
     current.expected_revision<>COALESCE((SELECT max(prior.resulting_revision) FROM adventure_coordination_events_v36 prior WHERE prior.aggregate_kind=current.aggregate_kind
       AND prior.campaign_id=current.campaign_id AND prior.aggregate_id=current.aggregate_id AND prior.resulting_revision<current.resulting_revision),-1) LIMIT 1`).get() as { command_id: string } | undefined;
   if (badSequence) throw new Error(`schema v36 coordination ledger is not contiguous (${badSequence.command_id})`);
+  const revisionDrift = db.prepare(`SELECT event.event_id FROM adventure_coordination_events_v36 event WHERE event.resulting_revision=(
+      SELECT max(latest.resulting_revision) FROM adventure_coordination_events_v36 latest WHERE latest.aggregate_kind=event.aggregate_kind
+        AND latest.campaign_id=event.campaign_id AND latest.aggregate_id=event.aggregate_id) AND (
+    (event.aggregate_kind='turn' AND NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=event.campaign_id
+      AND turn.id=event.aggregate_id AND turn.revision=event.resulting_revision)) OR
+    (event.aggregate_kind='draft' AND NOT EXISTS(SELECT 1 FROM generation_drafts draft WHERE draft.campaign_id=event.campaign_id
+      AND draft.id=event.aggregate_id AND draft.revision=event.resulting_revision))) LIMIT 1`).get() as { event_id: string } | undefined;
+  if (revisionDrift) throw new Error(`schema v36 aggregate revision drifted from coordination event (${revisionDrift.event_id})`);
+  const decisionDrift = db.prepare(`SELECT decision.decision_id FROM confirmation_decisions decision WHERE NOT EXISTS(
+      SELECT 1 FROM adventure_coordination_commands_v36 snapshot WHERE snapshot.aggregate_kind='turn' AND snapshot.campaign_id=decision.campaign_id
+        AND snapshot.aggregate_id=decision.turn_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
+      SELECT 1 FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='turn' AND command.campaign_id=decision.campaign_id
+        AND command.aggregate_id=decision.turn_id AND command.mutation_type='confirmation-decision' AND command.principal_id=decision.principal_id
+        AND command.idempotency_key=decision.idempotency_key AND command.expected_revision=decision.expected_turn_revision
+        AND json_extract(command.request_json,'$.proposalId')=decision.proposal_id AND json_extract(command.request_json,'$.decision')=decision.decision)
+    UNION ALL SELECT review.decision_id FROM review_decisions review WHERE NOT EXISTS(
+      SELECT 1 FROM adventure_coordination_commands_v36 snapshot WHERE snapshot.aggregate_kind='draft' AND snapshot.campaign_id=review.campaign_id
+        AND snapshot.aggregate_id=review.draft_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
+      SELECT 1 FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='draft' AND command.campaign_id=review.campaign_id
+        AND command.aggregate_id=review.draft_id AND command.mutation_type='draft-review' AND command.principal_id=review.principal_id
+        AND command.idempotency_key=review.idempotency_key AND command.expected_revision=review.expected_draft_revision
+        AND json_extract(command.request_json,'$.decision')=review.decision) LIMIT 1`).get() as { decision_id: string } | undefined;
+  if (decisionDrift) throw new Error(`schema v36 decision revision drifted from coordination command (${decisionDrift.decision_id})`);
   const badProvider = db.prepare(`SELECT turn_id FROM provider_call_metadata GROUP BY campaign_id,turn_id HAVING count(*)>64
     UNION ALL SELECT terminal.turn_id FROM provider_call_metadata terminal WHERE terminal.phase<>'started' AND NOT EXISTS(SELECT 1 FROM provider_call_metadata start
       WHERE start.campaign_id=terminal.campaign_id AND start.turn_id=terminal.turn_id AND start.call_id=terminal.call_id AND start.phase='started'
@@ -276,14 +344,24 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
 
 /** Attests fixed v35/v36 layouts and validates all coordination data. */
 export function assertAdventureHardeningV36(db: DatabaseDriver.Database): void {
-  assertAdventureGenerationV35(db);
   assertAdventureHardeningLayoutV36(db);
+  validateAdventureGenerationDataV35(db);
   validateAdventureHardeningDataV36(db);
 }
 
 /** Validates only canonical v35/v36 SQL, allowing exact empty future shells to be inventoried before old migrations. */
 export function assertAdventureHardeningLayoutV36(db: DatabaseDriver.Database): void {
-  assertAdventureGenerationLayoutV35Canonical(db);
+  const attestation = db.prepare("SELECT layout_digest FROM adventure_generation_layout_attestation_v35 WHERE singleton=1").get() as { layout_digest: string } | undefined;
+  const superseded = new Set(["adventure_turns_guard_update_v35", "confirmation_decisions_guard_insert_v35",
+    "generation_drafts_guard_update_v35", "review_decisions_guard_insert_v35"]);
+  const hardenedObjects = ADVENTURE_GENERATION_V35_MANAGED_OBJECTS.filter(([, name]) => !superseded.has(name));
+  const hardenedRows = db.prepare(`SELECT type,name,sql FROM sqlite_master WHERE name IN (${hardenedObjects.map(() => "?").join(",")})
+    AND sql IS NOT NULL ORDER BY type,name`).all(...hardenedObjects.map(([, name]) => name));
+  const hardenedDigest = createHash("sha256").update(JSON.stringify(hardenedRows)).digest("hex");
+  if (attestation?.layout_digest !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST || hardenedRows.length !== hardenedObjects.length
+      || (V35_ADVENTURE_GENERATION_HARDENED_DIGEST && hardenedDigest !== V35_ADVENTURE_GENERATION_HARDENED_DIGEST)) {
+    throw new Error("schema v35 hardened adventure/generation layout is incompatible");
+  }
   assertInventory(db); const actual = layoutDigest(db);
   const row = db.prepare("SELECT v35_layout_digest,layout_digest FROM adventure_hardening_layout_attestation_v36 WHERE singleton=1").get() as any;
   if (!row || row.v35_layout_digest !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST || row.layout_digest !== actual
@@ -300,7 +378,47 @@ export function assertAdventureGenerationLayoutV35Canonical(db: DatabaseDriver.D
     throw new Error("schema v35 canonical adventure/generation layout is incompatible");
 }
 
+/** Restores the exact base-v35 guards after removing an empty future-v36 shell. */
+export function restoreAdventureGenerationV35Guards(db: DatabaseDriver.Database): void {
+  db.exec(`DROP TRIGGER IF EXISTS adventure_turns_guard_update_v36;
+    DROP TRIGGER IF EXISTS confirmation_decisions_guard_insert_v36;
+    DROP TRIGGER IF EXISTS generation_drafts_guard_update_v36;
+    DROP TRIGGER IF EXISTS review_decisions_guard_insert_v36;
+    CREATE TRIGGER IF NOT EXISTS adventure_turns_guard_update_v35 BEFORE UPDATE ON adventure_turns WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
+      NEW.timeline_id<>OLD.timeline_id OR NEW.session_id<>OLD.session_id OR NEW.actor_id<>OLD.actor_id OR NEW.principal_id<>OLD.principal_id OR
+      NEW.declaration<>OLD.declaration OR NEW.mode<>OLD.mode OR NEW.prior_turn_id IS NOT OLD.prior_turn_id OR NEW.idempotency_key<>OLD.idempotency_key OR
+      NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT (
+        (OLD.state='declared' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','narrating','cancelled','failed')) OR
+        (OLD.state='proposed' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
+        (OLD.state='awaiting-confirmation' AND NEW.state IN ('mechanics-committed','cancelled','failed')) OR
+        (OLD.state='mechanics-committed' AND NEW.state IN ('mechanics-committed','narrating','completed','cancelled','failed')) OR
+        (OLD.state='narrating' AND NEW.state IN ('narrating','completed','cancelled','failed'))) BEGIN SELECT RAISE(ABORT,'invalid adventure turn transition'); END;
+    CREATE TRIGGER IF NOT EXISTS confirmation_decisions_guard_insert_v35 BEFORE INSERT ON confirmation_decisions WHEN EXISTS(SELECT 1 FROM confirmation_decisions old WHERE old.decision_id=NEW.decision_id OR
+      (old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id AND (old.proposal_id=NEW.proposal_id OR old.idempotency_key=NEW.idempotency_key))) OR
+      NOT EXISTS(SELECT 1 FROM adventure_turns turn JOIN tool_proposals proposal ON proposal.campaign_id=turn.campaign_id AND proposal.turn_id=turn.id
+        WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND proposal.proposal_id=NEW.proposal_id AND proposal.requires_confirmation=1
+          AND proposal.confirmation_expires_at=NEW.expires_at AND turn.state='awaiting-confirmation' AND turn.revision=NEW.expected_turn_revision)
+      BEGIN SELECT RAISE(ABORT,'invalid or duplicate confirmation decision'); END;
+    CREATE TRIGGER IF NOT EXISTS generation_drafts_guard_update_v35 BEFORE UPDATE ON generation_drafts WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
+      NEW.timeline_id<>OLD.timeline_id OR NEW.session_id IS NOT OLD.session_id OR NEW.principal_id<>OLD.principal_id OR NEW.kind<>OLD.kind OR
+      NEW.idempotency_key<>OLD.idempotency_key OR NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR
+      NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT ((OLD.state='staged' AND NEW.state IN ('staged','in-review','cancelled')) OR
+      (OLD.state='in-review' AND NEW.state IN ('in-review','approved','rejected','cancelled')) OR (OLD.state='approved' AND NEW.state IN ('approved','applied','cancelled')))
+      BEGIN SELECT RAISE(ABORT,'invalid generation draft transition'); END;
+    CREATE TRIGGER IF NOT EXISTS review_decisions_guard_insert_v35 BEFORE INSERT ON review_decisions WHEN EXISTS(SELECT 1 FROM review_decisions old WHERE old.decision_id=NEW.decision_id OR
+      (old.campaign_id=NEW.campaign_id AND old.draft_id=NEW.draft_id)) OR NOT EXISTS(SELECT 1 FROM generation_drafts draft WHERE draft.campaign_id=NEW.campaign_id
+        AND draft.id=NEW.draft_id AND draft.state='in-review' AND draft.revision=NEW.expected_draft_revision) OR NOT EXISTS(SELECT 1 FROM campaign_memberships member
+        WHERE member.campaign_id=NEW.campaign_id AND member.principal_id=NEW.principal_id AND member.role IN ('owner','gm'))
+      BEGIN SELECT RAISE(ABORT,'invalid or duplicate review decision'); END;`);
+}
+
 /** Migrates v35 to additive v36 without changing any applied v35 table. */
 export function migrate35to36(db: DatabaseDriver.Database): void {
-  db.transaction(() => { assertAdventureGenerationV35(db); createAdventureHardeningV36(db); db.prepare("UPDATE meta SET value='36' WHERE key='schemaVersion'").run(); })();
+  db.transaction(() => {
+    assertAdventureGenerationV35(db);
+    if (db.prepare("SELECT 1 FROM final_receipt_links WHERE turn_id IS NOT NULL LIMIT 1").get()) {
+      throw new Error("schema v35 turn receipt ancestry is ambiguous and cannot be migrated");
+    }
+    createAdventureHardeningV36(db); db.prepare("UPDATE meta SET value='36' WHERE key='schemaVersion'").run();
+  })();
 }

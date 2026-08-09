@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -24,6 +25,7 @@ function rewindToV34(db: DatabaseDriver.Database): void {
   for (const table of ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36", "turn_mechanics_links_v36",
     "adventure_coordination_receipts_v36", "adventure_coordination_events_v36", "adventure_coordination_commands_v36"]) db.exec(`DROP TABLE IF EXISTS "${table}"`);
   for (const row of v36) if (row.type === "index") db.exec(`DROP INDEX IF EXISTS "${row.name}"`);
+  restoreAdventureGenerationV35Guards(db);
   const managed = db.prepare(`SELECT type,name FROM sqlite_master WHERE name GLOB '*v35*' OR name IN
     ('adventure_turns','tool_proposals','confirmation_decisions','provider_call_metadata','generation_drafts','review_decisions','final_receipt_links')`).all() as Array<{ type: string; name: string }>;
   for (const row of managed) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
@@ -76,7 +78,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
     const db = new DatabaseDriver(file());
     db.exec("DROP TRIGGER provider_call_metadata_guard_insert_v35");
     db.close();
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("schema v35 adventure/generation object inventory is incompatible");
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("schema v35 hardened adventure/generation layout is incompatible");
   });
 
   it("never cleans populated future v35 data from a v34 marker", () => {

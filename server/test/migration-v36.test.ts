@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrations/v35_adventure_generation.js";
+import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -16,6 +17,7 @@ function removeV36(db: DatabaseDriver.Database): void {
   for (const table of ["adventure_hardening_layout_attestation_v36", "generation_draft_apply_receipts_v36", "turn_mechanics_links_v36",
     "adventure_coordination_receipts_v36", "adventure_coordination_events_v36", "adventure_coordination_commands_v36"]) db.exec(`DROP TABLE IF EXISTS "${table}"`);
   for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
+  restoreAdventureGenerationV35Guards(db);
 }
 
 function createDraft() {
@@ -25,6 +27,40 @@ function createDraft() {
     kind: "encounter", stagedContent: { title: "Ambush" }, validation: { valid: true, issues: [], validatedAt: AT },
     expectedCampaignRevision: 0, idempotencyKey: "draft" });
   repo.close(); return { campaign, draft };
+}
+
+function createTurnReceipt(): { turnId: string } {
+  let repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date(AT) } });
+  const campaign = repo.createCampaign("local-owner", { name: "Legacy receipt" }); repo.close();
+  const db = new DatabaseDriver(file()); db.pragma("foreign_keys=ON");
+  db.prepare("INSERT INTO principals VALUES ('player','Player',0)").run();
+  db.prepare("INSERT INTO campaign_memberships VALUES (?,'player','player',?)").run(campaign.id, AT);
+  db.prepare("INSERT INTO characters VALUES ('persona','Hero',30,'hero','',1,0,?)").run(AT);
+  db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile','Profile','Rules','[]')").run();
+  db.prepare("INSERT INTO rpg_content_packs VALUES ('pack','1','profile','Pack','Pack','[]',0)").run();
+  db.prepare("INSERT INTO rpg_definitions VALUES ('pack','1','race','human','Human','Race','[]'),('pack','1','background','hero','Hero','Background','[]')").run();
+  db.prepare("UPDATE rpg_content_packs SET sealed=1 WHERE pack_id='pack'").run();
+  db.prepare("INSERT INTO campaign_rules_profiles VALUES (?,'profile')").run(campaign.id);
+  db.prepare("INSERT INTO campaign_content_packs VALUES (?,'pack','1','profile')").run(campaign.id);
+  db.prepare("INSERT INTO campaign_characters VALUES ('cc',?,'persona',?,?)").run(campaign.id, AT, AT);
+  db.prepare("INSERT INTO rpg_campaign_sheets VALUES ('sheet',?,'cc','pack','1','race','human','pack','1','background','hero',?,?)").run(campaign.id, AT, AT);
+  db.prepare("INSERT INTO campaign_actors VALUES ('actor',?,'cc','sheet','player-character','principal',?,?)").run(campaign.id, AT, AT);
+  db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor',?,'player','')").run(campaign.id);
+  db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(AT);
+  db.prepare("INSERT INTO session_characters VALUES('session','persona',0)").run();
+  db.prepare("INSERT INTO campaign_sessions VALUES('session',?,?)").run(campaign.id, AT); db.close();
+  let sequence = 0; repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date(AT) },
+    ids: { nextId: () => `legacy-${++sequence}` }, rng: { integer: (minimum) => minimum } });
+  const turn = repo.createAdventureTurn("player", { campaignId: campaign.id, timelineId: campaign.activeTimelineId, sessionId: "session",
+    actorId: "actor", declaration: "Roll", expectedCampaignRevision: 0, idempotencyKey: "turn" });
+  const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
+    idempotencyKey: "proposal", toolName: "roll", arguments: {}, requiresConfirmation: false });
+  repo.executeRollActorDice("local-owner", { commandId: "legacy-command", idempotencyKey: "legacy-command", campaignId: campaign.id,
+    timelineId: campaign.activeTimelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
+    command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
+  repo.linkFinalMechanicsReceipt("player", { turnId: turn.turnId, proposalId: proposed.toolCalls[0]!.proposal.proposalId,
+    commandId: "legacy-command", expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "link" });
+  repo.close(); return { turnId: turn.turnId };
 }
 
 describe("schema v36 adventure hardening", () => {
@@ -59,7 +95,7 @@ describe("schema v36 adventure hardening", () => {
     db.prepare("UPDATE adventure_generation_layout_attestation_v35 SET layout_digest=? WHERE singleton=1").run(resealed);
     db.exec("CREATE TRIGGER adventure_generation_attestation_immutable_update_v35 BEFORE UPDATE ON adventure_generation_layout_attestation_v35 BEGIN SELECT RAISE(ABORT,'adventure/generation attestation is immutable'); END;");
     db.close();
-    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("canonical adventure/generation layout");
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("hardened adventure/generation layout");
   });
 
   it("rejects malformed persisted shared-contract JSON at startup", () => {
@@ -76,5 +112,15 @@ describe("schema v36 adventure hardening", () => {
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("malformed partial future v36 artifacts");
     const verify = new DatabaseDriver(file(), { readonly: true });
     expect(verify.prepare("SELECT 1 FROM sqlite_master WHERE name='adventure_coordination_commands_v36'").get()).toEqual({ 1: 1 }); verify.close();
+  });
+
+  it("rolls back v35 migration instead of fabricating ambiguous proposal receipt ancestry", () => {
+    const { turnId } = createTurnReceipt(); const db = new DatabaseDriver(file());
+    removeV36(db); db.prepare("UPDATE meta SET value='35' WHERE key='schemaVersion'").run(); db.close();
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR! })).toThrow("turn receipt ancestry is ambiguous");
+    const verify = new DatabaseDriver(file(), { readonly: true });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "35" });
+    expect(verify.prepare("SELECT command_id FROM final_receipt_links WHERE turn_id=?").get(turnId)).toEqual({ command_id: "legacy-command" });
+    expect(verify.prepare("SELECT 1 FROM sqlite_master WHERE name='turn_mechanics_links_v36'").get()).toBeUndefined(); verify.close();
   });
 });

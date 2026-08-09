@@ -2,7 +2,8 @@
 import DatabaseDriver from "better-sqlite3";
 import { STORY_V34_MANAGED_OBJECTS } from "./migrations/v34_story_domain.js";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "./migrations/v35_adventure_generation.js";
-import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, assertAdventureGenerationLayoutV35Canonical, assertAdventureHardeningLayoutV36 } from "./migrations/v36_adventure_hardening.js";
+import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, assertAdventureGenerationLayoutV35Canonical,
+  assertAdventureHardeningLayoutV36, restoreAdventureGenerationV35Guards } from "./migrations/v36_adventure_hardening.js";
 
 type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
@@ -114,12 +115,13 @@ function cleanupFutureAdventureHardeningV36(db: DatabaseDriver.Database, marker:
     for (const artifact of artifacts) if (artifact.type === "trigger") db.exec(`DROP TRIGGER "${artifact.name}"`);
     for (const artifact of artifacts) if (artifact.type === "index") db.exec(`DROP INDEX IF EXISTS "${artifact.name}"`);
     for (const table of V36_TABLE_DROP_ORDER) db.exec(`DROP TABLE "${table}"`);
+    restoreAdventureGenerationV35Guards(db);
   })();
 }
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureGenerationV35, assertAdventureHardeningV36, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
@@ -192,7 +194,6 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertWorldNarrativeV32(db);
     assertQuestDomainV33(db);
     assertStoryDomainV34(db);
-    assertAdventureGenerationV35(db);
     assertAdventureHardeningV36(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
@@ -516,7 +517,6 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertWorldNarrativeV32(db);
   assertQuestDomainV33(db);
   assertStoryDomainV34(db);
-  assertAdventureGenerationV35(db);
   assertAdventureHardeningV36(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
