@@ -214,9 +214,8 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         const prior = turn(priorId!); authority(principalId, prior, input.expectedCampaignRevision, "turn");
         if (prior.campaign_id !== input.campaignId || prior.timeline_id !== input.timelineId || prior.session_id !== input.sessionId || prior.actor_id !== input.actorId)
           throw new AdventureTurnConflictError("narration ancestry is out of scope");
-        const source = root(prior), priorState = latest("turn", prior.campaign_id, prior.id)?.resulting_state;
-        const receipt = db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(source.campaign_id, source.id);
-        if (!receipt || !["completed", "cancelled", "failed"].includes(priorState)) throw new AdventureTurnConflictError("narration retry requires a terminal post-mechanics ancestor");
+        const priorState = latest("turn", prior.campaign_id, prior.id)?.resulting_state;
+        if (!["completed", "cancelled", "failed"].includes(priorState)) throw new AdventureTurnConflictError("narration retry requires a terminal ancestor");
         state = "mechanics-committed"; narration = "pending";
       }
       const row = { id: id(), campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId,
@@ -369,10 +368,11 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const rootRow = root(row); const hasMechanics = Boolean(db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(rootRow.campaign_id, rootRow.id));
       const hasProposals = Boolean(db.prepare("SELECT 1 FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
       const deterministicFallback = row.mode === "original" && !hasProposals;
+      const narrationDerivative = row.mode !== "original";
       let state = input.terminalState ?? current.resulting_state;
-      if (input.terminalState === "completed" && (current.resulting_state !== "narrating" || (!hasMechanics && !deterministicFallback))) throw new AdventureTurnConflictError("only committed or deterministic fallback narration can complete");
+      if (input.terminalState === "completed" && (current.resulting_state !== "narrating" || (!hasMechanics && !deterministicFallback && !narrationDerivative))) throw new AdventureTurnConflictError("only committed, derivative, or deterministic fallback narration can complete");
       if (!input.terminalState && input.narrationStatus !== "none") {
-        if (!hasMechanics && !deterministicFallback) throw new AdventureTurnConflictError("narration requires committed mechanics or an empty fallback turn"); state = "narrating";
+        if (!hasMechanics && !deterministicFallback && !narrationDerivative) throw new AdventureTurnConflictError("narration requires committed mechanics, a derivative, or an empty fallback turn"); state = "narrating";
       }
       if (input.terminalState === "cancelled" && !hasMechanics) {
         const commandExists = db.prepare("SELECT 1 FROM campaign_commands WHERE campaign_id=? AND source_turn_id=?").get(row.campaign_id, rootRow.id);

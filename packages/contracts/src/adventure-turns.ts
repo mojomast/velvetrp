@@ -124,7 +124,8 @@ const turnStateRefinement = (value: { state: z.infer<typeof adventureTurnStateSc
   if ((value.mode === "original") !== (value.priorTurnId === null)) context.addIssue({ code: "custom", path: ["priorTurnId"], message: "turn mode and ancestry must agree" });
   if (["mechanics-committed", "narrating", "completed"].includes(value.state) && value.receiptLinks.length === 0
       && !(value.mode === "original" && "proposals" in value && Array.isArray(value.proposals) && value.proposals.length === 0)
-      && !(value.mode === "original" && "toolCalls" in value && Array.isArray(value.toolCalls) && value.toolCalls.length === 0)) {
+      && !(value.mode === "original" && "toolCalls" in value && Array.isArray(value.toolCalls) && value.toolCalls.length === 0)
+      && value.mode === "original") {
     context.addIssue({ code: "custom", path: ["receiptLinks"], message: "post-proposal narration requires a receipt" });
   }
   if (["declared", "proposed", "awaiting-confirmation"].includes(value.state) && value.receiptLinks.length > 0) {

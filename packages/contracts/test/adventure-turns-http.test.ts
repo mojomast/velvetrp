@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  adventureTurnConfirmRequestSchema, adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema,
+  adventureTurnConfirmRequestSchema, adventureTurnGetResponseSchema, adventureTurnInitialReconcileRequestSchema,
+  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema,
 } from "../src/adventure-turns-http.js";
 import { decideToolProposalsInputSchema } from "../src/adventure-turns.js";
 
 const at = "2035-01-01T00:00:00.000Z";
-const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen",
+const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: "original", priorTurnId: null, declaration: "I listen",
   state: "declared", revision: 0, createdAt: at, updatedAt: at };
 
 describe("M2.11 adventure turn HTTP contracts", () => {
@@ -13,7 +14,19 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     const initial = { campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", expectedRevision: 0, idempotencyKey: "turn" };
     expect(adventureTurnStreamRequestSchema.parse(initial)).toEqual(initial);
     expect(adventureTurnStreamRequestSchema.parse({ resumeToken: "v1.dHVybg.ZGVjaXNpb24" })).toBeTruthy();
+    const variant = { variant: "narration-retry", campaignId: "campaign", sessionId: "session", actorId: "actor",
+      priorTurnId: "turn", expectedRevision: 2, idempotencyKey: "retry" };
+    expect(adventureTurnStreamRequestSchema.parse(variant)).toEqual(variant);
+    expect(adventureTurnStreamRequestSchema.safeParse({ ...variant, declaration: "private" }).success).toBe(false);
     expect(adventureTurnStreamRequestSchema.safeParse({ ...initial, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }).success).toBe(false);
+  });
+
+  it("keeps reconciliation locators exact and resume tokens role-safe", () => {
+    const locator = { campaignId: "campaign", sessionId: "session", actorId: "actor", idempotencyKey: "initial" };
+    expect(adventureTurnInitialReconcileRequestSchema.parse(locator)).toEqual(locator);
+    expect(adventureTurnInitialReconcileRequestSchema.safeParse({ ...locator, declaration: "secret" }).success).toBe(false);
+    expect(adventureTurnGetResponseSchema.parse({ turn, proposals: [], confirmation: { state: "none" }, receipts: [],
+      narrationStatus: { status: "completed", text: "Done" }, resumeToken: "v1.dHVybg.ZGlnZXN0" })).toBeTruthy();
   });
 
   it("closes and bounds the public SSE vocabulary", () => {

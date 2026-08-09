@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { confirmationDecisionKindSchema, narrationStatusSchema, roleSafeToolProposalSchema } from "./adventure-turns.js";
+import { confirmationDecisionKindSchema, narrationStatusSchema } from "./adventure-turns.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema } from "./rpg-characters.js";
@@ -21,9 +21,20 @@ export const adventureTurnInitialStreamRequestSchema = z.object({
 
 /** Separately issued durable continuation accepted by the same stream route. */
 export const adventureTurnResumeStreamRequestSchema = z.object({ resumeToken: adventureTurnResumeTokenSchema }).strict();
-/** Initial declaration or durable continuation; the variants cannot overlap. */
+/** Narration-only derivative request bound to one exact prior durable turn. */
+export const adventureTurnNarrationVariantStreamRequestSchema = z.object({
+  variant: z.enum(["narration-retry", "narration-swipe"]),
+  campaignId: campaignIdSchema,
+  sessionId: resourceIdSchema,
+  actorId: actorIdSchema,
+  priorTurnId: resourceIdSchema,
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+/** Initial declaration, narration derivative, or durable continuation; the variants cannot overlap. */
 export const adventureTurnStreamRequestSchema = z.union([
   adventureTurnInitialStreamRequestSchema,
+  adventureTurnNarrationVariantStreamRequestSchema,
   adventureTurnResumeStreamRequestSchema,
 ]);
 
@@ -33,6 +44,8 @@ export const adventureTurnHttpProjectionSchema = z.object({
   campaignId: campaignIdSchema,
   sessionId: resourceIdSchema,
   actorId: actorIdSchema,
+  mode: z.enum(["original", "narration-retry", "narration-swipe"]),
+  priorTurnId: resourceIdSchema.nullable(),
   declaration: z.string().trim().min(1).max(8_000),
   state: z.enum(["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating", "completed", "cancelled", "failed"]),
   revision: revisionSchema,
@@ -45,6 +58,19 @@ export const adventureTurnPublicReceiptSchema = z.object({
   commandId: resourceIdSchema,
   proposalId: resourceIdSchema,
   linkedAt: utcIsoTimestampSchema,
+}).strict();
+
+/** HTTP-safe proposal with decision identity, principal, and idempotency structurally absent. */
+export const adventureTurnHttpProposalSchema = z.object({
+  proposalId: resourceIdSchema,
+  position: z.number().int().min(0).max(31),
+  toolName: resourceIdSchema,
+  proposedAt: utcIsoTimestampSchema,
+  confirmation: z.discriminatedUnion("state", [
+    z.object({ state: z.literal("not-required") }).strict(),
+    z.object({ state: z.literal("pending"), expiresAt: utcIsoTimestampSchema }).strict(),
+    z.object({ state: z.literal("decided"), decision: confirmationDecisionKindSchema, decidedAt: utcIsoTimestampSchema }).strict(),
+  ]),
 }).strict();
 
 /** Aggregate confirmation state without private tool arguments. */
@@ -64,10 +90,24 @@ export const adventureTurnHttpNarrationStatusSchema = z.object({
 /** Exact role-safe reconciliation response for an adventure turn. */
 export const adventureTurnGetResponseSchema = z.object({
   turn: adventureTurnHttpProjectionSchema,
-  proposals: z.array(roleSafeToolProposalSchema).max(32),
+  proposals: z.array(adventureTurnHttpProposalSchema).max(32),
   confirmation: adventureTurnHttpConfirmationSchema,
   receipts: z.array(adventureTurnPublicReceiptSchema).max(32),
   narrationStatus: adventureTurnHttpNarrationStatusSchema,
+  resumeToken: adventureTurnResumeTokenSchema.optional(),
+}).strict();
+
+/** Exact safe locator for read-only initial-turn idempotency reconciliation. */
+export const adventureTurnInitialReconcileRequestSchema = z.object({
+  campaignId: campaignIdSchema,
+  sessionId: resourceIdSchema,
+  actorId: actorIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+/** Authority-masked initial-turn reconciliation result. Null remains race-ambiguous. */
+export const adventureTurnInitialReconcileResponseSchema = z.object({
+  result: adventureTurnGetResponseSchema.nullable(),
 }).strict();
 
 /** Exact plural confirmation command bound to one observed turn revision. */
@@ -96,7 +136,7 @@ export const adventureTurnAgentStatusEventSchema = streamEnvelope("agent_status"
   status: z.enum(["planning", "awaiting-confirmation", "pending-mechanics", "narrating"]),
 }).strict());
 /** Public proposal event without arguments or provider internals. */
-export const adventureTurnToolProposedEventSchema = streamEnvelope("tool_proposed", z.object({ proposal: roleSafeToolProposalSchema }).strict());
+export const adventureTurnToolProposedEventSchema = streamEnvelope("tool_proposed", z.object({ proposal: adventureTurnHttpProposalSchema }).strict());
 /** Durable confirmation boundary for one or more exact proposals. */
 export const adventureTurnConfirmationRequiredEventSchema = streamEnvelope("confirmation_required", z.object({
   proposalIds: z.array(resourceIdSchema).min(1).max(32), expiresAt: utcIsoTimestampSchema,
@@ -126,5 +166,9 @@ export const adventureTurnStreamEventSchema = z.discriminatedUnion("type", [
 
 export type AdventureTurnStreamRequest = z.infer<typeof adventureTurnStreamRequestSchema>;
 export type AdventureTurnGetResponse = z.infer<typeof adventureTurnGetResponseSchema>;
+/** Public HTTP proposal without private decision identity. */
+export type AdventureTurnHttpProposal = z.infer<typeof adventureTurnHttpProposalSchema>;
+/** Safe initial-turn idempotency reconciliation locator. */
+export type AdventureTurnInitialReconcileRequest = z.infer<typeof adventureTurnInitialReconcileRequestSchema>;
 export type AdventureTurnConfirmRequest = z.infer<typeof adventureTurnConfirmRequestSchema>;
 export type AdventureTurnStreamEvent = z.infer<typeof adventureTurnStreamEventSchema>;

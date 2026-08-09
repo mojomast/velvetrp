@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 import {
   adventureTurnConfirmRequestSchema, adventureTurnConfirmResponseSchema, adventureTurnGetResponseSchema,
-  adventureTurnResumeTokenSchema, adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, resourceIdSchema,
-  type AdventureTurnStreamEvent, type PrivateAdventureTurn, type RoleSafeToolProposal,
+  adventureTurnInitialReconcileRequestSchema, adventureTurnInitialReconcileResponseSchema, adventureTurnResumeTokenSchema,
+  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, resourceIdSchema,
+  type AdventureTurnStreamEvent, type PrivateAdventureTurn, type AdventureTurnHttpProposal,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -19,7 +20,7 @@ const FALLBACK_PREFIX = "No mechanics were planned for this declaration. The sce
 
 type Repo = Pick<AdventureTurnRepository,
   "createAdventureTurn" | "getAdventureTurn" | "getAdventureTurnNarration" | "waitForToolConfirmation"
-  | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration"> & {
+  | "getAdventureTurnByInitialIdempotencyKey" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration"> & {
   getCampaign(actorPrincipalId: string, campaignId: string): { activeTimelineId: string } | null;
 };
 
@@ -35,11 +36,14 @@ const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve
 
 function projectTurn(turn: PrivateAdventureTurn) {
   return { turnId: turn.turnId, campaignId: turn.campaignId, sessionId: turn.sessionId, actorId: turn.actorId,
+    mode: turn.mode === "narration-fallback" ? "narration-retry" as const : turn.mode, priorTurnId: turn.priorTurnId,
     declaration: turn.declaration, state: turn.state, revision: turn.revision, createdAt: turn.createdAt, updatedAt: turn.updatedAt };
 }
-const proposals = (turn: PrivateAdventureTurn): RoleSafeToolProposal[] => turn.toolCalls.map(({ proposal }) => ({
+const proposals = (turn: PrivateAdventureTurn): AdventureTurnHttpProposal[] => turn.toolCalls.map(({ proposal }) => ({
   proposalId: proposal.proposalId, position: proposal.position, toolName: proposal.toolName,
-  proposedAt: proposal.proposedAt, confirmation: proposal.confirmation,
+  proposedAt: proposal.proposedAt, confirmation: proposal.confirmation.state === "decided"
+    ? { state: "decided", decision: proposal.confirmation.decision.decision, decidedAt: proposal.confirmation.decision.decidedAt }
+    : proposal.confirmation,
 }));
 const receipts = (turn: PrivateAdventureTurn) => turn.receiptLinks.map(({ commandId, proposalId, linkedAt }) => {
   if (proposalId === null) throw new Error("turn receipt is not proposal-bound");
@@ -57,32 +61,42 @@ function requirePrivate(value: ReturnType<Repo["getAdventureTurn"]>): PrivateAdv
   if (!value || !("declaration" in value)) throw new AdventureTurnUnavailableError("turn is unavailable");
   return value;
 }
+function resumableDecisionDigest(turn: PrivateAdventureTurn): string | null {
+  const required = turn.toolCalls.filter(({ proposal }) => proposal.confirmation.state !== "not-required");
+  if (required.length === 0 || required.some(({ proposal }) => proposal.confirmation.state !== "decided")) return null;
+  const decisions = required.map(({ proposal }) => {
+    if (proposal.confirmation.state !== "decided" || proposal.confirmation.decision.principalId !== OWNER
+      || !proposal.confirmation.decision.idempotencyKey.startsWith("batch:")) return null;
+    const decision = proposal.confirmation.decision;
+    return [proposal.proposalId, decision.decisionId, decision.decision, decision.expectedTurnRevision,
+      decision.idempotencyKey, decision.principalId] as const;
+  });
+  if (decisions.some((decision) => decision === null)) return null;
+  return createHash("sha256").update(JSON.stringify([turn.turnId, OWNER, decisions.sort((left, right) => left![0].localeCompare(right![0]))])).digest("base64url");
+}
+function resumeToken(turn: PrivateAdventureTurn): string | null {
+  if (!["confirmed", "mechanics-committed", "narrating", "cancelled"].includes(turn.state)) return null;
+  const digest = resumableDecisionDigest(turn); if (!digest) return null;
+  return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
+}
 function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
+  const token = resumeToken(turn);
   return adventureTurnGetResponseSchema.parse({ turn: projectTurn(turn), proposals: proposals(turn), confirmation: confirmation(turn),
-    receipts: receipts(turn), narrationStatus: { status: turn.narrationStatus, text: repo.getAdventureTurnNarration(OWNER, turn.turnId) } });
+    receipts: receipts(turn), narrationStatus: { status: turn.narrationStatus, text: repo.getAdventureTurnNarration(OWNER, turn.turnId) },
+    ...(token ? { resumeToken: token } : {}) });
 }
 
-function resumeToken(turn: PrivateAdventureTurn): string {
-  const decisions = turn.toolCalls.flatMap(({ proposal }) => proposal.confirmation.state === "decided" && proposal.confirmation.decision.decision === "approved"
-    ? [proposal.confirmation.decision.decisionId] : []);
-  const decisionId = decisions.at(-1);
-  if (!decisionId) throw new AdventureTurnConflictError("approved confirmation identity is unavailable");
-  return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${Buffer.from(decisionId).toString("base64url")}`);
-}
-function decodeResumeToken(token: string): { turnId: string; decisionId: string } {
+function decodeResumeToken(token: string): { turnId: string; digest: string } {
   const parsed = adventureTurnResumeTokenSchema.parse(token);
-  const [, turnPart, decisionPart] = parsed.split(".");
+  const [, turnPart, digest] = parsed.split(".");
   const turnId = Buffer.from(turnPart!, "base64url").toString("utf8");
-  const decisionId = Buffer.from(decisionPart!, "base64url").toString("utf8");
-  if (!resourceIdSchema.safeParse(turnId).success || !resourceIdSchema.safeParse(decisionId).success) throw new AdventureTurnUnavailableError();
-  return { turnId, decisionId };
+  if (!resourceIdSchema.safeParse(turnId).success || !digest) throw new AdventureTurnUnavailableError();
+  return { turnId, digest };
 }
 function turnFromToken(repo: Repo, token: string): PrivateAdventureTurn {
-  const { turnId, decisionId } = decodeResumeToken(token);
+  const { turnId, digest } = decodeResumeToken(token);
   const turn = requirePrivate(repo.getAdventureTurn(OWNER, turnId));
-  if (!turn.toolCalls.some(({ proposal }) => proposal.confirmation.state === "decided"
-      && proposal.confirmation.decision.decisionId === decisionId && proposal.confirmation.decision.decision === "approved"
-      && proposal.confirmation.decision.principalId === OWNER && proposal.confirmation.decision.idempotencyKey.startsWith("batch:"))) {
+  if (resumeToken(turn) !== token || resumableDecisionDigest(turn) !== digest) {
     throw new AdventureTurnUnavailableError("resume token is unavailable");
   }
   return turn;
@@ -98,7 +112,8 @@ function fail(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[
   return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Adventure turn status is unknown; reconcile with GET before retrying and do not automatically retry");
 }
 
-async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], repo: Repo, initial: PrivateAdventureTurn, isResume: boolean): Promise<void> {
+async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], repo: Repo, initial: PrivateAdventureTurn,
+  streamKind: "initial" | "resume" | "variant"): Promise<void> {
   let writer: SseWriter | null = null; let heartbeat: NodeJS.Timeout | null = null; let sequence = 0; let closed = false; let terminal = false;
   const send = (event: Omit<AdventureTurnStreamEvent, "sequence" | "timestamp">) => {
     if (!writer || closed) return;
@@ -116,16 +131,16 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
     heartbeat = setInterval(() => writer?.comment("heartbeat"), Number.isFinite(configuredHeartbeat) && configuredHeartbeat > 0 ? configuredHeartbeat : 15_000);
     heartbeat.unref();
     let turn = initial;
-    if (isResume && turn.receiptLinks.some(({ linkId }) => linkId.startsWith("recoverable-"))) {
+    if (streamKind === "resume" && turn.receiptLinks.some(({ linkId }) => linkId.startsWith("recoverable-"))) {
       turn = repo.reconcileAdventureTurnMechanics(OWNER, { turnId: turn.turnId, expectedTurnRevision: turn.revision,
         expectedCampaignRevision: turn.campaignRevision, idempotencyKey: key("http-reconcile", turn.turnId, String(turn.revision)) });
       await yieldToEventLoop();
     }
-    if (!isResume) { send({ type: "turn_started", payload: { turn: projectTurn(turn) } }); await yieldToEventLoop(); }
+    if (streamKind !== "resume") { send({ type: "turn_started", payload: { turn: projectTurn(turn) } }); await yieldToEventLoop(); }
     send({ type: "agent_status", payload: { status: turn.state === "awaiting-confirmation" ? "awaiting-confirmation" : "planning" } });
     await yieldToEventLoop();
 
-    if (!isResume) for (const proposal of proposals(turn)) { send({ type: "tool_proposed", payload: { proposal } }); await yieldToEventLoop(); }
+    if (streamKind === "initial") for (const proposal of proposals(turn)) { send({ type: "tool_proposed", payload: { proposal } }); await yieldToEventLoop(); }
     const pending = turn.toolCalls.filter(({ proposal }) => proposal.confirmation.state === "pending");
     if (pending.length > 0) {
       if (turn.state === "proposed") turn = repo.waitForToolConfirmation(OWNER, { turnId: turn.turnId,
@@ -185,9 +200,20 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
     try {
       const repo = options.adventureTurnRepositoryAccessor();
       let turn: PrivateAdventureTurn;
-      let resumed = false;
-      if ("resumeToken" in body.data) { resumed = true; turn = turnFromToken(repo, body.data.resumeToken); }
-      else {
+       let streamKind: "initial" | "resume" | "variant" = "initial";
+       if ("resumeToken" in body.data) { streamKind = "resume"; turn = turnFromToken(repo, body.data.resumeToken); }
+       else if ("variant" in body.data) {
+         streamKind = "variant";
+         const campaign = repo.getCampaign(OWNER, body.data.campaignId); if (!campaign) throw new AdventureTurnUnavailableError();
+         const prior = requirePrivate(repo.getAdventureTurn(OWNER, body.data.priorTurnId));
+         if (prior.campaignId !== body.data.campaignId || prior.sessionId !== body.data.sessionId || prior.actorId !== body.data.actorId
+           || !["completed", "cancelled", "failed"].includes(prior.state)) throw new AdventureTurnConflictError("narration ancestor is out of scope");
+         turn = repo.createAdventureTurn(OWNER, { campaignId: body.data.campaignId, timelineId: campaign.activeTimelineId,
+           sessionId: body.data.sessionId, actorId: body.data.actorId, declaration: prior.declaration, mode: body.data.variant,
+           priorTurnId: prior.turnId, expectedCampaignRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey });
+         turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
+       }
+       else {
         const campaign = repo.getCampaign(OWNER, body.data.campaignId);
         if (!campaign) throw new AdventureTurnUnavailableError();
         turn = repo.createAdventureTurn(OWNER, { campaignId: body.data.campaignId, timelineId: campaign.activeTimelineId,
@@ -202,7 +228,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       // openSse hijacks Fastify and writes directly to the Node response, so
       // bind this route-specific header on the raw response before writeHead.
       reply.raw.setHeader("X-Adventure-Turn-Id", turn.turnId);
-      await stream(request, reply, repo, turn, resumed);
+       await stream(request, reply, repo, turn, streamKind);
     } catch (error) { return fail(request, reply, error); }
   });
 
@@ -213,6 +239,21 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
     const turnId = resourceIdSchema.safeParse(request.params.turnId); if (!turnId.success) return sendApiProblem(request, reply, 404, "RPG_ADVENTURE_TURN_NOT_FOUND", "Adventure turn not found");
     try { return reply.send(reconcile(options.adventureTurnRepositoryAccessor(), requirePrivate(options.adventureTurnRepositoryAccessor().getAdventureTurn(OWNER, turnId.data)))); }
     catch (error) { return fail(request, reply, error); }
+  });
+
+  app.get<{ Querystring: Record<string, unknown> }>("/adventure-turns/reconcile-initial", { exposeHeadRoute: false,
+    onRequest: async (request, reply) => { reply.header("cache-control", "private, no-store"); if (!enabled()) {
+      await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; } },
+  }, async (request, reply) => {
+    const query = adventureTurnInitialReconcileRequestSchema.safeParse(request.query);
+    if (!query.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Initial turn reconciliation locator is invalid");
+    try {
+      const repo = options.adventureTurnRepositoryAccessor();
+      const found = repo.getAdventureTurnByInitialIdempotencyKey(OWNER, query.data.campaignId, query.data.sessionId,
+        query.data.actorId, query.data.idempotencyKey);
+      const result = found ? reconcile(repo, requirePrivate(found)) : null;
+      return reply.send(adventureTurnInitialReconcileResponseSchema.parse({ result }));
+    } catch (error) { return fail(request, reply, error); }
   });
 
   app.post<{ Params: { turnId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/adventure-turns/:turnId/confirm", {
@@ -230,8 +271,7 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
       const turn = repo.decideToolProposals(OWNER, { turnId: turnId.data, proposalIds: body.data.proposalIds,
         decision: body.data.decision === "approve" ? "approved" : "rejected", expectedTurnRevision: body.data.expectedRevision,
         expectedCampaignRevision: before.campaignRevision, idempotencyKey: body.data.idempotencyKey });
-      const response = { turn: projectTurn(turn), ...(body.data.decision === "approve" && turn.state !== "completed" && turn.state !== "cancelled"
-        ? { resumeToken: resumeToken(turn) } : {}) };
+      const token = resumeToken(turn); const response = { turn: projectTurn(turn), ...(token ? { resumeToken: token } : {}) };
       return reply.send(adventureTurnConfirmResponseSchema.parse(response));
     } catch (error) { return fail(request, reply, error); }
   });

@@ -155,6 +155,7 @@ export interface CampaignListRepository extends
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
+  getAdventureTurnByInitialIdempotencyKey?: AdventureTurnRepository["getAdventureTurnByInitialIdempotencyKey"];
   getCampaignPlayBootstrap?: Repository["getCampaignPlayBootstrap"];
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
   createAdventureTurn?: AdventureTurnRepository["createAdventureTurn"];
@@ -278,7 +279,7 @@ type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatActio
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
-type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "createAdventureTurn"
+type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnByInitialIdempotencyKey" | "getAdventureTurnNarration" | "createAdventureTurn"
   | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
   & Required<Pick<CampaignListRepository, "getCampaign">>;
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
@@ -432,7 +433,7 @@ function assertFactionHttpRepository(repository:CampaignListRepository):asserts 
   if(typeof repository.listCampaignFactions!=="function"||typeof repository.createCampaignFaction!=="function"||typeof repository.changeFactionReputation!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
-  const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnNarration", "createAdventureTurn",
+  const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnByInitialIdempotencyKey", "getAdventureTurnNarration", "createAdventureTurn",
     "waitForToolConfirmation", "decideToolProposals", "reconcileAdventureTurnMechanics", "updateAdventureTurnNarration", "getCampaign"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }

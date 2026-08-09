@@ -219,6 +219,22 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
+  it("reconciles an exact committed initial locator without declaration replay and masks authority", () => {
+    const identity = seed(); let repo = factory();
+    const created = repo.createAdventureTurn("player", createInput(identity, "lost-initial"));
+    expect(repo.getAdventureTurnByInitialIdempotencyKey("player", identity.campaignId, "session", "actor", "lost-initial"))
+      .toMatchObject({ turnId: created.turnId, mode: "original" });
+    for (const mismatch of [["other", "actor", "lost-initial"], ["session", "other", "lost-initial"], ["session", "actor", "other"]]) {
+      expect(repo.getAdventureTurnByInitialIdempotencyKey("player", identity.campaignId, mismatch[0]!, mismatch[1]!, mismatch[2]!)).toBeNull();
+    }
+    repo.close(); repo = factory();
+    expect(repo.getAdventureTurnByInitialIdempotencyKey("player", identity.campaignId, "session", "actor", "lost-initial"))
+      .toMatchObject({ turnId: created.turnId });
+    repo.changeAuditedCampaignMembershipRole("local-owner", identity.campaignId, "player", { role: "observer", expectedRevision: 0, idempotencyKey: "demote-reconcile" });
+    expect(repo.getAdventureTurnByInitialIdempotencyKey("player", identity.campaignId, "session", "actor", "lost-initial")).toBeNull();
+    repo.close();
+  });
+
   it("reconciles a deterministic command committed immediately before a crash", () => {
     const identity = seed(); let repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "crash-turn"));

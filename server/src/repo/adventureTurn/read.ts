@@ -16,6 +16,9 @@ export type GenerationDraftProjection = PrivateGenerationDraft | RoleSafeGenerat
 export interface AdventureTurnReadRepository {
   /** Reads one turn, structurally redacting private coordination metadata when necessary. */
   getAdventureTurn(principalId: string, turnId: string): AdventureTurnProjection | null;
+  /** Finds one committed original turn by its exact safe submission locator and current action authority. */
+  getAdventureTurnByInitialIdempotencyKey(principalId: string, campaignId: string, sessionId: string, actorId: string,
+    idempotencyKey: string): AdventureTurnProjection | null;
   /** Reads one generation draft, exposing staged content only to current owner/GM principals. */
   getGenerationDraft(principalId: string, draftId: string): GenerationDraftProjection | null;
   /** Reads persisted fallback narration from the exact terminal coordination command. */
@@ -147,6 +150,21 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
              sourceTurnId: proposal.binding_source_turn_id },
            confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed" : proposal.decision ?? (proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),
         providerCalls, receiptLinks: links });
+    },
+    getAdventureTurnByInitialIdempotencyKey(principalId, campaignId, sessionId, actorId, idempotencyKey) {
+      const row = db.prepare(`SELECT turn.id FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id
+        JOIN campaign_memberships membership ON membership.campaign_id=turn.campaign_id AND membership.principal_id=?
+        JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
+        JOIN sessions session ON session.id=attached.session_id JOIN campaign_characters cc ON cc.campaign_id=turn.campaign_id
+        JOIN campaign_actors actor ON actor.campaign_id=cc.campaign_id AND actor.campaign_character_id=cc.id AND actor.id=turn.actor_id
+        JOIN session_characters participant ON participant.session_id=turn.session_id AND participant.character_id=cc.character_id
+        LEFT JOIN campaign_actor_private_state control ON control.campaign_id=turn.campaign_id AND control.actor_id=turn.actor_id
+        WHERE turn.principal_id=? AND turn.campaign_id=? AND turn.session_id=? AND turn.actor_id=? AND turn.idempotency_key=?
+          AND turn.mode='original' AND campaign.active_timeline_id=turn.timeline_id
+          AND campaign.lifecycle_status IN ('draft','published') AND session.state='active' AND session.stopped_at IS NULL
+          AND membership.role<>'observer' AND (membership.role IN ('owner','gm') OR control.controller_principal_id=?)`)
+        .get(principalId, principalId, campaignId, sessionId, actorId, idempotencyKey, principalId) as { id: string } | undefined;
+      return row ? this.getAdventureTurn(principalId, row.id) : null;
     },
     getGenerationDraft(principalId, draftId) {
       const row = db.prepare(`SELECT draft.*,event.resulting_state v36_state,event.resulting_revision v36_revision

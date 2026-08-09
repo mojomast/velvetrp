@@ -65,11 +65,40 @@ describe("M2.11 adventure turn routes", () => {
     await app.close();
 
     app = buildApp({ campaignRepositoryFactory: () => createRepository() });
+    const located = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/reconcile-initial?${new URLSearchParams({
+      campaignId: campaign.id, sessionId: "session", actorId: "actor", idempotencyKey: "initial",
+    })}` });
+    expect(located.statusCode).toBe(200); expect(located.json()).toMatchObject({ result: { turn: { turnId } } });
+    const absent = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/reconcile-initial?${new URLSearchParams({
+      campaignId: campaign.id, sessionId: "session", actorId: "actor", idempotencyKey: "not-committed",
+    })}` });
+    expect(absent.json()).toEqual({ result: null });
     const read = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${turnId}` });
     expect(read.statusCode).toBe(200); expect(read.json()).toMatchObject({ turn: { turnId, state: "completed" }, proposals: [], receipts: [],
       narrationStatus: { status: "completed", text: expect.stringContaining("without changing campaign state") } });
     expect(read.body).not.toMatch(/providerCalls|argumentsJson|principalId/);
     await app.close();
+  });
+
+  it.each(["approve", "reject"] as const)("recovers a lost %s confirmation response by GET and resumes after restart", async (decision) => {
+    enable(); const campaign = seed(); const repo = createRepository();
+    const turn = repo.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,
+      sessionId: "session", actorId: "actor", declaration: "I choose", expectedCampaignRevision: 0, idempotencyKey: `lost-${decision}` });
+    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll", arguments: {}, requiresConfirmation: true,
+      confirmationExpiresAt: expires, expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: `proposal-${decision}` });
+    repo.waitForToolConfirmation("local-owner", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: `wait-${decision}` });
+    const app = buildApp({ campaignRepositoryFactory: () => repo });
+    const confirmed = await app.inject({ method: "POST", url: `/api/rpg/v1/adventure-turns/${turn.turnId}/confirm`, headers: { "content-type": "application/json" },
+      payload: { proposalIds: [proposed.toolCalls[0]!.proposal.proposalId], decision, expectedRevision: 2, idempotencyKey: `confirm-${decision}` } });
+    expect(confirmed.statusCode).toBe(200); await app.close();
+    const restarted = buildApp({ campaignRepositoryFactory: () => createRepository() });
+    const read = await restarted.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${turn.turnId}` });
+    expect(read.json().resumeToken).toMatch(/^v1\./); expect(read.body).not.toMatch(/decisionId|principalId|batch:/);
+    expect(read.json().resumeToken).toBe(confirmed.json().resumeToken);
+    const resumed = await restarted.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" },
+      payload: { resumeToken: read.json().resumeToken } });
+    expect(resumed.statusCode).toBe(200); expect(events(resumed.body)[0]).toMatchObject({ type: "agent_status" });
+    await restarted.close();
   });
 
   it("seals duplicate confirmation and validates a restart-safe resume token", async () => {
@@ -133,6 +162,25 @@ describe("M2.11 adventure turn routes", () => {
     const after = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
     expect(after.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 1 });
     expect(after.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(turn.turnId)).toEqual({ count: 1 }); after.close();
+
+    let priorTurnId = turn.turnId;
+    for (const [variant, key] of [["narration-retry", "retry-one"], ["narration-retry", "retry-two"], ["narration-swipe", "swipe"]] as const) {
+      const derivative = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" },
+        payload: { variant, campaignId: campaign.id, sessionId: "session", actorId: "actor", priorTurnId, expectedRevision: 0, idempotencyKey: key } });
+      expect(derivative.statusCode).toBe(200);
+      const derivativeEvents = events(derivative.body); expect(derivativeEvents.map(({ type }) => type)).toEqual([
+        "turn_started", "agent_status", "mechanics_committed", "agent_status", "narration_delta", "terminal",
+      ]);
+      const startedDerivative = derivativeEvents[0]; if (startedDerivative?.type !== "turn_started") throw new Error("derivative start missing");
+      expect(startedDerivative.payload.turn).toMatchObject({ mode: variant, priorTurnId });
+      const terminalDerivative = derivativeEvents.at(-1); expect(terminalDerivative).toMatchObject({ payload: { receipts: [{ commandId: "full-command", proposalId }] } });
+      priorTurnId = startedDerivative.payload.turn.turnId;
+    }
+    const derivativeDb = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
+    expect(derivativeDb.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(turn.turnId)).toEqual({ count: 1 });
+    expect(derivativeDb.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id<>?").get(turn.turnId)).toEqual({ count: 0 });
+    expect(derivativeDb.prepare("SELECT revision FROM adventure_turns WHERE id=?").get(priorTurnId)).toEqual({ revision: 2 });
+    derivativeDb.close();
     await app.close();
   });
 
