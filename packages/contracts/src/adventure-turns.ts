@@ -114,7 +114,9 @@ const turnStateRefinement = (value: { state: z.infer<typeof adventureTurnStateSc
   if (["mechanics-committed", "narrating", "completed"].includes(value.state) && value.receiptLinks.length === 0) {
     context.addIssue({ code: "custom", path: ["receiptLinks"], message: "committed mechanics require a receipt" });
   }
-  if (value.state === "confirmed" && value.receiptLinks.length > 0) context.addIssue({ code: "custom", path: ["receiptLinks"], message: "confirmed turns are not mechanics-committed" });
+  if (["declared", "proposed", "awaiting-confirmation"].includes(value.state) && value.receiptLinks.length > 0) {
+    context.addIssue({ code: "custom", path: ["receiptLinks"], message: "pre-confirmation turns cannot contain mechanics receipts" });
+  }
 };
 
 /** Participant-safe turn projection without declaration, arguments, or provider metadata. */
@@ -135,8 +137,27 @@ export const privateAdventureTurnSchema = z.object({
   turnStateRefinement(value, context);
   const pending = value.toolCalls.some((call) => call.proposal.confirmation.state === "pending");
   if (value.state === "awaiting-confirmation" && !pending) context.addIssue({ code: "custom", path: ["state"], message: "waiting state requires a pending confirmation" });
-  if (value.state === "confirmed" && value.toolCalls.some((call) => call.status !== "approved" && call.status !== "rejected" && call.status !== "expired")) {
+  const committed = value.toolCalls.filter((call) => call.status === "committed");
+  const approved = value.toolCalls.filter((call) => call.status === "approved");
+  const callLinks = value.toolCalls.flatMap((call) => call.receiptLinks);
+  const aggregateLinkIds = [...value.receiptLinks.map((link) => link.linkId)].sort();
+  const callLinkIds = [...callLinks.map((link) => link.linkId)].sort();
+  if (value.mode === "original" && (JSON.stringify(aggregateLinkIds) !== JSON.stringify(callLinkIds)
+      || value.toolCalls.some((call) => call.receiptLinks.some((link) => link.proposalId !== call.proposal.proposalId)))) {
+    context.addIssue({ code: "custom", path: ["receiptLinks"], message: "aggregate receipts must be bound to their exact proposal calls" });
+  }
+  if (["declared", "proposed", "awaiting-confirmation"].includes(value.state) && committed.length > 0) {
+    context.addIssue({ code: "custom", path: ["receiptLinks"], message: "pre-confirmation turns cannot contain mechanics receipts" });
+  }
+  if (value.state === "confirmed" && value.toolCalls.some((call) => !["approved", "committed", "rejected", "expired"].includes(call.status))) {
     context.addIssue({ code: "custom", path: ["toolCalls"], message: "confirmed turns require terminal confirmation decisions" });
+  }
+  if (value.state === "confirmed" && (approved.length === 0 || committed.length !== value.receiptLinks.length)) {
+    context.addIssue({ code: "custom", path: ["toolCalls"], message: "confirmed turns require a strict subset of approved mechanics to remain uncommitted" });
+  }
+  if (value.mode === "original" && value.state === "mechanics-committed"
+      && (approved.length > 0 || committed.length === 0 || committed.length !== value.receiptLinks.length)) {
+    context.addIssue({ code: "custom", path: ["toolCalls"], message: "mechanics-committed turns require every approved proposal receipt" });
   }
 });
 

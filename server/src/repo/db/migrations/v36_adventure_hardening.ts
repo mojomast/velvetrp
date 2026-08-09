@@ -314,7 +314,18 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
       OR (latest.resulting_state='confirmed' AND (EXISTS(SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=turn.campaign_id
           AND proposal.turn_id=turn.id AND proposal.requires_confirmation=1 AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision
             WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id))
-        OR EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=turn.campaign_id AND link.turn_id=turn.id)))
+        OR (SELECT count(*) FROM turn_mechanics_links_v36 link WHERE link.campaign_id=turn.campaign_id AND link.turn_id=turn.id)>=(
+          SELECT count(*) FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
+            AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=turn.campaign_id
+            AND proposal.turn_id=turn.id AND (proposal.requires_confirmation=0 OR decision.decision='approved'))))
+      OR (latest.resulting_state='mechanics-committed' AND turn.mode='original' AND ((
+          SELECT count(*) FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
+            AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=turn.campaign_id
+            AND proposal.turn_id=turn.id AND (proposal.requires_confirmation=0 OR decision.decision='approved'))=0 OR
+        (SELECT count(*) FROM turn_mechanics_links_v36 link WHERE link.campaign_id=turn.campaign_id AND link.turn_id=turn.id)<>(
+          SELECT count(*) FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
+            AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=turn.campaign_id
+            AND proposal.turn_id=turn.id AND (proposal.requires_confirmation=0 OR decision.decision='approved'))))
       OR (latest.resulting_state IN ('mechanics-committed','narrating','completed') AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link
         WHERE link.campaign_id=turn.campaign_id AND link.root_turn_id IN (WITH RECURSIVE ancestry(id,mode,prior_turn_id) AS
           (SELECT turn.id,turn.mode,turn.prior_turn_id UNION ALL SELECT parent.id,parent.mode,parent.prior_turn_id FROM adventure_turns parent

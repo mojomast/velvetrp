@@ -62,4 +62,27 @@ describe("M1.10 adventure-turn contracts", () => {
     expect(roleSafeAdventureTurnSchema.parse(safe)).toEqual(safe);
     expect(JSON.stringify(safe)).not.toContain("secret");
   });
+
+  it("allows only a strict subset of approved proposal receipts while confirmed", () => {
+    const decision = (proposalId: string) => ({ state: "decided" as const, decision: { decisionId: `decision-${proposalId}`,
+      proposalId, principalId: "principal", decision: "approved" as const, expectedTurnRevision: 2,
+      idempotencyKey: `decision-${proposalId}`, expiresAt: later, decidedAt: at } });
+    const proposal = (proposalId: string, position: number) => ({ proposalId, position, toolName: "roll", argumentsJson: "{}",
+      proposedAt: at, confirmation: decision(proposalId) });
+    const link = (proposalId: string) => ({ linkId: `link-${proposalId}`, campaignId: "campaign", commandId: `command-${proposalId}`,
+      proposalId, sourceTurnId: "turn", linkedAt: at });
+    const firstLink = link("one");
+    const partial = { ...base, state: "confirmed" as const, declaration: "I inspect the seal",
+      toolCalls: [{ proposal: proposal("one", 0), status: "committed" as const, receiptLinks: [firstLink] },
+        { proposal: proposal("two", 1), status: "approved" as const, receiptLinks: [] }],
+      providerCalls: [], receiptLinks: [firstLink] };
+    expect(privateAdventureTurnSchema.parse(partial)).toEqual(partial);
+    expect(privateAdventureTurnSchema.safeParse({ ...partial, state: "mechanics-committed", narrationStatus: "pending" }).success).toBe(false);
+    expect(privateAdventureTurnSchema.safeParse({ ...partial, state: "proposed" }).success).toBe(false);
+    const secondLink = link("two");
+    const complete = { ...partial, state: "mechanics-committed" as const, narrationStatus: "pending" as const,
+      toolCalls: [partial.toolCalls[0], { ...partial.toolCalls[1], status: "committed" as const, receiptLinks: [secondLink] }],
+      receiptLinks: [firstLink, secondLink] };
+    expect(privateAdventureTurnSchema.parse(complete)).toEqual(complete);
+  });
 });

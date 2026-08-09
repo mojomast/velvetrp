@@ -277,8 +277,8 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
-  it("advances physical and coordination revisions once for each of multiple proposal decisions", () => {
-    const identity = seed(); const repo = factory();
+  it("advances plural decisions and preserves partial proposal-bound mechanics links across restart", () => {
+    const identity = seed(); let repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "multiple-decisions"));
     const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
       idempotencyKey: "proposal-one", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
@@ -300,7 +300,36 @@ describe("M1.10 adventure turn repository", () => {
         AND command.mutation_type='confirmation-decision' ORDER BY command.resulting_revision`).all(turn.turnId)).toEqual([
       { expected_revision: 3, resulting_revision: 4 }, { expected_revision: 4, resulting_revision: 5 },
     ]);
-    db.close(); repo.close();
+    db.close();
+    repo.executeRollActorDice("local-owner", { commandId: "plural-command-one", idempotencyKey: "plural-command-one",
+      campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 0,
+      sourceTurnId: turn.turnId, command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
+    repo.executeRollActorDice("local-owner", { commandId: "plural-command-two", idempotencyKey: "plural-command-two",
+      campaignId: identity.campaignId, timelineId: identity.timelineId, actorId: "actor", expectedRevision: 1,
+      sourceTurnId: turn.turnId, command: { type: "roll_actor_dice", payload: { expression: "1d6" } } });
+    const firstInput = { turnId: turn.turnId, proposalId: first.toolCalls[0]!.proposal.proposalId, commandId: "plural-command-one",
+      expectedTurnRevision: 5, expectedCampaignRevision: 0, idempotencyKey: "plural-link-one" };
+    const partiallyLinked = repo.linkFinalMechanicsReceipt("player", firstInput);
+    expect(partiallyLinked).toMatchObject({ state: "confirmed", revision: 6,
+      receiptLinks: [{ proposalId: firstInput.proposalId, commandId: "plural-command-one" }] });
+    expect(repo.linkFinalMechanicsReceipt("player", firstInput)).toEqual(partiallyLinked);
+    repo.close(); repo = factory();
+    expect(repo.getAdventureTurn("player", turn.turnId)).toMatchObject({ state: "confirmed", revision: 6,
+      receiptLinks: [{ proposalId: firstInput.proposalId, commandId: "plural-command-one" }] });
+    expect(repo.linkFinalMechanicsReceipt("player", firstInput)).toEqual(partiallyLinked);
+    const secondInput = { turnId: turn.turnId, proposalId: second.toolCalls[1]!.proposal.proposalId, commandId: "plural-command-two",
+      expectedTurnRevision: 6, expectedCampaignRevision: 0, idempotencyKey: "plural-link-two" };
+    const committed = repo.linkFinalMechanicsReceipt("player", secondInput);
+    expect(committed).toMatchObject({ state: "mechanics-committed", revision: 7 });
+    expect(committed.receiptLinks.map(({ proposalId, commandId }) => ({ proposalId, commandId }))).toEqual([
+      { proposalId: firstInput.proposalId, commandId: "plural-command-one" },
+      { proposalId: secondInput.proposalId, commandId: "plural-command-two" },
+    ]);
+    expect(repo.linkFinalMechanicsReceipt("player", secondInput)).toEqual(committed);
+    const revisionDb = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(revisionDb.prepare("SELECT revision FROM adventure_turns WHERE id=?").get(turn.turnId)).toEqual({ revision: 7 });
+    expect(revisionDb.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 2 });
+    revisionDb.close(); repo.close();
   });
 
   it("resets failed narration to in-progress on provider retry and keeps success in-progress", () => {
