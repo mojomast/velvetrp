@@ -17,6 +17,7 @@
 - [✅] Task 6: Extract actor-resource write repository
 - [✅] Task 7: Extract world read projection and inject required read context
 - [✅] M1.9 quests, storylines, clues, and rewards (repository/shared-contract layer; schema v29r2)
+- [✅] M1.10 Adventure turns, confirmations, and generation drafts
 - [✅] M2.4 campaign import dry-run, durable apply, and export routes
 - [✅] M2.5 content catalog and publication routes
 - [✅] M2.6 character builder and progression routes
@@ -24,6 +25,7 @@
 - [✅] M2.8 actor checks, powers, and effects routes
 - [✅] M2.9 encounter and combat routes
 - [✅] M2.10 world, NPC, faction, quest, and story routes
+- [✅] M2.11 Adventure turn, confirmation, and generation routes
 - [✅] M3.1 Campaign Administration Studio
 - [✅] M3.2 Content Pack Studio
 - [✅] M3.3 Character Builder and Advancement Flow
@@ -32,5 +34,11 @@
 - [✅] M3.6 World, Cast, and Journal Studio
 - [✅] Minimal campaign play bootstrap contract, repository read, and HTTP route
 - [✅] Normalize initial adventure-turn reconciliation problem instances
-- [ ] M3.7 Campaign Play Shell: blocked pending M2.11 adventure-turn streaming; intentionally deferred and not attempted
+- [✅] M3.7 Campaign Play Shell and mechanic receipts
 - [✅] M3.8 Event Log, recap, import, and export experience
+- [ ] M4.1 Campaign-aware context assembly
+- [ ] M4.2 Bounded tool loop and deterministic command bridge
+- [ ] M4.3 Durable confirmation and resume
+- [ ] M4.4 Receipt-aware narration and narrative consequence injection
+- [ ] M4.5 LLM encounter generation
+- [ ] M4.6 NPC stat derivation and campaign-content generation
