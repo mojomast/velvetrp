@@ -124,6 +124,9 @@ function safeProblemInstance(requestTarget: string): string {
   if (/^\/rooms\/[^/]+$/.test(suffix)) {
     return `${campaignPrefix}:campaignId/rooms/:sessionId`;
   }
+  if (/^\/rooms\/[^/]+\/play-bootstrap$/.test(suffix)) {
+    return `${campaignPrefix}:campaignId/rooms/:sessionId/play-bootstrap`;
+  }
   if (suffix === "/story" || suffix === "/storylines" || suffix === "/quests") {
     return `${campaignPrefix}:campaignId${suffix}`;
   }

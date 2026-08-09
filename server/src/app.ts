@@ -224,6 +224,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/play-bootstrap$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap",
+      hasQuery,
+      queryDetail: method === "GET" ? "Campaign play bootstrap does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/content(?:-packs\/[^/]+\/versions\/[^/]+)?$/.test(instance)) {
     return {
       instance,
@@ -586,6 +595,12 @@ export function buildApp(options: {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
         instance: instance === "/api/rpg/v1/generation-drafts" ? instance
           : instance.endsWith("/apply") ? "/api/rpg/v1/generation-drafts/:draftId/apply" : "/api/rpg/v1/generation-drafts/:draftId",
+      });
+    }
+    if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/play-bootstrap$/.test(instance)) {
+      reply.header("cache-control", "no-store");
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
+        instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap",
       });
     }
     if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers|power-commands|effects|effect-commands)$/.test(instance)) {

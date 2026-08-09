@@ -1,6 +1,7 @@
 // Part of db.ts refactor — see server/src/repo/db/schema.ts for migration order
 import type {
   CampaignCharacterWorkspaceResponse,
+  CampaignPlayBootstrap,
   CampaignRoomLinkingResponse,
   ProgressionState,
   PublicCampaignCharacterSummary,
@@ -100,6 +101,7 @@ export interface RepositoryUnitOfWork {
   getCampaignMembership(actorPrincipalId: string, campaignId: string, principalId: string): CampaignMembershipRead | null;
   listCampaignSessionAttachments(actorPrincipalId: string, campaignId: string): CampaignSessionAttachment[];
   getCampaignSessionAttachment(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignSessionAttachment | null;
+  getCampaignPlayBootstrap(actorPrincipalId: string, campaignId: string, sessionId: string): CampaignPlayBootstrap | null;
   getCampaignRoomLinkingSnapshot(actorPrincipalId: string, campaignId: string): CampaignRoomLinkingSnapshot | null;
   getCampaignContentConfiguration(actorPrincipalId: string, campaignId: string): CampaignContentConfiguration | null;
   getCampaignCharacterCreationOptions(actorPrincipalId: string, campaignId: string): CampaignCharacterCreationOptionsResponse | null;

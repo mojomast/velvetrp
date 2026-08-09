@@ -111,6 +111,7 @@ export type {
   CampaignCharacterWorkspaceSnapshot,
   CampaignEventPage,
   CampaignRoomLinkingSnapshot,
+  CampaignPlayReadRepository,
   OriginalStarterCampaignCharacterCreationResult,
   OriginalStarterSetupInspection,
   Repository,

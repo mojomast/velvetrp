@@ -24,6 +24,7 @@ export * from "./campaignEventReadRepo.js";
 export * from "./campaignGlobalContentReadRepo.js";
 export * from "./campaignLegacyCoreWriteRepo.js";
 export * from "./campaignMembershipReadRepo.js";
+export * from "./campaignPlayReadRepo.js";
 export * from "./campaignRoomLinkingSnapshotRepo.js";
 export * from "./campaignRoomSessionLifecycleRepo.js";
 export * from "./campaignSessionAttachmentReadRepo.js";

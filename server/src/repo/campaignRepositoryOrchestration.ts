@@ -141,6 +141,7 @@ import { createCampaignEventReadRepository } from "./campaign/campaignEventReadR
 import { createCampaignMembershipReadRepository } from "./campaign/campaignMembershipReadRepo.js";
 import { createCampaignSessionAttachmentReadRepository } from "./campaign/campaignSessionAttachmentReadRepo.js";
 import { createCampaignRoomLinkingSnapshotRepository } from "./campaign/campaignRoomLinkingSnapshotRepo.js";
+import { createCampaignPlayReadRepository } from "./campaign/campaignPlayReadRepo.js";
 import { createCampaignRoomSessionLifecycleRepository } from "./campaign/campaignRoomSessionLifecycleRepo.js";
 import { createCampaignCharacterCreationOptionsRepository } from "./campaign/campaignCharacterCreationOptionsRepo.js";
 import {
@@ -314,6 +315,7 @@ function runTransaction<T>(
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
+  const campaignPlayReadRepository = createCampaignPlayReadRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const campaignDetailReadRepository = createCampaignDetailReadRepository({
     getCampaign: (actor, campaignId) => campaignAccessRepository.getCampaign(actor, campaignId),
@@ -400,6 +402,10 @@ function runTransaction<T>(
     getCampaignSessionAttachment: (actorPrincipalId, campaignId, sessionId) => {
       assertActive();
       return campaignSessionAttachmentReadRepository.getCampaignSessionAttachment(actorPrincipalId, campaignId, sessionId);
+    },
+    getCampaignPlayBootstrap: (actorPrincipalId, campaignId, sessionId) => {
+      assertActive();
+      return campaignPlayReadRepository.getCampaignPlayBootstrap(actorPrincipalId, campaignId, sessionId);
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertActive();
@@ -562,6 +568,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignMembershipReadRepository = createCampaignMembershipReadRepository(db);
   const campaignSessionAttachmentReadRepository = createCampaignSessionAttachmentReadRepository(db);
   const campaignRoomLinkingSnapshotRepository = createCampaignRoomLinkingSnapshotRepository(db);
+  const campaignPlayReadRepository = createCampaignPlayReadRepository(db);
   const campaignRoomSessionLifecycleRepository = createCampaignRoomSessionLifecycleRepository(db);
   const campaignContentConfigurationReadRepository = createCampaignContentConfigurationReadRepository(db);
   const campaignDetailReadRepository = createCampaignDetailReadRepository({
@@ -792,6 +799,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     getCampaignSessionAttachment: (actorPrincipalId, campaignId, sessionId) => {
       assertOpen();
       return campaignCoreRepository.getCampaignSessionAttachment(actorPrincipalId, campaignId, sessionId);
+    },
+    getCampaignPlayBootstrap: (actorPrincipalId, campaignId, sessionId) => {
+      assertOpen();
+      return campaignPlayReadRepository.getCampaignPlayBootstrap(actorPrincipalId, campaignId, sessionId);
     },
     getCampaignRoomLinkingSnapshot: (actorPrincipalId, campaignId) => {
       assertOpen();

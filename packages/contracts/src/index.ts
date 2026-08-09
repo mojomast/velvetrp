@@ -28,6 +28,7 @@ export * from "./character-progression-http.js";
 export * from "./character-sheet-http.js";
 export * from "./campaign-administration-http.js";
 export * from "./campaign-history-http.js";
+export * from "./campaign-play-http.js";
 export * from "./campaign-transfer-http.js";
 export * from "./actor-resources.js";
 export * from "./actor-resources-http.js";
