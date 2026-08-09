@@ -116,6 +116,15 @@ describe("streamReply", () => {
     expect(deltas.join("")).toBe(result.text);
   });
 
+  it("preserves scoped loopback authorization in the legacy streaming path", async () => {
+    fake = await startFakeProvider({ replyText: "Scoped legacy reply." });
+    const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model", apiKey: "legacy-secret" };
+
+    await streamReply(makeArgs(provider), () => undefined);
+
+    expect(fake.requests[0]?.authorization).toBe("Bearer legacy-secret");
+  });
+
   it("passes optional campaign context to the provider without changing the final declaration", async () => {
     fake = await startFakeProvider({ replyText: "Campaign-aware reply." });
     const provider = { ...defaultProviderSettings(), baseUrl: fake.baseUrl, model: "fake-model" };

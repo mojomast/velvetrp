@@ -228,8 +228,8 @@ export function deleteCampaignForCorruptionTest(db:import("better-sqlite3").Data
 
 export interface FakeProvider {
   baseUrl: string;
-  requests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string }>;
-  sceneRequests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string }>;
+  requests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string; authorization: string | null }>;
+  sceneRequests: Array<{ model: string; messageCount: number; lastUserContent: string | null; systemContent: string; authorization: string | null }>;
   close: () => Promise<void>;
 }
 
@@ -274,6 +274,7 @@ export async function startFakeProvider(
               messageCount: messages.length,
               lastUserContent: lastUser?.content ?? null,
               systemContent: messages.filter((message) => message.role === "system").map((message) => message.content).join("\n"),
+              authorization: typeof req.headers.authorization === "string" ? req.headers.authorization : null,
           };
           sceneRequest = captured.systemContent.includes("SCENE STATE SYNTHESIZER");
           if (sceneRequest) sceneRequests.push(captured);

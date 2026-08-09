@@ -14,58 +14,8 @@ import type {
   Session,
   TokenUsage,
 } from "./types.js";
-
-const AUTH_ALLOWLIST_HOSTS = new Set(["api.openai.com", "openrouter.ai", "router.requesty.ai", "requesty.ai"]);
-
-export function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "::1" || host === "0:0:0:0:0:0:0:1") return true;
-  if (host.endsWith(".localhost")) return true;
-  return /^127(?:\.\d{1,3}){3}$/.test(host);
-}
-
-export function validateProviderBaseUrl(baseUrl: string): { ok: true } | { ok: false; reason: string } {
-  let url: URL;
-  try {
-    url = new URL(baseUrl.trim());
-  } catch {
-    return { ok: false, reason: "baseUrl is not a valid URL" };
-  }
-  if (url.protocol === "https:") return { ok: true };
-  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return { ok: true };
-  return { ok: false, reason: "baseUrl must use https, or http only for loopback hosts (localhost, 127.x, ::1)" };
-}
-
-function canSendAuthHeader(baseUrl: string): boolean {
-  try {
-    const url = new URL(baseUrl);
-    const host = url.hostname.toLowerCase();
-    return AUTH_ALLOWLIST_HOSTS.has(host) || isLoopbackHost(host);
-  } catch {
-    return false;
-  }
-}
-
-function canUseProvider(provider: ProviderSettings): boolean {
-  const baseUrl = provider.baseUrl.replace(/\/+$/, "");
-  const hostedProvider = /(?:api\.openai\.com|openrouter\.ai|requesty\.ai|router\.requesty\.ai)/i.test(baseUrl);
-  return Boolean(baseUrl && validateProviderBaseUrl(baseUrl).ok && (!hostedProvider || provider.apiKey.trim()));
-}
-
-function providerHeaders(baseUrl: string, provider: ProviderSettings): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (provider.apiKey.trim() && canSendAuthHeader(baseUrl)) headers.Authorization = `Bearer ${provider.apiKey.trim()}`;
-  try {
-    const hostname = new URL(baseUrl).hostname.toLowerCase();
-    if (hostname === "openrouter.ai" || hostname.endsWith(".openrouter.ai")) {
-      if (provider.httpReferer.trim()) headers["HTTP-Referer"] = provider.httpReferer.trim();
-      if (provider.appTitle.trim()) headers["X-Title"] = provider.appTitle.trim();
-    }
-  } catch {
-    // URL validation happens before requests are sent.
-  }
-  return headers;
-}
+import { buildProviderHeaders, canUseProvider } from "./provider/providerTransport.js";
+export { isLoopbackHost, validateProviderBaseUrl } from "./provider/providerTransport.js";
 
 function stubReply(userContent: string, memoryCount: number, loreCount: number): string {
   const trimmed = userContent.trim().replace(/\s+/g, " ").slice(0, 80);
@@ -126,7 +76,7 @@ function prepareGeneration(args: GenerationArgs): PreparedGeneration {
     return { kind: "stub", text: stubReply(userContent, memories.length, lore.length) };
   }
 
-  return { kind: "request", url: `${baseUrl}/chat/completions`, headers: providerHeaders(baseUrl, provider), messages };
+  return { kind: "request", url: `${baseUrl}/chat/completions`, headers: buildProviderHeaders(baseUrl, provider), messages };
 }
 
 export interface RoomSpeakerSelection {
@@ -165,7 +115,7 @@ export async function synthesizeSceneState(input: {
   delete body.stop;
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: providerHeaders(baseUrl, provider),
+    headers: buildProviderHeaders(baseUrl, provider),
     signal: AbortSignal.timeout(provider.requestTimeoutSeconds * 1000),
     body: JSON.stringify(body),
   });
@@ -250,7 +200,7 @@ export async function selectRoomSpeakers(input: {
   };
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: providerHeaders(baseUrl, provider),
+    headers: buildProviderHeaders(baseUrl, provider),
     signal: AbortSignal.timeout(provider.requestTimeoutSeconds * 1000),
     body: JSON.stringify(requestBody),
   });
