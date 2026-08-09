@@ -79,6 +79,7 @@ import { createEncounterRepository, type EncounterRepository } from "./encounter
 import { createWorldRepository, type WorldRepository } from "./worldRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
+import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -699,6 +700,9 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const storyRepository = createStoryRepository(db, { ...dependencies, guard: () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
   } });
+  const adventureTurnRepository = createAdventureTurnRepository(db, dependencies, () => {
+    assertOpen(); if (transactionDepth > 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
+  });
   return {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -715,6 +719,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     ...worldRepository,
     ...questRepository,
     ...storyRepository,
+    ...adventureTurnRepository,
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>

@@ -66,8 +66,8 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 0 AND 9007199254740991),
       campaign_revision INTEGER NOT NULL CHECK(typeof(campaign_revision)='integer' AND campaign_revision BETWEEN 0 AND 9007199254740991),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      created_at TEXT NOT NULL CHECK(length(created_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at),
-      updated_at TEXT NOT NULL CHECK(length(updated_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND updated_at>=created_at),
+      created_at TEXT NOT NULL CHECK(length(created_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at),
+      updated_at TEXT NOT NULL CHECK(length(updated_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND updated_at>=created_at),
       CHECK((mode='original' AND prior_turn_id IS NULL) OR (mode<>'original' AND prior_turn_id IS NOT NULL AND prior_turn_id<>id)),
       CHECK((state IN ('declared','proposed','awaiting-confirmation') AND narration_status='none') OR
         (state='mechanics-committed' AND narration_status IN ('none','pending')) OR
@@ -75,7 +75,6 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
         (state='completed' AND narration_status='completed') OR (state IN ('cancelled','failed'))),
       UNIQUE(campaign_id,id), UNIQUE(campaign_id,idempotency_key),
       FOREIGN KEY(campaign_id,timeline_id) REFERENCES campaign_timelines(campaign_id,id) ON DELETE RESTRICT,
-      FOREIGN KEY(campaign_id,session_id) REFERENCES campaign_sessions(campaign_id,session_id) ON DELETE RESTRICT,
       FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT,
       FOREIGN KEY(campaign_id,principal_id) REFERENCES campaign_memberships(campaign_id,principal_id) ON DELETE RESTRICT,
       FOREIGN KEY(campaign_id,prior_turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
@@ -88,8 +87,10 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       tool_name TEXT NOT NULL CHECK(length(tool_name) BETWEEN 1 AND 128 AND tool_name NOT GLOB '*[^A-Za-z0-9._:-]*'),
       arguments_json TEXT NOT NULL CHECK(json_valid(arguments_json) AND json_type(arguments_json)='object' AND length(arguments_json)<=32768),
       requires_confirmation INTEGER NOT NULL CHECK(typeof(requires_confirmation)='integer' AND requires_confirmation IN (0,1)),
+      confirmation_expires_at TEXT CHECK((requires_confirmation=0 AND confirmation_expires_at IS NULL) OR
+        (requires_confirmation=1 AND length(confirmation_expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',confirmation_expires_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',confirmation_expires_at)=confirmation_expires_at)),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      proposed_at TEXT NOT NULL CHECK(length(proposed_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',proposed_at)=proposed_at),
+      proposed_at TEXT NOT NULL CHECK(length(proposed_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',proposed_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',proposed_at)=proposed_at),
       UNIQUE(campaign_id,turn_id,position), UNIQUE(campaign_id,turn_id,idempotency_key), UNIQUE(campaign_id,turn_id,proposal_id),
       FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
     );
@@ -100,8 +101,8 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       principal_id TEXT NOT NULL, decision TEXT NOT NULL CHECK(decision IN ('approved','rejected','expired')),
       expected_turn_revision INTEGER NOT NULL CHECK(typeof(expected_turn_revision)='integer' AND expected_turn_revision BETWEEN 0 AND 9007199254740990),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      expires_at TEXT NOT NULL CHECK(length(expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at)=expires_at),
-      decided_at TEXT NOT NULL CHECK(length(decided_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at)=decided_at),
+      expires_at TEXT NOT NULL CHECK(length(expires_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',expires_at)=expires_at),
+      decided_at TEXT NOT NULL CHECK(length(decided_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at)=decided_at),
       CHECK((decision='expired' AND decided_at>=expires_at) OR (decision<>'expired' AND decided_at<expires_at)),
       UNIQUE(campaign_id,turn_id,proposal_id), UNIQUE(campaign_id,turn_id,idempotency_key),
       FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
@@ -116,7 +117,7 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       completion_tokens INTEGER CHECK(completion_tokens IS NULL OR (typeof(completion_tokens)='integer' AND completion_tokens BETWEEN 0 AND 1000000000)),
       outcome_code TEXT CHECK(outcome_code IS NULL OR length(outcome_code) BETWEEN 1 AND 128),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      recorded_at TEXT NOT NULL CHECK(length(recorded_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',recorded_at)=recorded_at),
+      recorded_at TEXT NOT NULL CHECK(length(recorded_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',recorded_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',recorded_at)=recorded_at),
       CHECK((phase='started' AND prompt_tokens IS NULL AND completion_tokens IS NULL AND outcome_code IS NULL) OR
         (phase<>'started' AND outcome_code IS NOT NULL)),
       UNIQUE(campaign_id,turn_id,call_id,phase), UNIQUE(campaign_id,turn_id,idempotency_key),
@@ -133,11 +134,10 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 0 AND 9007199254740991),
       campaign_revision INTEGER NOT NULL CHECK(typeof(campaign_revision)='integer' AND campaign_revision BETWEEN 0 AND 9007199254740991),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      created_at TEXT NOT NULL CHECK(length(created_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at),
-      updated_at TEXT NOT NULL CHECK(length(updated_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND updated_at>=created_at),
+      created_at TEXT NOT NULL CHECK(length(created_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at),
+      updated_at TEXT NOT NULL CHECK(length(updated_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND updated_at>=created_at),
       UNIQUE(campaign_id,id), UNIQUE(campaign_id,idempotency_key),
       FOREIGN KEY(campaign_id,timeline_id) REFERENCES campaign_timelines(campaign_id,id) ON DELETE RESTRICT,
-      FOREIGN KEY(campaign_id,session_id) REFERENCES campaign_sessions(campaign_id,session_id) ON DELETE RESTRICT,
       FOREIGN KEY(campaign_id,principal_id) REFERENCES campaign_memberships(campaign_id,principal_id) ON DELETE RESTRICT
     );
     CREATE INDEX idx_generation_drafts_campaign_v35 ON generation_drafts(campaign_id,state,updated_at,id);
@@ -147,7 +147,7 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       decision TEXT NOT NULL CHECK(decision IN ('approved','rejected')), notes TEXT CHECK(notes IS NULL OR length(notes)<=4000),
       expected_draft_revision INTEGER NOT NULL CHECK(typeof(expected_draft_revision)='integer' AND expected_draft_revision BETWEEN 0 AND 9007199254740990),
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      decided_at TEXT NOT NULL CHECK(length(decided_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at)=decided_at),
+      decided_at TEXT NOT NULL CHECK(length(decided_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',decided_at)=decided_at),
       UNIQUE(campaign_id,draft_id), UNIQUE(campaign_id,draft_id,idempotency_key),
       FOREIGN KEY(campaign_id,draft_id) REFERENCES generation_drafts(campaign_id,id) ON DELETE RESTRICT,
       FOREIGN KEY(campaign_id,principal_id) REFERENCES campaign_memberships(campaign_id,principal_id) ON DELETE RESTRICT
@@ -156,7 +156,7 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       link_id TEXT PRIMARY KEY CHECK(length(link_id) BETWEEN 1 AND 128 AND link_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
       campaign_id TEXT NOT NULL, turn_id TEXT, draft_id TEXT, command_id TEXT NOT NULL,
       idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'),
-      linked_at TEXT NOT NULL CHECK(length(linked_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',linked_at)=linked_at),
+      linked_at TEXT NOT NULL CHECK(length(linked_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',linked_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',linked_at)=linked_at),
       CHECK((turn_id IS NULL)<>(draft_id IS NULL)), UNIQUE(campaign_id,command_id),
       UNIQUE(campaign_id,turn_id,idempotency_key), UNIQUE(campaign_id,draft_id,idempotency_key),
       FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT,
@@ -169,19 +169,30 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       layout_digest TEXT NOT NULL CHECK(length(layout_digest)=64 AND layout_digest NOT GLOB '*[^0-9a-f]*'));
 
     CREATE TRIGGER adventure_turns_conflict_insert_v35 BEFORE INSERT ON adventure_turns WHEN EXISTS(SELECT 1 FROM adventure_turns old
-      WHERE old.id=NEW.id OR (old.campaign_id=NEW.campaign_id AND old.idempotency_key=NEW.idempotency_key)) BEGIN SELECT RAISE(ABORT,'adventure turn identity is sealed'); END;
+      WHERE old.id=NEW.id OR (old.campaign_id=NEW.campaign_id AND old.idempotency_key=NEW.idempotency_key)) OR
+      NOT EXISTS(SELECT 1 FROM campaigns campaign WHERE campaign.id=NEW.campaign_id AND campaign.active_timeline_id=NEW.timeline_id) OR
+      NOT EXISTS(SELECT 1 FROM campaign_sessions attached WHERE attached.campaign_id=NEW.campaign_id AND attached.session_id=NEW.session_id) OR
+      NOT EXISTS(SELECT 1 FROM campaign_actors actor WHERE actor.campaign_id=NEW.campaign_id AND actor.id=NEW.actor_id) OR
+      NOT EXISTS(SELECT 1 FROM campaign_memberships member WHERE member.campaign_id=NEW.campaign_id AND member.principal_id=NEW.principal_id) OR
+      (NEW.prior_turn_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM adventure_turns prior WHERE prior.campaign_id=NEW.campaign_id AND prior.id=NEW.prior_turn_id
+        AND prior.timeline_id=NEW.timeline_id AND prior.session_id=NEW.session_id AND prior.actor_id=NEW.actor_id))
+      BEGIN SELECT RAISE(ABORT,'adventure turn identity or ancestry is invalid'); END;
     CREATE TRIGGER adventure_turns_guard_update_v35 BEFORE UPDATE ON adventure_turns WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
       NEW.timeline_id<>OLD.timeline_id OR NEW.session_id<>OLD.session_id OR NEW.actor_id<>OLD.actor_id OR NEW.principal_id<>OLD.principal_id OR
       NEW.declaration<>OLD.declaration OR NEW.mode<>OLD.mode OR NEW.prior_turn_id IS NOT OLD.prior_turn_id OR NEW.idempotency_key<>OLD.idempotency_key OR
       NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT (
-        (OLD.state='declared' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
+        (OLD.state='declared' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','narrating','cancelled','failed')) OR
         (OLD.state='proposed' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
         (OLD.state='awaiting-confirmation' AND NEW.state IN ('mechanics-committed','cancelled','failed')) OR
         (OLD.state='mechanics-committed' AND NEW.state IN ('mechanics-committed','narrating','completed','cancelled','failed')) OR
         (OLD.state='narrating' AND NEW.state IN ('narrating','completed','cancelled','failed'))) BEGIN SELECT RAISE(ABORT,'invalid adventure turn transition'); END;
     CREATE TRIGGER adventure_turns_guard_delete_v35 BEFORE DELETE ON adventure_turns BEGIN SELECT RAISE(ABORT,'adventure turns cannot be deleted'); END;
     CREATE TRIGGER generation_drafts_conflict_insert_v35 BEFORE INSERT ON generation_drafts WHEN EXISTS(SELECT 1 FROM generation_drafts old
-      WHERE old.id=NEW.id OR (old.campaign_id=NEW.campaign_id AND old.idempotency_key=NEW.idempotency_key)) BEGIN SELECT RAISE(ABORT,'generation draft identity is sealed'); END;
+      WHERE old.id=NEW.id OR (old.campaign_id=NEW.campaign_id AND old.idempotency_key=NEW.idempotency_key)) OR
+      NOT EXISTS(SELECT 1 FROM campaigns campaign WHERE campaign.id=NEW.campaign_id AND campaign.active_timeline_id=NEW.timeline_id) OR
+      NOT EXISTS(SELECT 1 FROM campaign_memberships member WHERE member.campaign_id=NEW.campaign_id AND member.principal_id=NEW.principal_id) OR
+      (NEW.session_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM campaign_sessions attached WHERE attached.campaign_id=NEW.campaign_id AND attached.session_id=NEW.session_id))
+      BEGIN SELECT RAISE(ABORT,'generation draft identity or ancestry is invalid'); END;
     CREATE TRIGGER generation_drafts_guard_update_v35 BEFORE UPDATE ON generation_drafts WHEN NEW.id<>OLD.id OR NEW.campaign_id<>OLD.campaign_id OR
       NEW.timeline_id<>OLD.timeline_id OR NEW.session_id IS NOT OLD.session_id OR NEW.principal_id<>OLD.principal_id OR NEW.kind<>OLD.kind OR
       NEW.idempotency_key<>OLD.idempotency_key OR NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR
@@ -192,13 +203,14 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
     CREATE TRIGGER tool_proposals_guard_insert_v35 BEFORE INSERT ON tool_proposals WHEN EXISTS(SELECT 1 FROM tool_proposals old WHERE old.proposal_id=NEW.proposal_id OR
       (old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id AND (old.position=NEW.position OR old.idempotency_key=NEW.idempotency_key))) OR
       NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND turn.state IN ('declared','proposed')) OR
+      (NEW.requires_confirmation=1 AND NEW.confirmation_expires_at<=NEW.proposed_at) OR
       (SELECT count(*) FROM tool_proposals old WHERE old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id)>=32
       BEGIN SELECT RAISE(ABORT,'invalid or duplicate tool proposal'); END;
     CREATE TRIGGER confirmation_decisions_guard_insert_v35 BEFORE INSERT ON confirmation_decisions WHEN EXISTS(SELECT 1 FROM confirmation_decisions old WHERE old.decision_id=NEW.decision_id OR
       (old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id AND (old.proposal_id=NEW.proposal_id OR old.idempotency_key=NEW.idempotency_key))) OR
       NOT EXISTS(SELECT 1 FROM adventure_turns turn JOIN tool_proposals proposal ON proposal.campaign_id=turn.campaign_id AND proposal.turn_id=turn.id
         WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND proposal.proposal_id=NEW.proposal_id AND proposal.requires_confirmation=1
-          AND turn.state='awaiting-confirmation' AND turn.revision=NEW.expected_turn_revision)
+          AND proposal.confirmation_expires_at=NEW.expires_at AND turn.state='awaiting-confirmation' AND turn.revision=NEW.expected_turn_revision)
       BEGIN SELECT RAISE(ABORT,'invalid or duplicate confirmation decision'); END;
     CREATE TRIGGER provider_call_metadata_guard_insert_v35 BEFORE INSERT ON provider_call_metadata WHEN EXISTS(SELECT 1 FROM provider_call_metadata old WHERE old.record_id=NEW.record_id OR
       (old.campaign_id=NEW.campaign_id AND old.turn_id=NEW.turn_id AND (old.idempotency_key=NEW.idempotency_key OR (old.call_id=NEW.call_id AND old.phase=NEW.phase)))) OR
@@ -212,7 +224,9 @@ export function createAdventureGenerationV35(db: DatabaseDriver.Database): void 
       BEGIN SELECT RAISE(ABORT,'invalid or duplicate review decision'); END;
     CREATE TRIGGER final_receipt_links_guard_insert_v35 BEFORE INSERT ON final_receipt_links WHEN EXISTS(SELECT 1 FROM final_receipt_links old WHERE old.link_id=NEW.link_id OR
       (old.campaign_id=NEW.campaign_id AND (old.command_id=NEW.command_id OR (old.turn_id IS NEW.turn_id AND old.draft_id IS NEW.draft_id AND old.idempotency_key=NEW.idempotency_key)))) OR
-      (NEW.turn_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id AND turn.state IN ('mechanics-committed','narrating','completed','cancelled','failed'))) OR
+      (NEW.turn_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id
+        AND (turn.state IN ('mechanics-committed','narrating','completed') OR (turn.state='proposed' AND NOT EXISTS(
+          SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=turn.campaign_id AND proposal.turn_id=turn.id AND proposal.requires_confirmation=1))))) OR
       (NEW.draft_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM generation_drafts draft WHERE draft.campaign_id=NEW.campaign_id AND draft.id=NEW.draft_id AND draft.state IN ('approved','applied')))
       BEGIN SELECT RAISE(ABORT,'invalid or duplicate final receipt link'); END;
   `);
@@ -231,17 +245,23 @@ export function validateAdventureGenerationDataV35(db: DatabaseDriver.Database):
   const fk = (db.prepare("PRAGMA foreign_key_check").all() as Array<{ table: string }>).find(({ table }) => TABLES.includes(table as never));
   if (fk) throw new Error(`schema v35 adventure/generation data has a foreign-key violation (${fk.table})`);
   const badTurn = db.prepare(`SELECT turn.id FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id
-    LEFT JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
+    LEFT JOIN sessions session ON session.id=turn.session_id
     LEFT JOIN campaign_timelines timeline ON timeline.campaign_id=turn.campaign_id AND timeline.id=turn.timeline_id
     LEFT JOIN campaign_actors actor ON actor.campaign_id=turn.campaign_id AND actor.id=turn.actor_id
-    LEFT JOIN campaign_actor_private_state private ON private.campaign_id=turn.campaign_id AND private.actor_id=turn.actor_id
-    WHERE attached.session_id IS NULL OR timeline.id IS NULL OR actor.id IS NULL OR (turn.mode='original' AND private.controller_principal_id<>turn.principal_id)
+    WHERE session.id IS NULL OR timeline.id IS NULL OR actor.id IS NULL
       OR (turn.mode<>'original' AND NOT EXISTS(SELECT 1 FROM adventure_turns prior WHERE prior.campaign_id=turn.campaign_id AND prior.id=turn.prior_turn_id
         AND prior.timeline_id=turn.timeline_id AND prior.session_id=turn.session_id AND prior.actor_id=turn.actor_id)) LIMIT 1`).get() as { id: string } | undefined;
   if (badTurn) throw new Error(`schema v35 adventure/generation data has malformed turn ancestry (${badTurn.id})`);
+  const badDraft = db.prepare(`SELECT draft.id FROM generation_drafts draft LEFT JOIN campaigns campaign ON campaign.id=draft.campaign_id
+    LEFT JOIN campaign_timelines timeline ON timeline.campaign_id=draft.campaign_id AND timeline.id=draft.timeline_id
+    LEFT JOIN sessions session ON session.id=draft.session_id LEFT JOIN campaign_memberships member
+      ON member.campaign_id=draft.campaign_id AND member.principal_id=draft.principal_id
+    WHERE campaign.id IS NULL OR timeline.id IS NULL OR member.principal_id IS NULL OR (draft.session_id IS NOT NULL AND session.id IS NULL) LIMIT 1`)
+    .get() as { id: string } | undefined;
+  if (badDraft) throw new Error(`schema v35 adventure/generation data has malformed draft ancestry (${badDraft.id})`);
   const badDecision = db.prepare(`SELECT decision.decision_id FROM confirmation_decisions decision JOIN tool_proposals proposal
     ON proposal.campaign_id=decision.campaign_id AND proposal.turn_id=decision.turn_id AND proposal.proposal_id=decision.proposal_id
-    WHERE proposal.requires_confirmation<>1 LIMIT 1`).get() as { decision_id: string } | undefined;
+    WHERE proposal.requires_confirmation<>1 OR proposal.confirmation_expires_at<>decision.expires_at LIMIT 1`).get() as { decision_id: string } | undefined;
   if (badDecision) throw new Error(`schema v35 adventure/generation data has malformed confirmation ancestry (${badDecision.decision_id})`);
   const badProvider = db.prepare(`SELECT terminal.record_id FROM provider_call_metadata terminal WHERE terminal.phase<>'started' AND NOT EXISTS(
     SELECT 1 FROM provider_call_metadata start WHERE start.campaign_id=terminal.campaign_id AND start.turn_id=terminal.turn_id AND start.call_id=terminal.call_id

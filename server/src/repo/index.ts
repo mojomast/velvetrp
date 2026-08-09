@@ -62,6 +62,7 @@ export {
   StoryAuthorizationError, StoryConflictError, StoryStaleError, StoryUnavailableError,
   type StoryMutationResult, type StoryRepository,
 } from "./storyRepo.js";
+export * from "./adventureTurnRepo.js";
 export {
   createCharacter,
   deleteCharacter,
