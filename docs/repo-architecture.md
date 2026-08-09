@@ -52,7 +52,7 @@ Fresh creation and every supported sequential upgrade must converge on equivalen
 
 ## Repository ownership
 
-`campaignRepositoryOrchestration.ts` opens the factory connection, installs runtime ports and nested-transaction guards, composes the public `Repository`, and delegates invariants to focused owners. Its `campaign/` adapters own authorization-rooted campaign reads/writes, actors, content selection, rooms, timelines, command/event projections, play bootstrap, and legacy compatibility seams. Avoid duplicate SQL in the orchestration facade.
+`campaignRepositoryOrchestration.ts` opens the factory connection, installs runtime ports and nested-transaction guards, composes the public `Repository`, and delegates invariants to focused owners. Its `campaign/` adapters own authorization-rooted campaign reads/writes, actors, content selection, rooms, timelines, command/event projections, play bootstrap, role-sensitive agent context, and legacy compatibility seams. Avoid duplicate SQL in the orchestration facade.
 
 | Milestone | Persistence owner |
 | --- | --- |
@@ -66,6 +66,7 @@ Fresh creation and every supported sequential upgrade must converge on equivalen
 | M1.8 | `worldRepo.ts` and `world/` own locations, discovery/travel, actor placement, NPC/faction metadata and relationships, reputation, commands, and GM/player projections. |
 | M1.9 | `questRepo.ts` plus `quest/` own quest definitions, objectives, progress, rewards, journal reads, and retained v29 compatibility reads. `storyRepo.ts` owns story graphs, plot questions, clues/discovery, state transitions, and audience-specific story projections. |
 | M1.10 | `adventureTurnRepo.ts` and `adventureTurn/` own turns, proposals, confirmations, provider-call metadata, receipt linking/reconciliation, narration state, generation drafts, review, and apply receipts. Generation/provider execution remains outside the repository; only durable coordination metadata and reviewed staged content are persisted here. |
+| M4.1 | `campaign/campaignAgentContextReadRepo.ts` owns focused campaign/session/audience snapshots for server orchestrators. The factory facade wraps each read in one deferred SQLite transaction so membership, role/control, target ancestry, visible state, current combat, legal actions, and authorized target-private facts share one snapshot. `server/src/context.ts` owns the independent whole-line UTF-16 budgets and precedence assembly outside persistence. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 
@@ -85,6 +86,10 @@ Legacy persona, settings, session, message, memory, lore, and summary aggregates
 Authorization and projection are repository concerns even in trusted-local mode. Start reads from validated membership/control ancestry, select explicit columns, and use structurally distinct owner/GM, player, observer, public, and private schemas. Unauthorized or unrelated identities return the domain's non-disclosing `null`/empty/not-found result; an authorized reader encountering corrupt persisted state receives an integrity failure.
 
 Never project raw rows, idempotency keys, command envelopes, provider/private coordination data, controller identity, actor-private notes, hidden world routes, NPC goals, unrevealed quest/story truth, or staged generation content to a role that cannot see it. Internal path-binding evidence may accompany a repository snapshot only long enough for the route adapter to verify and strip it.
+
+M4.1 agent snapshots derive visibility from the requested audience plus current membership, campaign role, actor control, attached session, target ancestry, and encounter state; they do not reuse a caller-selected general-purpose projection. They contain bounded-source facts rather than full catalogs, full inventories, or story graphs. Target actor notes/attributes, the speaking NPC's goals, or the target enemy's tactic/template may appear only in that authorized target's private planning layer; unrelated private facts remain absent. NPC/enemy planning has an immutable higher-precedence nondisclosure rule. Companion reads return `null` for every principal because persistence has no companion aggregate or controller binding.
+
+The snapshot method is server-internal repository API, not HTTP or shared wire surface. M4.1 adds no production tool/provider loop and no mutation capability; M4.2 must compose those concerns without bypassing this disclosure boundary.
 
 ## Trusted-local HTTP and client context
 

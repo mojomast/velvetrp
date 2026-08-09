@@ -29,6 +29,16 @@ Approved memory is inserted as durable known context with instructions to use it
 
 The shared-context layer is computed for every generation from highest-priority editable manual canon, synthesized current scene facts, all session participants, recent active-branch events, approved memories across the cast, triggered lore, and unresolved questions/goals. When a usable provider is configured, a completed generated turn or room round invokes the synthesizer with immutable manual canon, prior synthesized state, and recent active-branch messages. It rewrites categorized current facts without copying dialogue; manual canon wins conflicts. The final-turn contract also discourages consecutive “I” sentence openings, treats `*emotes*` as concise physical action beats rather than mandatory opening decorations, and requires awareness of other participants' positions, actions, moods, relationships, and open threads.
 
+## Campaign context
+
+M4.1 adds an optional server-internal campaign context basket; it is not exposed through `/api/harness`, a prompt-template layer, or an RPG wire contract. Its exact conflict precedence is: safety/control; human canon; committed mechanics; the exact final user declaration; visible world/cast/quests and legal actions; authorized private target facts; approved memory/lore; recap/summary; generated suggestions. When supplied to legacy player/NPC generation, it replaces the ordinary triggered-lore, retrieved-memory, and shared-context prompt blocks so those retrieval sources are not duplicated. Generations without campaign context keep the existing 20-layer behavior.
+
+Campaign safety/control, human canon, world, mechanics/legal actions, quests, private target facts, recap/summary, lore, memory, and suggestions use independent UTF-16 code-unit budgets. Assembly normalizes budgeted facts to whole lines, includes or omits each line deterministically, never splits surrogate pairs, never borrows across categories, and records exact truncation metadata. The final declaration is separately limited to 8,000 UTF-16 code units and is rebound unchanged to the final session turn.
+
+Audience visibility is repository-derived from current role/control and campaign/session/target ancestry in one deferred snapshot. Full catalogs, full inventories, story graph dumps, hidden routes, controller identities, and unrelated private facts are excluded. NPC goals and enemy tactics are planning-only and protected by a non-overridable higher-precedence nondisclosure rule. Legacy campaign generation accepts only a player or NPC basket bound to the exact server-derived speaker persona and session; DM/enemy baskets fail closed there, and companion context fails closed everywhere because no persisted companion model/controller binding exists.
+
+This is assembly and optional provider-message plumbing only. Production adventure turns do not yet invoke a campaign tool/provider loop; that remains M4.2.
+
 
 ## Client
 

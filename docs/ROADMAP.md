@@ -4,7 +4,7 @@ This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, and client milestones M3.1-M3.8 are complete, including M1.10, M2.11, and M3.7. M4.1 is next. Earlier schema digests remain historical milestone records in the sections below.
+M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, client milestones M3.1-M3.8, and M4.1 are complete. M4.2 is next. Earlier schema digests remain historical milestone records in the sections below.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -155,7 +155,7 @@ Schema v35 provides the durable adventure-turn and generation-draft foundation, 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1 is next.**
+**Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1 is complete and M4.2 is next.**
 
 All routes below are delivered under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each request and response has a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
@@ -435,14 +435,22 @@ Create `CampaignEventLogPage`, `RecapViewer`, `CheckpointTimeline`, `CampaignImp
 
 ### M4.1 Campaign-aware context assembly
 
+**Status: Complete (server-internal context/repository boundary; no HTTP or wire change)**
+
 Extend the existing context basket with bounded, role-filtered campaign mechanics, world, cast, quest, recap, and legal-action sections.
 
 - **Complexity:** L
 - **Dependencies:** M1.8-M1.10; M2.7-M2.11; existing `server/src/context.ts`, `prompt.ts`, and `promptTemplates.ts`.
 - **Acceptance criteria:**
-  - Context precedence follows safety and control, human canon, committed mechanics, declaration, visible normalized state, approved memories/lore, summaries, then generated suggestions.
-  - Independent budgets limit world, mechanics, quests, recap, lore, and memory; full catalogs, inventories, enemy secrets, and story graphs are not dumped into prompts.
-  - Player, DM, NPC, companion, and enemy contexts have explicit projection tests proving private and hidden fields cannot cross roles.
+  - Context precedence is exactly: (1) safety/control, (2) human canon, (3) committed mechanics, (4) the exact final declaration, (5) visible world/cast/quests and legal actions, (6) authorized private target facts, (7) approved memory/lore, (8) recap/summary, and (9) generated suggestions.
+  - Safety/control, human canon, world, mechanics/legal actions, quests, authorized private target facts, recap/summary, lore, memory, and suggestions each have an independent UTF-16 code-unit budget. Deterministic truncation includes or omits normalized whole lines, reports exact accounting, and never borrows budget or splits a line/surrogate pair.
+  - Repository reads derive audience visibility from current campaign membership, role, actor control, attached session, target ancestry, and encounter state in one deferred SQLite snapshot. Player, DM, NPC, companion, and enemy authorization/projection tests prove private and hidden fields cannot cross audiences.
+  - Full catalogs, full inventories, story graph dumps, hidden routes, unrelated private state, and controller identities never enter the snapshot. NPC and enemy target-private goals/tactics are planning-only and have a non-overridable earlier rule forbidding disclosure, quotation, paraphrase, hints, or confirmation.
+  - Player and NPC legacy prompt generation is bound to the exact server-derived speaker persona and session and preserves the exact final declaration. DM and enemy legacy character prompts fail closed; companion context fails closed for every role because there is no persisted companion model or controller binding.
+
+#### Implementation notes
+
+M4.1 delivers typed server-internal campaign audiences, role-sensitive repository snapshots, deterministic basket assembly/truncation metadata, and optional provider-message plumbing. When campaign context is supplied, its approved retrieval layers replace the legacy lore/memory/shared-context trio to avoid duplicate context; generations without campaign context remain unchanged. There is no new route or shared wire contract, and no production adventure-turn tool/provider loop invokes this boundary yet. M4.2 must add that bounded loop and deterministic command bridge.
 
 ### M4.2 Bounded tool loop and deterministic command bridge
 

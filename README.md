@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v37 revision 1 (`v37r1`)**. The trusted-local RPG API has **92 explicitly registered HTTP operations through M2.11**, excluding `GET /api/rpg/v1/features`. Roadmap milestones M1-M3 are complete; **M4.1 campaign-aware context assembly is next**.
+Current persistence is **schema v37 revision 1 (`v37r1`)**. The trusted-local RPG API has **92 explicitly registered HTTP operations through M2.11**, excluding `GET /api/rpg/v1/features`. Roadmap milestones M1-M3 and M4.1 are complete; **M4.2 bounded tool-loop and deterministic command-bridge work is next**.
 
 ## Security And Privacy
 
@@ -35,6 +35,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and review-only generation drafts
+- Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
 
 The full operation contract is in the [API reference](docs/api.md). The implementation intentionally does not duplicate the route and schema tree here.
 
@@ -161,7 +162,8 @@ Schema `v37r1` migrates supported historical databases forward at startup and va
 
 ## Limitations
 
-- M4 AI-driven RPG integration is not complete. Campaign-aware prompt context, the bounded tool loop, durable provider-driven confirmation/resume, receipt-aware narration, and generated encounter/NPC application remain roadmap work.
+- M4 AI-driven RPG integration is not complete. M4.1 provides server-internal campaign-aware prompt context, but no production adventure-turn tool/provider loop uses it yet; the bounded loop and deterministic command bridge begin in M4.2, with provider-driven confirmation/resume, receipt-aware narration, and generated encounter/NPC application still pending.
+- M4.1 deliberately excludes full catalogs, full inventories, story graph dumps, unrelated private state, and hidden routes. NPC/enemy target-private planning is non-disclosable, and companion context fails closed because no persisted companion model exists.
 - Generation drafts currently seal reviewed deterministic user-brief changes only; they do not mutate campaign-domain content.
 - The campaign context drawer shows the campaign-visible NPC roster because NPC location/presence is not modeled.
 - Published content-pack versions are immutable. Create a new exact version to change one.
