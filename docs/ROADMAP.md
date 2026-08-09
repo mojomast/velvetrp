@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. Current persistence is schema v34 revision 1, with repository modules under `server/src/repo/`, shared runtime contracts under `packages/contracts/src/`, and 84 trusted-local operations registered under `server/src/routes/rpg/v1/`.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. Current persistence is schema v37r1, with repository modules under `server/src/repo/`, shared runtime contracts under `packages/contracts/src/`, and 92 trusted-local RPG operations implemented through M2.11 under `server/src/routes/rpg/v1/`.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.9 and trusted-local HTTP milestones M2.1-M2.10 are complete. The current boundary is exactly 84 operations; M2.11 is next. Earlier schema digests remain historical milestone records in the sections below.
+M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, and client milestones M3.1-M3.8 are complete, including M1.10, M2.11, and M3.7. M4.1 is next. Earlier schema digests remain historical milestone records in the sections below.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -137,6 +137,8 @@ Add explicit quest and story graphs whose state advances through commands rather
 
 ### M1.10 Adventure turns, confirmations, and generation drafts
 
+**Status: Complete (schema v37r1; repository/shared-contract only)**
+
 Persist the durable coordination state needed for player declarations, proposed tools, confirmation pauses, committed mechanics, and staged generated campaign content.
 
 - **Complexity:** L
@@ -147,9 +149,13 @@ Persist the durable coordination state needed for player declarations, proposed 
   - Swiped or retried narration reuses committed receipts and cannot reroll, re-spend, reapply damage, or duplicate rewards.
   - Cancellation before commit writes no mechanics; cancellation after commit preserves receipts and supports deterministic fallback narration.
 
+#### Implementation notes
+
+Schema v35 provides the durable adventure-turn and generation-draft foundation, v36 adds coordination and provenance hardening, and v37 binds each proposal to its exact server-owned mechanics execution. Human waits hold no SQLite transaction; resume can reconcile source-turn mechanics receipts exposed by a crash before narration without rerunning the command.
+
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: M2.1-M2.10 complete as trusted-local HTTP routes; M2.11 is next.**
+**Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1 is next.**
 
 All routes below are gaps under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each new request and response receives a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
@@ -296,6 +302,8 @@ Expose separate player and GM projections for campaign world and narrative state
 
 ### M2.11 Adventure turn, confirmation, and generation routes
 
+**Status: Complete (trusted-local HTTP routes)**
+
 Add one streaming turn protocol plus durable confirmation and reviewable generation resources.
 
 - **Complexity:** L
@@ -305,6 +313,10 @@ Add one streaming turn protocol plus durable confirmation and reviewable generat
   - `GET /adventure-turns/:turnId` returns `{ turn, proposals, confirmation, receipts, narrationStatus }`; `POST /adventure-turns/:turnId/confirm` accepts `{ proposalIds, decision: "approve"|"reject", expectedRevision, idempotencyKey }` and returns `{ turn }` or resumes the stream through a separately issued resume token.
   - `POST /generation-drafts` accepts `{ campaignId, kind, brief, constraints, idempotencyKey }`; `GET /generation-drafts/:draftId` returns staged content and validation issues; `POST /generation-drafts/:draftId/apply` accepts `{ selectedChanges, expectedRevision, idempotencyKey }` and returns `{ draft, receipts }`.
   - SSE disconnect, process restart, and duplicate confirmation requests preserve durable state; a committed turn always exposes receipts even if narration delivery fails.
+
+#### Implementation notes
+
+Proposal, confirmation, mechanics, and choice events are conditional because the M4.2 provider-driven tool planner and deterministic command bridge are pending; the current no-tool lane uses deterministic fallback narration. Generation creation is deterministic fallback, and apply seals selected review changes only with `campaignDomainMutated: false`. The delivered surface also includes a role-safe campaign play bootstrap, read-only initial-turn reconciliation, and narration retry/swipe stream variants that reuse prior receipts without rerunning mechanics.
 
 ## Milestone 3 — Client UI
 
@@ -376,6 +388,8 @@ Create `WorldExplorerPage`, `LocationTree`, `TravelDialog`, `NpcRosterPage`, `Fa
 
 ### M3.7 Campaign Play Shell and mechanic receipts
 
+**Status: Complete (client UI)**
+
 Create `CampaignPlayPage`, `CampaignContextDrawer`, `MechanicReceiptCard`, `ConfirmationBanner`, and `AdventureActionComposer` around the existing chat experience.
 
 - **Complexity:** L
@@ -384,6 +398,10 @@ Create `CampaignPlayPage`, `CampaignContextDrawer`, `MechanicReceiptCard`, `Conf
   - Chat remains central while the drawer shows current location, exits, present NPCs, active objectives, party resources, and encounter status from role-filtered APIs.
   - AI suggestions, pending confirmations, committed mechanics, and narration have distinct visual and screen-reader labels; receipt cards show rolls, modifiers, targets, outcomes, and state deltas.
   - Reloading or swiping narration preserves receipt identity and never implies that mechanics were rerun; committed turns remain inspectable when streaming narration fails.
+
+#### Implementation notes
+
+Chat remains central, with role-filtered context, durable receipt recovery, and narration swipes. Because the backend has no NPC location/presence model, the drawer visibly labels and shows the campaign-visible NPC roster rather than claiming those NPCs are present. Receipt cards omit unavailable target or outcome fields and never infer them; provider-driven tools remain M4 work.
 
 ### M3.8 Event Log, recap, import, and export experience
 
