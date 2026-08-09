@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adventureTurnConfirmRequestSchema, adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema,
 } from "../src/adventure-turns-http.js";
+import { decideToolProposalsInputSchema } from "../src/adventure-turns.js";
 
 const at = "2035-01-01T00:00:00.000Z";
 const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen",
@@ -27,5 +28,9 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     expect(adventureTurnConfirmRequestSchema.parse(command)).toEqual(command);
     expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, proposalIds: ["one", "one"] }).success).toBe(false);
     expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, decision: "approved" }).success).toBe(false);
+    const repositoryCommand = { turnId: "turn", proposalIds: ["one", "two"], decision: "approved",
+      expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "confirm" };
+    expect(decideToolProposalsInputSchema.parse(repositoryCommand)).toEqual(repositoryCommand);
+    expect(decideToolProposalsInputSchema.safeParse({ ...repositoryCommand, proposalIds: ["one", "one"] }).success).toBe(false);
   });
 });

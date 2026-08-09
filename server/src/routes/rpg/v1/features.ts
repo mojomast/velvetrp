@@ -125,6 +125,7 @@ import type { WorldRepository } from "../../../repo/worldRepo.js";
 import {npcHttpRoutes} from "./npcRoutes.js";
 import {factionHttpRoutes} from "./factionRoutes.js";
 
+/** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
 export interface CampaignListRepository extends
   Partial<OriginalStarterSetupRepository>,
   Partial<CampaignDiceRepository>,
@@ -156,7 +157,8 @@ export interface CampaignListRepository extends
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
   createAdventureTurn?: AdventureTurnRepository["createAdventureTurn"];
   waitForToolConfirmation?: AdventureTurnRepository["waitForToolConfirmation"];
-  decideToolProposal?: AdventureTurnRepository["decideToolProposal"];
+  decideToolProposals?: AdventureTurnRepository["decideToolProposals"];
+  reconcileAdventureTurnMechanics?: AdventureTurnRepository["reconcileAdventureTurnMechanics"];
   updateAdventureTurnNarration?: AdventureTurnRepository["updateAdventureTurnNarration"];
   getGenerationDraft?: AdventureTurnRepository["getGenerationDraft"];
   getGenerationDraftByIdempotencyKey?: AdventureTurnRepository["getGenerationDraftByIdempotencyKey"];
@@ -275,7 +277,8 @@ type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActo
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "createAdventureTurn"
-  | "waitForToolConfirmation" | "decideToolProposal" | "updateAdventureTurnNarration"> & Required<Pick<CampaignListRepository, "getCampaign">>;
+  | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
+  & Required<Pick<CampaignListRepository, "getCampaign">>;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
   | "createGenerationDraft" | "reviewGenerationDraft" | "applyGenerationDraft">
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
@@ -427,7 +430,7 @@ function assertFactionHttpRepository(repository:CampaignListRepository):asserts 
 }
 function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
   const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnNarration", "createAdventureTurn",
-    "waitForToolConfirmation", "decideToolProposal", "updateAdventureTurnNarration", "getCampaign"];
+    "waitForToolConfirmation", "decideToolProposals", "reconcileAdventureTurnMechanics", "updateAdventureTurnNarration", "getCampaign"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
@@ -436,6 +439,7 @@ function assertGenerationDraftRepository(repository: CampaignListRepository): as
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
+/** Registers trusted-local RPG v1 routes over one lazily owned repository. */
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
   let repositoryState:

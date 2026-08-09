@@ -183,6 +183,12 @@ export const appendToolProposalInputSchema = turnMutationInputSchema.extend({ to
 /** Strict input for one proposal decision. */
 export const decideToolProposalInputSchema = turnMutationInputSchema.extend({ proposalId: resourceIdSchema,
   decision: z.enum(["approved", "rejected"]), expiresAt: utcIsoTimestampSchema }).strict();
+/** Strict atomic decision for one exact bounded set of confirmation-required proposals. */
+export const decideToolProposalsInputSchema = turnMutationInputSchema.extend({
+  proposalIds: z.array(resourceIdSchema).min(1).max(MAX_ADVENTURE_TURN_TOOLS)
+    .refine((values) => new Set(values).size === values.length, "proposal IDs must be unique"),
+  decision: z.enum(["approved", "rejected"]),
+}).strict();
 /** Strict provider-call start input. */
 export const providerCallStartInputSchema = turnMutationInputSchema.extend({ callId: resourceIdSchema,
   provider: z.string().trim().min(1).max(128), model: z.string().trim().min(1).max(256), attempt: z.number().int().min(1).max(32) }).strict();
@@ -234,6 +240,8 @@ export type CreateAdventureTurnInput = z.infer<typeof createAdventureTurnInputSc
 export type AppendToolProposalInput = z.infer<typeof appendToolProposalInputSchema>;
 /** Strict proposal decision input. */
 export type DecideToolProposalInput = z.infer<typeof decideToolProposalInputSchema>;
+/** Strict atomic plural proposal decision input. */
+export type DecideToolProposalsInput = z.infer<typeof decideToolProposalsInputSchema>;
 /** Strict provider start input. */
 export type ProviderCallStartInput = z.infer<typeof providerCallStartInputSchema>;
 /** Strict provider outcome input. */

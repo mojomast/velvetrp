@@ -1,13 +1,14 @@
+import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   appendToolProposalInputSchema, applyGenerationDraftInputSchema, createAdventureTurnInputSchema,
-  createGenerationDraftInputSchema, decideToolProposalInputSchema, generationDraftValidationSchema,
+  createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
   providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema,
   reviewGenerationDraftInputSchema, stagedGenerationContentSchema, turnMutationInputSchema,
   updateTurnNarrationInputSchema, utcIsoTimestampSchema,
   type AppendToolProposalInput, type ApplyGenerationDraftInput, type CreateAdventureTurnInput,
-  type CreateGenerationDraftInput, type DecideToolProposalInput, type DraftMutationInput,
+  type CreateGenerationDraftInput, type DecideToolProposalInput, type DecideToolProposalsInput, type DraftMutationInput,
   type LinkTurnReceiptInput, type PrivateAdventureTurn, type PrivateGenerationDraft,
   type ProviderCallOutcomeInput, type ProviderCallStartInput, type ReviewGenerationDraftInput,
   type TurnMutationInput, type UpdateTurnNarrationInput,
@@ -17,7 +18,7 @@ import { AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureT
 import { createAdventureTurnReadRepository, type AdventureTurnReadRepository } from "./read.js";
 
 export type { AppendToolProposalInput, ApplyGenerationDraftInput, CreateAdventureTurnInput, CreateGenerationDraftInput,
-  DecideToolProposalInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
+  DecideToolProposalInput, DecideToolProposalsInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
   ReviewGenerationDraftInput, TurnMutationInput, UpdateTurnNarrationInput };
 
 type Database = DatabaseDriver.Database;
@@ -37,6 +38,8 @@ export interface AdventureTurnWriteRepository {
   waitForToolConfirmation(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Records one exact, non-expired proposal decision. */
   decideToolProposal(principalId: string, input: DecideToolProposalInput): PrivateAdventureTurn;
+  /** Atomically records one decision across an exact proposal set and advances the turn once. */
+  decideToolProposals(principalId: string, input: DecideToolProposalsInput): PrivateAdventureTurn;
   /** Records provider start metadata only; no provider work runs in this transaction. */
   recordProviderCallStart(principalId: string, input: ProviderCallStartInput): PrivateAdventureTurn;
   /** Records a matching provider outcome without directly completing narration. */
@@ -258,6 +261,48 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       physicalAdvance(row, physicalState, "none", at);
       return finish("turn", row, principalId, "confirmation-decision", input, input.expectedTurnRevision, state, "none", at, () => privateTurn(principalId, row.id));
     }); },
+    decideToolProposals(principalId, raw) {
+      const parsed = decideToolProposalsInputSchema.parse(raw);
+      const input = { ...parsed, proposalIds: [...parsed.proposalIds].sort() };
+      return immediate(() => {
+        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const old = replay("turn", row, principalId, "confirmation-decisions", input, input.expectedTurnRevision, privateAdventureTurnSchema);
+        if (old) return old;
+        const current = stale("turn", row, input.expectedTurnRevision);
+        if (current.resulting_state !== "awaiting-confirmation") throw new AdventureTurnConflictError("turn is not waiting for confirmation");
+        const at = now();
+        const selected = input.proposalIds.map((proposalId) => db.prepare(`SELECT proposal.*,
+          decision.decision_id FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
+            ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
+          WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`)
+          .get(row.campaign_id, row.id, proposalId) as any);
+        // Validate the complete batch before the first immutable decision row is inserted.
+        if (selected.some((proposal, index) => !proposal || proposal.proposal_id !== input.proposalIds[index]
+            || proposal.decision_id || !proposal.confirmation_expires_at)) {
+          throw new AdventureTurnConflictError("confirmation proposal set does not match durable pending state");
+        }
+        if (selected.some((proposal) => at >= proposal.confirmation_expires_at)) throw new AdventureTurnExpiredError("confirmation expired");
+        for (const [index, proposal] of selected.entries()) {
+          const decisionKey = `batch:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0, 48)}`;
+          db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, proposal.proposal_id, principalId, input.decision,
+              input.expectedTurnRevision, decisionKey, proposal.confirmation_expires_at, at);
+          if (index >= 31) throw new AdventureTurnConflictError("confirmation proposal bound exceeded");
+        }
+        const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=?
+          AND proposal.requires_confirmation=1 AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision
+            WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`)
+          .get(row.campaign_id, row.id);
+        let state = "awaiting-confirmation", physicalState = "awaiting-confirmation";
+        if (!pending) {
+          const approved = approvedProposals(row); state = approved.length > 0 ? "confirmed" : "cancelled";
+          physicalState = approved.length > 0 ? "mechanics-committed" : "cancelled";
+        }
+        physicalAdvance(row, physicalState, "none", at);
+        return finish("turn", row, principalId, "confirmation-decisions", input, input.expectedTurnRevision, state, "none", at,
+          () => privateTurn(principalId, row.id));
+      });
+    },
     recordProviderCallStart(principalId, raw) { const input = providerCallStartInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
       const old = replay("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;

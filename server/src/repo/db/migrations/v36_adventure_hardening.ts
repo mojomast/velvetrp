@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import DatabaseDriver from "better-sqlite3";
 import {
   appendToolProposalInputSchema, applyGenerationDraftInputSchema, createAdventureTurnInputSchema,
-  createGenerationDraftInputSchema, decideToolProposalInputSchema, generationDraftValidationSchema,
+  createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
   providerCallOutcomeInputSchema, providerCallStartInputSchema, reviewGenerationDraftInputSchema,
   stagedGenerationContentSchema, toolProposalSchema, turnMutationInputSchema, updateTurnNarrationInputSchema,
@@ -242,6 +242,7 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
   const mutationSchemas: Record<string, { parse(value: unknown): unknown }> = {
     "turn-create": createAdventureTurnInputSchema, "proposal-append": appendToolProposalInputSchema,
     "confirmation-wait": turnMutationInputSchema, "confirmation-decision": decideToolProposalInputSchema,
+    "confirmation-decisions": decideToolProposalsInputSchema,
     "provider-start": providerCallStartInputSchema, "provider-outcome": providerCallOutcomeInputSchema,
     "mechanics-link": linkTurnReceiptInputSchema, "mechanics-reconcile": turnMutationInputSchema,
     "narration-update": updateTurnNarrationInputSchema, "draft-create": createGenerationDraftInputSchema,
@@ -280,9 +281,12 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
       SELECT 1 FROM adventure_coordination_commands_v36 snapshot WHERE snapshot.aggregate_kind='turn' AND snapshot.campaign_id=decision.campaign_id
         AND snapshot.aggregate_id=decision.turn_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
       SELECT 1 FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='turn' AND command.campaign_id=decision.campaign_id
-        AND command.aggregate_id=decision.turn_id AND command.mutation_type='confirmation-decision' AND command.principal_id=decision.principal_id
-        AND command.idempotency_key=decision.idempotency_key AND command.expected_revision=decision.expected_turn_revision
-        AND json_extract(command.request_json,'$.proposalId')=decision.proposal_id AND json_extract(command.request_json,'$.decision')=decision.decision)
+        AND command.aggregate_id=decision.turn_id AND command.principal_id=decision.principal_id
+        AND command.expected_revision=decision.expected_turn_revision AND json_extract(command.request_json,'$.decision')=decision.decision
+        AND ((command.mutation_type='confirmation-decision' AND command.idempotency_key=decision.idempotency_key
+          AND json_extract(command.request_json,'$.proposalId')=decision.proposal_id)
+          OR (command.mutation_type='confirmation-decisions' AND EXISTS(SELECT 1 FROM json_each(command.request_json,'$.proposalIds') selected
+            WHERE selected.value=decision.proposal_id))))
     UNION ALL SELECT review.decision_id FROM review_decisions review WHERE NOT EXISTS(
       SELECT 1 FROM adventure_coordination_commands_v36 snapshot WHERE snapshot.aggregate_kind='draft' AND snapshot.campaign_id=review.campaign_id
         AND snapshot.aggregate_id=review.draft_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
@@ -350,7 +354,10 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
     FROM adventure_coordination_receipts_v36 receipt JOIN adventure_coordination_commands_v36 command ON command.command_id=receipt.command_id
     JOIN adventure_coordination_events_v36 event ON event.command_id=command.command_id WHERE command.mutation_type<>'migration-snapshot'`).all() as any[]).find((row) => {
       try { const result = (row.aggregate_kind === "turn" ? privateAdventureTurnSchema : privateGenerationDraftSchema).parse(JSON.parse(row.result_json)) as any;
-        return result.state !== row.resulting_state || (row.aggregate_kind === "turn" && result.narrationStatus !== row.narration_status); } catch { return true; }
+        const crashRecoveredMechanics = row.aggregate_kind === "turn" && ["proposed", "confirmed"].includes(row.resulting_state)
+          && result.state === "mechanics-committed" && result.receiptLinks.length > 0;
+        return (!crashRecoveredMechanics && result.state !== row.resulting_state)
+          || (row.aggregate_kind === "turn" && !crashRecoveredMechanics && result.narrationStatus !== row.narration_status); } catch { return true; }
     });
   if (badResult) throw new Error(`schema v36 coordination result is malformed (${badResult.command_id})`);
 }

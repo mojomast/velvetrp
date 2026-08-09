@@ -50,7 +50,8 @@ describe("M2.11 adventure turn routes", () => {
     let app = buildApp({ campaignRepositoryFactory: () => createRepository() });
     const first = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload });
     expect(first.statusCode).toBe(200); expect(first.headers["content-type"]).toContain("text/event-stream");
-    expect(first.headers["cache-control"]).toBe("no-cache, no-transform");
+    expect(first.headers["cache-control"]).toBe("private, no-store, no-transform");
+    expect(first.body).toContain(": heartbeat\n\n");
     const firstEvents = events(first.body); expect(firstEvents.map(({ type }) => type)).toEqual([
       "turn_started", "agent_status", "agent_status", "narration_delta", "terminal",
     ]);
@@ -89,6 +90,65 @@ describe("M2.11 adventure turn routes", () => {
     expect(events(resumed.body).map(({ type }) => type)).toEqual(["agent_status", "agent_status", "terminal"]);
     expect(resumed.body).not.toContain("turn_started"); expect(resumed.body).not.toContain("mechanics_committed");
     await restarted.close();
+  });
+
+  it("streams durable proposal, atomic confirmation, crash receipt recovery, and resumed narration without rerunning mechanics", async () => {
+    enable(); const campaign = seed(); let repo = createRepository();
+    const create = { campaignId: campaign.id, timelineId: campaign.activeTimelineId, sessionId: "session", actorId: "actor",
+      declaration: "I test the ancient lock", expectedCampaignRevision: 0, idempotencyKey: "full-turn" };
+    const turn = repo.createAdventureTurn("local-owner", create);
+    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll", arguments: {}, requiresConfirmation: true,
+      confirmationExpiresAt: expires, expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: "full-proposal" });
+    repo.waitForToolConfirmation("local-owner", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "full-wait" });
+    let app = buildApp({ campaignRepositoryFactory: () => repo });
+    const waiting = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload: {
+      campaignId: campaign.id, sessionId: "session", actorId: "actor", declaration: create.declaration, expectedRevision: 0, idempotencyKey: create.idempotencyKey,
+    } });
+    expect(events(waiting.body).map(({ type }) => type)).toEqual([
+      "turn_started", "agent_status", "tool_proposed", "confirmation_required", "terminal",
+    ]);
+    const proposalId = proposed.toolCalls[0]!.proposal.proposalId;
+    const confirmed = await app.inject({ method: "POST", url: `/api/rpg/v1/adventure-turns/${turn.turnId}/confirm`, headers: { "content-type": "application/json" },
+      payload: { proposalIds: [proposalId], decision: "approve", expectedRevision: 2, idempotencyKey: "full-confirm" } });
+    expect(confirmed.statusCode).toBe(200); const token = confirmed.json().resumeToken as string;
+    await app.close();
+
+    repo = createRepository();
+    repo.executeRollActorDice("local-owner", { commandId: "full-command", idempotencyKey: "full-command", campaignId: campaign.id,
+      timelineId: campaign.activeTimelineId, actorId: "actor", expectedRevision: 0, sourceTurnId: turn.turnId,
+      command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
+    repo.close();
+    app = buildApp({ campaignRepositoryFactory: () => createRepository() });
+    const recovered = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${turn.turnId}` });
+    expect(recovered.json()).toMatchObject({ turn: { state: "mechanics-committed" }, receipts: [{ commandId: "full-command", proposalId }] });
+    const before = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
+    expect(before.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 0 }); before.close();
+    const resumed = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload: { resumeToken: token } });
+    expect(events(resumed.body).map(({ type }) => type)).toEqual([
+      "agent_status", "mechanics_committed", "agent_status", "narration_delta", "terminal",
+    ]);
+    const after = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
+    expect(after.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 1 });
+    expect(after.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(turn.turnId)).toEqual({ count: 1 }); after.close();
+    await app.close();
+  });
+
+  it("finishes deterministic durable orchestration after delivery disconnect", async () => {
+    enable(); const campaign = seed(); const app = buildApp({ campaignRepositoryFactory: () => createRepository() });
+    const address = await app.listen({ host: "127.0.0.1", port: 0 });
+    const controller = new AbortController();
+    const response = await fetch(`${address}/api/rpg/v1/adventure-turns/stream`, { method: "POST", signal: controller.signal,
+      headers: { "content-type": "application/json" }, body: JSON.stringify({ campaignId: campaign.id, sessionId: "session", actorId: "actor",
+        declaration: "I wait beside the arch", expectedRevision: 0, idempotencyKey: "disconnect-turn" }) });
+    const reader = response.body!.getReader(); const decoder = new TextDecoder(); let received = "";
+    while (!received.includes("event: turn_started")) received += decoder.decode((await reader.read()).value, { stream: true });
+    const match = received.match(/data: (\{[^\n]+\})/); if (!match) throw new Error("turn_started data missing");
+    const started = adventureTurnStreamEventSchema.parse(JSON.parse(match[1]!));
+    if (started.type !== "turn_started") throw new Error("unexpected first event");
+    controller.abort(); await new Promise((resolve) => setTimeout(resolve, 50));
+    const reconciled = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${started.payload.turn.turnId}` });
+    expect(reconciled.json()).toMatchObject({ turn: { state: "completed" }, narrationStatus: { status: "completed" } });
+    await app.close();
   });
 
   it("gates before access and returns heartbeat-safe redacted framing and problems", async () => {

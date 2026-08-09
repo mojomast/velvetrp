@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   privateAdventureTurnSchema, privateGenerationDraftSchema, roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema,
@@ -36,13 +37,43 @@ const rootTurnId = (db: Database, campaignId: string, turnId: string): string =>
   }
 };
 
+const toolMatchesCommand = (toolName: string, commandType: string) => toolName === commandType
+  || (["roll", "roll-check", "roll_actor_dice"].includes(toolName) && commandType === "roll_actor_dice");
+
 const receipts = (db: Database, campaignId: string, turnId: string) => {
   const root = rootTurnId(db, campaignId, turnId);
-  return (db.prepare(`SELECT link_id,command_id,proposal_id,source_turn_id,linked_at FROM turn_mechanics_links_v36
+  const linked = (db.prepare(`SELECT link_id,command_id,proposal_id,source_turn_id,linked_at FROM turn_mechanics_links_v36
     WHERE campaign_id=? AND root_turn_id=? ORDER BY linked_at,link_id`).all(campaignId, root) as any[]).map((row) => ({
       linkId: row.link_id, campaignId, commandId: row.command_id, proposalId: row.proposal_id,
       sourceTurnId: row.source_turn_id, linkedAt: row.linked_at,
     }));
+  const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
+    .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
+  if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
+  const proposals = db.prepare(`SELECT proposal.proposal_id,proposal.tool_name,proposal.position FROM tool_proposals proposal
+    LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id
+      AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=? AND proposal.turn_id=?
+      AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
+    .all(campaignId, root) as Array<{ proposal_id: string; tool_name: string; position: number }>;
+  const unbound = proposals.filter((proposal) => !linked.some((link) => link.proposalId === proposal.proposal_id));
+  const commands = db.prepare(`SELECT command.command_id,command.type,event.occurred_at FROM campaign_commands command
+    JOIN command_receipts receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+    JOIN campaign_events event ON event.campaign_id=receipt.campaign_id AND event.event_id=receipt.event_id
+      AND event.command_id=receipt.command_id WHERE command.campaign_id=? AND command.timeline_id=? AND command.actor_id=?
+      AND command.source_turn_id=? AND event.timeline_id=? AND event.actor_id=? AND event.source_turn_id=?
+      AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link WHERE link.campaign_id=command.campaign_id AND link.command_id=command.command_id)
+    ORDER BY receipt.revision_after,command.command_id`).all(campaignId, rootRow.timeline_id, rootRow.actor_id, root,
+      rootRow.timeline_id, rootRow.actor_id, root) as Array<{ command_id: string; type: string; occurred_at: string }>;
+  if (commands.length > unbound.length) throw new Error("source-turn command receipts exceed approved proposals");
+  const recoverable = commands.map((entry) => {
+    const candidates = unbound.filter((proposal) => toolMatchesCommand(proposal.tool_name, entry.type));
+    if (candidates.length !== 1) throw new Error("source-turn command receipt proposal ancestry is ambiguous");
+    const proposal = candidates[0]!; unbound.splice(unbound.indexOf(proposal), 1);
+    return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
+      campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
+  });
+  return { links: [...linked, ...recoverable].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
+    recoverableCount: recoverable.length, approvedCount: proposals.length };
 };
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */
@@ -62,9 +93,9 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
     idempotencyKey: row.decision_key, expiresAt: row.expires_at, decidedAt: row.decided_at } }
     : row.requires_confirmation ? { state: "pending" as const, expiresAt: row.confirmation_expires_at ?? "9999-12-31T23:59:59.999Z" }
       : { state: "not-required" as const };
-  const common = (row: any) => ({ turnId: row.id, campaignId: row.campaign_id, timelineId: row.timeline_id, sessionId: row.session_id,
-    actorId: row.actor_id, principalId: row.principal_id, mode: row.v36_mode, priorTurnId: row.prior_turn_id, state: row.v36_state,
-    narrationStatus: row.v36_narration_status, revision: row.v36_revision, campaignRevision: row.campaign_revision,
+  const common = (row: any, effective?: { state: string; narrationStatus: string }) => ({ turnId: row.id, campaignId: row.campaign_id, timelineId: row.timeline_id, sessionId: row.session_id,
+    actorId: row.actor_id, principalId: row.principal_id, mode: row.v36_mode, priorTurnId: row.prior_turn_id, state: effective?.state ?? row.v36_state,
+    narrationStatus: effective?.narrationStatus ?? row.v36_narration_status, revision: row.v36_revision, campaignRevision: row.campaign_revision,
     createdAt: row.created_at, updatedAt: row.v36_updated_at });
 
   return {
@@ -80,16 +111,21 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
         WHERE turn.id=?`).get(turnId) as any;
       if (!row) return null;
       const member = membership(principalId, row.campaign_id); if (!member) throw new AdventureTurnUnavailableError("turn is unavailable");
-      const links = receipts(db, row.campaign_id, row.id);
+      const receiptProjection = receipts(db, row.campaign_id, row.id); const links = receiptProjection.links;
       const proposals = proposalRows(turnId);
-      if (!canSeePrivateTurn(principalId, row, member.role)) return roleSafeAdventureTurnSchema.parse({ ...common(row),
+      const pending = proposals.some((proposal) => proposal.requires_confirmation && !proposal.decision_id);
+      if (receiptProjection.recoverableCount > 0 && pending) throw new Error("recoverable mechanics coexist with pending confirmation");
+      const effective = receiptProjection.recoverableCount > 0 && ["proposed", "confirmed", "mechanics-committed"].includes(row.v36_state)
+        ? { state: links.length === receiptProjection.approvedCount ? "mechanics-committed" : "confirmed",
+          narrationStatus: links.length === receiptProjection.approvedCount ? "pending" : "none" } : undefined;
+      if (!canSeePrivateTurn(principalId, row, member.role)) return roleSafeAdventureTurnSchema.parse({ ...common(row, effective),
         proposals: proposals.map((proposal) => ({ proposalId: proposal.proposal_id, position: proposal.position, toolName: proposal.tool_name,
           proposedAt: proposal.proposed_at, confirmation: confirmation(proposal) })), receiptLinks: links });
       const providerCalls = (db.prepare("SELECT * FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? ORDER BY recorded_at,record_id")
         .all(row.campaign_id, turnId) as any[]).map((call) => ({ recordId: call.record_id, callId: call.call_id, phase: call.phase,
           provider: call.provider, model: call.model, attempt: call.attempt, promptTokens: call.prompt_tokens,
           completionTokens: call.completion_tokens, outcomeCode: call.outcome_code, recordedAt: call.recorded_at }));
-      return privateAdventureTurnSchema.parse({ ...common(row), declaration: row.declaration,
+      return privateAdventureTurnSchema.parse({ ...common(row, effective), declaration: row.declaration,
         toolCalls: proposals.map((proposal) => { const proposalLinks = links.filter((link) => link.proposalId === proposal.proposal_id); return ({ proposal: { proposalId: proposal.proposal_id, position: proposal.position,
            toolName: proposal.tool_name, argumentsJson: proposal.arguments_json, proposedAt: proposal.proposed_at,
            confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed" : proposal.decision ?? (proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),

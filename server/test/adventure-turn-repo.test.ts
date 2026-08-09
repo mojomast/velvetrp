@@ -229,6 +229,12 @@ describe("M1.10 adventure turn repository", () => {
       command: { type: "roll_actor_dice", payload: { expression: "1d20" } } });
     repo.close();
     repo = factory();
+    expect(repo.getAdventureTurn("player", turn.turnId)).toMatchObject({ state: "mechanics-committed",
+      receiptLinks: [{ commandId: "crash-command", proposalId: proposed.toolCalls[0]!.proposal.proposalId,
+        linkId: expect.stringMatching(/^recoverable-/) }] });
+    const beforeLink = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(beforeLink.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 0 });
+    beforeLink.close();
     const reconciled = repo.reconcileAdventureTurnMechanics("player", { turnId: turn.turnId, expectedTurnRevision: 1,
       expectedCampaignRevision: 0, idempotencyKey: "crash-reconcile" });
     expect(reconciled).toMatchObject({ state: "mechanics-committed",
@@ -310,12 +316,11 @@ describe("M1.10 adventure turn repository", () => {
     const firstInput = { turnId: turn.turnId, proposalId: first.toolCalls[0]!.proposal.proposalId, commandId: "plural-command-one",
       expectedTurnRevision: 5, expectedCampaignRevision: 0, idempotencyKey: "plural-link-one" };
     const partiallyLinked = repo.linkFinalMechanicsReceipt("player", firstInput);
-    expect(partiallyLinked).toMatchObject({ state: "confirmed", revision: 6,
-      receiptLinks: [{ proposalId: firstInput.proposalId, commandId: "plural-command-one" }] });
+    expect(partiallyLinked).toMatchObject({ state: "mechanics-committed", revision: 6 });
+    expect(partiallyLinked.receiptLinks.map(({ commandId }) => commandId).sort()).toEqual(["plural-command-one", "plural-command-two"]);
     expect(repo.linkFinalMechanicsReceipt("player", firstInput)).toEqual(partiallyLinked);
     repo.close(); repo = factory();
-    expect(repo.getAdventureTurn("player", turn.turnId)).toMatchObject({ state: "confirmed", revision: 6,
-      receiptLinks: [{ proposalId: firstInput.proposalId, commandId: "plural-command-one" }] });
+    expect(repo.getAdventureTurn("player", turn.turnId)).toMatchObject({ state: "mechanics-committed", revision: 6 });
     expect(repo.linkFinalMechanicsReceipt("player", firstInput)).toEqual(partiallyLinked);
     const secondInput = { turnId: turn.turnId, proposalId: second.toolCalls[1]!.proposal.proposalId, commandId: "plural-command-two",
       expectedTurnRevision: 6, expectedCampaignRevision: 0, idempotencyKey: "plural-link-two" };
@@ -330,6 +335,63 @@ describe("M1.10 adventure turn repository", () => {
     expect(revisionDb.prepare("SELECT revision FROM adventure_turns WHERE id=?").get(turn.turnId)).toEqual({ revision: 7 });
     expect(revisionDb.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 2 });
     revisionDb.close(); repo.close();
+  });
+
+  it("decides exact plural proposal sets atomically with whole-batch replay", () => {
+    const identity = seed(); const repo = factory();
+    const turn = repo.createAdventureTurn("player", createInput(identity, "atomic-decisions"));
+    const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
+      idempotencyKey: "atomic-one", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+    const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
+      idempotencyKey: "atomic-two", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+    repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "atomic-wait" });
+    const proposalIds = [first.toolCalls[0]!.proposal.proposalId, second.toolCalls[1]!.proposal.proposalId];
+    const input = { turnId: turn.turnId, proposalIds, decision: "approved" as const, expectedTurnRevision: 3,
+      expectedCampaignRevision: 0, idempotencyKey: "atomic-batch" };
+    const decided = repo.decideToolProposals("player", input);
+    expect(decided).toMatchObject({ state: "confirmed", revision: 4 });
+    expect(repo.decideToolProposals("player", { ...input, proposalIds: [...proposalIds].reverse() })).toEqual(decided);
+    expect(() => repo.decideToolProposals("player", { ...input, proposalIds: [proposalIds[0]!] })).toThrow(AdventureTurnConflictError);
+    const db = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(db.prepare("SELECT expected_turn_revision FROM confirmation_decisions WHERE turn_id=?").all(turn.turnId))
+      .toEqual([{ expected_turn_revision: 3 }, { expected_turn_revision: 3 }]);
+    expect(db.prepare(`SELECT count(*) count FROM adventure_coordination_commands_v36 WHERE aggregate_id=?
+      AND mutation_type='confirmation-decisions'`).get(turn.turnId)).toEqual({ count: 1 });
+    db.close(); repo.close();
+  });
+
+  it("rolls back plural confirmation when any proposal is unknown, stale, expired, or already decided", () => {
+    const identity = seed(); let repo = factory();
+    const setup = (suffix: string) => {
+      const turn = repo.createAdventureTurn("player", createInput(identity, `batch-${suffix}`));
+      const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
+        idempotencyKey: `${suffix}-one`, toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
+        idempotencyKey: `${suffix}-two`, toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: `${suffix}-wait` });
+      return { turn, ids: [first.toolCalls[0]!.proposal.proposalId, second.toolCalls[1]!.proposal.proposalId] };
+    };
+    const unknown = setup("unknown");
+    expect(() => repo.decideToolProposals("player", { turnId: unknown.turn.turnId, proposalIds: [unknown.ids[0]!, "missing"],
+      decision: "approved", expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "unknown-batch" })).toThrow(AdventureTurnConflictError);
+    const stale = setup("stale");
+    expect(() => repo.decideToolProposals("player", { turnId: stale.turn.turnId, proposalIds: stale.ids,
+      decision: "approved", expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "stale-batch" })).toThrow(AdventureTurnStaleError);
+    const concurrent = setup("concurrent");
+    repo.decideToolProposal("player", { turnId: concurrent.turn.turnId, proposalId: concurrent.ids[1]!, decision: "approved",
+      expiresAt: EXPIRES, expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "concurrent-single" });
+    expect(() => repo.decideToolProposals("player", { turnId: concurrent.turn.turnId, proposalIds: concurrent.ids,
+      decision: "approved", expectedTurnRevision: 4, expectedCampaignRevision: 0, idempotencyKey: "concurrent-batch" })).toThrow(AdventureTurnConflictError);
+    let db = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM confirmation_decisions WHERE turn_id IN (?,?)").get(unknown.turn.turnId, stale.turn.turnId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM confirmation_decisions WHERE turn_id=?").get(concurrent.turn.turnId)).toEqual({ count: 1 });
+    db.close(); repo.close();
+    repo = factory(); const expired = setup("expired"); repo.close(); repo = factory(EXPIRES);
+    expect(() => repo.decideToolProposals("player", { turnId: expired.turn.turnId, proposalIds: expired.ids,
+      decision: "approved", expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "expired-batch" })).toThrow(AdventureTurnExpiredError);
+    db = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(db.prepare("SELECT count(*) count FROM confirmation_decisions WHERE turn_id=?").get(expired.turn.turnId)).toEqual({ count: 0 });
+    db.close(); repo.close();
   });
 
   it("resets failed narration to in-progress on provider retry and keeps success in-progress", () => {

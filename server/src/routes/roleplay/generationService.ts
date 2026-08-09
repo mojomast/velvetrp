@@ -210,11 +210,12 @@ export class SseWriter {
   }
 }
 
-export function openSse(reply: FastifyReply): SseWriter {
+/** Opens an SSE response with reviewed cache policy and shared safe framing. */
+export function openSse(reply: FastifyReply, cacheControl = "no-cache, no-transform"): SseWriter {
   reply.hijack();
   reply.raw.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache, no-transform",
+    "Cache-Control": cacheControl,
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
