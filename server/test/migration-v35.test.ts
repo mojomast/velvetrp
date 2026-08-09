@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
+import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS } from "../src/repo/db/migrations/v38_durable_agent_execution.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -21,6 +22,14 @@ function schema(databaseFile: string): unknown[] {
 }
 
 function rewindToV34(db: DatabaseDriver.Database): void {
+  const v38Names = DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS.map(([, name]) => name);
+  const v38 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v38Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
+    .all(...v38Names) as Array<{ type: string; name: string }>;
+  for (const row of v38) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
+  for (const row of v38) if (row.type === "index") db.exec(`DROP INDEX IF EXISTS "${row.name}"`);
+  for (const table of ["durable_agent_execution_layout_attestation_v38", "agent_read_outcomes_v38",
+    "agent_decision_batch_seals_v38", "agent_tool_calls_v38", "agent_decision_rounds_v38", "agent_provider_starts_v38",
+    "agent_execution_operations_v38", "adventure_agent_executions_v38"]) db.exec(`DROP TABLE IF EXISTS "${table}"`);
   const v37Names = TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS.map(([, name]) => name);
   const v37 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v37Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
     .all(...v37Names) as Array<{ type: string; name: string }>;
@@ -55,7 +64,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
 
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "37" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "38" });
     expect(migrated.prepare("SELECT title FROM quest_storylines WHERE id='legacy-story'").get()).toEqual({ title: "Legacy story" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM adventure_generation_layout_attestation_v35").get()).toEqual({ length: 64 });
     for (const table of tables) expect(migrated.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });

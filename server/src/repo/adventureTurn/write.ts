@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   appendToolProposalInputSchema, applyGenerationDraftInputSchema, createAdventureTurnInputSchema,
+  AGENT_TOOL_REGISTRY_VERSION, DEFAULT_AGENT_EXECUTION_LIMITS,
   createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
   providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema,
@@ -225,6 +226,12 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         revision,campaign_revision,idempotency_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'declared','none',0,?,?,?,?)`)
         .run(row.id, input.campaignId, input.timelineId, input.sessionId, input.actorId, principalId, input.declaration, physicalMode, priorId,
           input.expectedCampaignRevision, input.idempotencyKey, at, at);
+      const limits = input.executionLimits ?? DEFAULT_AGENT_EXECUTION_LIMITS;
+      const deadlineAt = utcIsoTimestampSchema.parse(new Date(new Date(at).getTime() + limits.durationMs).toISOString());
+      db.prepare(`INSERT INTO adventure_agent_executions_v38(campaign_id,turn_id,tool_registry_version,
+        max_decision_rounds,max_tool_calls,max_mutation_calls,max_provider_calls,max_duration_ms,started_at,deadline_at)
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(row.campaign_id, row.id, AGENT_TOOL_REGISTRY_VERSION,
+          limits.decisionRounds, limits.toolCalls, limits.mutationCalls, limits.providerCalls, limits.durationMs, at, deadlineAt);
       return finish("turn", row, principalId, "turn-create", input, -1, state, narration, at, () => privateTurn(principalId, row.id));
     }); },
     appendToolProposal(principalId, raw) { const input = appendToolProposalInputSchema.parse(raw); return immediate(() => {
@@ -317,8 +324,13 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
       const old = replay("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
       const current = stale("turn", row, input.expectedTurnRevision); if (!["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating"].includes(current.resulting_state)) throw new AdventureTurnConflictError("provider start is illegal in this state");
-      const count = (db.prepare("SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id) as { count: number }).count;
-      if (count >= 64 || db.prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=?").get(row.campaign_id, row.id, input.callId)) throw new AdventureTurnConflictError("provider call identity or bound is invalid");
+      const run = db.prepare("SELECT max_provider_calls FROM adventure_agent_executions_v38 WHERE campaign_id=? AND turn_id=?")
+        .get(row.campaign_id, row.id) as { max_provider_calls: number } | undefined;
+      if (!run) throw new AdventureTurnUnavailableError("durable execution is unavailable");
+      const starts = (db.prepare("SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND phase='started'")
+        .get(row.campaign_id, row.id) as { count: number }).count;
+      if (starts >= run.max_provider_calls || db.prepare("SELECT 1 FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND call_id=?")
+        .get(row.campaign_id, row.id, input.callId)) throw new AdventureTurnConflictError("provider call identity or bound is invalid");
       const at = now(); db.prepare(`INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at)
         VALUES(?,?,?,?,'started',?,?,?,NULL,NULL,NULL,?,?)`).run(id(), row.campaign_id, row.id, input.callId, input.provider, input.model, input.attempt, input.idempotencyKey, at);
       const narrating = current.resulting_state === "mechanics-committed" || current.resulting_state === "narrating";

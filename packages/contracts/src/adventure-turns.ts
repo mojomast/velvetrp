@@ -2,6 +2,7 @@ import { z } from "zod";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
+import { agentExecutionLimitsSchema } from "./agent-execution.js";
 
 /** Maximum number of tool proposals or calls retained by one adventure turn. */
 export const MAX_ADVENTURE_TURN_TOOLS = 32;
@@ -182,7 +183,9 @@ export const turnMutationInputSchema = z.object({ turnId: resourceIdSchema, expe
 export const createAdventureTurnInputSchema = z.object({ campaignId: campaignIdSchema, timelineId: resourceIdSchema,
   sessionId: resourceIdSchema, actorId: actorIdSchema, declaration: z.string().trim().min(1).max(8_000),
   mode: adventureTurnModeSchema.optional(), priorTurnId: resourceIdSchema.nullable().optional(),
-  expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema }).strict().superRefine((value, context) => {
+  expectedCampaignRevision: revisionSchema, idempotencyKey: idempotencyKeySchema,
+  executionLimits: agentExecutionLimitsSchema.optional(),
+}).strict().superRefine((value, context) => {
     const mode = value.mode ?? "original";
     if ((mode === "original") !== ((value.priorTurnId ?? null) === null)) context.addIssue({ code: "custom", path: ["priorTurnId"], message: "narration derivatives require priorTurnId" });
   });

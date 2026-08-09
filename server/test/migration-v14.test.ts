@@ -278,7 +278,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "37" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "38" });
     expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get()).toEqual({ value: "1" });
     expect(migrated.prepare("SELECT * FROM rpg_actor_resources").all()).toEqual(before.rpg_actor_resources);
     expect(migrated.prepare("SELECT * FROM campaign_events").all()).toEqual(before.campaign_events);
@@ -880,7 +880,7 @@ describe("schema v14 normalized dice audit", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(integer).not.toHaveBeenCalled();
     const retried = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "37" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "38" });
     for (const table of AUDIT_TABLES) {
       expect(retried.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get(), table).toEqual({ count: 0 });
     }

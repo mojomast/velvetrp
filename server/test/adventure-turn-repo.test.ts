@@ -508,10 +508,10 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
-  it("bounds provider metadata at sixty-four exact records", () => {
+  it("unifies legacy provider starts under the seven-start execution ceiling", () => {
     const identity = seed(); const repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "provider-bound")); let revision = turn.revision;
-    for (let index = 0; index < 32; index += 1) {
+    for (let index = 0; index < 7; index += 1) {
       const started = repo.recordProviderCallStart("player", { turnId: turn.turnId, callId: `call-${index}`,
         provider: "test", model: "model", attempt: 1, expectedTurnRevision: revision, expectedCampaignRevision: 0, idempotencyKey: `start-${index}` });
       revision = started.revision;
@@ -519,9 +519,197 @@ describe("M1.10 adventure turn repository", () => {
         outcome: "succeeded", outcomeCode: "ok", expectedTurnRevision: revision, expectedCampaignRevision: 0, idempotencyKey: `outcome-${index}` }).revision;
     }
     const current = repo.getAdventureTurn("player", turn.turnId)!;
-    expect("providerCalls" in current && current.providerCalls).toHaveLength(64);
-    expect(() => repo.recordProviderCallStart("player", { turnId: current.turnId, callId: "call-33", provider: "test", model: "model", attempt: 1,
-      expectedTurnRevision: revision, expectedCampaignRevision: 0, idempotencyKey: "start-33" })).toThrow(AdventureTurnConflictError);
+    expect("providerCalls" in current && current.providerCalls).toHaveLength(14);
+    const before = repo.getDurableAgentPlanningState("player", turn.turnId);
+    expect(() => repo.recordProviderCallStart("player", { turnId: current.turnId, callId: "call-7", provider: "test", model: "model", attempt: 1,
+      expectedTurnRevision: revision, expectedCampaignRevision: 0, idempotencyKey: "start-7" })).toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toEqual(before);
+    repo.close();
+  });
+
+  it("persists complete decision batches before outcomes and replays exact bodies across restart", () => {
+    const identity = seed(); let repo = factory();
+    const turn = repo.createAdventureTurn("player", createInput(identity, "durable-planning"));
+    const startInput = { turnId: turn.turnId, providerCallId: "planner-1", provider: "test", model: "model", attempt: 1,
+      expectedTurnRevision: turn.revision, expectedCampaignRevision: 0, expectedExecutionRevision: 0, idempotencyKey: "planner-start" };
+    const started = repo.startAgentProviderCall("player", startInput);
+    expect(repo.startAgentProviderCall("player", startInput)).toEqual(started);
+    const batch = { turnId: turn.turnId, round: 1, providerCallId: "planner-1", toolRegistryVersion: "v1" as const,
+      request: { visible: ["door"] }, result: "tool-calls" as const, calls: [
+        { providerToolCallId: "read-1", toolName: "campaign_context.read" as const, kind: "read" as const, arguments: { section: "world" } },
+        { providerToolCallId: "read-2", toolName: "world_state.read" as const, kind: "read" as const, arguments: { scope: "visible" } },
+      ], expectedTurnRevision: 0, expectedExecutionRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "round-1" };
+    const persisted = repo.persistAgentDecisionRound("player", batch);
+    expect(persisted).toEqual({ turnId: turn.turnId, resultingExecutionRevision: 2 });
+    expect(repo.persistAgentDecisionRound("player", batch)).toEqual(persisted);
+    expect(() => repo.persistAgentDecisionRound("player", { ...batch, request: { visible: ["changed"] } }))
+      .toThrow(AdventureTurnConflictError);
+    const malformed = { ...batch, idempotencyKey: "malformed", round: 2, calls: [{ ...batch.calls[0], kind: "mutation" }] };
+    expect(() => repo.persistAgentDecisionRound("player", malformed as never)).toThrow();
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)?.toolCalls).toHaveLength(2);
+
+    const read = repo.markAgentReadOutcome("player", { turnId: turn.turnId, providerToolCallId: "read-1",
+      outcome: { status: "succeeded", result: { locations: ["hall"] } }, expectedTurnRevision: 0,
+      expectedExecutionRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "read-result" });
+    expect(read.resultingExecutionRevision).toBe(3);
+    repo.markAgentReadOutcome("player", { turnId: turn.turnId, providerToolCallId: "read-2",
+      outcome: { status: "failed", errorCode: "unavailable" }, expectedTurnRevision: 0,
+      expectedExecutionRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "read-result-2" });
+    const state = repo.getDurableAgentPlanningState("player", turn.turnId)!;
+    expect(state).toMatchObject({ executionRevision: 4, decisionRounds: 1, providerStarts: 1,
+      toolCalls: [{ status: "read-succeeded", readOutcome: { result: { locations: ["hall"] } } },
+        { status: "read-failed", readOutcome: { errorCode: "unavailable" } }] });
+    repo.close(); repo = factory();
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toEqual(state);
+    expect(repo.getAdventureTurn("observer", turn.turnId)).not.toHaveProperty("arguments");
+    repo.close();
+  });
+
+  it("enforces lower durable limits and the exact ninety-second restart deadline", () => {
+    const identity = seed(); let repo = factory();
+    const turn = repo.createAdventureTurn("player", { ...createInput(identity, "lower-limits"), executionLimits: {
+      decisionRounds: 1, toolCalls: 1, mutationCalls: 0, providerCalls: 1, durationMs: 90_000,
+    } });
+    repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "only-provider", provider: "test", model: "model",
+      attempt: 1, expectedTurnRevision: 0, expectedExecutionRevision: 0, expectedCampaignRevision: 0, idempotencyKey: "only-start" });
+    expect(() => repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "extra-provider", provider: "test", model: "model",
+      attempt: 2, expectedTurnRevision: 0, expectedExecutionRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "extra-start" }))
+      .toThrow(AdventureTurnConflictError);
+    repo.persistAgentDecisionRound("player", { turnId: turn.turnId, round: 1, providerCallId: "only-provider", toolRegistryVersion: "v1",
+      request: {}, result: "tool-calls", calls: [{ providerToolCallId: "only-read", toolName: "campaign_context.read", kind: "read", arguments: {} }],
+      expectedTurnRevision: 0, expectedExecutionRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "only-round" });
+    repo.close(); repo = factory("2035-01-01T00:01:30.000Z");
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toMatchObject({ deadlineExceeded: true, decisionRounds: 1 });
+    const before = repo.getDurableAgentPlanningState("player", turn.turnId);
+    expect(() => repo.markAgentReadOutcome("player", { turnId: turn.turnId, providerToolCallId: "only-read",
+      outcome: { status: "failed", errorCode: "timeout" }, expectedTurnRevision: 0, expectedExecutionRevision: 2,
+      expectedCampaignRevision: 0, idempotencyKey: "late-result" }))
+      .toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toEqual(before);
+    repo.close();
+  });
+
+  it("rejects a thirteenth total call and fifth mutation atomically", () => {
+    const identity = seed(); const repo = factory();
+    const callTurn = repo.createAdventureTurn("player", createInput(identity, "thirteenth-call"));
+    repo.startAgentProviderCall("player", { turnId: callTurn.turnId, providerCallId: "calls-one", provider: "test", model: "model",
+      attempt: 1, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 0, idempotencyKey: "calls-one" });
+    const twelve = Array.from({ length: 12 }, (_, index) => ({ providerToolCallId: `read-${index}`,
+      toolName: "campaign_context.read" as const, kind: "read" as const, arguments: { index } }));
+    repo.persistAgentDecisionRound("player", { turnId: callTurn.turnId, round: 1, providerCallId: "calls-one",
+      toolRegistryVersion: "v1", request: {}, result: "tool-calls", calls: twelve, expectedCampaignRevision: 0,
+      expectedTurnRevision: 0, expectedExecutionRevision: 1, idempotencyKey: "twelve-calls" });
+    let revision = 2;
+    for (const call of twelve) {
+      repo.markAgentReadOutcome("player", { turnId: callTurn.turnId, providerToolCallId: call.providerToolCallId,
+        outcome: { status: "succeeded", result: {} }, expectedCampaignRevision: 0, expectedTurnRevision: 0,
+        expectedExecutionRevision: revision, idempotencyKey: `outcome-${call.providerToolCallId}` });
+      revision += 1;
+    }
+    repo.startAgentProviderCall("player", { turnId: callTurn.turnId, providerCallId: "calls-two", provider: "test", model: "model",
+      attempt: 2, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: revision,
+      idempotencyKey: "calls-two" }); revision += 1;
+    const beforeThirteenth = repo.getDurableAgentPlanningState("player", callTurn.turnId);
+    expect(() => repo.persistAgentDecisionRound("player", { turnId: callTurn.turnId, round: 2, providerCallId: "calls-two",
+      toolRegistryVersion: "v1", request: {}, result: "tool-calls", calls: [{ providerToolCallId: "read-12",
+        toolName: "campaign_context.read", kind: "read", arguments: {} }], expectedCampaignRevision: 0,
+      expectedTurnRevision: 0, expectedExecutionRevision: revision, idempotencyKey: "thirteenth" })).toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", callTurn.turnId)).toEqual(beforeThirteenth);
+
+    const mutationTurn = repo.createAdventureTurn("player", createInput(identity, "fifth-mutation"));
+    repo.startAgentProviderCall("player", { turnId: mutationTurn.turnId, providerCallId: "mutations", provider: "test", model: "model",
+      attempt: 1, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 0, idempotencyKey: "mutations" });
+    const beforeFifth = repo.getDurableAgentPlanningState("player", mutationTurn.turnId);
+    expect(() => repo.persistAgentDecisionRound("player", { turnId: mutationTurn.turnId, round: 1, providerCallId: "mutations",
+      toolRegistryVersion: "v1", request: {}, result: "tool-calls", calls: Array.from({ length: 5 }, (_, index) => ({
+        providerToolCallId: `mutation-${index}`, toolName: "actor_dice.roll" as const, kind: "mutation" as const,
+        arguments: { expression: "1d20" } })), expectedCampaignRevision: 0, expectedTurnRevision: 0,
+      expectedExecutionRevision: 1, idempotencyKey: "five-mutations" })).toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", mutationTurn.turnId)).toEqual(beforeFifth);
+    repo.close();
+  });
+
+  it("starts the next provider only after every prior read outcome and preserves their ordering", () => {
+    const identity = seed(); const repo = factory();
+    const turn = repo.createAdventureTurn("player", createInput(identity, "provider-ordering"));
+    repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "first", provider: "test", model: "model",
+      attempt: 1, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 0, idempotencyKey: "first" });
+    repo.persistAgentDecisionRound("player", { turnId: turn.turnId, round: 1, providerCallId: "first", toolRegistryVersion: "v1",
+      request: {}, result: "tool-calls", calls: [{ providerToolCallId: "pending", toolName: "campaign_context.read", kind: "read",
+        arguments: {} }], expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 1, idempotencyKey: "first-round" });
+    const unresolved = repo.getDurableAgentPlanningState("player", turn.turnId);
+    expect(() => repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "too-early", provider: "test", model: "model",
+      attempt: 2, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 2,
+      idempotencyKey: "too-early" })).toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toEqual(unresolved);
+    repo.markAgentReadOutcome("player", { turnId: turn.turnId, providerToolCallId: "pending", outcome: { status: "succeeded", result: { ok: true } },
+      expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 2, idempotencyKey: "pending-outcome" });
+    expect(repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "second", provider: "test", model: "model",
+      attempt: 2, expectedCampaignRevision: 0, expectedTurnRevision: 0, expectedExecutionRevision: 3,
+      idempotencyKey: "second" })).toMatchObject({ resultingExecutionRevision: 4 });
+    repo.close();
+  });
+
+  it("accepts five resolved rounds and rejects a sixth without changing durable state", () => {
+    const identity = seed(); const repo = factory();
+    const turn = repo.createAdventureTurn("player", createInput(identity, "hard-boundaries"));
+    let executionRevision = 0;
+    let callNumber = 0;
+    for (let round = 1; round <= 5; round += 1) {
+      repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: `boundary-provider-${round}`,
+        provider: "test", model: "model", attempt: round, expectedTurnRevision: 0, expectedExecutionRevision: executionRevision,
+        expectedCampaignRevision: 0,
+        idempotencyKey: `boundary-provider-start-${round}` });
+      executionRevision += 1;
+      const count = round <= 2 ? 3 : round === 3 ? 2 : 2;
+      const calls = Array.from({ length: count }, (_, index) => {
+        callNumber += 1;
+        return { providerToolCallId: `boundary-call-${callNumber}`, toolName: "campaign_context.read" as const,
+          kind: "read" as const, arguments: { round, index } };
+      });
+      repo.persistAgentDecisionRound("player", { turnId: turn.turnId, round, providerCallId: `boundary-provider-${round}`,
+        toolRegistryVersion: "v1", request: { round }, result: "tool-calls", calls,
+        expectedTurnRevision: 0, expectedExecutionRevision: executionRevision,
+        expectedCampaignRevision: 0, idempotencyKey: `boundary-round-${round}` });
+      executionRevision += 1;
+      for (const call of calls) {
+        repo.markAgentReadOutcome("player", { turnId: turn.turnId,
+          providerToolCallId: call.providerToolCallId, outcome: { status: "succeeded", result: { ok: true } },
+          expectedTurnRevision: 0, expectedExecutionRevision: executionRevision, expectedCampaignRevision: 0,
+          idempotencyKey: `boundary-outcome-${call.providerToolCallId}` });
+        executionRevision += 1;
+      }
+    }
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toMatchObject({ decisionRounds: 5 });
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)?.toolCalls).toHaveLength(12);
+    const before = repo.getDurableAgentPlanningState("player", turn.turnId);
+    expect(() => repo.startAgentProviderCall("player", { turnId: turn.turnId, providerCallId: "sixth-round-provider", provider: "test",
+      model: "model", attempt: 6, expectedTurnRevision: 0, expectedExecutionRevision: executionRevision,
+      expectedCampaignRevision: 0, idempotencyKey: "sixth-round-provider" })).toThrow(AdventureTurnConflictError);
+    expect(repo.getDurableAgentPlanningState("player", turn.turnId)).toEqual(before);
+    repo.close();
+  });
+
+  it("enforces terminal rounds and current control", () => {
+    const identity = seed(); const repo = factory();
+    const terminal = repo.createAdventureTurn("player", createInput(identity, "terminal-agent-round"));
+    repo.startAgentProviderCall("player", { turnId: terminal.turnId, providerCallId: "terminal-provider", provider: "test",
+      model: "model", attempt: 1, expectedCampaignRevision: 0, expectedTurnRevision: 0,
+      expectedExecutionRevision: 0, idempotencyKey: "terminal-provider" });
+    repo.persistAgentDecisionRound("player", { turnId: terminal.turnId, round: 1, providerCallId: "terminal-provider",
+      toolRegistryVersion: "v1", request: {}, result: "complete", calls: [], expectedCampaignRevision: 0,
+      expectedTurnRevision: 0, expectedExecutionRevision: 1, idempotencyKey: "terminal-round" });
+    expect(() => repo.startAgentProviderCall("player", { turnId: terminal.turnId, providerCallId: "after-terminal",
+      provider: "test", model: "model", attempt: 2, expectedCampaignRevision: 0, expectedTurnRevision: 0,
+      expectedExecutionRevision: 2, idempotencyKey: "after-terminal" })).toThrow(AdventureTurnConflictError);
+
+    const controlled = repo.createAdventureTurn("player", createInput(identity, "control-agent"));
+    const db = new DatabaseDriver(dbPath());
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='local-owner' WHERE campaign_id=? AND actor_id='actor'")
+      .run(identity.campaignId); db.close();
+    expect(() => repo.startAgentProviderCall("player", { turnId: controlled.turnId, providerCallId: "lost-control",
+      provider: "test", model: "model", attempt: 1, expectedCampaignRevision: 0, expectedTurnRevision: 0,
+      expectedExecutionRevision: 0, idempotencyKey: "lost-control" })).toThrow(AdventureTurnAuthorizationError);
     repo.close();
   });
 });
