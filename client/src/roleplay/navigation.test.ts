@@ -7,7 +7,7 @@ describe("navigation persistence", () => {
 
   it("exports the exact storage key and accepts every supported view", () => {
     expect(NAV_KEY).toBe("velvet.navigation.v1");
-    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-history", "campaign-transfer", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"];
+    const views: View[] = ["home", "create", "edit", "memory", "lore", "chat", "campaigns", "campaign-detail", "campaign-play", "campaign-character", "campaign-character-sheet", "campaign-character-builder", "campaign-administration", "campaign-history", "campaign-transfer", "campaign-combat", "campaign-world", "campaign-cast", "campaign-journal", "campaign-story", "content-packs"];
     expect(views.map((view) => parseStoredNavigation({
       view,
       characterId: "character",
@@ -115,6 +115,13 @@ describe("navigation persistence", () => {
       expect(parseStoredNavigation({ view, campaignId: "bad/id" })).toEqual({ view: "campaigns", selectedIds: [] });
       expect(parseStoredNavigation({ view, campaignId: "campaign-one" })).toEqual({ view, campaignId: "campaign-one", selectedIds: [] });
     }
+  });
+
+  it("restores campaign play with only validated safe locators", () => {
+    expect(parseStoredNavigation({ view: "campaign-play", campaignId: "campaign", sessionId: "room", adventureTurnId: "turn", playSelectedActorId: "actor", declaration: "secret", proposals: ["secret"] }))
+      .toEqual({ view: "campaign-play", campaignId: "campaign", sessionId: "room", adventureTurnId: "turn", playSelectedActorId: "actor", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-play", campaignId: "campaign" })).toEqual({ view: "campaign-detail", campaignId: "campaign", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-play", campaignId: "bad/id", sessionId: "room", adventureTurnId: "bad/id" })).toEqual({ view: "campaigns", sessionId: "room", selectedIds: [] });
   });
 
   it("restores combat only inside a campaign and preserves a safe return origin", () => {

@@ -30,6 +30,8 @@ export interface CampaignContextDrawerProps {
 function status<T>(load: Load<T>, empty: boolean, label: string) {
   if (load.state === "loading" && !load.stale) return <p role="status">Loading {label}…</p>;
   if (load.state === "error" && !load.stale) return <p role="alert">{label} could not be loaded.</p>;
+  if (load.state === "loading" && load.stale) return <p role="status">Refreshing {label}; showing stale server data.</p>;
+  if (load.state === "error" && load.stale) return <p role="alert">{label} refresh failed; showing stale server data.</p>;
   if (empty) return <p>No {label} available.</p>;
   return null;
 }

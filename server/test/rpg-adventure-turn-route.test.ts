@@ -59,6 +59,7 @@ describe("M2.11 adventure turn routes", () => {
     const started = firstEvents.find((event) => event.type === "turn_started");
     if (!started || started.type !== "turn_started") throw new Error("turn_started missing");
     const turnId = started.payload.turn.turnId;
+    expect(first.headers["x-adventure-turn-id"]).toBe(turnId);
     const duplicate = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload });
     expect(events(duplicate.body).at(-1)).toMatchObject({ type: "terminal", payload: { outcome: "done", turn: { turnId } } });
     await app.close();
@@ -87,6 +88,7 @@ describe("M2.11 adventure turn routes", () => {
     await app.close();
     const restarted = buildApp({ campaignRepositoryFactory: () => createRepository() });
     const resumed = await restarted.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload: { resumeToken: first.json().resumeToken } });
+    expect(resumed.headers["x-adventure-turn-id"]).toBe(turn.turnId);
     expect(events(resumed.body).map(({ type }) => type)).toEqual(["agent_status", "agent_status", "terminal"]);
     expect(resumed.body).not.toContain("turn_started"); expect(resumed.body).not.toContain("mechanics_committed");
     await restarted.close();

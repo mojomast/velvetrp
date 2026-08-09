@@ -21,6 +21,11 @@ export interface ConfirmationBannerProps {
 
 const storageKey = (turnId: string) => `velvet.adventure-confirm.v1:${turnId}`;
 const makeKey = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `confirm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const batchFingerprint = (ids: readonly string[]) => {
+  let hash = 2166136261;
+  for (const unit of ids.join("\0")) { hash ^= unit.charCodeAt(0); hash = Math.imul(hash, 16777619); }
+  return `batch-${(hash >>> 0).toString(16)}`;
+};
 
 /** Renders a non-executable AI proposal review and performs one locked batch decision. */
 export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, expiresAt, api, onReconciled, restoreFocusRef }: ConfirmationBannerProps) {
@@ -37,9 +42,10 @@ export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, e
     if (phase !== "ready" || exactIds.length === 0) return;
     let idempotencyKey = makeKey();
     try {
-      const stored = JSON.parse(localStorage.getItem(storageKey(turnId)) ?? "null") as { revision?: unknown; proposalIds?: unknown; decision?: unknown; idempotencyKey?: unknown } | null;
-      if (stored?.revision === revision && stored.decision === decision && JSON.stringify(stored.proposalIds) === JSON.stringify(exactIds) && typeof stored.idempotencyKey === "string") idempotencyKey = stored.idempotencyKey;
-      localStorage.setItem(storageKey(turnId), JSON.stringify({ revision, proposalIds: exactIds, decision, idempotencyKey }));
+      const fingerprint = batchFingerprint(exactIds);
+      const stored = JSON.parse(localStorage.getItem(storageKey(turnId)) ?? "null") as { revision?: unknown; batchFingerprint?: unknown; decision?: unknown; idempotencyKey?: unknown } | null;
+      if (stored?.revision === revision && stored.decision === decision && stored.batchFingerprint === fingerprint && typeof stored.idempotencyKey === "string") idempotencyKey = stored.idempotencyKey;
+      localStorage.setItem(storageKey(turnId), JSON.stringify({ revision, batchFingerprint: fingerprint, decision, idempotencyKey }));
     } catch { /* the in-memory lock still prevents duplicate delivery */ }
     setPhase("sending"); setMessage("Recording your decision…");
     try {

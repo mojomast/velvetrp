@@ -3,9 +3,46 @@ import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMemb
 import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog, getCombatState, resolveCombatAction } from "./api";
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
+import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, streamAdventureTurn } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M3.7 adventure play API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", state: "completed" as const, revision: 1, createdAt: at, updatedAt: at };
+  const terminal = { type: "terminal" as const, sequence: 0, timestamp: at, payload: { outcome: "done" as const, turn, narrationStatus: { status: "completed" as const, text: "Done" }, receipts: [] } };
+
+  it("strictly parses CRLF chunks, a final unterminated frame, and exactly one terminal", () => {
+    const received: unknown[] = []; const parser = createAdventureTurnSseParser((event) => received.push(event));
+    const frame = `event: terminal\r\ndata: ${JSON.stringify(terminal)}`; parser.push(frame.slice(0, 17)); parser.push(frame.slice(17)); parser.finish();
+    expect(received).toEqual([terminal]);
+    expect(() => { const malformed = createAdventureTurnSseParser(vi.fn()); malformed.push("event: terminal\ndata: {bad}\n\n"); }).toThrow(/malformed JSON/);
+    expect(() => { const missing = createAdventureTurnSseParser(vi.fn()); missing.push(": heartbeat\n\n"); missing.finish(); }).toThrow(/terminal/);
+  });
+
+  it("binds bootstrap, GET, confirmation, and stream response headers to exact identities", async () => {
+    const bootstrap = { campaignId: "campaign", sessionId: "session", expectedRevision: 7, session: { attached: true, attachedAt: at, active: true, adventureEligible: true }, principal: { role: "player", control: "controlled" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done" } };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(bootstrap), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(durable), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ turn: { ...turn, state: "confirmed" }, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(`event: terminal\ndata: ${JSON.stringify(terminal)}\n\n`, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "private, no-store", "x-adventure-turn-id": "turn" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignPlayBootstrap("campaign", "session")).resolves.toEqual(bootstrap);
+    await expect(getAdventureTurn("turn")).resolves.toEqual(durable);
+    await expect(confirmAdventureTurn("turn", { proposalIds: ["proposal"], decision: "approve", expectedRevision: 0, idempotencyKey: "confirm" })).resolves.toMatchObject({ resumeToken: "v1.dHVybg.ZGVjaXNpb24" });
+    const stream = streamAdventureTurn({ kind: "initial", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", expectedRevision: 0, idempotencyKey: "initial" }, vi.fn());
+    await expect(stream.turnId).resolves.toBe("turn"); await expect(stream.done).resolves.toBeUndefined();
+    expect(fetchMock.mock.calls[3]?.[1]).toEqual(expect.objectContaining({ cache: "no-store", method: "POST" }));
+  });
+
+  it("rejects malformed stream payloads instead of discarding them", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("event: terminal\ndata: {bad}\n\n", { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-store", "x-adventure-turn-id": "turn" } })));
+    const stream = streamAdventureTurn({ kind: "resume", resumeToken: "v1.dHVybg.ZGVjaXNpb24" }, vi.fn());
+    await expect(stream.done).rejects.toThrow(/malformed JSON/);
+  });
 });
 
 describe("M3.8 public campaign receipt API binding", () => {

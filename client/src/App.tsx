@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  applyCampaignImport, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
+  applyCampaignImport, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
   getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, resolveCombatAction, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, resolveCombatAction, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
@@ -29,6 +29,7 @@ import { CampaignImportWizard, type CampaignImportApi } from "./components/rpg/t
 import { CampaignExportDialog, type CampaignExportApi } from "./components/rpg/transfer/CampaignExportDialog";
 import { StudioAuthorizationProvider, type StudioAuthorization } from "./components/rpg/StudioAuthorization";
 import { sanitizeCampaignNarrativeMutations } from "./components/rpg/narrativeMutationRegistry";
+import { CampaignPlayPage, type CampaignPlayApi } from "./components/rpg/play/CampaignPlayPage";
 import { readNavigation, writeNavigation, type StoredNavigation, type View } from "./roleplay/navigation";
 
 function messageFor(error: unknown, fallback: string) { return error instanceof ApiError ? error.message : fallback; }
@@ -78,14 +79,17 @@ const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignS
 const campaignHistoryApi: CampaignHistoryApi = { administration: getCampaignAdministration, timelines: listCampaignTimelines, checkpoints: listCampaignCheckpoints, events: listCampaignEvents, recaps: listCampaignRecaps, receipt: getCampaignCommandReceipt, createRecap: createCampaignRecap };
 const campaignImportApi: CampaignImportApi = { dryRun: dryRunCampaignImport, apply: applyCampaignImport };
 const campaignExportApi: CampaignExportApi = { export: getCampaignExport };
+const campaignPlayApi: CampaignPlayApi = { getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, confirmAdventureTurn,
+  getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources,
+  listCampaignEncounters, getCombatState };
 
-function CampaignStudioGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(authorization:StudioAuthorization)=>ReactNode}){
+function CampaignAuthorizationGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(authorization:StudioAuthorization)=>ReactNode}){
   const [authorization,setAuthorization]=useState<StudioAuthorization|null>(null),[failed,setFailed]=useState(false);
   const unavailableRef=useRef(onUnavailable),generationRef=useRef(0),mountedRef=useRef(true),authorizationRef=useRef<StudioAuthorization|null>(null);unavailableRef.current=onUnavailable;authorizationRef.current=authorization;
   const reauthorize=useCallback(async():Promise<StudioAuthorization>=>{const requestGeneration=++generationRef.current;setFailed(false);try{const {campaign}=await getCampaignDetail(campaignId);if(!mountedRef.current||requestGeneration!==generationRef.current)throw new Error("Studio authorization was superseded");const previous=authorizationRef.current,audience=campaign.actorRole==="owner"||campaign.actorRole==="gm"?"gm":"player",changed=previous!==null&&(previous.role!==campaign.actorRole||previous.audience!==audience);if(changed)sanitizeCampaignNarrativeMutations(campaignId);const next:StudioAuthorization={role:campaign.actorRole,audience,generation:changed||previous===null?requestGeneration:previous.generation,reauthorize};authorizationRef.current=next;setAuthorization(next);return next;}catch(error){if(!mountedRef.current||requestGeneration!==generationRef.current)throw error;sanitizeCampaignNarrativeMutations(campaignId);authorizationRef.current=null;setAuthorization(null);if(error instanceof ApiError&&error.status===404)unavailableRef.current();else setFailed(true);throw error;}},[campaignId]);
   useEffect(()=>{mountedRef.current=true;void reauthorize().catch(()=>undefined);return()=>{mountedRef.current=false;generationRef.current+=1}},[reauthorize]);
   useEffect(()=>{const focus=()=>void reauthorize().catch(()=>undefined);window.addEventListener("focus",focus);return()=>window.removeEventListener("focus",focus)},[reauthorize]);
-  if(failed)return <main className="studio-page"><section className="studio-shell" role="alert"><h1>Studio unavailable</h1><p>Campaign authority could not be refreshed.</p><button onClick={onUnavailable}>Return to campaign</button></section></main>;
+   if(failed)return <main className="studio-page"><section className="studio-shell" role="alert"><h1>Campaign unavailable</h1><p>Campaign authority could not be refreshed.</p><button onClick={onUnavailable}>Return to campaign</button></section></main>;
   if(authorization===null)return <main className="studio-page"><section className="studio-shell" role="status">Checking campaign role…</section></main>;
   return <StudioAuthorizationProvider value={authorization}>{children(authorization)}</StudioAuthorizationProvider>;
 }
@@ -100,6 +104,8 @@ export default function App() {
   const [activeCharacterId, setActiveCharacterId] = useState(stored.characterId ?? "");
   const [activeCampaignId, setActiveCampaignId] = useState(stored.campaignId ?? "");
   const [activeCampaignCharacterId, setActiveCampaignCharacterId] = useState(stored.campaignCharacterId ?? "");
+  const [playSelectedActorId, setPlaySelectedActorId] = useState(stored.playSelectedActorId ?? "");
+  const [playTurnId, setPlayTurnId] = useState(stored.adventureTurnId ?? "");
   const [characterDraftIds, setCharacterDraftIds] = useState<Record<string, string>>(stored.characterDraftIds ?? {});
   const [activeCampaignName, setActiveCampaignName] = useState("");
   const [chatReturnCampaignId, setChatReturnCampaignId] = useState(stored.chatReturnCampaignId ?? "");
@@ -216,7 +222,7 @@ export default function App() {
         setContentStudioAvailable(rpgFeatureData.campaign && rpgFeatureData.mechanics);
         const narrativeAvailable=rpgFeatureData.campaign&&rpgFeatureData.mechanics&&rpgFeatureData.studio;setNarrativeStudioAvailable(narrativeAvailable);setCampaignStudioRolloutAvailable(narrativeAvailable);
         const current = currentNavigationRef.current;
-        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-administration" || current.view === "campaign-history" || current.view === "campaign-transfer" || current.view === "campaign-character-builder" || current.view === "campaign-world" || current.view === "campaign-cast" || current.view === "campaign-journal" || current.view === "campaign-story"
+        const campaignRelated = current.view === "campaigns" || current.view === "campaign-detail" || current.view === "campaign-play" || current.view === "campaign-administration" || current.view === "campaign-history" || current.view === "campaign-transfer" || current.view === "campaign-character-builder" || current.view === "campaign-world" || current.view === "campaign-cast" || current.view === "campaign-journal" || current.view === "campaign-story"
           || current.view === "campaign-character" || current.view === "campaign-character-sheet" || current.view === "campaign-combat" || (current.view === "chat" && Boolean(current.chatReturnCampaignId));
         if (campaignRelated && !rpgFeatureData.campaign) {
           cancelRoomOpenForNavigation();
@@ -236,6 +242,10 @@ export default function App() {
         if (current.view === "campaign-character-builder" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
           currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
           setView(current.campaignId ? "campaign-detail" : "campaigns");
+        }
+        if (current.view === "campaign-play" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
+          currentNavigationRef.current = { view: "campaign-detail", campaignId: current.campaignId, chatReturnCampaignId: "" };
+          setSession(null); setMessages([]); setView(current.campaignId ? "campaign-detail" : "campaigns");
         }
         if (current.view === "campaign-character-sheet" && rpgFeatureData.campaign && !rpgFeatureData.mechanics) {
           currentNavigationRef.current = { view: "campaign-character", campaignId: current.campaignId, chatReturnCampaignId: "" };
@@ -261,7 +271,7 @@ export default function App() {
         const validSelected = selectedIds.filter((id) => valid.has(id));
         setSelectedIds(validSelected); setPrimaryId(validSelected.includes(primaryId) ? primaryId : validSelected[0] ?? "");
         if (activeCharacterId && !valid.has(activeCharacterId)) { setActiveCharacterId(""); if (["edit", "memory"].includes(view)) setView("home"); }
-        if (stored.sessionId && library.sessions.some((item) => item.id === stored.sessionId) && stored.view === "chat") {
+        if (stored.sessionId && library.sessions.some((item) => item.id === stored.sessionId) && (stored.view === "chat" || stored.view === "campaign-play")) {
           const restorationEpoch = navigationEpochRef.current;
           try {
             const hydrated = await getSession(stored.sessionId);
@@ -271,21 +281,21 @@ export default function App() {
             if (mounted && restorationEpoch === navigationEpochRef.current
               && !(stored.chatReturnCampaignId && campaignAvailabilityRef.current === false)) {
               chatEntryRef.current += 1; currentSessionRef.current = hydrated.session;
-              setSession(hydrated.session); setMessages(hydrated.messages); setView("chat");
+              setSession(hydrated.session); setMessages(hydrated.messages); setView(stored.view);
             }
           } catch {
             if (!mounted || restorationEpoch !== navigationEpochRef.current) return;
-            if (stored.chatReturnCampaignId && campaignAvailabilityRef.current !== false) {
+            if ((stored.chatReturnCampaignId || stored.view === "campaign-play") && stored.campaignId && campaignAvailabilityRef.current !== false) {
               const request = ++transitionRequestRef.current;
               campaignDetailEntryRef.current = request;
-              currentNavigationRef.current = { view: "campaign-detail", campaignId: stored.chatReturnCampaignId, chatReturnCampaignId: "" };
-              setActiveCampaignId(stored.chatReturnCampaignId);
+              currentNavigationRef.current = { view: "campaign-detail", campaignId: stored.campaignId, chatReturnCampaignId: "" };
+              setActiveCampaignId(stored.campaignId);
               setChatReturnCampaignId("");
-              setRoomOpenFailure({ campaignId: stored.chatReturnCampaignId, request, text: "Room could not be opened. Please try again." });
+              setRoomOpenFailure({ campaignId: stored.campaignId, request, text: "Room could not be opened. Please try again." });
               setSession(null); setMessages([]); setView("campaign-detail");
             } else { setChatReturnCampaignId(""); setView("home"); }
           }
-        } else if (stored.view === "chat") { setChatReturnCampaignId(""); setView("home"); }
+        } else if (stored.view === "chat" || stored.view === "campaign-play") { setChatReturnCampaignId(""); setView(stored.view === "campaign-play" && stored.campaignId ? "campaign-detail" : "home"); }
       })
       .catch((err) => setError(messageFor(err, "Could not load your library. Is the backend running on port 8787?")))
       .finally(() => mounted && setLoading(false));
@@ -295,8 +305,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    writeNavigation({ view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined } satisfies StoredNavigation);
-  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView]);
+    if (view === "campaign-play") writeNavigation({ view, campaignId: activeCampaignId || undefined, sessionId: session?.id,
+      adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined } satisfies StoredNavigation);
+    else writeNavigation({ view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined } satisfies StoredNavigation);
+  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, playSelectedActorId, playTurnId]);
 
   function goHome() { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setChatReturnCampaignId(""); setView("home"); setSession(null); setMessages([]); setError(null); }
   async function openSession(id: string) {
@@ -331,7 +343,7 @@ export default function App() {
     setBusy(true); setError(null);
     const isCurrent = () => request === privateOpenRequestRef.current
       && navigationEpoch === navigationEpochRef.current
-      && currentNavigationRef.current.view === "chat"
+      && (currentNavigationRef.current.view === "chat" || currentNavigationRef.current.view === "campaign-play")
       && chatEntryRef.current === sourceEntry
       && currentSessionRef.current?.id === sourceSessionId;
     try {
@@ -415,12 +427,14 @@ export default function App() {
       if (data.session.id !== sessionId) throw new Error("Session response did not match the requested room");
       // Persist the explicit origin before rendering chat so an immediate
       // reload cannot observe the prior detail navigation snapshot.
-      writeNavigation({ view: "chat", sessionId: data.session.id, selectedIds, primaryId, campaignId, chatReturnCampaignId: campaignId });
+       const destination: View = campaignMechanicsAvailable ? "campaign-play" : "chat";
+       writeNavigation(destination === "campaign-play" ? { view: destination, sessionId: data.session.id, campaignId }
+         : { view: destination, sessionId: data.session.id, selectedIds, primaryId, campaignId, chatReturnCampaignId: campaignId });
       navigationEpochRef.current += 1;
       chatEntryRef.current += 1; currentSessionRef.current = data.session;
-      currentNavigationRef.current = { view: "chat", campaignId, chatReturnCampaignId: campaignId };
-      setChatReturnCampaignId(campaignId);
-      setSession(data.session); setMessages(data.messages); setView("chat");
+       currentNavigationRef.current = { view: destination, campaignId, chatReturnCampaignId: destination === "chat" ? campaignId : "" };
+       setChatReturnCampaignId(destination === "chat" ? campaignId : ""); setPlayTurnId(""); setPlaySelectedActorId("");
+       setSession(data.session); setMessages(data.messages); setView(destination);
     }
     catch (err) {
       if (!isCurrent()) return;
@@ -455,18 +469,18 @@ export default function App() {
   if (view === "campaign-history" && campaignLibraryAvailable && campaignMechanicsAvailable && narrativeStudioAvailable && activeCampaignId) {
     const back = () => { cancelRoomOpenForNavigation(); const destination = campaignAuxReturnView; const request = ++transitionRequestRef.current; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; if (destination === "campaign-detail") { campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); } else { campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); } setView(destination); };
     const unavailable = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" }; setActiveCampaignId(""); setView("campaigns"); };
-    return <CampaignStudioGate campaignId={activeCampaignId} onUnavailable={unavailable}>{() => <CampaignEventLogPage campaignId={activeCampaignId} api={campaignHistoryApi} onBack={back} onUnavailable={unavailable} focusHeadingRequest={transitionRequestRef.current} />}</CampaignStudioGate>;
+    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{() => <CampaignEventLogPage campaignId={activeCampaignId} api={campaignHistoryApi} onBack={back} onUnavailable={unavailable} focusHeadingRequest={transitionRequestRef.current} />}</CampaignAuthorizationGate>;
   }
   if (view === "campaign-transfer" && campaignLibraryAvailable && campaignMechanicsAvailable && narrativeStudioAvailable && activeCampaignId) {
     const back = () => { setCampaignExportOpen(false); cancelRoomOpenForNavigation(); const destination = campaignAuxReturnView; const request = ++transitionRequestRef.current; currentNavigationRef.current = { view: destination, campaignId: activeCampaignId, chatReturnCampaignId: "" }; if (destination === "campaign-detail") { campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); } else { campaignAdministrationEntryRef.current = request; setAdministrationHeadingFocusRequest({ campaignId: activeCampaignId, request }); } setView(destination); };
     const unavailable = () => { setCampaignExportOpen(false); cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-detail"); };
-    return <CampaignStudioGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization) => authorization.role !== "owner" ? <main className="studio-page"><section className="studio-shell"><button className="back-link" onClick={back}>← Campaign</button><h1 autoFocus tabIndex={-1}>Transfer tools unavailable</h1><p>Import and export controls are available only to the campaign owner.</p></section></main> : <main className="studio-page transfer-page"><section className="studio-shell" aria-labelledby="transfer-heading"><header className="studio-header"><div><button className="back-link" onClick={back}>← Campaign</button><p className="eyebrow">OWNER-ONLY TRANSFER</p><h1 autoFocus tabIndex={-1} id="transfer-heading">Import and export</h1></div><button className="primary" onClick={() => setCampaignExportOpen(true)}>Review campaign export</button></header><CampaignImportWizard api={campaignImportApi} /><CampaignExportDialog campaignId={activeCampaignId} campaignName={activeCampaignName || "campaign"} open={campaignExportOpen} api={campaignExportApi} onClose={() => setCampaignExportOpen(false)} /></section></main>}</CampaignStudioGate>;
+    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization) => authorization.role !== "owner" ? <main className="studio-page"><section className="studio-shell"><button className="back-link" onClick={back}>← Campaign</button><h1 autoFocus tabIndex={-1}>Transfer tools unavailable</h1><p>Import and export controls are available only to the campaign owner.</p></section></main> : <main className="studio-page transfer-page"><section className="studio-shell" aria-labelledby="transfer-heading"><header className="studio-header"><div><button className="back-link" onClick={back}>← Campaign</button><p className="eyebrow">OWNER-ONLY TRANSFER</p><h1 autoFocus tabIndex={-1} id="transfer-heading">Import and export</h1></div><button className="primary" onClick={() => setCampaignExportOpen(true)}>Review campaign export</button></header><CampaignImportWizard api={campaignImportApi} /><CampaignExportDialog campaignId={activeCampaignId} campaignName={activeCampaignName || "campaign"} open={campaignExportOpen} api={campaignExportApi} onClose={() => setCampaignExportOpen(false)} /></section></main>}</CampaignAuthorizationGate>;
   }
   if (["campaign-world","campaign-cast","campaign-journal","campaign-story"].includes(view) && campaignLibraryAvailable && campaignMechanicsAvailable && narrativeStudioAvailable && activeCampaignId) {
     const studioView=view as "campaign-world"|"campaign-cast"|"campaign-journal"|"campaign-story";
     const returnToCampaign=()=>{cancelRoomOpenForNavigation();const studio=studioView.replace("campaign-","") as "world"|"cast"|"journal"|"story";const request=++transitionRequestRef.current;setStudioReturnFocusRequest({view:studio,request});campaignDetailEntryRef.current=request;currentNavigationRef.current={view:"campaign-detail",campaignId:activeCampaignId,chatReturnCampaignId:""};setView("campaign-detail")};
     const unavailable=()=>{cancelRoomOpenForNavigation();currentNavigationRef.current={view:"campaigns",campaignId:"",chatReturnCampaignId:""};setActiveCampaignId("");setView("campaigns")};
-    return <CampaignStudioGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization)=>studioView==="campaign-world"?<WorldExplorerPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={worldExplorerApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-cast"?<NpcRosterPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={castStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-journal"?<QuestJournalPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={questJournalApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:<StoryStudioPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={storyStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>}</CampaignStudioGate>;
+    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={unavailable}>{(authorization)=>studioView==="campaign-world"?<WorldExplorerPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={worldExplorerApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-cast"?<NpcRosterPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={castStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:studioView==="campaign-journal"?<QuestJournalPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={questJournalApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>:<StoryStudioPage key={authorization.generation} campaignId={activeCampaignId} authorization={authorization} api={storyStudioApi} onBack={returnToCampaign} focusHeadingRequest={studioEntryRef.current}/>}</CampaignAuthorizationGate>;
   }
   if (view === "campaign-administration" && campaignLibraryAvailable && activeCampaignId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setView("campaign-detail"); };
@@ -493,6 +507,24 @@ export default function App() {
     const setDraftIdentity = (draftId: string | null) => setCharacterDraftIds((current) => { const next = { ...current }; if (draftId) next[activeCampaignId] = draftId; else delete next[activeCampaignId]; return next; });
     return <CharacterBuilderPage campaignId={activeCampaignId} personas={characters.map((character) => ({ id: character.id, name: character.name }))} initialDraftId={characterDraftIds[activeCampaignId]} api={characterBuilderApi} focusHeadingRequest={characterBuilderEntryRef.current || undefined} onDraftIdentity={setDraftIdentity} onBack={returnToCampaign} onReviewCampaignRoster={returnToCampaign} onUnavailable={returnToCampaign} onEditPersona={(personaId) => { cancelRoomOpenForNavigation(); setActiveCharacterId(personaId); setError(null); setView("edit"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); setActiveCampaignCharacterId(campaignCharacterId); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character"); }} />;
   }
+  if (view === "campaign-play" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && session) {
+    const entryToken = chatEntryRef.current;
+    const returnToCampaign = () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
+      setRoomsRefreshRequest({ campaignId: activeCampaignId, request }); setPlayTurnId(""); setPlaySelectedActorId("");
+      currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" };
+      setSession(null); setMessages([]); setView("campaign-detail"); };
+    const replaceCurrentSession = (next: Session) => { if (currentNavigationRef.current.view !== "campaign-play" || chatEntryRef.current !== entryToken
+      || currentSessionRef.current?.id !== session.id || next.id !== session.id) return; currentSessionRef.current = next; setSession(next); };
+    return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
+      <CampaignPlayPage campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
+        initialSelectedActorId={playSelectedActorId} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
+        onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading onBack={returnToCampaign} onUnavailable={returnToCampaign}>
+        <Chat embedded key={`${session.id}:${entryToken}`} session={session} initialMessages={messages} provider={provider} harness={harness} features={features}
+          externalError={error} navigationBusy={busy} onSessionChange={replaceCurrentSession} onProviderChange={setProvider} onHarnessChange={setHarness}
+          onOpenPrivate={openPrivateSession} backLabel="← Back to campaign" onBack={returnToCampaign} />
+      </CampaignPlayPage>}
+    </CampaignAuthorizationGate>;
+  }
   if (view === "chat" && session) {
     const returnCampaignId = chatReturnCampaignId;
     const returnToCampaign = returnCampaignId ? () => {
@@ -515,8 +547,8 @@ export default function App() {
   return <Home characters={characters} sessions={sessions} selectedIds={selectedIds} primaryId={primaryId} busy={busy} error={error} provider={provider} campaignLibraryAvailable={campaignLibraryAvailable} onCampaigns={() => { setChatReturnCampaignId(""); setView("campaigns"); }} onSelected={(ids) => { setSelectedIds(ids); setPrimaryId((current) => ids.includes(current) ? current : ids[0] ?? ""); }} onPrimary={setPrimaryId} onCreate={() => { setActiveCharacterId(""); setError(null); setView("create"); }} onEdit={(id) => { setActiveCharacterId(id); setError(null); setView("edit"); }} onMemory={(id) => { setActiveCharacterId(id); setView("memory"); }} onLore={() => setView("lore")} onStart={createSelectedSession} onResume={(id) => void openSession(id)} onDeleteSession={async (item) => { if (!confirm(`Delete session “${item.title || item.participants.map((participant) => participant.name).join(", ")}”? Its messages and summary will be permanently removed.`)) return; setBusy(true); setError(null); try { await deleteSession(item.id); if (session?.id === item.id) { setSession(null); setMessages([]); setView("home"); } await refreshLibrary(); } catch (err) { setError(messageFor(err, "Could not delete session.")); } finally { setBusy(false); } }} onDelete={async (character) => { if (!confirm(`Delete ${character.name}? This cannot be undone.`)) return; setError(null); try { await deleteCharacter(character.id); setSelectedIds((ids) => ids.filter((id) => id !== character.id)); await refreshLibrary(); } catch (err) { setError(messageFor(err, "Could not delete character.")); } }} onExport={async (character) => { try { const data = await exportCharacter(character.id); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })); link.download = `${character.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-velvet.json`; link.click(); URL.revokeObjectURL(link.href); } catch (err) { setError(messageFor(err, "Could not export character.")); } }} onImport={async (file) => { setError(null); try { const data: unknown = JSON.parse(await file.text()); await importCharacter(data); await refreshLibrary(); } catch (err) { setError(messageFor(err, "That file is not a valid Velvet character export.")); } }} />;
 }
 
-interface ChatProps { session: Session; initialMessages: ChatMessage[]; provider: ProviderSettings | null; harness: HarnessSettings | null; features: FeatureFlags; externalError: string | null; navigationBusy: boolean; onSessionChange: (session: Session) => void; onProviderChange: (provider: ProviderSettings) => void; onHarnessChange: (harness: HarnessSettings) => void; onOpenPrivate: (characterId: string) => Promise<void>; backLabel: string; onBack: () => void; }
-function Chat({ session, initialMessages, provider, harness, features, externalError, navigationBusy, onSessionChange, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
+interface ChatProps { embedded?: boolean; session: Session; initialMessages: ChatMessage[]; provider: ProviderSettings | null; harness: HarnessSettings | null; features: FeatureFlags; externalError: string | null; navigationBusy: boolean; onSessionChange: (session: Session) => void; onProviderChange: (provider: ProviderSettings) => void; onHarnessChange: (harness: HarnessSettings) => void; onOpenPrivate: (characterId: string) => Promise<void>; backLabel: string; onBack: () => void; }
+function Chat({ embedded = false, session, initialMessages, provider, harness, features, externalError, navigationBusy, onSessionChange, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
   const [messages, setMessages] = useState(initialMessages); const [draft, setDraft] = useState(""); const [targetId, setTargetId] = useState(session.primaryCharacterId); const [sending, setSending] = useState(false); const [roomSending, setRoomSending] = useState(false); const [error, setError] = useState<string | null>(null); const [streamText, setStreamText] = useState(""); const [streamSpeakerId, setStreamSpeakerId] = useState(session.primaryCharacterId); const [swipeInfo, setSwipeInfo] = useState<SiblingsResponse | null>(null); const [settingsOpen, setSettingsOpen] = useState(false);
   const handleRef = useRef<StreamHandle | null>(null); const streamRef = useRef(""); const scrollRef = useRef<HTMLDivElement>(null);
   const [settingsWidth, setSettingsWidth] = useState(() => { const saved = Number(localStorage.getItem("velvet.settings.width")); return Number.isFinite(saved) && saved >= 320 ? saved : 440; });
@@ -605,7 +637,7 @@ function Chat({ session, initialMessages, provider, harness, features, externalE
   async function retry() { if (!latestCharacter || !latestUserParent || sending || navigationBusy || closed) return; setSending(true); setError(null); try { applyResult(await branchMessage(session.id, latestCharacter.id, latestUserParent.content, targetId)); } catch (err) { setError(messageFor(err, "Failed to retry turn.")); } finally { setSending(false); } }
   async function navigateSwipe(direction: -1 | 1) { if (!swipeInfo || sending || navigationBusy) return; const sorted = [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)); const active = swipeInfo.activeMessageId ?? latestCharacter?.id; const target = sorted[sorted.findIndex((item) => item.id === active) + direction]; if (!target) return; setSending(true); try { const data = await activateMessage(session.id, target.id); setMessages(data.messages); await refreshSwipe(target.id); } catch (err) { setError(messageFor(err, "Could not switch reply.")); } finally { setSending(false); } }
   const sortedSwipes = swipeInfo ? [...swipeInfo.siblings].sort((a, b) => (a.swipeIndex ?? 0) - (b.swipeIndex ?? 0)) : []; const activeSwipe = sortedSwipes.findIndex((item) => item.id === (swipeInfo?.activeMessageId ?? latestCharacter?.id));
-  return <main className="chat-page"><section className={`chat-app ${settingsOpen ? "settings-visible" : ""}`} style={{ "--settings-width": `${settingsWidth}px` } as CSSProperties}>
+  const chat = <section className={`chat-app ${settingsOpen ? "settings-visible" : ""}`} style={{ "--settings-width": `${settingsWidth}px` } as CSSProperties}>
     <div className="chat-main"><header className="chat-header"><div><button className="back-link" onClick={onBack}>{backLabel}</button><h1 className="chat-title">{session.title || session.participants.map((item) => item.name).join(" & ")}</h1><p className="chat-meta">{session.participants.map((item) => item.name).join(" · ")} · {session.state}</p><p className="chat-meta token-status">ACTIVE BRANCH // {usage.toLocaleString()} TOKENS{overallUsage ? ` · LIFETIME // ${overallUsage.totalTokens.toLocaleString()} TOKENS · ${formatCost(overallUsage.estimatedCostUsd)}` : ""}</p></div><div className="chat-actions">{handleRef.current && <button className="ghost" disabled={navigationBusy} onClick={() => { if (!navigationBusy) void handleRef.current?.cancel().finally(finish); }}>Stop generating</button>}<button className="ghost" disabled={navigationBusy} aria-expanded={settingsOpen} onClick={() => { if (!navigationBusy) setSettingsOpen((open) => !open); }}>Prompt & settings</button><button className="danger" disabled={closed || navigationBusy} onClick={() => { if (!navigationBusy) void stopSession(session.id).then(onSessionChange).catch((err) => setError(messageFor(err, "Could not end session."))); }}>End session</button></div></header>
       {overallUsage && <details className="usage-dashboard"><summary>Overall usage & estimated cost <span>{overallUsage.totalTokens.toLocaleString()} tokens · {formatCost(overallUsage.estimatedCostUsd)}</span></summary><div className="usage-totals"><div><strong>{overallUsage.promptTokens.toLocaleString()}</strong><small>Prompt tokens</small></div><div><strong>{overallUsage.completionTokens.toLocaleString()}</strong><small>Completion tokens</small></div><div><strong>{overallUsage.calls.toLocaleString()}</strong><small>Tracked calls</small></div><div><strong>{formatCost(overallUsage.estimatedCostUsd)}</strong><small>Estimated lifetime cost</small></div></div><p className="meta-text">{overallUsage.providerMeasuredTokens.toLocaleString()} provider-reported tokens · {overallUsage.estimatedTokens.toLocaleString()} locally estimated tokens. Cost uses ${overallUsage.pricing.promptPerMillion ?? "unset"}/M input and ${overallUsage.pricing.completionPerMillion ?? "unset"}/M output.</p><div className="usage-breakdowns"><section><h3>By operation</h3>{overallUsage.byKind.map((item) => <p key={item.kind}><span>{item.kind.replaceAll("_", " ")}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>By model</h3>{overallUsage.byModel.map((item) => <p key={item.model}><span>{item.model}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section><section><h3>Top sessions</h3>{overallUsage.bySession.slice(0, 8).map((item) => <p key={item.sessionId}><span>{item.title || "Untitled session"}</span><strong>{item.totalTokens.toLocaleString()} · {formatCost(item.estimatedCostUsd)}</strong></p>)}</section></div></details>}
       {closed && <p className="closed-banner">This session is closed{session.stopReason ? ` (${session.stopReason})` : ""}. You can read its history, but it is no longer writable.</p>}
@@ -621,7 +653,8 @@ function Chat({ session, initialMessages, provider, harness, features, externalE
     </div>
     <div className="settings-separator" role="separator" aria-label="Resize settings pane" aria-orientation="vertical" aria-valuemin={320} aria-valuemax={Math.round(window.innerWidth * .6)} aria-valuenow={Math.round(settingsWidth)} onPointerDown={(event) => { if (!navigationBusy) resizeSettings(event); }} onKeyDown={(event) => { if (navigationBusy) return; if (event.key === "ArrowLeft") setSettingsWidth((width) => Math.min(window.innerWidth * .6, width + (event.shiftKey ? 64 : 16))); if (event.key === "ArrowRight") setSettingsWidth((width) => Math.max(320, width - (event.shiftKey ? 64 : 16))); }} tabIndex={settingsOpen && !navigationBusy ? 0 : -1} />
     <aside className="settings-pane" aria-hidden={!settingsOpen}><fieldset disabled={navigationBusy}><PromptSettings provider={provider} harness={harness} features={features} onProviderChange={onProviderChange} onHarnessChange={onHarnessChange} onClose={() => setSettingsOpen(false)} /></fieldset></aside>
-  </section></main>;
+  </section>;
+  return embedded ? <div className="chat-page embedded-chat-page">{chat}</div> : <main className="chat-page">{chat}</main>;
 }
 
 export function RuntimeSettings({ provider, harness, features, onProviderChange, onHarnessChange }: { provider: ProviderSettings | null; harness: HarnessSettings | null; features: FeatureFlags; onProviderChange: (value: ProviderSettings) => void; onHarnessChange: (value: HarnessSettings) => void }) {

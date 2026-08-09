@@ -196,6 +196,12 @@ export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOpti
         // Creation receipts intentionally replay their historical result; stream the fresh durable aggregate.
         turn = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
       }
+      // The durable identity exists before SSE framing for both initial and
+      // resume requests, allowing clients to reconcile even if the first body
+      // frame is never delivered.
+      // openSse hijacks Fastify and writes directly to the Node response, so
+      // bind this route-specific header on the raw response before writeHead.
+      reply.raw.setHeader("X-Adventure-Turn-Id", turn.turnId);
       await stream(request, reply, repo, turn, resumed);
     } catch (error) { return fail(request, reply, error); }
   });

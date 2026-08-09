@@ -22,6 +22,6 @@ describe("CampaignPlayPage", () => {
     localStorage.clear(); localStorage.setItem("velvet.campaign-play.v1:campaign:session", JSON.stringify({ turnId: "turn", selectedActorId: "actor", streamPhase: "ambiguous" }));
     const client = api(); vi.mocked(client.getAdventureTurn).mockResolvedValue({ turn: { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "private declaration", state: "completed", revision: 2, createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-01T00:00:00.000Z" }, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Fallback narration" } });
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()}><div>Chat</div></CampaignPlayPage>);
-    await screen.findByText("Fallback narration"); expect(client.getAdventureTurn).toHaveBeenCalledWith("turn"); expect(client.streamAdventureTurn).not.toHaveBeenCalled(); expect(screen.getByText(/server fallback\/no-tools/)).toBeTruthy();
+    await screen.findByText("Fallback narration"); expect(client.getAdventureTurn).toHaveBeenCalledWith("turn"); expect(client.streamAdventureTurn).not.toHaveBeenCalled(); expect(screen.getByText(/does not identify whether narration used a fallback/)).toBeTruthy();
   });
 });

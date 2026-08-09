@@ -394,6 +394,29 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBeUndefined());
   });
 
+  it("opens a mechanics-enabled campaign room in the primary play shell around existing Chat", async () => {
+    const attached = { sessionId: baseSession.id, title: "Night watch", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
+    const playBootstrap = { campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: attached.attachedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    installFetch([aria], [baseSession], true, true);
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
+      { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("campaign-message", "character", "Campaign room history", aria.id)] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/encounters$/, handler: () => json({ encounters: [] }) },
+    );
+    await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "Campaigns" })); fireEvent.click(await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` }));
+    fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
+    await screen.findByRole("heading", { name: "Adventure room" }); expect(screen.getByText("Campaign room history")).toBeTruthy();
+    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
+    const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
+  });
+
   it("opens an attached opaque room and keeps read and send calls on its exact encoded segment", async () => {
     const opaqueId = " room/%?#雪 ";
     const encodedId = encodeURIComponent(opaqueId);

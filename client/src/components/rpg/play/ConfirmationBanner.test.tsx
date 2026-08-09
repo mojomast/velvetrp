@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConfirmationBanner } from "./ConfirmationBanner";
 
 const at = "2030-01-01T00:00:00.000Z";
@@ -7,6 +7,7 @@ const proposal = { proposalId: "proposal", position: 0, toolName: "roll", propos
 const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "Listen", state: "confirmed" as const, revision: 3, createdAt: at, updatedAt: at };
 
 describe("ConfirmationBanner", () => {
+  afterEach(() => { cleanup(); localStorage.clear(); });
   it("labels AI content and submits one exact selected batch", async () => {
     const confirmAdventureTurn = vi.fn().mockResolvedValue({ turn, resumeToken: "v1.dHVybg.ZGVjaXNpb24" });
     const getAdventureTurn = vi.fn().mockResolvedValue({ turn, proposals: [proposal], confirmation: { state: "decided", decisions: [{ proposalId: "proposal", decision: "approved", decidedAt: at }] }, receipts: [], narrationStatus: { status: "none", text: null } });
