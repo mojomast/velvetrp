@@ -326,7 +326,9 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
           SELECT count(*) FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
             AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=turn.campaign_id
             AND proposal.turn_id=turn.id AND (proposal.requires_confirmation=0 OR decision.decision='approved'))))
-      OR (latest.resulting_state IN ('mechanics-committed','narrating','completed') AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link
+      OR (latest.resulting_state IN ('mechanics-committed','narrating','completed')
+        AND NOT (turn.mode='original' AND NOT EXISTS(SELECT 1 FROM tool_proposals empty_proposal WHERE empty_proposal.campaign_id=turn.campaign_id AND empty_proposal.turn_id=turn.id))
+        AND NOT EXISTS(SELECT 1 FROM turn_mechanics_links_v36 link
         WHERE link.campaign_id=turn.campaign_id AND link.root_turn_id IN (WITH RECURSIVE ancestry(id,mode,prior_turn_id) AS
           (SELECT turn.id,turn.mode,turn.prior_turn_id UNION ALL SELECT parent.id,parent.mode,parent.prior_turn_id FROM adventure_turns parent
             JOIN ancestry child ON parent.campaign_id=turn.campaign_id AND parent.id=child.prior_turn_id)

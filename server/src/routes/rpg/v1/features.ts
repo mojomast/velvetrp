@@ -99,6 +99,8 @@ import { storyHttpRoutes } from "./storyRoutes.js";
 import type { StoryRepository } from "../../../repo/storyRepo.js";
 import { contentCatalogHttpRoutes } from "./contentCatalog.js";
 import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.js";
+import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js";
+import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
 import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 import { actorInventoryHttpRoutes } from "./actorInventory.js";
@@ -149,6 +151,13 @@ export interface CampaignListRepository extends
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
+  getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
+  getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
+  createAdventureTurn?: AdventureTurnRepository["createAdventureTurn"];
+  waitForToolConfirmation?: AdventureTurnRepository["waitForToolConfirmation"];
+  decideToolProposal?: AdventureTurnRepository["decideToolProposal"];
+  updateAdventureTurnNarration?: AdventureTurnRepository["updateAdventureTurnNarration"];
+  getCampaign?(actorPrincipalId: string, campaignId: string): CampaignAccess | null;
   listCampaigns(actorPrincipalId: string): CampaignAccess[];
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
   listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
@@ -259,6 +268,8 @@ type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatActio
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
+type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "createAdventureTurn"
+  | "waitForToolConfirmation" | "decideToolProposal" | "updateAdventureTurnNarration"> & Required<Pick<CampaignListRepository, "getCampaign">>;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -405,6 +416,11 @@ function assertNpcHttpRepository(repository:CampaignListRepository):asserts repo
 function assertFactionHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&FactionHttpLaneRepository{
   if(typeof repository.listCampaignFactions!=="function"||typeof repository.createCampaignFaction!=="function"||typeof repository.changeFactionReputation!=="function")throw new UnsupportedCampaignRepositoryError();
 }
+function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
+  const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnNarration", "createAdventureTurn",
+    "waitForToolConfirmation", "decideToolProposal", "updateAdventureTurnNarration", "getCampaign"];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
 
 export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, options) => {
   // The plugin lazily owns one narrow repository for its lifetime; requests never open DB connections repeatedly.
@@ -534,6 +550,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const worldRepositoryAccessor=():WorldHttpLaneRepository=>{const repository=getCampaignRepository();assertWorldHttpRepository(repository);return repository;};
   const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
   const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
+  const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository; };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -565,6 +582,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(worldHttpRoutes,{worldRepositoryAccessor});
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});
+  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor });
 
   app.get<{
     Params: { campaignId: string };

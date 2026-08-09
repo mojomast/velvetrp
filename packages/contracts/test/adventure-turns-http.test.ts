@@ -1,0 +1,31 @@
+import { describe, expect, it } from "vitest";
+import {
+  adventureTurnConfirmRequestSchema, adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema,
+} from "../src/adventure-turns-http.js";
+
+const at = "2035-01-01T00:00:00.000Z";
+const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen",
+  state: "declared", revision: 0, createdAt: at, updatedAt: at };
+
+describe("M2.11 adventure turn HTTP contracts", () => {
+  it("accepts only exact initial and resume stream variants", () => {
+    const initial = { campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", expectedRevision: 0, idempotencyKey: "turn" };
+    expect(adventureTurnStreamRequestSchema.parse(initial)).toEqual(initial);
+    expect(adventureTurnStreamRequestSchema.parse({ resumeToken: "v1.dHVybg.ZGVjaXNpb24" })).toBeTruthy();
+    expect(adventureTurnStreamRequestSchema.safeParse({ ...initial, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }).success).toBe(false);
+  });
+
+  it("closes and bounds the public SSE vocabulary", () => {
+    const event = { type: "turn_started", sequence: 0, timestamp: at, payload: { turn } };
+    expect(adventureTurnStreamEventSchema.parse(event)).toEqual(event);
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, provider: "private" }).success).toBe(false);
+    expect(adventureTurnStreamEventSchema.safeParse({ ...event, type: "delta" }).success).toBe(false);
+  });
+
+  it("requires unique plural proposal IDs and exact decision names", () => {
+    const command = { proposalIds: ["one", "two"], decision: "approve", expectedRevision: 2, idempotencyKey: "confirm" };
+    expect(adventureTurnConfirmRequestSchema.parse(command)).toEqual(command);
+    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, proposalIds: ["one", "one"] }).success).toBe(false);
+    expect(adventureTurnConfirmRequestSchema.safeParse({ ...command, decision: "approved" }).success).toBe(false);
+  });
+});

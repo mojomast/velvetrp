@@ -111,8 +111,10 @@ const turnStateRefinement = (value: { state: z.infer<typeof adventureTurnStateSc
           : true;
   if (!legalNarration) context.addIssue({ code: "custom", path: ["narrationStatus"], message: "narration status is inconsistent with turn state" });
   if ((value.mode === "original") !== (value.priorTurnId === null)) context.addIssue({ code: "custom", path: ["priorTurnId"], message: "turn mode and ancestry must agree" });
-  if (["mechanics-committed", "narrating", "completed"].includes(value.state) && value.receiptLinks.length === 0) {
-    context.addIssue({ code: "custom", path: ["receiptLinks"], message: "committed mechanics require a receipt" });
+  if (["mechanics-committed", "narrating", "completed"].includes(value.state) && value.receiptLinks.length === 0
+      && !(value.mode === "original" && "proposals" in value && Array.isArray(value.proposals) && value.proposals.length === 0)
+      && !(value.mode === "original" && "toolCalls" in value && Array.isArray(value.toolCalls) && value.toolCalls.length === 0)) {
+    context.addIssue({ code: "custom", path: ["receiptLinks"], message: "post-proposal narration requires a receipt" });
   }
   if (["declared", "proposed", "awaiting-confirmation"].includes(value.state) && value.receiptLinks.length > 0) {
     context.addIssue({ code: "custom", path: ["receiptLinks"], message: "pre-confirmation turns cannot contain mechanics receipts" });
@@ -192,8 +194,10 @@ export const providerCallOutcomeInputSchema = providerCallStartInputSchema.exten
 export const linkTurnReceiptInputSchema = turnMutationInputSchema.extend({ proposalId: resourceIdSchema, commandId: resourceIdSchema }).strict();
 /** Strict input for narration progress and terminal cancellation/failure. */
 export const updateTurnNarrationInputSchema = turnMutationInputSchema.extend({ narrationStatus: narrationStatusSchema,
-  terminalState: z.enum(["completed", "cancelled", "failed"]).optional() }).strict().superRefine((value, context) => {
+  terminalState: z.enum(["completed", "cancelled", "failed"]).optional(),
+  fallbackNarration: z.string().trim().min(1).max(8_000).optional() }).strict().superRefine((value, context) => {
     if (value.terminalState === "completed" && value.narrationStatus !== "completed") context.addIssue({ code: "custom", path: ["narrationStatus"], message: "completed turns require completed narration" });
+    if (value.fallbackNarration !== undefined && value.terminalState !== "completed") context.addIssue({ code: "custom", path: ["fallbackNarration"], message: "fallback narration belongs only to terminal completion" });
   });
 
 /** Durable adventure-turn lifecycle state. */

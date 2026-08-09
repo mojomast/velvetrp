@@ -17,6 +17,10 @@ export interface AdventureTurnReadRepository {
   getAdventureTurn(principalId: string, turnId: string): AdventureTurnProjection | null;
   /** Reads one generation draft, exposing staged content only to current owner/GM principals. */
   getGenerationDraft(principalId: string, draftId: string): GenerationDraftProjection | null;
+  /** Reads persisted fallback narration from the exact terminal coordination command. */
+  getAdventureTurnNarration(principalId: string, turnId: string): string | null;
+  /** Finds an idempotent draft create without exposing cross-campaign data. */
+  getGenerationDraftByIdempotencyKey(principalId: string, campaignId: string, idempotencyKey: string): GenerationDraftProjection | null;
 }
 
 const rootTurnId = (db: Database, campaignId: string, turnId: string): string => {
@@ -120,6 +124,22 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
           decidedAt: decision.decided_at } : null, receiptLinks: links, applyReceipt: applyReceipt ? { receiptId: applyReceipt.receipt_id,
           draftId, reviewDecisionId: applyReceipt.review_decision_id, principalId: applyReceipt.principal_id,
           result: JSON.parse(applyReceipt.result_json), appliedAt: applyReceipt.applied_at } : null });
+    },
+    getAdventureTurnNarration(principalId, turnId) {
+      const projection = this.getAdventureTurn(principalId, turnId);
+      if (!projection) return null;
+      const row = db.prepare(`SELECT command.request_json FROM adventure_coordination_commands_v36 command
+        WHERE command.aggregate_kind='turn' AND command.aggregate_id=? AND command.mutation_type='narration-update'
+          AND json_type(command.request_json,'$.fallbackNarration')='text'
+        ORDER BY command.resulting_revision DESC LIMIT 1`).get(turnId) as { request_json: string } | undefined;
+      if (!row) return null;
+      const text = (JSON.parse(row.request_json) as { fallbackNarration?: unknown }).fallbackNarration;
+      return typeof text === "string" ? text : null;
+    },
+    getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey) {
+      const row = db.prepare("SELECT id FROM generation_drafts WHERE campaign_id=? AND idempotency_key=?")
+        .get(campaignId, idempotencyKey) as { id: string } | undefined;
+      return row ? this.getGenerationDraft(principalId, row.id) : null;
     },
   };
 }
