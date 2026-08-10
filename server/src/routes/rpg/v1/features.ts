@@ -104,6 +104,8 @@ import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { campaignPlayHttpRoutes } from "./campaignPlay.js";
 import { generationDraftsHttpRoutes } from "./generationDrafts.js";
 import type { GenerationDraftsHttpOptions } from "./generationDrafts.js";
+import { campaignContentGenerationHttpRoutes } from "./campaignContentGeneration.js";
+import type { CampaignContentGenerationOptions } from "./campaignContentGeneration.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
 import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 import { actorInventoryHttpRoutes } from "./actorInventory.js";
@@ -223,6 +225,7 @@ interface RpgV1RoutesOptions {
   diceCommandIds: IdGenerator;
   adventureAgentDependencies?: AdventureAgentDependencies;
   encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
+  campaignContentGeneration?: CampaignContentGenerationOptions["generateCampaignContent"];
 }
 
 const LOCAL_CAMPAIGN_PRINCIPAL = "local-owner";
@@ -290,7 +293,7 @@ type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTu
   & Required<Pick<CampaignListRepository, "getCampaign">>;
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
-  | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically">
+  | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically" | "applyCampaignContentGenerationDraftAtomically">
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
 
 class UnsupportedCampaignRepositoryError extends Error {
@@ -449,7 +452,7 @@ function assertCampaignPlayRepository(repository: CampaignListRepository): asser
 }
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
   const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
-    "applyEncounterGenerationDraftAtomically", "getCampaign", "getCampaignAdministration"];
+    "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration"];
   if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
@@ -621,6 +624,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
     ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
+  await app.register(campaignContentGenerationHttpRoutes, { generationDraftRepositoryAccessor,
+    ...(options.campaignContentGeneration ? { generateCampaignContent: options.campaignContentGeneration } : {}) });
 
   app.get<{
     Params: { campaignId: string };

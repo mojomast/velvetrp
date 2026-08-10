@@ -31,6 +31,7 @@ import { assertToolExecutionBindingsV37, createToolExecutionBindingsV37, migrate
 import { assertDurableAgentExecutionV38, createDurableAgentExecutionV38, migrate37to38 } from "./db/migrations/v38_durable_agent_execution.js";
 import { assertAgentResponseProvenanceV39, createAgentResponseProvenanceV39, migrate38to39 } from "./db/migrations/v39_agent_response_provenance.js";
 import { assertConfirmationPolicyV40, createConfirmationPolicyV40, migrate39to40 } from "./db/migrations/v40_confirmation_policy.js";
+import { createCampaignContentGenerationV41, migrate40to41 } from "./db/migrations/v41_campaign_content_generation.js";
 import {
   assertCampaignContentPacksHaveExactSealedPacks,
   createCampaignContentPackSealedPinTriggers,
@@ -57,7 +58,7 @@ configureSchema({
   migrate17to18, migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24,
   migrate24to25, migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, migrate38to39, migrate39to40, validateCharacterProgressionV23,
   validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25, validateM16PersistenceV26,
-  validateV20DraftAudit, validateWorldTravelNpcFactionV28,
+  validateV20DraftAudit, validateWorldTravelNpcFactionV28, createCampaignContentGenerationV41, migrate40to41,
 });
 configureDatabaseConnection(ensureSchema, migrateLegacyIfPresent);
 configureRepositoryDatabase(getDb);

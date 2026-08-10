@@ -7,7 +7,7 @@ import { campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
 /** Maximum validation issues retained for one generated draft. */
 export const MAX_GENERATION_VALIDATION_ISSUES = 256;
 /** Closed kinds of content that may be staged for human review. */
-export const generationDraftKindSchema = z.enum(["encounter", "location", "npc", "faction", "quest", "storyline", "content-pack"]);
+export const generationDraftKindSchema = z.enum(["encounter", "location", "npc", "faction", "quest", "storyline", "content-pack", "campaign-content"]);
 /** Guarded generation-draft lifecycle. */
 export const generationDraftStateSchema = z.enum(["staged", "in-review", "approved", "rejected", "applied", "cancelled"]);
 /** Review status exposed independently from mutable staged content. */

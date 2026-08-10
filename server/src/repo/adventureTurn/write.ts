@@ -64,6 +64,8 @@ export interface AdventureTurnWriteRepository {
   applyGenerationDraft(principalId: string, input: ApplyGenerationDraftInput): PrivateGenerationDraft;
   /** Reviews, applies the authoritative encounter command, and seals one draft in one SQLite transaction. */
   applyEncounterGenerationDraftAtomically(principalId: string, input: DraftMutationInput): { draft: PrivateGenerationDraft; encounterId: string };
+  /** Applies a reviewed content bundle through the campaign-content command service. */
+  applyCampaignContentGenerationDraftAtomically(principalId: string, input: DraftMutationInput): PrivateGenerationDraft;
 }
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) => nested && typeof nested === "object" && !Array.isArray(nested)
@@ -541,6 +543,9 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     // aggregate never fabricates domain writes or bypasses encounter authority.
     applyEncounterGenerationDraftAtomically() {
       throw new AdventureTurnUnavailableError("encounter draft application is unavailable");
+    },
+    applyCampaignContentGenerationDraftAtomically() {
+      throw new AdventureTurnUnavailableError("campaign-content draft application is unavailable");
     },
   };
 }

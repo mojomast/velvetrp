@@ -433,6 +433,7 @@ export function buildApp(options: {
   diceCommandIds?: { nextId(): string };
   adventureAgentDependencies?: AdventureAgentDependencies;
   encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
+  campaignContentGeneration?: import("./routes/rpg/v1/campaignContentGeneration.js").CampaignContentGenerationOptions["generateCampaignContent"];
 } = {}) {
   const runtime = options.runtime ?? systemRuntime;
   const app = Fastify({
@@ -691,6 +692,7 @@ export function buildApp(options: {
     diceCommandIds: options.diceCommandIds ?? { nextId: () => randomUUID() },
     ...(options.adventureAgentDependencies ? { adventureAgentDependencies: options.adventureAgentDependencies } : {}),
     ...(options.encounterGeneration ? { encounterGeneration: options.encounterGeneration } : {}),
+    ...(options.campaignContentGeneration ? { campaignContentGeneration: options.campaignContentGeneration } : {}),
   });
 
   return app;

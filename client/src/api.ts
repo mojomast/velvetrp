@@ -31,6 +31,8 @@ import {
   campaignTransferHttpDryRunResponseSchema,
   campaignTransferHttpExportDocumentSchema,
 } from "@velvet/contracts";
+import { campaignContentApplyRequestSchema, campaignContentApplyResponseSchema, campaignContentDraftViewSchema, campaignContentGenerationRequestSchema } from "@velvet/contracts";
+import type { CampaignContentGenerationRequest } from "@velvet/contracts";
 import type {
   CampaignAdministrationHttpArchiveRequest,
   CampaignAdministrationHttpArchiveResponse,
@@ -1578,6 +1580,26 @@ export async function applyEncounterGenerationDraft(draftId: string, input: Gene
   const response = generationDraftApplyResponseSchema.parse(success.body);
   if (response.draft.draftId !== id || response.application.encounterId !== response.receipts[0].encounterId) throw new Error("Encounter generation apply response did not match the request");
   return response;
+}
+
+/** Requests a bounded campaign-content draft; provider internals never enter this projection. */
+export async function createCampaignContentDraft(input: CampaignContentGenerationRequest) {
+  const body = parseApiInput(() => campaignContentGenerationRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/campaign-content-drafts", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 201, "Campaign content generation");
+  return campaignContentDraftViewSchema.parse(success.body);
+}
+export async function getCampaignContentDraft(draftId: string) {
+  const id = parseApiInput(() => resourceIdSchema.parse(draftId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Campaign content draft");
+  return campaignContentDraftViewSchema.parse(success.body);
+}
+export async function applyCampaignContentDraft(draftId: string, input: { expectedRevision: number; idempotencyKey: string }) {
+  const id = parseApiInput(() => resourceIdSchema.parse(draftId)), body = parseApiInput(() => campaignContentApplyRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Campaign content apply");
+  return campaignContentApplyResponseSchema.parse(success.body);
 }
 
 export async function startEncounter(encounterId: string, input: EncounterStartCommandRequest) {

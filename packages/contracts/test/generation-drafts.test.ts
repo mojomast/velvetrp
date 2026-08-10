@@ -13,11 +13,11 @@ const base = { draftId: "draft", campaignId: "campaign", timelineId: "timeline",
 
 describe("M1.10 generation-draft contracts", () => {
   it("publishes exhaustive kind, lifecycle, review, and apply vocabularies", () => {
-    expect(generationDraftKindSchema.options).toEqual(["encounter", "location", "npc", "faction", "quest", "storyline", "content-pack"]);
+    expect(generationDraftKindSchema.options).toEqual(["encounter", "location", "npc", "faction", "quest", "storyline", "content-pack", "campaign-content"]);
     expect(generationDraftStateSchema.options).toEqual(["staged", "in-review", "approved", "rejected", "applied", "cancelled"]);
     expect(generationDraftReviewStateSchema.options).toEqual(["pending", "approved", "rejected"]);
     expect(generationDraftApplyStateSchema.options).toEqual(["not-ready", "ready", "applied"]);
-    expectTypeOf<GenerationDraftKind>().toEqualTypeOf<"encounter" | "location" | "npc" | "faction" | "quest" | "storyline" | "content-pack">();
+    expectTypeOf<GenerationDraftKind>().toEqualTypeOf<"encounter" | "location" | "npc" | "faction" | "quest" | "storyline" | "content-pack" | "campaign-content">();
     expectTypeOf<GenerationDraftState>().toEqualTypeOf<"staged" | "in-review" | "approved" | "rejected" | "applied" | "cancelled">();
     expectTypeOf<GenerationDraftReviewState>().toEqualTypeOf<"pending" | "approved" | "rejected">();
     expectTypeOf<GenerationDraftApplyState>().toEqualTypeOf<"not-ready" | "ready" | "applied">();

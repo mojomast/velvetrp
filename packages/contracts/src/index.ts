@@ -58,6 +58,7 @@ export * from "./confirmation-policy.js";
 export * from "./generation-drafts.js";
 export * from "./adventure-turns-http.js";
 export * from "./generation-drafts-http.js";
+export * from "./campaign-content-generation-http.js";
 
 export {
   addCampaignMembershipInputSchema,
