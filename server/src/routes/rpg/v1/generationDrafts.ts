@@ -12,13 +12,13 @@ import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import {
   AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnStaleError,
-  AdventureTurnUnavailableError, type AdventureTurnRepository, type EncounterRepository,
+  AdventureTurnUnavailableError, type AdventureTurnRepository,
 } from "../../../repo/index.js";
 
 const OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 type Repo = Pick<AdventureTurnRepository, "createGenerationDraft" | "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
-  | "reviewGenerationDraft" | "applyGenerationDraft"> & Pick<EncounterRepository, "createEncounter"> & {
+  | "applyEncounterGenerationDraftAtomically"> & {
   getCampaign(actorPrincipalId: string, campaignId: string): { activeTimelineId: string } | null;
   getCampaignAdministration(actorPrincipalId: string, campaignId: string): { revision: number } | null;
 };
@@ -103,12 +103,11 @@ export const generationDraftsHttpRoutes: FastifyPluginAsync<GenerationDraftsHttp
   });
   app.post<{ Params: { draftId: string }; Querystring: Record<string, unknown>; Body: unknown }>("/generation-drafts/:draftId/apply", { onRequest: async (request, reply) => { reply.header("cache-control", "no-store"); if (!enabled()) return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); if (hasQuery(request)) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Encounter draft apply does not accept query parameters"); if (typeof request.headers["content-type"] !== "string" || !JSON_TYPE.test(request.headers["content-type"])) return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Encounter draft apply requires application/json"); } }, async (request, reply) => {
     const draftId = resourceIdSchema.safeParse(request.params.draftId), body = generationDraftApplyRequestSchema.safeParse(request.body); if (!draftId.success || !body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Encounter draft apply request is invalid");
-    try { const repo = options.generationDraftRepositoryAccessor(), before = requirePrivate(repo.getGenerationDraft(OWNER, draftId.data)), staged = content(before);
-      const reviewed = repo.reviewGenerationDraft(OWNER, { draftId: before.draftId, decision: "approved", expectedDraftRevision: body.data.expectedRevision, expectedCampaignRevision: before.campaignRevision, idempotencyKey: key("encounter-review", body.data.idempotencyKey) });
-      const encounter = repo.createEncounter(OWNER, before.campaignId, { sessionId: staged.sessionId, name: staged.encounter.name, combatants: [...staged.partyActorIds.map((actorId) => ({ kind: "actor" as const, actorId, team: "allies" as const })), ...staged.encounter.combatants], idempotencyKey: key("encounter-create", body.data.idempotencyKey) });
-      const applied = repo.applyGenerationDraft(OWNER, { draftId: before.draftId, expectedDraftRevision: reviewed.revision, expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("encounter-apply", body.data.idempotencyKey), result: { scope: "encounter", encounterId: encounter.encounter.encounterId } });
+    try { const repo = options.generationDraftRepositoryAccessor(), before = requirePrivate(repo.getGenerationDraft(OWNER, draftId.data));
+      const { draft: applied, encounterId } = repo.applyEncounterGenerationDraftAtomically(OWNER, { draftId: before.draftId,
+        expectedDraftRevision: body.data.expectedRevision, expectedCampaignRevision: before.campaignRevision, idempotencyKey: body.data.idempotencyKey });
       if (!applied.applyReceipt) throw new Error("missing draft apply receipt");
-      return reply.send(generationDraftApplyResponseSchema.parse({ draft: projection(applied), application: { scope: "encounter", campaignDomainMutated: true, encounterId: encounter.encounter.encounterId }, receipts: [{ receiptId: applied.applyReceipt.receiptId, reviewDecisionId: applied.applyReceipt.reviewDecisionId, scope: "encounter", encounterId: encounter.encounter.encounterId, appliedAt: applied.applyReceipt.appliedAt }] }));
+      return reply.send(generationDraftApplyResponseSchema.parse({ draft: projection(applied), application: { scope: "encounter", campaignDomainMutated: true, encounterId }, receipts: [{ receiptId: applied.applyReceipt.receiptId, reviewDecisionId: applied.applyReceipt.reviewDecisionId, scope: "encounter", encounterId, appliedAt: applied.applyReceipt.appliedAt }] }));
     } catch (error) { return fail(request, reply, error); }
   });
 };

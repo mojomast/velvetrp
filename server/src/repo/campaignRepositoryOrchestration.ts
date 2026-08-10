@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import DatabaseDriver from "better-sqlite3";
 import {
   addCampaignMembershipInputSchema,
@@ -27,7 +28,9 @@ import {
   renameCampaignInputSchema,
   resourceIdSchema,
   resolvedCharacterChoiceSchema,
+  stagedEncounterGenerationSchema,
   utcIsoTimestampSchema,
+  type DraftMutationInput,
   type PublicCampaignCharacterSummary,
   type CampaignCharacterWorkspaceResponse,
   type CampaignRoomLinkingResponse,
@@ -80,6 +83,7 @@ import { createWorldRepository, type WorldRepository } from "./worldRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
+import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -640,6 +644,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const campaignActorResourceRepository = createCampaignActorResourceRepository(db);
   let closed = false;
   let transactionDepth = 0;
+  let atomicGenerationApplyDepth = 0;
   const assertOpen = () => {
     if (closed) throw new Error("repository is closed");
   };
@@ -701,7 +706,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   const checkRepository=createCheckRepository(db,dependencies,m16Guard);
   const powerRepository=createPowerRepository(db,dependencies,m16Guard);
   const effectRepository=createEffectRepository(db,dependencies,m16Guard);
-  const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
+  const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0&&atomicGenerationApplyDepth===0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
   const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.8 mutation cannot run inside a repository transaction");});
   const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
@@ -717,7 +722,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
   } });
   const adventureTurnRepository = createAdventureTurnRepository(db, dependencies, () => {
-    assertOpen(); if (transactionDepth > 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
+    assertOpen(); if (transactionDepth > 0 && atomicGenerationApplyDepth === 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
   },{
     executeSetActorAttribute:(principal,input)=>campaignCommandWriteOperations.executeSetActorAttribute(principal,input),
     executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
@@ -740,6 +745,43 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     ...questRepository,
     ...storyRepository,
     ...adventureTurnRepository,
+    applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
+      assertOpen();
+      const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
+      transactionDepth += 1; atomicGenerationApplyDepth += 1;
+      try {
+        return db.transaction(() => {
+          const before = adventureTurnRepository.getGenerationDraft(principalId, input.draftId);
+          if (!before || !("stagedContent" in before)) throw new Error("generation draft is unavailable");
+          if (before.state === "applied") {
+            const appliedCommand = db.prepare(`SELECT idempotency_key FROM adventure_coordination_commands_v36
+              WHERE aggregate_kind='draft' AND campaign_id=? AND aggregate_id=? AND mutation_type='draft-apply'`).get(before.campaignId, before.draftId) as { idempotency_key: string } | undefined;
+            if (appliedCommand?.idempotency_key !== key("encounter-apply")) throw new AdventureTurnConflictError("idempotency key was reused");
+            const encounterId = resourceIdSchema.safeParse((before.applyReceipt?.result as { encounterId?: unknown } | undefined)?.encounterId);
+            if (!encounterId.success) throw new Error("applied encounter draft has no encounter receipt");
+            return { draft: before, encounterId: encounterId.data };
+          }
+          const staged = stagedEncounterGenerationSchema.parse(before.stagedContent);
+          const reviewed = adventureTurnRepository.reviewGenerationDraft(principalId, {
+            draftId: before.draftId, decision: "approved", expectedDraftRevision: input.expectedDraftRevision,
+            expectedCampaignRevision: before.campaignRevision, idempotencyKey: key("encounter-review"),
+          });
+          const encounter = encounterRepository.createEncounter(principalId, before.campaignId, {
+            sessionId: staged.sessionId, name: staged.encounter.name,
+            combatants: [...staged.partyActorIds.map((actorId) => ({ kind: "actor" as const, actorId, team: "allies" as const })), ...staged.encounter.combatants],
+            idempotencyKey: key("encounter-create"),
+          });
+          const draft = adventureTurnRepository.applyGenerationDraft(principalId, {
+            draftId: before.draftId, expectedDraftRevision: reviewed.revision,
+            expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("encounter-apply"),
+            result: { scope: "encounter", encounterId: encounter.encounter.encounterId },
+          });
+          return { draft, encounterId: encounter.encounter.encounterId };
+        }).immediate();
+      } finally {
+        atomicGenerationApplyDepth -= 1; transactionDepth -= 1;
+      }
+    },
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>

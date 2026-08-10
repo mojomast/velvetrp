@@ -34,6 +34,18 @@ describe("M4.5 typed encounter generation routes", () => {
     expect(response.statusCode).toBe(503); expect(response.body).not.toMatch(/hidden|provider|prompt|pack|wolf/); await app.close();
   });
 
+  it("rolls back review when authoritative encounter creation fails", async () => {
+    enable(); const seed = createRepository(); const campaign = seed.createCampaign("local-owner", { name: "Atomic apply" }); const persona = seed.createCharacter({ name: "Player", age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true }); const session = await createSession({ characterId: persona.id }); await transitionSession(session.id, "active", "test"); seed.attachCampaignSession("local-owner", { campaignId: campaign.id, sessionId: session.id } as any); seed.close();
+    const app = buildApp({ campaignRepositoryFactory: () => createRepository(), encounterGeneration: async () => generated });
+    const request = { campaignId: campaign.id, sessionId: session.id, brief: "An ambush", visibleLocation: "Bridge", tone: "Tense", difficulty: "easy", partyActorIds: ["missing-actor"], pinnedEnemyTemplates: [{ kind: "enemy-template", packId: "pack", packVersion: "1", definitionId: "wolf" }], exclusions: [], idempotencyKey: "atomic-draft" };
+    const created = await app.inject({ method: "POST", url: "/api/rpg/v1/generation-drafts", headers: { "content-type": "application/json" }, payload: request });
+    expect(created.statusCode).toBe(201);
+    const apply = await app.inject({ method: "POST", url: `/api/rpg/v1/generation-drafts/${created.json().draft.draftId}/apply`, headers: { "content-type": "application/json" }, payload: { expectedRevision: 0, idempotencyKey: "atomic-apply" } });
+    expect(apply.statusCode).toBe(503);
+    const after = await app.inject({ method: "GET", url: `/api/rpg/v1/generation-drafts/${created.json().draft.draftId}` });
+    expect(after.json().draft).toMatchObject({ state: "staged", revision: 0 }); await app.close();
+  });
+
   it("gates and strictly rejects malformed request shapes without opening a repository", async () => {
     let accesses = 0; const app = buildApp({ campaignRepositoryFactory: () => { accesses += 1; return { close() {}, listCampaigns: () => [] } as unknown as CampaignListRepository; } });
     expect((await app.inject({ method: "POST", url: "/api/rpg/v1/generation-drafts", headers: { "content-type": "application/json" }, payload: {} })).statusCode).toBe(404); expect(accesses).toBe(0); enable();

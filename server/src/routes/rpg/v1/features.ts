@@ -290,8 +290,7 @@ type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTu
   & Required<Pick<CampaignListRepository, "getCampaign">>;
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
-  | "createGenerationDraft" | "reviewGenerationDraft" | "applyGenerationDraft">
-  & Pick<EncounterRepository, "createEncounter">
+  | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically">
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
 
 class UnsupportedCampaignRepositoryError extends Error {
@@ -450,8 +449,8 @@ function assertCampaignPlayRepository(repository: CampaignListRepository): asser
 }
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
   const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
-    "reviewGenerationDraft", "applyGenerationDraft", "createEncounter", "getCampaign", "getCampaignAdministration"];
-  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+    "applyEncounterGenerationDraftAtomically", "getCampaign", "getCampaignAdministration"];
+  if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
 /** Registers trusted-local RPG v1 routes over one lazily owned repository. */
