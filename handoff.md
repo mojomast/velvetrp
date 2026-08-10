@@ -10,7 +10,7 @@
 - SSE disconnects abort in-flight orchestration and stop polling. A durable dispatch may be reconciled by a later stream; disconnect does not create a speculative mechanics mutation.
 - Encounter generation accepts a bounded typed request. The provider gets only the user-authored visible brief/location/tone/difficulty/exclusions, party size, and ordinal pinned-enemy choices. It never receives actor IDs, catalog references, principals, provider metadata, hidden campaign state, or command arguments.
 - Provider JSON is strictly validated before server-side ordinal-to-pinned-reference mapping. Invalid/unavailable output returns a safe unavailable response and persists neither draft nor encounter. Role-safe draft reads omit stored party and catalog identities.
-- Apply is an explicit GM review action. It calls `createEncounter` through the authoritative repository command service, then seals the draft receipt; it does not start combat. Exact idempotency retries return the existing draft or command result.
+- Apply is an explicit GM review action. One immediate SQLite transaction reviews the draft, calls `createEncounter` through the authoritative repository command service, and seals the draft receipt; any encounter failure rolls back the review and draft mutation. It does not start combat. Exact idempotency retries return the sealed result; changed key reuse conflicts.
 
 ## Boundaries
 
@@ -20,8 +20,8 @@
 
 ## Verification
 
-- Root `npm run typecheck` passed before the M4.5 implementation commit.
-- Focused M4.5 suites passed: server `rpg-generation-draft-route.test.ts` (3 tests) and client `api.test.ts` (85 tests).
+- Root `TMPDIR=/dev/shm npm run typecheck` passed before the atomic-apply implementation commit.
+- Focused M4.5 suite passed: server `rpg-generation-draft-route.test.ts` (4 tests), including authoritative-command failure rollback.
 
 ## Workspace Note
 
