@@ -1,6 +1,6 @@
 # Development Plan
 
-Current persistence is `v41`. The authoritative dependency order and acceptance criteria live in the [RPG roadmap](docs/ROADMAP.md). This file is only a compact completion ledger.
+Current persistence is `v42r1`. The authoritative dependency order and acceptance criteria live in the [RPG roadmap](docs/ROADMAP.md). This file is only a compact completion ledger.
 
 ## Complete
 
@@ -16,6 +16,6 @@ Current persistence is `v41`. The authoritative dependency order and acceptance 
 
 ## Pending
 
-M4.6 receives only a bounded visible brief, tone, and exclusions, validates strict provider JSON, and stores campaign-content drafts durably. Role-safe previews omit NPC goals and all provider/private metadata. Apply is a single immediate transaction that reviews, creates bounded public locations/factions/quests and manually controlled fictional NPCs, records only explicit 10/10/10 conservative baseline stats (no catalog powers or effects), persists opening prose, and seals an idempotent receipt. Provider work remains outside SQLite.
+No M4 work is pending. M4.6 accepts only a bounded visible brief, tone, and exclusions, validates strict provider JSON, and stores campaign-content drafts durably. Role-safe previews omit NPC goals and all provider/private metadata. Apply is a single immediate transaction that reviews, creates bounded public locations/factions/quests and manually controlled fictional NPCs, records only explicit 10/10/10 conservative baseline stats (no catalog powers or effects), persists opening prose, and seals an idempotent receipt. Provider work remains outside SQLite.
 
 Deferred and out-of-scope work remains recorded in the [roadmap](docs/ROADMAP.md#out-of-scope--deferred).

@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for schema v37 revision 1 (`v37r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for schema v42 revision 1 (`v42r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -26,14 +26,14 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 | --- | --- |
 | `db.ts` | Stable facade, dependency wiring, historical v2-v14 migration code, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
 | `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, schema startup, legacy import invocation, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | `SCHEMA_VERSION = 37`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
+| `db/schema.ts` | `SCHEMA_VERSION = 42`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
 | `db/migrations/*.ts` | Version-owned DDL, canonical object inventories/digests, data validation, backfill, and one-step migration functions. New schema behavior goes in the migration that introduces it. |
 | `db/legacyImport.ts` | One-way import of an otherwise-empty legacy `db.json` store into SQLite. It does not merge stores. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-Fresh creation and every supported sequential upgrade must converge on equivalent v37r1 DDL and validated data. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
+Fresh creation and every supported sequential upgrade must converge on equivalent v42r1 DDL and validated data. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
 
-## Migrations v26-v37
+## Migrations v26-v42
 
 | Version | Additive responsibility |
 | --- | --- |
@@ -49,6 +49,11 @@ Fresh creation and every supported sequential upgrade must converge on equivalen
 | v35 | M1.10 durable adventure turns, tool proposals, confirmations, provider-call metadata, generation drafts, reviews, and final receipt links. |
 | v36 | Adventure coordination command/event/receipt ledgers, exact turn-mechanics links, generation-draft apply receipts, and hardened v35 layout/data validation. |
 | v37 | Exact server-owned proposal execution bindings tying each proposal to its idempotency key, command type, source turn, timeline, and actor; ambiguous historical receipts reject migration. |
+| v38 | Durable bounded agent execution, decision rounds, tool calls, provider starts, and recovery state. |
+| v39 | Agent provider-response provenance, dispatch claims, combat proposal bindings, and generalized receipts. |
+| v40 | Confirmation policy, authority evidence, expiry operations, mutation accounting, and replan requirements. |
+| v41 | Reviewed campaign-content generation drafts and projections. |
+| v42 | Additive immutable campaign-content commands, receipts, revisions, and layout attestation sealing reviewed atomic application. |
 
 ## Repository ownership
 
@@ -67,6 +72,9 @@ Fresh creation and every supported sequential upgrade must converge on equivalen
 | M1.9 | `questRepo.ts` plus `quest/` own quest definitions, objectives, progress, rewards, journal reads, and retained v29 compatibility reads. `storyRepo.ts` owns story graphs, plot questions, clues/discovery, state transitions, and audience-specific story projections. |
 | M1.10 | `adventureTurnRepo.ts` and `adventureTurn/` own turns, proposals, confirmations, provider-call metadata, receipt linking/reconciliation, narration state, generation drafts, review, and apply receipts. Generation/provider execution remains outside the repository; only durable coordination metadata and reviewed staged content are persisted here. |
 | M4.1 | `campaign/campaignAgentContextReadRepo.ts` owns focused campaign/session/audience snapshots for server orchestrators. The factory facade wraps each read in one deferred SQLite transaction so membership, role/control, target ancestry, visible state, current combat, legal actions, and authorized target-private facts share one snapshot. `server/src/context.ts` owns the independent whole-line UTF-16 budgets and precedence assembly outside persistence. |
+| M4.2-M4.4 | `agent/adventureOrchestrator.ts`, `agent/toolRegistry.ts`, and `agent/confirmationPolicy.ts` own bounded provider orchestration, role-selected tools, deterministic command bridging, durable confirmation/resume, and receipt-aware narration. Durable execution and response provenance are persisted through the v38-v40 repository boundary. |
+| M4.5 | `generationDrafts.ts` and the encounter repository own typed encounter draft validation, reviewed authoritative encounter application, and role-safe projections. |
+| M4.6 | `campaignContentGeneration.ts`, `campaign/campaignContentWriteRepo.ts`, and the v41-v42 migrations own typed campaign-content drafts, conservative NPC baselines, and atomic reviewed campaign-content application with immutable receipts. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 
@@ -89,7 +97,7 @@ Never project raw rows, idempotency keys, command envelopes, provider/private co
 
 M4.1 agent snapshots derive visibility from the requested audience plus current membership, campaign role, actor control, attached session, target ancestry, and encounter state; they do not reuse a caller-selected general-purpose projection. They contain bounded-source facts rather than full catalogs, full inventories, or story graphs. Target actor notes/attributes, the speaking NPC's goals, or the target enemy's tactic/template may appear only in that authorized target's private planning layer; unrelated private facts remain absent. NPC/enemy planning has an immutable higher-precedence nondisclosure rule. Companion reads return `null` for every principal because persistence has no companion aggregate or controller binding.
 
-The snapshot method is server-internal repository API, not HTTP or shared wire surface. M4.1 adds no production tool/provider loop and no mutation capability; M4.2 must compose those concerns without bypassing this disclosure boundary.
+The snapshot method is server-internal repository API, not HTTP or shared wire surface. At M4.1 completion it added no production tool/provider loop or mutation capability; M4.2 subsequently composed those concerns without bypassing this disclosure boundary.
 
 ## Trusted-local HTTP and client context
 

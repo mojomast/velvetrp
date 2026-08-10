@@ -1,10 +1,10 @@
 # VelvetRP RPG Feature Roadmap
 
-This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. Current persistence is schema v37r1, with repository modules under `server/src/repo/`, shared runtime contracts under `packages/contracts/src/`, and 92 trusted-local RPG operations implemented through M2.11 under `server/src/routes/rpg/v1/`.
+This roadmap turns the completed gap analysis in [the RPG integration plan](rpg-integration-plan.md) and [the 2026 architecture notes](roleplay-architecture-2026.md) into dependency-ordered work. Current persistence is schema v42r1, with repository modules under `server/src/repo/`, shared runtime contracts under `packages/contracts/src/`, and the trusted-local RPG surface implemented through M2.11 and the completed M4 integration work under `server/src/routes/rpg/v1/`.
 
 All milestones preserve existing roleplay APIs and local-first SQLite operation. Until a separate remote-authentication project supplies verified principals and authorization, RPG HTTP handlers must continue to use the fixed trusted-local `local-owner` principal, bind only to loopback, and must not be represented as safe for remote or multi-user deployment. Mutations use revisions, idempotency keys, atomic repository transactions, structured problems, and authoritative-read reconciliation when delivery leaves commit status unknown.
 
-M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, client milestones M3.1-M3.8, and M4.1 are complete. M4.2 is next. Earlier schema digests remain historical milestone records in the sections below.
+M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, client milestones M3.1-M3.8, and M4.1-M4.6 are complete. Earlier schema digests and milestone baseline descriptions remain historical records in the sections below.
 
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
@@ -155,7 +155,7 @@ Schema v35 provides the durable adventure-turn and generation-draft foundation, 
 
 ## Milestone 2 — API Surface (Routes + Contracts)
 
-**Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1 is complete and M4.2 is next.**
+**Progress: M2.1-M2.11 complete as trusted-local HTTP routes; M4.1-M4.6 are complete.**
 
 All routes below are delivered under `/api/rpg/v1`; the existing campaign list/create/detail/rename, original and mechanics starter setup, character roster/create/options/workspace, dice history/roll, room list/attach, and feature discovery operations remain compatible. Each request and response has a strict runtime schema in `packages/contracts/src/`, opaque IDs are path-encoded once, mutable responses include revisions, retry-sensitive writes require `idempotencyKey`, and role-specific response schemas omit unauthorized fields structurally.
 
@@ -319,7 +319,7 @@ Add one streaming turn protocol plus durable confirmation and reviewable generat
 
 #### Implementation notes
 
-Proposal, confirmation, mechanics, and choice events are conditional because the M4.2 provider-driven tool planner and deterministic command bridge are pending; the current no-tool lane uses deterministic fallback narration. Generation creation is deterministic fallback, and apply seals selected review changes only with `campaignDomainMutated: false`. The delivered surface also includes a role-safe campaign play bootstrap, read-only initial-turn reconciliation, and narration retry/swipe stream variants that reuse prior receipts without rerunning mechanics.
+At M2.11 completion, proposal, confirmation, mechanics, and choice events were conditional because the M4.2 provider-driven tool planner and deterministic command bridge were pending; the no-tool lane used deterministic fallback narration. Generation creation was deterministic fallback, and apply sealed selected review changes only with `campaignDomainMutated: false`. The delivered surface also included a role-safe campaign play bootstrap, read-only initial-turn reconciliation, and narration retry/swipe stream variants that reused prior receipts without rerunning mechanics.
 
 ## Milestone 3 — Client UI
 
@@ -450,9 +450,11 @@ Extend the existing context basket with bounded, role-filtered campaign mechanic
 
 #### Implementation notes
 
-M4.1 delivers typed server-internal campaign audiences, role-sensitive repository snapshots, deterministic basket assembly/truncation metadata, and optional provider-message plumbing. When campaign context is supplied, its approved retrieval layers replace the legacy lore/memory/shared-context trio to avoid duplicate context; generations without campaign context remain unchanged. There is no new route or shared wire contract, and no production adventure-turn tool/provider loop invokes this boundary yet. M4.2 must add that bounded loop and deterministic command bridge.
+At M4.1 completion, the milestone delivered typed server-internal campaign audiences, role-sensitive repository snapshots, deterministic basket assembly/truncation metadata, and optional provider-message plumbing. When campaign context is supplied, its approved retrieval layers replace the legacy lore/memory/shared-context trio to avoid duplicate context; generations without campaign context remain unchanged. There was no new route or shared wire contract, and no production adventure-turn tool/provider loop invoked this boundary yet. M4.2 subsequently added that bounded loop and deterministic command bridge.
 
 ### M4.2 Bounded tool loop and deterministic command bridge
+
+**Status: Complete**
 
 Implement a server-selected tool registry and bounded decision loop that can propose only authorized reads and command-service calls.
 
@@ -465,6 +467,8 @@ Implement a server-selected tool registry and bounded decision loop that can pro
 
 ### M4.3 Durable confirmation and resume
 
+**Status: Complete**
+
 Pause consequential AI proposals for human review and resume from persisted state after disconnect or restart.
 
 - **Complexity:** L
@@ -475,6 +479,8 @@ Pause consequential AI proposals for human review and resume from persisted stat
   - Duplicate decisions converge, stale revisions require replanning, rejection commits no proposed mechanic, and approved commands remain attributable through receipts.
 
 ### M4.4 Receipt-aware narration and narrative consequence injection
+
+**Status: Complete**
 
 Generate final narration only after mechanics commit, injecting immutable receipts and bounded narrative consequences without granting mutation tools.
 
@@ -487,6 +493,8 @@ Generate final narration only after mechanics commit, injecting immutable receip
 
 ### M4.5 LLM encounter generation
 
+**Status: Complete**
+
 Create staged encounter drafts from campaign-aware constraints, then validate and require review before adding them to play.
 
 - **Complexity:** L
@@ -498,12 +506,14 @@ Create staged encounter drafts from campaign-aware constraints, then validate an
 
 ### M4.6 NPC stat derivation and campaign-content generation
 
-Derive playable NPC mechanics from approved narrative briefs and support staged NPC, location, faction, quest, and opening drafts.
+**Status: Complete (schema v42r1 additive integrity sealing)**
+
+Support staged NPC, location, faction, quest, and opening drafts with explicit conservative NPC baselines.
 
 - **Complexity:** L
 - **Dependencies:** M4.1-M4.5; world/story repositories from M1.8-M1.9; generation drafts from M1.10.
 - **Acceptance criteria:**
-  - NPC stat derivation selects pinned templates and bounded deterministic adjustments, with the server recomputing all derived values and rejecting unsupported powers or effect references.
+  - NPC application records only explicit 10/10/10 conservative baseline stats, with no catalog powers or effects.
   - Generated personas, goals, secrets, relationships, locations, factions, quests, clues, and openings remain typed drafts with provenance, validation, role-safe previews, and per-change approval.
   - Applying a draft emits command receipts; generated prose cannot directly mutate campaign state, create permissions, voice player characters, or expose hidden information.
 
