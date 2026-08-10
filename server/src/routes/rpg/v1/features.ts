@@ -103,6 +103,7 @@ import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js
 import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { campaignPlayHttpRoutes } from "./campaignPlay.js";
 import { generationDraftsHttpRoutes } from "./generationDrafts.js";
+import type { GenerationDraftsHttpOptions } from "./generationDrafts.js";
 import { actorResourcesHttpRoutes } from "./actorResources.js";
 import type { ActorResourceRepository } from "../../../repo/actorResourceRepo.js";
 import { actorInventoryHttpRoutes } from "./actorInventory.js";
@@ -221,6 +222,7 @@ interface RpgV1RoutesOptions {
   campaignRepositoryFactory: () => CampaignListRepository;
   diceCommandIds: IdGenerator;
   adventureAgentDependencies?: AdventureAgentDependencies;
+  encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
 }
 
 const LOCAL_CAMPAIGN_PRINCIPAL = "local-owner";
@@ -289,6 +291,7 @@ type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTu
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
   | "createGenerationDraft" | "reviewGenerationDraft" | "applyGenerationDraft">
+  & Pick<EncounterRepository, "createEncounter">
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
 
 class UnsupportedCampaignRepositoryError extends Error {
@@ -447,7 +450,7 @@ function assertCampaignPlayRepository(repository: CampaignListRepository): asser
 }
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
   const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
-    "reviewGenerationDraft", "applyGenerationDraft", "getCampaign", "getCampaignAdministration"];
+    "reviewGenerationDraft", "applyGenerationDraft", "createEncounter", "getCampaign", "getCampaignAdministration"];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
@@ -617,7 +620,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
-  await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor });
+  await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
+    ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
 
   app.get<{
     Params: { campaignId: string };

@@ -22,6 +22,7 @@ import type { CampaignListRepository } from "./routes/rpg/v1/features.js";
 import { systemRuntime } from "./runtime.js";
 import type { RuntimeDependencies } from "./runtime.js";
 import type { AdventureAgentDependencies } from "./agent/adventureOrchestrator.js";
+import type { GenerationDraftsHttpOptions } from "./routes/rpg/v1/generationDrafts.js";
 
 interface NormalizedCampaignResourceRoute {
   instance: string;
@@ -431,6 +432,7 @@ export function buildApp(options: {
   loggerStream?: Writable;
   diceCommandIds?: { nextId(): string };
   adventureAgentDependencies?: AdventureAgentDependencies;
+  encounterGeneration?: GenerationDraftsHttpOptions["generateEncounter"];
 } = {}) {
   const runtime = options.runtime ?? systemRuntime;
   const app = Fastify({
@@ -688,6 +690,7 @@ export function buildApp(options: {
     campaignRepositoryFactory: options.campaignRepositoryFactory ?? (() => createRepository()),
     diceCommandIds: options.diceCommandIds ?? { nextId: () => randomUUID() },
     ...(options.adventureAgentDependencies ? { adventureAgentDependencies: options.adventureAgentDependencies } : {}),
+    ...(options.encounterGeneration ? { encounterGeneration: options.encounterGeneration } : {}),
   });
 
   return app;

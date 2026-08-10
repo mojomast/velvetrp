@@ -4,9 +4,24 @@ import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
 import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
+import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M4.5 encounter generation API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const request = { campaignId: "campaign", sessionId: "session", brief: "An ambush", visibleLocation: "Bridge", tone: "Tense", difficulty: "standard" as const, partyActorIds: ["actor"], pinnedEnemyTemplates: [{ kind: "enemy-template" as const, packId: "pack", packVersion: "1", definitionId: "wolf" }], exclusions: [], idempotencyKey: "draft" };
+  const response = { draft: { draftId: "draft-id", campaignId: "campaign", kind: "encounter" as const, state: "staged" as const, revision: 0, createdAt: at, updatedAt: at }, encounter: { name: "Bridge Ambush", enemyCount: 1, terrain: "Stone bridge", motives: "Drive intruders away", rewardNarrative: "Safe passage" }, validationIssues: [] };
+  it("uses strict no-store create and read bindings", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 201 })).mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(createEncounterGenerationDraft(request)).resolves.toEqual(response);
+    await expect(getEncounterGenerationDraft("draft-id")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/generation-drafts", expect.objectContaining({ method: "POST", cache: "no-store" }));
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual(request);
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/generation-drafts/draft-id", expect.objectContaining({ cache: "no-store" }));
+  });
 });
 
 describe("M3.7 adventure play API binding", () => {

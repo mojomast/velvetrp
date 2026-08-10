@@ -63,6 +63,19 @@ import type {
   CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
 import {
+  generationDraftApplyRequestSchema,
+  generationDraftApplyResponseSchema,
+  generationDraftCreateRequestSchema,
+  generationDraftCreateResponseSchema,
+  generationDraftGetResponseSchema,
+} from "@velvet/contracts";
+import type {
+  GenerationDraftApplyRequest,
+  GenerationDraftApplyResponse,
+  GenerationDraftCreateRequest,
+  GenerationDraftGetResponse,
+} from "@velvet/contracts";
+import {
   adventureTurnConfirmRequestSchema,
   adventureTurnConfirmResponseSchema,
   adventureTurnGetResponseSchema,
@@ -1536,6 +1549,35 @@ export async function createCampaignEncounter(campaignId: string, input: Encount
     throw new Error("Encounter creation response did not match the request");
   }
   return encounter;
+}
+
+/** Requests one typed encounter draft. Writes are never retried automatically. */
+export async function createEncounterGenerationDraft(input: GenerationDraftCreateRequest): Promise<GenerationDraftGetResponse> {
+  const body = parseApiInput(() => generationDraftCreateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>("/rpg/v1/generation-drafts", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 201, "Encounter generation");
+  const response = generationDraftCreateResponseSchema.parse(success.body);
+  if (response.draft.campaignId !== body.campaignId || response.draft.kind !== "encounter") throw new Error("Encounter generation response did not match the request");
+  return response;
+}
+
+/** Reads only the role-safe typed encounter draft projection. */
+export async function getEncounterGenerationDraft(draftId: string): Promise<GenerationDraftGetResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(draftId));
+  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Encounter generation draft");
+  return generationDraftGetResponseSchema.parse(success.body);
+}
+
+/** Confirms and applies one reviewed encounter draft through the authoritative encounter command service. */
+export async function applyEncounterGenerationDraft(draftId: string, input: GenerationDraftApplyRequest): Promise<GenerationDraftApplyResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(draftId));
+  const body = parseApiInput(() => generationDraftApplyRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/generation-drafts/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Encounter generation apply");
+  const response = generationDraftApplyResponseSchema.parse(success.body);
+  if (response.draft.draftId !== id || response.application.encounterId !== response.receipts[0].encounterId) throw new Error("Encounter generation apply response did not match the request");
+  return response;
 }
 
 export async function startEncounter(encounterId: string, input: EncounterStartCommandRequest) {
