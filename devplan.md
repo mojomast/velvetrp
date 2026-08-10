@@ -11,13 +11,12 @@ Current persistence is `v40`. The authoritative dependency order and acceptance 
 - [x] M4.2: bounded provider tool loop and deterministic, revision-checked command bridge
 - [x] M4.3: durable confirmation, expiry, restart reconciliation, and resume
 - [x] M4.4: receipt-aware narration and narrative consequence injection
+- [x] M4.5: typed LLM encounter generation, strict staged validation, GM-confirmed authoritative encounter creation, and privacy-safe projections
 
 ## Pending
 
-- [ ] M4.4: receipt-aware narration and narrative consequence injection
-- [ ] M4.5: LLM encounter generation
 - [ ] M4.6: NPC stat derivation and campaign-content generation
 
-M4.5-M4.6 remain unimplemented. M4.4 narration receives only closed display-safe receipt facts after authoritative mechanics commit, has no mutation tools, reuses receipt identity for variants, and falls back deterministically after provider failure or an interrupted dispatch. Provider/tool internals, principals, opaque bindings, and hidden planning data remain private.
+M4.6 remains unimplemented. M4.5 accepts bounded encounter briefs, visible location/tone/difficulty/exclusions, party membership, and pinned enemy references; the provider receives only display-safe prose, party size, and ordinal enemy choices. Its strict typed response is mapped server-side to pinned definitions, staged durably, and projected without actor or catalog identities. Provider failures and malformed output create no draft or encounter. GM apply reviews the exact draft and invokes the authoritative encounter command service; it never silently activates combat. Provider/tool internals, principals, opaque bindings, and hidden planning data remain private.
 
 Deferred and out-of-scope work remains recorded in the [roadmap](docs/ROADMAP.md#out-of-scope--deferred).

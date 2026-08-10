@@ -2,12 +2,15 @@
 
 ## Current State
 
-- Persistence remains `v40`; M4.4 uses existing durable narration and provider-call metadata, so no migration was required.
-- M4.1-M4.4 are complete. M4.5 and M4.6 remain unimplemented.
+- Persistence remains `v40`; M4.5 reuses durable generation drafts and authoritative encounter commands, so no migration was required.
+- M4.1-M4.5 are complete. M4.6 remains unimplemented.
 - Adventure turns use bounded durable provider dispatches, server-selected tools, revision-checked idempotent command services, durable confirmation/expiry, and restart-safe reconciliation.
 - After mechanics commit, narration receives only a closed display-safe receipt subset: attribute before/after values, resource current/max values, dice total/modifier, or combat round transition. It has no tools and cannot receive command/proposal IDs, tool arguments, provider metadata, principals, opaque bindings, or hidden state.
 - Narration provider starts/outcomes are persisted around the remote call. An interrupted durable start is failed rather than replayed, provider failure or invalid prose uses the deterministic receipt renderer, and in-process concurrent resumes share one narration dispatch.
 - SSE disconnects abort in-flight orchestration and stop polling. A durable dispatch may be reconciled by a later stream; disconnect does not create a speculative mechanics mutation.
+- Encounter generation accepts a bounded typed request. The provider gets only the user-authored visible brief/location/tone/difficulty/exclusions, party size, and ordinal pinned-enemy choices. It never receives actor IDs, catalog references, principals, provider metadata, hidden campaign state, or command arguments.
+- Provider JSON is strictly validated before server-side ordinal-to-pinned-reference mapping. Invalid/unavailable output returns a safe unavailable response and persists neither draft nor encounter. Role-safe draft reads omit stored party and catalog identities.
+- Apply is an explicit GM review action. It calls `createEncounter` through the authoritative repository command service, then seals the draft receipt; it does not start combat. Exact idempotency retries return the existing draft or command result.
 
 ## Boundaries
 
@@ -17,8 +20,8 @@
 
 ## Verification
 
-- Root `npm run typecheck` passed before the M4.4 implementation commit.
-- Focused M4 server suites passed: `adventure-agent-orchestrator.test.ts` and `m4-agent-acceptance.test.ts` (46 tests).
+- Root `npm run typecheck` passed before the M4.5 implementation commit.
+- Focused M4.5 suites passed: server `rpg-generation-draft-route.test.ts` (3 tests) and client `api.test.ts` (85 tests).
 
 ## Workspace Note
 
