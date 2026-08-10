@@ -242,7 +242,7 @@ describe("bounded adventure orchestrator", () => {
     const campaign = seed();
     process.env.FEATURE_RPG_CAMPAIGN = "true"; process.env.FEATURE_RPG_MECHANICS = "true";
     let wire:Record<string,unknown>|null=null;const providerServer=createServer((request,response)=>{let body="";request.on("data",chunk=>body+=String(chunk));request.on("end",()=>{
-      wire=JSON.parse(body);response.writeHead(200,{"content-type":"application/json"});response.end(JSON.stringify({model:"fake",choices:[{message:{role:"assistant",content:null,tool_calls:[{id:"private-call",type:"function",function:{name:"actor_dice.roll",arguments:'{"expression":"1d20"}'}}]}}],usage:{prompt_tokens:2,completion_tokens:1,total_tokens:3}}));});});
+       const parsed=JSON.parse(body);if(parsed.tools)wire=parsed;response.writeHead(200,{"content-type":"application/json"});response.end(JSON.stringify({model:"fake",choices:[{message:{role:"assistant",content:null,tool_calls:[{id:"private-call",type:"function",function:{name:"actor_dice.roll",arguments:'{"expression":"1d20"}'}}]}}],usage:{prompt_tokens:2,completion_tokens:1,total_tokens:3}}));});});
     await new Promise<void>((resolve)=>providerServer.listen(0,"127.0.0.1",resolve));const port=(providerServer.address() as AddressInfo).port;
     const realDependencies:AdventureAgentDependencies={complete:completeWithProvider,getProvider:async()=>({...defaultProviderSettings(),baseUrl:`http://127.0.0.1:${port}/v1`,model:"fake",requestTimeoutSeconds:2}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
     const app = buildApp({ campaignRepositoryFactory: () => createRepository(), adventureAgentDependencies: realDependencies });

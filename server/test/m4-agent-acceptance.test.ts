@@ -112,6 +112,11 @@ async function fakeToolProvider(select: ProviderSelector) {
     request.on("data", (chunk) => { body += String(chunk); });
     request.on("end", () => {
       const parsed = JSON.parse(body); requests.push(parsed);
+      if (!parsed.tools) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ model: "acceptance-fake", choices: [{ message: { role: "assistant", content: "The committed result changes the scene." } }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+        return;
+      }
       const call = select(parsed);
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ model: "acceptance-fake", choices: [{ message: { role: "assistant", content: null,
@@ -177,7 +182,11 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
       headers: { "content-type": "application/json" }, payload: { resumeToken: read.json().resumeToken } });
     expect(streamEvents(resumed.body).at(-1)).toMatchObject({ type: "terminal", payload: { outcome: "done",
       turn: { turnId: fixture.turnId, state: "completed" }, receipts: [{ proposalId: fixture.proposal.proposalId }] } });
-    expect(fixture.provider.requests).toHaveLength(1);
+    expect(fixture.provider.requests).toHaveLength(2);
+    expect(fixture.provider.requests[1]).toMatchObject({ tool_choice: "none" });
+    expect(fixture.provider.requests[1].tools).toBeUndefined();
+    expect(JSON.parse(fixture.provider.requests[1].messages[1].content)).toEqual({ declaration: "Set my might precisely",
+      receipts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }] });
     await restarted.close();
 
     const db = new DatabaseDriver(dbFile(), { readonly: true });
@@ -253,7 +262,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(publicReceipt.json()).toMatchObject({ receipt: { kind: "combat", revisionBefore: seeded.combat!.revision,
       revisionAfter: seeded.combat!.revision + 1, roundBefore: expect.any(Number), roundAfter: expect.any(Number) } });
     expect(publicReceipt.body).not.toMatch(/provider|arguments|principal|idempotency/i);
-    expect(provider.requests).toHaveLength(1);
+    expect(provider.requests).toHaveLength(2);
     await app.close();
   });
 
@@ -282,7 +291,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(db.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(fixture.turnId)).toEqual({ count: 1 });
     expect(db.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(fixture.turnId)).toEqual({ count: 1 });
     db.close();
-    expect(fixture.provider.requests).toHaveLength(1);
+    expect(fixture.provider.requests).toHaveLength(2);
     await first.close(); await second.close();
   });
 
