@@ -2,9 +2,11 @@
 
 ## Current State
 
-- Persistence is `v40`, with additive M4.2/M4.3 provenance and confirmation-policy migrations.
-- M4.1, M4.2, and M4.3 are complete. M4.4 receipt-aware narration and narrative consequence injection is next; M4.5 and M4.6 remain unimplemented.
+- Persistence remains `v40`; M4.4 uses existing durable narration and provider-call metadata, so no migration was required.
+- M4.1-M4.4 are complete. M4.5 and M4.6 remain unimplemented.
 - Adventure turns use bounded durable provider dispatches, server-selected tools, revision-checked idempotent command services, durable confirmation/expiry, and restart-safe reconciliation.
+- After mechanics commit, narration receives only a closed display-safe receipt subset: attribute before/after values, resource current/max values, dice total/modifier, or combat round transition. It has no tools and cannot receive command/proposal IDs, tool arguments, provider metadata, principals, opaque bindings, or hidden state.
+- Narration provider starts/outcomes are persisted around the remote call. An interrupted durable start is failed rather than replayed, provider failure or invalid prose uses the deterministic receipt renderer, and in-process concurrent resumes share one narration dispatch.
 - SSE disconnects abort in-flight orchestration and stop polling. A durable dispatch may be reconciled by a later stream; disconnect does not create a speculative mechanics mutation.
 
 ## Boundaries
@@ -15,9 +17,8 @@
 
 ## Verification
 
-- Root `npm run typecheck` passed immediately before implementation commit `af1966f`.
-- Full contracts passed: 48 files, 287 tests. Focused M4 server tests passed: 15 tests. Focused client receipt tests passed: 89 tests. Production build passed.
-- The full server suite completed with 2129 passed and 1 skipped after correcting its one stale safe-projection assertion. The full client suite identified two stale safe-projection assertions; focused replacements passed.
+- Root `npm run typecheck` passed before the M4.4 implementation commit.
+- Focused M4 server suites passed: `adventure-agent-orchestrator.test.ts` and `m4-agent-acceptance.test.ts` (46 tests).
 
 ## Workspace Note
 

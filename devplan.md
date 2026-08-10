@@ -10,6 +10,7 @@ Current persistence is `v40`. The authoritative dependency order and acceptance 
 - [x] M4.1: role-sensitive campaign context snapshots and bounded prompt assembly with exact precedence, UTF-16 whole-line budgets, and fail-closed persona/session binding
 - [x] M4.2: bounded provider tool loop and deterministic, revision-checked command bridge
 - [x] M4.3: durable confirmation, expiry, restart reconciliation, and resume
+- [x] M4.4: receipt-aware narration and narrative consequence injection
 
 ## Pending
 
@@ -17,6 +18,6 @@ Current persistence is `v40`. The authoritative dependency order and acceptance 
 - [ ] M4.5: LLM encounter generation
 - [ ] M4.6: NPC stat derivation and campaign-content generation
 
-M4.4-M4.6 remain unimplemented. M4.2/M4.3 expose only safe projections; provider/tool internals, principals, opaque bindings, and hidden planning data remain private.
+M4.5-M4.6 remain unimplemented. M4.4 narration receives only closed display-safe receipt facts after authoritative mechanics commit, has no mutation tools, reuses receipt identity for variants, and falls back deterministically after provider failure or an interrupted dispatch. Provider/tool internals, principals, opaque bindings, and hidden planning data remain private.
 
 Deferred and out-of-scope work remains recorded in the [roadmap](docs/ROADMAP.md#out-of-scope--deferred).
