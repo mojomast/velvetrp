@@ -6,6 +6,7 @@ import type {
 } from "../../context.js";
 import { CAMPAIGN_COMPANION_CONTEXT_SUPPORTED } from "../../context.js";
 import { buildCombatActionPlans } from "../encounter/combatActionPlan.js";
+import { createHash } from "node:crypto";
 import { createCampaignPlayReadRepository } from "./campaignPlayReadRepo.js";
 
 const MAX_CAMPAIGN_CONTEXT_COMBATANTS = 32;
@@ -62,6 +63,11 @@ export function createCampaignAgentContextReadRepository(
         throw error;
       }
       if (!play || play.principal.role === "observer") return null;
+      const campaignState = db.prepare(`SELECT campaign.active_timeline_id,campaign.administration_revision,timeline.revision timeline_revision
+        FROM campaigns campaign JOIN campaign_timelines timeline ON timeline.campaign_id=campaign.id
+          AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`)
+        .get(campaign) as { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
+      if (!campaignState) return null;
       const isGm = play.principal.role === "owner" || play.principal.role === "gm";
       let targetActorId: string | null = null;
       let targetNpcId: string | null = null;
@@ -197,19 +203,24 @@ export function createCampaignAgentContextReadRepository(
       const recap = recapRows.reverse().flatMap((row) => row.text.split(/\r?\n/));
 
       let legalActions: string[] = [];
+      let legalActionCandidates: NonNullable<CampaignAgentContextSnapshot["encounter"]>["legalActionCandidates"] = [];
       if (encounter) {
         const current = combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id);
         const audienceOwnsCurrent = audience.kind === "dm"
           || (audience.kind === "player" && current?.actor_id === targetActorId)
           || (audience.kind === "enemy" && current?.combatant_id === targetEnemyId);
         if (audienceOwnsCurrent) {
-          legalActions = buildCombatActionPlans(db, principal, campaign, encounter.encounter_id,
-            encounter.current_turn_combatant_id).map((plan) =>
-            `${plan.legalActionId}; acting combatant ${plan.actingCombatantId}; targets ${plan.targetIds.length ? plan.targetIds.join(", ") : "none"}.`);
+          const plans=buildCombatActionPlans(db, principal, campaign, encounter.encounter_id,encounter.current_turn_combatant_id);
+          legalActionCandidates=plans.flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).map((targetId)=>{
+            const legalActionId=targetId===null?plan.legalActionId:`${plan.legalActionId}:target:${createHash("sha256").update(targetId).digest("hex").slice(0,12)}`;
+            return{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,
+              digest:createHash("sha256").update(JSON.stringify([encounter.encounter_id,encounter.revision,legalActionId,plan.actingCombatantId,targetId])).digest("hex")};}));
+          legalActions = legalActionCandidates.map((candidate) => `${candidate.legalActionId}; digest ${candidate.digest}; exactly one target ${candidate.targetId ?? "none"}.`);
         }
       }
 
       const privateTargetFacts: string[] = [];
+      let attributeCandidates:CampaignAgentContextSnapshot["attributeCandidates"]=[];
       if (targetActorId) {
         const actor = db.prepare(`SELECT private.private_notes,actor.sheet_id FROM campaign_actors actor
           JOIN campaign_actor_private_state private ON private.campaign_id=actor.campaign_id AND private.actor_id=actor.id
@@ -220,6 +231,9 @@ export function createCampaignAgentContextReadRepository(
         const attributes = db.prepare(`SELECT attribute_id,value FROM rpg_character_attributes
           WHERE campaign_id=? AND sheet_id=? ORDER BY position LIMIT 64`).all(campaign, actor.sheet_id) as Array<{ attribute_id: string; value: number }>;
         privateTargetFacts.push(...attributes.map((row) => `Target attribute ${row.attribute_id}: ${row.value}.`));
+        attributeCandidates=attributes.map((row)=>{const candidateId=`attribute:${createHash("sha256").update(row.attribute_id).digest("hex").slice(0,24)}`;
+          return{candidateId,commandAttributeId:row.attribute_id,currentValue:row.value,
+            digest:createHash("sha256").update(JSON.stringify([campaign,campaignState.active_timeline_id,campaignState.timeline_revision,targetActorId,row.attribute_id,row.value])).digest("hex")};});
       } else if (targetNpcId) {
         const npc = db.prepare(`SELECT private.private_goals
           FROM campaign_npcs_v28 npc
@@ -237,6 +251,9 @@ export function createCampaignAgentContextReadRepository(
 
       return {
         campaignId: campaign,
+        timelineId: campaignState.active_timeline_id,
+        timelineRevision: campaignState.timeline_revision,
+        campaignRevision: campaignState.administration_revision,
         sessionId,
         audience,
         authority: { role: play.principal.role, control: play.principal.control },
@@ -253,8 +270,18 @@ export function createCampaignAgentContextReadRepository(
         visibleQuests,
         legalActions,
         privateTargetFacts,
+        attributeCandidates,
         synthesizedSummaryFacts,
         recap,
+        encounter: encounter ? {
+          encounterId: encounter.encounter_id,
+          phase: "active",
+          revision: encounter.revision,
+          currentCombatantId: encounter.current_turn_combatant_id,
+          currentCombatantKind: combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.combatant_kind ?? null,
+          currentActorId: combatants.find((row) => row.combatant_id === encounter.current_turn_combatant_id)?.actor_id ?? null,
+          legalActionCandidates,
+        } : null,
       };
     },
   };

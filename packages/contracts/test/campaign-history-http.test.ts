@@ -57,7 +57,7 @@ describe("campaign history HTTP contracts", () => {
   it("exposes a strict discriminated receipt read projection without identities or generic payloads", () => {
     const mechanic = { kind: "mechanic", revisionBefore: 0, revisionAfter: 1,
       occurredAt: "2030-01-01T00:00:00.000Z", event: { type: "actor_attribute_set",
-        data: { attributeId: "strength", valueBefore: 10, valueAfter: 12 } } };
+        data: { valueBefore: 10, valueAfter: 12 } } };
     const administration = { kind: "administration", type: "checkpoint_created",
       revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z" };
     expect(campaignHistoryHttpPublicReceiptSchema.parse(mechanic)).toEqual(mechanic);

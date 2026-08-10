@@ -5,6 +5,7 @@ import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults
 import { getPromptPreset } from "../src/presets.js";
 import {
   completeWithProvider,
+  PROVIDER_SUCCESS_BODY_BYTE_LIMIT,
   ProviderCallerAbortError,
   ProviderConfigurationError,
   ProviderHttpError,
@@ -105,6 +106,11 @@ const textResponse = (content = "The door opens.") => ({
 });
 
 describe("non-stream provider completion request", () => {
+  it("rejects an oversized successful body before JSON parsing",async()=>{
+    const fake=await startProvider({body:JSON.stringify(textResponse("x".repeat(PROVIDER_SUCCESS_BODY_BYTE_LIMIT))),raw:true,
+      headers:{"content-type":"application/json"}});
+    await expect(completeWithProvider(input(provider(fake.baseUrl)))).rejects.toThrow(/byte limit/);
+  });
   it("sends the configured model, messages, samplers, headers, and stream:false", async () => {
     const fake = await startProvider({ body: textResponse() });
     const result = await completeWithProvider(input(provider(`${fake.baseUrl}/`)));

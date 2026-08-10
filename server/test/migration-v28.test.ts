@@ -30,7 +30,7 @@ describe("additive schema v28r1 world/travel/NPC/faction migration", () => {
     rewindToV27(migrated);
     createRepository({ dataDir: migrated }).close();
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "38" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
     expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM world_travel_layout_attestation_v28").get()).toEqual({
       prior_layout_digest: "5ff782cab830d8c7e934edbae69fde1398b7482531d6b77c7ced8696798737be",
        current_layout_digest: "2f6001699f45ecc90c426e05065d0ef004196c4419a5fbe2a94cd7e3770688c7",

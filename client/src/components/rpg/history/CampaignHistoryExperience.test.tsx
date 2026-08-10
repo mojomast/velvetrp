@@ -21,7 +21,7 @@ describe("campaign history experience", () => {
   it("uses bounded cursor pagination, role-safe recap absence, and explicit fork language", async () => {
     const client = api("player"); render(<CampaignEventLogPage campaignId="campaign-one" api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByText(/Strength changed from 1 to 2/); expect(screen.getByText("Technical identifier:").parentElement?.textContent).toContain("strength"); expect(screen.queryByText("Secret story")).toBeNull(); expect(screen.queryByRole("heading", { name: "Create a recap" })).toBeNull(); expect(screen.getByText(/never erases history/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Open public receipt" })); expect(await screen.findByText("Strength: 1 → 2.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Open public receipt" })); expect(await screen.findByText("Attribute changed: 1 → 2.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Load next events" })); await screen.findByText(/Strength changed from 2 to 3/);
     expect(client.events).toHaveBeenNthCalledWith(2, "campaign-one", { timelineId: "timeline-one", afterRevision: 1, limit: 25 });
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Event log" })));

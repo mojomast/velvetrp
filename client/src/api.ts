@@ -1099,7 +1099,7 @@ export async function confirmAdventureTurn(turnId: string, input: AdventureTurnC
   const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}/confirm`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Adventure turn confirmation"); const response = adventureTurnConfirmResponseSchema.parse(success.body);
   assertAdventureTurnBinding(response.turn, { ...expected, turnId: id });
-  if (response.turn.revision !== body.expectedRevision + 1) throw new Error("Adventure turn confirmation response did not match the request");
+  if (response.turn.revision < body.expectedRevision + 1) throw new Error("Adventure turn confirmation response did not match the request");
   return response;
 }
 

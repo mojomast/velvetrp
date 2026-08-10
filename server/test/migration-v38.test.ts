@@ -7,7 +7,7 @@ import { createRepository } from "../src/repo/index.js";
 import { canonicalAgentJson } from "@velvet/contracts";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS, V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST }
   from "../src/repo/db/migrations/v38_durable_agent_execution.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureAgentSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const AT = "2035-01-01T00:00:00.000Z";
@@ -21,6 +21,7 @@ function v38Sql(db: DatabaseDriver.Database): unknown[] {
 }
 
 function removeV38(db: DatabaseDriver.Database): void {
+  removeFutureAgentSchema(db);
   const objects = v38Sql(db) as Array<{ type: string; name: string }>;
   for (const object of objects) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
   for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
@@ -69,7 +70,7 @@ describe("schema v38 durable agent execution", () => {
     db.prepare("UPDATE meta SET value='37' WHERE key='schemaVersion'").run(); db.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     db = new DatabaseDriver(file(), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "38" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
     const run = db.prepare(`SELECT started_at,deadline_at,max_decision_rounds,max_tool_calls,
       max_mutation_calls,max_provider_calls,max_duration_ms FROM adventure_agent_executions_v38 WHERE turn_id=?`).get(identity.turnId) as any;
     expect(run).toMatchObject({ max_decision_rounds: 5, max_tool_calls: 12,

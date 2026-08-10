@@ -3,6 +3,7 @@ import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js"
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
 import { agentExecutionLimitsSchema } from "./agent-execution.js";
+import { confirmationPolicyAttestationSchema, roleSafeConfirmationPolicySchema } from "./confirmation-policy.js";
 
 /** Maximum number of tool proposals or calls retained by one adventure turn. */
 export const MAX_ADVENTURE_TURN_TOOLS = 32;
@@ -54,7 +55,7 @@ export const confirmationStateSchema = z.discriminatedUnion("state", [
 ]);
 
 /** Full private proposal including provider-bound tool arguments. */
-export const toolProposalExecutionBindingSchema = z.object({
+const legacyToolProposalExecutionBindingSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   commandType: z.enum(["set_actor_attribute", "initialize_actor_resource", "roll_actor_dice"]),
   campaignId: campaignIdSchema,
@@ -62,6 +63,10 @@ export const toolProposalExecutionBindingSchema = z.object({
   actorId: actorIdSchema,
   sourceTurnId: resourceIdSchema,
 }).strict();
+const combatToolProposalExecutionBindingSchema=z.object({idempotencyKey:idempotencyKeySchema,commandType:z.literal("combat_action"),
+  campaignId:campaignIdSchema,timelineId:resourceIdSchema,actorId:actorIdSchema,sourceTurnId:resourceIdSchema,
+  encounterId:resourceIdSchema,legalActionId:resourceIdSchema,legalActionDigest:z.string().length(64).regex(/^[0-9a-f]+$/),expectedCombatRevision:revisionSchema}).strict();
+export const toolProposalExecutionBindingSchema=z.union([legacyToolProposalExecutionBindingSchema,combatToolProposalExecutionBindingSchema]);
 
 /** Full private proposal including provider-bound tool arguments and server-owned mechanics identity. */
 export const toolProposalSchema = z.object({
@@ -74,11 +79,14 @@ export const toolProposalSchema = z.object({
   }, "tool arguments must be a JSON object"),
   proposedAt: utcIsoTimestampSchema,
   executionBinding: toolProposalExecutionBindingSchema,
+  policy: confirmationPolicyAttestationSchema,
   confirmation: confirmationStateSchema,
 }).strict();
 
 /** Role-safe proposal projection that structurally excludes arguments and private execution identity. */
-export const roleSafeToolProposalSchema = toolProposalSchema.omit({ argumentsJson: true, executionBinding: true });
+export const roleSafeToolProposalSchema = toolProposalSchema.omit({ argumentsJson: true, executionBinding: true, policy: true }).extend({
+  policy: roleSafeConfirmationPolicySchema,
+}).strict();
 
 /** Durable bounded tool-call projection and its immutable mechanics links. */
 export const toolCallSchema = z.object({
@@ -108,7 +116,7 @@ export const providerCallMetadataSchema = z.object({
 
 const turnBase = {
   turnId: resourceIdSchema, campaignId: campaignIdSchema, timelineId: resourceIdSchema, sessionId: resourceIdSchema,
-  actorId: actorIdSchema, principalId: principalIdSchema, mode: adventureTurnModeSchema, priorTurnId: resourceIdSchema.nullable(),
+  actorId: actorIdSchema, mode: adventureTurnModeSchema, priorTurnId: resourceIdSchema.nullable(),
   state: adventureTurnStateSchema, narrationStatus: narrationStatusSchema, revision: revisionSchema,
   campaignRevision: revisionSchema, createdAt: utcIsoTimestampSchema, updatedAt: utcIsoTimestampSchema,
 };
@@ -144,6 +152,7 @@ export const roleSafeAdventureTurnSchema = z.object({
 /** Authorized private turn projection used by the controller and owner/GM lanes. */
 export const privateAdventureTurnSchema = z.object({
   ...turnBase,
+  principalId: principalIdSchema,
   declaration: z.string().trim().min(1).max(8_000),
   toolCalls: z.array(toolCallSchema).max(MAX_ADVENTURE_TURN_TOOLS),
   providerCalls: z.array(providerCallMetadataSchema).max(64),
@@ -155,7 +164,7 @@ export const privateAdventureTurnSchema = z.object({
   const committed = value.toolCalls.filter((call) => call.status === "committed");
   const approved = value.toolCalls.filter((call) => call.status === "approved");
   const callLinks = value.toolCalls.flatMap((call) => call.receiptLinks);
-  const aggregateLinkIds = [...value.receiptLinks.map((link) => link.linkId)].sort();
+  const aggregateLinkIds = [...value.receiptLinks.filter((link) => link.proposalId !== null).map((link) => link.linkId)].sort();
   const callLinkIds = [...callLinks.map((link) => link.linkId)].sort();
   if (value.mode === "original" && (JSON.stringify(aggregateLinkIds) !== JSON.stringify(callLinkIds)
       || value.toolCalls.some((call) => call.receiptLinks.some((link) => link.proposalId !== call.proposal.proposalId)))) {
@@ -171,6 +180,7 @@ export const privateAdventureTurnSchema = z.object({
     context.addIssue({ code: "custom", path: ["toolCalls"], message: "confirmed turns require a strict subset of approved mechanics to remain uncommitted" });
   }
   if (value.mode === "original" && value.state === "mechanics-committed"
+      && !value.receiptLinks.some((link) => link.proposalId === null)
       && (approved.length > 0 || committed.length === 0 || committed.length !== value.receiptLinks.length)) {
     context.addIssue({ code: "custom", path: ["toolCalls"], message: "mechanics-committed turns require every approved proposal receipt" });
   }

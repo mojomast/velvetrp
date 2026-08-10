@@ -24,6 +24,8 @@ export const MAX_AGENT_REQUEST_JSON_LENGTH = 262_144;
 export const MAX_AGENT_RESULT_JSON_LENGTH = 262_144;
 /** Version of the closed server-selected tool registry represented by these contracts. */
 export const AGENT_TOOL_REGISTRY_VERSION = "v1" as const;
+/** Additive registry for consequential tools that cannot alter sealed v38 DDL. */
+export const POST_V38_AGENT_TOOL_REGISTRY_VERSION = "v2" as const;
 
 /** A finite recursive JSON value accepted by durable agent contracts. */
 export type AgentJsonValue = null | boolean | number | string | AgentJsonValue[] | { [key: string]: AgentJsonValue };
@@ -105,11 +107,13 @@ export const agentToolCallKindSchema = z.enum(["read", "mutation"]);
 /** Closed first-version tool registry; availability is selected by the server for each round. */
 export const agentToolNameSchema = z.enum([
   "campaign_context.read", "actor_resources.read", "actor_inventory.read", "actor_powers.read",
-  "combat_state.read", "world_state.read", "quest_state.read",
-  "actor_attribute.set", "actor_resource.initialize", "actor_dice.roll",
+   "combat_state.read", "world_state.read", "quest_state.read",
+    "actor_attribute.set", "actor_resource.initialize", "actor_dice.roll",
 ]);
 /** Closed mutation-tool vocabulary. */
 export const agentMutationToolNameSchema = z.enum(["actor_attribute.set", "actor_resource.initialize", "actor_dice.roll"]);
+/** Post-v38 consequential tools are persisted in versioned additive ledgers. */
+export const postV38AgentToolNameSchema = z.enum(["combat_action.execute"]);
 /** Reachable durable progress states before an authoritative mutation bridge exists. */
 export const durableAgentToolCallStatusSchema = z.enum(["pending", "read-succeeded", "read-failed"]);
 /** Provider decision-round completion reason, independent of any RPG rules. */
@@ -203,6 +207,8 @@ export const durableAgentPlanningStateSchema = z.object({
   limits: durableAgentExecutionLimitsSchema, startedAt: utcIsoTimestampSchema, deadlineAt: utcIsoTimestampSchema,
   decisionRounds: z.number().int().min(0).max(MAX_AGENT_DECISION_ROUNDS),
   toolCalls: z.array(durableAgentToolCallSchema).max(MAX_AGENT_TOOL_CALLS),
+  /** Includes sealed v38 calls and post-v38 consequential tool accounting. */
+  totalToolCalls: z.number().int().min(0).max(MAX_AGENT_TOOL_CALLS),
   mutationCalls: z.number().int().min(0).max(MAX_AGENT_MUTATION_CALLS),
   // Historical v37 turns may already exceed the new planning limit. The exact
   // baseline remains visible, while v38 refuses every additional start.

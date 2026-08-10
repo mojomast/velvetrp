@@ -5,6 +5,8 @@ import { buildProviderHeaders, canUseProvider, validateProviderBaseUrl } from ".
 
 const HTTP_ERROR_DETAIL_LIMIT = 1_000;
 const HTTP_ERROR_READ_LIMIT = 4_096;
+/** Successful provider bodies are bounded before JSON text is buffered. */
+export const PROVIDER_SUCCESS_BODY_BYTE_LIMIT = 262_144;
 
 /** A JSON value accepted in function parameters and response schemas. */
 export type CompletionJsonValue = null | boolean | number | string | CompletionJsonValue[] | { [key: string]: CompletionJsonValue };
@@ -336,6 +338,24 @@ async function readBoundedErrorDetail(response: Response): Promise<string> {
   }
 }
 
+async function readBoundedSuccessPayload(response: Response): Promise<unknown> {
+  const declared=response.headers.get("content-length");
+  if(declared!==null&&(/^\d+$/.test(declared)===false||Number(declared)>PROVIDER_SUCCESS_BODY_BYTE_LIMIT))
+    throw new ProviderProtocolError("Provider completion response exceeded the byte limit");
+  if(!response.body)throw new ProviderProtocolError("Provider completion response had no body");
+  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0;
+  try{
+    while(true){const {done,value}=await reader.read();if(done)break;if(!value)continue;
+      bytes+=value.byteLength;if(bytes>PROVIDER_SUCCESS_BODY_BYTE_LIMIT)
+        throw new ProviderProtocolError("Provider completion response exceeded the byte limit");
+      chunks.push(value);
+    }
+  }finally{await reader.cancel().catch(()=>undefined);}
+  const joined=new Uint8Array(bytes);let offset=0;for(const chunk of chunks){joined.set(chunk,offset);offset+=chunk.byteLength;}
+  try{return JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(joined));}
+  catch(error){throw new ProviderProtocolError("Provider completion response was not valid JSON",{cause:error});}
+}
+
 function parseResponse(
   payload: unknown,
   requestedModel: string,
@@ -436,13 +456,7 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
     if (!response.ok) {
       throw new ProviderHttpError(response.status, await readBoundedErrorDetail(response), input.provider.apiKey);
     }
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch (error) {
-      if (input.signal?.aborted || timeout.signal.aborted) throw error;
-      throw new ProviderProtocolError("Provider completion response was not valid JSON", { cause: error });
-    }
+    const payload=await readBoundedSuccessPayload(response);
     return parseResponse(payload, requestedModel, {
       advertisedNames,
       toolChoice: input.toolChoice,

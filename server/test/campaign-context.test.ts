@@ -18,14 +18,14 @@ const session: Session = { id: "room", characterId: character.id, primaryCharact
 
 function snapshot(audience: CampaignAgentAudience): CampaignAgentContextSnapshot {
   return {
-    campaignId: "campaign", sessionId: "room", audience,
+    campaignId: "campaign", timelineId: "timeline", timelineRevision: 0, campaignRevision: 0, sessionId: "room", audience,
     authority: { role: audience.kind === "player" ? "player" : "gm", control: audience.kind === "player" ? "controlled" : "all" },
     speakerPersona: audience.kind === "player" ? { characterId: "hero", displayName: "Aster" }
       : audience.kind === "npc" ? { characterId: "npc-persona", displayName: "Marrow" } : null,
     safetyControl: ["SAFETY_SENTINEL"], humanCanon: ["CANON_SENTINEL"],
     committedMechanics: ["MECHANICS_SENTINEL"], visibleWorld: ["WORLD_SENTINEL"],
     visibleCast: ["CAST_SENTINEL"], visibleQuests: ["QUEST_SENTINEL"], legalActions: ["LEGAL_SENTINEL"],
-    privateTargetFacts: ["PRIVATE_TARGET_SENTINEL"], synthesizedSummaryFacts: ["SYNTHESIZED_SENTINEL"], recap: ["RECAP_SENTINEL"],
+    privateTargetFacts: ["PRIVATE_TARGET_SENTINEL"],attributeCandidates:[], synthesizedSummaryFacts: ["SYNTHESIZED_SENTINEL"], recap: ["RECAP_SENTINEL"], encounter: null,
   };
 }
 

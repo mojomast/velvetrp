@@ -5,7 +5,7 @@ import {
   createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
   providerCallOutcomeInputSchema, providerCallStartInputSchema, reviewGenerationDraftInputSchema,
-  stagedGenerationContentSchema, toolProposalSchema, turnMutationInputSchema, updateTurnNarrationInputSchema,
+  resourceIdSchema, stagedGenerationContentSchema, toolProposalSchema, turnMutationInputSchema, updateTurnNarrationInputSchema,
 } from "@velvet/contracts";
 import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS, assertAdventureGenerationV35,
   validateAdventureGenerationDataV35 } from "./v35_adventure_generation.js";
@@ -14,6 +14,10 @@ import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS, assertAdventureGenerationV35,
 export const V35_ADVENTURE_GENERATION_CANONICAL_DIGEST = "e133d1bf2490232c9eef1d9cb9fbca669c2320385f35d28d8bb02c62b5a28133";
 /** Canonical digest of v35-owned objects after v36 supersedes four transition guards. */
 export const V35_ADVENTURE_GENERATION_HARDENED_DIGEST = "aabd25196bc51719e4b91754d729a3a7f95e2df2afee4a96c01b33e0ba832661";
+const V40_EVOLVED_V35_PROPOSAL_GUARD_DIGEST = "7df3657a5801ef8ce88a2481c90047ec1c867a141fabe2d841514523a962a337";
+const V40_RESTORED_V35_PROPOSAL_GUARD_DIGEST = "b7f6a6557df2b95c9429909e68041552e6dbaa4cf96b68a1d5af7e1fb1d356b0";
+const V40_RESTORED_V35_HARDENED_GUARD_DIGEST = "04dd33b9c1a527df5580b5d181943bba90d9e1580b651f3d803ed72a2260c61c";
+const V40_POST_V36_RESTORED_V35_DIGEST = "39eb774c596f8f5d7b2b52bea3f28b79201692a36389384a8460bd8e70ef8b62";
 /** Canonical digest of the v36 hardening layout. Filled from the reviewed DDL, never from persisted attestation. */
 export const V36_ADVENTURE_HARDENING_CANONICAL_DIGEST = "b19c881dde8817ee7b82e767173ff3182b107a9f1cb498afd52408e051321bcb";
 
@@ -239,10 +243,25 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
       try { return canonical(JSON.parse(row.request_json)) !== row.request_json; } catch { return true; }
     });
   if (malformedJson) throw new Error(`schema v36 coordination JSON is not canonical (${malformedJson.command_id})`);
+  const agentReplanInputSchema = { parse(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("agent replan input is invalid");
+    const input = value as Record<string, unknown>;
+    if (Object.keys(input).some((key) => !["turnId", "proposalId", "reason", "expectedTurnRevision", "expectedCampaignRevision", "idempotencyKey"].includes(key))) {
+      throw new Error("agent replan input contains an unknown key");
+    }
+    turnMutationInputSchema.parse({ turnId: input.turnId, expectedTurnRevision: input.expectedTurnRevision,
+      expectedCampaignRevision: input.expectedCampaignRevision, idempotencyKey: input.idempotencyKey });
+    resourceIdSchema.parse(input.proposalId);
+    if (!["policy-stale", "command-stale", "campaign-stale", "timeline-stale", "combat-stale", "authority-stale"].includes(String(input.reason))) {
+      throw new Error("agent replan reason is invalid");
+    }
+    return value;
+  } };
   const mutationSchemas: Record<string, { parse(value: unknown): unknown }> = {
     "turn-create": createAdventureTurnInputSchema, "proposal-append": appendToolProposalInputSchema,
     "confirmation-wait": turnMutationInputSchema, "confirmation-decision": decideToolProposalInputSchema,
-    "confirmation-decisions": decideToolProposalsInputSchema,
+    "confirmation-decisions": decideToolProposalsInputSchema, "confirmation-expiration": turnMutationInputSchema,
+    "agent-replan": agentReplanInputSchema,
     "provider-start": providerCallStartInputSchema, "provider-outcome": providerCallOutcomeInputSchema,
     "mechanics-link": linkTurnReceiptInputSchema, "mechanics-reconcile": turnMutationInputSchema,
     "narration-update": updateTurnNarrationInputSchema, "draft-create": createGenerationDraftInputSchema,
@@ -282,11 +301,12 @@ export function validateAdventureHardeningDataV36(db: DatabaseDriver.Database): 
         AND snapshot.aggregate_id=decision.turn_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
       SELECT 1 FROM adventure_coordination_commands_v36 command WHERE command.aggregate_kind='turn' AND command.campaign_id=decision.campaign_id
         AND command.aggregate_id=decision.turn_id AND command.principal_id=decision.principal_id
-        AND command.expected_revision=decision.expected_turn_revision AND json_extract(command.request_json,'$.decision')=decision.decision
-        AND ((command.mutation_type='confirmation-decision' AND command.idempotency_key=decision.idempotency_key
+        AND command.expected_revision=decision.expected_turn_revision AND
+        ((decision.decision='expired' AND command.mutation_type='confirmation-expiration') OR
+         (json_extract(command.request_json,'$.decision')=decision.decision AND ((command.mutation_type='confirmation-decision' AND command.idempotency_key=decision.idempotency_key
           AND json_extract(command.request_json,'$.proposalId')=decision.proposal_id)
           OR (command.mutation_type='confirmation-decisions' AND EXISTS(SELECT 1 FROM json_each(command.request_json,'$.proposalIds') selected
-            WHERE selected.value=decision.proposal_id))))
+            WHERE selected.value=decision.proposal_id))))))
     UNION ALL SELECT review.decision_id FROM review_decisions review WHERE NOT EXISTS(
       SELECT 1 FROM adventure_coordination_commands_v36 snapshot WHERE snapshot.aggregate_kind='draft' AND snapshot.campaign_id=review.campaign_id
         AND snapshot.aggregate_id=review.draft_id AND snapshot.mutation_type='migration-snapshot') AND NOT EXISTS(
@@ -389,7 +409,7 @@ export function assertAdventureHardeningLayoutV36(db: DatabaseDriver.Database): 
     AND sql IS NOT NULL ORDER BY type,name`).all(...hardenedObjects.map(([, name]) => name));
   const hardenedDigest = createHash("sha256").update(JSON.stringify(hardenedRows)).digest("hex");
   if (attestation?.layout_digest !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST || hardenedRows.length !== hardenedObjects.length
-      || (V35_ADVENTURE_GENERATION_HARDENED_DIGEST && hardenedDigest !== V35_ADVENTURE_GENERATION_HARDENED_DIGEST)) {
+      || ![V35_ADVENTURE_GENERATION_HARDENED_DIGEST,V40_EVOLVED_V35_PROPOSAL_GUARD_DIGEST,V40_RESTORED_V35_HARDENED_GUARD_DIGEST].includes(hardenedDigest)) {
     throw new Error("schema v35 hardened adventure/generation layout is incompatible");
   }
   assertInventory(db); const actual = layoutDigest(db);
@@ -404,7 +424,8 @@ export function assertAdventureGenerationLayoutV35Canonical(db: DatabaseDriver.D
   const v35Actual = createHash("sha256").update(JSON.stringify(db.prepare(`SELECT type,name,sql FROM sqlite_master WHERE name IN
     (${ADVENTURE_GENERATION_V35_MANAGED_OBJECTS.map(() => "?").join(",")}) AND sql IS NOT NULL ORDER BY type,name`)
     .all(...ADVENTURE_GENERATION_V35_MANAGED_OBJECTS.map(([, name]) => name)))).digest("hex");
-  if (v35?.layout_digest !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST || v35Actual !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST)
+  if (v35?.layout_digest !== V35_ADVENTURE_GENERATION_CANONICAL_DIGEST
+      || ![V35_ADVENTURE_GENERATION_CANONICAL_DIGEST,V40_RESTORED_V35_PROPOSAL_GUARD_DIGEST,V40_POST_V36_RESTORED_V35_DIGEST].includes(v35Actual))
     throw new Error("schema v35 canonical adventure/generation layout is incompatible");
 }
 

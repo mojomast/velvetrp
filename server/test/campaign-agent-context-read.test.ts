@@ -289,9 +289,9 @@ describe("campaign agent context repository", () => {
     const attack = enemy.legalActions.find((line) => line.startsWith("attack:basic"))!;
     const actorCombatants = combat.combatants.filter((item) => item.kind === "actor").map((item) => item.combatantId)
       .sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-    expect(attack).toContain(`targets ${actorCombatants[0]}`);
+    expect(attack).toContain(`exactly one target ${actorCombatants[0]}`);
     expect(attack).not.toContain(actorCombatants[1]!);
-    expect(enemy.legalActions.map((line) => line.split(";")[0])).toEqual(["attack:basic", "flee", "end-turn"]);
+    expect(enemy.legalActions.map((line) => line.split(";")[0])).toEqual([expect.stringMatching(/^attack:basic:target:[0-9a-f]{12}$/), "flee", "end-turn"]);
     expect(enemy.visibleWorld).toEqual([]);
     expect(enemy.visibleCast.every((line) => !line.includes(" at "))).toBe(true);
     expect(enemy.committedMechanics).toHaveLength(34);

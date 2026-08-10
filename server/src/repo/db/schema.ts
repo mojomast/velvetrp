@@ -6,12 +6,14 @@ import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, assertAdventureGenerationLayou
   assertAdventureHardeningLayoutV36, restoreAdventureGenerationV35Guards } from "./migrations/v36_adventure_hardening.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS, assertToolExecutionBindingLayoutV37 } from "./migrations/v37_tool_execution_bindings.js";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS, assertDurableAgentExecutionLayoutV38 } from "./migrations/v38_durable_agent_execution.js";
+import { assertAgentResponseProvenanceLayoutV39 } from "./migrations/v39_agent_response_provenance.js";
+import { assertConfirmationPolicyLayoutV40, restorePreV40CoordinationGuards } from "./migrations/v40_confirmation_policy.js";
 
 type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
   | "assertCampaignContentPacksHaveExactSealedPacks" | "assertCampaignImportStagingV30"
   | "assertEncounterLifecycleV31"
-  | "assertWorldNarrativeV32" | "assertQuestDomainV33" | "assertStoryDomainV34" | "assertAdventureGenerationV35" | "assertAdventureHardeningV36" | "assertToolExecutionBindingsV37" | "assertDurableAgentExecutionV38"
+  | "assertWorldNarrativeV32" | "assertQuestDomainV33" | "assertStoryDomainV34" | "assertAdventureGenerationV35" | "assertAdventureHardeningV36" | "assertToolExecutionBindingsV37" | "assertDurableAgentExecutionV38" | "assertAgentResponseProvenanceV39" | "assertConfirmationPolicyV40"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
   | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28"
@@ -22,12 +24,12 @@ type SchemaDependencies = Record<
   | "createCharacterProgressionV23" | "createChecksPowersEffectsV26" | "createCombatFoundationV27"
   | "createContentCatalogV16" | "createContentCatalogV17" | "createContentCatalogV18" | "createQuestsV29r2"
   | "createResourcesInventoryEconomyRestV25" | "createRpgCommandAuditV14" | "createSchemaV11"
-  | "createTimelineRevisionV12" | "createWorldTravelNpcFactionV28" | "createAdventureHardeningV36" | "createToolExecutionBindingsV37" | "createDurableAgentExecutionV38"
+  | "createTimelineRevisionV12" | "createWorldTravelNpcFactionV28" | "createAdventureHardeningV36" | "createToolExecutionBindingsV37" | "createDurableAgentExecutionV38" | "createAgentResponseProvenanceV39" | "createConfirmationPolicyV40"
   | "migrate2to3" | "migrate3to4" | "migrate4to5" | "migrate5to6" | "migrate6to7" | "migrate7to8"
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38" | "migrate38to39" | "migrate39to40"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -45,7 +47,7 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "38";
+export const SCHEMA_VERSION = "40";
 export const SCHEMA_REVISION = "1";
 
 const V34_TABLE_DROP_ORDER = ["story_layout_attestation_v34", "story_discoveries_v34", "story_clue_sources_v34", "story_clues_v34",
@@ -60,6 +62,30 @@ const V37_TABLE_DROP_ORDER = ["tool_execution_binding_layout_attestation_v37", "
 const V38_TABLE_DROP_ORDER = ["durable_agent_execution_layout_attestation_v38",
   "agent_read_outcomes_v38", "agent_decision_batch_seals_v38", "agent_tool_calls_v38", "agent_decision_rounds_v38",
   "agent_provider_starts_v38", "agent_execution_operations_v38", "adventure_agent_executions_v38"] as const;
+
+function cleanupFutureAgentResponseV39(db:DatabaseDriver.Database,marker:string):void{
+  const artifacts=db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v39*' AND sql IS NOT NULL").all() as Array<{type:string;name:string}>;
+  if(!artifacts.length)return;try{assertAgentResponseProvenanceLayoutV39(db);}catch(error){throw new Error(`schema marker ${marker} contains malformed future v39 artifacts`,{cause:error});}
+  for(const table of ["agent_provider_contexts_v39","agent_provider_dispatch_claims_v39","agent_provider_responses_v39","agent_combat_proposal_bindings_v39","agent_generalized_receipts_v39"]){
+    if(!artifacts.some((artifact)=>artifact.type==="table"&&artifact.name===table))continue;
+    const count=(db.prepare(`SELECT count(*) count FROM ${table}`).get() as {count:number}).count;if(count)throw new Error(`schema marker ${marker} contains populated future v39 artifacts`);
+  }
+  db.transaction(()=>{for(const {name} of artifacts.filter(({type})=>type==="trigger"))db.exec(`DROP TRIGGER "${name}"`);
+    for(const name of ["agent_response_provenance_attestation_v39","agent_generalized_receipts_v39","agent_combat_proposal_bindings_v39",
+      "agent_provider_responses_v39","agent_provider_dispatch_claims_v39","agent_provider_contexts_v39"])
+      if(artifacts.some((artifact)=>artifact.type==="table"&&artifact.name===name))db.exec(`DROP TABLE "${name}"`);
+  })();
+}
+
+function cleanupFutureConfirmationPolicyV40(db:DatabaseDriver.Database,marker:string):void{
+  const artifacts=db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v40*' AND sql IS NOT NULL").all() as Array<{type:string;name:string}>;
+  if(!artifacts.length)return;try{assertConfirmationPolicyLayoutV40(db);}catch(error){throw new Error(`schema marker ${marker} contains malformed future v40 artifacts`,{cause:error});}
+  for(const table of ["confirmation_policy_attestations_v40","agent_mutation_accounting_v40","agent_replan_requirements_v40","confirmation_authority_evidence_v40","confirmation_expiration_operations_v40"]){const row=db.prepare(`SELECT count(*) count FROM ${table}`).get() as {count:number};
+    if(row.count)throw new Error(`schema marker ${marker} contains populated future v40 artifact ${table}`);}
+  db.transaction(()=>{restorePreV40CoordinationGuards(db);for(const artifact of artifacts.filter(({type})=>type==="trigger"))db.exec(`DROP TRIGGER "${artifact.name}"`);
+    for(const table of ["confirmation_policy_layout_attestation_v40","confirmation_authority_evidence_v40","confirmation_expiration_operations_v40","agent_replan_requirements_v40","agent_mutation_accounting_v40","confirmation_policy_attestations_v40"])
+      if(artifacts.some((artifact)=>artifact.type==="table"&&artifact.name===table))db.exec(`DROP TABLE "${table}"`);})();
+}
 
 /** Removes only a canonical empty v38 shell from a rewound historical fixture. */
 function cleanupFutureDurableAgentExecutionV38(db: DatabaseDriver.Database, marker: string): void {
@@ -176,19 +202,19 @@ function cleanupFutureAdventureHardeningV36(db: DatabaseDriver.Database, marker:
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
     createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20, createCharacterBuilderV19,
     createCharacterLayoutV29, createCharacterProgressionIntegrityV24, createCharacterProgressionV23,
     createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16, createContentCatalogV17,
-    createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createStoryDomainV34, createAdventureGenerationV35, createAdventureHardeningV36, createToolExecutionBindingsV37, createDurableAgentExecutionV38, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
+    createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createStoryDomainV34, createAdventureGenerationV35, createAdventureHardeningV36, createToolExecutionBindingsV37, createDurableAgentExecutionV38, createAgentResponseProvenanceV39, createConfirmationPolicyV40, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
     createSchemaV11, createTimelineRevisionV12, createWorldTravelNpcFactionV28, migrate2to3, migrate3to4,
     migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10, migrate10to11,
     migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17, migrate17to18,
     migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24, migrate24to25,
-    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, validateCharacterProgressionV23,
+    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, migrate38to39, migrate39to40, validateCharacterProgressionV23,
     validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25,
     validateM16PersistenceV26, validateV20DraftAudit, validateWorldTravelNpcFactionV28,
   } = getSchemaDependencies();
@@ -234,7 +260,9 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
                createAdventureGenerationV35(db);
                 createAdventureHardeningV36(db);
                  createToolExecutionBindingsV37(db);
-                 createDurableAgentExecutionV38(db);
+                  createDurableAgentExecutionV38(db);
+                   createAgentResponseProvenanceV39(db);
+                   createConfirmationPolicyV40(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -253,6 +281,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertStoryDomainV34(db);
     assertToolExecutionBindingsV37(db);
     assertDurableAgentExecutionV38(db);
+    assertAgentResponseProvenanceV39(db);
+    assertConfirmationPolicyV40(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -372,6 +402,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
       DROP TABLE quest_domain_receipts_v33;DROP TABLE quest_domain_commands_v33;DROP TABLE quest_domain_revisions_v33;
       DROP INDEX IF EXISTS uq_quest_reward_ancestry_v33;DROP INDEX IF EXISTS uq_quest_campaign_id_v33;`);
   }
+  if(Number(version)<40)cleanupFutureConfirmationPolicyV40(db,version);
+  if(Number(version)<39)cleanupFutureAgentResponseV39(db,version);
   if(Number(version)<34)cleanupFutureStoryV34(db,version);
   if(Number(version)<38)cleanupFutureDurableAgentExecutionV38(db,version);
   if(Number(version)<37)cleanupFutureToolExecutionBindingsV37(db,version);
@@ -561,6 +593,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   if(version==="35"){migrate35to36(db);version="36";}
   if(version==="36"){migrate36to37(db);version="37";}
   if(version==="37"){migrate37to38(db);version="38";}
+  if(version==="38"){migrate38to39(db);version="39";}
+  if(version==="39"){migrate39to40(db);version="40";}
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -581,6 +615,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertStoryDomainV34(db);
   assertToolExecutionBindingsV37(db);
   assertDurableAgentExecutionV38(db);
+  assertAgentResponseProvenanceV39(db);
+  assertConfirmationPolicyV40(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

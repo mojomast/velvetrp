@@ -125,6 +125,7 @@ import { worldHttpRoutes } from "./worldRoutes.js";
 import type { WorldRepository } from "../../../repo/worldRepo.js";
 import {npcHttpRoutes} from "./npcRoutes.js";
 import {factionHttpRoutes} from "./factionRoutes.js";
+import type { AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
 export interface CampaignListRepository extends
@@ -173,6 +174,7 @@ export interface CampaignListRepository extends
   listCampaignMemberships?(actorPrincipalId: string, campaignId: string): unknown[];
   listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
   getCommandReceipt?: Repository["getCommandReceipt"];
+  getAgentCombatReceipt?:Repository["getAgentCombatReceipt"];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -218,6 +220,7 @@ export interface CampaignListRepository extends
 interface RpgV1RoutesOptions {
   campaignRepositoryFactory: () => CampaignListRepository;
   diceCommandIds: IdGenerator;
+  adventureAgentDependencies?: AdventureAgentDependencies;
 }
 
 const LOCAL_CAMPAIGN_PRINCIPAL = "local-owner";
@@ -256,6 +259,7 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps" | "getCampaignAdministrationReceipt"> & {
   listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
   getCommandReceipt: Repository["getCommandReceipt"];
+  getAgentCombatReceipt:Repository["getAgentCombatReceipt"];
 };
 type QuestLaneRepository = Pick<QuestRepository,
   "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
@@ -365,7 +369,8 @@ function assertCampaignHistoryRepository(
     || typeof repository.listCampaignRecaps !== "function"
     || typeof repository.getCampaignAdministrationReceipt !== "function"
     || typeof repository.listPublicCampaignEvents !== "function"
-    || typeof repository.getCommandReceipt !== "function") throw new UnsupportedCampaignRepositoryError();
+    || typeof repository.getCommandReceipt !== "function"
+    || typeof repository.getAgentCombatReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
@@ -575,7 +580,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const worldRepositoryAccessor=():WorldHttpLaneRepository=>{const repository=getCampaignRepository();assertWorldHttpRepository(repository);return repository;};
   const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
   const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
-  const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository; };
+  const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository as unknown as AdventureTurnLaneRepository & Repository; };
   const campaignPlayRepositoryAccessor = (): CampaignPlayLaneRepository => { const repository = getCampaignRepository(); assertCampaignPlayRepository(repository); return repository; };
   const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
   await app.register(characterBuilderHttpRoutes, {
@@ -609,7 +614,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(worldHttpRoutes,{worldRepositoryAccessor});
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});
-  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor });
+  await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
+    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor });
 

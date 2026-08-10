@@ -9,6 +9,8 @@ import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrati
 import { ADVENTURE_HARDENING_V36_MANAGED_OBJECTS, restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS } from "../src/repo/db/migrations/v38_durable_agent_execution.js";
+import { AGENT_RESPONSE_PROVENANCE_V39_MANAGED_OBJECTS } from "../src/repo/db/migrations/v39_agent_response_provenance.js";
+import { CONFIRMATION_POLICY_V40_MANAGED_OBJECTS } from "../src/repo/db/migrations/v40_confirmation_policy.js";
 
 const tmpDirs: string[] = [];
 
@@ -82,8 +84,25 @@ export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").
   }
 }
 
-/** Removes exact v35-v38 adventure artifacts before destructive historical fixture rewinds. */
+/** Removes exact additive agent sidecars before destructive fixture rewinds. */
+export function removeFutureAgentSchema(db:import("better-sqlite3").Database):void {
+  const remove = (inventory: ReadonlyArray<readonly [string, string]>, tables: readonly string[]) => {
+    const names = inventory.map(([, name]) => name);
+    const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
+      .all(...names) as Array<{ type: string; name: string }>;
+    for (const object of objects) if (object.type === "trigger") db.exec(`DROP TRIGGER "${object.name}"`);
+    for (const object of objects) if (object.type === "index") db.exec(`DROP INDEX IF EXISTS "${object.name}"`);
+    for (const table of tables) db.exec(`DROP TABLE IF EXISTS "${table}"`);
+  };
+  remove(CONFIRMATION_POLICY_V40_MANAGED_OBJECTS,["confirmation_policy_layout_attestation_v40","confirmation_authority_evidence_v40","confirmation_expiration_operations_v40",
+    "agent_replan_requirements_v40","agent_mutation_accounting_v40","confirmation_policy_attestations_v40"]);
+  remove(AGENT_RESPONSE_PROVENANCE_V39_MANAGED_OBJECTS,["agent_response_provenance_attestation_v39","agent_generalized_receipts_v39",
+    "agent_combat_proposal_bindings_v39","agent_provider_responses_v39","agent_provider_dispatch_claims_v39","agent_provider_contexts_v39"]);
+}
+
+/** Removes exact v35-v40 adventure artifacts before destructive historical fixture rewinds. */
 export function removeFutureAdventureCoordinationSchema(db: import("better-sqlite3").Database): void {
+  removeFutureAgentSchema(db);
   const remove = (inventory: ReadonlyArray<readonly [string, string]>, tables: readonly string[]) => {
     const names = inventory.map(([, name]) => name);
     const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL`)

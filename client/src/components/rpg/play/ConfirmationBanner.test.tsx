@@ -1,9 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../../api";
 import { ConfirmationBanner } from "./ConfirmationBanner";
 
 const at = "2030-01-01T00:00:00.000Z";
-const proposal = { proposalId: "proposal", position: 0, toolName: "roll", proposedAt: at, confirmation: { state: "pending" as const, expiresAt: "2099-01-01T00:00:00.000Z" } };
+const proposal = { proposalId: "proposal", position: 0, toolName: "roll", proposedAt: at,
+  policy:{version:"v1" as const,category:"ambiguous-consequential-change" as const,requiresConfirmation:true,requiredAuthorizer:"controller" as const,
+    review:{summary:"Apply a consequential change.",consequences:[{kind:"campaign-change" as const,text:"Campaign state may change"}]}},
+  confirmation: { state: "pending" as const, expiresAt: "2099-01-01T00:00:00.000Z" } };
 const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: "original" as const, priorTurnId: null, declaration: "Listen", state: "confirmed" as const, revision: 3, createdAt: at, updatedAt: at };
 const binding = { campaignId: "campaign", sessionId: "session", actorId: "actor", turnId: "turn" };
 
@@ -29,6 +33,33 @@ describe("ConfirmationBanner", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reject selected batch" }));
     await screen.findByRole("alert");
     expect(confirmAdventureTurn).toHaveBeenCalledTimes(1); expect(getAdventureTurn).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocks after a deterministic confirmation rejection without reconciling", async () => {
+    const confirmAdventureTurn = vi.fn().mockRejectedValue(new ApiError(409, "stale"));
+    const getAdventureTurn = vi.fn();
+    render(<ConfirmationBanner turnId="turn" revision={2} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
+      binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Approve selected batch" }));
+    await screen.findByRole("alert");
+    expect(getAdventureTurn).not.toHaveBeenCalled();
+    expect((screen.getByRole("button", { name: "Approve selected batch" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("resets a sending banner when the pending revision changes", async () => {
+    let resolveConfirmation!: (value: { turn: typeof turn }) => void;
+    const confirmAdventureTurn = vi.fn().mockReturnValue(new Promise<{ turn: typeof turn }>((resolve) => { resolveConfirmation = resolve; }));
+    const getAdventureTurn = vi.fn();
+    const { rerender } = render(<ConfirmationBanner turnId="turn" revision={2} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
+      binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Approve selected batch" }));
+    expect((screen.getByRole("button", { name: "Approve selected batch" }) as HTMLButtonElement).disabled).toBe(true);
+    rerender(<ConfirmationBanner turnId="turn" revision={3} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
+      binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={vi.fn()} />);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Approve selected batch" }) as HTMLButtonElement).disabled).toBe(false));
+    resolveConfirmation({ turn });
+    await waitFor(() => expect((screen.getByRole("button", { name: "Approve selected batch" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(getAdventureTurn).not.toHaveBeenCalled();
   });
 
   it.each(["approved", "rejected"] as const)("recovers a lost %s response token by GET without replaying confirm", async (decision) => {

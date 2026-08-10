@@ -5,7 +5,7 @@ import {
   AGENT_TOOL_REGISTRY_VERSION, DEFAULT_AGENT_EXECUTION_LIMITS,
   createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
-  providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema,
+  providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema, canonicalAgentJson,
   reviewGenerationDraftInputSchema, stagedGenerationContentSchema, turnMutationInputSchema,
   updateTurnNarrationInputSchema, utcIsoTimestampSchema,
   type AppendToolProposalInput, type ApplyGenerationDraftInput, type CreateAdventureTurnInput,
@@ -17,6 +17,7 @@ import {
 import type { Clock, IdGenerator } from "../../runtime.js";
 import { AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnExpiredError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./errors.js";
 import { createAdventureTurnReadRepository, type AdventureTurnReadRepository } from "./read.js";
+import { deriveConfirmationPolicy } from "../../agent/confirmationPolicy.js";
 
 export type { AppendToolProposalInput, ApplyGenerationDraftInput, CreateAdventureTurnInput, CreateGenerationDraftInput,
   DecideToolProposalInput, DecideToolProposalsInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
@@ -41,6 +42,10 @@ export interface AdventureTurnWriteRepository {
   decideToolProposal(principalId: string, input: DecideToolProposalInput): PrivateAdventureTurn;
   /** Atomically records one decision across an exact proposal set and advances the turn once. */
   decideToolProposals(principalId: string, input: DecideToolProposalsInput): PrivateAdventureTurn;
+  /** Atomically records every due immutable expiry and advances the turn once. */
+  expireToolProposals(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
+  /** Returns a stale approved proposal to planning without changing turn identity. */
+  replanAgentProposal(principalId:string,input:{turnId:string;proposalId:string;reason:string;expectedTurnRevision:number;expectedCampaignRevision:number;idempotencyKey:string}):PrivateAdventureTurn;
   /** Records provider start metadata only; no provider work runs in this transaction. */
   recordProviderCallStart(principalId: string, input: ProviderCallStartInput): PrivateAdventureTurn;
   /** Records a matching provider outcome without directly completing narration. */
@@ -107,6 +112,29 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     }
   }
 
+  function attestConfirmationAuthority(row:any,proposal:any,principalId:string,decisionId:string,
+    decision:"approved"|"rejected"|"expired",at:string):void {
+    const member=db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+      .get(row.campaign_id,principalId) as {role:"owner"|"gm"|"player"|"observer"}|undefined;
+    const controlled=Boolean(db.prepare(`SELECT 1 FROM campaign_actor_private_state
+      WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?`).get(row.campaign_id,row.actor_id,principalId));
+    const control=member?.role==="owner"||member?.role==="gm"?"all":controlled?"controlled":"none";
+    if(!member||member.role==="observer"||(member.role==="player"&&!controlled)
+      ||(decision!=="expired"&&proposal.required_authorizer==="gm"&&!['owner','gm'].includes(member.role)))
+      throw new AdventureTurnAuthorizationError("decision-time confirmation authority is required");
+    const policyDigest=createHash("sha256").update(canonicalAgentJson({version:proposal.policy_version,category:proposal.category,
+      requiresConfirmation:Boolean(proposal.policy_requires_confirmation??proposal.requires_confirmation),
+      requiredAuthorizer:proposal.required_authorizer,proposedCommandDigest:proposal.proposed_command_digest,
+      observedDomains:JSON.parse(proposal.observed_domain_revisions_json)} as never)).digest("hex");
+    const value={evidenceVersion:"v1",authorityProven:true,decisionId,campaignId:row.campaign_id,turnId:row.id,
+      proposalId:proposal.proposal_id,principalId,decision,actorId:row.actor_id,authorityRole:member.role,
+      authorityControl:control,requiredAuthorizer:proposal.required_authorizer,policyDigest,attestedAt:at};
+    const json=canonicalAgentJson(value as never);
+    db.prepare("INSERT INTO confirmation_authority_evidence_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .run(id(),decisionId,row.campaign_id,row.id,proposal.proposal_id,principalId,decision,"v1",member.role,control,row.actor_id,
+        proposal.required_authorizer,policyDigest,json,createHash("sha256").update(json).digest("hex"),at);
+  }
+
   const stale = (kind: AggregateKind, row: any, expected: number) => {
     const event = latest(kind, row.campaign_id, row.id); if (!event || event.resulting_revision !== expected) throw new AdventureTurnStaleError(`${kind} revision is stale`); return event;
   };
@@ -157,9 +185,10 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
     WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
     .all(row.campaign_id, row.id) as any[];
-  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" => {
+  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" | "combat_action" => {
     if (["roll", "roll-check", "roll_actor_dice"].includes(toolName)) return "roll_actor_dice";
     if (toolName === "set_actor_attribute" || toolName === "initialize_actor_resource") return toolName;
+    if(toolName==="combat_action")return "combat_action";
     throw new AdventureTurnConflictError("tool proposal has no supported mechanics command binding");
   };
   const insertMechanicsLink = (row: any, proposalId: string, commandId: string, at: string) => {
@@ -240,14 +269,38 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const current = stale("turn", row, input.expectedTurnRevision); if (row.mode !== "original" || !["declared", "proposed"].includes(current.resulting_state)) throw new AdventureTurnConflictError("turn cannot accept proposals");
       const position = (db.prepare("SELECT count(*) count FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id) as { count: number }).count;
       const at = now(), proposalId = id(), argumentsJson = canonical(input.arguments);
+      const timelineRevision=(db.prepare("SELECT revision FROM campaign_timelines WHERE campaign_id=? AND id=?").get(row.campaign_id,row.timeline_id) as {revision:number}|undefined)?.revision;
+      if(timelineRevision===undefined)throw new AdventureTurnStaleError("timeline is unavailable");
+      const combatRevision=Number.isSafeInteger((input.arguments as any).expectedCombatRevision)?(input.arguments as any).expectedCombatRevision as number:undefined;
+      const autonomousEnemy=input.toolName==="combat_action"&&Boolean(db.prepare(`SELECT 1 FROM encounter JOIN combatant ON combatant.encounter_id=encounter.encounter_id
+        WHERE encounter.encounter_id=? AND encounter.campaign_id=? AND encounter.current_turn_combatant_id=combatant.combatant_id AND combatant.combatant_kind='enemy'`)
+        .get((input.arguments as any).encounterId,row.campaign_id));
+      const policy=deriveConfirmationPolicy({toolName:input.toolName,arguments:input.arguments,campaignRevision:row.campaign_revision,
+        turnRevision:input.expectedTurnRevision,timelineRevision,...(combatRevision===undefined?{}:{combatRevision}),autonomousEnemy,at});
+      if(policy.requiresConfirmation&&!input.confirmationExpiresAt)throw new AdventureTurnConflictError("server policy requires a confirmation expiry");
       db.prepare(`INSERT INTO tool_proposals(proposal_id,campaign_id,turn_id,position,tool_name,arguments_json,requires_confirmation,confirmation_expires_at,idempotency_key,proposed_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(proposalId, row.campaign_id, row.id, position, input.toolName, argumentsJson, input.requiresConfirmation ? 1 : 0,
-          input.confirmationExpiresAt ?? null, input.idempotencyKey, at);
+        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(proposalId, row.campaign_id, row.id, position, input.toolName, argumentsJson, policy.requiresConfirmation ? 1 : 0,
+          policy.requiresConfirmation ? input.confirmationExpiresAt : null, input.idempotencyKey, at);
+      db.prepare(`INSERT INTO confirmation_policy_attestations_v40 VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(proposalId,row.campaign_id,row.id,
+        policy.version,policy.category,policy.requiresConfirmation?1:0,policy.requiredAuthorizer,canonicalAgentJson(policy.review as never),
+        policy.proposedCommandDigest,canonicalAgentJson(policy.observedDomains),policy.attestedAt);
       const executionKey = `mechanics:${createHash("sha256").update(proposalId).digest("hex").slice(0, 48)}`;
-      db.prepare(`INSERT INTO tool_proposal_execution_bindings_v37(proposal_id,campaign_id,turn_id,execution_idempotency_key,
-        command_type,source_turn_id,timeline_id,actor_id,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`)
-        .run(proposalId, row.campaign_id, row.id, executionKey, commandType(input.toolName), row.id, row.timeline_id, row.actor_id, at);
-      physicalAdvance(row, "proposed", "none", at);
+       if(commandType(input.toolName)==="combat_action"){
+         const args=input.arguments as Record<string,unknown>;
+           db.prepare(`INSERT INTO agent_combat_proposal_bindings_v39(proposal_id,campaign_id,turn_id,provider_call_id,provider_tool_call_id,encounter_id,legal_action_id,command_legal_action_id,legal_action_digest,expected_combat_revision,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
+             .run(proposalId,row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.encounterId,args.legalActionId,args.commandLegalActionId,args.legalActionDigest,args.expectedCombatRevision,executionKey,at);
+           const response=db.prepare(`SELECT context.round_number FROM agent_provider_responses_v39 response JOIN agent_provider_contexts_v39 context
+             ON context.context_id=response.context_id AND context.campaign_id=response.campaign_id AND context.turn_id=response.turn_id
+               AND context.provider_call_id=response.provider_call_id
+             WHERE response.campaign_id=? AND response.provider_call_id=? AND response.turn_id=? AND response.status='succeeded'`)
+             .get(row.campaign_id,args.providerCallId,row.id) as {round_number:number}|undefined;
+          if(!response)throw new AdventureTurnConflictError("combat mutation lacks durable provider response");
+          db.prepare(`INSERT INTO agent_mutation_accounting_v40 VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(),row.campaign_id,row.id,proposalId,
+            args.providerCallId,args.providerToolCallId,response.round_number,"combat_action.execute",createHash("sha256").update(canonicalAgentJson(input.arguments as never)).digest("hex"),at);
+       }else db.prepare(`INSERT INTO tool_proposal_execution_bindings_v37(proposal_id,campaign_id,turn_id,execution_idempotency_key,
+         command_type,source_turn_id,timeline_id,actor_id,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`)
+         .run(proposalId, row.campaign_id, row.id, executionKey, commandType(input.toolName), row.id, row.timeline_id, row.actor_id, at);
+       physicalAdvance(row, row.state==="mechanics-committed"?"mechanics-committed":"proposed", "none", at);
       return finish("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, "proposed", "none", at, () => privateTurn(principalId, row.id));
     }); },
     waitForToolConfirmation(principalId, raw) { const input = turnMutationInputSchema.parse(raw); return immediate(() => {
@@ -256,21 +309,31 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const current = stale("turn", row, input.expectedTurnRevision); if (current.resulting_state !== "proposed" || !db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
         AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id, row.id))
         throw new AdventureTurnConflictError("no proposal is waiting for confirmation");
-      const at = now(); physicalAdvance(row, "awaiting-confirmation", "none", at);
+      const at = now(); physicalAdvance(row, row.state==="mechanics-committed"?"mechanics-committed":"awaiting-confirmation", "none", at);
       return finish("turn", row, principalId, "confirmation-wait", input, input.expectedTurnRevision, "awaiting-confirmation", "none", at, () => privateTurn(principalId, row.id));
     }); },
     decideToolProposal(principalId, raw) { const input = decideToolProposalInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
       const old = replay("turn", row, principalId, "confirmation-decision", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
       const current = stale("turn", row, input.expectedTurnRevision); if (current.resulting_state !== "awaiting-confirmation") throw new AdventureTurnConflictError("turn is not waiting for confirmation");
-      const proposal = db.prepare("SELECT * FROM tool_proposals WHERE campaign_id=? AND turn_id=? AND proposal_id=? AND requires_confirmation=1")
-        .get(row.campaign_id, row.id, input.proposalId) as any;
-      if (!proposal || proposal.confirmation_expires_at !== input.expiresAt) throw new AdventureTurnConflictError("confirmation proposal or expiry does not match");
-      const at = now(); if (at >= input.expiresAt) throw new AdventureTurnExpiredError("confirmation expired");
+        const proposal = db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
+          policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json FROM tool_proposals proposal
+         JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id
+           AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id
+         WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`)
+         .get(row.campaign_id, row.id, input.proposalId) as any;
+       if (!proposal || proposal.confirmation_expires_at !== input.expiresAt || proposal.policy_version!=="v1"
+         || !proposal.policy_requires_confirmation) throw new AdventureTurnConflictError("confirmation proposal, policy, or expiry does not match");
+       const at = now(); if (at >= input.expiresAt) throw new AdventureTurnExpiredError("confirmation expired");
+       const decisionRole=(db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?")
+         .get(row.campaign_id,principalId) as {role:string}).role;
+       if(proposal.required_authorizer==="gm"&&decisionRole!=="owner"&&decisionRole!=="gm")
+         throw new AdventureTurnAuthorizationError("owner or GM confirmation is required");
       if (db.prepare("SELECT 1 FROM confirmation_decisions WHERE campaign_id=? AND turn_id=? AND proposal_id=?").get(row.campaign_id, row.id, input.proposalId))
         throw new AdventureTurnConflictError("proposal already has a decision");
-      db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, input.proposalId, principalId, input.decision, row.revision, input.idempotencyKey, input.expiresAt, at);
+       const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,input.decision,at);
+       db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
+         VALUES(?,?,?,?,?,?,?,?,?,?)`).run(decisionId, row.campaign_id, row.id, input.proposalId, principalId, input.decision, row.revision, input.idempotencyKey, input.expiresAt, at);
       const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
         AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id, row.id);
       let state = "awaiting-confirmation", physicalState = "awaiting-confirmation";
@@ -289,9 +352,11 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         const current = stale("turn", row, input.expectedTurnRevision);
         if (current.resulting_state !== "awaiting-confirmation") throw new AdventureTurnConflictError("turn is not waiting for confirmation");
         const at = now();
-        const selected = input.proposalIds.map((proposalId) => db.prepare(`SELECT proposal.*,
+        const selected = input.proposalIds.map((proposalId) => db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,
+          policy.category,policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json,
           decision.decision_id FROM tool_proposals proposal LEFT JOIN confirmation_decisions decision
             ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
+          JOIN confirmation_policy_attestations_v40 policy ON policy.proposal_id=proposal.proposal_id
           WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.proposal_id=? AND proposal.requires_confirmation=1`)
           .get(row.campaign_id, row.id, proposalId) as any);
         // Validate the complete batch before the first immutable decision row is inserted.
@@ -300,10 +365,14 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           throw new AdventureTurnConflictError("confirmation proposal set does not match durable pending state");
         }
         if (selected.some((proposal) => at >= proposal.confirmation_expires_at)) throw new AdventureTurnExpiredError("confirmation expired");
+        const role=(db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(row.campaign_id,principalId) as {role:string}).role;
+        if(selected.some((proposal)=>proposal.required_authorizer==="gm"&&role!=="owner"&&role!=="gm"))
+          throw new AdventureTurnAuthorizationError("owner or GM confirmation is required");
         for (const proposal of selected) {
           const decisionKey = `batch:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0, 48)}`;
+          const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,input.decision,at);
           db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,expected_turn_revision,idempotency_key,expires_at,decided_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?)`).run(id(), row.campaign_id, row.id, proposal.proposal_id, principalId, input.decision,
+            VALUES(?,?,?,?,?,?,?,?,?,?)`).run(decisionId, row.campaign_id, row.id, proposal.proposal_id, principalId, input.decision,
               input.expectedTurnRevision, decisionKey, proposal.confirmation_expires_at, at);
         }
         const pending = db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=?
@@ -320,6 +389,41 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           () => privateTurn(principalId, row.id));
       });
     },
+    expireToolProposals(principalId, raw) { const input=turnMutationInputSchema.parse(raw); return immediate(()=>{
+      const row=turn(input.turnId);authority(principalId,row,input.expectedCampaignRevision,"turn");
+      const old=replay("turn",row,principalId,"confirmation-expiration",input,input.expectedTurnRevision,privateAdventureTurnSchema);if(old)return old;
+      const current=stale("turn",row,input.expectedTurnRevision);if(current.resulting_state!=="awaiting-confirmation")throw new AdventureTurnConflictError("turn is not waiting for confirmation");
+      const at=now();const due=db.prepare(`SELECT proposal.*,policy.required_authorizer,policy.policy_version,policy.category,
+        policy.requires_confirmation policy_requires_confirmation,policy.proposed_command_digest,policy.observed_domain_revisions_json
+        FROM tool_proposals proposal JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id
+          AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id WHERE proposal.campaign_id=? AND proposal.turn_id=?
+        AND proposal.requires_confirmation=1 AND proposal.confirmation_expires_at<=? AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision
+          WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)
+        ORDER BY proposal.proposal_id`).all(row.campaign_id,row.id,at) as any[];
+      if(!due.length)throw new AdventureTurnConflictError("no confirmation is due for expiration");
+      for(const proposal of due){const decisionId=id();attestConfirmationAuthority(row,proposal,principalId,decisionId,"expired",at);
+        db.prepare(`INSERT INTO confirmation_decisions(decision_id,campaign_id,turn_id,proposal_id,principal_id,decision,
+          expected_turn_revision,idempotency_key,expires_at,decided_at) VALUES(?,?,?,?,?,'expired',?,?,?,?)`).run(decisionId,row.campaign_id,row.id,proposal.proposal_id,
+            principalId,input.expectedTurnRevision,`expiry:${createHash("sha256").update(`${input.idempotencyKey}\0${proposal.proposal_id}`).digest("hex").slice(0,48)}`,proposal.confirmation_expires_at,at);}
+      const pending=Boolean(db.prepare(`SELECT 1 FROM tool_proposals proposal WHERE proposal.campaign_id=? AND proposal.turn_id=? AND proposal.requires_confirmation=1
+        AND NOT EXISTS(SELECT 1 FROM confirmation_decisions decision WHERE decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id)`).get(row.campaign_id,row.id));
+      const approved=approvedProposals(row);const state=pending?"awaiting-confirmation":approved.length?"confirmed":"cancelled";
+      physicalAdvance(row,state==="confirmed"?"mechanics-committed":state,"none",at);
+      db.prepare(`INSERT INTO confirmation_expiration_operations_v40 VALUES(?,?,?,?,?,?,?,?,?)`).run(id(),row.campaign_id,row.id,principalId,input.idempotencyKey,
+        input.expectedTurnRevision,input.expectedTurnRevision+1,canonicalAgentJson(due.map((proposal)=>proposal.proposal_id)),at);
+      return finish("turn",row,principalId,"confirmation-expiration",input,input.expectedTurnRevision,state,"none",at,()=>privateTurn(principalId,row.id));
+    }); },
+    replanAgentProposal(principalId,input){return immediate(()=>{
+      const row=turn(input.turnId);authority(principalId,row,input.expectedCampaignRevision,"turn");
+      const old=replay("turn",row,principalId,"agent-replan",input,input.expectedTurnRevision,privateAdventureTurnSchema);if(old)return old;
+      const current=stale("turn",row,input.expectedTurnRevision);
+      if(["completed","cancelled","failed"].includes(current.resulting_state))throw new AdventureTurnConflictError("terminal turn cannot replan");
+      const requirement=db.prepare("SELECT reason FROM agent_replan_requirements_v40 WHERE campaign_id=? AND turn_id=? AND proposal_id=?")
+        .get(row.campaign_id,row.id,input.proposalId) as {reason:string}|undefined;
+      if(!requirement||requirement.reason!==input.reason)throw new AdventureTurnConflictError("durable replan requirement is unavailable");
+      const at=now();physicalAdvance(row,row.state,"none",at);
+      return finish("turn",row,principalId,"agent-replan",input,input.expectedTurnRevision,"declared","none",at,()=>privateTurn(principalId,row.id));
+    });},
     recordProviderCallStart(principalId, raw) { const input = providerCallStartInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "provider");
       const old = replay("turn", row, principalId, "provider-start", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
@@ -377,7 +481,9 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const old = replay("turn", row, principalId, "narration-update", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
       const current = stale("turn", row, input.expectedTurnRevision), at = now();
       if (input.terminalState === "cancelled" && row.mode === "original") reconcile(row, at);
-      const rootRow = root(row); const hasMechanics = Boolean(db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(rootRow.campaign_id, rootRow.id));
+      const rootRow = root(row); const hasMechanics = Boolean(
+        db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(rootRow.campaign_id, rootRow.id)
+        || db.prepare("SELECT 1 FROM agent_generalized_receipts_v39 WHERE campaign_id=? AND turn_id=?").get(rootRow.campaign_id, rootRow.id));
       const hasProposals = Boolean(db.prepare("SELECT 1 FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
       const deterministicFallback = row.mode === "original" && !hasProposals;
       const narrationDerivative = row.mode !== "original";

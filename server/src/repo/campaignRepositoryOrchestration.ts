@@ -718,6 +718,10 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
   } });
   const adventureTurnRepository = createAdventureTurnRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
+  },{
+    executeSetActorAttribute:(principal,input)=>campaignCommandWriteOperations.executeSetActorAttribute(principal,input),
+    executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
+    resolveCombatAction:(principal,encounterId,input)=>encounterRepository.resolveCombatAction(principal,encounterId,input),
   });
   return {
     ...administrationRepository,

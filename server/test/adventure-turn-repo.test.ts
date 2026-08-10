@@ -120,6 +120,31 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
+  it("validates immutable decision-time authority after membership changes and rejects evidence tampering",()=>{
+    const identity=seed();let repo=factory();
+    const approvedTurn=repo.createAdventureTurn("player",createInput(identity,"authority-approved"));
+    const approvedProposal=repo.appendToolProposal("player",{turnId:approvedTurn.turnId,expectedTurnRevision:0,expectedCampaignRevision:0,
+      idempotencyKey:"authority-approved-proposal",toolName:"roll-check",arguments:{},requiresConfirmation:true,confirmationExpiresAt:EXPIRES});
+    repo.waitForToolConfirmation("player",{turnId:approvedTurn.turnId,expectedTurnRevision:1,expectedCampaignRevision:0,idempotencyKey:"authority-approved-wait"});
+    repo.decideToolProposal("player",{turnId:approvedTurn.turnId,proposalId:approvedProposal.toolCalls[0]!.proposal.proposalId,
+      decision:"approved",expiresAt:EXPIRES,expectedTurnRevision:2,expectedCampaignRevision:0,idempotencyKey:"authority-approved-decision"});
+    const expiredTurn=repo.createAdventureTurn("player",createInput(identity,"authority-expired"));
+    repo.appendToolProposal("player",{turnId:expiredTurn.turnId,expectedTurnRevision:0,expectedCampaignRevision:0,
+      idempotencyKey:"authority-expired-proposal",toolName:"roll-check",arguments:{},requiresConfirmation:true,confirmationExpiresAt:EXPIRES});
+    repo.waitForToolConfirmation("player",{turnId:expiredTurn.turnId,expectedTurnRevision:1,expectedCampaignRevision:0,idempotencyKey:"authority-expired-wait"});
+    repo.close();repo=factory(EXPIRES);repo.expireToolProposals("player",{turnId:expiredTurn.turnId,expectedTurnRevision:2,
+      expectedCampaignRevision:0,idempotencyKey:"authority-expire"});
+    repo.changeAuditedCampaignMembershipRole("local-owner",identity.campaignId,"player",{role:"observer",expectedRevision:0,idempotencyKey:"authority-demote"});
+    repo.close();expect(()=>factory().close()).not.toThrow();
+    const damage=new DatabaseDriver(dbPath());const trigger=(damage.prepare(`SELECT sql FROM sqlite_master
+      WHERE type='trigger' AND name='confirmation_authority_evidence_v40_update_v40'`).get() as {sql:string}).sql;
+    damage.exec("DROP TRIGGER confirmation_authority_evidence_v40_update_v40");
+    damage.prepare(`UPDATE confirmation_authority_evidence_v40 SET authority_control='none' WHERE evidence_id=(
+      SELECT evidence_id FROM confirmation_authority_evidence_v40 WHERE evidence_version='v1' ORDER BY evidence_id LIMIT 1)`).run();
+    damage.exec(trigger);damage.close();
+    expect(()=>factory()).toThrow(/confirmation authority evidence malformed/);
+  });
+
   it("enforces expiry and cancellation boundaries", () => {
     const identity = seed(); const repo = factory();
     const before = repo.createAdventureTurn("player", createInput(identity));
@@ -140,13 +165,17 @@ describe("M1.10 adventure turn repository", () => {
     expect(cancelledAfter.receiptLinks.map((link) => link.commandId)).toEqual(["cancel-command"]);
     const expiring = repo.createAdventureTurn("player", createInput(identity, "expiring"));
     const proposal = repo.appendToolProposal("player", { turnId: expiring.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
-      idempotencyKey: "expiring-proposal", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      idempotencyKey: "expiring-proposal", toolName: "roll-check", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
     repo.waitForToolConfirmation("player", { turnId: expiring.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "wait" });
     repo.close();
     const expiredRepo = factory(EXPIRES);
     expect(() => expiredRepo.decideToolProposal("player", { turnId: expiring.turnId, proposalId: proposal.toolCalls[0]!.proposal.proposalId,
       decision: "approved", expiresAt: EXPIRES, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "late" }))
       .toThrow(AdventureTurnExpiredError);
+    const expired=expiredRepo.expireToolProposals("player",{turnId:expiring.turnId,expectedTurnRevision:2,expectedCampaignRevision:0,idempotencyKey:"expire"});
+    expect(expired).toMatchObject({state:"cancelled",revision:3,toolCalls:[{status:"expired",proposal:{policy:{version:"v1",requiresConfirmation:true}}}]});
+    const audit=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    expect(audit.prepare("SELECT expected_turn_revision,resulting_turn_revision FROM confirmation_expiration_operations_v40").get()).toEqual({expected_turn_revision:2,resulting_turn_revision:3});audit.close();
     expiredRepo.close();
   });
 
@@ -263,10 +292,10 @@ describe("M1.10 adventure turn repository", () => {
     const identity = seed(); let repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "independent-recovery"));
     const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
-      idempotencyKey: "independent-one", toolName: "roll", arguments: { expression: "1d20" }, requiresConfirmation: true,
+      idempotencyKey: "independent-one", toolName: "roll-check", arguments: { expression: "1d20" }, requiresConfirmation: true,
       confirmationExpiresAt: EXPIRES });
     const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
-      idempotencyKey: "independent-two", toolName: "roll", arguments: { expression: "1d6" }, requiresConfirmation: true,
+      idempotencyKey: "independent-two", toolName: "roll-check", arguments: { expression: "1d6" }, requiresConfirmation: true,
       confirmationExpiresAt: EXPIRES });
     const firstProposal = first.toolCalls[0]!.proposal, secondProposal = second.toolCalls[1]!.proposal;
     expect(firstProposal.executionBinding.idempotencyKey).not.toBe(secondProposal.executionBinding.idempotencyKey);
@@ -342,9 +371,9 @@ describe("M1.10 adventure turn repository", () => {
     const identity = seed(); let repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity, "multiple-decisions"));
     const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
-      idempotencyKey: "proposal-one", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      idempotencyKey: "proposal-one", toolName: "roll-check", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
     const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
-      idempotencyKey: "proposal-two", toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+      idempotencyKey: "proposal-two", toolName: "roll-check", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
     repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: "wait-two" });
     const one = repo.decideToolProposal("player", { turnId: turn.turnId, proposalId: first.toolCalls[0]!.proposal.proposalId,
       decision: "approved", expiresAt: EXPIRES, expectedTurnRevision: 3, expectedCampaignRevision: 0, idempotencyKey: "decision-one" });
@@ -398,7 +427,7 @@ describe("M1.10 adventure turn repository", () => {
     const proposalIds: string[] = [];
     for (let index = 0; index < 32; index += 1) {
       const proposed = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: index, expectedCampaignRevision: 0,
-        idempotencyKey: `atomic-${index}`, toolName: "roll", arguments: { index }, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+        idempotencyKey: `atomic-${index}`, toolName: "roll-check", arguments: { index }, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
       proposalIds.push(proposed.toolCalls[index]!.proposal.proposalId);
     }
     repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 32, expectedCampaignRevision: 0, idempotencyKey: "atomic-wait" });
@@ -421,9 +450,9 @@ describe("M1.10 adventure turn repository", () => {
     const setup = (suffix: string) => {
       const turn = repo.createAdventureTurn("player", createInput(identity, `batch-${suffix}`));
       const first = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
-        idempotencyKey: `${suffix}-one`, toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+        idempotencyKey: `${suffix}-one`, toolName: "roll-check", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
       const second = repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0,
-        idempotencyKey: `${suffix}-two`, toolName: "roll", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
+        idempotencyKey: `${suffix}-two`, toolName: "roll-check", arguments: {}, requiresConfirmation: true, confirmationExpiresAt: EXPIRES });
       repo.waitForToolConfirmation("player", { turnId: turn.turnId, expectedTurnRevision: 2, expectedCampaignRevision: 0, idempotencyKey: `${suffix}-wait` });
       return { turn, ids: [first.toolCalls[0]!.proposal.proposalId, second.toolCalls[1]!.proposal.proposalId] };
     };

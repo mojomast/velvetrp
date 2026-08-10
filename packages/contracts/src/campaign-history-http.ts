@@ -71,8 +71,8 @@ export const campaignHistoryHttpCommandReceiptSchema = z.object({
  * or administration metadata crosses the read boundary.
  */
 export const campaignHistoryHttpPublicMechanicEventSchema = z.discriminatedUnion("type", [
-  actorAttributeSetEventSchema.pick({ type: true, data: true }),
-  actorResourceInitializedEventSchema.pick({ type: true, data: true }),
+  z.object({ type: z.literal("actor_attribute_set"), data: z.object({ valueBefore: z.number().int().min(-1_000).max(1_000), valueAfter: z.number().int().min(-1_000).max(1_000) }).strict() }).strict(),
+  z.object({ type: z.literal("actor_resource_initialized"), data: z.object({ current: z.number().int().min(0), max: z.number().int().min(0) }).strict() }).strict(),
   actorDiceRolledEventSchema.pick({ type: true, data: true }),
 ]);
 export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind", [
@@ -92,6 +92,9 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
     occurredAt: z.string().datetime({ offset: false, precision: 3 }),
   }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
     "receipt revision must advance once"),
+  z.object({kind:z.literal("combat"),revisionBefore:revisionSchema,revisionAfter:revisionSchema,
+    occurredAt:z.string().datetime({offset:false,precision:3}),roundBefore:revisionSchema,roundAfter:revisionSchema}).strict()
+    .refine((value)=>value.revisionAfter===value.revisionBefore+1,"receipt revision must advance once"),
 ]);
 export const campaignHistoryHttpPublicReceiptResponseSchema = z.object({
   receipt: campaignHistoryHttpPublicReceiptSchema,

@@ -47,6 +47,10 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
       linkId: row.link_id, campaignId, commandId: row.command_id, proposalId: row.proposal_id,
       sourceTurnId: row.source_turn_id, linkedAt: row.linked_at,
     }));
+  const generalized = (db.prepare(`SELECT link_id,proposal_id,command_id,linked_at FROM agent_generalized_receipts_v39
+    WHERE campaign_id=? AND turn_id=? ORDER BY linked_at,link_id`).all(campaignId, root) as any[]).map((row) => ({
+      linkId: row.link_id, campaignId, commandId: row.command_id, proposalId: row.proposal_id, sourceTurnId: root, linkedAt: row.linked_at,
+    }));
   const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
     .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
   if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
@@ -85,8 +89,8 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
       campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
   });
-  return { links: [...linked, ...recoverable].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
-    recoverableCount: recoverable.length, approvedCount: proposals.length };
+  return { links: [...linked, ...recoverable, ...generalized].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
+    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length };
 };
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */
@@ -97,21 +101,36 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
   const canSeePrivateTurn = (principalId: string, row: any, role: string) => role === "owner" || role === "gm" || row.principal_id === principalId || Boolean(db.prepare(
     "SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?",
   ).get(row.campaign_id, row.actor_id, principalId));
-  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,binding.execution_idempotency_key,binding.command_type,
-    binding.source_turn_id binding_source_turn_id,binding.timeline_id binding_timeline_id,binding.actor_id binding_actor_id,
-    decision.decision_id,decision.principal_id decision_principal_id,
+  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,COALESCE(binding.execution_idempotency_key,combat.execution_idempotency_key) execution_idempotency_key,
+    COALESCE(binding.command_type,'combat_action') command_type,
+    COALESCE(binding.source_turn_id,proposal.turn_id) binding_source_turn_id,COALESCE(binding.timeline_id,turn.timeline_id) binding_timeline_id,
+    COALESCE(binding.actor_id,turn.actor_id) binding_actor_id,combat.encounter_id,combat.legal_action_id,combat.legal_action_digest,combat.expected_combat_revision,
+     combat.command_legal_action_id,policy.policy_version,policy.category policy_category,policy.requires_confirmation policy_requires_confirmation,
+    policy.required_authorizer,policy.safe_summary_json,policy.proposed_command_digest,policy.observed_domain_revisions_json,policy.attested_at,
+    decision.decision_id,decision.principal_id decision_principal_id,replan.reason replan_reason,
     decision.decision,decision.expected_turn_revision,decision.idempotency_key decision_key,decision.expires_at,decision.decided_at
-    FROM tool_proposals proposal JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=proposal.campaign_id
+    FROM tool_proposals proposal JOIN adventure_turns turn ON turn.id=proposal.turn_id LEFT JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=proposal.campaign_id
       AND binding.turn_id=proposal.turn_id AND binding.proposal_id=proposal.proposal_id
+      LEFT JOIN agent_combat_proposal_bindings_v39 combat ON combat.campaign_id=proposal.campaign_id AND combat.turn_id=proposal.turn_id AND combat.proposal_id=proposal.proposal_id
+      JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id
       LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
-      AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id WHERE proposal.turn_id=? ORDER BY proposal.position`).all(turnId) as any[];
+      AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
+      LEFT JOIN agent_replan_requirements_v40 replan ON replan.campaign_id=proposal.campaign_id AND replan.turn_id=proposal.turn_id
+        AND replan.proposal_id=proposal.proposal_id WHERE proposal.turn_id=?
+      AND (binding.proposal_id IS NOT NULL OR combat.proposal_id IS NOT NULL) ORDER BY proposal.position`).all(turnId) as any[];
   const confirmation = (row: any) => row.decision_id ? { state: "decided" as const, decision: { decisionId: row.decision_id,
     proposalId: row.proposal_id, principalId: row.decision_principal_id, decision: row.decision, expectedTurnRevision: row.expected_turn_revision,
     idempotencyKey: row.decision_key, expiresAt: row.expires_at, decidedAt: row.decided_at } }
     : row.requires_confirmation ? { state: "pending" as const, expiresAt: row.confirmation_expires_at ?? "9999-12-31T23:59:59.999Z" }
       : { state: "not-required" as const };
+  const policy = (row:any) => ({ version:row.policy_version,category:row.policy_category,
+    requiresConfirmation:Boolean(row.policy_requires_confirmation),requiredAuthorizer:row.required_authorizer,
+    review:JSON.parse(row.safe_summary_json),proposedCommandDigest:row.proposed_command_digest,
+    observedDomains:JSON.parse(row.observed_domain_revisions_json),attestedAt:row.attested_at });
+  const safePolicy = (row:any) => { const value=policy(row); return {version:value.version,category:value.category,
+    requiresConfirmation:value.requiresConfirmation,requiredAuthorizer:value.requiredAuthorizer,review:value.review}; };
   const common = (row: any, effective?: { state: string; narrationStatus: string }) => ({ turnId: row.id, campaignId: row.campaign_id, timelineId: row.timeline_id, sessionId: row.session_id,
-    actorId: row.actor_id, principalId: row.principal_id, mode: row.v36_mode, priorTurnId: row.prior_turn_id, state: effective?.state ?? row.v36_state,
+    actorId: row.actor_id, mode: row.v36_mode, priorTurnId: row.prior_turn_id, state: effective?.state ?? row.v36_state,
     narrationStatus: effective?.narrationStatus ?? row.v36_narration_status, revision: row.v36_revision, campaignRevision: row.campaign_revision,
     createdAt: row.created_at, updatedAt: row.v36_updated_at });
 
@@ -132,23 +151,29 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
       const proposals = proposalRows(turnId);
       const pending = proposals.some((proposal) => proposal.requires_confirmation && !proposal.decision_id);
       if (receiptProjection.recoverableCount > 0 && pending) throw new Error("recoverable mechanics coexist with pending confirmation");
-      const effective = receiptProjection.recoverableCount > 0 && ["proposed", "confirmed", "mechanics-committed"].includes(row.v36_state)
+      const effective = receiptProjection.generalizedCount > 0 && ["declared","proposed","confirmed"].includes(row.v36_state)
+        ? { state: "mechanics-committed", narrationStatus: "pending" }
+        : receiptProjection.recoverableCount > 0 && ["proposed", "confirmed", "mechanics-committed"].includes(row.v36_state)
         ? { state: links.length === receiptProjection.approvedCount ? "mechanics-committed" : "confirmed",
           narrationStatus: links.length === receiptProjection.approvedCount ? "pending" : "none" } : undefined;
       if (!canSeePrivateTurn(principalId, row, member.role)) return roleSafeAdventureTurnSchema.parse({ ...common(row, effective),
         proposals: proposals.map((proposal) => ({ proposalId: proposal.proposal_id, position: proposal.position, toolName: proposal.tool_name,
-          proposedAt: proposal.proposed_at, confirmation: confirmation(proposal) })), receiptLinks: links });
+          proposedAt: proposal.proposed_at, policy:safePolicy(proposal), confirmation: confirmation(proposal) })), receiptLinks: links });
       const providerCalls = (db.prepare("SELECT * FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? ORDER BY recorded_at,record_id")
         .all(row.campaign_id, turnId) as any[]).map((call) => ({ recordId: call.record_id, callId: call.call_id, phase: call.phase,
           provider: call.provider, model: call.model, attempt: call.attempt, promptTokens: call.prompt_tokens,
           completionTokens: call.completion_tokens, outcomeCode: call.outcome_code, recordedAt: call.recorded_at }));
-      return privateAdventureTurnSchema.parse({ ...common(row, effective), declaration: row.declaration,
+      return privateAdventureTurnSchema.parse({ ...common(row, effective), principalId:row.principal_id,declaration: row.declaration,
         toolCalls: proposals.map((proposal) => { const proposalLinks = links.filter((link) => link.proposalId === proposal.proposal_id); return ({ proposal: { proposalId: proposal.proposal_id, position: proposal.position,
            toolName: proposal.tool_name, argumentsJson: proposal.arguments_json, proposedAt: proposal.proposed_at,
-           executionBinding: { idempotencyKey: proposal.execution_idempotency_key, commandType: proposal.command_type,
-             campaignId: proposal.campaign_id, timelineId: proposal.binding_timeline_id, actorId: proposal.binding_actor_id,
-             sourceTurnId: proposal.binding_source_turn_id },
-           confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed" : proposal.decision ?? (proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),
+             policy:policy(proposal),
+            executionBinding: { idempotencyKey: proposal.execution_idempotency_key, commandType: proposal.command_type,
+              campaignId: proposal.campaign_id, timelineId: proposal.binding_timeline_id, actorId: proposal.binding_actor_id,
+              sourceTurnId: proposal.binding_source_turn_id,...(proposal.command_type==="combat_action"?{encounterId:proposal.encounter_id,
+                 legalActionId:proposal.command_legal_action_id,legalActionDigest:proposal.legal_action_digest,expectedCombatRevision:proposal.expected_combat_revision}:{}) },
+              confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed"
+               : proposal.replan_reason ? "cancelled" : proposal.decision ?? (row.v36_state === "cancelled" ? "cancelled"
+                : proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),
         providerCalls, receiptLinks: links });
     },
     getAdventureTurnByInitialIdempotencyKey(principalId, campaignId, sessionId, actorId, idempotencyKey) {

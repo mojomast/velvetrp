@@ -86,7 +86,7 @@ describe("M3.8 public campaign receipt API binding", () => {
   it("reads an exact no-store mechanic receipt projection", async () => {
     const receipt = { kind: "mechanic", revisionBefore: 0, revisionAfter: 1,
       occurredAt: "2030-01-01T00:00:00.000Z", event: { type: "actor_attribute_set",
-        data: { attributeId: "strength", valueBefore: 10, valueAfter: 12 } } };
+        data: { valueBefore: 10, valueAfter: 12 } } };
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ receipt }), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
     await expect(getCampaignCommandReceipt("campaign", "command")).resolves.toEqual({ receipt });
     expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign/commands/command/receipt", expect.objectContaining({ cache: "no-store" }));

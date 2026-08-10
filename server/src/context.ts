@@ -77,6 +77,10 @@ export interface CampaignAgentSpeakerPersona {
 /** A focused, already role-filtered persistence snapshot used only by server orchestrators. */
 export interface CampaignAgentContextSnapshot {
   campaignId: string;
+  /** Active ancestry observed in the same snapshot as authority and legal actions. */
+  timelineId: string;
+  timelineRevision: number;
+  campaignRevision: number;
   sessionId: string;
   audience: CampaignAgentAudience;
   authority: CampaignAgentAuthority;
@@ -89,8 +93,21 @@ export interface CampaignAgentContextSnapshot {
   visibleQuests: string[];
   legalActions: string[];
   privateTargetFacts: string[];
+  /** Opaque provider selector cross-bound to one exact authoritative attribute. */
+  attributeCandidates: Array<{ candidateId:string; digest:string; commandAttributeId:string; currentValue:number }>;
   synthesizedSummaryFacts: string[];
   recap: string[];
+  /** Structured encounter authority used to select tools; never rendered to HTTP. */
+  encounter: null | {
+    encounterId: string;
+    phase: "active";
+    revision: number;
+    currentCombatantId: string | null;
+    currentCombatantKind: "actor" | "enemy" | null;
+    currentActorId: string | null;
+    legalActionCandidates: Array<{ legalActionId:string; commandLegalActionId:string; digest:string;
+      kind:"attack"|"flee"|"end-turn"; targetId:string|null }>;
+  };
 }
 
 /**

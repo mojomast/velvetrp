@@ -121,9 +121,12 @@ function backfillBindings(db: DatabaseDriver.Database): void {
 
 /** Validates exact sidecar coverage and command/link provenance. */
 export function validateToolExecutionBindingDataV37(db: DatabaseDriver.Database): void {
+  const hasCombatBindings = Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_combat_proposal_bindings_v39'").get());
   const missing = db.prepare(`SELECT proposal.proposal_id FROM tool_proposals proposal LEFT JOIN tool_proposal_execution_bindings_v37 binding
     ON binding.campaign_id=proposal.campaign_id AND binding.turn_id=proposal.turn_id AND binding.proposal_id=proposal.proposal_id
-    WHERE binding.proposal_id IS NULL LIMIT 1`).get() as { proposal_id: string } | undefined;
+    ${hasCombatBindings ? `LEFT JOIN agent_combat_proposal_bindings_v39 combat ON combat.campaign_id=proposal.campaign_id
+      AND combat.turn_id=proposal.turn_id AND combat.proposal_id=proposal.proposal_id` : ""}
+    WHERE binding.proposal_id IS NULL ${hasCombatBindings ? "AND combat.proposal_id IS NULL" : ""} LIMIT 1`).get() as { proposal_id: string } | undefined;
   if (missing) throw new Error(`schema v37 tool proposal execution binding is missing (${missing.proposal_id})`);
   const invalidLink = db.prepare(`SELECT link.link_id FROM turn_mechanics_links_v36 link
     JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=link.campaign_id AND binding.turn_id=link.turn_id

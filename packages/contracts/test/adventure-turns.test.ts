@@ -4,14 +4,24 @@ import {
   appendToolProposalInputSchema, privateAdventureTurnSchema, providerCallMetadataSchema, roleSafeAdventureTurnSchema, toolProposalSchema,
   type AdventureTurnState, type ConfirmationDecisionKind, type NarrationStatus,
 } from "../src/adventure-turns.js";
+import { roleSafeConfirmationPolicySchema } from "../src/confirmation-policy.js";
 
 const at = "2035-01-01T00:00:00.000Z";
 const later = "2035-01-01T00:00:01.000Z";
+const safePolicy={version:"v1" as const,category:"ambiguous-consequential-change" as const,requiresConfirmation:true,
+  requiredAuthorizer:"controller" as const,review:{summary:"Review a consequential change.",consequences:[{kind:"campaign-change" as const,text:"Campaign state may change"}]}};
+const policy={...safePolicy,proposedCommandDigest:"a".repeat(64),observedDomains:[{domain:"timeline",revision:0}],attestedAt:at};
 const base = { turnId: "turn", campaignId: "campaign", timelineId: "timeline", sessionId: "session", actorId: "actor",
   principalId: "principal", mode: "original" as const, priorTurnId: null, state: "declared" as const, narrationStatus: "none" as const,
   revision: 0, campaignRevision: 1, createdAt: at, updatedAt: at };
 
 describe("M1.10 adventure-turn contracts", () => {
+  it("structurally rejects opaque identities in confirmation display text",()=>{
+    expect(roleSafeConfirmationPolicySchema.safeParse({...safePolicy,review:{...safePolicy.review,
+      summary:"Change 123e4567-e89b-12d3-a456-426614174000"}}).success).toBe(false);
+    expect(roleSafeConfirmationPolicySchema.safeParse({...safePolicy,review:{...safePolicy.review,
+      consequences:[{kind:"campaign-change",text:"Digest "+"a".repeat(64)}]}}).success).toBe(false);
+  });
   it("publishes exhaustive closed lifecycle vocabularies", () => {
     expect(adventureTurnStateSchema.options).toEqual(["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating", "completed", "cancelled", "failed"]);
     expect(narrationStatusSchema.options).toEqual(["none", "pending", "in-progress", "completed", "failed"]);
@@ -32,7 +42,7 @@ describe("M1.10 adventure-turn contracts", () => {
   it("bounds strict tool proposals and confirmation expiry", () => {
     const executionBinding = { idempotencyKey: "mechanics-key", commandType: "roll_actor_dice" as const, campaignId: "campaign",
       timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" };
-    const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{}", proposedAt: at, executionBinding,
+    const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{}", proposedAt: at, executionBinding,policy,
       confirmation: { state: "pending", expiresAt: later } } as const;
     expect(toolProposalSchema.parse(proposal)).toEqual(proposal);
     for (const invalid of [{ ...proposal, position: MAX_ADVENTURE_TURN_TOOLS }, { ...proposal, argumentsJson: "[]" },
@@ -55,16 +65,16 @@ describe("M1.10 adventure-turn contracts", () => {
 
   it("structurally separates role-safe and private projections", () => {
     const proposal = { proposalId: "proposal", position: 0, toolName: "roll", argumentsJson: "{\"secret\":true}", proposedAt: at,
-      executionBinding: { idempotencyKey: "private-key", commandType: "roll_actor_dice", campaignId: "campaign", timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" },
+      executionBinding: { idempotencyKey: "private-key", commandType: "roll_actor_dice", campaignId: "campaign", timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" },policy:{...policy,requiresConfirmation:false,category:"deterministic-roll" as const},
       confirmation: { state: "not-required" } } as const;
     const privateTurn = { ...base, declaration: "I inspect the seal", toolCalls: [{ proposal, status: "approved", receiptLinks: [] }],
       providerCalls: [], receiptLinks: [] } as const;
     expect(privateAdventureTurnSchema.parse(privateTurn)).toEqual(privateTurn);
     expect(roleSafeAdventureTurnSchema.safeParse(privateTurn).success).toBe(false);
-    const safe = { ...base, proposals: [{ proposalId: "proposal", position: 0, toolName: "roll", proposedAt: at,
+    const {principalId:_principalId,...safeBase}=base;const safe = { ...safeBase, proposals: [{ proposalId: "proposal", position: 0, toolName: "roll", proposedAt: at,policy:{...safePolicy,requiresConfirmation:false,category:"deterministic-roll" as const},
       confirmation: { state: "not-required" } }], receiptLinks: [] } as const;
     expect(roleSafeAdventureTurnSchema.parse(safe)).toEqual(safe);
-    expect(JSON.stringify(safe)).not.toMatch(/secret|private-key|executionBinding/);
+    expect(JSON.stringify(safe)).not.toMatch(/secret|private-key|executionBinding|principalId/);
   });
 
   it("allows only a strict subset of approved proposal receipts while confirmed", () => {
@@ -72,7 +82,7 @@ describe("M1.10 adventure-turn contracts", () => {
       proposalId, principalId: "principal", decision: "approved" as const, expectedTurnRevision: 2,
       idempotencyKey: `decision-${proposalId}`, expiresAt: later, decidedAt: at } });
     const proposal = (proposalId: string, position: number) => ({ proposalId, position, toolName: "roll", argumentsJson: "{}",
-      proposedAt: at, executionBinding: { idempotencyKey: `key-${proposalId}`, commandType: "roll_actor_dice" as const,
+       proposedAt: at,policy, executionBinding: { idempotencyKey: `key-${proposalId}`, commandType: "roll_actor_dice" as const,
         campaignId: "campaign", timelineId: "timeline", actorId: "actor", sourceTurnId: "turn" }, confirmation: decision(proposalId) });
     const link = (proposalId: string) => ({ linkId: `link-${proposalId}`, campaignId: "campaign", commandId: `command-${proposalId}`,
       proposalId, sourceTurnId: "turn", linkedAt: at });

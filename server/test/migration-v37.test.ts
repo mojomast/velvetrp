@@ -4,13 +4,14 @@ import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS, proposalExecutionIdempotencyKeyV37 } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS } from "../src/repo/db/migrations/v38_durable_agent_execution.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureAgentSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const AT = "2035-01-01T00:00:00.000Z";
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 
 function removeV37(db: DatabaseDriver.Database): void {
+  removeFutureAgentSchema(db);
   const v38Names = DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS.map(([, name]) => name);
   const v38 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v38Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
     .all(...v38Names) as Array<{ type: string; name: string }>;
@@ -62,7 +63,7 @@ describe("schema v37 exact tool execution bindings", () => {
     removeV37(db); db.prepare("UPDATE meta SET value='36' WHERE key='schemaVersion'").run(); db.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "38" });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
     expect(verify.prepare(`SELECT execution_idempotency_key,command_type,source_turn_id,timeline_id,actor_id
       FROM tool_proposal_execution_bindings_v37 WHERE proposal_id=?`).get(seeded.proposal.proposalId)).toEqual({
       execution_idempotency_key: proposalExecutionIdempotencyKeyV37(seeded.proposal.proposalId), command_type: "roll_actor_dice",

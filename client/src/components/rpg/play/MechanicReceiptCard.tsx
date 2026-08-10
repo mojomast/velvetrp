@@ -4,7 +4,7 @@ import type { CampaignHistoryHttpPublicReceiptResponse } from "@velvet/contracts
 /** Public mechanics link retained by an adventure turn. */
 export interface MechanicReceiptLink {
   commandId: string;
-  proposalId: string;
+  proposalId: string | null;
   linkedAt: string;
 }
 
@@ -24,6 +24,9 @@ type Receipt = CampaignHistoryHttpPublicReceiptResponse["receipt"];
 type Load = { state: "loading" } | { state: "error" } | { state: "ready"; receipt: Receipt };
 
 function ReceiptBody({ receipt }: { receipt: Receipt }) {
+  if(receipt.kind==="combat")return <><dl><div><dt>Combat update</dt><dd>Action resolved</dd></div>
+    <div><dt>Round</dt><dd>{receipt.roundBefore} → {receipt.roundAfter}</dd></div>
+    <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div></dl></>;
   if (receipt.kind !== "mechanic") return <p>This receipt contains campaign administration metadata, not a mechanic.</p>;
   const event = receipt.event;
   return <>
@@ -35,11 +38,11 @@ function ReceiptBody({ receipt }: { receipt: Receipt }) {
       <div><dt>Total</dt><dd><strong>{event.data.total}</strong></dd></div>
     </dl>}
     {event.type === "actor_attribute_set" && <dl>
-      <div><dt>Attribute</dt><dd>{event.data.attributeId}</dd></div>
+      <div><dt>Attribute</dt><dd>Updated</dd></div>
       <div><dt>Authoritative delta</dt><dd>{event.data.valueBefore} → {event.data.valueAfter}</dd></div>
     </dl>}
     {event.type === "actor_resource_initialized" && <dl>
-      <div><dt>Resource initialized</dt><dd>{event.data.name}</dd></div>
+      <div><dt>Resource initialized</dt><dd>Recorded</dd></div>
       <div><dt>Current / maximum</dt><dd>{event.data.current} / {event.data.max}</dd></div>
     </dl>}
     <dl><div><dt>Target / outcome</dt><dd>Not recorded for this mechanic</dd></div>

@@ -15,4 +15,10 @@ describe("MechanicReceiptCard", () => {
     expect(screen.getAllByText("Not recorded for this mechanic")).toHaveLength(2);
     expect(screen.getByRole("region", { name: "Committed mechanics" })).toBeTruthy();
   });
+  it("resolves and renders an authoritative generalized combat receipt",async()=>{
+    const getCampaignCommandReceipt=vi.fn().mockResolvedValue({receipt:{kind:"combat",revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:00.000Z",
+      roundBefore:1,roundAfter:2}});
+    render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"combat-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
+    await screen.findByText("Combat update");expect(screen.getByText("Action resolved")).toBeTruthy();expect(screen.getByText("1 → 2")).toBeTruthy();expect(getCampaignCommandReceipt).toHaveBeenCalledWith("campaign","combat-command");
+  });
 });

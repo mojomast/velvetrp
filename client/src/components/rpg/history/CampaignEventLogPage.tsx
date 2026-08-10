@@ -26,9 +26,10 @@ function eventSummary(event: CampaignHistoryHttpEvent): { text: string; technica
 }
 function receiptDetail(receipt: CampaignHistoryHttpPublicReceipt): string {
   if (receipt.kind === "administration") return `${receipt.type.replaceAll("_", " ")} committed revision ${receipt.revisionAfter}.`;
+  if(receipt.kind==="combat")return `Combat advanced from round ${receipt.roundBefore} to ${receipt.roundAfter}.`;
   const event = receipt.event;
-  if (event.type === "actor_attribute_set") { const value = presentation(event.data.attributeId, "attribute"); return `${value.label}: ${event.data.valueBefore} → ${event.data.valueAfter}.`; }
-  if (event.type === "actor_resource_initialized") { const value = presentation(event.data.name, "resource"); return `${value.label}: ${event.data.current} of ${event.data.max}.`; }
+  if (event.type === "actor_attribute_set") return `Attribute changed: ${event.data.valueBefore} → ${event.data.valueAfter}.`;
+  if (event.type === "actor_resource_initialized") return `Resource initialized: ${event.data.current} of ${event.data.max}.`;
   return `${event.data.expression} rolled ${event.data.terms.map((term) => term.value).join(", ")} for a total of ${event.data.total}.`;
 }
 

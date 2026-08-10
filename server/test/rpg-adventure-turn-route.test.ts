@@ -2,7 +2,9 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { adventureTurnStreamEventSchema } from "@velvet/contracts";
+import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { buildApp } from "../src/app.js";
+import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { createRepository } from "../src/repo/index.js";
 import type { CampaignListRepository } from "../src/routes/rpg/v1/features.js";
 import { useTmpDataDir } from "./helpers.js";
@@ -27,8 +29,9 @@ function seed() {
   db.prepare("INSERT INTO campaign_content_packs VALUES (?,'turn-pack','1','turn-profile')").run(campaign.id);
   db.prepare("INSERT INTO campaign_characters VALUES ('cc',?,'persona',?,?)").run(campaign.id, at, at);
   db.prepare("INSERT INTO rpg_campaign_sheets VALUES ('sheet',?,'cc','turn-pack','1','race','human','turn-pack','1','background','hero',?,?)").run(campaign.id, at, at);
-  db.prepare("INSERT INTO campaign_actors VALUES ('actor',?,'cc','sheet','player-character','principal',?,?)").run(campaign.id, at, at);
-  db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(at);
+   db.prepare("INSERT INTO campaign_actors VALUES ('actor',?,'cc','sheet','player-character','principal',?,?)").run(campaign.id, at, at);
+   db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor',?,'local-owner',NULL)").run(campaign.id);
+   db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(at);
   db.prepare("INSERT INTO session_characters VALUES('session','persona',0)").run();
   db.prepare("INSERT INTO campaign_sessions VALUES('session',?,?)").run(campaign.id, at);
   db.close();
@@ -84,7 +87,7 @@ describe("M2.11 adventure turn routes", () => {
     enable(); const campaign = seed(); const repo = createRepository();
     const turn = repo.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,
       sessionId: "session", actorId: "actor", declaration: "I choose", expectedCampaignRevision: 0, idempotencyKey: `lost-${decision}` });
-    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll", arguments: {}, requiresConfirmation: true,
+    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll-check", arguments: {}, requiresConfirmation: true,
       confirmationExpiresAt: expires, expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: `proposal-${decision}` });
     repo.waitForToolConfirmation("local-owner", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: `wait-${decision}` });
     const app = buildApp({ campaignRepositoryFactory: () => repo });
@@ -97,7 +100,8 @@ describe("M2.11 adventure turn routes", () => {
     expect(read.json().resumeToken).toBe(confirmed.json().resumeToken);
     const resumed = await restarted.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" },
       payload: { resumeToken: read.json().resumeToken } });
-    expect(resumed.statusCode).toBe(200); expect(events(resumed.body)[0]).toMatchObject({ type: "agent_status" });
+    expect(resumed.statusCode).toBe(200);const streamed=events(resumed.body);if(decision==="reject"){expect(streamed).toHaveLength(2);expect(streamed[0]).toMatchObject({type:"agent_status",payload:{status:"decision-rejected"}});expect(streamed[1]).toMatchObject({type:"terminal"});}
+    else expect(streamed[0]).toMatchObject({type:"agent_status"});
     await restarted.close();
   });
 
@@ -105,7 +109,7 @@ describe("M2.11 adventure turn routes", () => {
     enable(); const campaign = seed(); const repo = createRepository();
     const turn = repo.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,
       sessionId: "session", actorId: "actor", declaration: "I open it", expectedCampaignRevision: 0, idempotencyKey: "confirm-turn" });
-    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll", arguments: {}, requiresConfirmation: true,
+    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll-check", arguments: {}, requiresConfirmation: true,
       confirmationExpiresAt: expires, expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: "proposal" });
     repo.waitForToolConfirmation("local-owner", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "wait" });
     const proposalId = proposed.toolCalls[0]!.proposal.proposalId;
@@ -118,7 +122,7 @@ describe("M2.11 adventure turn routes", () => {
     const restarted = buildApp({ campaignRepositoryFactory: () => createRepository() });
     const resumed = await restarted.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream", headers: { "content-type": "application/json" }, payload: { resumeToken: first.json().resumeToken } });
     expect(resumed.headers["x-adventure-turn-id"]).toBe(turn.turnId);
-    expect(events(resumed.body).map(({ type }) => type)).toEqual(["agent_status", "agent_status", "terminal"]);
+    expect(events(resumed.body).map(({ type }) => type)).toEqual(["agent_status", "terminal"]);
     expect(resumed.body).not.toContain("turn_started"); expect(resumed.body).not.toContain("mechanics_committed");
     await restarted.close();
   });
@@ -128,7 +132,7 @@ describe("M2.11 adventure turn routes", () => {
     const create = { campaignId: campaign.id, timelineId: campaign.activeTimelineId, sessionId: "session", actorId: "actor",
       declaration: "I test the ancient lock", expectedCampaignRevision: 0, idempotencyKey: "full-turn" };
     const turn = repo.createAdventureTurn("local-owner", create);
-    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll", arguments: {}, requiresConfirmation: true,
+    const proposed = repo.appendToolProposal("local-owner", { turnId: turn.turnId, toolName: "roll-check", arguments: {}, requiresConfirmation: true,
       confirmationExpiresAt: expires, expectedTurnRevision: 0, expectedCampaignRevision: 0, idempotencyKey: "full-proposal" });
     repo.waitForToolConfirmation("local-owner", { turnId: turn.turnId, expectedTurnRevision: 1, expectedCampaignRevision: 0, idempotencyKey: "full-wait" });
     let app = buildApp({ campaignRepositoryFactory: () => repo });
@@ -184,8 +188,17 @@ describe("M2.11 adventure turn routes", () => {
     await app.close();
   });
 
-  it("finishes deterministic durable orchestration after delivery disconnect", async () => {
-    enable(); const campaign = seed(); const app = buildApp({ campaignRepositoryFactory: () => createRepository() });
+  it("aborts provider orchestration when the SSE client disconnects", async () => {
+    enable(); const campaign = seed(); let completeStarted = false; let completeAborted = false;
+    const dependencies: AdventureAgentDependencies = {
+      complete: async ({ signal }) => new Promise((_resolve, reject) => {
+        completeStarted = true;
+        signal?.addEventListener("abort", () => { completeAborted = true; reject(new Error("stream disconnected")); }, { once: true });
+      }),
+      getProvider: async () => ({ ...defaultProviderSettings(), baseUrl: "http://127.0.0.1:1/v1", model: "fake" }),
+      getHarness: async () => defaultHarnessSettings(), now: () => new Date(),
+    };
+    const app = buildApp({ campaignRepositoryFactory: () => createRepository(), adventureAgentDependencies: dependencies });
     const address = await app.listen({ host: "127.0.0.1", port: 0 });
     const controller = new AbortController();
     const response = await fetch(`${address}/api/rpg/v1/adventure-turns/stream`, { method: "POST", signal: controller.signal,
@@ -196,9 +209,13 @@ describe("M2.11 adventure turn routes", () => {
     const match = received.match(/data: (\{[^\n]+\})/); if (!match) throw new Error("turn_started data missing");
     const started = adventureTurnStreamEventSchema.parse(JSON.parse(match[1]!));
     if (started.type !== "turn_started") throw new Error("unexpected first event");
-    controller.abort(); await new Promise((resolve) => setTimeout(resolve, 50));
+    for (let attempts = 0; !completeStarted && attempts < 100; attempts += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(completeStarted).toBe(true);
+    controller.abort();
+    for (let attempts = 0; !completeAborted && attempts < 100; attempts += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(completeAborted).toBe(true);
     const reconciled = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${started.payload.turn.turnId}` });
-    expect(reconciled.json()).toMatchObject({ turn: { state: "completed" }, narrationStatus: { status: "completed" } });
+    expect(reconciled.json()).toMatchObject({ turn: { state: "declared" }, narrationStatus: { status: "none" } });
     await app.close();
   });
 

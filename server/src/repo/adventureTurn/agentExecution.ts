@@ -135,7 +135,12 @@ export function createAdventureTurnAgentExecutionRepository(
     const run = executionRun(db, row);
     const calls = (db.prepare(`SELECT call.*,outcome.status outcome_status,outcome.result_json,outcome.result_digest,outcome.error_code
       FROM agent_tool_calls_v38 call LEFT JOIN agent_read_outcomes_v38 outcome ON outcome.call_id=call.call_id
-      WHERE call.campaign_id=? AND call.turn_id=? ORDER BY call.round_number,call.position`).all(row.campaign_id, row.id) as any[])
+      WHERE call.campaign_id=? AND call.turn_id=? AND NOT(call.call_kind='mutation' AND EXISTS(
+        SELECT 1 FROM agent_replan_requirements_v40 replan JOIN tool_proposals proposal ON proposal.proposal_id=replan.proposal_id
+        WHERE replan.campaign_id=call.campaign_id AND replan.turn_id=call.turn_id AND proposal.position=(SELECT count(*)-1
+          FROM agent_tool_calls_v38 prior WHERE prior.campaign_id=call.campaign_id AND prior.turn_id=call.turn_id AND prior.call_kind='mutation'
+            AND (prior.round_number<call.round_number OR (prior.round_number=call.round_number AND prior.position<=call.position)))))
+      ORDER BY call.round_number,call.position`).all(row.campaign_id, row.id) as any[])
       .map((call) => {
         const readOutcome = call.outcome_status ? { status: call.outcome_status,
           result: call.result_json ? JSON.parse(call.result_json) : null, resultDigest: call.result_digest, errorCode: call.error_code } : null;
@@ -145,15 +150,21 @@ export function createAdventureTurnAgentExecutionRepository(
           toolName: call.tool_name, kind: call.call_kind, arguments: JSON.parse(call.arguments_json), argumentDigest: call.argument_digest,
           status, readOutcome };
       });
-    const decisionRounds = (db.prepare("SELECT count(*) count FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?")
-      .get(row.campaign_id, row.id) as { count: number }).count;
+    const decisionRounds = (db.prepare(`SELECT max(rounds) count FROM (
+      SELECT count(*) rounds FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?
+      UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?)`)
+      .get(row.campaign_id, row.id,row.campaign_id,row.id) as { count: number }).count;
+    const postV38Mutations=(db.prepare(`SELECT count(*) count FROM agent_mutation_accounting_v40 item WHERE campaign_id=? AND turn_id=?
+      AND NOT EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan WHERE replan.proposal_id=item.proposal_id)`)
+      .get(row.campaign_id,row.id) as {count:number}).count;
     const providerStarts = (db.prepare("SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND phase='started'")
       .get(row.campaign_id, row.id) as { count: number }).count;
     return durableAgentPlanningStateSchema.parse({ turnId: row.id, toolRegistryVersion: run.tool_registry_version,
       executionRevision: executionRevision(db, row),
       limits: { decisionRounds: run.max_decision_rounds, toolCalls: run.max_tool_calls, mutationCalls: run.max_mutation_calls,
         providerCalls: run.max_provider_calls, durationMs: run.max_duration_ms }, startedAt: run.started_at, deadlineAt: run.deadline_at,
-      decisionRounds, toolCalls: calls, mutationCalls: calls.filter((call) => call.kind === "mutation").length,
+       decisionRounds, toolCalls: calls, totalToolCalls:calls.length+postV38Mutations,
+       mutationCalls: calls.filter((call) => call.kind === "mutation").length+postV38Mutations,
       providerStarts, deadlineExceeded: now() >= run.deadline_at });
   };
 
@@ -181,12 +192,18 @@ export function createAdventureTurnAgentExecutionRepository(
         const starts = (db.prepare(`SELECT count(*) count FROM provider_call_metadata
           WHERE campaign_id=? AND turn_id=? AND phase='started'`).get(row.campaign_id, row.id) as { count: number }).count;
         if (starts >= run.max_provider_calls) throw new AdventureTurnConflictError("provider call limit exceeded");
-        const rounds = (db.prepare("SELECT count(*) count FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?")
-          .get(row.campaign_id, row.id) as { count: number }).count;
+        const rounds = (db.prepare(`SELECT max(completed) count FROM (
+          SELECT count(*) completed FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?
+          UNION ALL SELECT COALESCE(max(round_number),0) completed FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?)`)
+          .get(row.campaign_id,row.id,row.campaign_id,row.id) as { count: number }).count;
         const agentStarts = (db.prepare("SELECT count(*) count FROM agent_provider_starts_v38 WHERE campaign_id=? AND turn_id=?")
           .get(row.campaign_id, row.id) as { count: number }).count;
         const unresolved = db.prepare(`SELECT 1 FROM agent_tool_calls_v38 call WHERE call.campaign_id=? AND call.turn_id=? AND
-          (call.call_kind='mutation' OR NOT EXISTS(SELECT 1 FROM agent_read_outcomes_v38 outcome WHERE outcome.call_id=call.call_id)) LIMIT 1`)
+           ((call.call_kind='mutation' AND NOT EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan JOIN tool_proposals proposal ON proposal.proposal_id=replan.proposal_id
+             WHERE replan.campaign_id=call.campaign_id AND replan.turn_id=call.turn_id AND proposal.position=(SELECT count(*)-1
+               FROM agent_tool_calls_v38 prior WHERE prior.campaign_id=call.campaign_id AND prior.turn_id=call.turn_id AND prior.call_kind='mutation'
+                 AND (prior.round_number<call.round_number OR (prior.round_number=call.round_number AND prior.position<=call.position)))))
+             OR (call.call_kind='read' AND NOT EXISTS(SELECT 1 FROM agent_read_outcomes_v38 outcome WHERE outcome.call_id=call.call_id))) LIMIT 1`)
           .get(row.campaign_id, row.id);
         if (rounds >= run.max_decision_rounds) throw new AdventureTurnConflictError("decision round limit exceeded");
         if (agentStarts !== rounds || unresolved) throw new AdventureTurnConflictError("prior provider round is unresolved");
@@ -212,14 +229,22 @@ export function createAdventureTurnAgentExecutionRepository(
         const at = now(); const run = requireFresh(db, row, input, at);
         const priorRounds = db.prepare("SELECT * FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=? ORDER BY round_number")
           .all(row.campaign_id, row.id) as any[];
-        if (input.round !== priorRounds.length + 1 || input.round > run.max_decision_rounds
+        const priorCompleted=(db.prepare("SELECT COALESCE(max(round_number),0) round FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?")
+          .get(row.campaign_id,row.id) as {round:number}).round;
+        if (input.round !== Math.max(priorRounds.length,priorCompleted) + 1 || input.round > run.max_decision_rounds
             || priorRounds.some((round) => round.result !== "tool-calls")
             || priorRounds.some((round) => db.prepare(`SELECT 1 FROM agent_tool_calls_v38 call WHERE call.round_id=? AND
                ((call.call_kind='read' AND NOT EXISTS(SELECT 1 FROM agent_read_outcomes_v38 outcome WHERE outcome.call_id=call.call_id)) OR
-                 call.call_kind='mutation') LIMIT 1`)
+                  (call.call_kind='mutation' AND NOT EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan JOIN tool_proposals proposal ON proposal.proposal_id=replan.proposal_id
+                    WHERE replan.campaign_id=call.campaign_id AND replan.turn_id=call.turn_id AND proposal.position=(SELECT count(*)-1
+                      FROM agent_tool_calls_v38 prior WHERE prior.campaign_id=call.campaign_id AND prior.turn_id=call.turn_id AND prior.call_kind='mutation'
+                        AND (prior.round_number<call.round_number OR (prior.round_number=call.round_number AND prior.position<=call.position)))))) LIMIT 1`)
               .get(round.round_id))) throw new AdventureTurnConflictError("prior decision round is not terminal");
-        const totals = db.prepare(`SELECT count(*) calls,COALESCE(sum(call_kind='mutation'),0) mutations FROM agent_tool_calls_v38
-          WHERE campaign_id=? AND turn_id=?`).get(row.campaign_id, row.id) as { calls: number; mutations: number };
+        const totals = db.prepare(`SELECT count(*) calls,COALESCE(sum(call_kind='mutation'),0) mutations FROM agent_tool_calls_v38 call
+          WHERE campaign_id=? AND turn_id=? AND NOT(call_kind='mutation' AND EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan JOIN tool_proposals proposal ON proposal.proposal_id=replan.proposal_id
+            WHERE replan.campaign_id=call.campaign_id AND replan.turn_id=call.turn_id AND proposal.position=(SELECT count(*)-1
+              FROM agent_tool_calls_v38 prior WHERE prior.campaign_id=call.campaign_id AND prior.turn_id=call.turn_id AND prior.call_kind='mutation'
+                AND (prior.round_number<call.round_number OR (prior.round_number=call.round_number AND prior.position<=call.position)))))`).get(row.campaign_id, row.id) as { calls: number; mutations: number };
         const addedMutations = input.calls.filter((call) => call.kind === "mutation").length;
         if (totals.calls + input.calls.length > run.max_tool_calls || totals.mutations + addedMutations > run.max_mutation_calls) {
           throw new AdventureTurnConflictError("durable execution tool limit exceeded");

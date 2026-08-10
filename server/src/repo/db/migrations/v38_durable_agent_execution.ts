@@ -10,6 +10,8 @@ import { assertToolExecutionBindingsV37 } from "./v37_tool_execution_bindings.js
 
 /** Canonical digest of the additive v38 durable agent-execution layout. */
 export const V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST = "8757b92bb686f546c1cc9102565215f3c2047197097855afb29d31a48ad52717";
+const V40_EVOLVED_V38_PROVIDER_START_DIGEST = "62e1a115c4ef413a2645359d0a4aaca087b43a114e120399434734a905bb2f6b";
+const V40_RESTORED_V38_GUARD_DIGEST = "21f0aeb24bb3b88a486f9a8ae5d6ecd65f2c58ab1c161e11383578db6b5f973b";
 
 const TABLES = [
   "adventure_agent_executions_v38", "agent_execution_operations_v38", "agent_provider_starts_v38",
@@ -472,7 +474,9 @@ export function assertDurableAgentExecutionV38(db: DatabaseDriver.Database): voi
 export function assertDurableAgentExecutionLayoutV38(db: DatabaseDriver.Database): void {
   assertInventory(db); const actual = layoutDigest(db);
   const row = db.prepare("SELECT layout_digest FROM durable_agent_execution_layout_attestation_v38 WHERE singleton=1").get() as { layout_digest: string } | undefined;
-  if (!row || row.layout_digest !== actual || (V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST && actual !== V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST)) {
+  const evolved=row?.layout_digest===V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST
+    &&[V40_EVOLVED_V38_PROVIDER_START_DIGEST,V40_RESTORED_V38_GUARD_DIGEST].includes(actual);
+  if (!row || (!evolved&&(row.layout_digest !== actual || actual !== V38_DURABLE_AGENT_EXECUTION_CANONICAL_DIGEST))) {
     throw new Error("schema v38 canonical durable agent execution layout is incompatible");
   }
 }

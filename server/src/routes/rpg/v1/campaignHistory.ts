@@ -32,7 +32,7 @@ const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.
 type CampaignHistoryRepository = Pick<CampaignAdministrationRepository,
   "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt">;
+  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt" | "getAgentCombatReceipt">;
 
 export interface CampaignHistoryHttpOptions {
   campaignHistoryRepositoryAccessor: () => CampaignHistoryRepository;
@@ -148,9 +148,16 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
         }
         return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({ receipt: {
           kind: "mechanic", revisionBefore: mechanic.revisionBefore, revisionAfter: mechanic.revisionAfter,
-          occurredAt: event.occurredAt, event: { type: event.type, data: event.data },
+          occurredAt: event.occurredAt, event: event.type === "actor_attribute_set"
+            ? { type: event.type, data: { valueBefore: event.data.valueBefore, valueAfter: event.data.valueAfter } }
+            : event.type === "actor_resource_initialized"
+              ? { type: event.type, data: { current: event.data.current, max: event.data.max } }
+              : { type: event.type, data: event.data },
         } }));
       }
+      const combat=typeof repository.getAgentCombatReceipt==="function"?repository.getAgentCombatReceipt(LOCAL_OWNER,campaignId,request.params.commandId):null;
+      if(combat)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat",revisionBefore:combat.revisionBefore,
+        revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,roundBefore:combat.resolution.roundBefore,roundAfter:combat.resolution.roundAfter}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
       if (administration === null) return unavailable(request, reply);
       const safe = publicReceipt(administration, campaignId, request.params.commandId);

@@ -7,13 +7,14 @@ import { ADVENTURE_GENERATION_V35_MANAGED_OBJECTS } from "../src/repo/db/migrati
 import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS } from "../src/repo/db/migrations/v38_durable_agent_execution.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureAgentSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 const AT = "2035-01-01T00:00:00.000Z";
 
 function removeV36(db: DatabaseDriver.Database): void {
+  removeFutureAgentSchema(db);
   const v38Names = DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS.map(([, name]) => name);
   const v38 = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${v38Names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
     .all(...v38Names) as Array<{ type: string; name: string }>;
@@ -87,7 +88,7 @@ describe("schema v36 adventure hardening", () => {
     expect(reopened.getGenerationDraft("local-owner", draft.draftId)).toMatchObject({ draftId: draft.draftId, state: "staged" });
     reopened.close();
     const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "38" });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
     expect(verify.prepare("SELECT mutation_type,expected_revision,resulting_revision FROM adventure_coordination_commands_v36").get())
       .toMatchObject({ mutation_type: "migration-snapshot", expected_revision: -1 });
     verify.close();

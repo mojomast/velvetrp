@@ -3,6 +3,7 @@ import { confirmationDecisionKindSchema, narrationStatusSchema } from "./adventu
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema, campaignIdSchema } from "./rpg-characters.js";
+import { roleSafeConfirmationPolicySchema } from "./confirmation-policy.js";
 
 /** Maximum number of validated events emitted by one adventure-turn stream. */
 export const MAX_ADVENTURE_STREAM_SEQUENCE = 1_000_000;
@@ -56,7 +57,7 @@ export const adventureTurnHttpProjectionSchema = z.object({
 /** Public projection of one exact proposal-bound mechanics receipt. */
 export const adventureTurnPublicReceiptSchema = z.object({
   commandId: resourceIdSchema,
-  proposalId: resourceIdSchema,
+  proposalId: resourceIdSchema.nullable(),
   linkedAt: utcIsoTimestampSchema,
 }).strict();
 
@@ -66,6 +67,7 @@ export const adventureTurnHttpProposalSchema = z.object({
   position: z.number().int().min(0).max(31),
   toolName: resourceIdSchema,
   proposedAt: utcIsoTimestampSchema,
+  policy: roleSafeConfirmationPolicySchema,
   confirmation: z.discriminatedUnion("state", [
     z.object({ state: z.literal("not-required") }).strict(),
     z.object({ state: z.literal("pending"), expiresAt: utcIsoTimestampSchema }).strict(),
@@ -133,7 +135,7 @@ const streamEnvelope = <K extends string, T extends z.ZodType>(type: K, payload:
 export const adventureTurnStartedEventSchema = streamEnvelope("turn_started", z.object({ turn: adventureTurnHttpProjectionSchema }).strict());
 /** Reviewed, non-sensitive coordination status. */
 export const adventureTurnAgentStatusEventSchema = streamEnvelope("agent_status", z.object({
-  status: z.enum(["planning", "awaiting-confirmation", "pending-mechanics", "narrating"]),
+  status: z.enum(["planning", "awaiting-confirmation", "pending-mechanics", "narrating", "decision-rejected", "expired"]),
 }).strict());
 /** Public proposal event without arguments or provider internals. */
 export const adventureTurnToolProposedEventSchema = streamEnvelope("tool_proposed", z.object({ proposal: adventureTurnHttpProposalSchema }).strict());

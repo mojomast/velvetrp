@@ -21,6 +21,7 @@ import { rpgV1Routes } from "./routes/rpg/v1/features.js";
 import type { CampaignListRepository } from "./routes/rpg/v1/features.js";
 import { systemRuntime } from "./runtime.js";
 import type { RuntimeDependencies } from "./runtime.js";
+import type { AdventureAgentDependencies } from "./agent/adventureOrchestrator.js";
 
 interface NormalizedCampaignResourceRoute {
   instance: string;
@@ -429,6 +430,7 @@ export function buildApp(options: {
   campaignRepositoryFactory?: () => CampaignListRepository;
   loggerStream?: Writable;
   diceCommandIds?: { nextId(): string };
+  adventureAgentDependencies?: AdventureAgentDependencies;
 } = {}) {
   const runtime = options.runtime ?? systemRuntime;
   const app = Fastify({
@@ -685,6 +687,7 @@ export function buildApp(options: {
     prefix: "/api/rpg/v1",
     campaignRepositoryFactory: options.campaignRepositoryFactory ?? (() => createRepository()),
     diceCommandIds: options.diceCommandIds ?? { nextId: () => randomUUID() },
+    ...(options.adventureAgentDependencies ? { adventureAgentDependencies: options.adventureAgentDependencies } : {}),
   });
 
   return app;

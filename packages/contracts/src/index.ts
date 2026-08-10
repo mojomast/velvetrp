@@ -54,6 +54,7 @@ export * from "./story.js";
 export * from "./story-http.js";
 export * from "./adventure-turns.js";
 export * from "./agent-execution.js";
+export * from "./confirmation-policy.js";
 export * from "./generation-drafts.js";
 export * from "./adventure-turns-http.js";
 export * from "./generation-drafts-http.js";
