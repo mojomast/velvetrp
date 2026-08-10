@@ -12,7 +12,7 @@ Current persistence is `v41`. The authoritative dependency order and acceptance 
 - [x] M4.3: durable confirmation, expiry, restart reconciliation, and resume
 - [x] M4.4: receipt-aware narration and narrative consequence injection
 - [x] M4.5: typed LLM encounter generation, strict staged validation, GM-confirmed authoritative encounter creation, and privacy-safe projections
-- [x] M4.6: typed campaign-content drafts, conservative generated NPC baselines, and atomic reviewed application
+- [x] M4.6: typed campaign-content drafts, conservative generated NPC baselines, atomic reviewed application, and v42 additive integrity sealing
 
 ## Pending
 
