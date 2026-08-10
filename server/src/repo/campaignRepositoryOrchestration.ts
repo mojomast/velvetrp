@@ -796,10 +796,17 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
           if (command?.idempotency_key !== key("content-apply")) throw new AdventureTurnConflictError("idempotency key was reused");
           return before;
         }
+        // Draft creation captures the campaign revision.  Seal that observation
+        // in a dedicated content aggregate before any domain projection is
+        // written: a second independently staged draft cannot silently apply.
+        const priorContent = db.prepare("SELECT revision FROM campaign_content_revisions_v42 WHERE campaign_id=?").get(before.campaignId) as { revision: number } | undefined;
+        if (priorContent && priorContent.revision !== before.campaignRevision) throw new AdventureTurnConflictError("campaign content revision is stale");
         const staged = stagedCampaignContentGenerationSchema.parse(before.stagedContent);
         const reviewed = adventureTurnRepository.reviewGenerationDraft(principalId, { draftId: before.draftId, decision: "approved", expectedDraftRevision: input.expectedDraftRevision, expectedCampaignRevision: before.campaignRevision, idempotencyKey: key("content-review") });
         const at = dependencies.clock.now().toISOString();
         const next = () => resourceIdSchema.parse(dependencies.ids.nextId());
+        const commandId = next();
+        db.prepare("INSERT INTO campaign_content_commands_v42 VALUES(?,?,?,?,?,?,?)").run(commandId, before.campaignId, before.draftId, createHash("sha256").update(principalId).digest("hex"), key("content-apply"), before.campaignRevision, at);
         for (const location of staged.locations) db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,'public',?)").run(next(), before.campaignId, null, location.name, location.description, at);
         for (const faction of staged.factions) { const factionId = next(); db.prepare("INSERT INTO campaign_factions_v28(faction_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)").run(factionId, before.campaignId, faction.name, at); db.prepare("INSERT INTO campaign_faction_private_state_v28 VALUES(?,?,?)").run(before.campaignId, factionId, ""); }
         for (const npc of staged.npcs) { const personaId = next(), npcId = next();
@@ -809,8 +816,11 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
           db.prepare("INSERT INTO campaign_npc_baseline_stats_v41 VALUES(?,?,10,10,10,'generated-deterministic-baseline')").run(before.campaignId, npcId);
         }
         for (const quest of staged.quests) db.prepare("INSERT INTO generated_campaign_quests_v41 VALUES(?,?,?,?,?)").run(before.campaignId, next(), quest.title, quest.description, before.draftId);
-        db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?) ON CONFLICT(campaign_id) DO UPDATE SET opening_text=excluded.opening_text,campaign_premise=excluded.campaign_premise,source_draft_id=excluded.source_draft_id,created_at=excluded.created_at").run(before.campaignId, staged.opening, staged.premise, before.draftId, at);
-        return adventureTurnRepository.applyGenerationDraft(principalId, { draftId: before.draftId, expectedDraftRevision: reviewed.revision, expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("content-apply"), result: { scope: "campaign-content" } });
+        db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)").run(before.campaignId, staged.opening, staged.premise, before.draftId, at);
+        db.prepare("INSERT INTO campaign_content_revisions_v42 VALUES(?,?,?,?)").run(before.campaignId, before.campaignRevision + 1, before.draftId, at);
+        const draft = adventureTurnRepository.applyGenerationDraft(principalId, { draftId: before.draftId, expectedDraftRevision: reviewed.revision, expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("content-apply"), result: { scope: "campaign-content" } });
+        db.prepare("INSERT INTO campaign_content_receipts_v42 VALUES(?,?,?,?,?,?)").run(next(), commandId, before.campaignId, before.draftId, at, JSON.stringify({ scope: "campaign-content" }));
+        return draft;
       }).immediate(); } finally { atomicGenerationApplyDepth -= 1; transactionDepth -= 1; }
     },
     installMechanicsStarterCatalog: (actorPrincipalId) =>

@@ -13,7 +13,7 @@ type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
   | "assertCampaignContentPacksHaveExactSealedPacks" | "assertCampaignImportStagingV30"
   | "assertEncounterLifecycleV31"
-  | "assertWorldNarrativeV32" | "assertQuestDomainV33" | "assertStoryDomainV34" | "assertAdventureGenerationV35" | "assertAdventureHardeningV36" | "assertToolExecutionBindingsV37" | "assertDurableAgentExecutionV38" | "assertAgentResponseProvenanceV39" | "assertConfirmationPolicyV40"
+  | "assertWorldNarrativeV32" | "assertQuestDomainV33" | "assertStoryDomainV34" | "assertAdventureGenerationV35" | "assertAdventureHardeningV36" | "assertToolExecutionBindingsV37" | "assertDurableAgentExecutionV38" | "assertAgentResponseProvenanceV39" | "assertConfirmationPolicyV40" | "assertCampaignContentIntegrityV42"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
   | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28"
@@ -29,7 +29,7 @@ type SchemaDependencies = Record<
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38" | "migrate38to39" | "migrate39to40" | "migrate40to41" | "createCampaignContentGenerationV41"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38" | "migrate38to39" | "migrate39to40" | "migrate40to41" | "createCampaignContentGenerationV41" | "migrate41to42" | "createCampaignContentIntegrityV42"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -47,7 +47,7 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "41";
+export const SCHEMA_VERSION = "42";
 export const SCHEMA_REVISION = "1";
 
 const V34_TABLE_DROP_ORDER = ["story_layout_attestation_v34", "story_discoveries_v34", "story_clue_sources_v34", "story_clues_v34",
@@ -85,6 +85,18 @@ function cleanupFutureConfirmationPolicyV40(db:DatabaseDriver.Database,marker:st
   db.transaction(()=>{restorePreV40CoordinationGuards(db);for(const artifact of artifacts.filter(({type})=>type==="trigger"))db.exec(`DROP TRIGGER "${artifact.name}"`);
     for(const table of ["confirmation_policy_layout_attestation_v40","confirmation_authority_evidence_v40","confirmation_expiration_operations_v40","agent_replan_requirements_v40","agent_mutation_accounting_v40","confirmation_policy_attestations_v40"])
       if(artifacts.some((artifact)=>artifact.type==="table"&&artifact.name===table))db.exec(`DROP TABLE "${table}"`);})();
+}
+
+/** Never discard a real v42 command; an empty canonical shell may be replayed. */
+function cleanupFutureCampaignContentV42(db: DatabaseDriver.Database, marker: string): void {
+  const artifacts = db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v42*' AND sql IS NOT NULL").all() as Array<{type:string;name:string}>;
+  if (!artifacts.length) return;
+  try { getSchemaDependencies().assertCampaignContentIntegrityV42(db); } catch (error) { throw new Error(`schema marker ${marker} contains malformed future v42 artifacts`, { cause: error }); }
+  for (const table of ["campaign_content_commands_v42", "campaign_content_receipts_v42", "campaign_content_revisions_v42"]) {
+    if ((db.prepare(`SELECT count(*) count FROM ${table}`).get() as {count:number}).count) throw new Error(`schema marker ${marker} contains populated future v42 artifact ${table}`);
+  }
+  db.transaction(() => { for (const {name} of artifacts.filter(({type}) => type === "trigger")) db.exec(`DROP TRIGGER "${name}"`);
+    for (const table of ["campaign_content_layout_attestation_v42", "campaign_content_revisions_v42", "campaign_content_receipts_v42", "campaign_content_commands_v42"]) db.exec(`DROP TABLE "${table}"`); })();
 }
 
 /** Removes only a canonical empty v38 shell from a rewound historical fixture. */
@@ -202,7 +214,7 @@ function cleanupFutureAdventureHardeningV36(db: DatabaseDriver.Database, marker:
 
 export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
-    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
+    assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCampaignContentIntegrityV42, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
     assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
@@ -263,7 +275,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
                   createDurableAgentExecutionV38(db);
                    createAgentResponseProvenanceV39(db);
                     createConfirmationPolicyV40(db);
-                    createCampaignContentGenerationV41(db);
+                     createCampaignContentGenerationV41(db);
+                     getSchemaDependencies().createCampaignContentIntegrityV42(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -284,6 +297,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertDurableAgentExecutionV38(db);
     assertAgentResponseProvenanceV39(db);
     assertConfirmationPolicyV40(db);
+    assertCampaignContentIntegrityV42(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -404,6 +418,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
       DROP INDEX IF EXISTS uq_quest_reward_ancestry_v33;DROP INDEX IF EXISTS uq_quest_campaign_id_v33;`);
   }
   if(Number(version)<40)cleanupFutureConfirmationPolicyV40(db,version);
+  if(Number(version)<42)cleanupFutureCampaignContentV42(db,version);
   if(Number(version)<39)cleanupFutureAgentResponseV39(db,version);
   if(Number(version)<34)cleanupFutureStoryV34(db,version);
   if(Number(version)<38)cleanupFutureDurableAgentExecutionV38(db,version);
@@ -597,6 +612,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   if(version==="38"){migrate38to39(db);version="39";}
   if(version==="39"){migrate39to40(db);version="40";}
   if(version==="40"){getSchemaDependencies().migrate40to41(db);version="41";}
+  if(version==="41"){getSchemaDependencies().migrate41to42(db);version="42";}
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -619,6 +635,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertDurableAgentExecutionV38(db);
   assertAgentResponseProvenanceV39(db);
   assertConfirmationPolicyV40(db);
+  assertCampaignContentIntegrityV42(db);
+  getSchemaDependencies().assertCampaignContentIntegrityV42(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

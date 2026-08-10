@@ -183,7 +183,7 @@ describe("M2.11 adventure turn routes", () => {
     const derivativeDb = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
     expect(derivativeDb.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(turn.turnId)).toEqual({ count: 1 });
     expect(derivativeDb.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id<>?").get(turn.turnId)).toEqual({ count: 0 });
-    expect(derivativeDb.prepare("SELECT revision FROM adventure_turns WHERE id=?").get(priorTurnId)).toEqual({ revision: 2 });
+    expect(derivativeDb.prepare("SELECT revision FROM adventure_turns WHERE id=?").get(priorTurnId)).toEqual({ revision: 4 });
     derivativeDb.close();
     await app.close();
   });

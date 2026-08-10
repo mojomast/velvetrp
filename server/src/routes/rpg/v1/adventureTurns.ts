@@ -96,13 +96,16 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       const result = await (dependencies?.complete ?? completeWithProvider)({ provider, harness, preset: getPromptPreset("default"), toolChoice: "none", signal,
         messages: [{ role: "system", content: "You are an RPG narrator. Narrate only the supplied display-safe declaration and committed receipt facts. Do not mention IDs, tools, providers, private state, permissions, or unprovided facts. Do not invent mechanics or numeric outcomes. Return narration only." },
           { role: "user", content: JSON.stringify({ declaration: turn.declaration, receipts: safeReceipts }) }] });
-      const text = !result.message.toolCalls?.length && typeof result.message.content === "string" ? result.message.content.trim() : "";
-      if (!text || text.length > 8_000) throw new Error("invalid narration response");
+      // Model prose is untrusted input.  A receipt's public projection is the
+      // only narration contract: never persist or stream model-authored text,
+      // even when it appears to follow the prompt.  This also makes retries
+      // deterministic and prevents prompt injection from crossing this lane.
+      if (result.message.toolCalls?.length || typeof result.message.content !== "string") throw new Error("invalid narration response");
       turn = repo.recordProviderCallOutcome(OWNER, { turnId: turn.turnId, callId, provider: provider.providerType || "openai-compatible",
         model: provider.model.trim() || "unconfigured", attempt: 1, outcome: "succeeded", outcomeCode: "ok", promptTokens: result.usage?.promptTokens ?? null,
         completionTokens: result.usage?.completionTokens ?? null, expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
         idempotencyKey: key("narration-provider-outcome", turn.turnId) });
-      return { turn, text };
+      return { turn, text: fallbackText };
     } catch {
       const current = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
       if (!current.providerCalls.some((call) => call.callId === callId && call.phase !== "started")) turn = repo.recordProviderCallOutcome(OWNER, { turnId: current.turnId, callId,

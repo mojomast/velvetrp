@@ -3,28 +3,27 @@ import { generationDraftApplyRequestSchema, generationDraftApplyResponseSchema, 
 
 describe("M2.11 generation draft HTTP contracts", () => {
   it("accepts only exact roadmap create and apply shapes", () => {
-    const create = { campaignId: "campaign", kind: "npc", brief: "A careful guide", constraints: ["No hidden powers"], idempotencyKey: "draft" };
+    const create = { campaignId: "campaign", sessionId: "session", brief: "A careful guide", visibleLocation: "The road", tone: "quiet", difficulty: "standard", partyActorIds: ["actor"], pinnedEnemyTemplates: [{ kind: "enemy-template", packId: "pack", packVersion: "1", definitionId: "wolf" }], exclusions: ["No hidden powers"], idempotencyKey: "draft" };
     expect(generationDraftCreateRequestSchema.parse(create)).toEqual(create);
     expect(generationDraftCreateRequestSchema.safeParse({ ...create, expectedRevision: 0 }).success).toBe(false);
-    const apply = { selectedChanges: ["brief"], expectedRevision: 0, idempotencyKey: "apply" };
+    const apply = { expectedRevision: 0, idempotencyKey: "apply" };
     expect(generationDraftApplyRequestSchema.parse(apply)).toEqual(apply);
-    expect(generationDraftApplyRequestSchema.safeParse({ ...apply, selectedChanges: ["brief", "brief"] }).success).toBe(false);
+    expect(generationDraftApplyRequestSchema.safeParse({ ...apply, selectedChanges: ["brief"] }).success).toBe(false);
   });
 
-  it("requires explicit fallback provenance", () => {
+  it("projects only safe encounter facts", () => {
     const at = "2035-01-01T00:00:00.000Z";
-    const response = { draft: { draftId: "draft", campaignId: "campaign", kind: "npc", state: "staged", revision: 0, createdAt: at, updatedAt: at },
-      provenance: { source: "user-brief", method: "deterministic-fallback", applicationScope: "draft-review" },
-      changes: [{ changeId: "brief", summary: "Review user brief", content: { brief: "A guide", constraints: [] } }], validationIssues: [] };
+    const response = { draft: { draftId: "draft", campaignId: "campaign", kind: "encounter", state: "staged", revision: 0, createdAt: at, updatedAt: at },
+      encounter: { name: "Road ambush", enemyCount: 2, terrain: "road", motives: "delay", rewardNarrative: "safe passage" }, validationIssues: [] };
     expect(generationDraftGetResponseSchema.parse(response)).toEqual(response);
-    expect(generationDraftGetResponseSchema.safeParse({ ...response, provenance: { source: "llm", method: "generated" } }).success).toBe(false);
+    expect(generationDraftGetResponseSchema.safeParse({ ...response, provider: "secret" }).success).toBe(false);
   });
 
-  it("labels apply receipts as draft-only review sealing", () => {
+  it("labels apply receipts as authoritative encounter application", () => {
     const at = "2035-01-01T00:00:00.000Z";
-    const response = { draft: { draftId: "draft", campaignId: "campaign", kind: "npc", state: "applied", revision: 2, createdAt: at, updatedAt: at },
-      application: { scope: "draft-only", campaignDomainMutated: false },
-      receipts: [{ receiptId: "receipt", reviewDecisionId: "review", scope: "draft-only", selectedChanges: ["brief"], appliedAt: at }] };
+    const response = { draft: { draftId: "draft", campaignId: "campaign", kind: "encounter", state: "applied", revision: 2, createdAt: at, updatedAt: at },
+      application: { scope: "encounter", campaignDomainMutated: true, encounterId: "encounter" },
+      receipts: [{ receiptId: "receipt", reviewDecisionId: "review", scope: "encounter", encounterId: "encounter", appliedAt: at }] };
     expect(generationDraftApplyResponseSchema.parse(response)).toEqual(response);
   });
 });
