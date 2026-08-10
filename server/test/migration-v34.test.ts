@@ -4,12 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 const schema = (name: string) => { const db = new DatabaseDriver(name, { readonly: true }); const rows = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all(); db.close(); return rows; };
 function rewind(db: DatabaseDriver.Database) {
+  removeFutureCampaignContentGenerationSchema(db);
   db.prepare("UPDATE meta SET value='33' WHERE key='schemaVersion'").run();
   for (const row of db.prepare("SELECT name,type FROM sqlite_master WHERE name GLOB '*v34*'").all() as any[]) if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
   for (const table of ["story_layout_attestation_v34","story_discoveries_v34","story_clue_sources_v34","story_clues_v34","story_plot_point_answers_v34","story_plot_points_v34","story_edges_v34","story_node_state_v34","story_nodes_v34","story_metadata_v34","story_events_v34","story_receipts_v34","story_commands_v34","story_campaign_revisions_v34"]) db.exec(`DROP TABLE "${table}"`);
@@ -20,7 +21,7 @@ describe("schema v34 story domain", () => {
     const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! }); const campaign = repo.createCampaign("local-owner", { name: "Migration" });
     const db = new DatabaseDriver(file()); rewind(db); db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES('legacy',?,'Legacy','active','2035-01-01T00:00:00.000Z')").run(campaign.id); db.close(); repo.close();
     const migratedRepo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! }); expect(migratedRepo.getCampaignStory("local-owner", campaign.id)?.story).toMatchObject({ storylines: [{ storylineId: "legacy" }], nodes: [] }); migratedRepo.close();
-    const migrated = new DatabaseDriver(file(), { readonly: true }); expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" }); migrated.close();
+    const migrated = new DatabaseDriver(file(), { readonly: true }); expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" }); migrated.close();
     const freshDir = fs.mkdtempSync(path.join(os.tmpdir(), "velvet-v34-fresh-")); createRepository({ dataDir: freshDir }).close(); expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite"))); fs.rmSync(freshDir, { recursive: true, force: true });
   });
   it("rolls back a rejected malformed legacy ancestry", () => {

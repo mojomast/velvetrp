@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { removeFutureCampaignContentGenerationSchema } from "./helpers.js";
 
 const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v29-"));
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
@@ -17,6 +18,7 @@ function layout(dir: string): unknown[] {
 
 function rewindToV28(dir: string): void {
   const db = new DatabaseDriver(file(dir));
+  removeFutureCampaignContentGenerationSchema(db);
   db.exec("DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_update; DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_delete; DROP TABLE character_layout_attestation_v29; ALTER TABLE characters ADD COLUMN safe_word TEXT NOT NULL DEFAULT ''; ");
   db.prepare("UPDATE meta SET value='28' WHERE key='schemaVersion'").run();
   db.close();
@@ -36,7 +38,7 @@ describe("schema v29 character-column removal", () => {
     createRepository({ dataDir: migrated }).close();
 
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect((db.prepare("PRAGMA table_info(characters)").all() as Array<{ name: string }>).map((column) => column.name)).not.toContain("safe_word");
     expect(db.prepare("SELECT id FROM characters WHERE id=?").get(character.id)).toEqual({ id: character.id });
     expect(db.prepare("SELECT character_id FROM sessions WHERE id='preserved-session'").get()).toEqual({ character_id: character.id });

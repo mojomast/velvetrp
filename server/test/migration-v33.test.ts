@@ -4,13 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 const schema = (databaseFile: string) => { const db = new DatabaseDriver(databaseFile, { readonly: true });
   const rows = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all(); db.close(); return rows; };
 function rewindToV32(db: DatabaseDriver.Database): void {
+  removeFutureCampaignContentGenerationSchema(db);
   for (const row of db.prepare("SELECT name,type FROM sqlite_master WHERE name GLOB '*v34*'").all() as any[]) {
     if (row.type === "trigger") db.exec(`DROP TRIGGER "${row.name}"`);
   }
@@ -41,7 +42,7 @@ describe("schema v33 quest domain", () => {
     db.close(); repo.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect(migrated.prepare("SELECT title FROM quests WHERE id='legacy'").get()).toEqual({ title: "Legacy quest" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM quest_domain_layout_attestation_v33").get()).toEqual({ length: 64 });
     migrated.close();

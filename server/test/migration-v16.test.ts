@@ -127,7 +127,7 @@ describe("additive schema v15 through v18 migration", () => {
     }).toEqual(preserved);
     expect(migrated.prepare("SELECT validation_level,manifest_digest,manifest_json,provenance_json FROM rpg_content_pack_publications").get())
       .toEqual({ validation_level: "legacy-v10", manifest_digest: null, manifest_json: null, provenance_json: null });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     migrated.close();
     const freshDir = makeDir(); createRepository({ dataDir: freshDir }).close();
     expect(schema(file(migratedDir))).toEqual(schema(file(freshDir)));
@@ -151,7 +151,7 @@ describe("additive schema v15 through v18 migration", () => {
     const dir=makeDir(),{campaignId}=populatedV16(dir);
     createRepository({dataDir:dir}).close();
     const db=new DatabaseDriver(file(dir),{readonly:true});
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"40"});
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});
     expect(db.prepare("SELECT COUNT(*) count FROM rpg_catalog_definition_visibility").get()).toEqual({count:17});
     expect(db.prepare("SELECT campaign_id FROM campaign_catalog_current_selections").get()).toEqual({campaign_id:campaignId});
     expect(db.prepare("SELECT revision,type FROM campaign_imported_administration_events WHERE campaign_id=?").all(campaignId)).toEqual([]);
@@ -204,7 +204,7 @@ describe("additive schema v15 through v18 migration", () => {
       packId:MECHANICS_STARTER_CATALOG.manifest.packId,packVersion:MECHANICS_STARTER_CATALOG.manifest.packVersion}))).not.toContain("migration-leak");
     repo.close();const db=new DatabaseDriver(file(dir),{readonly:true});
     expect(JSON.stringify(db.prepare("SELECT public_definition_json FROM rpg_catalog_definition_visibility").all())).not.toContain("migration-leak");
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"40"});db.close();
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});db.close();
   });
 
   it("rolls back marker-v16 migration when the strict full definition graph is forged",()=>{
@@ -222,7 +222,7 @@ describe("additive schema v15 through v18 migration", () => {
   it("upgrades a valid populated marker-v17 additively with fresh-v18 DDL parity",()=>{
     const dir=makeDir(),{campaignId}=populatedV17(dir);createRepository({dataDir:dir}).close();
     const db=new DatabaseDriver(file(dir),{readonly:true});
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"40"});
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});
     expect(db.prepare("SELECT proposed_event_id FROM campaign_catalog_command_provenance_v18 WHERE campaign_id=?").get(campaignId))
       .toEqual({proposed_event_id:"v17-config"});db.close();
     const fresh=makeDir();createRepository({dataDir:fresh}).close();expect(schema(file(dir))).toEqual(schema(file(fresh)));

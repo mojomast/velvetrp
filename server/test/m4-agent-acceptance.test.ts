@@ -20,7 +20,7 @@ import {
 } from "../src/repo/index.js";
 import { CONFIRMATION_POLICY_V40_MANAGED_OBJECTS, restorePreV40CoordinationGuards } from "../src/repo/db/migrations/v40_confirmation_policy.js";
 import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -325,6 +325,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
 function removeV40ToGenuineV39(): void {
   const db = new DatabaseDriver(dbFile());
   db.pragma("foreign_keys=OFF");
+  removeFutureCampaignContentGenerationSchema(db);
   for (const [type, name] of [...CONFIRMATION_POLICY_V40_MANAGED_OBJECTS].reverse()) {
     db.exec(`DROP ${type === "trigger" ? "TRIGGER" : "TABLE"} IF EXISTS "${name}"`);
   }
@@ -368,7 +369,7 @@ describe("genuine populated v39 to v40 acceptance", () => {
     const fixture = await populatedV39Fixture();
     let repo = createRepository({ clock: { now: () => new Date(AT) } });
     const db = new DatabaseDriver(dbFile(), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     const policies = db.prepare(`SELECT proposal_id,policy_version,category,requires_confirmation,required_authorizer,
       safe_summary_json,proposed_command_digest,observed_domain_revisions_json,attested_at
       FROM confirmation_policy_attestations_v40 ORDER BY proposal_id`).all() as any[];

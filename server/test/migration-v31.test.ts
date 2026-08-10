@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { removeFutureCampaignContentGenerationSchema } from "./helpers.js";
 
 const makeDir=()=>mkdtempSync(path.join(os.tmpdir(),"velvet-v31-"));
 const file=(dir:string)=>path.join(dir,"velvet.sqlite");
@@ -12,6 +13,7 @@ const layout=(dir:string)=>{const db=new DatabaseDriver(file(dir),{readonly:true
   db.close();return rows;};
 function rewind(dir:string):void{
   const db=new DatabaseDriver(file(dir));
+  removeFutureCampaignContentGenerationSchema(db);
   db.exec(`DROP TRIGGER encounter_enemy_provenance_v31_immutable_delete;
     DROP TRIGGER encounter_enemy_provenance_v31_immutable_update;
     DROP TRIGGER encounter_enemy_provenance_v31_exact_combatant;
@@ -29,7 +31,7 @@ describe("schema v31 encounter lifecycle",()=>{
     const fresh=makeDir();createRepository({dataDir:fresh}).close();
     expect(layout(migrated)).toEqual(layout(fresh));
     const db=new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"40"});
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});
     expect(()=>db.prepare(`INSERT INTO encounter_lifecycle_v31(encounter_id,campaign_id,session_id,name,
       create_idempotency_key,canonical_create_request_json,request_digest) VALUES('missing','missing','missing','Name',
       'key','{}','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')`).run()).toThrow();

@@ -42,6 +42,7 @@ export function useTmpDataDir(): void {
 
 /** Remove impossible future builder artifacts when constructing genuine historical fixtures. */
 export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").Database): void {
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureAdventureCoordinationSchema(db);
   removeFutureCharacterProgressionSchema(db);
   const v20Triggers = db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger'
@@ -84,8 +85,30 @@ export function removeFutureCharacterBuilderSchema(db: import("better-sqlite3").
   }
 }
 
+/** Removes additive v41-v42 campaign-content artifacts for historical fixtures. */
+export function removeFutureCampaignContentGenerationSchema(db: import("better-sqlite3").Database): void {
+  db.exec(`
+    DROP TRIGGER IF EXISTS campaign_content_commands_v42_immutable_update_v42;
+    DROP TRIGGER IF EXISTS campaign_content_commands_v42_immutable_delete_v42;
+    DROP TRIGGER IF EXISTS campaign_content_receipts_v42_immutable_update_v42;
+    DROP TRIGGER IF EXISTS campaign_content_receipts_v42_immutable_delete_v42;
+    DROP TRIGGER IF EXISTS campaign_content_revisions_v42_immutable_update_v42;
+    DROP TRIGGER IF EXISTS campaign_content_revisions_v42_immutable_delete_v42;
+    DROP TRIGGER IF EXISTS campaign_content_layout_attestation_v42_immutable_update_v42;
+    DROP TRIGGER IF EXISTS campaign_content_layout_attestation_v42_immutable_delete_v42;
+    DROP TABLE IF EXISTS campaign_content_layout_attestation_v42;
+    DROP TABLE IF EXISTS campaign_content_revisions_v42;
+    DROP TABLE IF EXISTS campaign_content_receipts_v42;
+    DROP TABLE IF EXISTS campaign_content_commands_v42;
+    DROP TABLE IF EXISTS generated_campaign_quests_v41;
+    DROP TABLE IF EXISTS campaign_npc_baseline_stats_v41;
+    DROP TABLE IF EXISTS campaign_opening_narratives_v41;
+  `);
+}
+
 /** Removes exact additive agent sidecars before destructive fixture rewinds. */
 export function removeFutureAgentSchema(db:import("better-sqlite3").Database):void {
+  removeFutureCampaignContentGenerationSchema(db);
   const remove = (inventory: ReadonlyArray<readonly [string, string]>, tables: readonly string[]) => {
     const names = inventory.map(([, name]) => name);
     const objects = db.prepare(`SELECT type,name FROM sqlite_master WHERE name IN (${names.map(() => "?").join(",")}) AND sql IS NOT NULL`)
@@ -124,6 +147,7 @@ export function removeFutureAdventureCoordinationSchema(db: import("better-sqlit
 
 /** Remove only v23 artifacts when a test needs a genuine v19-v22 fixture. */
 export function removeFutureCharacterProgressionSchema(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureCharacterProgressionIntegrityV24(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v23' OR name GLOB '*_v23_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
@@ -137,6 +161,7 @@ export function removeFutureCharacterProgressionSchema(db:import("better-sqlite3
 
 /** Remove only additive v24 progression-integrity artifacts. */
 export function removeFutureCharacterProgressionIntegrityV24(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureResourcesInventoryEconomyRestV25(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v24' OR name GLOB '*_v24_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
@@ -150,6 +175,7 @@ export function removeFutureCharacterProgressionIntegrityV24(db:import("better-s
 
 /** Remove additive v25 artifacts before exercising a genuine historical marker. */
 export function removeFutureResourcesInventoryEconomyRestV25(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureChecksPowersEffectsV26(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v25' OR name GLOB '*_v25_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
@@ -159,6 +185,7 @@ export function removeFutureResourcesInventoryEconomyRestV25(db:import("better-s
 
 /** Remove additive v26 artifacts before exercising a genuine historical marker. */
 export function removeFutureChecksPowersEffectsV26(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureCombatFoundationV27(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v26' OR name GLOB '*_v26_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
@@ -168,6 +195,7 @@ export function removeFutureChecksPowersEffectsV26(db:import("better-sqlite3").D
 
 /** Remove every v27 combat artifact before constructing a historical fixture. */
 export function removeFutureCombatFoundationV27(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureEncounterLifecycleV31(db);
   removeFutureWorldTravelNpcFactionV28(db);
   const combatTables = "('encounter','combatant','combat_log','reward_bundle','reward_entry_v27','reward_claim_v27')";
@@ -199,6 +227,7 @@ export function removeFutureEncounterLifecycleV31(db:import("better-sqlite3").Da
 
 /** Remove additive v32 narrative state before historical world parents. */
 export function removeFutureWorldNarrativeV32(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   const triggers=db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name GLOB '*_v32' OR name GLOB '*_v32_*')").all() as Array<{name:string}>;
   for(const trigger of triggers)db.exec(`DROP TRIGGER ${trigger.name}`);
   const tables=["campaign_faction_reputation_v32","campaign_faction_metadata_v32","campaign_npc_relationships_v32",
@@ -209,6 +238,7 @@ export function removeFutureWorldNarrativeV32(db:import("better-sqlite3").Databa
 
 /** Remove every v28 world/travel artifact before constructing a historical fixture. */
 export function removeFutureWorldTravelNpcFactionV28(db:import("better-sqlite3").Database):void{
+  removeFutureCampaignContentGenerationSchema(db);
   removeFutureCharacterLayoutV29(db);
   const artifacts = "(name GLOB '*_v28' OR name GLOB '*_v28_*' OR tbl_name GLOB '*_v28' OR tbl_name GLOB '*_v28_*')";
   const triggers=db.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND ${artifacts}`).all() as Array<{name:string}>;
@@ -223,6 +253,7 @@ export function removeFutureWorldTravelNpcFactionV28(db:import("better-sqlite3")
 
 /** Remove v29 character-layout artifacts when constructing historical fixtures. */
 export function removeFutureCharacterLayoutV29(db: import("better-sqlite3").Database): void {
+  removeFutureCampaignContentGenerationSchema(db);
   db.exec(`DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_update;
     DROP TRIGGER IF EXISTS character_layout_attestation_v29_immutable_delete;
     DROP TABLE IF EXISTS character_layout_attestation_v29;`);

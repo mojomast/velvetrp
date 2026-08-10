@@ -88,7 +88,7 @@ describe("schema v36 adventure hardening", () => {
     expect(reopened.getGenerationDraft("local-owner", draft.draftId)).toMatchObject({ draftId: draft.draftId, state: "staged" });
     reopened.close();
     const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect(verify.prepare("SELECT mutation_type,expected_revision,resulting_revision FROM adventure_coordination_commands_v36").get())
       .toMatchObject({ mutation_type: "migration-snapshot", expected_revision: -1 });
     verify.close();

@@ -4,7 +4,7 @@ import { describe,expect,it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { AGENT_RESPONSE_PROVENANCE_V39_MANAGED_OBJECTS } from "../src/repo/db/migrations/v39_agent_response_provenance.js";
 import { CONFIRMATION_POLICY_V40_MANAGED_OBJECTS } from "../src/repo/db/migrations/v40_confirmation_policy.js";
-import { useTmpDataDir } from "./helpers.js";
+import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const dbPath=()=>path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite");
@@ -25,13 +25,13 @@ function populatedV38(){const first=createRepository();const campaign=first.crea
 
 describe("schema v39 agent response provenance",()=>{
   it("migrates an exact v38 database and seals the additive inventory",()=>{
-    createRepository().close();const db=new DatabaseDriver(dbPath());db.pragma("foreign_keys=OFF");dropFutureV40(db);
+    createRepository().close();const db=new DatabaseDriver(dbPath());db.pragma("foreign_keys=OFF");removeFutureCampaignContentGenerationSchema(db);dropFutureV40(db);
     for(const [type,name] of [...AGENT_RESPONSE_PROVENANCE_V39_MANAGED_OBJECTS].reverse()){
       if(type==="trigger")db.exec(`DROP TRIGGER "${name}"`);else if(type==="table")db.exec(`DROP TABLE "${name}"`);
     }
     db.prepare("UPDATE meta SET value='38' WHERE key='schemaVersion'").run();db.close();
     const migrated=createRepository();migrated.close();const verify=new DatabaseDriver(dbPath(),{readonly:true});
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"40"});
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});
     expect(verify.prepare("SELECT count(*) count FROM agent_response_provenance_attestation_v39").get()).toEqual({count:1});verify.close();
   });
   it("rejects a modified attestation on startup",()=>{
@@ -40,7 +40,7 @@ describe("schema v39 agent response provenance",()=>{
     expect(()=>createRepository()).toThrow(/schema v39 inventory incompatible|v39 attestation mismatch/);
   });
   it("preserves populated v38 provider starts and validates populated digest provenance",()=>{
-    const fixture=populatedV38();const db=new DatabaseDriver(dbPath());db.pragma("foreign_keys=OFF");dropFutureV40(db);
+    const fixture=populatedV38();const db=new DatabaseDriver(dbPath());db.pragma("foreign_keys=OFF");removeFutureCampaignContentGenerationSchema(db);dropFutureV40(db);
     for(const [type,name] of AGENT_RESPONSE_PROVENANCE_V39_MANAGED_OBJECTS)if(type==="trigger")db.exec(`DROP TRIGGER "${name}"`);
     for(const name of ["agent_response_provenance_attestation_v39","agent_generalized_receipts_v39","agent_combat_proposal_bindings_v39","agent_provider_responses_v39","agent_provider_dispatch_claims_v39","agent_provider_contexts_v39"])db.exec(`DROP TABLE "${name}"`);
     db.prepare("UPDATE meta SET value='38' WHERE key='schemaVersion'").run();db.close();const migrated=createRepository();

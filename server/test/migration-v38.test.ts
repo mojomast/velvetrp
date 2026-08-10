@@ -70,7 +70,7 @@ describe("schema v38 durable agent execution", () => {
     db.prepare("UPDATE meta SET value='37' WHERE key='schemaVersion'").run(); db.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     db = new DatabaseDriver(file(), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     const run = db.prepare(`SELECT started_at,deadline_at,max_decision_rounds,max_tool_calls,
       max_mutation_calls,max_provider_calls,max_duration_ms FROM adventure_agent_executions_v38 WHERE turn_id=?`).get(identity.turnId) as any;
     expect(run).toMatchObject({ max_decision_rounds: 5, max_tool_calls: 12,

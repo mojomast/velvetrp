@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { removeFutureCampaignContentGenerationSchema } from "./helpers.js";
 
 const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v30-"));
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
@@ -14,6 +15,7 @@ const layout = (dir: string) => {
 };
 function rewind(dir: string): void {
   const db = new DatabaseDriver(file(dir));
+  removeFutureCampaignContentGenerationSchema(db);
   db.exec(`DROP TRIGGER campaign_import_dry_runs_v30_immutable_update;
     DROP TRIGGER campaign_import_dry_runs_v30_immutable_delete;
     DROP TRIGGER campaign_import_dry_runs_v30_prevent_replace;
@@ -29,7 +31,7 @@ describe("schema v30 campaign import staging", () => {
     const fresh = makeDir(); createRepository({ dataDir: fresh }).close();
     expect(layout(migrated)).toEqual(layout(fresh));
     const db = new DatabaseDriver(file(migrated));
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     db.close();
   });
 

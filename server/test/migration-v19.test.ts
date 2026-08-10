@@ -63,7 +63,7 @@ describe("additive schema v19r1 migration", () => {
     }; before.close();
     createRepository({ dataDir: migratedDir }).close();
     const migrated = new DatabaseDriver(file(migratedDir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect({
       character: migrated.prepare("SELECT * FROM campaign_characters WHERE id=?").get(identity.characterId),
       sheet: migrated.prepare("SELECT * FROM rpg_campaign_sheets WHERE campaign_character_id=?").get(identity.characterId),

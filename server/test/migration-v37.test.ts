@@ -63,7 +63,7 @@ describe("schema v37 exact tool execution bindings", () => {
     removeV37(db); db.prepare("UPDATE meta SET value='36' WHERE key='schemaVersion'").run(); db.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect(verify.prepare(`SELECT execution_idempotency_key,command_type,source_turn_id,timeline_id,actor_id
       FROM tool_proposal_execution_bindings_v37 WHERE proposal_id=?`).get(seeded.proposal.proposalId)).toEqual({
       execution_idempotency_key: proposalExecutionIdempotencyKeyV37(seeded.proposal.proposalId), command_type: "roll_actor_dice",

@@ -65,7 +65,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
 
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
     const migrated = new DatabaseDriver(file(), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
     expect(migrated.prepare("SELECT title FROM quest_storylines WHERE id='legacy-story'").get()).toEqual({ title: "Legacy story" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM adventure_generation_layout_attestation_v35").get()).toEqual({ length: 64 });
     for (const table of tables) expect(migrated.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });

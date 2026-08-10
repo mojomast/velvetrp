@@ -212,7 +212,7 @@ describe("schema v13 actor resources and union audit", () => {
     expect(nextId).not.toHaveBeenCalled();
 
     const migrated = new DatabaseDriver(dbPath(dir), { readonly: true });
-    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "40" });
+    expect(migrated.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "42" });
     expect(migrated.prepare("SELECT * FROM campaign_commands").get()).toEqual({
       ...(before.command as object), resource_name: null, resource_current: null, resource_max: null,
       dice_expression: null, dice_count: null, dice_sides: null, dice_selection_type: null,
@@ -490,7 +490,7 @@ describe("schema v13 actor resources and union audit", () => {
 
     createRepository({ dataDir: dir }).close();
     const retried = new DatabaseDriver(file, { readonly: true });
-    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "40" });
+    expect(retried.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get()).toEqual({ value: "42" });
     expect(retried.prepare("SELECT COUNT(*) AS count FROM rpg_actor_resources").get()).toEqual({ count: 0 });
     expect(retried.pragma("foreign_key_check")).toEqual([]);
     retried.close();
