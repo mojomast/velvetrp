@@ -48,23 +48,35 @@ const characterInput = {
 };
 
 describe("schema", () => {
-  it("records the fresh v43r1 schema, current inventory, and foreign-key integrity", async () => {
+  it("records the fresh v44r1 schema, current inventory, and foreign-key integrity", async () => {
     const dir = process.env.VELVET_DATA_DIR as string;
     await listCharacters();
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = raw.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
     const revision = raw.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string };
-    expect(version.value).toBe("43");
+    expect(version.value).toBe("44");
     expect(revision.value).toBe("1");
     expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
     expect(raw.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND (name IN (
       'campaign_opening_narratives_v41', 'generated_campaign_quests_v41',
       'campaign_content_commands_v42', 'campaign_content_layout_attestation_v42'
-    ) OR name GLOB '*v43*') ORDER BY name`).all()).toEqual([
+    ) OR name GLOB '*v43*' OR name GLOB '*v44*') ORDER BY name`).all()).toEqual([
+      { name: "campaign_companions_v44" },
       { name: "campaign_content_commands_v42" },
       { name: "campaign_content_layout_attestation_v42" },
       { name: "campaign_npc_presence_v43" },
       { name: "campaign_opening_narratives_v41" },
+      { name: "companion_audit_events_v44" },
+      { name: "companion_commands_v44" },
+      { name: "companion_decision_receipts_v44" },
+      { name: "companion_decisions_v44" },
+      { name: "companion_grant_command_families_v44" },
+      { name: "companion_grant_revocations_v44" },
+      { name: "companion_grants_v44" },
+      { name: "companion_layout_attestation_v44" },
+      { name: "companion_presence_links_v44" },
+      { name: "companion_proposals_v44" },
+      { name: "companion_receipts_v44" },
       { name: "generated_campaign_quests_v41" },
       { name: "npc_presence_commands_v43" },
       { name: "npc_presence_events_v43" },

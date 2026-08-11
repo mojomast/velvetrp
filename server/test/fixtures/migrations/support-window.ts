@@ -5,6 +5,9 @@ import { createRepository } from "../../../src/repo/index.js";
 const AT = "2035-01-01T00:00:00.000Z";
 const V42_TABLES = ["campaign_content_layout_attestation_v42", "campaign_content_revisions_v42", "campaign_content_receipts_v42", "campaign_content_commands_v42"];
 const V43_TABLES = ["npc_presence_layout_attestation_v43", "campaign_npc_presence_v43", "npc_presence_receipts_v43", "npc_presence_events_v43", "npc_presence_commands_v43", "npc_presence_session_revisions_v43"];
+const V44_TABLES = ["companion_layout_attestation_v44", "companion_audit_events_v44", "companion_grant_revocations_v44", "companion_grant_command_families_v44",
+  "companion_grants_v44", "companion_decision_receipts_v44", "companion_decisions_v44", "companion_proposals_v44",
+  "companion_presence_links_v44", "campaign_companions_v44", "companion_receipts_v44", "companion_commands_v44"];
 
 export const SUPPORT_WINDOW = {
   at: AT,
@@ -105,6 +108,16 @@ function removeV43(db: DatabaseDriver.Database): void {
   for (const table of V43_TABLES) db.exec(`DROP TABLE IF EXISTS "${table}"`);
 }
 
+function removeV44(db: DatabaseDriver.Database): void {
+  const artifacts = db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v44*' AND sql IS NOT NULL ORDER BY type DESC")
+    .all() as Array<{ type: string; name: string }>;
+  for (const { type, name } of artifacts) {
+    if (type === "index") db.exec(`DROP INDEX "${name}"`);
+    if (type === "trigger") db.exec(`DROP TRIGGER "${name}"`);
+  }
+  for (const table of V44_TABLES) db.exec(`DROP TABLE IF EXISTS "${table}"`);
+}
+
 function removeV42(db: DatabaseDriver.Database): void {
   for (const table of V42_TABLES) {
     db.exec(`DROP TRIGGER IF EXISTS ${table}_immutable_update_v42`);
@@ -117,6 +130,7 @@ function removeV42(db: DatabaseDriver.Database): void {
 export function buildCanonicalV41Fixture(): SupportWindowFixture {
   const fixture = createCanonicalCampaign();
   const db = new DatabaseDriver(databaseFile());
+  removeV44(db);
   removeV43(db);
   removeV42(db);
   db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)")
@@ -134,6 +148,7 @@ export function buildCanonicalV41Fixture(): SupportWindowFixture {
 export function buildCanonicalV41CrossCampaignFixture(): Required<SupportWindowFixture> {
   const fixture = createCanonicalCampaign(true) as Required<SupportWindowFixture>;
   const db = new DatabaseDriver(databaseFile());
+  removeV44(db);
   removeV43(db);
   removeV42(db);
   db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)")
@@ -151,6 +166,7 @@ export function buildCanonicalV41CrossCampaignFixture(): Required<SupportWindowF
 export function buildCanonicalV42Fixture(withOtherCampaign = false): SupportWindowFixture {
   const fixture = createCanonicalCampaign(withOtherCampaign);
   const db = new DatabaseDriver(databaseFile());
+  removeV44(db);
   removeV43(db);
   db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)")
     .run(fixture.campaignId, SUPPORT_WINDOW.opening, SUPPORT_WINDOW.premise, fixture.draftId, AT);
@@ -165,6 +181,33 @@ export function buildCanonicalV42Fixture(withOtherCampaign = false): SupportWind
   db.prepare("INSERT INTO campaign_content_revisions_v42 VALUES(?,1,?,?)")
     .run(fixture.campaignId, fixture.draftId, AT);
   db.prepare("UPDATE meta SET value='42' WHERE key='schemaVersion'").run();
+  db.close();
+  return fixture;
+}
+
+
+/** Builds genuine populated v43 presence history and no v44 artifacts. */
+export function buildCanonicalV43Fixture(): SupportWindowFixture {
+  const fixture = createCanonicalCampaign();
+  const db = new DatabaseDriver(databaseFile());
+  removeV44(db);
+  db.prepare("INSERT INTO npc_presence_session_revisions_v43 VALUES(?,?,0,?)")
+    .run(fixture.campaignId, fixture.sessionId, AT);
+  db.prepare(`INSERT INTO npc_presence_commands_v43
+    VALUES(?,?,'support-window-presence-command','support-window-presence-key','local-owner',?,'present',NULL,0,1,?)`)
+    .run(fixture.campaignId, fixture.sessionId, fixture.npcId, AT);
+  db.prepare("UPDATE npc_presence_session_revisions_v43 SET revision=1,updated_at=? WHERE campaign_id=? AND session_id=?")
+    .run(AT, fixture.campaignId, fixture.sessionId);
+  db.prepare(`INSERT INTO npc_presence_events_v43
+    VALUES('support-window-presence-event',?,?,'support-window-presence-command',1,?,'present',NULL,?)`)
+    .run(fixture.campaignId, fixture.sessionId, fixture.npcId, AT);
+  db.prepare(`INSERT INTO npc_presence_receipts_v43
+    VALUES(?,?,'support-window-presence-command',1,'support-window-presence-event',?,'present',NULL,?)`)
+    .run(fixture.campaignId, fixture.sessionId, fixture.npcId, AT);
+  db.prepare(`INSERT INTO campaign_npc_presence_v43
+    VALUES(?,?,?,'present',NULL,1,?,?,'support-window-presence-command')`)
+    .run(fixture.campaignId, fixture.sessionId, fixture.npcId, AT, AT);
+  db.prepare("UPDATE meta SET value='43' WHERE key='schemaVersion'").run();
   db.close();
   return fixture;
 }

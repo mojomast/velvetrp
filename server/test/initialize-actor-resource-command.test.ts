@@ -204,10 +204,10 @@ describe("initialize actor resource command", () => {
   });
 
   it.each([
-    ["missing principal", "DELETE FROM principals WHERE id = 'local-owner'", "local-owner"],
-    ["missing campaign", "DELETE FROM campaigns WHERE id = 'campaign-one'", "gm"],
-    ["owner disagreement", "UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'", "local-owner"],
-  ])("denies corrupt authorization: %s", (_label, mutation, principal) => {
+    ["missing principal", "DELETE FROM principals WHERE id = 'local-owner'", "campaign_memberships"],
+    ["missing campaign", "DELETE FROM campaigns WHERE id = 'campaign-one'", "campaign_timelines"],
+    ["owner disagreement", "UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'", "campaigns"],
+  ])("rejects corrupt authorization at startup: %s", (_label, mutation, table) => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
@@ -215,22 +215,19 @@ describe("initialize actor resource command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.executeInitializeActorResource(principal, envelope)).toThrow("command unavailable");
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
+      .toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
-    repository.close();
   });
 
-  it("keeps valid GM authority despite owner disagreement", () => {
+  it("rejects owner disagreement at startup before GM authorization", () => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
     db.close();
-    const repository = factory();
-    expect(repository.executeInitializeActorResource("gm", envelope).revisionAfter).toBe(1);
-    repository.close();
+    expect(() => factory()).toThrow("schema marker 44 contains foreign-key violation in campaigns");
   });
 
   it("returns an exact historical retry before inactive and existing-resource checks", () => {
@@ -326,7 +323,7 @@ describe("initialize actor resource command", () => {
     repository.close();
   });
 
-  it("rejects a resource with a corrupt campaign association before dependencies", () => {
+  it("rejects a corrupt resource campaign association at startup before dependencies", () => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
@@ -334,11 +331,10 @@ describe("initialize actor resource command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
-    expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("resource is invalid");
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
+      .toThrow("schema marker 44 contains foreign-key violation in rpg_actor_resources");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
-    repository.close();
   });
 
   it.each([
@@ -371,8 +367,6 @@ describe("initialize actor resource command", () => {
   it.each([
     ["missing audit", "DROP TRIGGER command_receipts_prevent_delete; DROP TRIGGER campaign_events_prevent_delete; DELETE FROM command_receipts; DELETE FROM campaign_events;", "incomplete"],
     ["changed event payload", "DROP TRIGGER campaign_events_prevent_update; UPDATE campaign_events SET resource_current = 6;", "invalid"],
-    ["missing timeline parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_timelines WHERE id = 'timeline-one';", "incomplete"],
-    ["missing actor parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_actors WHERE id = 'actor-one';", "incomplete"],
   ])("rejects malformed retry: %s", (_label, mutation, message) => {
     seed();
     const first = factory();
@@ -388,6 +382,25 @@ describe("initialize actor resource command", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
     retry.close();
+  });
+
+  it.each([
+    ["missing timeline parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_timelines WHERE id = 'timeline-one';", "campaign_timeline_events"],
+    ["missing actor parent", "PRAGMA foreign_keys = OFF; DELETE FROM campaign_actors WHERE id = 'actor-one';", "campaign_events"],
+  ])("rejects malformed retry corruption at startup: %s", (_label, mutation, table) => {
+    seed();
+    const first = factory();
+    first.executeInitializeActorResource("local-owner", envelope);
+    first.close();
+    const db = new DatabaseDriver(dbPath());
+    db.exec(mutation);
+    db.close();
+    const nextId = vi.fn(() => "unused");
+    const now = vi.fn(() => new Date(AT));
+    expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
+      .toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
+    expect(nextId).not.toHaveBeenCalled();
+    expect(now).not.toHaveBeenCalled();
   });
 
   it.each(["one", 1.5, -1, Number.MAX_SAFE_INTEGER + 1])("rejects malformed retry timeline revision %s", (revision) => {
@@ -406,18 +419,15 @@ describe("initialize actor resource command", () => {
   });
 
   it.each([
-    ["missing character", "DELETE FROM campaign_characters WHERE id = 'cc-one'"],
-    ["mismatched sheet", "UPDATE campaign_actors SET sheet_id = 'sheet-other' WHERE id = 'actor-one'"],
-  ])("rejects malformed ancestry: %s", (_label, mutation) => {
+    ["missing character", "DELETE FROM campaign_characters WHERE id = 'cc-one'", "rpg_campaign_sheets"],
+    ["mismatched sheet", "UPDATE campaign_actors SET sheet_id = 'sheet-other' WHERE id = 'actor-one'", "campaign_actors"],
+  ])("rejects malformed ancestry at startup: %s", (_label, mutation, table) => {
     seed();
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
     db.close();
-    const repository = factory();
-    expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("target unavailable");
-    expect(snapshot().resources).toEqual([]);
-    repository.close();
+    expect(() => factory()).toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
   });
 
   it("consumes one valid event ID before exactly one clock reading", () => {
