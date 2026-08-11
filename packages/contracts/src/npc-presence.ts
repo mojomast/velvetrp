@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { campaignSessionAttachmentSchema } from "./campaigns.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
@@ -10,7 +11,7 @@ export const npcPresenceStatusSchema = z.enum(["present", "left"]);
 /** Authoritative per-NPC session state. Its revision is informational, not a concurrency root. */
 export const npcPresenceSchema = z.object({
   campaignId: campaignIdSchema,
-  sessionId: resourceIdSchema,
+  sessionId: campaignSessionAttachmentSchema.shape.sessionId,
   npcId: npcIdSchema,
   personaId: resourceIdSchema,
   status: npcPresenceStatusSchema,
@@ -58,7 +59,7 @@ export const npcPresenceMutationSchema = z.discriminatedUnion("kind", [
 /** Internal command after campaign, session, and NPC identities have been taken from the route. */
 export const npcPresenceCommandSchema = z.object({
   campaignId: campaignIdSchema,
-  sessionId: resourceIdSchema,
+  sessionId: campaignSessionAttachmentSchema.shape.sessionId,
   npcId: npcIdSchema,
   expectedRevision: expectedRevisionSchema,
   idempotencyKey: idempotencyKeySchema,

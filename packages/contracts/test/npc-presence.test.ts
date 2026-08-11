@@ -13,10 +13,11 @@ describe("M5.1 NPC presence contracts", () => {
   it("freezes the internal lifecycle and per-NPC informational revision", () => {
     expect(npcPresenceStatusSchema.options).toEqual(["present", "left"]);
     expectTypeOf<NpcPresenceStatus>().toEqualTypeOf<"present" | "left">();
-    const presence = { campaignId: "campaign", sessionId: "session", npcId: "npc", personaId: "persona",
+    const presence = { campaignId: "campaign", sessionId: " session/opaque value ", npcId: "npc", personaId: "persona",
       status: "present", locationId: null, principals: ["principal"], revision: 3,
       presentAt: at, updatedAt: at, leftAt: null } as const;
     expect(npcPresenceSchema.parse(presence)).toEqual(presence);
+    expect(npcPresenceSchema.safeParse({ ...presence, sessionId: "" }).success).toBe(false);
     expect(npcPresenceSchema.safeParse({ ...presence, revision: 0 }).success).toBe(false);
     expect(npcPresenceSchema.safeParse({ ...presence, status: "left" }).success).toBe(false);
     expect(npcPresenceSchema.safeParse({ ...presence, principals: ["principal", "principal"] }).success).toBe(false);
@@ -47,9 +48,10 @@ describe("M5.1 NPC presence contracts", () => {
   });
 
   it("uses only the session root revision for internal commands", () => {
-    const command = { campaignId: "campaign", sessionId: "session", npcId: "npc", expectedRevision: 4,
+    const command = { campaignId: "campaign", sessionId: " session/opaque value ", npcId: "npc", expectedRevision: 4,
       idempotencyKey: "presence", mutation: { kind: "move", locationId: null } } as const;
     expect(npcPresenceCommandSchema.parse(command)).toEqual(command);
+    expect(npcPresenceCommandSchema.safeParse({ ...command, sessionId: "" }).success).toBe(false);
     expect(npcPresenceCommandSchema.safeParse({ ...command, expectedNpcRevision: 2 }).success).toBe(false);
     expect(npcPresenceCommandSchema.safeParse({ ...command, principalId: "caller" }).success).toBe(false);
   });
