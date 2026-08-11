@@ -103,7 +103,8 @@ describe("M5.1 NPC presence HTTP routes", () => {
       delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS;
       enable(flags.includes("campaign"), flags.includes("mechanics"));
       const read = await app.inject({ method: "GET",
-        url: "/api/rpg/v1/campaigns/%20/rooms/room/present-cast?hostile=secret" });
+        url: "/api/rpg/v1/campaigns/%20/rooms/room/present-cast?hostile=secret",
+        headers: { "content-type": "application/json" }, payload: { hostile: "body-secret" } });
       const command = await app.inject({ method: "POST",
         url: "/api/rpg/v1/campaigns/%20/rooms/room/npcs/%20/presence-commands?hostile=secret",
         headers: { "content-type": "text/plain" }, payload: "invalid" });
@@ -111,6 +112,39 @@ describe("M5.1 NPC presence HTTP routes", () => {
       expect(read.body).not.toContain("secret"); expect(command.body).not.toContain("secret");
     }
     expect(opens).toBe(0);
+    await app.close();
+  });
+
+  it("rejects every present-cast body after gate, query, and path validation without accessor use", async () => {
+    enable();
+    const getNpcCast = vi.fn(() => gmRunning);
+    const app = buildApp({ campaignRepositoryFactory: () => repository({ getNpcCast }) });
+
+    const queried = await app.inject({ method: "GET",
+      url: "/api/rpg/v1/campaigns/campaign/rooms/room/present-cast?x=1",
+      headers: { "content-type": "application/json" }, payload: { supplied: true } });
+    expect(queried.statusCode).toBe(400);
+    expect(queried.json()).toMatchObject({ code: "RPG_INVALID_REQUEST",
+      detail: "NPC present cast does not accept query parameters" });
+
+    const invalidPath = await app.inject({ method: "GET",
+      url: "/api/rpg/v1/campaigns/%20/rooms/room/present-cast",
+      headers: { "content-type": "text/plain" }, payload: "supplied" });
+    expect(invalidPath.statusCode).toBe(404);
+    expect(invalidPath.json()).toMatchObject({ code: "RPG_NPC_PRESENCE_NOT_FOUND" });
+
+    for (const [contentType, payload] of [["application/json", { supplied: true }],
+      ["text/plain", "supplied"]] as const) {
+      const response = await app.inject({ method: "GET",
+        url: "/api/rpg/v1/campaigns/campaign/rooms/room/present-cast",
+        headers: { "content-type": contentType, "x-request-id": "presence-body" }, payload });
+      expect(response.statusCode).toBe(400);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.headers["content-type"]).toContain("application/problem+json");
+      expect(response.json()).toMatchObject({ code: "RPG_INVALID_REQUEST", requestId: "presence-body",
+        detail: "NPC present cast does not accept a request body" });
+    }
+    expect(getNpcCast).not.toHaveBeenCalled();
     await app.close();
   });
 

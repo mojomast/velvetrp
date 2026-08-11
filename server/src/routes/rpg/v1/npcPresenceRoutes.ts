@@ -82,17 +82,43 @@ export const npcPresenceHttpRoutes: FastifyPluginAsync<NpcPresenceHttpOptions> =
   app.get<{
     Params: { campaignId: string; sessionId: string };
     Querystring: Record<string, unknown>;
-  }>("/campaigns/:campaignId/rooms/:sessionId/present-cast", { exposeHeadRoute: false }, async (request, reply) => {
-    reply.header("cache-control", "no-store");
-    if (!enabled()) return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
-      { instance: PRESENT_CAST_INSTANCE });
-    if (hasQuery(request)) {
-      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "NPC present cast does not accept query parameters",
-        { instance: PRESENT_CAST_INSTANCE });
-    }
+    Body: unknown;
+  }>("/campaigns/:campaignId/rooms/:sessionId/present-cast", {
+    exposeHeadRoute: false,
+    onRequest: async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      if (!enabled()) {
+        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+          { instance: PRESENT_CAST_INSTANCE });
+        return;
+      }
+      if (hasQuery(request)) {
+        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST",
+          "NPC present cast does not accept query parameters", { instance: PRESENT_CAST_INSTANCE });
+        return;
+      }
+      if (!resourceIdSchema.safeParse(request.params.campaignId).success
+        || !sessionIdSchema.safeParse(request.params.sessionId).success) {
+        await missing(request, reply);
+        return;
+      }
+      if (request.headers["content-length"] !== undefined || request.headers["transfer-encoding"] !== undefined) {
+        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST",
+          "NPC present cast does not accept a request body", { instance: PRESENT_CAST_INSTANCE });
+      }
+    },
+    errorHandler: (_error, request, reply) => sendApiProblem(
+      request, reply, 400, "RPG_INVALID_REQUEST", "NPC present cast does not accept a request body",
+      { instance: PRESENT_CAST_INSTANCE },
+    ),
+  }, async (request, reply) => {
     const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
     const sessionId = sessionIdSchema.safeParse(request.params.sessionId);
     if (!campaignId.success || !sessionId.success) return missing(request, reply);
+    if (request.body !== undefined) {
+      return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST",
+        "NPC present cast does not accept a request body", { instance: PRESENT_CAST_INSTANCE });
+    }
 
     try {
       const result = options.npcPresenceRepositoryAccessor().getNpcCast(
