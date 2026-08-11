@@ -143,7 +143,7 @@ export default function App() {
   const [administrationHeadingFocusRequest, setAdministrationHeadingFocusRequest] = useState<{ campaignId: string; request: number } | null>(null);
   const [contentHeadingFocusRequest, setContentHeadingFocusRequest] = useState<number | null>(null);
   const [contentReturnFocusRequest, setContentReturnFocusRequest] = useState<number | null>(null);
-  const [sheetReturnFocusRequest, setSheetReturnFocusRequest] = useState<number | null>(null);
+  const [sheetReturnFocusRequest, setSheetReturnFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(null);
   const [sheetHeadingFocusRequest, setSheetHeadingFocusRequest] = useState<{ campaignId: string; campaignCharacterId: string; request: number } | null>(() =>
     stored.view === "campaign-character-sheet" && stored.campaignId && stored.campaignCharacterId
       ? { campaignId: stored.campaignId, campaignCharacterId: stored.campaignCharacterId, request: 1 } : null);
@@ -436,13 +436,19 @@ export default function App() {
       return request === roomOpenRequestRef.current && navigationEpoch === navigationEpochRef.current
         && navigation.view === "campaign-detail" && navigation.campaignId === campaignId;
     };
+    let hydratingSession = false;
     try {
+      // A missing campaign and a missing room have different recovery paths.
+      // Validate the campaign first so only session hydration can refresh rooms.
+      const { campaign } = await getCampaignDetail(campaignId);
+      if (!isCurrent()) return;
+      hydratingSession = true;
       const data = await getSession(sessionId);
       if (!isCurrent()) return;
       if (data.session.id !== sessionId) throw new Error("Session response did not match the requested room");
       // Persist the explicit origin before rendering chat so an immediate
       // reload cannot observe the prior detail navigation snapshot.
-       const destination: View = campaignMechanicsAvailable ? "campaign-play" : "chat";
+       const destination: View = campaignMechanicsAvailable && campaign.content.status === "configured" ? "campaign-play" : "chat";
        writeNavigation(destination === "campaign-play" ? { view: destination, sessionId: data.session.id, campaignId }
          : { view: destination, sessionId: data.session.id, selectedIds, primaryId, campaignId, chatReturnCampaignId: campaignId });
       navigationEpochRef.current += 1;
@@ -453,7 +459,16 @@ export default function App() {
     }
     catch (err) {
       if (!isCurrent()) return;
-      const missing = err instanceof ApiError && err.status === 404;
+      if (!hydratingSession && err instanceof ApiError && err.status === 404) {
+        cancelRoomOpenForNavigation();
+        currentNavigationRef.current = { view: "campaigns", campaignId: "", chatReturnCampaignId: "" };
+        campaignDetailEntryRef.current = ++transitionRequestRef.current;
+        setActiveCampaignId("");
+        setActiveCampaignCharacterId("");
+        setView("campaigns");
+        return;
+      }
+      const missing = hydratingSession && err instanceof ApiError && err.status === 404;
       setRoomOpenFailure({
         campaignId,
         request,
@@ -505,10 +520,10 @@ export default function App() {
   }
   if (view === "campaign-character" && campaignLibraryAvailable && activeCampaignId && activeCampaignCharacterId) {
     const returnToCampaign = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; campaignDetailEntryRef.current = request; setCampaignHeadingFocusRequest({ campaignId: activeCampaignId, request }); setActiveCampaignCharacterId(""); setView("campaign-detail"); };
-    return <CampaignCharacterWorkspacePage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} focusHeadingRequest={workspaceHeadingFocusRequest?.campaignId === activeCampaignId && workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId ? workspaceHeadingFocusRequest.request : undefined} focusSheetRequest={sheetReturnFocusRequest ?? undefined} onSheetFocused={(request) => setSheetReturnFocusRequest((current) => current === request ? null : current)} onBack={returnToCampaign} onUnavailable={returnToCampaign} onOpenSheet={campaignMechanicsAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); currentNavigationRef.current = { view: "campaign-character-sheet", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-sheet"); } : undefined} />;
+    return <CampaignCharacterWorkspacePage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} focusHeadingRequest={workspaceHeadingFocusRequest?.campaignId === activeCampaignId && workspaceHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId ? workspaceHeadingFocusRequest.request : undefined} focusSheetRequest={sheetReturnFocusRequest?.campaignId === activeCampaignId && sheetReturnFocusRequest.campaignCharacterId === activeCampaignCharacterId ? sheetReturnFocusRequest.request : undefined} onSheetFocused={(request) => setSheetReturnFocusRequest((current) => current?.campaignId === activeCampaignId && current.campaignCharacterId === activeCampaignCharacterId && current.request === request ? null : current)} onBack={returnToCampaign} onUnavailable={returnToCampaign} onOpenSheet={campaignMechanicsAvailable ? () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current; characterSheetEntryRef.current = request; setSheetHeadingFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); currentNavigationRef.current = { view: "campaign-character-sheet", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character-sheet"); } : undefined} />;
   }
   if (view === "campaign-character-sheet" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && activeCampaignCharacterId) {
-    const returnToWorkspace = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setSheetReturnFocusRequest(request); setView("campaign-character"); };
+    const returnToWorkspace = () => { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; const request = ++transitionRequestRef.current; setSheetReturnFocusRequest({ campaignId: activeCampaignId, campaignCharacterId: activeCampaignCharacterId, request }); setView("campaign-character"); };
     const focusRequest = sheetHeadingFocusRequest?.campaignId === activeCampaignId && sheetHeadingFocusRequest.campaignCharacterId === activeCampaignCharacterId
       && sheetHeadingFocusRequest.request === characterSheetEntryRef.current ? sheetHeadingFocusRequest.request : undefined;
     return <RpgCharacterSheetPage campaignId={activeCampaignId} campaignCharacterId={activeCampaignCharacterId} api={rpgCharacterSheetApi} focusHeadingRequest={focusRequest} focusCombatRequest={combatReturnView === "campaign-character-sheet" ? combatReturnFocusRequest ?? undefined : undefined} onCombatFocused={(request) => setCombatReturnFocusRequest((current) => current === request ? null : current)} onBack={returnToWorkspace} onUnavailable={returnToWorkspace} onOpenCombat={combatAvailable ? () => { cancelRoomOpenForNavigation(); setCombatReturnView("campaign-character-sheet"); combatEntryRef.current = ++transitionRequestRef.current; currentNavigationRef.current = { view: "campaign-combat", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-combat"); } : undefined} />;

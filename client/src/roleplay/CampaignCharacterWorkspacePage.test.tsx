@@ -1,7 +1,7 @@
 import { StrictMode, useState } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getCampaignCharacterWorkspace } from "../api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError, getCampaignCharacterWorkspace, getCharacterProgression, getCharacterSheet, previewCharacterProgression } from "../api";
 import { CampaignCharacterWorkspacePage, resetCampaignCharacterWorkspacePageModuleStateForTests } from "./CampaignCharacterWorkspacePage";
 import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../components/rpg/actor/RpgCharacterSheetPage";
 import { formatMinorUnits } from "../components/rpg/actor/ShopBrowser";
@@ -10,7 +10,13 @@ import { InventoryPanel } from "../components/rpg/actor/InventoryPanel";
 import { TradeReviewDialog } from "../components/rpg/actor/TradeReviewDialog";
 import { RestDialog } from "../components/rpg/actor/RestDialog";
 
-vi.mock("../api", async (importOriginal) => ({ ...await importOriginal<typeof import("../api")>(), getCampaignCharacterWorkspace: vi.fn() }));
+vi.mock("../api", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../api")>(),
+  getCampaignCharacterWorkspace: vi.fn(),
+  getCharacterProgression: vi.fn(),
+  getCharacterSheet: vi.fn(),
+  previewCharacterProgression: vi.fn(),
+}));
 
 const response = { character: {
   name: "ليلى 🐉", race: { name: "Avelune", description: "Moonlit people." }, background: { name: "Rainledger", description: "Records journeys." },
@@ -28,6 +34,13 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function missingProgression(): ApiError {
+  const error = new ApiError(404, "private absence");
+  error.code = "RPG_CHARACTER_PROGRESSION_NOT_FOUND";
+  return error;
+}
+
+beforeEach(() => { vi.mocked(getCharacterProgression).mockRejectedValue(missingProgression()); });
 afterEach(() => { cleanup(); localStorage.clear(); resetCampaignCharacterWorkspacePageModuleStateForTests(); vi.resetAllMocks(); });
 
 describe("CampaignCharacterWorkspacePage", () => {
@@ -46,13 +59,42 @@ describe("CampaignCharacterWorkspacePage", () => {
   it("focuses the ready heading only for an exact open-transition request", async () => {
     vi.mocked(getCampaignCharacterWorkspace).mockResolvedValue(response);
     render(<CampaignCharacterWorkspacePage campaignId="campaign" campaignCharacterId="entry" focusHeadingRequest={7} onBack={vi.fn()} onUnavailable={vi.fn()} />);
-    await screen.findByRole("heading", { name: response.character.name });
+    const heading = await screen.findByRole("heading", { name: response.character.name });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 
   it("renders the exact empty collection messages", async () => {
     vi.mocked(getCampaignCharacterWorkspace).mockResolvedValue({ character: { ...response.character, classes: [], attributes: [], proficiencies: [], choices: [], resources: [] } });
     render(<CampaignCharacterWorkspacePage campaignId="campaign" campaignCharacterId="entry" onBack={vi.fn()} onUnavailable={vi.fn()} />);
     for (const text of ["No classes.", "No attributes.", "No proficiencies.", "No choices.", "No resources."]) expect(await screen.findByText(text)).toBeTruthy();
+  });
+
+  it("keeps metadata-only characters in the workspace without advancement or a sheet command", async () => {
+    vi.mocked(getCampaignCharacterWorkspace).mockResolvedValue(response);
+    const unavailable = vi.fn();
+    render(<CampaignCharacterWorkspacePage campaignId="campaign" campaignCharacterId="metadata-only" onBack={vi.fn()} onUnavailable={unavailable} onOpenSheet={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: response.character.name })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Advancement" })).toBeNull());
+    expect(screen.queryByRole("button", { name: "Open sheet, inventory & economy" })).toBeNull();
+    expect(getCharacterSheet).not.toHaveBeenCalled();
+    expect(previewCharacterProgression).not.toHaveBeenCalled();
+    expect(unavailable).not.toHaveBeenCalled();
+  });
+
+  it("offers the sheet command only after the wizard refreshes the authoritative sheet", async () => {
+    const sheetRead = deferred<any>();
+    vi.mocked(getCampaignCharacterWorkspace).mockResolvedValue(response);
+    vi.mocked(getCharacterProgression).mockResolvedValue({ level: 1, totalXp: 0, milestoneCount: 0, pendingChoices: [] } as any);
+    vi.mocked(getCharacterSheet).mockReturnValue(sheetRead.promise);
+    vi.mocked(previewCharacterProgression).mockResolvedValue({ eligibleLevel: 1, pendingChoices: [], levels: [], previewRevision: 1, previewToken: "token" } as any);
+    render(<CampaignCharacterWorkspacePage campaignId="campaign" campaignCharacterId="character" onBack={vi.fn()} onUnavailable={vi.fn()} onOpenSheet={vi.fn()} />);
+
+    expect(await screen.findByRole("heading", { name: response.character.name })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open sheet, inventory & economy" })).toBeNull();
+    sheetRead.resolve({ sheet: { ...response.character, name: "Refreshed" } });
+    expect(await screen.findByRole("button", { name: "Open sheet, inventory & economy" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Refreshed" })).toBeTruthy();
   });
 
   it("keeps failures local, restores Retry focus, and focuses content after retry success", async () => {

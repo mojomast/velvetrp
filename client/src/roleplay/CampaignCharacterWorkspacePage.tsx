@@ -53,7 +53,9 @@ type WorkspaceFocusIntent = {
 
 export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId, onBack, onUnavailable, focusHeadingRequest, focusSheetRequest, onSheetFocused, onOpenSheet }: CampaignCharacterWorkspacePageProps) {
   const [workspace, setWorkspace] = useState<CampaignCharacterWorkspace | null>(null);
+  const [authoritativeSheetKey, setAuthoritativeSheetKey] = useState<string | null>(null);
   const [phase, setPhase] = useState<"loading" | "ready" | "failed">("loading");
+  const characterKey = `${campaignId.length}:${campaignId}${campaignCharacterId}`;
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
   const activeRef = useRef({ campaignId, campaignCharacterId });
@@ -71,6 +73,7 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
     const generation = ++generationRef.current;
     if (!mountedRef.current) return;
     setWorkspace(null);
+    setAuthoritativeSheetKey(null);
     setPhase("loading");
     focusIntentRef.current = retry
       ? { ...requested, generation, target: "retry", outcome: "pending" }
@@ -131,9 +134,9 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
   }, [campaignCharacterId, campaignId, focusHeadingRequest, phase]);
 
   useEffect(() => {
-    if (phase !== "ready" || focusSheetRequest === undefined) return;
+    if (phase !== "ready" || authoritativeSheetKey !== characterKey || focusSheetRequest === undefined) return;
     queueMicrotask(() => { if (mountedRef.current) { sheetButtonRef.current?.focus(); onSheetFocused?.(focusSheetRequest); } });
-  }, [focusSheetRequest, onSheetFocused, phase]);
+  }, [authoritativeSheetKey, characterKey, focusSheetRequest, onSheetFocused, phase]);
 
   return <main className="page library-page campaign-page workspace-page"><section className="campaign-shell" aria-labelledby="workspace-heading">
     <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CHARACTER WORKSPACE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="workspace-heading"><bdi dir="auto">{workspace?.name ?? "Character"}</bdi></h1></div></header>
@@ -141,7 +144,7 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
       {phase === "loading" && <p className="empty-state" role="status">Loading character…</p>}
       {phase === "failed" && <div className="empty-state large" role="alert"><p>Character could not be loaded.</p><button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>Retry</button></div>}
       {phase === "ready" && workspace && <>
-        {onOpenSheet && <div className="workspace-command-bar"><button ref={sheetButtonRef} className="primary" type="button" onClick={onOpenSheet}>Open sheet, inventory & economy</button><span>Authoritative gameplay state</span></div>}
+        {onOpenSheet && authoritativeSheetKey === characterKey && <div className="workspace-command-bar"><button ref={sheetButtonRef} className="primary" type="button" onClick={onOpenSheet}>Open sheet, inventory & economy</button><span>Authoritative gameplay state</span></div>}
         <section className="workspace-identity" aria-label="Character metadata">
           <article><span>Race</span><h2><bdi dir="auto">{workspace.race.name}</bdi></h2><p><bdi dir="auto">{workspace.race.description}</bdi></p></article>
           <article><span>Background</span><h2><bdi dir="auto">{workspace.background.name}</bdi></h2><p><bdi dir="auto">{workspace.background.description}</bdi></p></article>
@@ -151,7 +154,7 @@ export function CampaignCharacterWorkspacePage({ campaignId, campaignCharacterId
         <section className="workspace-section"><h2>Proficiencies</h2>{workspace.proficiencies.length ? <ul>{workspace.proficiencies.map((item, index) => <li key={index}><span>{displayKind(item.category)}</span><strong>{item.label}</strong></li>)}</ul> : <p>No proficiencies.</p>}</section>
         <section className="workspace-section"><h2>Choices</h2>{workspace.choices.length ? <ul>{workspace.choices.map((item, index) => <li key={index}><span>{item.label} · {displayKind(item.selection.kind)}</span><h3><bdi dir="auto">{item.selection.name}</bdi></h3><p><bdi dir="auto">{item.selection.description}</bdi></p></li>)}</ul> : <p>No choices.</p>}</section>
         <section className="workspace-section"><h2>Resources</h2>{workspace.resources.length ? <dl>{workspace.resources.map((item, index) => <div key={index}><dt>{item.label}</dt><dd>{item.current} / {item.max}</dd></div>)}</dl> : <p>No resources.</p>}</section>
-        <LevelUpWizard campaignId={campaignId} campaignCharacterId={campaignCharacterId} api={levelUpApi} onUnavailable={onUnavailable} onSheetRefreshed={(sheet) => setWorkspace(sheet.sheet)} />
+        <LevelUpWizard campaignId={campaignId} campaignCharacterId={campaignCharacterId} api={levelUpApi} mode="workspace" onUnavailable={onUnavailable} onSheetRefreshed={(sheet) => { setWorkspace(sheet.sheet); setAuthoritativeSheetKey(characterKey); }} />
       </>}
     </section>
   </section></main>;

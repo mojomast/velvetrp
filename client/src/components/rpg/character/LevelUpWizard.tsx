@@ -16,6 +16,7 @@ export interface LevelUpWizardProps {
   campaignId: string;
   campaignCharacterId: string;
   api: LevelUpWizardApi;
+  mode?: "standalone" | "workspace";
   onUnavailable?: () => void;
   onSheetRefreshed?: (sheet: CharacterSheetHttpResponse) => void;
 }
@@ -27,6 +28,7 @@ const characterKey = (campaignId: string, characterId: string) => `${campaignId.
 function publish(key: string, lock: ApplyLock | null) { if (lock) applyLocks.set(key, lock); else applyLocks.delete(key); for (const listener of applyListeners) listener(key, lock); }
 function intentKey(kind: string) { const value = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`; return `ui-${kind}-${value}`; }
 function knownNonCommit(error: unknown) { return error instanceof ApiInputError || (error instanceof ApiError && [400, 404, 409, 415, 422].includes(error.status)); }
+function isMissingProgression(error: unknown) { return error instanceof ApiError && error.status === 404 && error.code === "RPG_CHARACTER_PROGRESSION_NOT_FOUND"; }
 function optionKey(option: ProgressionSelection["ability"]) { return `${option.packId}:${option.packVersion}:${option.definitionId}`; }
 function selectionKey(selections: ProgressionSelection[]): string {
   return JSON.stringify([...selections].sort((left, right) => left.choiceId.localeCompare(right.choiceId))
@@ -36,7 +38,7 @@ function selectionKey(selections: ProgressionSelection[]): string {
 export function resetLevelUpWizardModuleStateForTests(): void { applyLocks.clear(); applyListeners.clear(); }
 
 /** Applies one exact server preview. A document-lifetime lock prevents replay after an ambiguous outcome. */
-export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavailable = () => undefined, onSheetRefreshed = () => undefined }: LevelUpWizardProps) {
+export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "standalone", onUnavailable = () => undefined, onSheetRefreshed = () => undefined }: LevelUpWizardProps) {
   const key = characterKey(campaignId, campaignCharacterId);
   const [state, setState] = useState<CharacterProgressionHttpState | null>(null);
   const [preview, setPreview] = useState<CharacterProgressionHttpPreview | null>(null);
@@ -44,6 +46,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
   const [pendingChoices, setPendingChoices] = useState<CharacterProgressionHttpPreview["pendingChoices"]>([]);
   const [selections, setSelections] = useState<ProgressionSelection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [omitted, setOmitted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -64,13 +67,30 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
   const load = useCallback(async (authoritative = false, retryFocus = false) => {
     const requestedKey = key; const generation = ++generationRef.current;
     if (authoritative) setRefreshing(true); else setLoading(true);
+    setOmitted(false);
     setError("");
     try {
-      const [nextState, nextSheet] = await Promise.all([api.getProgression(campaignId, campaignCharacterId), api.getSheet(campaignId, campaignCharacterId)]);
+      let nextState: CharacterProgressionHttpState;
+      let nextSheet: CharacterSheetHttpResponse;
+      if (mode === "workspace") {
+        try {
+          nextState = await api.getProgression(campaignId, campaignCharacterId);
+        } catch (progressionError) {
+          if (!isMissingProgression(progressionError)) throw progressionError;
+          if (!mountedRef.current || activeRef.current !== requestedKey || generationRef.current !== generation) return;
+          setState(null); setLoading(false); setRefreshing(false); setOmitted(true);
+          return;
+        }
+        nextSheet = await api.getSheet(campaignId, campaignCharacterId);
+        if (!mountedRef.current || activeRef.current !== requestedKey || generationRef.current !== generation) return;
+        sheetRefreshedRef.current(nextSheet);
+      } else {
+        [nextState, nextSheet] = await Promise.all([api.getProgression(campaignId, campaignCharacterId), api.getSheet(campaignId, campaignCharacterId)]);
+      }
       const nextPreview = await api.preview(campaignId, campaignCharacterId, { selections: [] });
       if (!mountedRef.current || activeRef.current !== requestedKey || generationRef.current !== generation) return;
       setState(nextState); setPreview(nextPreview); setPreviewSelectionKey(selectionKey([])); setPendingChoices(nextPreview.pendingChoices); setSelections([]); setLoading(false); setRefreshing(false);
-      sheetRefreshedRef.current(nextSheet);
+      if (mode === "standalone") sheetRefreshedRef.current(nextSheet);
       if (authoritative) {
         publish(requestedKey, null); setNotice("Authoritative progression and sheet refreshed. No advancement was retried."); focusStatus(generation);
       }
@@ -79,7 +99,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
       setLoading(false); setRefreshing(false); setError("Character advancement could not be loaded.");
       if (loadError instanceof ApiError && loadError.status === 404) unavailableRef.current(); else if (retryFocus || authoritative) focusStatus(generation, true);
     }
-  }, [api, campaignCharacterId, campaignId, focusStatus, key]);
+  }, [api, campaignCharacterId, campaignId, focusStatus, key, mode]);
 
   useEffect(() => {
     mountedRef.current = true; activeRef.current = key; setLock(applyLocks.get(key) ?? null);
@@ -138,6 +158,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, onUnavaila
     }
   }
 
+  if (omitted) return null;
   if (loading && !state) return <section className="builder-section level-up-wizard" aria-busy="true"><h2>Advancement</h2><p role="status">Loading progression…</p></section>;
   if (!state) return <section className="builder-section level-up-wizard"><h2>Advancement unavailable</h2><p role="alert">{error}</p><button ref={retryRef} className="primary" onClick={() => void load(false, true)}>Retry</button></section>;
   const pending = pendingChoices.length ? pendingChoices : state.pendingChoices;
