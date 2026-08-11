@@ -1,13 +1,12 @@
 import DatabaseDriver from "better-sqlite3";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { restoreAdventureGenerationV35Guards } from "../src/repo/db/migrations/v36_adventure_hardening.js";
 import { TOOL_EXECUTION_BINDING_V37_MANAGED_OBJECTS } from "../src/repo/db/migrations/v37_tool_execution_bindings.js";
 import { DURABLE_AGENT_EXECUTION_V38_MANAGED_OBJECTS } from "../src/repo/db/migrations/v38_durable_agent_execution.js";
-import { removeFutureAgentSchema, useTmpDataDir } from "./helpers.js";
+import { makeTmpDir, removeFutureAgentSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
@@ -71,7 +70,7 @@ describe("schema v35 adventure turns and generation drafts", () => {
     for (const table of tables) expect(migrated.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });
     migrated.close();
 
-    const freshDir = fs.mkdtempSync(path.join(os.tmpdir(), "velvet-v35-fresh-"));
+    const freshDir = makeTmpDir("velvet-v35-fresh-");
     createRepository({ dataDir: freshDir }).close();
     expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite")));
     fs.rmSync(freshDir, { recursive: true, force: true });

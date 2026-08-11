@@ -1,14 +1,14 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
-import { removeFutureCharacterProgressionSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCharacterProgressionSchema } from "./helpers.js";
 
-const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v19-"));
+const makeDir = () => makeTmpDir("velvet-v19-");
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
+
+afterEach(cleanupTmpDataDirs);
 const v19Tables = [
   "character_starting_grants_v19", "character_derived_snapshots_v19", "character_draft_revisions_v19",
   "character_draft_receipts_v19", "character_draft_events_v19", "character_draft_commands_v19",

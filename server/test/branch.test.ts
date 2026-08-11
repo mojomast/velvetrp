@@ -136,7 +136,8 @@ describe("branching foreign keys", () => {
   });
 });
 
-describe("schema v2 to v3 migration", () => {
+// Archived: the pre-release supported/tested window is v40/v41 -> v42.
+describe.skip("schema v2 to v3 migration", () => {
   it("backfills linear parents, seq, and the active leaf", async () => {
     const dir = makeTmpDataDir();
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"));

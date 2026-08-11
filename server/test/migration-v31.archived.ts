@@ -1,12 +1,10 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { removeFutureCampaignContentGenerationSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCampaignContentGenerationSchema } from "./helpers.js";
 
-const makeDir=()=>mkdtempSync(path.join(os.tmpdir(),"velvet-v31-"));
+const makeDir=()=>makeTmpDir("velvet-v31-");
 const file=(dir:string)=>path.join(dir,"velvet.sqlite");
 const layout=(dir:string)=>{const db=new DatabaseDriver(file(dir),{readonly:true});
   const rows=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();
@@ -24,6 +22,8 @@ function rewind(dir:string):void{
     DROP TABLE encounter_lifecycle_v31;`);
   db.prepare("UPDATE meta SET value='30' WHERE key='schemaVersion'").run();db.close();
 }
+
+afterEach(cleanupTmpDataDirs);
 
 describe("schema v31 encounter lifecycle",()=>{
   it("has fresh/migrated parity and immutable metadata",()=>{

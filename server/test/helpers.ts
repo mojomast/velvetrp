@@ -14,9 +14,14 @@ import { CONFIRMATION_POLICY_V40_MANAGED_OBJECTS } from "../src/repo/db/migratio
 
 const tmpDirs: string[] = [];
 
-export function makeTmpDataDir(): string {
-  const dir = mkdtempSync(path.join(tmpdir(), "velvet-test-"));
+export function makeTmpDir(prefix = "velvet-test-"): string {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
   tmpDirs.push(dir);
+  return dir;
+}
+
+export function makeTmpDataDir(): string {
+  const dir = makeTmpDir();
   process.env.VELVET_DATA_DIR = dir;
   closeRepo();
   return dir;

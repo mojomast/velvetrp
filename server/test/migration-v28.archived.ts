@@ -1,13 +1,13 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { removeFutureWorldTravelNpcFactionV28 } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureWorldTravelNpcFactionV28 } from "./helpers.js";
 
-const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v28-"));
+const makeDir = () => makeTmpDir("velvet-v28-");
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
+
+afterEach(cleanupTmpDataDirs);
 
 function layout(dir: string): unknown[] {
   const db = new DatabaseDriver(file(dir), { readonly: true });

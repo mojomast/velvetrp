@@ -1,14 +1,14 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
-import { removeFutureCharacterProgressionSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCharacterProgressionSchema } from "./helpers.js";
 
-const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v20-"));
+const makeDir = () => makeTmpDir("velvet-v20-");
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
+
+afterEach(cleanupTmpDataDirs);
 const scores = Object.fromEntries(["might", "agility", "resolve", "insight", "presence", "craft"]
   .map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]])) as any;
 function schema(name:string):unknown[]{const db=new DatabaseDriver(name,{readonly:true});

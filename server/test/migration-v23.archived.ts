@@ -1,17 +1,17 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe,expect,it } from "vitest";
+import { afterEach,describe,expect,it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
 import { createRepository,MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
-import { removeFutureCharacterProgressionSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCharacterProgressionSchema } from "./helpers.js";
 
-const dir=()=>mkdtempSync(path.join(os.tmpdir(),"velvet-v23-"));
+const dir=()=>makeTmpDir("velvet-v23-");
 const file=(value:string)=>path.join(value,"velvet.sqlite");
 const schema=(value:string)=>{const db=new DatabaseDriver(file(value),{readonly:true});const rows=db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();db.close();return rows;};
 function populated(value:string){const repo=createRepository({dataDir:value,clock:{now:()=>new Date("2033-01-01T00:00:00.000Z")}});const persona=repo.createCharacter({name:"Migrated progression",age:30,archetype:"Warden",boundaries:"",fictionalConfirmed:true});const campaign=repo.createCampaign("local-owner",{name:"V23"});repo.installMechanicsStarterCatalog("local-owner");repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"pins"});const scores=Object.fromEntries(["might","agility","resolve","insight","presence","craft"].map((key,index)=>[key,CHARACTER_BUILDER_STANDARD_ARRAY[index]])) as any;const draft=repo.createCharacterDraft("local-owner",campaign.id,{personaId:persona.id,controllerPrincipalId:"local-owner",durability:"durable",allocation:{method:"standard-array",scores},idempotencyKey:"draft"});const defs=MECHANICS_STARTER_CATALOG.definitions;repo.updateCharacterDraft("local-owner",draft.draft.id,{expectedRevision:0,idempotencyKey:"select",selections:{race:defs.find((x)=>x.reference.kind==="race")!.reference,background:defs.find((x)=>x.reference.kind==="background")!.reference,class:defs.find((x)=>x.reference.kind==="class")!.reference,starterGrant:"kit"}} as any);const final=repo.finalizeCharacterDraft("local-owner",draft.draft.id,{expectedRevision:1,idempotencyKey:"final"});repo.close();return final.receipt.campaignCharacterId;}
 function rewind(value:string){const db=new DatabaseDriver(file(value));removeFutureCharacterProgressionSchema(db);db.prepare("UPDATE meta SET value='22' WHERE key='schemaVersion'").run();db.close();}
+
+afterEach(cleanupTmpDataDirs);
 
 describe("additive schema v23r1 progression migration",()=>{
   it("attests canonical prior/current DDL, backfills eligible finalized builders, preserves rows, and matches fresh DDL",()=>{const migrated=dir(),id=populated(migrated);const before=new DatabaseDriver(file(migrated),{readonly:true});const aggregate=before.prepare("SELECT * FROM campaign_characters WHERE id=?").get(id);before.close();rewind(migrated);createRepository({dataDir:migrated}).close();const db=new DatabaseDriver(file(migrated),{readonly:true});expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"42"});expect(db.prepare("SELECT * FROM campaign_characters WHERE id=?").get(id)).toEqual(aggregate);expect(db.prepare("SELECT level,revision,total_xp FROM character_progression_v23 WHERE campaign_character_id=?").get(id)).toEqual({level:1,revision:0,total_xp:0});expect(db.prepare("SELECT prior_layout_digest,current_layout_digest FROM character_progression_layout_attestation_v23").get()).toEqual({prior_layout_digest:"21f7c0c17a9ee210f1271bd1abaa6ac41d7d753acd2417f63c8ea4ce8c711599",current_layout_digest:"f68e713487a2e7a56f12781c30362bc710b14858b086bda543bd3184b0745a73"});db.close();const fresh=dir();createRepository({dataDir:fresh}).close();expect(schema(migrated)).toEqual(schema(fresh));});

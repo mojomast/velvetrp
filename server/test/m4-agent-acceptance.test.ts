@@ -364,7 +364,8 @@ async function populatedV39Fixture() {
   return { ...seeded, result };
 }
 
-describe("genuine populated v39 to v40 acceptance", () => {
+// Archived: the pre-release supported/tested window is v40/v41 -> v42.
+describe.skip("genuine populated v39 to v40 acceptance", () => {
   it("backfills exact legacy policy and evidence, refuses legacy execution, and stays stable after authority changes", async () => {
     const fixture = await populatedV39Fixture();
     let repo = createRepository({ clock: { now: () => new Date(AT) } });

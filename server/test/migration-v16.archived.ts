@@ -1,14 +1,14 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { canonicalCatalogJson, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
-import { removeFutureCharacterBuilderSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCharacterBuilderSchema } from "./helpers.js";
 
-const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v16-"));
+const makeDir = () => makeTmpDir("velvet-v16-");
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
+
+afterEach(cleanupTmpDataDirs);
 function schema(name: string): unknown[] {
   const db = new DatabaseDriver(name, { readonly: true });
   const rows = db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();

@@ -1,11 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
-import { mkdtempSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_RACE } from "@velvet/contracts";
 import { createRepository } from "../src/repo/index.js";
-import { removeFutureCharacterBuilderSchema } from "./helpers.js";
+import { cleanupTmpDataDirs, makeTmpDir, removeFutureCharacterBuilderSchema } from "./helpers.js";
 
 const V15_TABLES = ["campaign_checkpoint_attribute_snapshots", "campaign_checkpoint_resource_snapshots",
   "campaign_imported_administration_receipts", "campaign_imported_administration_events",
@@ -13,8 +11,10 @@ const V15_TABLES = ["campaign_checkpoint_attribute_snapshots", "campaign_checkpo
   "campaign_export_manifests", "campaign_imports", "campaign_recaps", "campaign_checkpoints",
   "campaign_administration_receipts", "campaign_administration_events", "campaign_timeline_history",
   "campaign_administration_commands"] as const;
-const makeDir = () => mkdtempSync(path.join(os.tmpdir(), "velvet-v15-"));
+const makeDir = () => makeTmpDir("velvet-v15-");
 const file = (dir: string) => path.join(dir, "velvet.sqlite");
+
+afterEach(cleanupTmpDataDirs);
 
 function genuineV14(dir: string): void {
   let sequence = 0;

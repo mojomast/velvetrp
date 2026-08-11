@@ -1,10 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
+import { makeTmpDir, removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
@@ -46,7 +45,7 @@ describe("schema v33 quest domain", () => {
     expect(migrated.prepare("SELECT title FROM quests WHERE id='legacy'").get()).toEqual({ title: "Legacy quest" });
     expect(migrated.prepare("SELECT length(layout_digest) length FROM quest_domain_layout_attestation_v33").get()).toEqual({ length: 64 });
     migrated.close();
-    const freshDir = fs.mkdtempSync(path.join(os.tmpdir(), "velvet-v33-fresh-")); createRepository({ dataDir: freshDir }).close();
+    const freshDir = makeTmpDir("velvet-v33-fresh-"); createRepository({ dataDir: freshDir }).close();
     expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite"))); fs.rmSync(freshDir, { recursive: true, force: true });
   });
 

@@ -1,10 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
+import { makeTmpDir, removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
@@ -22,7 +21,7 @@ describe("schema v34 story domain", () => {
     const db = new DatabaseDriver(file()); rewind(db); db.prepare("INSERT INTO quest_storylines(id,campaign_id,title,status,created_at) VALUES('legacy',?,'Legacy','active','2035-01-01T00:00:00.000Z')").run(campaign.id); db.close(); repo.close();
     const migratedRepo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! }); expect(migratedRepo.getCampaignStory("local-owner", campaign.id)?.story).toMatchObject({ storylines: [{ storylineId: "legacy" }], nodes: [] }); migratedRepo.close();
     const migrated = new DatabaseDriver(file(), { readonly: true }); expect(migrated.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" }); migrated.close();
-    const freshDir = fs.mkdtempSync(path.join(os.tmpdir(), "velvet-v34-fresh-")); createRepository({ dataDir: freshDir }).close(); expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite"))); fs.rmSync(freshDir, { recursive: true, force: true });
+    const freshDir = makeTmpDir("velvet-v34-fresh-"); createRepository({ dataDir: freshDir }).close(); expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite"))); fs.rmSync(freshDir, { recursive: true, force: true });
   });
   it("rolls back a rejected malformed legacy ancestry", () => {
     const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR! }); const db = new DatabaseDriver(file()); rewind(db); db.pragma("foreign_keys=OFF");

@@ -1,16 +1,17 @@
 import DatabaseDriver from "better-sqlite3";
-import {mkdtempSync} from "node:fs";
-import os from "node:os";import path from "node:path";
-import {describe,expect,it} from "vitest";
+import path from "node:path";
+import {afterEach,describe,expect,it} from "vitest";
 import {createRepository} from "../src/repo/index.js";
-import {removeFutureWorldNarrativeV32} from "./helpers.js";
+import {cleanupTmpDataDirs,makeTmpDir,removeFutureWorldNarrativeV32} from "./helpers.js";
 
-const dir=()=>mkdtempSync(path.join(os.tmpdir(),"velvet-v32-"));
+const dir=()=>makeTmpDir("velvet-v32-");
 const file=(value:string)=>path.join(value,"velvet.sqlite");
 const layout=(value:string)=>{const db=new DatabaseDriver(file(value),{readonly:true});const rows=db.prepare(
   "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();db.close();return rows;};
 function rewind(value:string){const db=new DatabaseDriver(file(value));removeFutureWorldNarrativeV32(db);
   db.prepare("UPDATE meta SET value='31' WHERE key='schemaVersion'").run();db.close();}
+
+afterEach(cleanupTmpDataDirs);
 
 describe("schema v32 world narrative",()=>{
   it("has fresh and migrated parity",()=>{const migrated=dir();createRepository({dataDir:migrated}).close();rewind(migrated);
