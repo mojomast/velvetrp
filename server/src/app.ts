@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { Writable } from "node:stream";
-import { requestIdSchema } from "@velvet/contracts";
+import { campaignSessionAttachmentSchema, npcIdSchema, requestIdSchema, resourceIdSchema } from "@velvet/contracts";
 import Fastify from "fastify";
-import type { FastifyReply } from "fastify";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "./features.js";
-import { sendApiProblem } from "./http/problem.js";
+import { createApiProblem, sendApiProblem } from "./http/problem.js";
 import { createRepository } from "./repo/index.js";
 import { roleplayCharacterRoutes } from "./routes/roleplay/characters.js";
 import { roleplayHarnessRoutes } from "./routes/roleplay/harness.js";
@@ -238,6 +238,24 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/present-cast$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast",
+      hasQuery,
+      queryDetail: method === "GET" ? "NPC present cast does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/npcs\/[^/]+\/presence-commands$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands",
+      hasQuery,
+      queryDetail: method === "POST" ? "NPC presence commands do not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/content(?:-packs\/[^/]+\/versions\/[^/]+)?$/.test(instance)) {
     return {
       instance,
@@ -426,6 +444,24 @@ function safeRouterMessage(errorCode: string): string {
     : "Request URL is invalid";
 }
 
+function isNpcPresenceRoute(instance: string): boolean {
+  return instance === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast"
+    || instance === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands";
+}
+
+function sendNpcPresenceProblem(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  status: 400 | 404,
+  code: "RPG_INVALID_REQUEST" | "RPG_NPC_PRESENCE_NOT_FOUND" | "RPG_ROUTE_NOT_FOUND",
+  detail: string,
+  instance: string,
+): FastifyReply {
+  const problem = createApiProblem(request, status, code, detail, { instance });
+  reply.raw.setHeader("x-request-id", request.id);
+  return reply.type("application/problem+json").code(status).send({ ...problem, instance });
+}
+
 export function buildApp(options: {
   runtime?: RuntimeDependencies;
   campaignRepositoryFactory?: () => CampaignListRepository;
@@ -475,11 +511,19 @@ export function buildApp(options: {
         if (!flags.campaign || (normalizedRoute.mechanics === true && !flags.mechanics)
             || (normalizedRoute.combat === true && !flags.combat)
             || normalizedRoute.queryDetail === null) {
+          if (isNpcPresenceRoute(normalizedRoute.instance)) {
+            return sendNpcPresenceProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+              normalizedRoute.instance);
+          }
           return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
             instance: normalizedRoute.instance,
           });
         }
         if (normalizedRoute.hasQuery) {
+          if (isNpcPresenceRoute(normalizedRoute.instance)) {
+            return sendNpcPresenceProblem(request, reply, 400, "RPG_INVALID_REQUEST", normalizedRoute.queryDetail,
+              normalizedRoute.instance);
+          }
           return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", normalizedRoute.queryDetail, {
             instance: normalizedRoute.instance,
           });
@@ -504,6 +548,7 @@ export function buildApp(options: {
           normalizedRoute.instance,
         );
         const isShop = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/shops\/[^/]+$/.test(normalizedRoute.instance);
+        const isNpcPresence = isNpcPresenceRoute(normalizedRoute.instance);
         const isActorCheck = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/check-commands";
         const isActorWorld = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/travel-commands";
         const isActorPowers = normalizedRoute.instance === "/api/rpg/v1/actors/:actorId/powers"
@@ -520,7 +565,11 @@ export function buildApp(options: {
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/log"
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/action-commands"
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/end-commands"
-          || normalizedRoute.instance === "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey";
+           || normalizedRoute.instance === "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey";
+        if (isNpcPresence) {
+          return sendNpcPresenceProblem(request, reply, 404, "RPG_NPC_PRESENCE_NOT_FOUND",
+            "NPC presence not found", normalizedRoute.instance);
+        }
         return sendApiProblem(request, reply, 404,
           isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorWorld ? "RPG_ACTOR_WORLD_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isEncounter ? "RPG_ENCOUNTER_NOT_FOUND" : isNpc ? "RPG_NPC_NOT_FOUND" : isFaction ? "RPG_FACTION_NOT_FOUND" : isQuest ? "RPG_QUEST_NOT_FOUND" : isStoryline ? "RPG_STORYLINE_NOT_FOUND" : isCampaignFactions ? "RPG_CAMPAIGN_FACTIONS_NOT_FOUND" : isCombat ? "RPG_COMBAT_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
           isActorCheck ? "Actor check state not found" : isActorWorld ? "Actor world state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isEncounter ? "Encounter not found" : isNpc ? "NPC not found" : isFaction ? "Faction not found" : isQuest ? "Quest not found" : isStoryline ? "Storyline not found" : isCampaignFactions ? "Campaign factions not found" : isCombat ? "Combat not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
@@ -559,9 +608,35 @@ export function buildApp(options: {
     const rawUrl = request.raw.url ?? request.url;
     const pathOnly = rawUrl.split("?", 1)[0]!;
     const hasOverlongSegment = pathOnly.split("/").some((segment) => segment.length > 128);
+    const normalizedRoute = normalizedCampaignResourceRoute(request.method, rawUrl);
+    const presenceCommand = normalizedRoute?.instance
+      === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands";
+    const isNpcPresence = presenceCommand || normalizedRoute?.instance
+      === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast";
+    if (normalizedRoute && isNpcPresence && (request.method === "HEAD" || hasOverlongSegment)) {
+      reply.raw.setHeader("x-request-id", request.id);
+      reply.raw.setHeader("cache-control", "no-store");
+      const flags = readRpgFeatureFlags();
+      if (!flags.campaign || !flags.mechanics || request.method === "HEAD") {
+        return sendNpcPresenceProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+          normalizedRoute.instance);
+      }
+      if (normalizedRoute.hasQuery) {
+        return sendNpcPresenceProblem(request, reply, 400, "RPG_INVALID_REQUEST", normalizedRoute.queryDetail!,
+          normalizedRoute.instance);
+      }
+      const segments = pathOnly.split("/");
+      const campaignId = resourceIdSchema.safeParse(decodeURIComponent(segments[5]!));
+      const sessionId = campaignSessionAttachmentSchema.shape.sessionId.safeParse(decodeURIComponent(segments[7]!));
+      const npcId = presenceCommand ? npcIdSchema.safeParse(decodeURIComponent(segments[9]!)) : null;
+      if (!campaignId.success || !sessionId.success || (npcId !== null && !npcId.success)) {
+        return sendNpcPresenceProblem(request, reply, 404, "RPG_NPC_PRESENCE_NOT_FOUND", "NPC presence not found",
+          normalizedRoute.instance);
+      }
+    }
     const isExactNestedCharacterResource = /^\/api\/rpg\/v1\/campaigns\/[^/]+\/characters\/[^/]+\/(?:workspace|sheet)$/.test(pathOnly);
     if (hasOverlongSegment && !isExactNestedCharacterResource
-      && normalizedCampaignResourceRoute(request.method, rawUrl) === null) {
+      && normalizedRoute === null) {
       const body = JSON.stringify({
         error: "Bad Request",
         code: "FST_ERR_MAX_PARAM_LENGTH",
@@ -614,6 +689,15 @@ export function buildApp(options: {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
         instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap",
       });
+    }
+    if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/present-cast$/.test(instance)
+      || /^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/npcs\/[^/]+\/presence-commands$/.test(instance)) {
+      const command = instance.endsWith("/presence-commands");
+      reply.header("cache-control", "no-store");
+      return sendNpcPresenceProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+        command
+          ? "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands"
+          : "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast");
     }
     if (/^\/api\/rpg\/v1\/actors\/[^/]+\/(?:check-commands|powers|power-commands|effects|effect-commands)$/.test(instance)) {
       reply.header("cache-control", "no-store");
