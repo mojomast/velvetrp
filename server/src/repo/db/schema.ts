@@ -62,6 +62,39 @@ const V37_TABLE_DROP_ORDER = ["tool_execution_binding_layout_attestation_v37", "
 const V38_TABLE_DROP_ORDER = ["durable_agent_execution_layout_attestation_v38",
   "agent_read_outcomes_v38", "agent_decision_batch_seals_v38", "agent_tool_calls_v38", "agent_decision_rounds_v38",
   "agent_provider_starts_v38", "agent_execution_operations_v38", "adventure_agent_executions_v38"] as const;
+const V42_ARTIFACTS = new Set([
+  "table:campaign_content_commands_v42", "table:campaign_content_receipts_v42",
+  "table:campaign_content_revisions_v42", "table:campaign_content_layout_attestation_v42",
+  "trigger:campaign_content_commands_v42_immutable_update_v42", "trigger:campaign_content_commands_v42_immutable_delete_v42",
+  "trigger:campaign_content_receipts_v42_immutable_update_v42", "trigger:campaign_content_receipts_v42_immutable_delete_v42",
+  "trigger:campaign_content_revisions_v42_immutable_update_v42", "trigger:campaign_content_revisions_v42_immutable_delete_v42",
+  "trigger:campaign_content_layout_attestation_v42_immutable_update_v42", "trigger:campaign_content_layout_attestation_v42_immutable_delete_v42",
+]);
+
+/** Read-only guard: never clean up or migrate a database with persisted integrity evidence. */
+function preflightPersistedIntegrity(db: DatabaseDriver.Database, marker: string): void {
+  const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string; rowid: number; parent: string; fkid: number } | undefined;
+  if (foreignKeyIssue) throw new Error(`schema marker ${marker} contains foreign-key violation in ${foreignKeyIssue.table}`);
+
+  const unexpectedV42Artifact = (db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v42*' AND sql IS NOT NULL ORDER BY type,name").all() as Array<{ type: string; name: string }>)
+    .find(({ type, name }) => !V42_ARTIFACTS.has(`${type}:${name}`));
+  if (unexpectedV42Artifact) throw new Error(`schema marker ${marker} contains unexpected v42 artifact ${unexpectedV42Artifact.name}`);
+
+  const hasTable = (name: string) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
+  for (const [table, draftColumn] of [
+    ["campaign_opening_narratives_v41", "source_draft_id"],
+    ["generated_campaign_quests_v41", "source_draft_id"],
+    ["campaign_content_commands_v42", "draft_id"],
+    ["campaign_content_receipts_v42", "draft_id"],
+    ["campaign_content_revisions_v42", "source_draft_id"],
+  ] as const) {
+    if (!hasTable(table)) continue;
+    const mismatch = db.prepare(`SELECT child.campaign_id,child."${draftColumn}" draft_id FROM "${table}" child
+      LEFT JOIN generation_drafts draft ON draft.id=child."${draftColumn}"
+      WHERE draft.campaign_id IS NOT child.campaign_id LIMIT 1`).get();
+    if (mismatch) throw new Error(`schema marker ${marker} contains cross-campaign draft ancestry in ${table}`);
+  }
+}
 
 function cleanupFutureAgentResponseV39(db:DatabaseDriver.Database,marker:string):void{
   const artifacts=db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v39*' AND sql IS NOT NULL").all() as Array<{type:string;name:string}>;
@@ -242,6 +275,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     `);
   }
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string } | undefined;
+  preflightPersistedIntegrity(db, row?.value ?? "unversioned");
   if (!row) {
     db.transaction(() => {
       createSchemaV11(db);

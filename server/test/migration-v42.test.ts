@@ -23,8 +23,23 @@ describe("schema v42 campaign content integrity", () => {
     expect(() => createRepository()).toThrow(/malformed future v42 artifacts/);
     // Recreate a clean file then prove a populated command is never discarded.
     db = new DatabaseDriver(file()); db.exec("DROP TABLE campaign_content_layout_attestation_v42; DROP TABLE campaign_content_revisions_v42; DROP TABLE campaign_content_receipts_v42; DROP TABLE campaign_content_commands_v42;"); db.close();
-    createRepository().close(); db = new DatabaseDriver(file()); db.pragma("foreign_keys=OFF");
-    db.prepare("INSERT INTO campaign_content_commands_v42 VALUES('x','c','d','p','k',0,'2035-01-01')").run(); db.prepare("UPDATE meta SET value='41' WHERE key='schemaVersion'").run(); db.close();
+    let nextId = 0;
+    const repo = createRepository({
+      clock: { now: () => new Date("2035-01-01T00:00:00.000Z") },
+      ids: { nextId: () => `v42-fixture-${++nextId}` },
+    });
+    const campaign = repo.createCampaign("local-owner", { name: "Future artifact" });
+    const draft = repo.createGenerationDraft("local-owner", {
+      campaignId: campaign.id,
+      timelineId: campaign.activeTimelineId,
+      kind: "quest",
+      stagedContent: { title: "Future artifact draft" },
+      validation: { valid: true, issues: [], validatedAt: "2035-01-01T00:00:00.000Z" },
+      expectedCampaignRevision: 0,
+      idempotencyKey: "v42-fixture-draft",
+    });
+    repo.close(); db = new DatabaseDriver(file());
+    db.prepare("INSERT INTO campaign_content_commands_v42 VALUES('x',?,?, 'p','k',0,'2035-01-01')").run(campaign.id, draft.draftId); db.prepare("UPDATE meta SET value='41' WHERE key='schemaVersion'").run(); db.close();
     expect(() => createRepository()).toThrow(/populated future v42 artifact/);
   });
 });
