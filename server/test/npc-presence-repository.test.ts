@@ -109,6 +109,25 @@ describe("M5.1 NPC presence repository", () => {
     f.db.close();
   });
 
+  it("does not inspect a malformed foreign session for an authorized campaign member", async () => {
+    const f = await fixture();
+    const character = f.db.prepare("SELECT character_id FROM sessions WHERE id=?")
+      .get(f.sessionId) as { character_id: string };
+    const foreignSession = await createSession({ characterId: character.character_id, title: "Foreign session" });
+    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR! });
+    const foreignCampaign = repository.createCampaign("local-owner", { name: "Foreign campaign" });
+    repository.attachCampaignSession("local-owner", {
+      campaignId: foreignCampaign.id,
+      sessionId: foreignSession.id,
+    });
+    repository.close();
+    f.db.prepare("UPDATE sessions SET state='closed',stopped_at=NULL,stop_reason=NULL WHERE id=?")
+      .run(foreignSession.id);
+
+    expect(f.presence.getNpcCast("presence-player", f.campaignId, foreignSession.id)).toBeNull();
+    f.db.close();
+  });
+
   it("reads revision and lifecycle from one deferred snapshot during a competing commit", async () => {
     const f = await fixture();
     const writer = await startLockedWrite(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), [{

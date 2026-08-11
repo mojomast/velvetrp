@@ -197,12 +197,12 @@ export function createNpcPresenceReadRepository(
   const projectNpcCast = (principalId: string, campaignId: string, sessionId: string, revision: number): NpcCastHttp | null => {
     const authority = membership(principalId, campaignId);
     if (!authority) return null;
-    assertScopedIntegrity(campaignId, sessionId);
-    const lifecycle = lifecycleRepository.getCampaignRoomSessionLifecycle(sessionId);
     const root = db.prepare("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?")
       .get(campaignId, sessionId) as { revision: number } | undefined;
-    if (!lifecycle || (!isAttached(campaignId, sessionId) && !root)
-      || revision < 0 || revision > (root?.revision ?? 0)) return null;
+    if (!isAttached(campaignId, sessionId) && !root) return null;
+    assertScopedIntegrity(campaignId, sessionId);
+    const lifecycle = lifecycleRepository.getCampaignRoomSessionLifecycle(sessionId);
+    if (!lifecycle || revision < 0 || revision > (root?.revision ?? 0)) return null;
 
     const isGm = authority.role === "owner" || authority.role === "gm";
     const running = lifecycle === "running";
