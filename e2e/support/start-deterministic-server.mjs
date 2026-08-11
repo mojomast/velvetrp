@@ -4,10 +4,13 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "velvet-e2e-"));
+const inheritedEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith("OPENROUTER_")),
+);
 const child = spawn("npm", ["--prefix", "server", "exec", "--", "tsx", "e2e/support/deterministic-server.ts"], {
   cwd: new URL("../..", import.meta.url),
   env: {
-    ...process.env,
+    ...inheritedEnv,
     PORT: "18787",
     HOST: "127.0.0.1",
     VELVET_DATA_DIR: dataDir,

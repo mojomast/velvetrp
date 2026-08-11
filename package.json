@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "pretest:e2e:live": "npm run build --workspace @velvet/contracts",
     "test:e2e:live": "playwright test --config=playwright.live.config.ts",
+    "health": "npm run typecheck && npm run build && npm test && npm run test:e2e",
     "ci": "npm ci && npm run typecheck && npm run build && npm run test"
   },
   "devDependencies": {

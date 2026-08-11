@@ -227,7 +227,7 @@ describe("generateReply", () => {
   });
 });
 
-describe.skipIf(!process.env.OPENROUTER_API_KEY)("OpenRouter live integration", () => {
+describe.skipIf(process.env.VELVET_E2E_LIVE !== "1" || !process.env.OPENROUTER_API_KEY)("OpenRouter live integration", () => {
   it("completes a real OpenRouter request", async () => {
     const provider = {
       ...defaultProviderSettings(),
