@@ -5,9 +5,35 @@ import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStor
 import { getCampaignCommandReceipt } from "./api";
 import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
 import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./api";
+import { commandNpcPresence, getCampaignPresentCast } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("M5.1 NPC presence API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  it("encodes every path segment and strictly binds cast audience and revision", async () => {
+    const cast = { audience: "player", state: "running", sessionRevision: 4, presentCast: [{ npcId: "npc", publicState: { name: "Mira" }, revision: 1, presentAt: at, updatedAt: at, location: { label: "Hall" } }] };
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(cast), { status: 200, headers: { "x-npc-presence-revision": "4" } })));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignPresentCast("campaign:one", "room/%2F exact", "player")).resolves.toEqual(cast);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign%3Aone/rooms/room%2F%252F%20exact/present-cast", expect.objectContaining({ cache: "no-store" }));
+    await expect(getCampaignPresentCast("campaign:one", "room", "gm")).rejects.toThrow(/audience/);
+  });
+
+  it("posts one strict receipt-only command and rejects mismatched contracts", async () => {
+    const input = { expectedRevision: 4, idempotencyKey: "presence-key", mutation: { kind: "move" as const, locationId: "hall" } };
+    const receipt = { receipt: { kind: "move", revisionBefore: 4, revisionAfter: 5, occurredAt: at } };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(receipt), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ receipt: { ...receipt.receipt, kind: "remove" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(commandNpcPresence("campaign:one", "room/%2F", "npc:one", input)).resolves.toEqual(receipt);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rpg/v1/campaigns/campaign%3Aone/rooms/room%2F%252F/npcs/npc%3Aone/presence-commands");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: "POST", cache: "no-store", body: JSON.stringify(input) }));
+    await expect(commandNpcPresence("campaign:one", "room", "npc:one", input)).rejects.toThrow(/receipt/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("M4.5 encounter generation API binding", () => {

@@ -24,6 +24,10 @@ const PREFIX = "velvet.narrative-mutation.v3:";
 const LEGACY_UNSAFE_PREFIX = "velvet.narrative-mutation.v2:";
 const records = new Map<string, NarrativeMutationState | null>();
 const listeners = new Map<string, Set<() => void>>();
+export type NpcPresenceMutationLock = { campaignId: string; sessionId: string; npcId: string; resultingRevision?: number; phase: "pending" | "ambiguous" | "reconciling" };
+const presenceRecords = new Map<string, NpcPresenceMutationLock>();
+const presenceListeners = new Map<string, Set<() => void>>();
+const presenceKey = (campaignId: string, sessionId: string) => `${campaignId}\u0000${sessionId}`;
 const recordKey = (campaignId: string, lane: NarrativeLane) => `${campaignId}:${lane}`;
 const storageKey = (campaignId: string, lane: NarrativeLane) => `${PREFIX}${campaignId}:${lane}`;
 const publicReceipt=(value:unknown):PublicNarrativeReceipt|undefined=>{if(typeof value!=="object"||value===null)return undefined;const item=value as Record<string,unknown>;return typeof item.idempotencyKey==="string"&&typeof item.revisionBefore==="number"&&typeof item.revisionAfter==="number"&&typeof item.occurredAt==="string"?{idempotencyKey:item.idempotencyKey,revisionBefore:item.revisionBefore,revisionAfter:item.revisionAfter,occurredAt:item.occurredAt}:undefined;};
@@ -66,6 +70,23 @@ export function blocksNarrativeMutation(value:NarrativeMutationState|null){retur
 export function sanitizeCampaignNarrativeMutations(campaignId:string):void{for(const lane of ["travel","npc","faction","quest","story"] as const){const value=current(campaignId,lane)??readStored(campaignId,lane);if(value)publish({...value,memoryResult:undefined});else remove(campaignId,lane);}}
 export function useNarrativeMutation(campaignId:string,lane:NarrativeLane):NarrativeMutationState|null{const key=recordKey(campaignId,lane);return useSyncExternalStore((listener)=>{const set=listeners.get(key)??new Set();set.add(listener);listeners.set(key,set);return()=>{set.delete(listener);if(!set.size)listeners.delete(key);};},()=>current(campaignId,lane),()=>null);}
 export function resetNarrativeMutationRegistryForTests(){records.clear();listeners.clear();}
+
+function notifyPresence(key: string) { for (const listener of presenceListeners.get(key) ?? []) listener(); }
+export function beginNpcPresenceMutation(campaignId: string, sessionId: string, npcId: string): NpcPresenceMutationLock | null {
+  const key = presenceKey(campaignId, sessionId); if (presenceRecords.has(key)) return null;
+  const value: NpcPresenceMutationLock = { campaignId, sessionId, npcId, phase: "pending" }; presenceRecords.set(key, value); notifyPresence(key); return value;
+}
+export function markNpcPresenceAmbiguous(value: NpcPresenceMutationLock): void { const key = presenceKey(value.campaignId, value.sessionId); if (presenceRecords.get(key) !== value) return; const next = { ...value, phase: "ambiguous" as const }; presenceRecords.set(key, next); notifyPresence(key); }
+export function markNpcPresenceReconciliation(value: NpcPresenceMutationLock, resultingRevision: number): void { const key = presenceKey(value.campaignId, value.sessionId); if (presenceRecords.get(key) !== value) return; const next = { ...value, resultingRevision, phase: "reconciling" as const }; presenceRecords.set(key, next); notifyPresence(key); }
+export function reconcileNpcPresenceMutation(campaignId: string, sessionId: string, revision: number, explicitAmbiguousRefresh = false): boolean {
+  const key = presenceKey(campaignId, sessionId), value = presenceRecords.get(key); if (!value) return true;
+  if ((value.resultingRevision === undefined || revision < value.resultingRevision) && !(explicitAmbiguousRefresh && value.phase === "ambiguous")) return false;
+  presenceRecords.delete(key); notifyPresence(key); return true;
+}
+export function clearNpcPresenceMutation(campaignId: string, sessionId: string): void { const key = presenceKey(campaignId, sessionId); presenceRecords.delete(key); notifyPresence(key); }
+export function releaseNpcPresenceMutation(value: NpcPresenceMutationLock): void { const key = presenceKey(value.campaignId, value.sessionId); if (presenceRecords.get(key) !== value) return; presenceRecords.delete(key); notifyPresence(key); }
+export function useNpcPresenceMutation(campaignId: string, sessionId: string): NpcPresenceMutationLock | null { const key = presenceKey(campaignId, sessionId); return useSyncExternalStore((listener) => { const set = presenceListeners.get(key) ?? new Set(); set.add(listener); presenceListeners.set(key, set); return () => { set.delete(listener); if (!set.size) presenceListeners.delete(key); }; }, () => presenceRecords.get(key) ?? null, () => null); }
+export function resetNpcPresenceMutationRegistryForTests(): void { presenceRecords.clear(); presenceListeners.clear(); }
 
 if(typeof window!=="undefined"){
   // One-time cleanup of the previous unsafe format that could contain full payloads.

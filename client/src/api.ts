@@ -65,6 +65,16 @@ import type {
   CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
 import {
+  npcCastHttpSchema,
+  npcPresenceMutationHttpRequestSchema,
+  npcPresenceMutationHttpResponseSchema,
+} from "@velvet/contracts";
+import type {
+  NpcCastHttp,
+  NpcPresenceMutationHttpRequest,
+  NpcPresenceMutationHttpResponse,
+} from "@velvet/contracts";
+import {
   generationDraftApplyRequestSchema,
   generationDraftApplyResponseSchema,
   generationDraftCreateRequestSchema,
@@ -2325,6 +2335,37 @@ export async function listCampaignNpcs(campaignId: string, audience: "gm" | "pla
   const success = await requestResponse<unknown>(campaignLane(campaignId, "npcs"), { cache: "no-store" }); requireStatus(success, 200, "Campaign NPC read");
   const data=audience==="gm"?gmCampaignNpcsHttpResponseSchema.parse(success.body):playerCampaignNpcsHttpResponseSchema.parse(success.body);
   return { data, revision: revisionFrom(success.headers, "x-world-revision") };
+}
+
+function npcPresenceLane(campaignId: string, sessionId: string): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const session = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  return `/rpg/v1/campaigns/${encodeOpaquePathSegment(campaign)}/rooms/${encodeOpaquePathSegment(session)}`;
+}
+
+/** Reads the authoritative running cast or stopped cast history for one opaque room. */
+export async function getCampaignPresentCast(campaignId: string, sessionId: string, audience: "gm" | "player"): Promise<NpcCastHttp> {
+  const success = await requestResponse<unknown>(`${npcPresenceLane(campaignId, sessionId)}/present-cast`, { cache: "no-store" });
+  requireStatus(success, 200, "NPC present cast read");
+  const cast = npcCastHttpSchema.parse(success.body);
+  const revision = success.headers.get("x-npc-presence-revision");
+  if (cast.audience !== audience) throw new Error("NPC present cast audience did not match the request");
+  if (revision === null || String(cast.sessionRevision) !== revision) throw new Error("NPC present cast revision header did not match the response");
+  return cast;
+}
+
+/** Issues one presence write. Ambiguous outcomes are never retried by this transport. */
+export async function commandNpcPresence(campaignId: string, sessionId: string, npcId: string, input: NpcPresenceMutationHttpRequest): Promise<NpcPresenceMutationHttpResponse> {
+  const npc = parseApiInput(() => resourceIdSchema.parse(npcId));
+  const body = parseApiInput(() => npcPresenceMutationHttpRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${npcPresenceLane(campaignId, sessionId)}/npcs/${encodeOpaquePathSegment(npc)}/presence-commands`, {
+    method: "POST", cache: "no-store", body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "NPC presence command");
+  const response = npcPresenceMutationHttpResponseSchema.parse(success.body);
+  if (response.receipt.kind !== body.mutation.kind || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) throw new Error("NPC presence receipt did not match the request");
+  return response;
 }
 export async function createCampaignNpc(campaignId: string, input: CreateCampaignNpcHttpRequest): Promise<ReturnType<typeof createCampaignNpcHttpResponseSchema.parse>> {
   const body=parseApiInput(()=>createCampaignNpcHttpRequestSchema.parse(input)); const success=await requestResponse<unknown>(campaignLane(campaignId,"npcs"),{method:"POST",cache:"no-store",body:JSON.stringify(body)}); requireStatus(success,201,"NPC creation");
