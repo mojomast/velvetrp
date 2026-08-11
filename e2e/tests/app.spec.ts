@@ -22,6 +22,13 @@ async function stream(request: APIRequestContext, sessionId: string, content: st
   return events;
 }
 
+async function actorForCampaignCharacter(request: APIRequestContext, campaignId: string, characterId: string): Promise<string> {
+  const actor = await json<{ actorId: string }>(
+    request, "GET", `/__e2e/campaigns/${campaignId}/characters/${characterId}/actor`,
+  );
+  return actor.actorId;
+}
+
 test("M2.5 content catalog API flow publishes, configures, and replays an exact pin", async ({ request }) => {
   const fixture = MECHANICS_STARTER_CATALOG;
   const pin = {
@@ -131,35 +138,39 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
 
   const finalization = { expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.6-finalize` };
   const finalized = await json<{
-    draft: { id: string; status: string; revision: number; completion: { complete: boolean } };
-    receipt: { draftId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; campaignCharacterId: string; sheetId: string; actorId: string; derived: unknown };
-  }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200);
+    character: { id: string };
+    receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number; derived: unknown };
+  }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 201);
   expect(finalized).toMatchObject({
-    draft: { id: created.draft.id, status: "finalized", revision: 2, completion: { complete: true } },
-    receipt: { draftId: created.draft.id, idempotencyKey: finalization.idempotencyKey, revisionBefore: 1, revisionAfter: 2,
-      campaignCharacterId: expect.any(String), sheetId: expect.any(String), actorId: expect.any(String) },
+    character: { id: expect.any(String) },
+    receipt: { idempotencyKey: finalization.idempotencyKey, revisionBefore: 1, revisionAfter: 2 },
   });
 
   const retried = await json<typeof finalized>(
-    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 200,
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${created.draft.id}/finalize`, finalization, 201,
   );
   expect(retried).toEqual(finalized);
+  const actorId = await actorForCampaignCharacter(request, campaign.campaign.id, finalized.character.id);
+  const lookupWithUnexpectedQuery = await request.get(
+    `/api/__e2e/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/actor?unexpected=1`,
+  );
+  expect(lookupWithUnexpectedQuery.status()).toBe(400);
 
   const resources = await json<{ resources: Array<{ name: string; current: number; max: number }>; revision: number }>(
-    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`,
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/resources`,
   );
   const health = resources.resources.find((resource) => resource.name === "health")!;
   expect(health).toMatchObject({ current: health.max });
   const damage = { kind: "change" as const, resourceName: "health", amount: -1, expectedRevision: resources.revision, idempotencyKey: `${runId}-m2.7-damage` };
   const changedResources = await json<{ resources: Array<{ name: string; current: number; max: number }>; receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(
-    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resource-commands`, damage, 200,
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/resource-commands`, damage, 200,
   );
   expect(changedResources.resources.find((resource) => resource.name === "health")).toMatchObject({ current: health.current - 1, max: health.max });
   expect(changedResources.receipt).toMatchObject({ revisionBefore: resources.revision, revisionAfter: resources.revision + 1, idempotencyKey: damage.idempotencyKey });
-  expect(await json<typeof changedResources>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resource-commands`, damage, 200)).toEqual(changedResources);
+  expect(await json<typeof changedResources>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/resource-commands`, damage, 200)).toEqual(changedResources);
 
   const progression = await json<{ progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; revision: number } }>(
-    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/progression`,
   );
   const xpCommand = {
     amount: 300,
@@ -171,18 +182,18 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
     progression: { campaignId: string; campaignCharacterId: string; level: number; totalXp: number; milestoneCount: number; revision: number; derived: unknown; updatedAt: string };
     receipt: { campaignCharacterId: string; idempotencyKey: string; type: string; revisionBefore: number; revisionAfter: number; occurredAt: string; appliedLevels: unknown[] };
   }>(
-    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/xp-commands`, xpCommand, 200,
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/xp-commands`, xpCommand, 200,
   );
   expect(granted).toMatchObject({
     progression: {
       campaignId: campaign.campaign.id,
-      campaignCharacterId: finalized.receipt.campaignCharacterId,
+      campaignCharacterId: finalized.character.id,
       level: progression.progression.level,
       totalXp: progression.progression.totalXp + xpCommand.amount,
       revision: progression.progression.revision + 1,
     },
     receipt: {
-      campaignCharacterId: finalized.receipt.campaignCharacterId,
+      campaignCharacterId: finalized.character.id,
       idempotencyKey: xpCommand.idempotencyKey,
       type: "grant-xp",
       revisionBefore: progression.progression.revision,
@@ -194,17 +205,17 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   expect(granted.progression).not.toHaveProperty("sheetId");
   expect(granted.progression).not.toHaveProperty("actorId");
   const grantRetried = await json<typeof granted>(
-    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/xp-commands`, xpCommand, 200,
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/xp-commands`, xpCommand, 200,
   );
   expect(grantRetried).toEqual(granted);
 
   const persisted = await json<typeof progression>(
-    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression`,
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/progression`,
   );
   expect(persisted).toEqual({ progression: granted.progression });
 
   const publicSheet = characterSheetHttpResponseSchema.parse(await json<unknown>(
-    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/sheet`,
+    request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/sheet`,
   ));
   expect(publicSheet.sheet.classes.reduce((total, characterClass) => total + characterClass.level, 0))
     .toBe(publicSheet.progression.level);
@@ -225,24 +236,46 @@ test("M2.6 durable standard-array draft finalizes, previews progression, and rep
   expect(publicSheet.sheet).not.toHaveProperty("controllerPrincipalId");
   expect(publicSheet.sheet).not.toHaveProperty("privateNotes");
   expect(publicSheet.progression).not.toHaveProperty("revision");
-  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.sheetId);
-  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.actorId);
-  expect(JSON.stringify(publicSheet)).not.toContain(finalized.receipt.campaignCharacterId);
+  expect(JSON.stringify(publicSheet)).not.toContain(actorId);
+  expect(JSON.stringify(publicSheet)).not.toContain(finalized.character.id);
   expect(JSON.stringify(publicSheet)).not.toContain(created.draft.id);
   expect(JSON.stringify(publicSheet)).not.toContain(persona.id);
 
   const preview = await json<{ preview: { campaignId: string; campaignCharacterId: string; currentLevel: number; eligibleLevel: number; levels: unknown[] } }>(
-    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.receipt.campaignCharacterId}/progression/preview`, { selections: [] }, 200,
+    request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/characters/${finalized.character.id}/progression/preview`, { selections: [] }, 200,
   );
   expect(preview.preview).toMatchObject({
     campaignId: campaign.campaign.id,
-    campaignCharacterId: finalized.receipt.campaignCharacterId,
+    campaignCharacterId: finalized.character.id,
     currentLevel: granted.progression.level,
     eligibleLevel: granted.progression.level + 1,
   });
   expect(preview.preview.levels).toHaveLength(1);
   expect(preview.preview).toHaveProperty("previewRevision");
   expect(preview.preview).toHaveProperty("previewToken");
+});
+
+test("M2.7 deterministic fixture routes reject malformed semantic input", async ({ request }) => {
+  const malformedFixture = await request.post("/api/__e2e/materialize-waylamp", {
+    data: { campaignId: "invalid campaign", actorId: "actor", entryId: "waylamp", expectedRevision: 0 },
+  });
+  expect(malformedFixture.status()).toBe(400);
+
+  const malformedEconomyCommand = await request.post("/api/__e2e/economy/commands", {
+    data: {
+      type: "request_purchase_quote", campaignId: "campaign", buyerActorId: "actor", shopId: "shop",
+      item: { kind: "item", packId: "pack", packVersion: "1", definitionId: "item" }, quantity: 0,
+      expectedRevision: 0, idempotencyKey: "malformed-economy-command",
+    },
+  });
+  expect(malformedEconomyCommand.status()).toBe(400);
+
+  const malformedEconomyLookups = await Promise.all([
+    request.get("/api/__e2e/economy/campaigns/invalid%20campaign/actors/actor/wallet"),
+    request.get("/api/__e2e/economy/campaigns/campaign/actors/invalid%20actor/wallet"),
+    request.get("/api/__e2e/economy/campaigns/campaign/shops/invalid%20shop"),
+  ]);
+  expect(malformedEconomyLookups.map((response) => response.status())).toEqual([400, 400, 400]);
 });
 
 test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips it", async ({ request }) => {
@@ -278,19 +311,20 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
       selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
     },
   );
-  const finalized = await json<{ receipt: { actorId: string } }>(
+  const finalized = await json<{ character: { id: string } }>(
     request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
       expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-finalize`,
-    }, 200,
+    }, 201,
   );
-  const inventoryPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/inventory`;
+  const actorId = await actorForCampaignCharacter(request, campaign.campaign.id, finalized.character.id);
+  const inventoryPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/inventory`;
   const commandPath = `${inventoryPath}-commands`;
   const initial = await json<{ entries: unknown[]; equipment: unknown[]; capacity: number; revision: number }>(request, "GET", inventoryPath);
   expect(initial).toMatchObject({ entries: [], equipment: [], capacity: 1000, revision: 0 });
 
   const entryId = `${runId}-waylamp`;
   const materialized = await request.post("/api/__e2e/materialize-waylamp", {
-    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, entryId, expectedRevision: initial.revision },
+    data: { campaignId: campaign.campaign.id, actorId, entryId, expectedRevision: initial.revision },
   });
   expect(materialized.status()).toBe(204);
   const stocked = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { definitionId: string } }>; equipment: unknown[]; revision: number }>(request, "GET", inventoryPath);
@@ -338,15 +372,16 @@ test("M2.7 finalized actor short-rests and replays exactly", async ({ request })
     expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m2.7-rest-select`,
     selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
   });
-  const finalized = await json<{ receipt: { actorId: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
+  const finalized = await json<{ character: { id: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
     expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-rest-finalize`,
-  }, 200);
-  const resources = await json<{ revision: number }>(request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`);
+  }, 201);
+  const actorId = await actorForCampaignCharacter(request, campaign.campaign.id, finalized.character.id);
+  const resources = await json<{ revision: number }>(request, "GET", `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/resources`);
   const materialized = await request.post("/api/__e2e/materialize-short-rest-resource", {
-    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: resources.revision },
+    data: { campaignId: campaign.campaign.id, actorId, expectedRevision: resources.revision },
   });
   expect(materialized.status()).toBe(204);
-  const command = { type: "take_short_rest" as const, campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: resources.revision, idempotencyKey: `${runId}-m2.7-short-rest` };
+  const command = { type: "take_short_rest" as const, campaignId: campaign.campaign.id, actorId, expectedRevision: resources.revision, idempotencyKey: `${runId}-m2.7-short-rest` };
   const rested = await json<{ rest: { kind: string; recovery: { resources: Array<{ resourceId: string; before: number; after: number }> }; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", "/__e2e/take-short-rest", command, 200);
   expect(rested.rest).toMatchObject({
     kind: "short", recovery: { resources: [{ resourceId: "focus", before: 1, after: 4 }] }, revisionBefore: command.expectedRevision,
@@ -377,25 +412,26 @@ test("M2.7 economy quotes, replays, purchases, and reconciles authoritative stat
   const selected = await json<{ draft: { revision: number } }>(request, "PATCH", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}`, {
     expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m2.7-economy-select`, selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
   });
-  const finalized = await json<{ receipt: { actorId: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
+  const finalized = await json<{ character: { id: string } }>(request, "POST", `/rpg/v1/campaigns/${campaign.campaign.id}/character-drafts/${draft.draft.id}/finalize`, {
     expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m2.7-economy-finalize`,
-  }, 200);
+  }, 201);
+  const actorId = await actorForCampaignCharacter(request, campaign.campaign.id, finalized.character.id);
   const base = `/__e2e/economy/campaigns/${campaign.campaign.id}`;
-  const resourcesPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${finalized.receipt.actorId}/resources`;
+  const resourcesPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/resources`;
   const initialResources = await json<{ revision: number }>(request, "GET", resourcesPath);
   const materialized = await request.post("/api/__e2e/materialize-economy-fixture", {
-    data: { campaignId: campaign.campaign.id, actorId: finalized.receipt.actorId, expectedRevision: initialResources.revision },
+    data: { campaignId: campaign.campaign.id, actorId, expectedRevision: initialResources.revision },
   });
   expect(materialized.status()).toBe(204);
-  const walletPath = `${base}/actors/${finalized.receipt.actorId}/wallet`;
+  const walletPath = `${base}/actors/${actorId}/wallet`;
   const shopPath = `${base}/shops/e2e-waylamp-shop`;
   expect(await json<{ wallet: { balances: Array<{ currency: typeof glimmer; minorUnits: number }> } }>(request, "GET", walletPath)).toEqual({ wallet: { balances: [{ currency: glimmer, minorUnits: 20 }] } });
   expect(await json<{ shop: { name: string; stock: Array<{ item: typeof waylamp; quantity: number; unitPrice: { currency: typeof glimmer; minorUnits: number } }> } }>(request, "GET", shopPath)).toEqual({ shop: { shopId: "e2e-waylamp-shop", campaignId: campaign.campaign.id, name: "E2E Waylamp Shop", stock: [{ item: waylamp, quantity: 2, unitPrice: { currency: glimmer, minorUnits: 8 } }] } });
-  const quoteCommand = { type: "request_purchase_quote" as const, campaignId: campaign.campaign.id, buyerActorId: finalized.receipt.actorId, shopId: "e2e-waylamp-shop", item: waylamp, quantity: 1, expectedRevision: initialResources.revision, idempotencyKey: `${runId}-m2.7-economy-quote` };
+  const quoteCommand = { type: "request_purchase_quote" as const, campaignId: campaign.campaign.id, buyerActorId: actorId, shopId: "e2e-waylamp-shop", item: waylamp, quantity: 1, expectedRevision: initialResources.revision, idempotencyKey: `${runId}-m2.7-economy-quote` };
   const quoted = await json<{ quote: { quoteId: string; total: { currency: typeof glimmer; minorUnits: number } }; receipt: { revisionBefore: number; revisionAfter: number } }>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200);
-  expect(quoted).toMatchObject({ quote: { campaignId: campaign.campaign.id, shopId: quoteCommand.shopId, buyerActorId: finalized.receipt.actorId, item: waylamp, quantity: 1, total: { currency: glimmer, minorUnits: 8 } }, receipt: { revisionBefore: initialResources.revision, revisionAfter: initialResources.revision + 1 } });
+  expect(quoted).toMatchObject({ quote: { campaignId: campaign.campaign.id, shopId: quoteCommand.shopId, buyerActorId: actorId, item: waylamp, quantity: 1, total: { currency: glimmer, minorUnits: 8 } }, receipt: { revisionBefore: initialResources.revision, revisionAfter: initialResources.revision + 1 } });
   expect(await json<typeof quoted>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200)).toEqual(quoted);
-  const purchaseCommand = { type: "purchase_from_shop" as const, campaignId: campaign.campaign.id, buyerActorId: finalized.receipt.actorId, quoteId: quoted.quote.quoteId, expectedRevision: quoted.receipt.revisionAfter, idempotencyKey: `${runId}-m2.7-economy-purchase` };
+  const purchaseCommand = { type: "purchase_from_shop" as const, campaignId: campaign.campaign.id, buyerActorId: actorId, quoteId: quoted.quote.quoteId, expectedRevision: quoted.receipt.revisionAfter, idempotencyKey: `${runId}-m2.7-economy-purchase` };
   const purchased = await json<{ purchase: { quoteId: string; total: { currency: typeof glimmer; minorUnits: number }; revisionBefore: number; revisionAfter: number }; receipt: { revisionBefore: number; revisionAfter: number } }>(request, "POST", "/__e2e/economy/commands", purchaseCommand, 200);
   expect(purchased).toMatchObject({ purchase: { quoteId: quoted.quote.quoteId, total: { currency: glimmer, minorUnits: 8 }, revisionBefore: quoted.receipt.revisionAfter, revisionAfter: quoted.receipt.revisionAfter + 1 }, receipt: { revisionBefore: quoted.receipt.revisionAfter, revisionAfter: quoted.receipt.revisionAfter + 1 } });
   expect(await json<typeof purchased>(request, "POST", "/__e2e/economy/commands", purchaseCommand, 200)).toEqual(purchased);
@@ -1157,61 +1193,124 @@ test("quest workflow creates and resolves campaign state", async ({ request }) =
     const campaignId = campaign.campaign.id;
     expect(campaignId).toBeTruthy();
 
+    const fixture = MECHANICS_STARTER_CATALOG;
+    const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+    await json(request, "POST", "/rpg/v1/content-packs", fixture);
+    const administration = await json<{ campaign: { revision: number } }>(
+      request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+    );
+    await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/content`, {
+      rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+      contentPacks: [pin],
+      expectedRevision: administration.campaign.revision,
+      idempotencyKey: `${runId}-quest-configure`,
+    });
+    const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+    const draft = await json<{ draft: { id: string; revision: number } }>(
+      request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+        personaId: characterId,
+        durability: "durable",
+        allocation: { method: "standard-array", scores },
+        idempotencyKey: `${runId}-quest-draft`,
+      },
+    );
+    const reference = (kind: "race" | "background" | "class") =>
+      fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+    const selected = await json<{ draft: { revision: number } }>(
+      request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+        expectedRevision: draft.draft.revision,
+        idempotencyKey: `${runId}-quest-select`,
+        selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+      },
+    );
+    const finalized = await json<{ character: { id: string } }>(
+      request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+        expectedRevision: selected.draft.revision,
+        idempotencyKey: `${runId}-quest-finalize`,
+      }, 201,
+    );
+    const actorId = await actorForCampaignCharacter(request, campaignId, finalized.character.id);
+
+    const storylineId = `${runId}-quest-storyline`;
+    const storylineRequest = {
+      storyline: { storylineId, title: "The missing star", summary: "Follow the observatory chart.", nodes: [], edges: [], plotPoints: [], clues: [] },
+      expectedRevision: 0,
+      idempotencyKey: `${runId}-storyline-create`,
+    };
     const storyline = await json<{
-      storyline: { id: string; campaignId: string; title: string; description: string | null; status: string };
-    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/storylines`, {
-      title: "The missing star", description: "Follow the observatory chart.",
-    });
+      storyline: { storylineId: string; campaignId: string; title: string; summary: string | null; status: string };
+      story: { nodes: unknown[]; edges: unknown[]; plotPoints: unknown[]; clues: unknown[] };
+      receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/storylines`, storylineRequest, 201);
     expect(storyline.storyline).toMatchObject({
-      campaignId, title: "The missing star", description: "Follow the observatory chart.", status: "active",
+      storylineId, campaignId, title: "The missing star", summary: "Follow the observatory chart.", status: "active",
     });
-    expect(storyline.storyline.id).toBeTruthy();
+    expect(storyline.story).toMatchObject({ nodes: [], edges: [], plotPoints: [], clues: [] });
+    expect(storyline.receipt).toMatchObject({
+      idempotencyKey: storylineRequest.idempotencyKey, revisionBefore: 0, revisionAfter: 1,
+    });
+    expect(await json<typeof storyline>(
+      request, "POST", `/rpg/v1/campaigns/${campaignId}/storylines`, storylineRequest, 201,
+    )).toEqual(storyline);
 
+    const questId = `${runId}-decode-chart`;
+    const objectiveId = `${runId}-moon-seal`;
+    const rewardId = `${runId}-observatory-xp`;
+    const questRequest = {
+      quest: {
+        questId, storylineId, title: "Decode the chart", description: "Identify its moon seal.", visibility: "public" as const,
+        objectives: [{ objectiveId, description: "Identify the moon seal.", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" as const }],
+        rewards: [{ rewardId, kind: "xp" as const, amount: 100, label: "Observatory XP", visibility: "public" as const }],
+        journalText: "The observatory chart awaits decoding.",
+      },
+      expectedRevision: 0,
+      idempotencyKey: `${runId}-quest-create`,
+    };
     const quest = await json<{
-      quest: { id: string; campaignId: string; storylineId: string; title: string; description: string | null; status: string };
-    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests`, {
-      storylineId: storyline.storyline.id, title: "Decode the chart", description: "Identify its moon seal.",
-    });
+      quest: { questId: string; campaignId: string; storylineId: string; title: string; description: string | null; status: string };
+      definition: typeof questRequest.quest;
+      projection: { objectives: Array<{ objectiveId: string; questId: string; progress: number; targetProgress: number }> };
+      revision: number;
+      receipt: { idempotencyKey: string; revisionBefore: number; revisionAfter: number };
+    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests`, questRequest, 201);
     expect(quest.quest).toMatchObject({
-      campaignId, storylineId: storyline.storyline.id, title: "Decode the chart", description: "Identify its moon seal.", status: "open",
+      questId, campaignId, storylineId, title: "Decode the chart", description: "Identify its moon seal.", status: "offered",
     });
-    expect(quest.quest.id).toBeTruthy();
+    expect(quest.definition).toEqual(questRequest.quest);
+    expect(quest.projection.objectives).toContainEqual(expect.objectContaining({ objectiveId, questId, progress: 0, targetProgress: 1 }));
+    expect(quest).toMatchObject({ revision: 1, receipt: { idempotencyKey: questRequest.idempotencyKey, revisionBefore: 0, revisionAfter: 1 } });
+    expect(await json<typeof quest>(
+      request, "POST", `/rpg/v1/campaigns/${campaignId}/quests`, questRequest, 201,
+    )).toEqual(quest);
 
-    const clue = await json<{
-      clue: { id: string; campaignId: string; questId: string; content: string; discoveredByCharacterId: string | null; discoveredAt: string | null };
-    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/clues`, {
-      content: "The chart bears a moon seal.",
-    });
-    expect(clue.clue).toMatchObject({
-      campaignId, questId: quest.quest.id, content: "The chart bears a moon seal.", discoveredByCharacterId: null, discoveredAt: null,
-    });
-    expect(clue.clue.id).toBeTruthy();
+    const accepted = await json<{ quest: { status: string }; receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(
+      request, "POST", `/rpg/v1/quests/${questId}/commands`, { kind: "accept", expectedRevision: quest.receipt.revisionAfter, idempotencyKey: `${runId}-quest-accept` }, 200,
+    );
+    expect(accepted).toMatchObject({ quest: { status: "active" }, receipt: { revisionBefore: 1, revisionAfter: 2, idempotencyKey: `${runId}-quest-accept` } });
+    expect(await json<typeof accepted>(
+      request, "POST", `/rpg/v1/quests/${questId}/commands`, { kind: "accept", expectedRevision: quest.receipt.revisionAfter, idempotencyKey: `${runId}-quest-accept` }, 200,
+    )).toEqual(accepted);
 
-    const discovered = await json<{
-      clue: { id: string; discoveredByCharacterId: string | null; discoveredAt: string | null };
-    }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/clues/${clue.clue.id}/discover`, {
-      characterId,
+    const advanced = await json<{ quest: { status: string }; receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(
+      request, "POST", `/rpg/v1/quests/${questId}/commands`, { kind: "advance-objective", objectiveId, expectedRevision: accepted.receipt.revisionAfter, idempotencyKey: `${runId}-quest-advance` }, 200,
+    );
+    expect(advanced).toMatchObject({ quest: { status: "completed" }, receipt: { revisionBefore: 2, revisionAfter: 3, idempotencyKey: `${runId}-quest-advance` } });
+    expect(await json<typeof advanced>(
+      request, "POST", `/rpg/v1/quests/${questId}/commands`, { kind: "advance-objective", objectiveId, expectedRevision: accepted.receipt.revisionAfter, idempotencyKey: `${runId}-quest-advance` }, 200,
+    )).toEqual(advanced);
+
+    const claimed = await json<{
+      quest: { status: string; rewards: Array<{ rewardId: string; claimedByActorId: string | null; claimedAt: string | null }> };
+      receipt: { revisionBefore: number; revisionAfter: number; idempotencyKey: string };
+    }>(request, "POST", `/rpg/v1/quests/${questId}/commands`, {
+      kind: "claim-reward", actorId, rewardId, expectedRevision: advanced.receipt.revisionAfter, idempotencyKey: `${runId}-quest-claim`,
     }, 200);
-    expect(discovered.clue).toMatchObject({ id: clue.clue.id, discoveredByCharacterId: characterId });
-    expect(discovered.clue.discoveredAt).toBeTruthy();
-
-    const reward = await json<{
-      reward: { id: string; campaignId: string; questId: string; kind: string; amount: number | null; label: string; grantedToCharacterId: string | null; grantedAt: string | null };
-    }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/rewards`, {
-      kind: "xp", amount: 100, label: "Observatory XP",
-    });
-    expect(reward.reward).toMatchObject({
-      campaignId, questId: quest.quest.id, kind: "xp", amount: 100, label: "Observatory XP", grantedToCharacterId: null, grantedAt: null,
-    });
-    expect(reward.reward.id).toBeTruthy();
-
-    const granted = await json<{
-      reward: { id: string; grantedToCharacterId: string | null; grantedAt: string | null };
-    }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/quests/${quest.quest.id}/rewards/${reward.reward.id}/grant`, {
-      characterId,
-    }, 200);
-    expect(granted.reward).toMatchObject({ id: reward.reward.id, grantedToCharacterId: characterId });
-    expect(granted.reward.grantedAt).toBeTruthy();
+    expect(claimed.quest).toMatchObject({ status: "completed" });
+    expect(claimed.quest.rewards).toContainEqual(expect.objectContaining({ rewardId, claimedByActorId: actorId, claimedAt: expect.any(String) }));
+    expect(claimed.receipt).toMatchObject({ revisionBefore: 3, revisionAfter: 4, idempotencyKey: `${runId}-quest-claim` });
+    expect(await json<typeof claimed>(request, "POST", `/rpg/v1/quests/${questId}/commands`, {
+      kind: "claim-reward", actorId, rewardId, expectedRevision: advanced.receipt.revisionAfter, idempotencyKey: `${runId}-quest-claim`,
+    }, 200)).toEqual(claimed);
   } finally {
     if (characterId) await request.delete(`/api/characters/${characterId}`).catch(() => undefined);
   }

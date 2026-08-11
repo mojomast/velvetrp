@@ -116,6 +116,10 @@ import type {
   RepositoryDependencies,
   RepositoryUnitOfWork,
 } from "./campaign/campaignTypes.js";
+import type {
+  DeterministicE2EFixtureDatabase,
+  DeterministicE2EFixtures,
+} from "./testing/deterministicE2EFixtureRepo.js";
 export type {
   CampaignCharacterRosterSnapshot,
   CampaignCharacterSheetSnapshot,
@@ -561,7 +565,10 @@ function runTransaction<T>(
  * used after it returns. Do not close the repository from a unit-of-work
  * callback.
  */
-export function createRepository(options: CreateRepositoryOptions = {}): Repository {
+function createRepositoryComposition<T>(
+  options: CreateRepositoryOptions,
+  createPrivateExtension?: (db: DatabaseDriver.Database, assertOpen: () => void) => T,
+): { repository: Repository; privateExtension: T | undefined } {
   const dependencies: RepositoryDependencies = {
     clock: options.clock ?? systemRuntime.clock,
     ids: options.ids ?? systemRuntime.ids,
@@ -729,7 +736,7 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
     executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
     resolveCombatAction:(principal,encounterId,input)=>encounterRepository.resolveCombatAction(principal,encounterId,input),
   });
-  return {
+  const repository: Repository = {
     ...administrationRepository,
     ...contentCatalogRepository,
     ...characterBuilderRepository,
@@ -1143,4 +1150,42 @@ export function createRepository(options: CreateRepositoryOptions = {}): Reposit
       closed = true;
     },
   };
+  try {
+    return {
+      repository,
+      privateExtension: createPrivateExtension?.(db, assertOpen),
+    };
+  } catch (error) {
+    repository.close();
+    throw error;
+  }
+}
+
+export function createRepository(options: CreateRepositoryOptions = {}): Repository {
+  return createRepositoryComposition(options).repository;
+}
+
+/** @internal Testing-only fixture seam; the owned database is never exposed. */
+export function createRepositoryTestingComposition(
+  options: CreateRepositoryOptions,
+  createExtension: (db: DeterministicE2EFixtureDatabase) => DeterministicE2EFixtures,
+): { repository: Repository; extension: DeterministicE2EFixtures } {
+  const composition = createRepositoryComposition(options, (db, assertOpen) => {
+    const fixtureDatabase: DeterministicE2EFixtureDatabase = {
+      prepare(source) {
+        assertOpen();
+        const statement = db.prepare(source);
+        return {
+          get: (...parameters) => statement.get(...parameters),
+          run: (...parameters) => { statement.run(...parameters); },
+        };
+      },
+      immediate(operation) {
+        assertOpen();
+        db.transaction(operation).immediate();
+      },
+    };
+    return createExtension(fixtureDatabase);
+  });
+  return { repository: composition.repository, extension: composition.privateExtension! };
 }
