@@ -2,21 +2,21 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current status (v42r1; M4 complete)
+## Current status (v43r1; M5.1 complete)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v42 revision 1 (v42r1)**. The trusted-local RPG HTTP boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3 and M4.1-M4.6 are complete**. The approved post-M4 queue is the H0 repository-health work followed by M5, with later and Unscheduled work ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v43 revision 1 (v43r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.1 delivered persisted session NPC presence; the remaining approved M5 queue is **M5.2-M5.6**, ordered and statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v40 and v41 databases upgrading to v42**. Historical v2-v39 migration code and archived tests do not constitute startup-upgrade support.
-- The current backend has campaign-visible NPC records but no NPC location/presence model, and campaign NPCs are not implicitly Velvet session participants. Session participation remains the explicit legacy 1-12 character list. UI and context must say "campaign-visible NPC roster" rather than "present NPCs" unless a later authoritative presence/session link is implemented.
+- Supported executable migration coverage is for canonical populated **v41 and v42 databases upgrading to v43**. Historical v2-v40 migration code and archived tests do not constitute startup-upgrade support.
+- M5.1 persists a campaign NPC in a running attached session's present cast, optionally with a role-visible location, and retains a stopped session's cast as structurally distinct at-stop history. Presence does not add the NPC to the explicit legacy 1-12 session participant list, make it an autonomous speaker, create a campaign-NPC speech bridge, or imply that the full campaign-visible NPC roster is present.
 
 ## Point-in-time language
 
-Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v42r1 status or the normative sources above.
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v43r1 status or the normative sources above.
 
 ## Historical Slice 98 closeout
 
@@ -89,7 +89,7 @@ States: `setup -> active -> closed` exercised in the MVP; `paused`/`cooldown` ex
 
 Messages form a per-session tree (`parent_id`), with swipe alternates grouped by `swipe_group_id`/`swipe_index`. Each session tracks `active_leaf_id`; history, prompt assembly, and summaries operate on the active root-to-leaf branch. Character messages carry `speaker_character_id`. Swipes require a character reply with a direct user parent and inherit that reply's speaker by default. Branching retries or edits a user turn and preserves speaker attribution.
 
-Sessions have 1-12 participants through `session_characters`, plus a primary character retained in `sessions.character_id` for backward compatibility. Each character-generation call targets exactly one participant; room routing and scene synthesis are auxiliary provider calls. `POST /api/sessions/:id/continue` creates one character turn without a new user message, enabling deliberate character-to-character dialogue without an automatic loop.
+Sessions have 1-12 legacy participants through `session_characters`, plus a primary character retained in `sessions.character_id` for backward compatibility. Each character-generation call targets exactly one participant; room routing and scene synthesis are auxiliary provider calls. `POST /api/sessions/:id/continue` creates one character turn without a new user message, enabling deliberate character-to-character dialogue without an automatic loop. A persisted present NPC is additional role-visible scene cast, not a legacy participant or autonomous speaker; campaign roster membership alone does not establish presence.
 
 ## Prompt orchestration skeleton
 
@@ -100,7 +100,7 @@ Sessions have 1-12 participants through `session_characters`, plus a primary cha
 5. Authoritative shared context: editable manual canon plus synthesized current scene facts, with manual canon taking precedence.
 6. Recent dialogue window (active branch, last `harness.recentTurns`).
 
-The completed M4.1 campaign-aware context boundary uses this canonical authority order: safety and actor control; human-authored campaign canon and explicit overrides; committed mechanics and campaign events; the exact final player declaration; visible world, cast, quests, and legal actions; authorized private target facts; approved memories and visible lore; recaps and summaries; then generated suggestions. Lower layers cannot contradict or mutate higher layers.
+The completed campaign-aware context boundary uses this canonical authority order: safety and actor control; human-authored campaign canon and explicit overrides; committed mechanics and campaign events; the exact final player declaration; visible world, cast, quests, and legal actions; authorized private target facts; approved memories and visible lore; recaps and summaries; then generated suggestions. Visible cast includes only persisted present NPCs while the attached session is running, with locations only when visible to the role. Stopped at-stop cast history is not prompt-current, and the full campaign NPC roster is never inferred to be present. Lower layers cannot contradict or mutate higher layers.
 
 ## Historical MVP implementation ledger (through 2026-08-05 checkpoints)
 

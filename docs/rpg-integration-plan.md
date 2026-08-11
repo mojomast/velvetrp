@@ -1,20 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v42r1; M4 complete)
+## Current status (v43r1; M5.1 complete)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v42 revision 1 (v42r1)**. The trusted-local RPG HTTP boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3 and M4.1-M4.6 are complete**. The approved post-M4 queue is the H0 repository-health work followed by M5, with later and Unscheduled work ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v43 revision 1 (v43r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.1 delivered persisted session NPC presence; the remaining approved M5 queue is **M5.2-M5.6**, ordered and statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v40 and v41 databases upgrading to v42**. Historical v2-v39 migration code and archived tests do not constitute startup-upgrade support.
-- A campaign NPC's persona reference is identity metadata. There is no campaign-NPC speech or session-participation bridge, and the current implementation has no NPC location/presence model. Current UI/API data can identify a campaign-visible NPC roster, not NPCs speaking in or present in an attached room.
+- Supported executable migration coverage is for canonical populated **v41 and v42 databases upgrading to v43**. Historical v2-v40 migration code and archived tests do not constitute startup-upgrade support.
+- A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v42r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v43r1 status above.
 
 ## Original purpose (historical)
 
@@ -119,7 +119,7 @@ Campaign
 - Existing `/api/characters` and `/api/sessions` behavior stays compatible.
 - RPG state is additive and initially feature-flagged.
 - The same Velvet persona can participate in multiple campaigns with independent levels, equipment, relationships, and history.
-- Campaign NPC persona references are identity metadata only. They do not connect campaign NPCs to Velvet speech, memories, or session participation, and there is no campaign-NPC speech/session bridge or NPC location/presence model. Campaign visibility must not be interpreted as room participation or physical presence.
+- Campaign NPC persona references are identity metadata only. Persisted presence can add an NPC to a running attached session's present cast and optionally associate a role-visible location; stopping the session retains structurally historical at-stop cast state. Presence does not connect the NPC to Velvet speech or memories, make it a legacy session participant or autonomous speaker, or imply presence for the full campaign-visible roster.
 - Ordinary enemy instances do not become Velvet characters unless promoted to recurring speaking NPCs.
 
 ## Architectural Decisions
@@ -480,7 +480,7 @@ Capabilities:
 - Per-character affinity, trust, fear, and relationship notes.
 - Factions, memberships, allies/enemies, party or individual reputation, standing tiers, and favor.
 - Promote an enemy into a persistent NPC when it becomes narratively important.
-- Campaign NPC persona references remain identity metadata and do not create a speech, memory, or session-participation bridge; campaign visibility does not imply session participation or physical presence.
+- Campaign NPC persona references remain identity metadata. Persisted session presence and optional role-visible location do not create a speech or memory bridge, make an NPC a legacy session participant or autonomous speaker, or imply that every campaign-visible NPC is present.
 
 Core tables:
 
@@ -855,7 +855,7 @@ Key screens:
 ### Play Experience
 
 - Chat remains central but does not host every editor.
-- A compact campaign drawer shows location, exits, the campaign-visible NPC roster, active objectives, party resources, and current encounter. It must not label NPCs as present until an authoritative location/presence model exists.
+- A compact campaign drawer distinguishes the full campaign-visible NPC roster from the running session's persisted present cast, may show role-visible present-NPC locations, and also shows exits, active objectives, party resources, and the current encounter. Stopped at-stop cast history is historical rather than prompt-current or running presence.
 - Active combat uses a focused action tray while preserving narration.
 - Mechanic receipts are linked to messages and show rolls, modifiers, targets, outcomes, and state changes.
 - AI suggestions are visibly different from committed actions.
@@ -876,7 +876,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema **v42 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
+Velvet currently uses schema **v43 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
 
 | Version | Scope |
 |---|---|
@@ -910,12 +910,13 @@ Velvet currently uses schema **v42 revision 1**. The concise sequence below is a
 | v40 | Confirmation-policy attestations, authority evidence, expiration operations, mutation accounting, and replanning requirements |
 | v41 | Reviewed campaign opening, conservative NPC baseline, and generated quest persistence |
 | v42 | Immutable campaign-content commands, receipts, revisions, and layout attestation |
+| v43 | Persisted session NPC presence, session-root revisions, optional locations, at-stop history, and layout attestation |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- The supported executable startup window is canonical populated v40 and v41 databases upgrading to v42; v2-v39 migration implementations and archived tests are historical and unsupported.
+- The supported executable startup window is canonical populated v41 and v42 databases upgrading to v43; v2-v40 migration implementations and archived tests are historical and unsupported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
