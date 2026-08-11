@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v42 revision 1 (`v42r1`)**. The trusted-local RPG API currently has **95 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`; the historical M2.11 baseline was 92, and M4.6 added three reviewed campaign-content draft operations. Roadmap milestones M1-M3 and **M4.1-M4.6 are complete**, including the bounded tool loop, deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation.
+Current persistence is **schema v43 revision 1 (`v43r1`)**. The trusted-local RPG API currently has **97 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, and M5.1 added two NPC-presence operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete, including the bounded tool loop, deterministic command bridge, durable confirmation/resume, receipt-aware narration, reviewed encounter and campaign-content generation, and authoritative room-scoped NPC presence.
 
 ## Security And Privacy
 
@@ -33,6 +33,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Character drafts, finalization, derived sheets, XP, level advancement, resources, inventory, economy, and rest
 - Server-resolved checks, powers, effects, encounters, legal combat actions, logs, and rewards
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
+- Authoritative room-scoped NPC place, move, and remove commands with role-safe running-cast and stopped-history projections
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
@@ -162,15 +163,14 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-For pre-release schema `v42r1`, v40/v41 -> v42 is the tested and supported forward-startup compatibility window; it validates canonical layout/integrity attestations. Legacy marker paths for v2-v39 remain in the binary temporarily, but are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+For pre-release schema `v43r1`, canonical populated v41 and v42 databases migrating forward to v43 are the tested and supported startup compatibility window. The sequential lineage is v41 -> v42 -> v43; v43 adds empty NPC-presence storage and does not infer or backfill presence from the campaign NPC roster, actor locations, room participants, or prior narrative state. Historical v2-v40 migration code remains in the binary, but those startup paths are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 
-- Campaign context excludes full catalogs, full inventories, story graph dumps, unrelated private state, hidden routes, and controller identities. NPC/enemy target-private planning is non-disclosable. Legacy character prompting accepts only exact session- and persona-bound player/NPC baskets; DM/enemy legacy prompts fail closed, while the composed adventure orchestrator selects role-authorized player or enemy context. Companion context fails closed because no persisted companion model or controller binding exists.
-- The campaign context drawer shows the campaign-visible NPC roster because NPC location/presence is not modeled.
+- Campaign context excludes full catalogs, full inventories, story graph dumps, unrelated private state, hidden routes, and controller identities. NPC/enemy target-private planning is non-disclosable. Legacy character prompting accepts only exact session- and persona-bound player/NPC baskets; DM/enemy legacy prompts fail closed, while the composed adventure orchestrator selects role-authorized player or enemy context.
+- The campaign-visible NPC roster is the set of available campaign NPCs; persisted room presence is separate explicit M5.1 state. The context drawer uses the roster for GM placement choices and the authoritative present-cast read for running presence or stopped history. Existing exclusions remain: unrelated roster entries are not treated as present, and hidden locations, controller identities, and role-private NPC state are not added to player projections.
 - Published content-pack versions are immutable. Create a new exact version to change one.
-- Build Later includes planned remote campaign identity and tenancy; the current runtime remains fixed to the trusted-local `local-owner` principal.
-- Append-only multiclass progression and autonomous parties are Approved Build Unscheduled.
+- Append-only multiclass progression remains outside the current runtime.
 - Discord, VTT adapters, and simultaneous encounters remain deferred.
 - Feature flags can hide surfaces but cannot authorize users.
 

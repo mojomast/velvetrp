@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for schema v42 revision 1 (`v42r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for schema v43 revision 1 (`v43r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -26,14 +26,14 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 | --- | --- |
 | `db.ts` | Stable facade, dependency wiring, historical v2-v14 migration code, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
 | `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, schema startup, legacy import invocation, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | `SCHEMA_VERSION = 42`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
+| `db/schema.ts` | `SCHEMA_VERSION = 43`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
 | `db/migrations/*.ts` | Version-owned DDL, canonical object inventories/digests, data validation, backfill, and one-step migration functions. New schema behavior goes in the migration that introduces it. |
 | `db/legacyImport.ts` | One-way import of an otherwise-empty legacy `db.json` store into SQLite. It does not merge stores. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-Fresh creation and the v40-to-v42 and v41-to-v42 sequential upgrades in the tested and supported pre-release compatibility window must converge on equivalent v42r1 DDL and validated data. Legacy v2-v39 marker paths remain in the binary temporarily, but are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in supported v40/v41 migration inputs. The same pre-cleanup preflight rejects unexpected v42 named artifacts and cross-campaign generation-draft ancestry, including on current v42. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
+Fresh creation and canonical populated v41-to-v43 and v42-to-v43 upgrades in the tested and supported pre-release compatibility window must converge on equivalent v43r1 DDL and validated preexisting data. The v41 path remains sequential v41 -> v42 -> v43; this preserves v41 campaign-content staging lineage and v42 immutable application lineage before v43 presence is introduced. Historical v2-v40 marker paths remain in the binary, but are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in supported v41/v42 inputs, unexpected v42/v43 named artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
 
-## Migrations v26-v42
+## Migrations v26-v43
 
 | Version | Additive responsibility |
 | --- | --- |
@@ -54,6 +54,7 @@ Fresh creation and the v40-to-v42 and v41-to-v42 sequential upgrades in the test
 | v40 | Confirmation policy, authority evidence, expiry operations, mutation accounting, and replan requirements. |
 | v41 | Reviewed campaign-content generation drafts and projections. |
 | v42 | Additive immutable campaign-content commands, receipts, revisions, and layout attestation sealing reviewed atomic application. |
+| v43 | M5.1 room-scoped NPC-presence revisions, materialized current state, immutable commands/events/receipts, exact graph triggers, and canonical layout attestation. Migration owns no inferred presence and creates no backfill rows. |
 
 ## Repository ownership
 
@@ -75,6 +76,7 @@ Fresh creation and the v40-to-v42 and v41-to-v42 sequential upgrades in the test
 | M4.2-M4.4 | `agent/adventureOrchestrator.ts`, `agent/toolRegistry.ts`, and `agent/confirmationPolicy.ts` own bounded provider orchestration, role-selected tools, deterministic command bridging, durable confirmation/resume, and receipt-aware narration. Durable execution and response provenance are persisted through the v38-v40 repository boundary. |
 | M4.5 | `generationDrafts.ts` and the encounter repository own typed encounter draft validation, reviewed authoritative encounter application, and role-safe projections. |
 | M4.6 | `campaignContentGeneration.ts`, `campaign/campaignContentWriteRepo.ts`, and the v41-v42 migrations own typed campaign-content drafts, conservative NPC baselines, and atomic reviewed campaign-content application with immutable receipts. |
+| M5.1 | `world/npcPresenceRepo.ts`, `world/npcPresenceReadRepo.ts`, `world/npcPresenceWriteRepo.ts`, and `db/migrations/v43_npc_presence.ts` own room-scoped NPC presence, role/lifecycle projections, command idempotency, graph integrity, detachment protection, and canonical v43 layout. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 
@@ -89,19 +91,27 @@ Legacy persona, settings, session, message, memory, lore, and summary aggregates
 - Unknown delivery is not permission to replay. Callers reconcile through authoritative reads and command/receipt locators. For adventure turns, recover exact committed source-turn commands through v37 proposal execution bindings, persist missing links, and reuse mechanics receipts for swipes, retries, fallback narration, and post-commit cancellation.
 - Preserve observable clock, ID, and RNG consumption order. Failed validation and exact retries must not reroll, spend resources again, duplicate rewards, or fabricate identifiers.
 
+M5.1 presence reads execute in one deferred transaction: membership, scoped graph verification, room lifecycle, session revision, event reconstruction, NPC metadata, and role-visible locations share one snapshot without taking the write lock early. Presence writes execute in one immediate transaction. They derive owner/GM authority, verify the complete scoped graph, resolve an exact idempotent replay before attachment/lifecycle/staleness checks, then validate an attached running room, the session revision, campaign NPC/location ancestry, and the transition before consuming clock or IDs. A fresh commit advances the session root exactly once and atomically writes one command, event, receipt, and matching materialized state.
+
+The v43 integrity boundary requires contiguous revisions from zero; one exact event and receipt per command; exact command/event/receipt NPC, state, location, revision, and timestamp bindings; valid principal/NPC/location ancestry; monotonic command time; and materialized state reconstructed exactly from the immutable ledger. Authorized corruption fails loudly; an outsider remains non-disclosing. Exact idempotency reuse returns the persisted receipt without dependency, clock, ID, lifecycle, or write use even after stop/detach. Changed reuse conflicts. Place transitions absent/left to present, move transitions present to a different location, remove transitions present to left, and a later place may begin a new presence interval.
+
+Both legacy direct detach and audited administration detach consult `hasAttachedRunningNpcPresence()` inside their immediate transaction. Only an attached running room with at least one materialized `present` row is blocked. Detach does not delete the v43 root, ledger, receipts, or state; stopped history and exact receipt replay remain available. Fresh commands continue to require attachment and a non-stopped lifecycle.
+
 ## Role-safe projections
 
 Authorization and projection are repository concerns even in trusted-local mode. Start reads from validated membership/control ancestry, select explicit columns, and use structurally distinct owner/GM, player, observer, public, and private schemas. Unauthorized or unrelated identities return the domain's non-disclosing `null`/empty/not-found result; an authorized reader encountering corrupt persisted state receives an integrity failure.
 
 Never project raw rows, idempotency keys, command envelopes, provider/private coordination data, controller identity, actor-private notes, hidden world routes, NPC goals, unrevealed quest/story truth, or staged generation content to a role that cannot see it. Internal path-binding evidence may accompany a repository snapshot only long enough for the route adapter to verify and strip it.
 
-M4.1 agent snapshots derive visibility from the requested audience plus current membership, campaign role, actor control, attached session, target ancestry, and encounter state; they do not reuse a caller-selected general-purpose projection. They contain bounded-source facts rather than full catalogs, full inventories, or story graphs. Target actor notes/attributes, the speaking NPC's goals, or the target enemy's tactic/template may appear only in that authorized target's private planning layer; unrelated private facts remain absent. NPC/enemy planning has an immutable higher-precedence nondisclosure rule. Companion reads return `null` for every principal because persistence has no companion aggregate or controller binding.
+M4.1 agent snapshots derive visibility from the requested audience plus current membership, campaign role, actor control, attached session, target ancestry, encounter state, and the validated v43 presence graph; they do not reuse a caller-selected general-purpose projection. They contain bounded-source facts rather than full catalogs, full inventories, or story graphs. During a running room, v43 presence adds campaign-NPC roster facts only for NPCs whose state is currently `present`, and an NPC speaker target must itself be present in that running room. Legacy room participants linked through `session_characters` remain independently included and are not filtered by NPC presence. NPC locations follow the same GM-versus-controlled-principal discovery rule as the HTTP projection. Target actor notes/attributes, the speaking NPC's goals, or the target enemy's tactic/template may appear only in that authorized target's private planning layer; unrelated private facts remain absent. NPC/enemy planning has an immutable higher-precedence nondisclosure rule.
 
 The snapshot method is server-internal repository API, not HTTP or shared wire surface. At M4.1 completion it added no production tool/provider loop or mutation capability; M4.2 subsequently composed those concerns without bypassing this disclosure boundary.
 
 ## Trusted-local HTTP and client context
 
 RPG HTTP adapters use the fixed `LOCAL_OWNER_PRINCIPAL_ID` (`local-owner`) on a loopback, single-user boundary. This is convenience identity, not authentication or a remote-safe authorization design; do not accept caller identity headers or generalize it to multi-user deployment. Routes own request parsing, status/problem mapping, and wire projection; `packages/contracts` owns strict transport schemas. The client owns interaction, streaming state, resume tokens, and authoritative-read reconciliation, but never invents revisions, mechanics outcomes, or persistence truth. Consult `docs/api.md` for the route inventory rather than duplicating it here.
+
+For M5.1, the client treats the campaign NPC roster and persisted room presence as separate authorities: the roster supplies GM placement candidates, while the no-store present-cast GET supplies running presence or stopped history. It accepts only a request-bound receipt-only POST response, keeps at most one in-memory mutation lock per campaign/session, and never automatically repeats the POST. Receipt-backed locks require an authoritative revision at least as new as the receipt; ambiguous locks require explicit refresh. Player projections are structurally unable to contain persona IDs, command principals, private NPC state, controller identities, or location IDs, and authorization downgrade clears GM-only controls and lock state.
 
 ## Test approach
 
