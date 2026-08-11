@@ -102,6 +102,23 @@ describe("supported v40/v41 startup upgrades", () => {
     db.close();
   });
 
+  it("rejects persisted foreign-key corruption before changing the v40 marker or artifacts", () => {
+    const { npcId } = buildCanonicalV40Fixture();
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=OFF");
+    db.prepare("UPDATE campaign_npc_private_state_v28 SET campaign_id='support-window-missing-campaign' WHERE npc_id=?").run(npcId);
+    db.close();
+
+    expect(() => createRepository()).toThrow("schema marker 40 contains foreign-key violation in campaign_npc_private_state_v28");
+
+    const verify = new DatabaseDriver(file(), { readonly: true });
+    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "40" });
+    expect(tableNames(verify)).toEqual([]);
+    expect(verify.prepare("SELECT campaign_id FROM campaign_npc_private_state_v28 WHERE npc_id=?").get(npcId)).toEqual({ campaign_id: "support-window-missing-campaign" });
+    expect(verify.pragma("foreign_key_check")).toEqual([{ table: "campaign_npc_private_state_v28", rowid: 1, parent: "campaign_npcs_v28", fkid: 0 }]);
+    verify.close();
+  });
+
   it("rejects persisted foreign-key corruption before changing the v41 marker or artifacts", () => {
     const { campaignId } = buildCanonicalV41Fixture();
     const db = new DatabaseDriver(file());

@@ -71,10 +71,12 @@ const V42_ARTIFACTS = new Set([
   "trigger:campaign_content_layout_attestation_v42_immutable_update_v42", "trigger:campaign_content_layout_attestation_v42_immutable_delete_v42",
 ]);
 
-/** Read-only guard: never clean up or migrate a database with persisted integrity evidence. */
+/** Read-only guard before cleanup; database-wide FK checking applies to supported migration inputs. */
 function preflightPersistedIntegrity(db: DatabaseDriver.Database, marker: string): void {
-  const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string; rowid: number; parent: string; fkid: number } | undefined;
-  if (foreignKeyIssue) throw new Error(`schema marker ${marker} contains foreign-key violation in ${foreignKeyIssue.table}`);
+  if (marker === "40" || marker === "41") {
+    const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string; rowid: number; parent: string; fkid: number } | undefined;
+    if (foreignKeyIssue) throw new Error(`schema marker ${marker} contains foreign-key violation in ${foreignKeyIssue.table}`);
+  }
 
   const unexpectedV42Artifact = (db.prepare("SELECT type,name FROM sqlite_master WHERE name GLOB '*v42*' AND sql IS NOT NULL ORDER BY type,name").all() as Array<{ type: string; name: string }>)
     .find(({ type, name }) => !V42_ARTIFACTS.has(`${type}:${name}`));
