@@ -51,6 +51,7 @@ export * from "./world-http.js";
 export * from "./npc-presence.js";
 export * from "./npc-presence-http.js";
 export * from "./companion.js";
+export * from "./exact-candidate-protocol.js";
 export * from "./quest.js";
 export * from "./quest-http.js";
 export * from "./story.js";
