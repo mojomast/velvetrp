@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v37 revision 1 (`v37r1`)**. The trusted-local RPG API has **92 explicitly registered HTTP operations through M2.11**, excluding `GET /api/rpg/v1/features`. Roadmap milestones M1-M3 and M4.1 are complete; **M4.2 bounded tool-loop and deterministic command-bridge work is next**.
+Current persistence is **schema v42 revision 1 (`v42r1`)**. The trusted-local RPG API currently has **95 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`; the historical M2.11 baseline was 92, and M4.6 added three reviewed campaign-content draft operations. Roadmap milestones M1-M3 and **M4.1-M4.6 are complete**, including the bounded tool loop, deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation.
 
 ## Security And Privacy
 
@@ -10,7 +10,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 
 - SQLite data is local by default.
 - When a remote model provider is configured, Velvet sends assembled prompts and conversation context to that provider. Review the provider's privacy and retention terms.
-- Without a usable provider, roleplay uses a clearly marked deterministic local stub. Current RPG adventure turns also use deterministic fallback narration until the M4 tool/provider integration is implemented.
+- Without a usable provider, roleplay uses a clearly marked deterministic local stub. RPG adventure turns use deterministic recovery after provider failure, including receipt-backed fallback narration and authoritative enemy-turn recovery; this is a delivered M4 recovery path, not a placeholder for future tool-loop work.
 - The server defaults to `127.0.0.1` and RPG routes use the fixed `local-owner` principal. There is no authentication boundary. Authorization and principal headers are ignored.
 - Do not expose this server to a LAN, the internet, a reverse proxy, or multiple untrusted users. `FEATURE_REMOTE_AUTHENTICATION` is discovery-only rollout state, not implemented authentication.
 - Provider keys are persisted locally and are never returned by the public provider API. Authorization headers are sent only to allowlisted hosted providers or loopback hosts.
@@ -34,8 +34,9 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Server-resolved checks, powers, effects, encounters, legal combat actions, logs, and rewards
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
-- Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and review-only generation drafts
+- Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
+- A role-selected, bounded provider tool loop with deterministic command bridging, durable resume, and receipt-aware narration and recovery
 
 The full operation contract is in the [API reference](docs/api.md). The implementation intentionally does not duplicate the route and schema tree here.
 
@@ -158,21 +159,21 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-Schema `v37r1` migrates supported historical databases forward at startup and validates canonical layout/integrity attestations. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+For pre-release schema `v42r1`, v40/v41 -> v42 is the tested and supported forward-startup compatibility window; it validates canonical layout/integrity attestations. Legacy marker paths for v2-v39 remain in the binary temporarily, but are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 
-- M4 AI-driven RPG integration is not complete. M4.1 provides server-internal campaign-aware prompt context, but no production adventure-turn tool/provider loop uses it yet; the bounded loop and deterministic command bridge begin in M4.2, with provider-driven confirmation/resume, receipt-aware narration, and generated encounter/NPC application still pending.
-- M4.1 deliberately excludes full catalogs, full inventories, story graph dumps, unrelated private state, and hidden routes. NPC/enemy target-private planning is non-disclosable, and companion context fails closed because no persisted companion model exists.
-- Generation drafts currently seal reviewed deterministic user-brief changes only; they do not mutate campaign-domain content.
+- Campaign context excludes full catalogs, full inventories, story graph dumps, unrelated private state, hidden routes, and controller identities. NPC/enemy target-private planning is non-disclosable. Legacy character prompting accepts only exact session- and persona-bound player/NPC baskets; DM/enemy legacy prompts fail closed, while the composed adventure orchestrator selects role-authorized player or enemy context. Companion context fails closed because no persisted companion model or controller binding exists.
 - The campaign context drawer shows the campaign-visible NPC roster because NPC location/presence is not modeled.
 - Published content-pack versions are immutable. Create a new exact version to change one.
-- Advanced rules such as multiclass execution, arbitrary effects DSLs, tactical grids, simultaneous encounters, autonomous play, remote identity, and third-party adapters are deferred.
+- Build Later includes planned remote campaign identity and tenancy; the current runtime remains fixed to the trusted-local `local-owner` principal.
+- Append-only multiclass progression and autonomous parties are Approved Build Unscheduled.
+- Discord, VTT adapters, and simultaneous encounters remain deferred.
 - Feature flags can hide surfaces but cannot authorize users.
 
 ## Testing
 
-Use `npm run typecheck`, `npm run build`, and `npm test` for the normal validation gate. Run `npm run test:e2e` when behavior crosses browser/API/persistence boundaries; it is deterministic and isolated. Run live E2E only when intentionally validating a configured provider. Test totals are intentionally omitted because they change frequently.
+For local development, run the owning workspace typecheck and only the test file(s) affected by the change, for example `npm run test --workspace velvet-mvp-server -- test/repo.test.ts`. Run `npm test` for broad or cross-workspace changes, or before merging when CI is unavailable. CI is the normal full validation gate and runs all unit tests plus deterministic E2E. Run `npm run test:e2e` locally when behavior crosses browser, API, streaming, persistence, or migration boundaries. Run live E2E only when intentionally validating a configured provider. Test totals are intentionally omitted because they change frequently.
 
 ## Policy Status
 

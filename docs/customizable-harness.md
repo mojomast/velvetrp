@@ -31,20 +31,23 @@ The shared-context layer is computed for every generation from highest-priority 
 
 ## Campaign context
 
-M4.1 adds an optional server-internal campaign context basket; it is not exposed through `/api/harness`, a prompt-template layer, or an RPG wire contract. Its exact conflict precedence is: safety/control; human canon; committed mechanics; the exact final user declaration; visible world/cast/quests and legal actions; authorized private target facts; approved memory/lore; recap/summary; generated suggestions. When supplied to legacy player/NPC generation, it replaces the ordinary triggered-lore, retrieved-memory, and shared-context prompt blocks so those retrieval sources are not duplicated. Generations without campaign context keep the existing 20-layer behavior.
+The M4.1 server-internal campaign context basket is not exposed through `/api/harness`, a prompt-template layer, or an RPG wire contract. Its exact conflict precedence is: safety/control; human canon; committed mechanics; the exact final user declaration; visible world/cast/quests and legal actions; authorized private target facts; approved memory/lore; recap/summary; generated suggestions. When supplied to legacy player/NPC generation, it replaces the ordinary triggered-lore, retrieved-memory, and shared-context prompt blocks so those retrieval sources are not duplicated. Generations without campaign context keep the existing 20-layer behavior.
 
 Campaign safety/control, human canon, world, mechanics/legal actions, quests, private target facts, recap/summary, lore, memory, and suggestions use independent UTF-16 code-unit budgets. Assembly normalizes budgeted facts to whole lines, includes or omits each line deterministically, never splits surrogate pairs, never borrows across categories, and records exact truncation metadata. The final declaration is separately limited to 8,000 UTF-16 code units and is rebound unchanged to the final session turn.
 
 Audience visibility is repository-derived from current role/control and campaign/session/target ancestry in one deferred snapshot. Full catalogs, full inventories, story graph dumps, hidden routes, controller identities, and unrelated private facts are excluded. NPC goals and enemy tactics are planning-only and protected by a non-overridable higher-precedence nondisclosure rule. Legacy campaign generation accepts only a player or NPC basket bound to the exact server-derived speaker persona and session; DM/enemy baskets fail closed there, and companion context fails closed everywhere because no persisted companion model/controller binding exists.
 
-This is assembly and optional provider-message plumbing only. Production adventure turns do not yet invoke a campaign tool/provider loop; that remains M4.2.
+M4.2 composes this disclosure boundary into production adventure turns through a role-selected bounded provider loop and deterministic command bridge. The orchestrator selects exact server-derived player or enemy context, keeps provider calls outside repository transactions, and uses deterministic recovery after provider failure; it does not bypass the campaign basket's audience, ancestry, budget, or nondisclosure restrictions.
 
 
 ## Client
 
 The chat treats the viewport as its application area. **Prompt & settings** opens an independently scrolling right pane with a pointer- and keyboard-resizable separator; width is persisted in local storage and the pane becomes a full-screen drawer on narrow displays. The pane exposes all template layers, harness text/context fields, model/base URL, streaming, timeout, samplers, reasoning, stop strings, routing controls, provider metadata, and input/output USD-per-million token prices. It reports whether an API key exists but never displays the key. The chat also exposes lifetime usage/cost breakdowns separately from active-branch tokens.
 
-## Deferred
+## Current limitation
 
-- Prompt assembly reads all context budgets from harness settings; prompt presets (`default`, `compact`, `immersive`) currently contribute only their `temperature` fallback (`harness.temperature ?? preset.temperature`). Wiring preset budgets into `buildOrchestratedMessages` is deferred.
-- There is no per-session harness override; the persisted harness applies globally.
+- Prompt assembly reads all context budgets from harness settings; prompt presets (`default`, `compact`, `immersive`) currently contribute only their `temperature` fallback (`harness.temperature ?? preset.temperature`). Preset budgets are not wired into `buildOrchestratedMessages`.
+
+## Build Later / Planned
+
+- Bounded per-session harness overrides are planned for Build Later in the roadmap; they are not shipped. The persisted harness currently applies globally.
