@@ -2,20 +2,21 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current status (v37r1)
+## Current status (v42r1; M4 complete)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v37 revision 1 (v37r1)**. The trusted-local RPG HTTP boundary exposes exactly **92 explicit operations through M2.11**, excluding the feature-discovery read, and uses fixed `local-owner`. It is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3 are complete**. **M4.1 campaign-aware context assembly is next**; later M4 milestones remain future work.
-- M2.11's delivered adventure-turn and generation-draft lanes are deterministic boundaries, not the future AI tool system. Ordinary turns use deterministic fallback narration; proposal, confirmation, mechanics, and choice stream events are conditional; no bounded provider tool bridge executes tools yet. Generation-draft creation is deterministic user-brief fallback, and apply only seals reviewed draft changes with `campaignDomainMutated: false`; provider-backed generation and campaign-domain application remain M4.2, M4.5, and M4.6 work.
+- Current persistence is schema **v42 revision 1 (v42r1)**. The trusted-local RPG HTTP boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3 and M4.1-M4.6 are complete**. The approved post-M4 queue is the H0 repository-health work followed by M5, with later and Unscheduled work ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
+- Supported executable migration coverage is for canonical populated **v40 and v41 databases upgrading to v42**. Historical v2-v39 migration code and archived tests do not constitute startup-upgrade support.
 - The current backend has campaign-visible NPC records but no NPC location/presence model, and campaign NPCs are not implicitly Velvet session participants. Session participation remains the explicit legacy 1-12 character list. UI and context must say "campaign-visible NPC roster" rather than "present NPCs" unless a later authoritative presence/session link is implemented.
 
 ## Point-in-time language
 
-Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v37r1 status or the normative sources above.
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v42r1 status or the normative sources above.
 
 ## Historical Slice 98 closeout
 
@@ -99,7 +100,7 @@ Sessions have 1-12 participants through `session_characters`, plus a primary cha
 5. Authoritative shared context: editable manual canon plus synthesized current scene facts, with manual canon taking precedence.
 6. Recent dialogue window (active branch, last `harness.recentTurns`).
 
-For the next RPG context work, the canonical authority order is: safety and actor control; human-authored campaign canon and explicit overrides; committed mechanics and campaign events; the current player declaration; visible normalized campaign state; approved memories and visible lore; recaps, summaries, and synthesized facts; then generated plans, suggestions, and narration. Lower layers cannot contradict or mutate higher layers.
+The completed M4.1 campaign-aware context boundary uses this canonical authority order: safety and actor control; human-authored campaign canon and explicit overrides; committed mechanics and campaign events; the exact final player declaration; visible world, cast, quests, and legal actions; authorized private target facts; approved memories and visible lore; recaps and summaries; then generated suggestions. Lower layers cannot contradict or mutate higher layers.
 
 ## Historical MVP implementation ledger (through 2026-08-05 checkpoints)
 

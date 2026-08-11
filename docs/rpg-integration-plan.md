@@ -1,19 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v37r1)
+## Current status (v42r1; M4 complete)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v37 revision 1 (v37r1)**. The trusted-local RPG HTTP boundary exposes exactly **92 explicit operations through M2.11**, excluding feature discovery, under fixed unauthenticated `local-owner` loopback-only authority.
-- Milestones **M1-M3 are complete**. **M4.1 campaign-aware context assembly is next**.
-- M2.11 deliberately stops at deterministic boundaries: ordinary turns use fallback narration; no bounded provider tool bridge executes tools; generation-draft creation is deterministic user-brief fallback; and draft apply seals review state only with `campaignDomainMutated: false`. Provider tool planning/command bridging and provider-backed campaign generation/application remain M4.2, M4.5, and M4.6 work.
+- Current persistence is schema **v42 revision 1 (v42r1)**. The trusted-local RPG HTTP boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3 and M4.1-M4.6 are complete**. The approved post-M4 queue is the H0 repository-health work followed by M5, with later and Unscheduled work ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
+- Supported executable migration coverage is for canonical populated **v40 and v41 databases upgrading to v42**. Historical v2-v39 migration code and archived tests do not constitute startup-upgrade support.
 - A campaign NPC's persona reference is identity metadata. There is no campaign-NPC speech or session-participation bridge, and the current implementation has no NPC location/presence model. Current UI/API data can identify a campaign-visible NPC roster, not NPCs speaking in or present in an attached room.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v37r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v42r1 status above.
 
 ## Original purpose (historical)
 
@@ -562,7 +563,7 @@ Invariants:
 
 ## AI Game Master And Agent Architecture
 
-The agent roles, module paths, tool categories, prompt-template names, limits, and pipeline below are conceptual targets. They do not describe the deterministic M2.11 fallback implementation or imply that the M4 tool bridge exists.
+The agent roles, module paths, tool categories, prompt-template names, limits, and pipeline below originated as conceptual targets and are not a current implementation inventory. The M2.11 fallback limitations were historical; [ROADMAP.md](ROADMAP.md) owns the delivered M4 boundary and subsequent work.
 
 ### Agent Roles
 
@@ -875,7 +876,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema **v37 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
+Velvet currently uses schema **v42 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
 
 | Version | Scope |
 |---|---|
@@ -904,12 +905,17 @@ Velvet currently uses schema **v37 revision 1**. The concise sequence below is a
 | v35 | M1.10 durable adventure-turn and generation-draft foundation |
 | v36 | Adventure coordination and provenance hardening |
 | v37 | Exact server-owned proposal-to-mechanics execution bindings |
+| v38 | Durable bounded agent-execution operations, provider starts, decision rounds, tool calls, read outcomes, and layout attestation |
+| v39 | Provider context/response provenance, dispatch claims, combat proposal bindings, and generalized receipts |
+| v40 | Confirmation-policy attestations, authority evidence, expiration operations, mutation accounting, and replanning requirements |
+| v41 | Reviewed campaign opening, conservative NPC baseline, and generated quest persistence |
+| v42 | Immutable campaign-content commands, receipts, revisions, and layout attestation |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- Existing databases migrate sequentially to schema v37 revision 1, including explicit same-version corrective revisions where supported.
+- The supported executable startup window is canonical populated v40 and v41 databases upgrading to v42; v2-v39 migration implementations and archived tests are historical and unsupported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
@@ -924,9 +930,9 @@ Migration requirements:
 
 ## Implementation Progress
 
-### 2026-08-09: Current v37r1 boundary
+### Historical 2026-08-09 v37r1 boundary
 
-Current persistence is v37r1, 92 explicit trusted-local RPG operations are implemented through M2.11, M1-M3 are complete, and M4.1 is next. M2.11 provides deterministic adventure-turn fallback and draft-review persistence only: it does not execute the future bounded provider tool bridge, does not perform provider-backed campaign generation, and does not apply generated changes to campaign-domain state. See [ROADMAP.md](ROADMAP.md), [api.md](api.md), and [repo-architecture.md](repo-architecture.md) for the normative current descriptions.
+At this historical checkpoint, current persistence was v37r1, 92 explicit trusted-local RPG operations were implemented through M2.11, M1-M3 were complete, and M4.1 was next. M2.11 provided deterministic adventure-turn fallback and draft-review persistence only: it did not execute the future bounded provider tool bridge, perform provider-backed campaign generation, or apply generated changes to campaign-domain state. See [ROADMAP.md](ROADMAP.md), [api.md](api.md), and [repo-architecture.md](repo-architecture.md) for the normative current descriptions.
 
 ### 2026-08-05: Schema v25 M1.5 Resources, Inventory, Economy, and Rest
 
