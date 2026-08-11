@@ -133,24 +133,25 @@ Delivery waves are: **Wave H (health)** H0.1-H0.4; then parallel **Wave A tracks
 
 ### H0.3 — Current documentation reconciliation
 
-**Status:** Planned.
+**Status:** Complete.
 
 - **Outcome:** normative and entry-point docs describe v42r1, completed M4.1-M4.6, current migration support, and the approved post-M4 plan; historical ledgers remain visibly historical.
+- **Delivered evidence:** active documentation records 95 current trusted-local RPG HTTP operations versus the historical 92-operation M2.11 baseline, completed M4.1-M4.6, and canonical populated v40/v41->v42 executable support. Historical schema, milestone, operation-count, and gate ledgers remain preserved and are distinguished from current implementation, Planned, Unscheduled, deferred, and excluded status.
 - **Dependencies:** H0.1 policy wording and H0.2 final result should be known before closeout.
 - **Scope:** repair stale active/current sections in root `README.md`, `docs/rpg-integration-plan.md`, `docs/roleplay-architecture-2026.md`, and `docs/customizable-harness.md`; retain dated ledgers and v37 milestone history rather than rewriting it. Reconcile `docs/api.md`, `docs/operations.md`, `docs/repo-architecture.md`, `docs/README.md`, ROADMAP, devplan, and handoff where their normative roles require it.
-- **Observed stale claims:** root README says M4.2 is next and fallback/generation work remains; both historical design docs label v37r1/M4.1 as current; harness docs say the production tool loop remains M4.2. Historical v37 descriptions inside dated sections are valid when labeled as such.
+- **Reconciled stale-claim evidence:** root README had said M4.2 was next and fallback/generation work remained; both historical design docs had labeled v37r1/M4.1 as current; harness docs had said the production tool loop remained M4.2. Those active claims are corrected, while historical v37 descriptions inside dated sections remain valid when labeled as such.
 - **Authority/projection/security:** documentation must preserve loopback-only `local-owner`, provider-outside-transaction, role-safe projection, immutable receipts, and no remote-safe claims. Do not invent future operation totals or report hidden/private examples.
 - **Migration/backfill:** documentation only.
 - **Non-goals:** no production/test/package changes and no erasure of historical acceptance/gate records.
-- **Acceptance:** targeted searches find no unlabeled active v37/M4-next claims; links resolve; current support window and post-M4 status agree; historical context remains intact.
-- **Validation:** targeted `rg` searches for `v37r1`, `M4.1`, `M4.2`, `next`, and migration-window wording in Markdown, followed by `git diff --check`. No code test is needed for docs-only edits.
+- **Acceptance completed:** targeted searches found no unlabeled active v37/M4-next claims; all 37 checked local Markdown links and anchors resolved; the current support window and post-M4 status agree; historical context remains intact.
+- **Validation completed:** targeted stale-claim `rg`, 37 local Markdown link/anchor resolutions, and `git diff --check` passed. No code tests were run or required for this docs-only reconciliation.
 - **Docs:** this is the docs slice; finish ROADMAP/devplan/handoff last.
-- **Logical commits:** normative/entry docs, then historical headers/qualifiers, then planning lifecycle. For each docs-only commit, run targeted consistency/link checks plus `git diff --check`; do not run root typecheck unless the docs change generated/typechecked code or repository instructions explicitly require it.
+- **Logical commits:** normative/entry docs, then historical headers/qualifiers, then planning lifecycle. For each docs-only commit, run targeted consistency/link checks plus `git diff --check`; do not run root typecheck unless the docs change generated/typechecked code or repository instructions explicitly require it. Commits: `77ed4b0 docs: reconcile current RPG guidance`; `2a50a41 docs: qualify historical RPG baselines`; docs/status commit remains pending.
 - **Rollback/recovery:** revert only inaccurate paragraphs; never remove historical ledgers to resolve a search hit.
 
 ### H0.4 — Canonical health command and gate
 
-**Status:** Planned.
+**Status:** Planned; next operation after H0.3.
 
 - **Outcome:** one documented root command runs the release-health sequence in deterministic order and CI uses or exactly mirrors it.
 - **Dependencies:** H0.1-H0.3 complete.

@@ -29,8 +29,8 @@ Later: rules/simulation use only relevant mechanics; remote identity -> harness 
 
 - **H0.1 Complete:** executable supported migration coverage is canonical populated v40/v41->v42, with the historical test archive retained and discoverable. The archive does not claim v2-v39 support; startup preflight rejects persisted foreign-key corruption, unexpected v42 named artifacts, and cross-campaign generation-draft ancestry before marker or artifact mutation.
 - **H0.2 Complete:** the original six failures were four finalization call sites in `e2e/tests/app.spec.ts` expecting `200` versus authoritative `201`, one attached unconfigured room expecting legacy chat/back but routing to play under feature-only routing, and one storyline/quest setup expecting creation while story `POST` returned `400` under the strict graph contract. Repairs preserve the public `201` contract with an E2E-only authorized actor resolver, gate play routing on configured status with cancellation/error handling, and use the current strict story/quest workflow with idempotent replay. The old supplied aggregate had drifted: M2.5 passed and the current full deterministic suite includes 12 cases. Validation passed: client focused 3 files/113 tests plus client typecheck; server fixture/M1.5 2 files/17 tests plus server typecheck; `typecheck:e2e`; full deterministic E2E 12 passed; `git diff --check`. Commits: `ee7dfba fix(client): preserve authoritative campaign navigation`; `60afa5f test(e2e): align authoritative RPG workflows`.
-- **H0.3 Planned:** reconcile stale current-status documentation while retaining historical ledgers.
-- **H0.4 Planned:** establish root `npm run health` as exactly `npm run typecheck && npm run build && npm test && npm run test:e2e`; migration-support tests are discovered by `npm test`, milestone-focused migration/security gates are not duplicated, and CI calls health once or mirrors those four phases once.
+- **H0.3 Complete:** active documentation now describes v42r1, completed M4.1-M4.6, 95 current trusted-local RPG HTTP operations versus the historical 92-operation M2.11 baseline, and supported canonical populated v40/v41->v42 startup upgrades. Historical schema, operation, and milestone ledgers remain preserved and visibly distinct from current implementation, Planned, Unscheduled, deferred, and excluded status. Commits: `77ed4b0 docs: reconcile current RPG guidance`; `2a50a41 docs: qualify historical RPG baselines`; docs/status commit remains pending.
+- **H0.4 Planned (next):** establish root `npm run health` as exactly `npm run typecheck && npm run build && npm test && npm run test:e2e`; migration-support tests are discovered by `npm test`, milestone-focused migration/security gates are not duplicated, and CI calls health once or mirrors those four phases once.
 
 ### Build next — M5
 
@@ -461,7 +461,7 @@ Create `CampaignPlayPage`, `CampaignContextDrawer`, `MechanicReceiptCard`, `Conf
 
 #### Implementation notes
 
-Chat remains central, with role-filtered context, durable receipt recovery, and narration swipes. Because the backend has no NPC location/presence model, the drawer visibly labels and shows the campaign-visible NPC roster rather than claiming those NPCs are present. Receipt cards omit unavailable target or outcome fields and never infer them; provider-driven tools remain M4 work.
+At M3.7 completion, chat remained central, with role-filtered context, durable receipt recovery, and narration swipes. Because the backend had no NPC location/presence model, the drawer visibly labeled and showed the campaign-visible NPC roster rather than claiming those NPCs were present. Receipt cards omitted unavailable target or outcome fields and never inferred them; provider-driven tools remained future M4 work at that historical checkpoint. M4.2 subsequently delivered the bounded provider tool loop and deterministic command bridge.
 
 ### M3.8 Event Log, recap, import, and export experience
 
