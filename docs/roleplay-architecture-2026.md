@@ -2,21 +2,21 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current status (v43r1; M5.1 complete)
+## Current status (v44r1; Wave A slices committed)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v43 revision 1 (v43r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.1 delivered persisted session NPC presence; the remaining approved M5 queue is **M5.2-M5.6**, ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v44 revision 1 (v44r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 remains In Progress/partial after its contracts and additive empty companion foundation; M5.3 remains partial after no-schema Slice 0; M5.4 and M5.5 have completed only their pure no-schema contract/vector checkpoints. Repository/client integration and later slices remain statused by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v41 and v42 databases upgrading to v43**. Historical v2-v40 migration code and archived tests do not constitute startup-upgrade support.
+- Supported executable migration coverage is for canonical populated **v42 and v43 databases upgrading to v44**. Historical v2-v41 migration code and archived tests do not constitute startup-upgrade support.
 - M5.1 persists a campaign NPC in a running attached session's present cast, optionally with a role-visible location, and retains a stopped session's cast as structurally distinct at-stop history. Presence does not add the NPC to the explicit legacy 1-12 session participant list, make it an autonomous speaker, create a campaign-NPC speech bridge, or imply that the full campaign-visible NPC roster is present.
 
 ## Point-in-time language
 
-Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v43r1 status or the normative sources above.
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v44r1 status or the normative sources above.
 
 ## Historical Slice 98 closeout
 

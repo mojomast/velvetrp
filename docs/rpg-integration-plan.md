@@ -1,20 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v43r1; M5.1 complete)
+## Current status (v44r1; Wave A slices committed)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v43 revision 1 (v43r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.1 delivered persisted session NPC presence; the remaining approved M5 queue is **M5.2-M5.6**, ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v44 revision 1 (v44r1)**, with **97 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 remains In Progress/partial after its contracts and additive empty companion foundation; M5.3 remains partial after no-schema Slice 0; M5.4 and M5.5 have completed only their pure no-schema contract/vector checkpoints. Remaining persistence, adapter, route, client, and policy work is ordered and statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v41 and v42 databases upgrading to v43**. Historical v2-v40 migration code and archived tests do not constitute startup-upgrade support.
+- Supported executable migration coverage is for canonical populated **v42 and v43 databases upgrading to v44**. Historical v2-v41 migration code and archived tests do not constitute startup-upgrade support.
 - A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v43r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v44r1 status above.
 
 ## Original purpose (historical)
 
@@ -876,7 +876,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema **v43 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
+Velvet currently uses schema **v44 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
 
 | Version | Scope |
 |---|---|
@@ -911,12 +911,13 @@ Velvet currently uses schema **v43 revision 1**. The concise sequence below is a
 | v41 | Reviewed campaign opening, conservative NPC baseline, and generated quest persistence |
 | v42 | Immutable campaign-content commands, receipts, revisions, and layout attestation |
 | v43 | Persisted session NPC presence, session-root revisions, optional locations, at-stop history, and layout attestation |
+| v44 | Additive empty companion foundation with immutable revisioned commands/receipts and companion, proposal, decision, grant, revocation, audit, and layout-attestation sidecars; no repository commands, routes, UI, or grant exercise |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- The supported executable startup window is canonical populated v41 and v42 databases upgrading to v43; v2-v40 migration implementations and archived tests are historical and unsupported.
+- The supported executable startup window is canonical populated v42 and v43 databases upgrading to v44; v2-v41 migration implementations and archived tests are historical and unsupported.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
