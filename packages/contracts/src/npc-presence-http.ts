@@ -160,11 +160,7 @@ export const npcCastHttpSchema = z.union([
 
 export const npcPresenceMutationHttpResponseSchema = z.object({
   receipt: npcPresenceMutationReceiptHttpSchema,
-  cast: z.union([gmRunningNpcCastHttpSchema, playerRunningNpcCastHttpSchema]),
-}).strict().refine((response) => response.cast.sessionRevision === response.receipt.revisionAfter, {
-  message: "the resultant cast revision must equal receipt.revisionAfter",
-  path: ["cast", "sessionRevision"],
-});
+}).strict();
 
 export type NpcPresenceMutationHttpRequest = z.infer<typeof npcPresenceMutationHttpRequestSchema>;
 export type NpcPresenceMutationReceiptHttp = z.infer<typeof npcPresenceMutationReceiptHttpSchema>;

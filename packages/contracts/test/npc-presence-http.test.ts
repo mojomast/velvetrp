@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   gmHistoricalNpcHttpSchema,
   gmPresentNpcHttpSchema,
@@ -12,6 +12,7 @@ import {
   playerPresentNpcHttpSchema,
   playerRunningNpcCastHttpSchema,
   playerStoppedNpcCastHttpSchema,
+  type NpcPresenceMutationHttpResponse,
 } from "../src/npc-presence-http.js";
 
 const presentAt = "2035-01-01T00:00:00.000Z";
@@ -112,16 +113,18 @@ describe("M5.1 NPC presence HTTP contracts", () => {
     ]);
 
     const response = {
-      receipt: { kind: "move", revisionBefore: 5, revisionAfter: 6, occurredAt: updatedAt }, cast: playerRunning,
+      receipt: { kind: "move", revisionBefore: 5, revisionAfter: 6, occurredAt: updatedAt },
     } as const;
     const parsedResponse = npcPresenceMutationHttpResponseSchema.parse(response);
-    expect(Object.keys(parsedResponse)).toEqual(["receipt", "cast"]);
-    expect(Object.keys(parsedResponse.cast)).toEqual(["audience", "state", "sessionRevision", "presentCast"]);
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({ ...response, commandId: "command" }).success).toBe(false);
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({ ...response, cast: { ...playerRunning, privateState } }).success).toBe(false);
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({
-      ...response, cast: { ...playerRunning, presentCast: [{ ...playerNpc, privateState }] },
-    }).success).toBe(false);
+    expect(Object.keys(parsedResponse)).toEqual(["receipt"]);
+    expectTypeOf<NpcPresenceMutationHttpResponse>().toEqualTypeOf<{
+      receipt: { kind: "place" | "move" | "remove"; revisionBefore: number; revisionAfter: number; occurredAt: string };
+    }>();
+
+    for (const forbidden of [
+      { cast: playerRunning }, { cast: gmRunning }, { commandId: "command" }, { eventId: "event" },
+      { idempotencyKey: "presence" }, { internalId: "internal" }, { privateState },
+    ]) expect(npcPresenceMutationHttpResponseSchema.safeParse({ ...response, ...forbidden }).success).toBe(false);
   });
 
   it("rejects every private or internal field from running and historical player members", () => {
@@ -173,11 +176,14 @@ describe("M5.1 NPC presence HTTP contracts", () => {
     expect(playerHistoricalNpcHttpSchema.safeParse({ ...playerHistoricalNpc, lastLocation: { label: " " } }).success).toBe(false);
   });
 
-  it("requires mutation response cast and receipt revisions to agree at runtime", () => {
+  it("keeps exact retry responses immutable and independent of later GET projections", () => {
     const receipt = { kind: "remove", revisionBefore: 5, revisionAfter: 6, occurredAt: leftAt } as const;
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({ receipt, cast: playerRunning }).success).toBe(true);
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({ receipt, cast: { ...playerRunning, sessionRevision: 5 } }).success).toBe(false);
-    expect(npcPresenceMutationHttpResponseSchema.safeParse({ receipt, cast: { ...gmRunning, sessionRevision: 7 } }).success).toBe(false);
+    const original = npcPresenceMutationHttpResponseSchema.parse({ receipt });
+    const exactRetry = npcPresenceMutationHttpResponseSchema.parse({ receipt: { ...receipt } });
+    expect(exactRetry).toEqual(original);
+    expect(Object.keys(exactRetry)).toEqual(["receipt"]);
+    expect(npcPresenceMutationHttpResponseSchema.safeParse({ receipt, cast: playerRunning }).success).toBe(false);
+    expect(npcPresenceMutationHttpResponseSchema.safeParse({ receipt, cast: gmRunning }).success).toBe(false);
   });
 
   it("fails closed for unknown projection kinds and fields", () => {
