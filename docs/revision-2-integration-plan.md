@@ -90,13 +90,13 @@ U4 boss phases <- M5.3 + stable combat
 U5 autonomous parties <- M5.2 + M5.4 + L5 + L7
 ```
 
-Delivery waves are: **Wave H (health)** H0.1-H0.4; then parallel **Wave A tracks** for NPC→companion core, atomic combat, candidate protocol, and dice after its threat-model checkpoint; **Wave B (per-family integration)** M5.6 adapters gated only by their exact domain dependencies; **Wave C (extensibility and safe local tooling)** L1, L3, and L4, with ingestion still blocked by promoted/delivered U2 unless its separate immutable-draft-only exception is approved; and **Wave D (remote trust and automation)** L5-L7. A wave is an integration grouping, not a blanket prerequisite chain.
+Delivery waves are: **Wave H (health, green)** H0.1-H0.4; then parallel **Wave A tracks** for NPC→companion core, atomic combat, candidate protocol, and dice after its threat-model checkpoint; **Wave B (per-family integration)** M5.6 adapters gated only by their exact domain dependencies; **Wave C (extensibility and safe local tooling)** L1, L3, and L4, with ingestion still blocked by promoted/delivered U2 unless its separate immutable-draft-only exception is approved; and **Wave D (remote trust and automation)** L5-L7. A wave is an integration grouping, not a blanket prerequisite chain. H0 is green; M5 remains Planned and is not shipped.
 
-## H0 — repository health baseline
+## H0 — repository health baseline (green)
 
 ### H0.1 — Rolling migration support foundation
 
-**Status:** Planned; first executable task.
+**Status:** Complete.
 
 - **Outcome:** fresh v42 creation and canonical populated v40/v41 startup upgrades are the only executable supported migration baseline; old suites remain discoverable but non-running.
 - **Dependencies:** none. Preserve the current dirty archive/support work and do not rewrite old migration implementations.
@@ -151,7 +151,7 @@ Delivery waves are: **Wave H (health)** H0.1-H0.4; then parallel **Wave A tracks
 
 ### H0.4 — Canonical health command and gate
 
-**Status:** Planned; next operation after H0.3.
+**Status:** Complete; Wave H/H0 green.
 
 - **Outcome:** one documented root command runs the release-health sequence in deterministic order and CI uses or exactly mirrors it.
 - **Dependencies:** H0.1-H0.3 complete.
@@ -164,7 +164,8 @@ Delivery waves are: **Wave H (health)** H0.1-H0.4; then parallel **Wave A tracks
 - **Acceptance:** `npm run health` stops at first failure, returns nonzero, and runs exactly root typecheck, build, `npm test`, and deterministic E2E once each in that order; CI calls it or exactly mirrors those four phases once. The final H0 gate passes before feature work starts.
 - **Validation:** run the new command once with unique `/dev/shm` `TMPDIR`; also run `git diff --check`. Record outcomes without test totals.
 - **Docs:** README commands, operations testing, contributing gate, ROADMAP/devplan/handoff.
-- **Logical commits:** script/CI equivalence (cross-workspace, so root typecheck), then docs/status (targeted consistency/link checks plus `git diff --check`; no redundant root typecheck unless required by generated/typechecked docs or repository instructions).
+- **Completion evidence:** the first canonical run timed out externally; the second exposed a global foreign-key preflight regression, which was corrected and scoped before the final wrapper run. The final recovery run used a unique `/dev/shm` `TMPDIR` and passed all four phases in order. Independent release/security review found no material issues and confirmed deterministic/live credential isolation.
+- **Logical commits:** `3e6c1a6 fix(repo): scope migration integrity preflight`; `f18a081 chore: add canonical health gate`; `7286ded docs: document canonical health gate`; docs/status commit remains pending.
 - **Rollback/recovery:** preserve the previous individual scripts; if the wrapper is faulty, remove only the wrapper and use the documented explicit sequence until corrected.
 
 ## Build-next feature milestones
