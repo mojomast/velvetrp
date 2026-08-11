@@ -1315,3 +1315,226 @@ test("quest workflow creates and resolves campaign state", async ({ request }) =
     if (characterId) await request.delete(`/api/characters/${characterId}`).catch(() => undefined);
   }
 });
+
+test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history", async ({ page, request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const campaignName = `${runId}-M5.1-Presence`;
+  const playerName = `${runId}-M5.1-Player`;
+  const npcName = `${runId}-M5.1-Warden`;
+  const locationId = `${runId}-m5.1-glass-harbor`;
+  const locationName = `${runId}-M5.1-Glass-Harbor`;
+  const locationDescription = "A deterministic public harbor.";
+  const privateSentinel = `${runId}-PRIVATE-GOALS-NOTES`;
+  const principalSentinel = "local-owner";
+
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const playerPersona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: playerName, age: 32, archetype: "Steady navigator",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", { name: campaignName });
+  const campaignId = campaign.campaign.id;
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+    contentPacks: [pin],
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-m5.1-configure`,
+  });
+
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+      personaId: playerPersona.id, durability: "durable", allocation: { method: "standard-array", scores },
+      idempotencyKey: `${runId}-m5.1-draft`,
+    },
+  );
+  const reference = (kind: "race" | "background" | "class") =>
+    fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(
+    request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+      expectedRevision: draft.draft.revision,
+      idempotencyKey: `${runId}-m5.1-select`,
+      selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+    },
+  );
+  const finalized = await json<{ character: { id: string } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+      expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m5.1-finalize`,
+    }, 201,
+  );
+  expect(finalized.character.id).toBeTruthy();
+
+  const room = await json<{ id: string }>(request, "POST", "/sessions", {
+    characterId: playerPersona.id, title: `${runId}-M5.1-Room`,
+  });
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId: room.id });
+
+  const locationFixture = { campaignId, locationId, parentLocationId: null, name: locationName, description: locationDescription };
+  const materializeLocation = (data: unknown, suffix = "") =>
+    request.post(`/api/__e2e/materialize-campaign-location${suffix}`, { data });
+  expect((await materializeLocation(locationFixture)).status()).toBe(204);
+  expect((await materializeLocation(locationFixture)).status()).toBe(204);
+  expect((await materializeLocation(locationFixture, "?unexpected=1")).status()).toBe(400);
+  expect((await materializeLocation({ ...locationFixture, unexpected: true })).status()).toBe(400);
+  expect((await materializeLocation({ ...locationFixture, parentLocationId: locationId })).status()).toBe(400);
+  expect((await materializeLocation({ ...locationFixture, description: "Different fixture state." })).status()).toBe(409);
+
+  const world = await json<{
+    currentLocations: Array<{ actorId: string; locationId: string }>;
+    visibleLocations: Array<{ locationId: string; parentLocationId: string | null; name: string; description: string }>;
+    visibleConnections: Array<{ connectionId: string; fromLocationId: string; toLocationId: string }>;
+  }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/world`);
+  expect(world).toEqual({
+    currentLocations: [],
+    visibleLocations: [{ locationId, parentLocationId: null, name: locationName, description: locationDescription }],
+    visibleConnections: [],
+  });
+
+  const npcPersona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M5.1-Private-Persona`, age: 41, archetype: "Harbor warden",
+    boundaries: privateSentinel, fictionalConfirmed: true,
+  });
+  const npcCreationKey = `${runId}-m5.1-create-npc`;
+  const npc = await json<{ npc: { npcId: string; personaId: string; publicState: { name: string }; privateState: { goals: string; gmNotes: string; merchantState: null } }; receipt: { revisionAfter: number } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/npcs`, {
+      personaId: npcPersona.id, publicState: { name: npcName },
+      privateState: { goals: privateSentinel, gmNotes: privateSentinel, merchantState: null },
+      expectedRevision: 0, idempotencyKey: npcCreationKey,
+    }, 201,
+  );
+  expect(npc.npc).toEqual(expect.objectContaining({
+    personaId: npcPersona.id, publicState: { name: npcName },
+    privateState: { goals: privateSentinel, gmNotes: privateSentinel, merchantState: null },
+  }));
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Campaigns" }).click();
+  await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
+  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "NPCs present now" })).toBeVisible();
+  await expect(page.getByText("No NPCs marked present.")).toBeVisible();
+
+  const presencePath = `/api/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/npcs/${encodeURIComponent(npc.npc.npcId)}/presence-commands`;
+  const castPath = `/api/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/present-cast`;
+  const presenceRequests: string[] = [];
+  const commandKeys: string[] = [];
+  page.on("request", (browserRequest) => {
+    const url = new URL(browserRequest.url());
+    if (url.pathname === presencePath) {
+      presenceRequests.push(browserRequest.method());
+      const body = browserRequest.postDataJSON() as { idempotencyKey?: string } | null;
+      if (body?.idempotencyKey) commandKeys.push(body.idempotencyKey);
+    } else if (url.pathname === castPath) presenceRequests.push(browserRequest.method());
+  });
+
+  await page.getByLabel("NPC").selectOption(npc.npc.npcId);
+  await page.getByLabel("Place location").selectOption(locationId);
+  await page.getByRole("button", { name: "Place NPC" }).click();
+  await expect(page.getByText("NPC presence updated from the authoritative present cast.")).toBeVisible();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
+  expect(presenceRequests).toEqual(["POST", "GET"]);
+
+  const assertNoPrivateClientState = async () => {
+    const clientState = `${await page.locator("body").innerText()}\n${await page.evaluate(() => JSON.stringify(localStorage))}`;
+    for (const secret of [privateSentinel, npcPersona.id, principalSentinel, npcCreationKey, ...commandKeys]) {
+      expect(clientState).not.toContain(secret);
+    }
+  };
+  await assertNoPrivateClientState();
+  await page.reload();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
+  await assertNoPrivateClientState();
+
+  const moveLocation = page.getByLabel(`Move ${npcName} location`);
+  await moveLocation.selectOption("");
+  await page.getByRole("button", { name: `Move ${npcName}`, exact: true }).click();
+  await expect(page.getByText(npcName, { exact: true })).toBeVisible();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toHaveCount(0);
+  await moveLocation.selectOption(locationId);
+  await page.getByRole("button", { name: `Move ${npcName}`, exact: true }).click();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
+
+  const remove = page.getByRole("button", { name: `Remove ${npcName}` });
+  await remove.click();
+  const confirmRemove = page.getByRole("button", { name: "Confirm remove" });
+  await expect(confirmRemove).toBeFocused();
+  await confirmRemove.click();
+  await expect(page.getByText("No NPCs marked present.")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "NPC presence updated" })).toBeFocused();
+  expect(presenceRequests).toEqual([
+    "POST", "GET", "GET", "GET",
+    "POST", "GET", "POST", "GET", "POST", "GET",
+  ]);
+
+  await page.getByLabel("NPC").selectOption(npc.npc.npcId);
+  await page.getByLabel("Place location").selectOption(locationId);
+  const ambiguousStart = presenceRequests.length;
+  let committedPosts = 0;
+  await page.route(`**${presencePath}`, async (route) => {
+    if (route.request().method() !== "POST") { await route.continue(); return; }
+    committedPosts += 1;
+    const committed = await route.fetch();
+    expect(committed.status()).toBe(200);
+    await route.abort("failed");
+  });
+  await page.getByRole("button", { name: "Place NPC" }).click();
+  await expect(page.getByText(/NPC presence outcome is uncertain/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh present cast" })).toBeVisible();
+  expect(committedPosts).toBe(1);
+  expect(presenceRequests.slice(ambiguousStart)).toEqual(["POST"]);
+  await page.getByRole("button", { name: "Refresh present cast" }).click();
+  await expect(page.getByText("Present cast refreshed from the server.")).toBeVisible();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
+  expect(committedPosts).toBe(1);
+  expect(presenceRequests.slice(ambiguousStart)).toEqual(["POST", "GET"]);
+  await page.unroute(`**${presencePath}`);
+  await assertNoPrivateClientState();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  for (const control of [page.getByRole("button", { name: `Move ${npcName}`, exact: true }), page.getByRole("button", { name: `Remove ${npcName}`, exact: true })]) {
+    const box = await control.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+  await json(request, "POST", `/sessions/${room.id}/stop`, undefined, 200);
+  const stoppedBefore = await json<{
+    audience: "gm"; state: "stopped"; sessionRevision: number; castHistory: unknown[];
+  }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/present-cast`);
+  expect(stoppedBefore).toMatchObject({
+    audience: "gm", state: "stopped",
+    castHistory: [expect.objectContaining({ npcId: npc.npc.npcId })],
+  });
+  const stoppedCommand = await request.post(presencePath, { data: {
+    expectedRevision: stoppedBefore.sessionRevision,
+    idempotencyKey: `${runId}-m5.1-stopped-remove`,
+    mutation: { kind: "remove" },
+  } });
+  expect(stoppedCommand.status()).toBe(404);
+  expect(stoppedCommand.headers()["content-type"]).toContain("application/problem+json");
+  expect(await stoppedCommand.json()).toEqual({
+    type: "https://velvet.local/problems/rpg-npc-presence-not-found",
+    title: "Not found",
+    status: 404,
+    detail: "NPC presence not found",
+    instance: "/api/rpg/v1/campaigns/:campaignId/*",
+    code: "RPG_NPC_PRESENCE_NOT_FOUND",
+    requestId: expect.any(String),
+    error: "NPC presence not found",
+  });
+  const stoppedAfter = await json<typeof stoppedBefore>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/present-cast`,
+  );
+  expect(stoppedAfter).toEqual(stoppedBefore);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Present at stop/history" })).toBeVisible();
+  await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
+  await expect(page.getByText(/no longer writable/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^(?:Place|Move|Remove|Confirm remove)/ })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await assertNoPrivateClientState();
+});

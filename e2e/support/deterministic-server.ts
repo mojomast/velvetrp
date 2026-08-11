@@ -4,6 +4,7 @@ import {
   economyCommandSchema,
   resourceIdSchema,
   takeShortRestCommandSchema,
+  worldVisibleLocationHttpSchema,
 } from "@velvet/contracts";
 import { buildApp } from "../../server/src/app.js";
 import { createRepository, MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
@@ -75,6 +76,8 @@ const materialize = (reply: { code(status: number): { send(body?: unknown): unkn
 
 const fixtureTargetBodySchema = takeShortRestCommandSchema.omit({ type: true, idempotencyKey: true });
 const waylampFixtureBodySchema = fixtureTargetBodySchema.extend({ entryId: resourceIdSchema });
+const campaignLocationFixtureBodySchema = worldVisibleLocationHttpSchema.extend({ campaignId: resourceIdSchema })
+  .refine((location) => location.parentLocationId !== location.locationId, { path: ["parentLocationId"] });
 
 // This route exposes the one internal linkage fixture adapters need without
 // widening the public finalization response.
@@ -131,6 +134,16 @@ app.post("/api/__e2e/materialize-economy-fixture", async (request, reply) => {
   return materialize(reply, () => fixtures.materializeEconomyGraph({
     principalId: "local-owner", ...body.data,
   }));
+});
+
+// Public locations are materialized only by this disposable server and remain
+// visible through the normal repository-backed world projection.
+app.post("/api/__e2e/materialize-campaign-location", async (request, reply) => {
+  const body = campaignLocationFixtureBodySchema.safeParse(request.body);
+  if (!body.success || Object.keys(request.query as Record<string, unknown>).length > 0) {
+    return reply.code(400).send({ error: "invalid E2E campaign location materialization request" });
+  }
+  return materialize(reply, () => fixtures.materializeCampaignLocation(body.data));
 });
 
 // Production economy HTTP routes are intentionally outside this milestone.

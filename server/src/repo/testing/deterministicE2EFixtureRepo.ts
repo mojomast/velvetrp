@@ -1,4 +1,4 @@
-import { resourceIdSchema } from "@velvet/contracts";
+import { resourceIdSchema, worldVisibleLocationHttpSchema } from "@velvet/contracts";
 import { MECHANICS_STARTER_CATALOG } from "../../content/mechanicsStarterCatalog.js";
 import {
   createRepositoryTestingComposition,
@@ -28,6 +28,12 @@ const ECONOMY = {
   quantity: 2,
   unitPrice: 8,
 };
+const campaignLocationFixtureSchema = worldVisibleLocationHttpSchema.extend({
+  campaignId: resourceIdSchema,
+}).refine((location) => location.parentLocationId !== location.locationId, {
+  message: "a location cannot be its own parent",
+  path: ["parentLocationId"],
+});
 
 export class DeterministicE2EFixtureAuthorizationError extends Error {
   readonly code = "DETERMINISTIC_E2E_FIXTURE_FORBIDDEN";
@@ -43,6 +49,13 @@ export interface DeterministicE2EFixtures {
   materializeWaylamp(input: FixtureTarget & { entryId: string }): void;
   materializeShortRestFocus(input: FixtureTarget): void;
   materializeEconomyGraph(input: FixtureTarget): void;
+  materializeCampaignLocation(input: {
+    campaignId: string;
+    locationId: string;
+    parentLocationId: string | null;
+    name: string;
+    description: string;
+  }): void;
 }
 
 type FixtureSqlParameter = string | number | bigint | Buffer | null;
@@ -198,6 +211,37 @@ export function createDeterministicE2EFixturesForOwnedRepository(
           item_definition_id,available_quantity,unit_price_minor,currency_code) VALUES(?,?,?,?,?,?,?,?,?,?)`)
           .run(ECONOMY.stockId, target.campaignId, ECONOMY.shopId, WAYLAMP.packId, WAYLAMP.packVersion,
             WAYLAMP.kind, WAYLAMP.definitionId, ECONOMY.quantity, ECONOMY.unitPrice, ECONOMY.currencyCode);
+      });
+    },
+    materializeCampaignLocation(input) {
+      const location = campaignLocationFixtureSchema.parse(input);
+      immediate(() => {
+        const ownedCampaign = db.prepare(`SELECT 1 FROM campaigns campaign
+          JOIN campaign_memberships membership ON membership.campaign_id=campaign.id
+            AND membership.principal_id='local-owner' AND membership.role='owner'
+          WHERE campaign.id=? AND campaign.owner_principal_id='local-owner'`)
+          .get(location.campaignId);
+        if (!ownedCampaign) {
+          throw new DeterministicE2EFixtureAuthorizationError("deterministic E2E fixture target is unavailable");
+        }
+
+        const existing = db.prepare(`SELECT location_id locationId,campaign_id campaignId,
+          parent_location_id parentLocationId,public_name name,public_description description,
+          visibility,created_at createdAt FROM campaign_locations_v28 WHERE location_id=?`)
+          .get(location.locationId) as Record<string, unknown> | undefined;
+        const exact = { ...location, visibility: "public", createdAt: FIXTURE_TIME };
+        if (existing) {
+          if (!same(existing, exact)) conflict("campaign location fixture identity already has different state");
+          return;
+        }
+        if (location.parentLocationId !== null && !db.prepare(`SELECT 1 FROM campaign_locations_v28
+          WHERE campaign_id=? AND location_id=?`).get(location.campaignId, location.parentLocationId)) {
+          throw new DeterministicE2EFixtureAuthorizationError("deterministic E2E fixture parent is unavailable");
+        }
+        db.prepare(`INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,
+          public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,'public',?)`)
+          .run(location.locationId, location.campaignId, location.parentLocationId,
+            location.name, location.description, FIXTURE_TIME);
       });
     },
   };

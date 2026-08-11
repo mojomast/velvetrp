@@ -1,8 +1,8 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
-import { describe, expect, it } from "vitest";
-import { MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { describe, expect, it, vi } from "vitest";
+import { createSession, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import {
   createDeterministicE2EFixturesForOwnedRepository,
   createDeterministicE2ERepository,
@@ -28,9 +28,13 @@ const scores = Object.fromEntries(
 ) as CharacterBuilderAttributeScores;
 
 function setup() {
+  let generatedId = 0;
+  const clock = vi.fn(() => new Date("2035-01-01T00:00:00.000Z"));
+  const ids = { nextId: vi.fn(() => `deterministic-fixture-${++generatedId}`) };
   const composition = createDeterministicE2ERepository({
     dataDir: process.env.VELVET_DATA_DIR!,
-    clock: { now: () => new Date("2035-01-01T00:00:00.000Z") },
+    clock: { now: clock },
+    ids,
   });
   const { repository } = composition;
   const campaign = repository.createCampaign(OWNER, { name: "Deterministic fixture seam" });
@@ -57,7 +61,8 @@ function setup() {
       idempotencyKey: `${key}-finalize`,
     }).receipt.actorId;
   };
-  return { ...composition, campaignId: campaign.id, actorId: makeActor("Aster", "aster"), otherActorId: makeActor("Briar", "briar") };
+  return { ...composition, campaignId: campaign.id, actorId: makeActor("Aster", "aster"),
+    otherActorId: makeActor("Briar", "briar"), clock, ids };
 }
 
 function inspect() {
@@ -175,5 +180,78 @@ describe("deterministic E2E fixture repository", () => {
       principalId: OWNER, campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0,
     })).toThrow("repository is closed");
     fixture.repository.close();
+  });
+
+  it("requires exact local ownership and replays only the exact public location", () => {
+    const fixture = setup();
+    const input = { campaignId: fixture.campaignId, locationId: "fixture-harbor", parentLocationId: null,
+      name: "Fixture Harbor", description: "A deterministic public harbor." };
+    const clockCalls = fixture.clock.mock.calls.length;
+    const idCalls = fixture.ids.nextId.mock.calls.length;
+    expect(fixture.fixtures.materializeCampaignLocation(input)).toBeUndefined();
+    expect(fixture.fixtures.materializeCampaignLocation(input)).toBeUndefined();
+    expect(fixture.clock).toHaveBeenCalledTimes(clockCalls);
+    expect(fixture.ids.nextId).toHaveBeenCalledTimes(idCalls);
+
+    const db = inspect();
+    expect(db.prepare("SELECT * FROM campaign_locations_v28 WHERE location_id=?").get(input.locationId)).toMatchObject({
+      campaign_id: fixture.campaignId, parent_location_id: null, public_name: input.name,
+      public_description: input.description, visibility: "public", created_at: "2035-01-01T00:00:00.000Z",
+    });
+    expect(db.prepare("SELECT count(*) count FROM world_mutation_revisions_v28").get()).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM world_narrative_revisions_v32").get()).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM world_commands_v28").get()).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM world_receipts_v28").get()).toEqual({ count: 0 });
+    expect(() => fixture.fixtures.materializeCampaignLocation({ ...input, description: "Different" }))
+      .toThrow(DeterministicE2EFixtureConflictError);
+
+    expect(() => fixture.fixtures.materializeCampaignLocation({ ...input,
+      campaignId: "unavailable-campaign", locationId: "not-owned" }))
+      .toThrow(DeterministicE2EFixtureAuthorizationError);
+    db.close();
+    fixture.repository.close();
+  });
+
+  it("requires a parent in the same campaign and rolls back an aborted insert", () => {
+    const fixture = setup();
+    const otherCampaign = fixture.repository.createCampaign(OWNER, { name: "Other fixture campaign" });
+    fixture.fixtures.materializeCampaignLocation({ campaignId: otherCampaign.id, locationId: "foreign-parent",
+      parentLocationId: null, name: "Foreign Parent", description: "" });
+    expect(() => fixture.fixtures.materializeCampaignLocation({ campaignId: fixture.campaignId,
+      locationId: "wrong-child", parentLocationId: "foreign-parent", name: "Wrong Child", description: "" }))
+      .toThrow(DeterministicE2EFixtureAuthorizationError);
+
+    const db = inspect();
+    db.exec(`CREATE TABLE deterministic_location_audit(value TEXT NOT NULL);
+      CREATE TRIGGER deterministic_location_abort BEFORE INSERT ON campaign_locations_v28
+      WHEN NEW.location_id='aborted-location' BEGIN
+        INSERT INTO deterministic_location_audit VALUES(NEW.location_id);
+        SELECT RAISE(ABORT,'test location rejection');
+      END;`);
+    expect(() => fixture.fixtures.materializeCampaignLocation({ campaignId: fixture.campaignId,
+      locationId: "aborted-location", parentLocationId: null, name: "Aborted", description: "" }))
+      .toThrow("test location rejection");
+    expect(db.prepare("SELECT count(*) count FROM campaign_locations_v28 WHERE location_id='aborted-location'").get())
+      .toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM deterministic_location_audit").get()).toEqual({ count: 0 });
+    db.close();
+    fixture.repository.close();
+  });
+
+  it("makes locations visible through production world reads and rejects use after close", async () => {
+    const fixture = setup();
+    const persona = fixture.repository.createCharacter({ name: "World reader", age: 30, archetype: "Guide",
+      boundaries: "", fictionalConfirmed: true });
+    const session = await createSession({ characterId: persona.id, title: "Fixture world" });
+    fixture.repository.attachCampaignSession(OWNER, { campaignId: fixture.campaignId, sessionId: session.id });
+    fixture.fixtures.materializeCampaignLocation({ campaignId: fixture.campaignId, locationId: "visible-fixture",
+      parentLocationId: null, name: "Visible Fixture", description: "Seen by production." });
+    expect(fixture.repository.getCampaignWorld(OWNER, fixture.campaignId)?.visibleLocations).toContainEqual({
+      locationId: "visible-fixture", parentLocationId: null, name: "Visible Fixture", description: "Seen by production.",
+    });
+    fixture.repository.close();
+    expect(() => fixture.fixtures.materializeCampaignLocation({ campaignId: fixture.campaignId,
+      locationId: "after-close", parentLocationId: null, name: "After Close", description: "" }))
+      .toThrow("repository is closed");
   });
 });
