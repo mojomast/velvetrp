@@ -32,6 +32,8 @@ import {
 } from "./encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot, EncounterReadRepository } from "./encounterReadRepo.js";
 import { buildCombatActionPlans } from "./combatActionPlan.js";
+import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatCompositionPlan.js";
+import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 
 export type EncounterDependencies={clock:Clock;ids:IdGenerator;rng:RandomNumberGenerator};
 export type EncounterReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
@@ -158,6 +160,19 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       const root=db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId) as any;
       if(!root||root.revision!==command.expectedRevision)throw new EncounterStaleError("encounter revision is stale");
       if(encounter.status!=="preparing")throw new EncounterConflictError("encounter cannot be started");
+      const preparedActors=db.prepare(`SELECT combatant.hit_points,combatant.maximum_hit_points,
+        health.current health_current,health.max health_max FROM combatant
+        LEFT JOIN rpg_actor_resources health ON health.campaign_id=combatant.campaign_id
+          AND health.actor_id=combatant.actor_id AND health.name='health'
+        WHERE combatant.encounter_id=? AND combatant.actor_id IS NOT NULL`).all(encounterId) as Array<{
+          hit_points:number;maximum_hit_points:number;health_current:number|null;health_max:number|null}>;
+      if(preparedActors.some(actor=>actor.health_current===null||actor.health_max===null||actor.health_current<=0
+          ||actor.hit_points!==actor.health_current||actor.maximum_hit_points!==actor.health_max))
+        throw new EncounterConflictError("prepared actor health changed before encounter activation");
+      if(db.prepare(`SELECT 1 FROM combatant candidate JOIN combatant active ON active.actor_id=candidate.actor_id
+        JOIN encounter other ON other.encounter_id=active.encounter_id AND other.status='active'
+        WHERE candidate.encounter_id=? AND candidate.actor_id IS NOT NULL AND active.encounter_id<>? LIMIT 1`)
+        .get(encounterId,encounterId))throw new EncounterConflictError("an actor is already in an active encounter");
       if(db.prepare("SELECT 1 FROM encounter WHERE session_id=? AND status='active' AND encounter_id<>?")
         .get(encounter.session_id,encounterId))throw new EncounterConflictError("session already has an active encounter");
       const first=db.prepare(`SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active'
@@ -216,7 +231,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
 
       let outcome:any=null;
       if(plan.kind==="attack"){
-        const target=db.prepare("SELECT hit_points,status FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
+        const target=db.prepare("SELECT hit_points,status,state_revision FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
           .get(combatId,command.targetIds[0]!) as any;
         if(!target)throw new EncounterConflictError("combat target is unavailable");
         const hitPointsAfter=Math.max(0,target.hit_points-1);
@@ -226,13 +241,28 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       }else if(plan.kind==="flee"){
         outcome={kind:"status",targetId:current.combatant_id,statusBefore:"active",statusAfter:"fled"};
       }
-      const before=root.revision,after=before+1,at=now(deps),commandId=id(deps),actionId=id(deps);
+      const before=root.revision,after=before+1,at=now(deps);
+      const stateOverrides=new Map<string,string>();
+      if(outcome?.kind==="damage")stateOverrides.set(outcome.targetId,outcome.statusAfter);
+      else if(outcome?.kind==="status")stateOverrides.set(current.combatant_id,"fled");
+      const turnPlan=planTurnAdvance(db,combatId,encounter,current.combatant_id,stateOverrides);
+      const combatantChanges:CombatantStateChange[]=outcome?.kind==="damage"?[{combatantId:outcome.targetId,
+        hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusBefore:outcome.statusBefore,
+        statusAfter:outcome.statusAfter,stateRevisionBefore:(db.prepare("SELECT state_revision FROM combatant WHERE combatant_id=?")
+          .get(outcome.targetId) as {state_revision:number}).state_revision}]:outcome?.kind==="status"?[{
+        combatantId:current.combatant_id,hitPointsBefore:current.hit_points,hitPointsAfter:current.hit_points,
+        statusBefore:"active",statusAfter:"fled",stateRevisionBefore:current.state_revision}]:[];
+      const compositionPlan=buildCombatCompositionPlan(db,deps.ids,{encounterId:combatId,campaignId:encounter.campaign_id,
+        roundBefore:encounter.round_number,roundAfter:turnPlan.round,occurredAt:at,
+        combatantChanges});
+      const commandId=id(deps),actionId=id(deps);
       const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
       beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
         {kind:"action_resolved",actionId,action:plan.kind},"action",0);
-      if(outcome?.kind==="damage")state(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
-      else if(outcome?.kind==="status")state(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
-      advanceOrTerminal(db,deps,combatId,encounter,current.combatant_id,at,commandId,after);
+      if(outcome?.kind==="damage")recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
+      else if(outcome?.kind==="status")recordStateEvent(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
+      executeCombatCompositionPlan(db,compositionPlan);
+      persistTurnAdvance(db,deps,combatId,turnPlan,at,commandId,after);
       advanceRevision(db,combatId,after,at);
       const combat=deps.reads.getCombatState(p,combatId);
       if(!combat)throw new Error("resolved combat projection is unavailable");
@@ -371,14 +401,35 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(command.combatantId!==current.combatant_id) throw new EncounterTurnError("only the current combatant may act");
       const allow=legal(p,command.campaignId,command.encounterId);
       if(!allow||allow.revision!==before||!allowed(allow,command)) throw new EncounterUnavailableError("action is not in the authoritative allowlist");
-      // Powers/items are intentionally rejected, rather than becoming a successful no-op. Their
-      // independent M15/M16 revision streams cannot be nested in this combat transaction.
+      // Powers/items are intentionally rejected rather than becoming a successful no-op; this
+      // allowlist does not yet carry enough fixed server-owned mechanics to resolve either safely.
       if(command.type==="power"||command.type==="item") throw new EncounterUnavailableError("power and item combat resolution is unavailable");
+      let combatantChange:CombatantStateChange|undefined;
+      const overrides=new Map<string,string>();
+      if(command.type==="attack"){
+        const target=db.prepare("SELECT hit_points,status,state_revision FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
+          .get(command.encounterId,command.targetCombatantId) as {hit_points:number;status:string;state_revision:number}|undefined;
+        if(!target)throw new EncounterUnavailableError("attack target unavailable");
+        const hitPointsAfter=Math.max(0,target.hit_points-1);
+        combatantChange={combatantId:command.targetCombatantId,hitPointsBefore:target.hit_points,hitPointsAfter,
+          statusBefore:target.status,statusAfter:hitPointsAfter===0?"defeated":"active",stateRevisionBefore:target.state_revision};
+        overrides.set(command.targetCombatantId,hitPointsAfter===0?"defeated":"active");
+      }else if(command.type==="flee"){
+        overrides.set(current.combatant_id,"fled");combatantChange={combatantId:current.combatant_id,
+          hitPointsBefore:current.hit_points,hitPointsAfter:current.hit_points,statusBefore:"active",statusAfter:"fled",
+          stateRevisionBefore:current.state_revision};
+      }
+      const turnPlan=planTurnAdvance(db,command.encounterId,encounter,current.combatant_id,overrides);
+      const compositionPlan=buildCombatCompositionPlan(db,deps.ids,{encounterId:command.encounterId,
+        campaignId:command.campaignId,roundBefore:encounter.round_number,roundAfter:turnPlan.round,occurredAt:at,
+        combatantChanges:combatantChange?[combatantChange]:[]});
       const result=receipt(command,commandId,before,after,at,encounter.status);
       protocol(db,deps,command,request,commandId,current.actor_id,before,after,at,result,"combat_action_resolved",{kind:"action_resolved",actionId:command.actionId,action:command.type},"action",0);
-      if(command.type==="attack") damage(db,deps,command.encounterId,command.targetCombatantId,1,at,commandId,after);
-      if(command.type==="flee") state(db,deps,command.encounterId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
-      finishOrTurn(db,deps,command.encounterId,encounter,current.combatant_id,at,commandId,after);
+      if(command.type==="attack")recordStateEvent(db,deps,command.encounterId,command.targetCombatantId,
+        combatantChange!.hitPointsAfter,overrides.get(command.targetCombatantId)!,at,commandId,after);
+      if(command.type==="flee")recordStateEvent(db,deps,command.encounterId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
+      executeCombatCompositionPlan(db,compositionPlan);
+      persistTurnAdvance(db,deps,command.encounterId,turnPlan,at,commandId,after);
       advanceRevision(db,command.encounterId,after,at); return result;
     }).immediate();
   };
@@ -413,8 +464,13 @@ function join(db:DatabaseDriver.Database,d:EncounterDependencies,p:string,c:Extr
   if(c.combatant.kind!=="actor") throw new EncounterUnavailableError("enemies are created only from pinned enemy spawns");
   if(!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(c.campaignId,c.combatant.actorId)) throw new EncounterUnavailableError("actor unavailable");
   if(db.prepare("SELECT 1 FROM combatant WHERE encounter_id=? AND (combatant_id=? OR actor_id=?)").get(c.encounterId,c.combatantId,c.combatant.actorId)) throw new EncounterConflictError("combatant already joined");
+  if(db.prepare(`SELECT 1 FROM combatant JOIN encounter ON encounter.encounter_id=combatant.encounter_id
+    WHERE combatant.campaign_id=? AND combatant.actor_id=? AND encounter.status='active'`).get(c.campaignId,c.combatant.actorId))
+    throw new EncounterConflictError("actor is already in an active encounter");
   const health=db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'").get(c.campaignId,c.combatant.actorId) as any;
-  const hp=Math.max(0,health?.current??10), max=Math.max(1,health?.max??10), result=receipt(c,commandId,b,a,at,e.status);
+  if(!health)throw new EncounterConflictError("actor health is unavailable");
+  if(health.current<=0)throw new EncounterConflictError("actor health must be positive to join combat");
+  const hp=health.current,max=health.max,result=receipt(c,commandId,b,a,at,e.status);
   protocol(db,d,c,request,commandId,null,b,a,at,result,"encounter_state_changed",{kind:"combatant_joined",combatantId:c.combatantId},"encounter_state",0);
   db.prepare("INSERT INTO combatant(combatant_id,encounter_id,campaign_id,actor_id,combatant_kind,team,initiative,initiative_tiebreaker,hit_points,maximum_hit_points,status,state_revision,created_at,updated_at) VALUES(?,?,?,?, 'actor',?,?,?,?,?,'active',0,?,?)").run(c.combatantId,c.encounterId,c.campaignId,c.combatant.actorId,c.team,d.rng.integer(1,21),d.rng.integer(0,1000001),hp,max,at,at);
   db.prepare("UPDATE encounter SET state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(at,c.encounterId); advanceRevision(db,c.encounterId,a,at); return result;
@@ -444,10 +500,22 @@ function advance(db:DatabaseDriver.Database,d:EncounterDependencies,p:string,c:a
   if(e.status!=="active") throw new EncounterUnavailableError("encounter is not active"); const current=currentCombatant(db,e); if(!current) throw new EncounterTurnError("no current combatant");
   const result=receipt(c,commandId,b,a,at,e.status);
   if(current.combatant_kind==="enemy"){
-    const target=db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id LIMIT 1").get(c.encounterId,current.team) as any;
-    if(target){protocol(db,d,c,request,commandId,null,b,a,at,result,"combat_action_resolved",{kind:"action_resolved",actionId:"enemy-fallback",action:"attack"},"action",0);damage(db,d,c.encounterId,target.combatant_id,1,at,commandId,a);finishOrTurn(db,d,c.encounterId,e,current.combatant_id,at,commandId,a);}
+    const target=db.prepare("SELECT combatant_id,hit_points,status,state_revision FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id LIMIT 1").get(c.encounterId,current.team) as any;
+    if(target){const hp=Math.max(0,target.hit_points-1),overrides=new Map([[target.combatant_id,hp===0?"defeated":"active"]]),turnPlan=planTurnAdvance(db,c.encounterId,e,current.combatant_id,overrides);
+      const compositionPlan=buildCombatCompositionPlan(db,d.ids,{encounterId:c.encounterId,campaignId:c.campaignId,
+        roundBefore:e.round_number,roundAfter:turnPlan.round,occurredAt:at,combatantChanges:[{combatantId:target.combatant_id,
+          hitPointsBefore:target.hit_points,hitPointsAfter:hp,statusBefore:target.status,statusAfter:overrides.get(target.combatant_id)!,
+          stateRevisionBefore:target.state_revision}]});
+      protocol(db,d,c,request,commandId,null,b,a,at,result,"combat_action_resolved",{kind:"action_resolved",actionId:"enemy-fallback",action:"attack"},"action",0);
+      recordStateEvent(db,d,c.encounterId,target.combatant_id,hp,overrides.get(target.combatant_id)!,at,commandId,a);
+      executeCombatCompositionPlan(db,compositionPlan);
+      persistTurnAdvance(db,d,c.encounterId,turnPlan,at,commandId,a);}
     else { protocol(db,d,c,request,commandId,null,b,a,at,result,"encounter_state_changed",{kind:"turn_advanced",combatantId:current.combatant_id},"encounter_state",0); complete(db,c.encounterId,at); }
-  } else {protocol(db,d,c,request,commandId,null,b,a,at,result,"encounter_state_changed",{kind:"turn_advanced",combatantId:current.combatant_id},"encounter_state",0);turn(db,c.encounterId,e,current.combatant_id,at);}
+  } else {const turnPlan=next(db,c.encounterId,current.combatant_id,e.round_number),roundAfter=turnPlan?.round??e.round_number;
+    const compositionPlan=buildCombatCompositionPlan(db,d.ids,{encounterId:c.encounterId,campaignId:c.campaignId,
+      roundBefore:e.round_number,roundAfter,occurredAt:at,combatantChanges:[]});
+    protocol(db,d,c,request,commandId,null,b,a,at,result,"encounter_state_changed",{kind:"turn_advanced",combatantId:current.combatant_id},"encounter_state",0);
+    executeCombatCompositionPlan(db,compositionPlan);turn(db,c.encounterId,e,current.combatant_id,at);}
   advanceRevision(db,c.encounterId,a,at);return result;
 }
 function receipt(c:any,commandId:string,b:number,a:number,at:string,status:string){return {encounterId:c.encounterId,status,receipt:{commandId,idempotencyKey:c.idempotencyKey,revisionBefore:b,revisionAfter:a,occurredAt:at}};}
@@ -457,27 +525,28 @@ function sealReceipt(db:DatabaseDriver.Database,encounterId:string,commandId:str
 function protocol(db:DatabaseDriver.Database,d:EncounterDependencies,c:any,request:string,commandId:string,actorId:string|null,b:number,a:number,at:string,result:any,eventType:string,event:any,logKind:string,ordinal:number){beginProtocol(db,d,c,request,commandId,actorId,b,a,at,eventType,event,logKind,ordinal);sealReceipt(db,c.encounterId,commandId,a,at,result);}
 function advanceRevision(db:DatabaseDriver.Database,e:string,a:number,at:string){db.prepare("UPDATE combat_mutation_revisions_v27 SET revision=?,updated_at=? WHERE encounter_id=?").run(a,at,e);}
 function currentCombatant(db:DatabaseDriver.Database,e:any){return e.current_turn_combatant_id&&db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(e.encounter_id,e.current_turn_combatant_id) as any;}
-function state(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,c:string,hp:number,status:string,at:string,commandId:string,revision:number){const eventId=id(d),event={kind:"combatant_state_changed",combatantId:c,hitPoints:hp,status};db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(eventId,e,commandId,revision,"combatant_state_changed",canonical(event),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(id(d),e,c,eventId,1,status==="fled"?"flee":status==="defeated"?"defeat":"damage",canonical(event),at);db.prepare("UPDATE combatant SET hit_points=?,status=?,state_revision=state_revision+1,updated_at=? WHERE encounter_id=? AND combatant_id=?").run(hp,status,at,e,c);}
-function damage(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,target:string,amount:number,at:string,commandId:string,revision:number){const row=db.prepare("SELECT hit_points FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(e,target) as any;if(!row)throw new EncounterUnavailableError("attack target unavailable");const hp=row.hit_points-amount;state(db,d,e,target,hp,hp<=0?"defeated":"active",at,commandId,revision);}
+function recordStateEvent(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,c:string,hp:number,status:string,at:string,commandId:string,revision:number){const eventId=id(d),event={kind:"combatant_state_changed",combatantId:c,hitPoints:hp,status};db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(eventId,e,commandId,revision,"combatant_state_changed",canonical(event),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(id(d),e,c,eventId,1,status==="fled"?"flee":status==="defeated"?"defeat":"damage",canonical(event),at);}
 function next(db:DatabaseDriver.Database,e:string,current:string,round:number){const rows=db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' ORDER BY initiative DESC,initiative_tiebreaker,combatant_id").all(e) as any[];const i=rows.findIndex(x=>x.combatant_id===current),n=rows[(i+1+rows.length)%rows.length];return n&&{combatantId:n.combatant_id,round:i===rows.length-1?round+1:round};}
 function turn(db:DatabaseDriver.Database,e:string,encounter:any,current:string,at:string){const n=next(db,e,current,encounter.round_number);if(n)db.prepare("UPDATE encounter SET current_turn_combatant_id=?,round_number=?,state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(n.combatantId,n.round,at,e);}
 function complete(db:DatabaseDriver.Database,e:string,at:string){db.prepare("UPDATE encounter SET status='completed',current_turn_combatant_id=NULL,state_revision=state_revision+1,updated_at=? WHERE encounter_id=?").run(at,e);}
-function finishOrTurn(db:DatabaseDriver.Database,d:EncounterDependencies,e:string,encounter:any,current:string,at:string,commandId:string,revision:number){advanceOrTerminal(db,d,e,encounter,current,at,commandId,revision);}
 
-function advanceOrTerminal(db:DatabaseDriver.Database,d:EncounterDependencies,encounterId:string,encounter:any,currentId:string,at:string,commandId:string,revision:number){
-  const activeTeams=(db.prepare("SELECT count(DISTINCT team) count FROM combatant WHERE encounter_id=? AND status='active'")
-    .get(encounterId) as {count:number}).count;
+type TurnAdvancePlan={event:any;nextId:string|null;round:number};
+function planTurnAdvance(db:DatabaseDriver.Database,encounterId:string,encounter:any,currentId:string,
+  overrides:ReadonlyMap<string,string>):TurnAdvancePlan{
+  const rows=db.prepare(`SELECT combatant_id,team,status FROM combatant WHERE encounter_id=?
+    ORDER BY initiative DESC,initiative_tiebreaker,combatant_id`).all(encounterId) as Array<{combatant_id:string;team:string;status:string}>;
+  const status=(row:{combatant_id:string;status:string})=>overrides.get(row.combatant_id)??row.status;
+  const activeTeams=new Set(rows.filter((row)=>status(row)==="active").map((row)=>row.team)).size;
   let event:any,nextId:string|null=null,round=encounter.round_number;
   if(activeTeams<2){
     event={kind:"combat_terminal"};
   }else{
-    const order=db.prepare(`SELECT combatant_id,status FROM combatant WHERE encounter_id=?
-      ORDER BY initiative DESC,initiative_tiebreaker,combatant_id`).all(encounterId) as Array<{combatant_id:string;status:string}>;
+    const order=rows;
     const currentIndex=order.findIndex((value)=>value.combatant_id===currentId);
     if(currentIndex<0)throw new EncounterTurnError("current combatant is outside turn order");
     for(let step=1;step<=order.length;step+=1){
       const index=(currentIndex+step)%order.length,candidate=order[index]!;
-      if(candidate.status==="active"){
+      if(status(candidate)==="active"){
         nextId=candidate.combatant_id;
         if(index<=currentIndex)round+=1;
         break;
@@ -485,13 +554,18 @@ function advanceOrTerminal(db:DatabaseDriver.Database,d:EncounterDependencies,en
     }
     event=nextId===null?{kind:"combat_terminal"}:{kind:"turn_advanced",combatantId:nextId};
   }
+  return {event,nextId,round};
+}
+
+function persistTurnAdvance(db:DatabaseDriver.Database,d:EncounterDependencies,encounterId:string,
+  plan:TurnAdvancePlan,at:string,commandId:string,revision:number){
   const eventId=id(d);
   db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)")
-    .run(eventId,encounterId,commandId,revision,"encounter_state_changed",canonical(event),at);
+    .run(eventId,encounterId,commandId,revision,"encounter_state_changed",canonical(plan.event),at);
   db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)")
-    .run(id(d),encounterId,null,eventId,2,"encounter_state",canonical(event),at);
+    .run(id(d),encounterId,null,eventId,2,"encounter_state",canonical(plan.event),at);
   db.prepare(`UPDATE encounter SET current_turn_combatant_id=?,round_number=?,
-    state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(nextId,round,at,encounterId);
+    state_revision=state_revision+1,updated_at=? WHERE encounter_id=?`).run(plan.nextId,plan.round,at,encounterId);
 }
 
 function ensureRewardCurrency(db:DatabaseDriver.Database,campaignId:string):{code:string;reference:{kind:"currency";packId:string;packVersion:string;definitionId:string}}{

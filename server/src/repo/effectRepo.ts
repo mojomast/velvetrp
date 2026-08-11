@@ -93,7 +93,7 @@ function sidecarModifier(row:EffectRow):EffectModifier {
 }
 
 /** Reconstruct only normalized mechanics and a validated legacy-command fallback. */
-function readActiveEffects(db:DatabaseDriver.Database,campaignId:string,actorId:string,now:string):ActiveEffect[]{
+export function readActiveEffects(db:DatabaseDriver.Database,campaignId:string,actorId:string,now:string):ActiveEffect[]{
   const rows=db.prepare(`SELECT effect.effect_id,effect.campaign_id,effect.actor_id,effect.source_pack_id,effect.source_pack_version,
     effect.source_kind,effect.source_definition_id,effect.duration_kind,effect.remaining_rounds,effect.expires_at,
     effect.recovery_kind,effect.concentration_key,effect.applied_at,command.command_family,command.command_type,

@@ -17,6 +17,7 @@ import { projectLegacyPersonaDisplayName } from "./legacyPersonaDisplayName.js";
 import { createCampaignCharacterRosterOperations } from "./campaignCharacterRosterRepo.js";
 import type { CommandEnvelope, CommandReceipt } from "../../types.js";
 import type { RepositoryDependencies } from "./campaignTypes.js";
+import { actorHasActiveEncounter } from "../encounter/activeEncounterPolicy.js";
 
 interface CampaignCommandRow {
   campaign_id: string;
@@ -557,6 +558,11 @@ function executeInitializeActorResourceSync(
         .get(envelope.campaignId, envelope.commandId, envelope.idempotencyKey) as CommandRetryRow | undefined;
       if (!retry) throw new Error("initialize actor resource command retry is incomplete");
       return resourceReceiptFromRetryRow(retry, envelope);
+    }
+
+    if (command.payload.name === "health"
+        && actorHasActiveEncounter(db, envelope.campaignId, envelope.actorId)) {
+      throw new Error("active encounter health is authoritative");
     }
 
     const timeline = db.prepare(`SELECT timeline.revision

@@ -1,6 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import { actorResourcesSchema, restCommandSchema, restReceiptSchema, resourceIdSchema, type RestCommand, type RestReceipt } from "@velvet/contracts";
 import { ActorResourceConflictError, m15Authorized, runM15Mutation, type M15Dependencies, type M15Result } from "./actorResourceRepo.js";
+import { actorHasActiveEncounter } from "./encounter/activeEncounterPolicy.js";
 
 export class RestAuthorizationError extends Error { readonly code="REST_FORBIDDEN"; }
 export class RestStaleError extends Error { readonly code="REST_STALE"; }
@@ -26,7 +27,9 @@ export function createRestRepository(db:DatabaseDriver.Database,deps:M15Dependen
       const changes=resources.filter(row=>{
        const recovery=row.binding_json?JSON.parse(row.binding_json).recovery:undefined;
        return row.current<row.max&&(recovery==='short-rest'||(command.type==='take_long_rest'&&recovery==='long-rest'));
-      }).map(row=>({resourceId:row.name,before:row.current,after:row.max}));
+       }).map(row=>({resourceId:row.name,before:row.current,after:row.max}));
+      if(changes.some(change=>change.resourceId==='health')&&actorHasActiveEncounter(db,command.campaignId,command.actorId))
+        throw new ActorResourceConflictError('active encounter health is authoritative');
       const sidecars=(table:string,current:string,maximum:string,suffix:string)=>(db.prepare(`SELECT sidecar.resource_name,sidecar.${current} current,sidecar.${maximum} maximum,binding.binding_json
         FROM ${table} sidecar JOIN rpg_actor_resource_bindings_v25 binding ON binding.campaign_id=sidecar.campaign_id AND binding.actor_id=sidecar.actor_id AND binding.resource_name=sidecar.resource_name
         WHERE sidecar.campaign_id=? AND sidecar.actor_id=?`).all(command.campaignId,command.actorId)as any[]).filter(row=>{

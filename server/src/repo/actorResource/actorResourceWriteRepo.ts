@@ -10,6 +10,7 @@ import {
   type M15Result,
 } from "./m15Protocol.js";
 import type { ActorResourceReadRepository } from "./actorResourceReadRepo.js";
+import { actorHasActiveEncounter } from "../encounter/activeEncounterPolicy.js";
 
 /** Matches the canonical JSON representation used by M1.5 receipts. */
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -58,6 +59,9 @@ export function createActorResourceWriteRepository(
       request: command,
       changedKeys: [`resource:${command.resourceId}`],
       apply() {
+        if (command.resourceId === "health" && actorHasActiveEncounter(db, command.campaignId, command.actorId)) {
+          throw new ActorResourceConflictError("active encounter health is authoritative");
+        }
         const row = db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?")
           .get(command.campaignId, command.actorId, command.resourceId) as any;
         if (!row) throw new ActorResourceConflictError("actor resource is unavailable");

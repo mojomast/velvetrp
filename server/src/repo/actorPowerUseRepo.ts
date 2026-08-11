@@ -11,6 +11,7 @@ import type { M16Dependencies, M16Result } from "./effectRepo.js";
 import { M16AuthorizationError, M16ConflictError, M16StaleError } from "./effectRepo.js";
 import { m15Authorized } from "./actorResourceRepo.js";
 import { planActorPowerCommands, plannedPowerSelection } from "./actorPowerCommandPlanner.js";
+import { actorHasActiveEncounter } from "./encounter/activeEncounterPolicy.js";
 
 export class ActorPowerNotFoundError extends Error { readonly code="ACTOR_POWER_NOT_FOUND"; }
 export class ActorPowerConflictError extends Error { readonly code="ACTOR_POWER_CONFLICT"; }
@@ -58,6 +59,10 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     const targetIds=plannedPowerSelection(plan,actorId,intent);
     if(!targetIds)throw new ActorPowerConflictError("illegal power target selection");
     const definition:any=plan.definition,costs:any[]=plan.costs;
+    if(definition.mechanics.effects.some((effect:any)=>effect.type==="damage"||effect.type==="healing"
+          ||(effect.type==="resource"&&effect.resource==="health"))
+        &&targetIds.some((id)=>actorHasActiveEncounter(db,campaignId,id)))
+      throw new ActorPowerConflictError("active encounter health is authoritative");
 
     const states=new Map<string,Resource[]>();const load=(id:string)=>{let value=states.get(id);if(!value){value=(db.prepare("SELECT name resourceId,current,max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(campaignId,id) as Resource[]).map(row=>({...row}));states.set(id,value);}return value;};
     // The shared planner checked required resources. Re-read into this transaction's mutable working set.

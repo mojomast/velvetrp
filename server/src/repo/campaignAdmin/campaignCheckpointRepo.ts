@@ -53,6 +53,12 @@ export function createCampaignCheckpointRepo(deps: CampaignCheckpointRepoDepende
       return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "timeline_forked", { checkpointId: input.checkpointId }, ({ commandId, at, auth }) => {
         const cp = db.prepare("SELECT * FROM campaign_checkpoints WHERE campaign_id=? AND id=?").get(campaignId, input.checkpointId) as any;
         if (!cp) throw conflict("checkpoint not found");
+        if (db.prepare(`SELECT 1 FROM combatant JOIN encounter ON encounter.encounter_id=combatant.encounter_id
+          JOIN rpg_actor_resources health ON health.campaign_id=combatant.campaign_id
+            AND health.actor_id=combatant.actor_id AND health.name='health'
+          WHERE encounter.campaign_id=? AND encounter.status='active' LIMIT 1`).get(campaignId)) {
+          throw conflict("active encounter health is authoritative");
+        }
         const id = resourceIdSchema.parse(nextId());
         db.prepare("INSERT INTO campaign_timelines (id,campaign_id,revision,created_at) VALUES (?,?,?,?)").run(id, campaignId, cp.timeline_revision, at);
         db.prepare(`INSERT INTO campaign_timeline_history

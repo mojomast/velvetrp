@@ -36,6 +36,9 @@ describe("M1.7 encounter repository",()=>{
       characterId:persona.id,controllerPrincipalId:"local-owner",race:ORIGINAL_STARTER_RACE.reference,
       background:ORIGINAL_STARTER_BACKGROUND.reference,classes:[{class:ORIGINAL_STARTER_CLASS.reference,level:1}],
       attributes:[],proficiencies:[],choices:[]}).projection.actor.id;
+    repo.executeInitializeActorResource("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,
+      actorId:actor,commandId:"lifecycle-health",idempotencyKey:"lifecycle-health",expectedRevision:0,sourceTurnId:null,
+      command:{type:"initialize_actor_resource",payload:{name:"health",current:10,max:10}}});
     const session=await createSession({characterId:persona.id,title:"Lifecycle combat"});
     repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
     const request={sessionId:session.id,name:"Bridge ambush",combatants:[{kind:"actor" as const,actorId:actor,

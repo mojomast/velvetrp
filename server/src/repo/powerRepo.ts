@@ -19,6 +19,7 @@ import { runM16Mutation, type M16Dependencies, type M16Result } from "./effectRe
 import { m15Authorized } from "./actorResourceRepo.js";
 import { useActorPower as executeActorPower, ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError } from "./actorPowerUseRepo.js";
 import { planActorPowerCommands } from "./actorPowerCommandPlanner.js";
+import { actorHasActiveEncounter } from "./encounter/activeEncounterPolicy.js";
 
 export class PowerUnavailableError extends Error { readonly code="POWER_UNAVAILABLE"; }
 export class PowerInsufficientResourceError extends Error { readonly code="POWER_INSUFFICIENT_RESOURCE"; }
@@ -127,6 +128,9 @@ export function createPowerRepository(db:DatabaseDriver.Database,deps:M16Depende
   return {getActorPowerSnapshot:readSnapshot,usePower(principal,input) {
     const command=powerUseCommandSchema.parse(input);
     return runM16Mutation(db,deps,guard,{principal,campaignId:command.campaignId,actorId:command.actorId,family:"power",type:"use_power",expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,eventType:"power_used",build:(after,now,id)=>{
+      if(command.costs.some(cost=>cost.kind==="resource"&&cost.resourceId==="health")
+          &&actorHasActiveEncounter(db,command.campaignId,command.actorId))
+        throw new PowerUnavailableError("active encounter health is authoritative");
       const known=db.prepare(`SELECT 1 FROM campaign_actors actor JOIN character_known_powers_v23 power ON power.campaign_character_id=actor.campaign_character_id WHERE actor.campaign_id=? AND actor.id=? AND power.kind=? AND power.pack_id=? AND power.pack_version=? AND power.definition_id=?`).get(command.campaignId,command.actorId,command.power.kind,command.power.packId,command.power.packVersion,command.power.definitionId);
       const pinned=db.prepare("SELECT 1 FROM rpg_campaign_catalog_definitions_v25 WHERE campaign_id=? AND pack_id=? AND pack_version=? AND kind=? AND definition_id=?").get(command.campaignId,command.power.packId,command.power.packVersion,command.power.kind,command.power.definitionId);
       if(!known||!pinned)throw new PowerUnavailableError("power is not known and pinned");
