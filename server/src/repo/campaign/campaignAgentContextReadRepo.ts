@@ -1,11 +1,13 @@
 import type DatabaseDriver from "better-sqlite3";
-import { resourceIdSchema } from "@velvet/contracts";
+import { npcPublicStateHttpSchema, resourceIdSchema } from "@velvet/contracts";
 import type {
   CampaignAgentAudience,
   CampaignAgentContextSnapshot,
 } from "../../context.js";
 import { CAMPAIGN_COMPANION_CONTEXT_SUPPORTED } from "../../context.js";
 import { buildCombatActionPlans } from "../encounter/combatActionPlan.js";
+import { createNpcPresenceReadRepository } from "../world/npcPresenceReadRepo.js";
+import { createCampaignRoomSessionLifecycleRepository } from "./campaignRoomSessionLifecycleRepo.js";
 import { createHash } from "node:crypto";
 import { createCampaignPlayReadRepository } from "./campaignPlayReadRepo.js";
 
@@ -33,6 +35,15 @@ interface CombatantRow {
   definition_id: string | null;
 }
 
+interface PresentNpcRow {
+  npc_id: string;
+  public_name: string;
+  public_state_json: string | null;
+  location_name: string | null;
+  location_visibility: string | null;
+  location_id: string | null;
+}
+
 /** Role-sensitive campaign context snapshot reads over a caller-owned connection. */
 export interface CampaignAgentContextReadRepository {
   /** Returns null whenever membership, audience authority, target control, or ancestry is unavailable. */
@@ -49,6 +60,8 @@ export function createCampaignAgentContextReadRepository(
   db: DatabaseDriver.Database,
 ): CampaignAgentContextReadRepository {
   const campaignPlay = createCampaignPlayReadRepository(db);
+  const sessionLifecycle = createCampaignRoomSessionLifecycleRepository(db);
+  const npcPresence = createNpcPresenceReadRepository(db, { guard() {} });
   return {
     getCampaignAgentContextSnapshot(principalId, campaignId, sessionId, audience) {
       const principal = resourceIdSchema.parse(principalId);
@@ -63,17 +76,13 @@ export function createCampaignAgentContextReadRepository(
         throw error;
       }
       if (!play || play.principal.role === "observer") return null;
-      const campaignState = db.prepare(`SELECT campaign.active_timeline_id,campaign.administration_revision,timeline.revision timeline_revision
-        FROM campaigns campaign JOIN campaign_timelines timeline ON timeline.campaign_id=campaign.id
-          AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`)
-        .get(campaign) as { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
-      if (!campaignState) return null;
       const isGm = play.principal.role === "owner" || play.principal.role === "gm";
       let targetActorId: string | null = null;
       let targetNpcId: string | null = null;
       let targetEnemyId: string | null = null;
       let targetName = "Dungeon Master";
       let speakerPersona: CampaignAgentContextSnapshot["speakerPersona"] = null;
+      let sessionIsRunning: boolean | null = null;
 
       if (audience.kind === "companion") {
         // There is no persisted companion aggregate or controller binding. A
@@ -100,10 +109,13 @@ export function createCampaignAgentContextReadRepository(
         if (!isGm) return null;
         targetNpcId = resourceIdSchema.parse(audience.npcId);
         const target = db.prepare(`SELECT npc.persona_id,character.name persona_name,npc.public_name
-          FROM campaign_npcs_v28 npc JOIN characters character ON character.id=npc.persona_id
-          WHERE npc.campaign_id=? AND npc.npc_id=?`)
-          .get(campaign, targetNpcId) as { persona_id: string; persona_name: string; public_name: string } | undefined;
-        if (!target) return null;
+          FROM campaign_npc_presence_v43 presence
+          JOIN campaign_npcs_v28 npc ON npc.campaign_id=presence.campaign_id AND npc.npc_id=presence.npc_id
+          JOIN characters character ON character.id=npc.persona_id
+          WHERE presence.campaign_id=? AND presence.session_id=? AND presence.npc_id=? AND presence.state='present'`)
+          .get(campaign, sessionId, targetNpcId) as { persona_id: string; persona_name: string; public_name: string } | undefined;
+        sessionIsRunning = sessionLifecycle.getCampaignRoomSessionLifecycle(sessionId) === "running";
+        if (!sessionIsRunning || !target) return null;
         targetName = target.public_name;
         speakerPersona = { characterId: target.persona_id, displayName: target.persona_name };
       } else {
@@ -117,6 +129,20 @@ export function createCampaignAgentContextReadRepository(
         if (!target) return null;
         targetName = `Enemy ${targetEnemyId}`;
       }
+
+      npcPresence.assertScopedIntegrity(campaign, sessionId);
+      sessionIsRunning ??= sessionLifecycle.getCampaignRoomSessionLifecycle(sessionId) === "running";
+      const campaignState = db.prepare(`SELECT campaign.active_timeline_id,campaign.administration_revision,timeline.revision timeline_revision
+        FROM campaigns campaign JOIN campaign_timelines timeline ON timeline.campaign_id=campaign.id
+          AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`)
+        .get(campaign) as { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
+      if (!campaignState) return null;
+
+      const principalVisibleLocationIds = audience.kind === "player" ? new Set((db.prepare(`SELECT DISTINCT discovery.location_id
+        FROM campaign_location_discoveries_v28 discovery JOIN campaign_actor_private_state actor
+          ON actor.campaign_id=discovery.campaign_id AND actor.actor_id=discovery.actor_id
+        WHERE discovery.campaign_id=? AND actor.controller_principal_id=?`)
+        .all(campaign, principal) as Array<{ location_id: string }>).map((row) => row.location_id)) : new Set<string>();
 
       const canon = db.prepare("SELECT source_of_truth,synthesized_source FROM session_context WHERE session_id=?")
         .get(sessionId) as { source_of_truth: string; synthesized_source: string } | undefined;
@@ -150,7 +176,7 @@ export function createCampaignAgentContextReadRepository(
       ] : ["No active encounter is committed for this session."];
 
       const castRows = db.prepare(`SELECT character.name,actor.id actor_id,location.public_name location_name,
-          location.visibility location_visibility,discovery.actor_id discovered_actor_id
+          location.visibility location_visibility,location.location_id
         FROM session_characters participant JOIN characters character ON character.id=participant.character_id
         LEFT JOIN campaign_characters campaign_character ON campaign_character.campaign_id=?
           AND campaign_character.character_id=participant.character_id
@@ -159,16 +185,33 @@ export function createCampaignAgentContextReadRepository(
           AND actor_location.session_id=? AND actor_location.actor_id=actor.id
         LEFT JOIN campaign_locations_v28 location ON location.campaign_id=actor_location.campaign_id
           AND location.location_id=actor_location.location_id
-        LEFT JOIN campaign_location_discoveries_v28 discovery ON discovery.campaign_id=location.campaign_id
-          AND discovery.location_id=location.location_id AND discovery.actor_id=actor.id
         WHERE participant.session_id=? ORDER BY participant.position,participant.character_id COLLATE BINARY LIMIT 12`)
         .all(campaign, campaign, campaign, sessionId, sessionId) as Array<{ name: string; actor_id: string | null;
-          location_name: string | null; location_visibility: string | null; discovered_actor_id: string | null }>;
+          location_name: string | null; location_visibility: string | null; location_id: string | null }>;
       const canSeeCastLocation = (row: typeof castRows[number]) => audience.kind === "dm"
-        || (audience.kind === "player" && row.actor_id === targetActorId
-          && (row.location_visibility === "public"
-            || (row.location_visibility === "discovered" && row.discovered_actor_id === targetActorId)));
+        || (audience.kind === "player" && row.location_visibility !== "gm" && row.location_id !== null
+          && principalVisibleLocationIds.has(row.location_id));
       const visibleCast = castRows.map((row) => `${row.name}${canSeeCastLocation(row) && row.location_name ? ` at ${row.location_name}` : ""}.`);
+      if (sessionIsRunning) {
+        const presentNpcs = db.prepare(`SELECT presence.npc_id,npc.public_name,metadata.public_state_json,
+            location.public_name location_name,location.visibility location_visibility,presence.location_id
+          FROM campaign_npc_presence_v43 presence
+          JOIN campaign_npcs_v28 npc ON npc.campaign_id=presence.campaign_id AND npc.npc_id=presence.npc_id
+          LEFT JOIN campaign_npc_metadata_v32 metadata ON metadata.npc_id=npc.npc_id
+          LEFT JOIN campaign_locations_v28 location ON location.campaign_id=presence.campaign_id
+            AND location.location_id=presence.location_id
+          WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+          ORDER BY presence.npc_id COLLATE BINARY`).all(campaign, sessionId) as PresentNpcRow[];
+        for (const row of presentNpcs) {
+          const publicState = npcPublicStateHttpSchema.parse(row.public_state_json
+            ? JSON.parse(row.public_state_json) as unknown
+            : { name: row.public_name });
+          const locationVisible = audience.kind === "dm"
+            || (audience.kind === "player" && row.location_visibility !== "gm" && row.location_id !== null
+              && principalVisibleLocationIds.has(row.location_id));
+          visibleCast.push(`${publicState.name}${locationVisible && row.location_name ? ` at ${row.location_name}` : ""}.`);
+        }
+      }
 
       const locationRows = audience.kind === "dm"
         ? db.prepare(`SELECT DISTINCT location.public_name,location.public_description FROM campaign_actor_locations_v28 actor_location
@@ -178,11 +221,13 @@ export function createCampaignAgentContextReadRepository(
         : audience.kind === "player" && targetActorId
           ? db.prepare(`SELECT location.public_name,location.public_description FROM campaign_actor_locations_v28 current
               JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
-              LEFT JOIN campaign_location_discoveries_v28 discovery ON discovery.campaign_id=location.campaign_id
-                AND discovery.location_id=location.location_id AND discovery.actor_id=current.actor_id
               WHERE current.campaign_id=? AND current.session_id=? AND current.actor_id=?
-                AND (location.visibility='public' OR (location.visibility='discovered' AND discovery.actor_id IS NOT NULL))
-              ORDER BY location.location_id COLLATE BINARY LIMIT 1`).all(campaign, sessionId, targetActorId)
+                AND location.visibility<>'gm' AND EXISTS(SELECT 1 FROM campaign_location_discoveries_v28 discovery
+                  JOIN campaign_actor_private_state actor ON actor.campaign_id=discovery.campaign_id
+                    AND actor.actor_id=discovery.actor_id
+                  WHERE discovery.campaign_id=location.campaign_id AND discovery.location_id=location.location_id
+                    AND actor.controller_principal_id=?)
+              ORDER BY location.location_id COLLATE BINARY LIMIT 1`).all(campaign, sessionId, targetActorId, principal)
           : [];
       const visibleWorld = (locationRows as Array<{ public_name: string; public_description: string }>).map((row) =>
         `${row.public_name}${row.public_description.trim() ? ` — ${row.public_description}` : ""}`);

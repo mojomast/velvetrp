@@ -46,10 +46,11 @@ async function roleFixture() {
     privateState: { goals: "NPC_TARGET_GOAL", gmNotes: "NPC_TARGET_GM_NOTE", merchantState: null },
     expectedRevision: 0, idempotencyKey: "npc" }).npc;
   const unrelatedNpcPersona = repo.createCharacter({ name: "Other persona", age: 41, archetype: "Spy", boundaries: "", fictionalConfirmed: true });
-  repo.createCampaignNpc("local-owner", campaign.id, { personaId: unrelatedNpcPersona.id, publicState: { name: "Other" },
+  const unrelatedNpc = repo.createCampaignNpc("local-owner", campaign.id, { personaId: unrelatedNpcPersona.id, publicState: { name: "Other" },
     privateState: { goals: "UNRELATED_NPC_GOAL", gmNotes: "UNRELATED_NPC_GM_NOTE", merchantState: null },
-    expectedRevision: 1, idempotencyKey: "other-npc" });
+    expectedRevision: 1, idempotencyKey: "other-npc" }).npc;
   repo.createLocation("local-owner", { campaignId: campaign.id, locationId: "public-place", name: "PUBLIC_LOCATION", visibility: "public" });
+  repo.createLocation("local-owner", { campaignId: campaign.id, locationId: "discovered-place", name: "DISCOVERED_LOCATION", visibility: "public" });
   repo.createLocation("local-owner", { campaignId: campaign.id, locationId: "gm-place", name: "GM_ONLY_LOCATION", visibility: "hidden" });
   repo.createLocationConnection("local-owner", { campaignId: campaign.id, locationConnectionId: "hidden-route",
     fromLocationId: "public-place", toLocationId: "gm-place", visibility: "hidden", routeState: "open" });
@@ -68,6 +69,8 @@ async function roleFixture() {
 
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys=ON");
+  db.prepare("UPDATE campaign_locations_v28 SET visibility='discovered' WHERE campaign_id=? AND location_id='discovered-place'")
+    .run(campaign.id);
   for (const [principal, role] of [["gm", "gm"], ["player", "player"], ["other-player", "player"], ["observer", "observer"]] as const) {
     db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal, principal);
     db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)")
@@ -101,7 +104,8 @@ async function roleFixture() {
   const foreignCampaign = repo.createCampaign("local-owner", { name: "Foreign" });
   return { repo, campaignId: campaign.id, sessionId: session.id, otherSessionId: otherSession.id,
     foreignCampaignId: foreignCampaign.id, actorId: playerActor.actorId, playerPersonaId: playerActor.persona.id,
-    unrelatedActorId: unrelatedActor.actorId, npcId: npc.npcId, npcPersonaId: npcPersona.id };
+    unrelatedActorId: unrelatedActor.actorId, npcId: npc.npcId, npcPersonaId: npcPersona.id,
+    unrelatedNpcId: unrelatedNpc.npcId };
 }
 
 function allText(snapshot: CampaignAgentContextSnapshot): string {
@@ -111,12 +115,14 @@ function allText(snapshot: CampaignAgentContextSnapshot): string {
 describe("campaign agent context repository", () => {
   it("derives audience visibility and excludes every role-sensitive sentinel", async () => {
     const f = await roleFixture();
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 0, idempotencyKey: "context-present", mutation: { kind: "place", locationId: "public-place" } });
     const player = f.repo.getCampaignAgentContextSnapshot("player", f.campaignId, f.sessionId,
       { kind: "player", actorId: f.actorId })!;
     expect(player.authority).toEqual({ role: "player", control: "controlled" });
     expect(player.speakerPersona).toEqual({ characterId: f.playerPersonaId, displayName: "Aster" });
     expect(player.privateTargetFacts.join(" ")).toContain("PLAYER_TARGET_SECRET");
-    expect(player.visibleWorld.join(" ")).toContain("PUBLIC_LOCATION");
+    expect(player.visibleWorld).toEqual([]);
     expect(player.visibleQuests.join(" ")).toContain("PUBLIC_QUEST");
     expect(player.recap).toContain("MEMBERS_RECAP");
     expect(player.synthesizedSummaryFacts).toEqual(["SYNTHESIZED_SCENE_SENTINEL"]);
@@ -150,6 +156,89 @@ describe("campaign agent context repository", () => {
     expect(npc.visibleCast.every((line) => !line.includes(" at "))).toBe(true);
     expect(npc.visibleQuests.join(" ")).toContain("PUBLIC_QUEST");
     expect(npc.recap).toContain("MEMBERS_RECAP");
+    f.repo.close();
+  });
+
+  it("appends only exact running present NPC public facts and gates NPC target context", async () => {
+    const f = await roleFixture();
+    const read = (principal: string, audience: Parameters<typeof f.repo.getCampaignAgentContextSnapshot>[3],
+      sessionId = f.sessionId, campaignId = f.campaignId) =>
+      f.repo.getCampaignAgentContextSnapshot(principal, campaignId, sessionId, audience);
+
+    expect(read("gm", { kind: "dm" })!.visibleCast).not.toContain("Marrow.");
+    expect(read("gm", { kind: "npc", npcId: f.npcId })).toBeNull();
+    expect(read("gm", { kind: "npc", npcId: f.unrelatedNpcId })).toBeNull();
+    expect(read("gm", { kind: "npc", npcId: f.npcId }, f.otherSessionId)).toBeNull();
+    expect(read("local-owner", { kind: "npc", npcId: f.npcId }, f.sessionId, f.foreignCampaignId)).toBeNull();
+
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 0, idempotencyKey: "place-public", mutation: { kind: "place", locationId: "public-place" } });
+    const playerPublic = read("player", { kind: "player", actorId: f.actorId })!;
+    const publicFact = playerPublic.visibleCast.find((line) => line.startsWith("Marrow"));
+    expect(publicFact).toBe("Marrow.");
+    expect(playerPublic.visibleWorld).toEqual([]);
+    expect(publicFact).not.toMatch(new RegExp([f.npcId, f.npcPersonaId, "NPC_TARGET_GOAL", "NPC_TARGET_GM_NOTE",
+      "local-owner"].join("|"), "i"));
+    expect(playerPublic.visibleCast.join(" ")).not.toContain("Other");
+    const discoveryDb = new DatabaseDriver(dbPath());
+    discoveryDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id=?")
+      .run(f.unrelatedActorId);
+    discoveryDb.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)")
+      .run(f.campaignId, f.unrelatedActorId, "public-place", at);
+    discoveryDb.close();
+    const playerSharedDiscovery = read("player", { kind: "player", actorId: f.actorId })!;
+    expect(playerSharedDiscovery.visibleCast).toContain("Marrow at PUBLIC_LOCATION.");
+    expect(playerSharedDiscovery.visibleWorld.join(" ")).toContain("PUBLIC_LOCATION");
+    const npc = read("gm", { kind: "npc", npcId: f.npcId })!;
+    expect(npc.speakerPersona).toEqual({ characterId: f.npcPersonaId, displayName: "Marrow persona" });
+    expect(npc.privateTargetFacts).toEqual(["Target NPC: Marrow.", "Target goals: NPC_TARGET_GOAL"]);
+    expect(npc.visibleCast).toContain("Marrow.");
+    expect(npc.visibleCast.join(" ")).not.toContain("PUBLIC_LOCATION");
+
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 1, idempotencyKey: "leave", mutation: { kind: "remove" } });
+    expect(read("gm", { kind: "dm" })!.visibleCast.join(" ")).not.toContain("Marrow");
+    expect(read("gm", { kind: "npc", npcId: f.npcId })).toBeNull();
+
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 2, idempotencyKey: "replace-discovered",
+      mutation: { kind: "place", locationId: "discovered-place" } });
+    expect(read("player", { kind: "player", actorId: f.actorId })!.visibleCast).toContain("Marrow.");
+    const db = new DatabaseDriver(dbPath());
+    db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)")
+      .run(f.campaignId, f.unrelatedActorId, "discovered-place", at);
+    db.close();
+    expect(read("player", { kind: "player", actorId: f.actorId })!.visibleCast)
+      .toContain("Marrow at DISCOVERED_LOCATION.");
+
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 3, idempotencyKey: "move-hidden", mutation: { kind: "move", locationId: "gm-place" } });
+    expect(read("player", { kind: "player", actorId: f.actorId })!.visibleCast).toContain("Marrow.");
+    expect(read("player", { kind: "player", actorId: f.actorId })!.visibleCast.join(" ")).not.toContain("GM_ONLY_LOCATION");
+    expect(read("gm", { kind: "dm" })!.visibleCast).toContain("Marrow at GM_ONLY_LOCATION.");
+
+    const stoppedDb = new DatabaseDriver(dbPath());
+    stoppedDb.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id=?").run(at, f.sessionId);
+    stoppedDb.close();
+    expect(read("gm", { kind: "dm" })!.visibleCast.join(" ")).not.toContain("Marrow");
+    expect(read("gm", { kind: "npc", npcId: f.npcId })).toBeNull();
+    f.repo.close();
+  });
+
+  it("fails loudly on authorized v43 corruption while outsiders remain nondisclosing", async () => {
+    const f = await roleFixture();
+    f.repo.mutateNpcPresence("local-owner", { campaignId: f.campaignId, sessionId: f.sessionId, npcId: f.npcId,
+      expectedRevision: 0, idempotencyKey: "corrupt-present", mutation: { kind: "place", locationId: null } });
+    const db = new DatabaseDriver(dbPath());
+    db.prepare(`UPDATE npc_presence_session_revisions_v43 SET revision=2
+      WHERE campaign_id=? AND session_id=?`).run(f.campaignId, f.sessionId);
+    db.close();
+    expect(() => f.repo.getCampaignAgentContextSnapshot("gm", f.campaignId, f.sessionId, { kind: "dm" }))
+      .toThrow("NPC presence scoped graph integrity is inconsistent");
+    expect(f.repo.getCampaignAgentContextSnapshot("player", f.campaignId, f.sessionId, { kind: "dm" })).toBeNull();
+    expect(f.repo.getCampaignAgentContextSnapshot("player", f.campaignId, f.sessionId,
+      { kind: "player", actorId: f.unrelatedActorId })).toBeNull();
+    expect(f.repo.getCampaignAgentContextSnapshot("missing", f.campaignId, f.sessionId, { kind: "dm" })).toBeNull();
     f.repo.close();
   });
 
