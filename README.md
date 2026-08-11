@@ -108,6 +108,7 @@ npm run build           # contracts, server, and client production builds
 npm test                # contracts, server, and client unit/component tests
 npm run test:e2e        # deterministic Playwright suite with disposable DB/provider
 npm run test:e2e:live   # opt-in live-provider Playwright suite
+npm run health          # final/release gate; prerequisites must already be installed
 npm run ci              # clean install, typecheck, build, and unit tests
 ```
 
@@ -128,6 +129,8 @@ The deterministic E2E command starts isolated test servers and does not make pai
 ```bash
 VELVET_E2E_LIVE=1 npm run test:e2e:live
 ```
+
+For a final or release gate, run `npm run health`: typecheck -> build -> `npm test` -> deterministic E2E, exactly once each and fail-fast. It excludes live-provider E2E and does not install dependencies or Chromium. Use the [canonical unique `/dev/shm` invocation](docs/operations.md#release-health-gate).
 
 ## Architecture
 

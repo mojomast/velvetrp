@@ -10,13 +10,16 @@
 
 ## Validation
 
-Run the checks appropriate to the change from the repository root:
+Run the smallest checks that cover the change from the repository root. Do not run the full suite after every edit; CI runs the complete unit and deterministic E2E gates on every push and pull request.
 
 ```bash
-npm run typecheck
-npm run build
-npm test
+npm run typecheck --workspace velvet-mvp-server
+npm run test --workspace velvet-mvp-server -- test/repo.test.ts
 ```
+
+Use the owning workspace typecheck and the affected test file(s) for focused changes. Add related tests when changing a shared contract, route, repository boundary, or migration. Run `npm test` only for broad or cross-workspace changes, before merging when CI is unavailable, or after focused validation finds a regression.
+
+Use `npm run health` as the final/release gate: typecheck -> build -> `npm test` -> deterministic E2E, exactly once each and fail-fast. Migration-support tests are already discovered by `npm test`; do not add a duplicate focused migration phase. See the [canonical unique `/dev/shm` invocation and prerequisites](docs/operations.md#release-health-gate).
 
 Run `npm run test:e2e` for behavior spanning the browser, API, streaming, persistence, or migration boundaries. This suite is deterministic, uses disposable services/data, and makes no paid provider calls.
 

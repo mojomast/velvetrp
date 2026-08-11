@@ -25,7 +25,26 @@ Common scripts:
 | `npm run build` | Build contracts, `server/dist`, and `client/dist`. |
 | `npm test` | Run contract, server, and client unit/integration tests. |
 | `npm run test:e2e` | Run deterministic Playwright E2E with disposable data and a fake provider. |
+| `npm run health` | Run the final/release gate: typecheck, build, unit/integration tests, and deterministic E2E. |
 | `npm run ci` | Install, typecheck, build, and unit/integration test; it does not run Playwright E2E. |
+
+## Release health gate
+
+`npm run health` is the final/release gate. It runs exactly `npm run typecheck` -> `npm run build` -> `npm test` -> `npm run test:e2e`, once each in that order. The phases are joined fail-fast: the first failure returns a nonzero status and prevents later phases from running.
+
+Use this canonical invocation so each run has a unique in-memory temp directory that is removed when the command finishes:
+
+```bash
+(
+  health_tmpdir="$(mktemp -d /dev/shm/velvet-health.XXXXXX)" || exit
+  trap 'rm -rf -- "$health_tmpdir"' EXIT
+  TMPDIR="$health_tmpdir" npm run health
+)
+```
+
+The health command assumes dependencies and Playwright Chromium are already installed; it does not install either. It runs deterministic E2E only and excludes opt-in live-provider E2E. Migration-support tests are already discovered by `npm test`, so there is no duplicate focused migration phase.
+
+Hosted CI mirrors the same four health phases exactly once each, in order and fail-fast, after installing dependencies and Chromium. The distinct `npm run ci` script performs its own clean install, typecheck, build, and unit/integration tests, but omits deterministic E2E and is not the final/release health gate.
 
 ## Environment
 
@@ -65,7 +84,7 @@ Always configure one explicit absolute data directory so startup location, servi
 export VELVET_DATA_DIR=/home/example/.local/share/velvet
 ```
 
-The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For this pre-release schema v42, v40/v41 -> v42 is the tested and supported forward-startup compatibility window. Legacy marker paths for v2-v39 remain in the binary temporarily, but are untested and unsupported. Before marker or artifact mutation, startup preflight rejects persisted foreign-key corruption, unexpected v42 named artifacts, and cross-campaign generation-draft ancestry. There is no separate migration command and no supported automatic downgrade. Recreate older development databases or restore a backup from a compatible build.
+The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For this pre-release schema v42, v40/v41 -> v42 is the tested and supported forward-startup compatibility window. Legacy marker paths for v2-v39 remain in the binary temporarily, but are untested and unsupported. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in supported v40/v41 migration inputs. The same pre-cleanup preflight rejects unexpected v42 named artifacts and cross-campaign generation-draft ancestry, including on current v42. There is no separate migration command and no supported automatic downgrade. Recreate older development databases or restore a backup from a compatible build.
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
 
@@ -118,7 +137,7 @@ Do not merge database files, omit a live WAL file, edit the schema marker, or ex
 
 ## Testing
 
-The GitHub Actions workflow uses Node 22 and runs, in order, `npm ci`, Chromium installation, typecheck, build, unit/integration tests, and deterministic E2E. The root `npm run ci` omits Chromium installation and E2E, so it is not identical to the hosted workflow.
+The GitHub Actions workflow uses Node 22, installs dependencies and Chromium, then mirrors the four [`npm run health` phases](#release-health-gate) once each. The root `npm run ci` remains distinct and omits Chromium installation and E2E, so it is not identical to the hosted workflow.
 
 `npm run test:e2e` is deterministic and safe for routine use: it creates a temporary data directory, enables campaign/mechanics features, starts a local fake OpenAI-compatible provider, and removes test data afterward. It does not require or spend a real provider key.
 
