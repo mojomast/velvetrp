@@ -1,7 +1,9 @@
 import type DatabaseDriver from "better-sqlite3";
 import {
+  createNpcPresenceRepository,
   createWorldReadRepository,
   createWorldWriteRepository,
+  type NpcPresenceRepository,
   type WorldDependencies,
   type WorldReadRepository,
   type WorldWriteRepository,
@@ -26,10 +28,11 @@ export {
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */
-export interface WorldRepository extends WorldReadRepository, WorldWriteRepository {}
+export interface WorldRepository extends WorldReadRepository, WorldWriteRepository, NpcPresenceRepository {}
 
 export function createWorldRepository(db:DatabaseDriver.Database,deps:WorldDependencies,guard:()=>void):WorldRepository {
   const reads=createWorldReadRepository(db,{guard});
   const writes=createWorldWriteRepository(db,{...deps,guard});
-  return {...reads,...writes};
+  const npcPresence=createNpcPresenceRepository(db,deps,guard);
+  return {...reads,...writes,...npcPresence};
 }

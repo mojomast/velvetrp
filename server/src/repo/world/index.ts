@@ -24,3 +24,7 @@ export {
   type CreateFactionResult,
   type FactionReputationResult,
 } from "./worldWriteRepo.js";
+export {
+  createNpcPresenceRepository,
+  type NpcPresenceRepository,
+} from "./npcPresenceRepo.js";

@@ -1,7 +1,11 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { createRepository } from "../src/repo/index.js";
+import {
+  CampaignAdministrationConflictError,
+  CampaignSessionAttachmentConflictError,
+  createRepository,
+} from "../src/repo/index.js";
 import type { DetachCampaignSessionInput } from "../src/types.js";
 import { useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
@@ -66,6 +70,49 @@ function snapshot(): { attachments: unknown[]; campaigns: unknown[] } {
   return result;
 }
 
+function seedNpcPresence(sessionId: string, leave = false): void {
+  const repository = createRepository({ dataDir: dataDir(), clock: { now: () => new Date("2031-01-01T00:00:00.000Z") } });
+  const npc = repository.createCampaignNpc("local-owner", "campaign-one", {
+    personaId: "character-one",
+    publicState: { name: "Detachment NPC" },
+    privateState: { goals: "Stay", gmNotes: "Present", merchantState: null },
+    expectedRevision: 0,
+    idempotencyKey: "detachment-npc",
+  }).npc;
+  repository.mutateNpcPresence("local-owner", {
+    campaignId: "campaign-one", sessionId, npcId: npc.npcId, expectedRevision: 0,
+    idempotencyKey: "presence-place", mutation: { kind: "place", locationId: null },
+  });
+  if (leave) {
+    repository.mutateNpcPresence("local-owner", {
+      campaignId: "campaign-one", sessionId, npcId: npc.npcId, expectedRevision: 1,
+      idempotencyKey: "presence-leave", mutation: { kind: "remove" },
+    });
+  }
+  repository.close();
+}
+
+function seedPresenceSession(sessionId: string): void {
+  const db = new DatabaseDriver(databasePath());
+  db.pragma("foreign_keys = ON");
+  db.prepare(`INSERT INTO sessions VALUES (?, 'character-one', ?, 'active', 'default', NULL, ?, NULL, NULL)`)
+    .run(sessionId, sessionId, fixedAt);
+  db.prepare("INSERT INTO session_characters VALUES (?, 'character-one', 0)").run(sessionId);
+  db.prepare("INSERT INTO campaign_sessions VALUES (?, 'campaign-one', ?)").run(sessionId, fixedAt);
+  db.close();
+}
+
+function presenceHistory(sessionId: string): unknown {
+  const db = new DatabaseDriver(databasePath(), { readonly: true });
+  const result = Object.fromEntries([
+    "npc_presence_session_revisions_v43", "campaign_npc_presence_v43", "npc_presence_commands_v43",
+    "npc_presence_events_v43", "npc_presence_receipts_v43",
+  ].map((table) => [table, db.prepare(`SELECT * FROM ${table} WHERE campaign_id=? AND session_id=? ORDER BY rowid`)
+    .all("campaign-one", sessionId)]));
+  db.close();
+  return result;
+}
+
 describe("factory campaign-session detachment", () => {
   it("returns the exact prior attachment, preserves other rows and campaign time, and consumes no dependencies", () => {
     seed();
@@ -103,6 +150,94 @@ describe("factory campaign-session detachment", () => {
     expect(nextId).not.toHaveBeenCalled();
     expect(clockNow).not.toHaveBeenCalled();
     repository.close();
+  });
+
+  it("blocks legacy detach for a running present NPC without writes or dependency use", () => {
+    seed();
+    seedPresenceSession("session-present");
+    seedNpcPresence("session-present");
+    const nextId = vi.fn(() => "unused");
+    const clockNow = vi.fn(() => new Date());
+    const before = { repository: snapshot(), presence: presenceHistory("session-present") };
+    const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
+
+    expect(() => repository.detachCampaignSession("local-owner", {
+      campaignId: "campaign-one", sessionId: "session-present",
+    })).toThrow(CampaignSessionAttachmentConflictError);
+    expect(nextId).not.toHaveBeenCalled();
+    expect(clockNow).not.toHaveBeenCalled();
+    repository.close();
+    expect({ repository: snapshot(), presence: presenceHistory("session-present") }).toEqual(before);
+  });
+
+  it("fails loudly instead of treating malformed lifecycle as stopped during detach", () => {
+    seed();
+    seedPresenceSession("session-malformed");
+    seedNpcPresence("session-malformed");
+    const db = new DatabaseDriver(databasePath());
+    db.prepare("UPDATE sessions SET state='closed',stopped_at=NULL,stop_reason=NULL WHERE id='session-malformed'").run();
+    db.close();
+    const before = { repository: snapshot(), presence: presenceHistory("session-malformed") };
+    const repository = createRepository({ dataDir: dataDir() });
+
+    expect(() => repository.detachCampaignSession("local-owner", {
+      campaignId: "campaign-one", sessionId: "session-malformed",
+    })).toThrow("campaign room session graph is malformed");
+    repository.close();
+    expect({ repository: snapshot(), presence: presenceHistory("session-malformed") }).toEqual(before);
+  });
+
+  it("permits legacy detach after the last NPC leaves and preserves all presence history", () => {
+    seed();
+    seedPresenceSession("session-left");
+    seedNpcPresence("session-left", true);
+    const before = presenceHistory("session-left");
+    const repository = createRepository({ dataDir: dataDir() });
+
+    expect(repository.detachCampaignSession("local-owner", {
+      campaignId: "campaign-one", sessionId: "session-left",
+    })).toEqual({ campaignId: "campaign-one", sessionId: "session-left", attachedAt: fixedAt });
+    repository.close();
+    expect(presenceHistory("session-left")).toEqual(before);
+  });
+
+  it("permits audited detach with NPCs present at stop, preserves history, and replays exactly", () => {
+    seed();
+    seedPresenceSession("session-stopped-present");
+    seedNpcPresence("session-stopped-present");
+    const stopped = new DatabaseDriver(databasePath());
+    stopped.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id='session-stopped-present'").run(fixedAt);
+    stopped.close();
+    const before = presenceHistory("session-stopped-present");
+    const repository = createRepository({ dataDir: dataDir(), clock: { now: () => new Date("2032-01-01T00:00:00.000Z") } });
+    const input = { sessionId: "session-stopped-present", expectedRevision: 0, idempotencyKey: "audited-stopped-detach" };
+
+    const detached = repository.detachAuditedCampaignRoom("local-owner", "campaign-one", input);
+    expect(detached.value).toEqual({ campaignId: "campaign-one", sessionId: "session-stopped-present", attachedAt: fixedAt });
+    expect(repository.detachAuditedCampaignRoom("local-owner", "campaign-one", input)).toEqual(detached);
+    repository.close();
+    expect(presenceHistory("session-stopped-present")).toEqual(before);
+  });
+
+  it("blocks audited detach before IDs, clock, audit writes, or revision changes", () => {
+    seed();
+    seedPresenceSession("session-audited-present");
+    seedNpcPresence("session-audited-present");
+    const nextId = vi.fn(() => "unused");
+    const clockNow = vi.fn(() => new Date());
+    const before = snapshot();
+    const repository = createRepository({ dataDir: dataDir(), ids: { nextId }, clock: { now: clockNow } });
+
+    expect(() => repository.detachAuditedCampaignRoom("local-owner", "campaign-one", {
+      sessionId: "session-audited-present", expectedRevision: 0, idempotencyKey: "blocked-audited-detach",
+    })).toThrow(CampaignAdministrationConflictError);
+    expect(nextId).not.toHaveBeenCalled();
+    expect(clockNow).not.toHaveBeenCalled();
+    repository.close();
+    expect(snapshot()).toEqual(before);
+    const audit = new DatabaseDriver(databasePath(), { readonly: true });
+    expect(audit.prepare("SELECT 1 FROM campaign_administration_commands WHERE idempotency_key='blocked-audited-detach'").get()).toBeUndefined();
+    audit.close();
   });
 
   it("returns null for unattached, missing, cross-campaign, and repeated requests after authorization", () => {

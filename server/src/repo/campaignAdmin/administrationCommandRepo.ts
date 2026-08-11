@@ -14,6 +14,7 @@ import { publicAdministrationPayload } from "./administrationEventRepo.js";
 import type { AdministrationAuthority } from "./administrationAccessRepo.js";
 import { createCampaignCheckpointRepo } from "./campaignCheckpointRepo.js";
 import { createCampaignRecapRepo } from "./campaignRecapRepo.js";
+import { hasAttachedRunningNpcPresence } from "../world/npcPresenceRepo.js";
 
 type MutationResult<T> = { value: T; receipt: CampaignAdministrationReceipt };
 interface NewContext { commandId: string; eventId: string; at: string; auth: AdministrationAuthority }
@@ -58,7 +59,8 @@ export interface AdministrationCommandDependencies {
  */
 function mutation<T>(deps: AdministrationMutationDependencies, actorRaw: string, campaignRaw: string,
   expectedRevision: number, keyRaw: string, type: CampaignAdministrationReceipt["type"], payload: object,
-  apply: (context: NewContext) => T, retry: (commandId: string, stored: unknown) => T): MutationResult<T> {
+  apply: (context: NewContext) => T, retry: (commandId: string, stored: unknown) => T,
+  beforeCreate?: () => void): MutationResult<T> {
   const { db, nextId, now, getAuthority, errors } = deps;
   const actor = resourceIdSchema.parse(actorRaw), campaignId = resourceIdSchema.parse(campaignRaw);
   const key = resourceIdSchema.parse(keyRaw), payloadJson = JSON.stringify(payload);
@@ -85,6 +87,7 @@ function mutation<T>(deps: AdministrationMutationDependencies, actorRaw: string,
     if (db.prepare(`SELECT 1 FROM campaign_catalog_commands WHERE campaign_id=? AND idempotency_key=?`).get(campaignId, key))
       throw errors.conflict("idempotency identity collision");
     if (auth.revision !== expectedRevision) throw errors.stale();
+    beforeCreate?.();
     const commandId = resourceIdSchema.parse(nextId()), eventId = resourceIdSchema.parse(nextId());
     const clockAt = utcIsoTimestampSchema.parse(now().toISOString());
     const at = utcIsoTimestampSchema.parse(new Date(Math.max(Date.parse(clockAt), Date.parse(auth.updatedAt) + 1)).toISOString());
@@ -115,9 +118,9 @@ export function createAdministrationCommandRepo(deps: AdministrationCommandDepen
   const { forbidden, stale, conflict } = errors;
   const runMutation = <T>(actor: string, campaignId: string, expectedRevision: number, key: string,
     type: CampaignAdministrationReceipt["type"], payload: object, apply: (context: NewContext) => T,
-    retry: (commandId: string, stored: unknown) => T): MutationResult<T> => {
+    retry: (commandId: string, stored: unknown) => T, beforeCreate?: () => void): MutationResult<T> => {
     assertCanMutate();
-    return mutation({ db, nextId, now, getAuthority, errors }, actor, campaignId, expectedRevision, key, type, payload, apply, retry);
+    return mutation({ db, nextId, now, getAuthority, errors }, actor, campaignId, expectedRevision, key, type, payload, apply, retry, beforeCreate);
   };
   const transitions: Record<string, readonly string[]> = { draft: ["published", "archived"],
     published: ["paused", "completed", "archived"], paused: ["published", "completed", "archived"],
@@ -207,12 +210,19 @@ export function createAdministrationCommandRepo(deps: AdministrationCommandDepen
     },
     detachAuditedCampaignRoom: (actor: string, campaignId: string, raw: unknown) => {
       const input = campaignRoomMutationSchema.parse(raw);
+      let detached: CampaignSessionAttachment | undefined;
       return runMutation(actor, campaignId, input.expectedRevision, input.idempotencyKey, "room_detached", { sessionId: input.sessionId }, () => {
+        if (!detached) throw new Error("validated room attachment is missing");
+        db.prepare("DELETE FROM campaign_sessions WHERE campaign_id=? AND session_id=?").run(campaignId, input.sessionId);
+        return detached;
+      }, (_commandId, stored) => campaignSessionAttachmentSchema.parse(stored), () => {
         const row = db.prepare("SELECT * FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId, input.sessionId) as any;
         if (!row) throw conflict("room attachment not found");
-        const detached = attachment(row); db.prepare("DELETE FROM campaign_sessions WHERE campaign_id=? AND session_id=?").run(campaignId, input.sessionId);
-        return detached;
-      }, (_commandId, stored) => campaignSessionAttachmentSchema.parse(stored));
+        detached = attachment(row);
+        if (hasAttachedRunningNpcPresence(db, campaignId, input.sessionId)) {
+          throw conflict("running room with present NPCs cannot be detached");
+        }
+      });
     },
     ...createCampaignCheckpointRepo({ db, nextId, runMutation, conflict, checkpoint, timeline, getAuthority }),
     ...createCampaignRecapRepo({ db, nextId, runMutation, conflict, recap, getAuthority }),

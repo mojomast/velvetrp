@@ -715,7 +715,7 @@ function createRepositoryComposition<T>(
   const powerRepository=createPowerRepository(db,dependencies,m16Guard);
   const effectRepository=createEffectRepository(db,dependencies,m16Guard);
   const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0&&atomicGenerationApplyDepth===0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
-  const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.8 mutation cannot run inside a repository transaction");});
+  const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("world operation cannot run inside a repository transaction");});
   const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
   }, dependencies);
@@ -799,7 +799,7 @@ function createRepositoryComposition<T>(
         const before = adventureTurnRepository.getGenerationDraft(principalId, input.draftId);
         if (!before || !("stagedContent" in before)) throw new Error("generation draft is unavailable");
         if (before.state === "applied") {
-          const command = db.prepare("SELECT idempotency_key FROM adventure_coordination_commands_v36 WHERE aggregate_kind='draft' AND aggregate_id=? AND mutation_type='draft-apply'").get(before.draftId) as any;
+          const command = db.prepare("SELECT idempotency_key FROM adventure_coordination_commands_v36 WHERE aggregate_kind='draft' AND aggregate_id=? AND mutation_type='draft-apply'").get(before.draftId) as { idempotency_key: string } | undefined;
           if (command?.idempotency_key !== key("content-apply")) throw new AdventureTurnConflictError("idempotency key was reused");
           return before;
         }

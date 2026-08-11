@@ -39,6 +39,7 @@ import {
   CampaignSessionAttachmentUnavailableError,
 } from "./campaignErrors.js";
 import { createCampaignRoomSessionLifecycleRepository } from "./campaignRoomSessionLifecycleRepo.js";
+import { hasAttachedRunningNpcPresence } from "../world/npcPresenceRepo.js";
 
 interface CampaignRow {
   id: string;
@@ -293,8 +294,15 @@ export function detachCampaignSessionSync(
     const campaign = db.prepare("SELECT owner_principal_id FROM campaigns WHERE id = ?").get(normalized.campaignId) as { owner_principal_id: string } | undefined;
     if (!campaign) throw new Error("campaign not found");
     if (campaign.owner_principal_id !== actorId) throw new Error("campaign session detachment requires the campaign owner");
-    const detached = db.prepare(`DELETE FROM campaign_sessions WHERE campaign_id = ? AND session_id = ?
-      RETURNING campaign_id, session_id, attached_at`).get(normalized.campaignId, normalized.sessionId) as CampaignSessionAttachmentRow | undefined;
-    return detached ? toCampaignSessionAttachment(detached) : null;
+    const attachment = db.prepare(`SELECT campaign_id, session_id, attached_at FROM campaign_sessions
+      WHERE campaign_id = ? AND session_id = ?`).get(normalized.campaignId, normalized.sessionId) as CampaignSessionAttachmentRow | undefined;
+    if (!attachment) return null;
+    const detached = toCampaignSessionAttachment(attachment);
+    if (hasAttachedRunningNpcPresence(db, normalized.campaignId, normalized.sessionId)) {
+      throw new CampaignSessionAttachmentConflictError("running sessions with present NPCs cannot be detached");
+    }
+    db.prepare("DELETE FROM campaign_sessions WHERE campaign_id = ? AND session_id = ?")
+      .run(normalized.campaignId, normalized.sessionId);
+    return detached;
   }).immediate();
 }

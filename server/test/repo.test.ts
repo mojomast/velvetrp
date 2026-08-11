@@ -367,9 +367,24 @@ describe("repository transactions", () => {
         unitOfWork.attachCampaignSession("local-owner", { campaignId: "campaign", sessionId: "session" });
         // @ts-expect-error Campaign-session detachment is factory-owned, not transactional.
         unitOfWork.detachCampaignSession("local-owner", { campaignId: "campaign", sessionId: "session" });
+        // @ts-expect-error NPC-presence reads are factory-owned, not transactional.
+        unitOfWork.getNpcCast("local-owner", "campaign", "session");
+        // @ts-expect-error NPC-presence mutations are factory-owned, not transactional.
+        unitOfWork.mutateNpcPresence("local-owner", {});
       }
     });
     repository.close();
+  });
+
+  it("exposes guarded NPC-presence methods only on the factory repository", () => {
+    const repository = createRepository({ dataDir: makeTmpDataDir() });
+    expect(typeof repository.getNpcCast).toBe("function");
+    expect(typeof repository.mutateNpcPresence).toBe("function");
+    expect(() => repository.transaction(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session")))
+      .toThrow("world operation cannot run inside a repository transaction");
+    repository.close();
+    expect(() => repository.getNpcCast("invalid actor", "invalid campaign", "invalid session"))
+      .toThrow("repository is closed");
   });
 
   it("commits all writes in a synchronous unit of work", async () => {
