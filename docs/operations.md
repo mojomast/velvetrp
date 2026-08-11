@@ -65,7 +65,7 @@ Always configure one explicit absolute data directory so startup location, servi
 export VELVET_DATA_DIR=/home/example/.local/share/velvet
 ```
 
-The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. There is no separate migration command and no supported automatic downgrade.
+The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For this pre-release schema v42, v40/v41 -> v42 is the tested and supported forward-startup compatibility window. Legacy marker paths for v2-v39 remain in the binary temporarily, but are untested and unsupported. Before marker or artifact mutation, startup preflight rejects persisted foreign-key corruption, unexpected v42 named artifacts, and cross-campaign generation-draft ancestry. There is no separate migration command and no supported automatic downgrade. Recreate older development databases or restore a backup from a compatible build.
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
 

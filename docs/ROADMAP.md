@@ -6,6 +6,51 @@ All milestones preserve existing roleplay APIs and local-first SQLite operation.
 
 M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, client milestones M3.1-M3.8, and M4.1-M4.6 are complete. Earlier schema digests and milestone baseline descriptions remain historical records in the sections below.
 
+## Approved post-M4 milestone DAG and status
+
+Planning-board revision 2 (saved 2026-08-11T00:47:24.296Z, ready with no blockers) is approved. The [revision 2 integration plan](revision-2-integration-plan.md) is the authoritative actionable execution design subordinate to this roadmap's scope and status. Its dependency order is:
+
+```text
+H0.1 migration support ─┐
+H0.2 E2E repairs ───────┼─> H0.4 health gate
+H0.3 docs reconciliation┘
+After H0.4, parallel tracks are:
+  M5.1 NPC presence -> M5.2 companion core/local-owner administration
+  M5.3 atomic combat
+  M5.4 candidate protocol contract/persistence
+  M5.5 threat-model checkpoint -> commit-reveal dice
+M5.6 adapters use per-family dependencies: existing commands+candidates for travel/rest and
+out-of-combat power/inventory; atomic combat for combat powers/items; companion authority plus
+exercisable L5 principals/grants for companion actions; dice only for proof-required randomness.
+Later: rules/simulation use only relevant mechanics; remote identity -> harness -> proactive automation.
+```
+
+### Build now — H0 repository health
+
+- **H0.1 Complete:** executable supported migration coverage is canonical populated v40/v41->v42, with the historical test archive retained and discoverable. The archive does not claim v2-v39 support; startup preflight rejects persisted foreign-key corruption, unexpected v42 named artifacts, and cross-campaign generation-draft ancestry before marker or artifact mutation.
+- **H0.2 Planned:** individually reproduce and repair the six observed deterministic E2E failures (latest observed run: 5 passed, 6 failed), recording expected/actual/source call site before edits.
+- **H0.3 Planned:** reconcile stale current-status documentation while retaining historical ledgers.
+- **H0.4 Planned:** establish root `npm run health` as exactly `npm run typecheck && npm run build && npm test && npm run test:e2e`; migration-support tests are discovered by `npm test`, milestone-focused migration/security gates are not duplicated, and CI calls health once or mirrors those four phases once.
+
+### Build next — M5
+
+- **M5.1-M5.6 Planned:** session NPC presence; companion aggregate, closed grants, repository authority, and local-owner owner/GM administration (not pre-auth non-owner HTTP exercise); composition-owned atomic combat power/item settlement; persisted exact reviewable candidates/quotes and policy metadata; commit-reveal dice after its threat checkpoint; and agent mechanics one family at a time behind exact domain dependencies. Delegated grantee exercise and principal-specific UI/E2E wait for remote identity/grants. Single active encounter remains mandatory.
+- Only the first persistence milestone has provisional schema allocation v43r1. Every later persistence milestone receives `vNext` from the schema steward at milestone start; each version moves the tested current-minus-two support window.
+
+### Build later
+
+- **Planned:** closed declarative rules IR; explicitly licensed offline reference ingestion; non-promotable ephemeral branch-local simulation; campaign tenancy and server-derived authenticated session metadata; bounded harness session overrides; allowlisted tools and proactive policy grants with visible receipts.
+- Reference ingestion remains blocked until Unscheduled mutable authoring is promoted and delivered, unless a separately reviewed immutable-draft-only ingestion path is approved. This dependency does not promote ingestion.
+- Remote identity/tenancy precedes remote multi-user harness semantics, proactive automation, and autonomous work. OIDC PKCE/server sessions are a recommended implementation detail subject to threat-model approval, not a caller-header identity scheme.
+
+### Approved Build Unscheduled
+
+- **Unscheduled:** append-only multiclass levels/prerequisites; mutable logical unpinned pack authoring that creates immutable revisions while exact pins/history never mutate; zones/range bands before full grids; explicit boss phase state; autonomous parties with revocable scoped grants. Promotion gates, full milestone fields, and `vNext`-only-at-promotion policy are defined in the detailed plan.
+
+### Still deferred or excluded
+
+- The three product deferrals are Discord, VTT adapters, and simultaneous encounters. Bilateral agent trade has no path without counterpart consent. Full grids/LOS, arbitrary executable rules, URL/network reference ingestion, in-place mutation of pinned history, and promotable/persistent simulation are excluded.
+
 ## Milestone 1 — Core RPG Mechanics (Schema + Repo layer)
 
 ### M1.1 Campaign administration, membership, and timelines
@@ -517,9 +562,13 @@ Support staged NPC, location, faction, quest, and opening drafts with explicit c
   - Generated personas, goals, secrets, relationships, locations, factions, quests, clues, and openings remain typed drafts with provenance, validation, role-safe previews, and per-change approval.
   - Applying a draft emits command receipts; generated prose cannot directly mutate campaign state, create permissions, voice player characters, or expose hidden information.
 
-## Out of Scope / Deferred
+## Historical out-of-scope / deferred baseline
+
+The D1-D5 entries below preserve the pre-revision-2 boundary as historical rationale. The approved post-M4 section above supersedes their disposition: branch-local simulation, boss phases, zones/range bands, closed rules IR, mutable **logical unpinned heads over immutable revisions**, licensed offline ingestion, remote identity/tenancy, autonomous parties, commit-reveal dice, and policy-granted proactive automation are Planned or Unscheduled exactly as stated above; notably, mutable authoring is Unscheduled and ingestion remains Build Later but blocked. Discord, VTT adapters, and simultaneous encounters remain deferred.
 
 ### D1 Alternate state and combat models
+
+**Historical status:** Partly superseded by revision 2. Ephemeral non-promotable simulation is Planned; explicit boss phases and zones/range bands are Unscheduled. Simultaneous encounters and full grids remain deferred/excluded.
 
 Defer mechanics that multiply authoritative state models until the single canonical timeline and ordinary encounter loop are stable.
 
@@ -531,6 +580,8 @@ Defer mechanics that multiply authoritative state models until the single canoni
 
 ### D2 Advanced rules extensibility
 
+**Historical status:** Partly superseded by revision 2. Closed rules IR is Planned; append-only multiclass and mutable logical unpinned-head authoring are Unscheduled. If promoted, advancing a head creates a new immutable revision; exact pins and historical revisions remain immutable.
+
 Defer rule execution that would undermine the initial typed, testable mechanics boundary.
 
 - **Complexity:** L
@@ -540,6 +591,8 @@ Defer rule execution that would undermine the initial typed, testable mechanics 
   - Schemas may preserve future-compatible identities where already designed, but no client or AI path can execute these capabilities, and sealed pack versions remain immutable.
 
 ### D3 External ingestion and remote identity
+
+**Historical status:** Superseded into Planned work with prerequisites: licensed reviewed offline files only, and threat-modeled campaign tenancy/server-derived authenticated sessions before remote exposure. Current `local-owner` restrictions remain until delivery.
 
 Defer optional reference-data migration and network identity until provenance and a real security boundary are separately approved.
 
@@ -551,6 +604,8 @@ Defer optional reference-data migration and network identity until provenance an
 
 ### D4 Autonomous and third-party play surfaces
 
+**Historical status:** Partly superseded. Autonomous parties are Unscheduled behind remote identity and revocable grants. Defer Discord for now; VTT remains deferred.
+
 Defer unattended play and external chat/tabletop adapters so all initial consequential actions retain direct human oversight.
 
 - **Complexity:** L
@@ -560,6 +615,8 @@ Defer unattended play and external chat/tabletop adapters so all initial consequ
   - No external service can initiate turns, approve confirmations, control player characters, or receive campaign-private context through the roadmap surface.
 
 ### D5 Fairness extensions and proactive automation
+
+**Historical status:** Superseded into Planned commit-reveal dice and later policy-granted proactive automation with visible receipts. Neither is current behavior.
 
 Defer stronger randomness guarantees and unsolicited agent activity beyond explicit user-driven turns.
 

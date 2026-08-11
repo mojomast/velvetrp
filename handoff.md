@@ -1,5 +1,7 @@
 # Handoff
-## Completed: M4 final gate and migration-test stabilization
-## Next Task: None (M4 roadmap complete)
-## Context: Historical v41 DDL remains untouched. The server suite is serialized because test files mutate process-wide `VELVET_DATA_DIR`; historical fixture rewinds now remove v41/v42 artifacts before lowering the schema marker. Every historical migration expectation targets schema version 42. Run tests with a unique `TMPDIR` under `/dev/shm` while `/tmp` is full. Deterministic E2E has six known baseline failures at 8851e5d (four finalize status mismatches, attached-room back button, and storyline 400); current main matches exactly.
-## Files Modified: server Vitest configuration and migration tests/helpers; handoff
+## Completed: H0.1 rolling migration support foundation
+## Next Task: H0.2 individual E2E reproduction
+## Context: The executable supported migration window is canonical populated v40/v41->v42. The historical archive is discoverable and does not claim v2-v39 support. Before marker or artifact mutation, startup preflight rejects persisted foreign-key corruption, unexpected v42 named artifacts, and cross-campaign generation-draft ancestry. For H0.2, individually reproduce each deterministic E2E failure and record expected behavior, actual behavior, and source call site before edits. Preserve unrelated dirty work; do not inspect `server/src/repo/contentCatalogRepo.ts`, stage, commit, push, clean, reset, stash, or overwrite another owner.
+## Files Modified: server/test/MIGRATION_TEST_ARCHIVE.md, docs/operations.md, docs/repo-architecture.md, docs/ROADMAP.md, devplan.md, handoff.md
+## Validation: `migration-support-window` and `migration-v42` passed (14 plus 2 individual tests); server typecheck passed; `git diff --check` passed.
+## Operational Notes: H0.2, H0.3, and H0.4 remain incomplete. Mutable pack authoring is Approved Build Unscheduled; reference ingestion remains Build Later and blocked until authoring is promoted/delivered unless a separately reviewed immutable-draft-only path is approved. Companion core supports repository authority and local-owner owner/GM administration; delegated grantee exercise and principal-specific UI/E2E wait for remote identity/grants, with no impersonation/header workaround.
