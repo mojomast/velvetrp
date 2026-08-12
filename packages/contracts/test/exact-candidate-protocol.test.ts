@@ -52,14 +52,14 @@ const candidate = (): InternalExactCandidate => {
       sessionId: "session-1",
       actorId: "actor-1",
       principalId: "principal-1",
-      connectionId: "provider-connection-1",
+      connectionId: "adventure-turn:turn-1",
       authorizationEffect: "none",
     },
     label: { format: "message-key-v1", key: "candidate.actor.travel.label", routeOption: 1 },
     summary: { format: "message-key-v1", key: "candidate.actor.travel.summary" },
     canonicalActionDigest: "0".repeat(64),
     canonicalEnvelopeDigest: "0".repeat(64),
-    privateParameters: { kind: "actor.travel", connectionId: "hidden-world-edge-7", partyActorIds: ["actor-1", "actor-2"] },
+    privateParameters: { kind: "actor.travel", connectionId: "hidden-world-edge-7", partyActorIds: ["actor-1"] },
     expectedRevisions: [{ domain: "world", revision: 4 }],
     policy: { kind: "actor.travel", result: "allowed", reason: "legal-visible-connection" },
     confirmation: { requirement: "not-required", decision: { state: "not-applicable" } },
@@ -85,7 +85,7 @@ const context = () => ({
   sessionId: "session-1",
   actorId: "actor-1",
   principalId: "principal-1",
-  connectionId: "provider-connection-1",
+  connectionId: "adventure-turn:turn-1",
   now: "2030-01-01T00:01:00.000Z",
   observedRevisions: { world: 4 },
 });
@@ -114,9 +114,9 @@ describe("exact candidate v1 closed protocol", () => {
 
   it("freezes canonical action framing and its digest vector", () => {
     const frame = canonicalExactCandidateActionFrame(candidate());
-    expect(frame).toBe("{\"candidateId\":\"candidate-1\",\"domain\":\"velvet.exact-candidate.action.v1\",\"expectedRevisions\":[{\"domain\":\"world\",\"revision\":4}],\"kind\":\"actor.travel\",\"privateParameters\":{\"connectionId\":\"hidden-world-edge-7\",\"kind\":\"actor.travel\",\"partyActorIds\":[\"actor-1\",\"actor-2\"]},\"purpose\":\"execute-once\",\"scope\":{\"actorId\":\"actor-1\",\"authorizationEffect\":\"none\",\"campaignId\":\"campaign-1\",\"connectionId\":\"provider-connection-1\",\"principalId\":\"principal-1\",\"sessionId\":\"session-1\"},\"version\":\"v1\"}");
+    expect(frame).toBe("{\"candidateId\":\"candidate-1\",\"domain\":\"velvet.exact-candidate.action.v1\",\"expectedRevisions\":[{\"domain\":\"world\",\"revision\":4}],\"kind\":\"actor.travel\",\"privateParameters\":{\"connectionId\":\"hidden-world-edge-7\",\"kind\":\"actor.travel\",\"partyActorIds\":[\"actor-1\"]},\"purpose\":\"execute-once\",\"scope\":{\"actorId\":\"actor-1\",\"authorizationEffect\":\"none\",\"campaignId\":\"campaign-1\",\"connectionId\":\"adventure-turn:turn-1\",\"principalId\":\"principal-1\",\"sessionId\":\"session-1\"},\"version\":\"v1\"}");
     expect(EXACT_CANDIDATE_ACTION_FRAME).toBe("velvet.exact-candidate.action.v1");
-    expect(computeExactCandidateActionDigest(candidate(), crypto)).toBe("44c745240c4764cb30dd903adb5ebaf43c96a7d821bb3029987a510067dd2b65");
+    expect(computeExactCandidateActionDigest(candidate(), crypto)).toBe("db4b6fc7811fe2a1a9ba128f2eab2e9db24600fe9d2b7a685e020125768bc118");
   });
 
   it("freezes the complete versioned execution-gating envelope vector", () => {
@@ -134,7 +134,7 @@ describe("exact candidate v1 closed protocol", () => {
       supersession: { state: "current", supersededAt: null, replacement: null },
       execution: { state: "unexecuted", receiptId: null, binding: null, linkedAt: null },
     });
-    expect(computeExactCandidateEnvelopeDigest(candidate(), crypto)).toBe("3a2c2183055e17fd3b48046727b5a52904dfbe588163f3325210fec386e5150d");
+    expect(computeExactCandidateEnvelopeDigest(candidate(), crypto)).toBe("2ab9fe2b9b4cd2ad44d0b162c82e59672fb73701660894b8096302bf6f38457b");
   });
 
   it("keeps lifecycle absence and presence injective in the envelope frame", () => {
@@ -202,7 +202,7 @@ describe("exact candidate v1 closed protocol", () => {
     expect(exactCandidateQuoteSchema.parse(quote)).toEqual(quote);
     expect(EXACT_CANDIDATE_QUOTE_FRAME).toBe("velvet.exact-candidate.quote.v1");
     expect(canonicalExactCandidateQuoteFrame(quote)).toContain("\"domain\":\"velvet.exact-candidate.quote.v1\"");
-    expect(quote.canonicalQuoteDigest).toBe("c88c2c7bcd33849ce273e827e4e2baa1c346d84b64273b6efb36a5b69776d30a");
+    expect(quote.canonicalQuoteDigest).toBe("82a2a859d70bf6ac8e9414ec79cfd43a47c56d0d6180d30b4972281748f76994");
     expect(verifyExactCandidateQuoteDigest(quote, crypto)).toBe(true);
     expect(verifyExactCandidateQuoteDigest({ ...quote, cost: { ...quote.cost, minorUnits: 126 } }, crypto)).toBe(false);
     expect(verifyExactCandidateQuoteDigest({ ...quote, binding: { ...quote.binding, candidateId: "candidate-2" } }, crypto)).toBe(false);

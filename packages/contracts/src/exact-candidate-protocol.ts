@@ -2,7 +2,7 @@ import { z } from "zod";
 import { canonicalAgentJson, canonicalSha256DigestSchema, type AgentJsonObject } from "./agent-execution.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { actorIdSchema, campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
-import { locationConnectionIdSchema, MAX_TRAVEL_PARTY_SIZE } from "./world.js";
+import { locationConnectionIdSchema } from "./world.js";
 
 export const EXACT_CANDIDATE_PROTOCOL_VERSION = "v1" as const;
 export const EXACT_CANDIDATE_ACTION_FRAME = "velvet.exact-candidate.action.v1" as const;
@@ -11,6 +11,12 @@ export const EXACT_CANDIDATE_QUOTE_VERSION = "v1" as const;
 export const EXACT_CANDIDATE_QUOTE_FRAME = "velvet.exact-candidate.quote.v1" as const;
 export const MAX_EXACT_CANDIDATES_PER_RESPONSE = 32;
 export const MAX_EXACT_CANDIDATE_LIFETIME_MS = 5 * 60 * 1_000;
+export const EXACT_CANDIDATE_TURN_CONNECTION_PREFIX = "adventure-turn:" as const;
+
+/** Server-owned connection scope: stable for one persisted adventure turn across calls and restarts. */
+export function exactCandidateTurnConnectionId(turnId: unknown): string {
+  return resourceIdSchema.parse(`${EXACT_CANDIDATE_TURN_CONNECTION_PREFIX}${resourceIdSchema.parse(turnId)}`);
+}
 
 /** V1 deliberately freezes only the first family in the rollout. New families require a new protocol version. */
 export const exactCandidateKindSchema = z.enum(["actor.travel"]);
@@ -70,7 +76,7 @@ export const exactCandidateExpectedRevisionSchema = z.object({
 export const exactCandidateTravelParametersSchema = z.object({
   kind: z.literal("actor.travel"),
   connectionId: locationConnectionIdSchema,
-  partyActorIds: z.array(actorIdSchema).min(1).max(MAX_TRAVEL_PARTY_SIZE),
+  partyActorIds: z.tuple([actorIdSchema]),
 }).strict().superRefine((parameters, context) => {
   if (new Set(parameters.partyActorIds).size !== parameters.partyActorIds.length) {
     context.addIssue({ code: "custom", message: "travel party actor IDs must be unique", path: ["partyActorIds"] });
@@ -199,6 +205,12 @@ export const internalExactCandidateSchema = z.object({
   }
   if (!candidate.privateParameters.partyActorIds.includes(candidate.scope.actorId)) {
     context.addIssue({ code: "custom", message: "travel party must contain the scoped actor", path: ["privateParameters", "partyActorIds"] });
+  }
+  if (candidate.privateParameters.partyActorIds[0] !== candidate.scope.actorId) {
+    context.addIssue({ code: "custom", message: "travel v1 party must be exactly the scoped actor", path: ["privateParameters", "partyActorIds"] });
+  }
+  if (!candidate.scope.connectionId.startsWith(EXACT_CANDIDATE_TURN_CONNECTION_PREFIX)) {
+    context.addIssue({ code: "custom", message: "candidate connection must be a server-owned adventure-turn scope", path: ["scope", "connectionId"] });
   }
   const bindingMatches = (binding: z.infer<typeof exactCandidateBindingSchema>) =>
     binding.candidateId === candidate.candidateId && binding.kind === candidate.kind && binding.version === candidate.version
