@@ -1,6 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { createRepository } from "../../../src/repo/index.js";
+import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_RACE } from "@velvet/contracts";
+import { createCompanionCoreV44 } from "../../../src/repo/db/migrations/v44_companion_core.js";
+import { COMPANION_CORE_V45_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v45_companion_principals.js";
 
 const AT = "2035-01-01T00:00:00.000Z";
 const V42_TABLES = ["campaign_content_layout_attestation_v42", "campaign_content_revisions_v42", "campaign_content_receipts_v42", "campaign_content_commands_v42"];
@@ -28,6 +31,13 @@ export interface SupportWindowFixture {
   locationId: string;
   otherCampaignId?: string;
   otherDraftId?: string;
+}
+
+export interface PopulatedV44CompanionFixture extends SupportWindowFixture {
+  actorId: string;
+  grantId: string;
+  grantorPrincipalId: string;
+  granteePrincipalId: string;
 }
 
 function databaseFile(): string {
@@ -118,6 +128,16 @@ function removeV44(db: DatabaseDriver.Database): void {
   for (const table of V44_TABLES) db.exec(`DROP TABLE IF EXISTS "${table}"`);
 }
 
+function removeV45(db: DatabaseDriver.Database): void {
+  for (const [type, name] of [...COMPANION_CORE_V45_MANAGED_OBJECTS].reverse()) {
+    if (type === "trigger") db.exec(`DROP TRIGGER "${name}"`);
+    if (type === "index") db.exec(`DROP INDEX "${name}"`);
+  }
+  for (const [, name] of [...COMPANION_CORE_V45_MANAGED_OBJECTS].filter(([type]) => type === "table").reverse()) {
+    db.exec(`DROP TABLE "${name}"`);
+  }
+}
+
 function removeV42(db: DatabaseDriver.Database): void {
   for (const table of V42_TABLES) {
     db.exec(`DROP TRIGGER IF EXISTS ${table}_immutable_update_v42`);
@@ -130,6 +150,7 @@ function removeV42(db: DatabaseDriver.Database): void {
 export function buildCanonicalV41Fixture(): SupportWindowFixture {
   const fixture = createCanonicalCampaign();
   const db = new DatabaseDriver(databaseFile());
+  removeV45(db);
   removeV44(db);
   removeV43(db);
   removeV42(db);
@@ -148,6 +169,7 @@ export function buildCanonicalV41Fixture(): SupportWindowFixture {
 export function buildCanonicalV41CrossCampaignFixture(): Required<SupportWindowFixture> {
   const fixture = createCanonicalCampaign(true) as Required<SupportWindowFixture>;
   const db = new DatabaseDriver(databaseFile());
+  removeV45(db);
   removeV44(db);
   removeV43(db);
   removeV42(db);
@@ -166,6 +188,7 @@ export function buildCanonicalV41CrossCampaignFixture(): Required<SupportWindowF
 export function buildCanonicalV42Fixture(withOtherCampaign = false): SupportWindowFixture {
   const fixture = createCanonicalCampaign(withOtherCampaign);
   const db = new DatabaseDriver(databaseFile());
+  removeV45(db);
   removeV44(db);
   removeV43(db);
   db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)")
@@ -190,6 +213,7 @@ export function buildCanonicalV42Fixture(withOtherCampaign = false): SupportWind
 export function buildCanonicalV43Fixture(): SupportWindowFixture {
   const fixture = createCanonicalCampaign();
   const db = new DatabaseDriver(databaseFile());
+  removeV45(db);
   removeV44(db);
   db.prepare("INSERT INTO npc_presence_session_revisions_v43 VALUES(?,?,0,?)")
     .run(fixture.campaignId, fixture.sessionId, AT);
@@ -210,4 +234,58 @@ export function buildCanonicalV43Fixture(): SupportWindowFixture {
   db.prepare("UPDATE meta SET value='43' WHERE key='schemaVersion'").run();
   db.close();
   return fixture;
+}
+
+/** Builds canonical populated v44 companion history, including a durable-principal grant. */
+export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44CompanionFixture {
+  const fixture = buildCanonicalV43Fixture();
+  let id = 0;
+  const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `support-companion-${++id}` } });
+  const grantorPrincipalId = "support-companion-gm";
+  const granteePrincipalId = "support-companion-player";
+  const db = new DatabaseDriver(databaseFile());
+  db.prepare("INSERT INTO principals VALUES(?,?,0)").run(grantorPrincipalId, "Companion GM");
+  db.prepare("INSERT INTO principals VALUES(?,?,0)").run(granteePrincipalId, "Companion Player");
+  db.close();
+  repo.addCampaignMembership("local-owner", fixture.campaignId, { principalId: grantorPrincipalId, role: "gm" });
+  repo.addCampaignMembership("local-owner", fixture.campaignId, { principalId: granteePrincipalId, role: "player" });
+  repo.installOriginalStarterContent("local-owner", fixture.campaignId);
+  repo.configureOriginalStarterContent("local-owner", fixture.campaignId);
+  const persona = repo.createCharacter({ name: "Companion Actor", age: 30, archetype: "warden", boundaries: "", fictionalConfirmed: true });
+  const actorId = repo.createOriginalStarterCampaignCharacter("local-owner", {
+    campaignId: fixture.campaignId, characterId: persona.id, controllerPrincipalId: "local-owner",
+    race: ORIGINAL_STARTER_RACE.reference, background: ORIGINAL_STARTER_BACKGROUND.reference,
+    classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }], attributes: [], proficiencies: [], choices: [],
+  }).projection.actor.id;
+  repo.createCompanion(grantorPrincipalId, fixture.campaignId, {
+    sessionId: fixture.sessionId, npcId: fixture.npcId, expectedRevision: 0, idempotencyKey: "support-companion-create",
+  });
+  const grant = repo.createCompanionGrant(grantorPrincipalId, fixture.campaignId, {
+    npcId: fixture.npcId, granteePrincipalId, allowedCommandFamilies: ["rest", "travel"],
+    actorScope: { kind: "campaign-actor", actorId }, resourceScope: { kind: "actor-resources" },
+    maxSpend: null, maxUses: null, startsAt: AT, expiresAt: "2035-01-02T00:00:00.000Z",
+    confirmationPolicy: "always", expectedRevision: 1, idempotencyKey: "support-grant-create",
+  });
+  const grantId = (grant.outcome as { grantId: string }).grantId;
+  repo.close();
+
+  const downgrade = new DatabaseDriver(databaseFile());
+  downgrade.pragma("foreign_keys=OFF");
+  downgrade.transaction(() => {
+    createCompanionCoreV44(downgrade);
+    for (const table of V44_TABLES.filter((name) => name !== "companion_layout_attestation_v44")) {
+      downgrade.exec(`INSERT INTO ${table} SELECT * FROM ${table.replace(/_v44$/, "_v45")}`);
+    }
+    for (const [type, name] of [...COMPANION_CORE_V45_MANAGED_OBJECTS].reverse()) {
+      if (type === "trigger") downgrade.exec(`DROP TRIGGER ${name}`);
+      if (type === "index") downgrade.exec(`DROP INDEX ${name}`);
+    }
+    for (const [, name] of [...COMPANION_CORE_V45_MANAGED_OBJECTS].filter(([type]) => type === "table").reverse()) {
+      downgrade.exec(`DROP TABLE ${name}`);
+    }
+    downgrade.prepare("UPDATE meta SET value='44' WHERE key='schemaVersion'").run();
+  })();
+  downgrade.pragma("foreign_keys=ON");
+  downgrade.close();
+  return { ...fixture, actorId, grantId, grantorPrincipalId, granteePrincipalId };
 }

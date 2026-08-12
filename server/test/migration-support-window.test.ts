@@ -4,27 +4,27 @@ import { describe, expect, it } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import { makeTmpDir, useTmpDataDir } from "./helpers.js";
 import {
-  buildCanonicalV42Fixture,
   buildCanonicalV43Fixture,
+  buildCanonicalPopulatedV44CompanionFixture,
   SUPPORT_WINDOW,
 } from "./fixtures/migrations/support-window.js";
 
 useTmpDataDir();
 
 const file = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
-const v44Tables = [
-  "campaign_companions_v44",
-  "companion_audit_events_v44",
-  "companion_commands_v44",
-  "companion_decision_receipts_v44",
-  "companion_decisions_v44",
-  "companion_grant_command_families_v44",
-  "companion_grant_revocations_v44",
-  "companion_grants_v44",
-  "companion_layout_attestation_v44",
-  "companion_presence_links_v44",
-  "companion_proposals_v44",
-  "companion_receipts_v44",
+const v45Tables = [
+  "campaign_companions_v45",
+  "companion_audit_events_v45",
+  "companion_commands_v45",
+  "companion_decision_receipts_v45",
+  "companion_decisions_v45",
+  "companion_grant_command_families_v45",
+  "companion_grant_revocations_v45",
+  "companion_grants_v45",
+  "companion_layout_attestation_v45",
+  "companion_presence_links_v45",
+  "companion_proposals_v45",
+  "companion_receipts_v45",
 ];
 
 function schema(databaseFile: string): unknown[] {
@@ -34,35 +34,17 @@ function schema(databaseFile: string): unknown[] {
   return rows;
 }
 
-function verifyV44(db: DatabaseDriver.Database): void {
-  expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "44" });
-  expect((db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB '*v44*' ORDER BY name").all() as Array<{ name: string }>).map(({ name }) => name)).toEqual(v44Tables);
-  for (const table of v44Tables.filter((table) => table !== "companion_layout_attestation_v44")) {
+function verifyV45(db: DatabaseDriver.Database): void {
+  expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "45" });
+  expect((db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name GLOB '*v45*' ORDER BY name").all() as Array<{ name: string }>).map(({ name }) => name)).toEqual(v45Tables);
+  for (const table of v45Tables.filter((table) => table !== "companion_layout_attestation_v45")) {
     expect(db.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({ count: 0 });
   }
   expect(db.pragma("foreign_key_check")).toEqual([]);
 }
 
-describe("supported v42/v43 startup upgrades", () => {
-  it("upgrades a genuine populated v42 fixture to v44 without changing its audit rows", () => {
-    const { campaignId, draftId } = buildCanonicalV42Fixture();
-    createRepository().close();
-
-    const db = new DatabaseDriver(file(), { readonly: true });
-    expect(db.prepare("SELECT command_id,campaign_id,draft_id,expected_campaign_revision FROM campaign_content_commands_v42").get()).toEqual({
-      command_id: "support-window-content-command", campaign_id: campaignId, draft_id: draftId, expected_campaign_revision: 0,
-    });
-    expect(db.prepare("SELECT receipt_id,command_id,campaign_id,draft_id FROM campaign_content_receipts_v42").get()).toEqual({
-      receipt_id: "support-window-content-receipt", command_id: "support-window-content-command", campaign_id: campaignId, draft_id: draftId,
-    });
-    expect(db.prepare("SELECT campaign_id,revision,source_draft_id FROM campaign_content_revisions_v42").get()).toEqual({
-      campaign_id: campaignId, revision: 1, source_draft_id: draftId,
-    });
-    verifyV44(db);
-    db.close();
-  });
-
-  it("upgrades genuine populated v43 presence to v44 unchanged", () => {
+describe("supported v43/v44 startup upgrades", () => {
+  it("upgrades genuine populated v43 presence to v45 unchanged", () => {
     const fixture = buildCanonicalV43Fixture();
     createRepository().close();
     const db = new DatabaseDriver(file(), { readonly: true });
@@ -71,46 +53,17 @@ describe("supported v42/v43 startup upgrades", () => {
     });
     expect(db.prepare("SELECT command_id,resulting_revision FROM npc_presence_commands_v43").get())
       .toEqual({ command_id: "support-window-presence-command", resulting_revision: 1 });
-    verifyV44(db);
+    verifyV45(db);
     db.close();
   });
 
-  it("matches fresh v44 schema after a populated v42 migration", () => {
-    buildCanonicalV42Fixture();
-    createRepository().close();
-    const migrated = schema(file());
-    const freshDir = makeTmpDir("velvet-fresh-v44-from-v42-");
-    createRepository({ dataDir: freshDir }).close();
-    expect(migrated).toEqual(schema(path.join(freshDir, "velvet.sqlite")));
-  });
-
-  it("matches fresh v44 schema after a populated v43 migration", () => {
+  it("matches fresh v45 schema after a populated v43 migration", () => {
     buildCanonicalV43Fixture();
     createRepository().close();
     const migrated = schema(file());
-    const freshDir = makeTmpDir("velvet-fresh-v44-from-v43-");
+    const freshDir = makeTmpDir("velvet-fresh-v45-from-v43-");
     createRepository({ dataDir: freshDir }).close();
     expect(migrated).toEqual(schema(path.join(freshDir, "velvet.sqlite")));
-  });
-
-  it("rejects persisted v42 foreign-key corruption before changing marker or artifacts", () => {
-    const { campaignId } = buildCanonicalV42Fixture();
-    const db = new DatabaseDriver(file());
-    db.pragma("foreign_keys=OFF");
-    db.prepare(`INSERT INTO campaign_content_commands_v42
-      VALUES('corrupt-v42-command',?,'missing-draft','principal','corrupt-v42-key',0,?)`)
-      .run(campaignId, SUPPORT_WINDOW.at);
-    db.close();
-
-    expect(() => createRepository()).toThrow("schema marker 42 contains foreign-key violation in campaign_content_commands_v42");
-    const verify = new DatabaseDriver(file(), { readonly: true });
-    expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
-    expect(verify.prepare("SELECT draft_id FROM campaign_content_commands_v42 WHERE command_id='corrupt-v42-command'").get())
-      .toEqual({ draft_id: "missing-draft" });
-    expect(verify.prepare("SELECT name FROM sqlite_master WHERE name='campaign_content_commands_v42_immutable_update_v42'").get())
-      .toEqual({ name: "campaign_content_commands_v42_immutable_update_v42" });
-    expect(verify.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v44*'").all()).toEqual([]);
-    verify.close();
   });
 
   it("rejects persisted v43 foreign-key corruption before changing marker or artifacts", () => {
@@ -124,27 +77,59 @@ describe("supported v42/v43 startup upgrades", () => {
     expect(() => createRepository()).toThrow("schema marker 43 contains foreign-key violation in npc_presence_session_revisions_v43");
     const verify = new DatabaseDriver(file(), { readonly: true });
     expect(verify.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "43" });
-    expect(verify.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v44*'").all()).toEqual([]);
+    expect(verify.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v45*'").all()).toEqual([]);
     verify.close();
   });
 
-  it("rolls back v44 artifacts on marker failure and retries", () => {
+  it("rolls back v45 artifacts on marker failure and retries", () => {
     const { campaignId } = buildCanonicalV43Fixture();
     let db = new DatabaseDriver(file());
-    db.exec("CREATE TRIGGER reject_schema_marker BEFORE UPDATE OF value ON meta WHEN NEW.value='44' BEGIN SELECT RAISE(ABORT,'reject v44 marker'); END;");
+    db.exec("CREATE TRIGGER reject_schema_marker BEFORE UPDATE OF value ON meta WHEN NEW.value='45' BEGIN SELECT RAISE(ABORT,'reject v45 marker'); END;");
     db.close();
 
-    expect(() => createRepository()).toThrow("reject v44 marker");
+    expect(() => createRepository()).toThrow("reject v45 marker");
     db = new DatabaseDriver(file());
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "43" });
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v44*'").all()).toEqual([]);
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "44" });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v45*'").all()).toEqual([]);
     expect(db.prepare("SELECT campaign_id FROM npc_presence_commands_v43").get()).toEqual({ campaign_id: campaignId });
     db.exec("DROP TRIGGER reject_schema_marker");
     db.close();
 
     createRepository().close();
     db = new DatabaseDriver(file(), { readonly: true });
-    verifyV44(db);
+    verifyV45(db);
     db.close();
+  });
+
+  it("migrates populated v44 principal history and permits membership removal", () => {
+    const fixture = buildCanonicalPopulatedV44CompanionFixture();
+    const before = new DatabaseDriver(file(), { readonly: true });
+    const v44Rows = Object.fromEntries(v45Tables.filter((table) => table !== "companion_layout_attestation_v45")
+      .map((table) => [table, before.prepare(`SELECT * FROM ${table.replace(/_v45$/, "_v44")} ORDER BY rowid`).all()]));
+    before.close();
+    createRepository().close();
+    const db = new DatabaseDriver(file());
+    db.pragma("foreign_keys=ON");
+    for (const table of v45Tables.filter((name) => name !== "companion_layout_attestation_v45")) {
+      expect(db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()).toEqual(v44Rows[table]);
+    }
+    expect(db.prepare("SELECT count(*) count FROM companion_commands_v45").get()).toEqual({ count: 2 });
+    expect(db.prepare("SELECT granted_by_principal_id,grantee_principal_id FROM companion_grants_v45").get()).toEqual({
+      granted_by_principal_id: fixture.grantorPrincipalId, grantee_principal_id: fixture.granteePrincipalId,
+    });
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name GLOB '*v44*'").all()).toEqual([]);
+    db.prepare("DELETE FROM campaign_memberships WHERE campaign_id=? AND principal_id IN (?,?)")
+      .run(fixture.campaignId, fixture.grantorPrincipalId, fixture.granteePrincipalId);
+    expect(db.pragma("foreign_key_check")).toEqual([]);
+    db.close();
+    const freshDir = makeTmpDir("velvet-fresh-v45-from-populated-v44-");
+    createRepository({ dataDir: freshDir }).close();
+    expect(schema(file())).toEqual(schema(path.join(freshDir, "velvet.sqlite")));
+    const repo = createRepository();
+    expect(repo.getCompanionManagement("local-owner", fixture.campaignId, fixture.npcId)?.grants[0]).toMatchObject({
+      grantId: fixture.grantId, grantedByPrincipalId: fixture.grantorPrincipalId,
+      granteePrincipalId: fixture.granteePrincipalId,
+    });
+    repo.close();
   });
 });
