@@ -6,6 +6,7 @@ import { ActorResourceConflictError, ActorResourceStaleError, EncounterConflictE
   M16StaleError, PowerUnavailableError, createRepository, createSession } from "../src/repo/index.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "../src/repo/encounter/combatCompositionPlan.js";
 import { executeCombatCompositionPlan, type CombatCompositionBoundary } from "../src/repo/encounter/combatCompositionExecutor.js";
+import { executeUseConsumable, type UseConsumableBoundary } from "../src/repo/encounter/useConsumableRuntime.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -69,6 +70,88 @@ function durableState(db: DatabaseDriver.Database, campaignId: string, actorId: 
     m16Root: db.prepare("SELECT revision,updated_at FROM rpg_m16_mutation_revisions_v26 WHERE campaign_id=? AND actor_id=?").get(campaignId, actorId),
     combatRoot: db.prepare("SELECT revision,updated_at FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId),
   };
+}
+
+function consumableRollbackState(db: DatabaseDriver.Database, campaignId: string, actorId: string, encounterId: string) {
+  return {
+    inventory: db.prepare("SELECT * FROM rpg_inventory_entries_v25 WHERE entry_id='rollback-tonic' ORDER BY entry_id").all(),
+    resources: db.prepare("SELECT * FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name")
+      .all(campaignId, actorId),
+    m15Roots: db.prepare("SELECT * FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=? AND actor_id=?")
+      .all(campaignId, actorId),
+    m15Commands: db.prepare("SELECT * FROM rpg_m15_commands_v25 WHERE campaign_id=? AND actor_id=? ORDER BY command_id")
+      .all(campaignId, actorId),
+    m15Receipts: db.prepare("SELECT * FROM rpg_m15_receipts_v25 WHERE campaign_id=? AND actor_id=? ORDER BY command_id")
+      .all(campaignId, actorId),
+    m15ChangedKeys: db.prepare(`SELECT * FROM rpg_m15_receipt_changed_keys_v25
+      WHERE campaign_id=? AND actor_id=? ORDER BY command_id,changed_key`).all(campaignId, actorId),
+    effects: db.prepare("SELECT * FROM rpg_active_effects_v26 WHERE campaign_id=? AND actor_id=? ORDER BY effect_id")
+      .all(campaignId, actorId),
+    m16Roots: db.prepare("SELECT * FROM rpg_m16_mutation_revisions_v26 WHERE campaign_id=? AND actor_id=?")
+      .all(campaignId, actorId),
+    m16Commands: db.prepare("SELECT * FROM rpg_m16_commands_v26 WHERE campaign_id=? AND actor_id=? ORDER BY command_id")
+      .all(campaignId, actorId),
+    m16Receipts: db.prepare("SELECT * FROM rpg_m16_receipts_v26 WHERE campaign_id=? AND actor_id=? ORDER BY command_id")
+      .all(campaignId, actorId),
+    m16Events: db.prepare("SELECT * FROM rpg_m16_events_v26 WHERE campaign_id=? AND actor_id=? ORDER BY event_id")
+      .all(campaignId, actorId),
+    effectLifecycle: db.prepare(`SELECT * FROM rpg_effect_lifecycle_events_v26
+      WHERE campaign_id=? AND actor_id=? ORDER BY lifecycle_event_id`).all(campaignId, actorId),
+    combatants: db.prepare("SELECT * FROM combatant WHERE encounter_id=? ORDER BY combatant_id").all(encounterId),
+    encounter: db.prepare("SELECT * FROM encounter WHERE encounter_id=?").get(encounterId),
+    combatRoot: db.prepare("SELECT * FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId),
+    combatLogs: db.prepare("SELECT * FROM combat_log WHERE encounter_id=? ORDER BY log_id").all(encounterId),
+    combatEvents: db.prepare("SELECT * FROM combat_events_v27 WHERE encounter_id=? ORDER BY event_id").all(encounterId),
+    combatCommands: db.prepare("SELECT * FROM combat_commands_v27 WHERE encounter_id=? ORDER BY command_id").all(encounterId),
+    combatReceipts: db.prepare("SELECT * FROM combat_receipts_v27 WHERE encounter_id=? ORDER BY command_id").all(encounterId),
+  };
+}
+
+async function consumableRollbackFixture() {
+  const f = await fixture(2);
+  const actor = f.combat.combatants.find((value) => value.kind === "actor")!;
+  let combat = f.repo.resolveCombatAction("local-owner", f.combat.combatId, { legalActionId: "end-turn", targetIds: [],
+    choices: [], expectedRevision: f.combat.revision, idempotencyKey: "rollback-actor-end" }).combat;
+  combat = f.repo.resolveCombatAction("local-owner", combat.combatId, { legalActionId: "attack:basic",
+    targetIds: [actor.combatantId], choices: [], expectedRevision: combat.revision,
+    idempotencyKey: "rollback-enemy-attack" }).combat;
+  const db = new DatabaseDriver(f.filename);
+  const enemy = combat.combatants.find((value) => value.kind === "enemy")!;
+  db.exec("DROP TRIGGER combatant_state_guard_v27");
+  db.prepare("UPDATE combatant SET initiative=0 WHERE combatant_id=?").run(actor.combatantId);
+  db.prepare("UPDATE combatant SET initiative=1 WHERE combatant_id=?").run(enemy.combatantId);
+  db.exec(`CREATE TRIGGER combatant_state_guard_v27 BEFORE UPDATE ON combatant WHEN NEW.combatant_id<>OLD.combatant_id OR NEW.encounter_id<>OLD.encounter_id OR NEW.campaign_id<>OLD.campaign_id OR NEW.combatant_kind<>OLD.combatant_kind OR NEW.team<>OLD.team OR NOT (NEW.actor_id IS OLD.actor_id) OR NOT (NEW.enemy_pack_id IS OLD.enemy_pack_id) OR NOT (NEW.enemy_pack_version IS OLD.enemy_pack_version) OR NOT (NEW.enemy_kind IS OLD.enemy_kind) OR NOT (NEW.enemy_definition_id IS OLD.enemy_definition_id) OR NEW.enemy_tactic<>OLD.enemy_tactic OR NEW.initiative<>OLD.initiative OR NEW.initiative_tiebreaker<>OLD.initiative_tiebreaker OR NEW.maximum_hit_points<>OLD.maximum_hit_points OR NEW.state_revision<>OLD.state_revision+1 OR NEW.updated_at<OLD.updated_at OR NOT EXISTS(SELECT 1 FROM combat_log l JOIN combat_events_v27 e ON e.event_id=l.event_id WHERE l.encounter_id=OLD.encounter_id AND l.combatant_id=OLD.combatant_id AND e.event_type='combatant_state_changed' AND e.occurred_at=NEW.updated_at) BEGIN SELECT RAISE(ABORT,'combatant state requires immutable combat event'); END`);
+  const item = f.definitions.find((value) => value.reference.kind === "item")!.reference;
+  db.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25
+    (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,'item',?)`)
+    .run(f.campaignId, item.packId, item.packVersion, item.definitionId);
+  db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,
+    item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+    VALUES('rollback-tonic',?,?,?,?,'item',?,'stackable',2,NULL,NULL,0,?)`)
+    .run(f.campaignId, f.actorId, item.packId, item.packVersion, item.definitionId, at);
+  const definition = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions
+    WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+    .get(item.packId, item.packVersion, item.definitionId) as { definition_json: string };
+  const tonic = JSON.parse(definition.definition_json);
+  tonic.mechanics = { ...tonic.mechanics, category: "consumable", stackable: true, slot: null,
+    effects: [{ type: "healing", dice: { count: 1, sides: 4, modifier: 0 } }] };
+  db.exec("DROP TRIGGER rpg_catalog_definitions_immutable_update");
+  db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=?
+    WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+    .run(JSON.stringify(tonic), JSON.stringify(tonic), item.packId, item.packVersion, item.definitionId);
+  db.close();
+  const action = f.repo.getUseConsumableLegalActions("local-owner", combat.combatId)
+    .find((value) => value.inventoryEntryId === "rollback-tonic" && value.target.relation === "self")!;
+  const command = { legalActionId: action.legalActionId, inventoryEntryId: action.inventoryEntryId, item: action.item,
+    quantity: 1 as const, targetCombatantId: action.target.combatantId, targetActorBacked: true,
+    expectedCombatRevision: combat.revision, expectedActingM15Revision: 1, expectedTargetM15Revision: 1,
+    idempotencyKey: "rollback-tonic-command" };
+  const publicState = { combat: f.repo.getCombatState("local-owner", combat.combatId),
+    effects: f.repo.listActiveEffects("local-owner", f.campaignId, f.actorId),
+    resources: f.repo.getActorResourceSnapshot("local-owner", f.campaignId, f.actorId) };
+  f.repo.close();
+  return { ...f, command, publicState, deps: { clock: { now: () => new Date(at) }, ids: f.ids,
+    rng: { integer: (minimum: number) => minimum } } };
 }
 
 describe("M5.3 Slice 0 combat composition", () => {
@@ -156,6 +239,29 @@ describe("M5.3 Slice 0 combat composition", () => {
     expect(reopened.getUseConsumableCommandResult("local-owner",commandId)).toEqual(result);
     reopened.close();
   });
+
+  it.each<UseConsumableBoundary>(["inventory", "m15", "effects", "combatant", "combat", "log", "receipt"])(
+    "rolls back every durable consumable write after the %s boundary",
+    async (boundary) => {
+      const f = await consumableRollbackFixture();
+      const db = new DatabaseDriver(f.filename);
+      const before = consumableRollbackState(db, f.campaignId, f.actorId, f.combat.combatId);
+      expect(() => executeUseConsumable(db, f.deps, "local-owner", f.command, (value) => {
+        if (value === boundary) throw new Error(`failpoint:${boundary}`);
+      })).toThrow(`failpoint:${boundary}`);
+      expect(consumableRollbackState(db, f.campaignId, f.actorId, f.combat.combatId)).toEqual(before);
+      db.close();
+
+      const reopened = createRepository({ dataDir: path.dirname(f.filename) });
+      expect({ combat: reopened.getCombatState("local-owner", f.combat.combatId),
+        effects: reopened.listActiveEffects("local-owner", f.campaignId, f.actorId),
+        resources: reopened.getActorResourceSnapshot("local-owner", f.campaignId, f.actorId) }).toEqual(f.publicState);
+      reopened.close();
+      const verify = new DatabaseDriver(f.filename, { readonly: true });
+      expect(consumableRollbackState(verify, f.campaignId, f.actorId, f.combat.combatId)).toEqual(before);
+      verify.close();
+    },
+  );
 
   it("requires transaction-owned sealed plans and rolls back representative composition boundaries", async () => {
     const f = await fixture();
