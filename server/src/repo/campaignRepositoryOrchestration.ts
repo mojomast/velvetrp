@@ -85,6 +85,7 @@ import { createCompanionRepository } from "./companionRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
+import { createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import {
   CampaignDiceCharacterConflict,
@@ -749,6 +750,9 @@ function createRepositoryComposition<T>(
     executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
     resolveCombatAction:(principal,encounterId,input)=>encounterRepository.resolveCombatAction(principal,encounterId,input),
   });
+  const exactCandidateRepository=createExactCandidateRepository(db,dependencies,()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("exact candidate operation cannot run inside a repository transaction");
+  });
   const repository: Repository = {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -767,6 +771,7 @@ function createRepositoryComposition<T>(
     ...questRepository,
     ...storyRepository,
     ...adventureTurnRepository,
+    ...exactCandidateRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
       const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;

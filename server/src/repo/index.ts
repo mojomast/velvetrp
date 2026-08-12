@@ -71,6 +71,7 @@ export {
   type StoryMutationResult, type StoryRepository,
 } from "./storyRepo.js";
 export * from "./adventureTurnRepo.js";
+export * from "./candidateRepo/index.js";
 export {
   createCharacter,
   deleteCharacter,
