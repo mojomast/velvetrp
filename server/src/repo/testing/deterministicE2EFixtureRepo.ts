@@ -209,8 +209,7 @@ export function createDeterministicE2EFixturesForOwnedRepository(
         catch { throw new DeterministicE2EFixtureConflictError("deterministic consumable definition is invalid"); }
         const plan = deriveUseConsumableEffectPlan(parsed, item);
         if (parsed.mechanics.category !== "consumable" || !parsed.mechanics.stackable || parsed.mechanics.slot !== null
-            || plan === null || !plan.effects.some(({ effect }) => effect.kind === "healing")
-            || plan.effects.some(({ effect }) => effect.kind === "modifier")) {
+            || plan === null || !plan.effects.some(({ effect }) => effect.kind === "healing")) {
           conflict("deterministic item is not a supported healing consumable");
         }
         const existing = db.prepare(`SELECT entry_id entryId,campaign_id campaignId,actor_id actorId,item_pack_id packId,

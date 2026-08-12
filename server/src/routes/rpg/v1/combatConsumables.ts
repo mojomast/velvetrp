@@ -40,7 +40,6 @@ export const combatConsumablesHttpRoutes:FastifyPluginAsync<CombatConsumablesHtt
     try{
       const actions=options.consumableRepositoryAccessor().getUseConsumableLegalActions(LOCAL_OWNER,combatId.data)
         .map((action)=>useConsumableLegalActionSchema.parse(action));
-      if(actions.some((action)=>action.effectPlan.effects.some(({effect})=>effect.kind==="modifier")))throw new Error("unsupported consumable action escaped projection");
       return reply.code(200).send(actions);
     }catch(error){
       if(error instanceof EncounterAuthorizationError||error instanceof EncounterUnavailableError)return notFound(request,reply);
@@ -96,7 +95,7 @@ export const combatConsumablesHttpRoutes:FastifyPluginAsync<CombatConsumablesHtt
       if(!action)return notFound(request,reply);
       if(action.inventoryEntryId!==body.data.inventoryEntryId||!sameItem(action.item,body.data.item)
         ||action.quantity!==body.data.quantity||action.target.combatantId!==body.data.targetCombatantId
-        ||action.target.actorBacked!==body.data.targetActorBacked||action.effectPlan.effects.some(({effect})=>effect.kind==="modifier"))
+        ||action.target.actorBacked!==body.data.targetActorBacked)
         throw new EncounterConflictError("request differs from the server-derived consumable action");
       const result=useConsumableCommandResultSchema.parse(repository.useConsumable(LOCAL_OWNER,body.data));
       if(!exactRequest(result.requestBinding.requestEvidence,body.data))throw new Error("consumable command result binding is invalid");

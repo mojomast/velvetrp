@@ -16,6 +16,7 @@ import {
   deriveUseConsumableEffectPlan,
   useConsumableCommandRequestSchema,
   useConsumableCommandResultSchema,
+  useConsumableEffectDescriptorSchema,
   useConsumableLegalActionSchema,
   useConsumableResolutionSchema,
   useConsumableSettlementSchema,
@@ -113,14 +114,10 @@ describe("encounter HTTP contracts",()=>{
       {effectOrdinal:1,effect:{kind:"resource",resource:"guard",amount:-2}},
     ]};
 
-    it("freezes eligibility and target policy without rejecting no-ops or mixed effects",()=>{
+    it("freezes eligibility and target policy while rejecting every modifier consumable",()=>{
       expect(evaluateUseConsumableEligibility(item([{type:"damage",damageType:"fire",dice:{count:1,sides:6,modifier:0}}]) as never))
         .toEqual({eligible:true,targetPolicy:"damage-only-enemy"});
-      expect(evaluateUseConsumableEligibility(item([{type:"healing",dice:{count:1,sides:6,modifier:0}},
-        {type:"resource",resource:"guard",amount:2},{type:"modifier",statistic:"defense",amount:1,duration:"instant"}]) as never))
-        .toEqual({eligible:true,targetPolicy:"beneficial-only-self-or-ally"});
-      expect(evaluateUseConsumableEligibility(item([{type:"resource",resource:"focus",amount:0},
-        {type:"modifier",statistic:"defense",amount:0,duration:"instant"}]) as never))
+      expect(evaluateUseConsumableEligibility(item([{type:"resource",resource:"focus",amount:0}]) as never))
         .toEqual({eligible:true,targetPolicy:"beneficial-only-self-or-ally"});
       expect(evaluateUseConsumableEligibility(item([{type:"damage",damageType:"fire",dice:{count:1,sides:6,modifier:0}},
         {type:"resource",resource:"focus",amount:0}]) as never))
@@ -142,6 +139,19 @@ describe("encounter HTTP contracts",()=>{
       expect(evaluateUseConsumableEligibility(rejected[3] as never)).toEqual({
         eligible:false,reasons:["spell-slot-level-identity-unavailable"],
       });
+
+      const statistics=["check","attack","defense","damage","healing","speed","max-hp","save-dc"] as const;
+      for(const statistic of statistics)for(const effects of [
+        [{type:"modifier",statistic,amount:1,duration:"instant"}],
+        [{type:"healing",dice:{count:1,sides:6,modifier:0}},{type:"modifier",statistic,amount:1,duration:"instant"}],
+        [{type:"modifier",statistic,amount:0,duration:"instant"}],
+      ]){
+        const candidate=item(effects);
+        expect(evaluateUseConsumableEligibility(candidate as never)).toEqual({
+          eligible:false,reasons:["instant-modifier-semantics-unavailable"],
+        });
+        expect(deriveUseConsumableEffectPlan(candidate,itemReference)).toBeNull();
+      }
     });
 
     it("derives and verifies an exact immutable plan from pinned catalog mechanics",()=>{
@@ -152,6 +162,7 @@ describe("encounter HTTP contracts",()=>{
       expect(verifyUseConsumableEffectPlan(catalogItem,itemReference,{...effectPlan,effects:[...effectPlan.effects].reverse()})).toBe(false);
       expect(verifyUseConsumableEffectPlan(catalogItem,itemReference,{...effectPlan,effects:[effectPlan.effects[0]]})).toBe(false);
       expect(verifyUseConsumableEffectPlan({},itemReference,effectPlan)).toBe(false);
+      expect(useConsumableEffectDescriptorSchema.safeParse({kind:"modifier",statistic:"check",amount:1,duration:"instant"}).success).toBe(false);
 
       const action={legalActionId:"consume:tonic:enemy",kind:"use-consumable",actingCombatantId:"actor-combatant",
         inventoryEntryId:"entry-1",item:itemReference,quantity:1,actionCost:"action",targetPolicy:"damage-only-enemy",
@@ -213,9 +224,10 @@ describe("encounter HTTP contracts",()=>{
       const health={kind:"combat-hp-resource",effectOrdinal:0,resource:"health",requested:3,applied:2,before:1,after:3};
       const guard={kind:"actor-resource-delta",effectOrdinal:0,resource:"guard",requested:3,applied:2};
       const modifier={kind:"instant-modifier",effectOrdinal:0,statistic:"defense",requested:0,applied:0,duration:"instant"};
-      for(const settlement of [healing,health,guard,modifier])expect(useConsumableSettlementSchema.safeParse(settlement).success).toBe(true);
+      for(const settlement of [healing,health,guard])expect(useConsumableSettlementSchema.safeParse(settlement).success).toBe(true);
+      expect(useConsumableSettlementSchema.safeParse(modifier).success).toBe(false);
       for(const invalid of [{...healing,requested:3},{...health,resource:"guard"},{...guard,before:1},
-        {...guard,after:3},{...guard,resource:"spell-slot"},{...modifier,duration:"round"},{...guard,applied:4}])
+        {...guard,after:3},{...guard,resource:"spell-slot"},{...guard,applied:4}])
         expect(useConsumableSettlementSchema.safeParse(invalid).success).toBe(false);
     });
 

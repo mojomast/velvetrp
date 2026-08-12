@@ -232,7 +232,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
   }
 
   async function submitConsumable(action:UseConsumableLegalAction){
-    if(!combat||marker||consumableMarker||action.quantity!==1||action.actionCost!=="action"||action.effectPlan.effects.some(({effect})=>effect.kind==="modifier"))return;
+    if(!combat||marker||consumableMarker||action.quantity!==1||action.actionCost!=="action")return;
     const acting=combat.combatants.find((entry)=>entry.combatantId===action.actingCombatantId),target=combat.combatants.find((entry)=>entry.combatantId===action.target.combatantId);
     if(acting?.kind!=="actor"||!target||action.target.actorBacked!==(target.kind==="actor"))return;
     setConsumableStatus("Reading authoritative actor revisions before one committed submission.");

@@ -1653,8 +1653,6 @@ export async function getCombatConsumableActions(combatId:string):Promise<UseCon
   const success=await requestResponse<unknown>(`${target.path}/consumable-actions`,{cache:"no-store"});
   requireStatus(success,200,"Combat consumable actions");
   const actions=useConsumableLegalActionSchema.array().parse(success.body);
-  if(actions.some((action)=>action.effectPlan.effects.some(({effect})=>effect.kind==="modifier")))
-    throw new Error("Combat consumable actions included an unsupported effect");
   return actions;
 }
 

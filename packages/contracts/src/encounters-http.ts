@@ -331,6 +331,7 @@ export const useConsumableEligibilityReasonSchema = z.enum([
   "no-effects",
   "unsupported-effect",
   "spell-slot-level-identity-unavailable",
+  "instant-modifier-semantics-unavailable",
   "noninstant-modifier",
 ]);
 export const useConsumableEligibilitySchema = z.discriminatedUnion("eligible", [
@@ -369,9 +370,9 @@ export const evaluateUseConsumableEligibility = (item: UseConsumableCatalogItem)
       else if (effect.amount === 0) hasNeutralEffect = true;
       else polarities.add(effect.amount < 0 ? "hostile" : "beneficial");
     } else if (effect.type === "modifier") {
-      if (effect.duration !== "instant") reasons.add("noninstant-modifier");
-      if (effect.amount === 0) hasNeutralEffect = true;
-      else polarities.add(effect.amount < 0 ? "hostile" : "beneficial");
+      reasons.add(effect.duration === "instant"
+        ? "instant-modifier-semantics-unavailable"
+        : "noninstant-modifier");
     } else {
       reasons.add("unsupported-effect");
     }
@@ -402,7 +403,6 @@ export const useConsumableEffectDescriptorSchema = z.discriminatedUnion("kind", 
   z.object({ kind: z.literal("damage"), damageType: damageTypeSchema, dice: useConsumableCatalogDiceSchema }).strict(),
   z.object({ kind: z.literal("healing"), dice: useConsumableCatalogDiceSchema.extend({ modifier: z.number().int().min(0).max(100) }).strict() }).strict(),
   z.object({ kind: z.literal("resource"), resource: z.enum(["health", "guard", "focus"]), amount: z.number().int().min(-1_000_000).max(1_000_000) }).strict(),
-  z.object({ kind: z.literal("modifier"), statistic: z.enum(["check", "attack", "defense", "damage", "healing", "speed", "max-hp", "save-dc"]), amount: z.number().int().min(-1_000_000).max(1_000_000), duration: z.literal("instant") }).strict(),
 ]);
 export const useConsumablePlannedEffectSchema = z.object({
   effectOrdinal: z.number().int().min(0).max(15),
@@ -435,9 +435,6 @@ export const deriveUseConsumableEffectPlan = (
     if (effect.type === "healing") return { effectOrdinal, effect: { kind: "healing" as const, dice: effect.dice } };
     if (effect.type === "resource" && effect.resource !== "spell-slot") {
       return { effectOrdinal, effect: { kind: "resource" as const, resource: effect.resource, amount: effect.amount } };
-    }
-    if (effect.type === "modifier" && effect.duration === "instant") {
-      return { effectOrdinal, effect: { kind: "modifier" as const, statistic: effect.statistic, amount: effect.amount, duration: effect.duration } };
     }
     return null;
   });
@@ -502,10 +499,6 @@ export const useConsumableCommandRequestSchema = z.object({
 const useConsumableAmountSchema = z.number().int().min(-1_000_000).max(1_000_000);
 const useConsumableCountSchema = z.number().int().min(0).max(1_000_000);
 const useConsumableEffectOrdinalSchema = z.number().int().min(0).max(15);
-const useConsumableModifierStatisticSchema = z.enum([
-  "check", "attack", "defense", "damage", "healing", "speed", "max-hp", "save-dc",
-]);
-
 export const useConsumableSettlementSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("combat-hp-damage"),
@@ -568,19 +561,6 @@ export const useConsumableSettlementSchema = z.discriminatedUnion("kind", [
     if (Math.abs(settlement.applied) > Math.abs(settlement.requested)
         || (settlement.applied !== 0 && Math.sign(settlement.applied) !== Math.sign(settlement.requested))) {
       context.addIssue({ code: "custom", message: "actor resource delta must be bounded by the requested amount", path: ["applied"] });
-    }
-  }),
-  z.object({
-    kind: z.literal("instant-modifier"),
-    effectOrdinal: useConsumableEffectOrdinalSchema,
-    statistic: useConsumableModifierStatisticSchema,
-    requested: useConsumableAmountSchema,
-    applied: useConsumableAmountSchema,
-    duration: z.literal("instant"),
-  }).strict().superRefine((settlement, context) => {
-    if (Math.abs(settlement.applied) > Math.abs(settlement.requested)
-        || (settlement.applied !== 0 && Math.sign(settlement.applied) !== Math.sign(settlement.requested))) {
-      context.addIssue({ code: "custom", message: "modifier settlement must be bounded by the requested amount", path: ["applied"] });
     }
   }),
 ]);
@@ -649,10 +629,8 @@ export const useConsumableResolutionSchema = z.object({
         ? rollMatches(descriptor.dice, settlement.roll)
         : descriptor?.kind === "resource" && descriptor.resource === "health" && settlement.kind === "combat-hp-resource"
           ? settlement.resource === descriptor.resource && settlement.requested === descriptor.amount
-          : descriptor?.kind === "resource" && descriptor.resource !== "health" && settlement.kind === "actor-resource-delta"
-            ? settlement.resource === descriptor.resource && settlement.requested === descriptor.amount
-            : descriptor?.kind === "modifier" && settlement.kind === "instant-modifier"
-              ? settlement.statistic === descriptor.statistic && settlement.requested === descriptor.amount
+            : descriptor?.kind === "resource" && descriptor.resource !== "health" && settlement.kind === "actor-resource-delta"
+              ? settlement.resource === descriptor.resource && settlement.requested === descriptor.amount
               : false;
     if (!matches) context.addIssue({ code: "custom", message: "settlement must exactly match its catalog effect descriptor", path: ["outcome", "settlements", index] });
   });

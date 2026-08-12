@@ -173,6 +173,29 @@ describe("M1.6 repository behavior", () => {
     const after=f.repo.getActorPowerSnapshot("local-owner",f.source)!;expect(after.revision).toBe(before.revision);expect(after.slots).toEqual(before.slots);expect(after.legalCommands).toEqual([]);f.repo.close();
   });
 
+  it("keeps instant modifier powers receipt-only without an active effect or state delta",()=>{
+    const f=fixture();
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    const row=db.prepare(`SELECT public_definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=?
+      AND kind=? AND definition_id=?`).get(ability.packId,ability.packVersion,ability.kind,ability.definitionId) as {public_definition_json:string};
+    const definition=JSON.parse(row.public_definition_json);
+    definition.mechanics={...definition.mechanics,target:"self",uses:0,recovery:"none",
+      effects:[{type:"modifier",statistic:"defense",amount:1,duration:"instant"}]};
+    db.exec("DROP TRIGGER rpg_catalog_definitions_immutable_update; DROP TRIGGER rpg_catalog_visibility_immutable_update");
+    db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
+      AND kind=? AND definition_id=?`).run(JSON.stringify(definition),JSON.stringify(definition),ability.packId,ability.packVersion,ability.kind,ability.definitionId);
+    db.prepare(`UPDATE rpg_catalog_definition_visibility SET public_definition_json=? WHERE pack_id=? AND pack_version=?
+      AND kind=? AND definition_id=?`).run(JSON.stringify(definition),ability.packId,ability.packVersion,ability.kind,ability.definitionId);
+    const resourcesBefore=db.prepare("SELECT name resourceId,current,max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(f.campaign,f.source);
+    db.close();
+    const result=f.repo.useActorPower("local-owner",f.source,{powerRef:ability,targetIds:[],choices:[],expectedRevision:0,idempotencyKey:"instant-modifier"});
+    expect(result.resolution.outcomes).toEqual([{kind:"modifier",targetId:f.source,effectId:null,statistic:"defense",amount:1,duration:"instant"}]);
+    expect(result.resolution.stateDeltas).toEqual([]);
+    expect(result.actorStates).toEqual([expect.objectContaining({actorId:f.source,activeEffects:[],resources:resourcesBefore,revision:1})]);
+    expect(f.repo.listActiveEffects("local-owner",f.campaign,f.source)).toEqual([]);
+    f.repo.close();
+  });
+
   it("stacks effects, replaces concentration atomically, applies immunity, and expires duration at query time", () => {
     const f = fixture();
     const effect = (effectId: string, modifiers: any[], duration: any, concentration: any = { kind: "none" }) => ({ effectId, campaignId: f.campaign, actorId: f.source, source: ability, modifiers, duration, recovery: "none", concentration, appliedAt: timestamp });

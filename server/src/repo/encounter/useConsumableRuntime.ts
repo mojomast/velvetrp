@@ -105,8 +105,6 @@ export function buildUseConsumableLegalActions(db:DatabaseDriver.Database,princi
         ||item.reference.definitionId!==reference.definitionId)continue;
     const eligibility=evaluateUseConsumableEligibility(item),effectPlan=deriveUseConsumableEffectPlan(item,reference);
     if(!eligibility.eligible||effectPlan===null)continue;
-    // Receipt-only instant modifiers have no authoritative runtime semantics yet.
-    if(effectPlan.effects.some(({effect})=>effect.kind==="modifier"))continue;
     for(const target of rows){
       const targetRelation=relation(acting,target);
       if(eligibility.targetPolicy==="damage-only-enemy"&&targetRelation!=="enemy")continue;
@@ -284,8 +282,6 @@ export function executeUseConsumable(db:DatabaseDriver.Database,deps:EncounterDe
     const eligibility=evaluateUseConsumableEligibility(item),derived=deriveUseConsumableEffectPlan(item,request.item);
     if(!eligibility.eligible||derived===null||canonical(derived)!==canonical(action.effectPlan)||eligibility.targetPolicy!==action.targetPolicy)
       throw new EncounterConflictError("consumable effect plan is unavailable");
-    if(derived.effects.some(({effect})=>effect.kind==="modifier"))
-      throw new EncounterConflictError("instant modifier runtime semantics are unavailable");
     if(relation(acting,target)!==action.target.relation)throw new EncounterConflictError("consumable target relation changed");
     if(target.actor_id!==null){
       const health=db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'")
@@ -347,7 +343,7 @@ export function executeUseConsumable(db:DatabaseDriver.Database,deps:EncounterDe
         touchedResources.add(resource);
         resourceValues.set(resource,{...value,current:after});return {kind:"actor-resource-delta",effectOrdinal,resource,requested:effect.amount,applied};
       }
-      throw new EncounterConflictError("instant modifier runtime semantics are unavailable");
+      throw new EncounterConflictError("unsupported consumable effect escaped contract validation");
     });
     const statusAfter=hp===0?"defeated":target.status,turn=statusAfter==="defeated"?defeatedTurn:activeTurn;
     const combatAfter=encounter.revision+1,actingAfter=actingBefore+1;

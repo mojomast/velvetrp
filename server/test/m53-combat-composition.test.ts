@@ -193,17 +193,29 @@ describe("M5.3 Slice 0 combat composition", () => {
     const definitionRow=db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=?
       AND kind='item' AND definition_id=?`).get(entry.item_pack_id,entry.item_pack_version,entry.item_definition_id) as {definition_json:string};
     const tonic=JSON.parse(definitionRow.definition_json);
-    const modifierOnly=structuredClone(tonic);
-    modifierOnly.mechanics={...modifierOnly.mechanics,category:"consumable",stackable:true,slot:null,
-      effects:[{type:"modifier",statistic:"check",amount:1,duration:"instant"}]};
     db.exec("DROP TRIGGER rpg_catalog_definitions_immutable_update");
-    db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
-      AND kind='item' AND definition_id=?`).run(JSON.stringify(modifierOnly),JSON.stringify(modifierOnly),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
-    expect(repo.getUseConsumableLegalActions("local-owner",combat.combatId)).toEqual([]);
+    const updateDefinition=db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
+      AND kind='item' AND definition_id=?`);
+    const statistics=["check","attack","defense","damage","healing","speed","max-hp","save-dc"] as const;
+    for(const statistic of statistics)for(const effects of [
+      [{type:"modifier",statistic,amount:1,duration:"instant"}],
+      [{type:"healing",dice:{count:1,sides:4,modifier:0}},{type:"modifier",statistic,amount:1,duration:"instant"}],
+      [{type:"modifier",statistic,amount:0,duration:"instant"}],
+    ]){
+      const modifierConsumable=structuredClone(tonic);
+      modifierConsumable.mechanics={...modifierConsumable.mechanics,category:"consumable",stackable:true,slot:null,effects};
+      updateDefinition.run(JSON.stringify(modifierConsumable),JSON.stringify(modifierConsumable),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
+      const before={rolls,inventory:db.prepare("SELECT * FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id),
+        combatCommands:(db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+        m15Commands:(db.prepare("SELECT count(*) count FROM rpg_m15_commands_v25 WHERE campaign_id=? AND actor_id=?").get(campaign.id,actorId) as {count:number}).count};
+      expect(repo.getUseConsumableLegalActions("local-owner",combat.combatId)).toEqual([]);
+      expect({rolls,inventory:db.prepare("SELECT * FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id),
+        combatCommands:(db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+        m15Commands:(db.prepare("SELECT count(*) count FROM rpg_m15_commands_v25 WHERE campaign_id=? AND actor_id=?").get(campaign.id,actorId) as {count:number}).count}).toEqual(before);
+    }
     tonic.mechanics={...tonic.mechanics,category:"consumable",stackable:true,slot:null,
       effects:[{type:"healing",dice:{count:1,sides:4,modifier:0}}]};
-    db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
-      AND kind='item' AND definition_id=?`).run(JSON.stringify(tonic),JSON.stringify(tonic),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
+    updateDefinition.run(JSON.stringify(tonic),JSON.stringify(tonic),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
     const action=repo.getUseConsumableLegalActions("local-owner",combat.combatId).find((value)=>value.target.relation==="self")!;
     expect(action).toMatchObject({kind:"use-consumable",inventoryEntryId:entry.entry_id,target:{actorBacked:true,relation:"self"}});
     const beforeRolls=rolls;
