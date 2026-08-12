@@ -229,6 +229,40 @@ describe("M5.3 Slice 0 combat composition", () => {
     expect(db.prepare("SELECT 1 FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id)).toBeUndefined();
     expect((db.prepare("SELECT count(*) count FROM rpg_m16_commands_v26 WHERE campaign_id=? AND actor_id=?")
       .get(campaign.id,actorId) as {count:number}).count).toBe(0);
+    const stored=db.prepare(`SELECT command_id,canonical_request_json,request_digest,canonical_result_json,result_digest
+      FROM combat_commands_v27 JOIN combat_receipts_v27 USING(encounter_id,command_id) WHERE encounter_id=? AND idempotency_key=?`)
+      .get(combat.combatId,command.idempotencyKey) as {command_id:string;canonical_request_json:string;request_digest:string;canonical_result_json:string;result_digest:string};
+    db.prepare(`INSERT INTO encounter(encounter_id,campaign_id,session_id,encounter_kind,status,round_number,current_turn_combatant_id,
+      state_revision,created_at,updated_at) VALUES('collision-combat',?,?,'prepared','completed',1,NULL,1,?,?)`).run(campaign.id,session.id,at,at);
+    db.prepare("INSERT INTO combat_mutation_revisions_v27 VALUES('collision-combat',3,?)").run(at);
+    db.prepare("INSERT INTO combat_commands_v27 VALUES('collision-combat',?,?, 'resolve_action',?,?,?,?,3,?)")
+      .run(stored.command_id,actorId,command.idempotencyKey,stored.canonical_request_json,stored.request_digest,2,at);
+    db.prepare("INSERT INTO combat_receipts_v27 VALUES('collision-combat',?,3,?,?,?)")
+      .run(stored.command_id,stored.canonical_result_json,stored.result_digest,at);
+    expect(repo.getUseConsumableCommandResultByKey("local-owner",combat.combatId,command.idempotencyKey)).toEqual(result);
+    expect(repo.getUseConsumableCommandResultByKey("local-owner","collision-combat",command.idempotencyKey)).toEqual(result);
+    for(const [principal,role] of [["result-gm","gm"],["result-player","player"],["result-observer","observer"],["result-controller","player"]] as const){
+      db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,principal);
+      db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)").run(campaign.id,principal,role,at);
+    }
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='result-controller' WHERE campaign_id=? AND actor_id=?")
+      .run(campaign.id,actorId);
+    expect(repo.getUseConsumableCommandResultByKey("local-owner",combat.combatId,command.idempotencyKey)).toEqual(result);
+    expect(repo.getUseConsumableCommandResultByKey("result-gm",combat.combatId,command.idempotencyKey)).toEqual(result);
+    expect(repo.getUseConsumableCommandResultByKey("result-controller",combat.combatId,command.idempotencyKey)).toEqual(result);
+    for(const principal of ["result-player","result-observer","result-outsider"])
+      expect(repo.getUseConsumableCommandResultByKey(principal,combat.combatId,command.idempotencyKey)).toBeNull();
+    expect(repo.getUseConsumableCommandResultByKey("result-gm","missing-combat",command.idempotencyKey)).toBeNull();
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='local-owner' WHERE campaign_id=? AND actor_id=?")
+      .run(campaign.id,actorId);
+    db.exec("DROP TRIGGER combat_receipts_v27_immutable_delete; DROP TRIGGER combat_commands_v27_immutable_delete; DROP TRIGGER combat_mutation_revisions_v27_retain");
+    db.prepare("DELETE FROM combat_receipts_v27 WHERE encounter_id='collision-combat'").run();
+    db.prepare("DELETE FROM combat_commands_v27 WHERE encounter_id='collision-combat'").run();
+    db.prepare("DELETE FROM combat_mutation_revisions_v27 WHERE encounter_id='collision-combat'").run();
+    db.prepare("DELETE FROM encounter WHERE encounter_id='collision-combat'").run();
+    db.exec(`CREATE TRIGGER combat_commands_v27_immutable_delete BEFORE DELETE ON combat_commands_v27 BEGIN SELECT RAISE(ABORT,'combat commands are immutable'); END;
+      CREATE TRIGGER combat_receipts_v27_immutable_delete BEFORE DELETE ON combat_receipts_v27 BEGIN SELECT RAISE(ABORT,'combat receipts are immutable'); END;
+      CREATE TRIGGER combat_mutation_revisions_v27_retain BEFORE DELETE ON combat_mutation_revisions_v27 BEGIN SELECT RAISE(ABORT,'combat mutation revisions are retained'); END;`);
     db.close();repo.close();
     const reopened=createRepository({dataDir:process.env.VELVET_DATA_DIR!});
     expect(reopened.getCombatState("local-owner",combat.combatId)?.revision).toBe(result.receipt.revisionAfter);
@@ -237,6 +271,7 @@ describe("M5.3 Slice 0 combat composition", () => {
       .get(combat.combatId,command.idempotencyKey) as {command_id:string}).command_id;
     verifyDb.close();
     expect(reopened.getUseConsumableCommandResult("local-owner",commandId)).toEqual(result);
+    expect(reopened.getUseConsumableCommandResultByKey("local-owner",combat.combatId,command.idempotencyKey)).toEqual(result);
     reopened.close();
   });
 

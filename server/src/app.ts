@@ -150,6 +150,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       queryDetail: method === "GET" ? "Combat command result does not accept query parameters" : null,
       mechanics: true, combat: true, noStore: true };
   }
+  if(/^\/api\/rpg\/v1\/combats\/[^/]+\/consumable-actions(?:\/commands|\/results\/[^/]+)?$/.test(instance)){
+    const command=instance.endsWith("/commands"),result=instance.includes("/results/");
+    return {instance:command?"/api/rpg/v1/combats/:combatId/consumable-actions/commands"
+      :result?"/api/rpg/v1/combats/:combatId/consumable-actions/results/:idempotencyKey"
+        :"/api/rpg/v1/combats/:combatId/consumable-actions",hasQuery,
+      queryDetail:method==="GET"&&!command?(result?"Consumable results do not accept a query or body":"Consumable actions do not accept a query or body")
+        :method==="POST"&&command?"Consumable commands do not accept query parameters":null,
+      mechanics:true,combat:true,noStore:true};
+  }
   if (/^\/api\/rpg\/v1\/combats\/[^/]+(?:\/(?:log|action-commands|end-commands))?$/.test(instance)) {
     const log=instance.endsWith("/log"),action=instance.endsWith("/action-commands"),end=instance.endsWith("/end-commands");
     return {
@@ -206,6 +215,20 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
     return {instance:"/api/rpg/v1/campaigns/:campaignId/factions",hasQuery,
       queryDetail:method==="GET"?"Campaign factions do not accept query parameters":method==="POST"?"Faction creation does not accept query parameters":null,
       mechanics:true,noStore:true};
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/npcs\/[^/]+\/companion-administration(?:\/commands)?$/.test(instance)) {
+    const command = instance.endsWith("/commands");
+    return {
+      instance: command
+        ? "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration/commands"
+        : "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration",
+      hasQuery,
+      queryDetail: command
+        ? method === "POST" ? "Companion administration commands do not accept query parameters" : null
+        : method === "GET" ? "Companion administration does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
   }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/encounters$/.test(instance)) {
     return {
@@ -449,6 +472,11 @@ function isNpcPresenceRoute(instance: string): boolean {
     || instance === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands";
 }
 
+function isCompanionAdministrationRoute(instance: string): boolean {
+  return instance === "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration"
+    || instance === "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration/commands";
+}
+
 function sendNpcPresenceProblem(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -460,6 +488,18 @@ function sendNpcPresenceProblem(
   const problem = createApiProblem(request, status, code, detail, { instance });
   reply.raw.setHeader("x-request-id", request.id);
   return reply.type("application/problem+json").code(status).send({ ...problem, instance });
+}
+
+function sendCompanionAdministrationProblem(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  code: "RPG_COMPANION_ADMINISTRATION_NOT_FOUND" | "RPG_ROUTE_NOT_FOUND",
+  detail: string,
+  instance: string,
+): FastifyReply {
+  const problem = createApiProblem(request, 404, code, detail, { instance });
+  reply.raw.setHeader("x-request-id", request.id);
+  return reply.type("application/problem+json").code(404).send({ ...problem, instance });
 }
 
 export function buildApp(options: {
@@ -566,13 +606,18 @@ export function buildApp(options: {
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/action-commands"
           || normalizedRoute.instance === "/api/rpg/v1/combats/:combatId/end-commands"
            || normalizedRoute.instance === "/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey";
+        const isConsumable=normalizedRoute.instance.startsWith("/api/rpg/v1/combats/:combatId/consumable-actions");
         if (isNpcPresence) {
           return sendNpcPresenceProblem(request, reply, 404, "RPG_NPC_PRESENCE_NOT_FOUND",
             "NPC presence not found", normalizedRoute.instance);
         }
+        if (isCompanionAdministrationRoute(normalizedRoute.instance)) {
+          return sendCompanionAdministrationProblem(request, reply, "RPG_COMPANION_ADMINISTRATION_NOT_FOUND",
+            "Companion administration not found", normalizedRoute.instance);
+        }
         return sendApiProblem(request, reply, 404,
-          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorWorld ? "RPG_ACTOR_WORLD_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isEncounter ? "RPG_ENCOUNTER_NOT_FOUND" : isNpc ? "RPG_NPC_NOT_FOUND" : isFaction ? "RPG_FACTION_NOT_FOUND" : isQuest ? "RPG_QUEST_NOT_FOUND" : isStoryline ? "RPG_STORYLINE_NOT_FOUND" : isCampaignFactions ? "RPG_CAMPAIGN_FACTIONS_NOT_FOUND" : isCombat ? "RPG_COMBAT_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
-          isActorCheck ? "Actor check state not found" : isActorWorld ? "Actor world state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isEncounter ? "Encounter not found" : isNpc ? "NPC not found" : isFaction ? "Faction not found" : isQuest ? "Quest not found" : isStoryline ? "Storyline not found" : isCampaignFactions ? "Campaign factions not found" : isCombat ? "Combat not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
+          isActorCheck ? "RPG_ACTOR_CHECK_NOT_FOUND" : isActorWorld ? "RPG_ACTOR_WORLD_NOT_FOUND" : isActorEffects ? "RPG_ACTOR_EFFECTS_NOT_FOUND" : isActorPowers ? "RPG_ACTOR_POWERS_NOT_FOUND" : isEncounter ? "RPG_ENCOUNTER_NOT_FOUND" : isNpc ? "RPG_NPC_NOT_FOUND" : isFaction ? "RPG_FACTION_NOT_FOUND" : isQuest ? "RPG_QUEST_NOT_FOUND" : isStoryline ? "RPG_STORYLINE_NOT_FOUND" : isCampaignFactions ? "RPG_CAMPAIGN_FACTIONS_NOT_FOUND" : isConsumable ? "RPG_COMBAT_CONSUMABLE_NOT_FOUND" : isCombat ? "RPG_COMBAT_NOT_FOUND" : isCharacterResource ? "RPG_CAMPAIGN_CHARACTER_NOT_FOUND" : isActorResource ? "RPG_ACTOR_RESOURCE_NOT_FOUND" : isActorInventory ? "RPG_ACTOR_INVENTORY_NOT_FOUND" : isActorRest ? "RPG_ACTOR_REST_NOT_FOUND" : isActorEconomy ? "RPG_ACTOR_ECONOMY_NOT_FOUND" : isShop ? "RPG_SHOP_NOT_FOUND" : "RPG_CAMPAIGN_NOT_FOUND",
+          isActorCheck ? "Actor check state not found" : isActorWorld ? "Actor world state not found" : isActorEffects ? "Actor effects not found" : isActorPowers ? "Actor powers not found" : isEncounter ? "Encounter not found" : isNpc ? "NPC not found" : isFaction ? "Faction not found" : isQuest ? "Quest not found" : isStoryline ? "Storyline not found" : isCampaignFactions ? "Campaign factions not found" : isConsumable ? "Consumable action not found" : isCombat ? "Combat not found" : isCharacterResource ? "Campaign character not found" : isActorResource ? "Actor resources not found" : isActorInventory ? "Actor inventory not found" : isActorRest ? "Actor rest state not found" : isActorEconomy ? "Actor economy not found" : isShop ? "Shop not found" : "Campaign not found", {
             instance: normalizedRoute.instance,
           });
       }
@@ -609,6 +654,30 @@ export function buildApp(options: {
     const pathOnly = rawUrl.split("?", 1)[0]!;
     const hasOverlongSegment = pathOnly.split("/").some((segment) => segment.length > 128);
     const normalizedRoute = normalizedCampaignResourceRoute(request.method, rawUrl);
+    const isConsumableRoute=normalizedRoute?.instance.startsWith("/api/rpg/v1/combats/:combatId/consumable-actions")??false;
+    if(normalizedRoute&&isConsumableRoute){
+      const command=normalizedRoute.instance.endsWith("/commands"),expectedMethod=command?"POST":"GET";
+      if(request.method!==expectedMethod||hasOverlongSegment){
+        reply.raw.setHeader("x-request-id",request.id);reply.raw.setHeader("cache-control","no-store");
+        return sendApiProblem(request,reply,404,request.method!==expectedMethod?"RPG_ROUTE_NOT_FOUND":"RPG_COMBAT_CONSUMABLE_NOT_FOUND",
+          request.method!==expectedMethod?"RPG route not found":"Consumable action not found",{instance:normalizedRoute.instance});
+      }
+    }
+    if (normalizedRoute && isCompanionAdministrationRoute(normalizedRoute.instance)) {
+      const command = normalizedRoute.instance.endsWith("/commands");
+      if (request.method !== (command ? "POST" : "GET")) {
+        reply.raw.setHeader("x-request-id", request.id);
+        reply.raw.setHeader("cache-control", "no-store");
+        return sendCompanionAdministrationProblem(request, reply, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+          normalizedRoute.instance);
+      }
+      if (hasOverlongSegment) {
+        reply.raw.setHeader("x-request-id", request.id);
+        reply.raw.setHeader("cache-control", "no-store");
+        return sendCompanionAdministrationProblem(request, reply, "RPG_COMPANION_ADMINISTRATION_NOT_FOUND",
+          "Companion administration not found", normalizedRoute.instance);
+      }
+    }
     const presenceCommand = normalizedRoute?.instance
       === "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands";
     const isNpcPresence = presenceCommand || normalizedRoute?.instance
@@ -660,6 +729,11 @@ export function buildApp(options: {
   app.setNotFoundHandler((request, reply) => {
     const rawUrl = request.raw.url ?? request.url;
     const instance = rawUrl.split("?", 1)[0]!;
+    const consumable=normalizedCampaignResourceRoute(request.method,rawUrl);
+    if(consumable?.instance.startsWith("/api/rpg/v1/combats/:combatId/consumable-actions")){
+      reply.header("cache-control","no-store");
+      return sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found",{instance:consumable.instance});
+    }
     if (/^\/api\/rpg\/v1\/campaign-imports\/[^/]+\/apply$/.test(instance)) {
       reply.header("cache-control", "no-store");
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
@@ -689,6 +763,13 @@ export function buildApp(options: {
       return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
         instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap",
       });
+    }
+    if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/npcs\/[^/]+\/companion-administration(?:\/commands)?$/.test(instance)) {
+      reply.header("cache-control", "no-store");
+      return sendCompanionAdministrationProblem(request, reply, "RPG_ROUTE_NOT_FOUND", "RPG route not found",
+        instance.endsWith("/commands")
+          ? "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration/commands"
+          : "/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration");
     }
     if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/present-cast$/.test(instance)
       || /^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/npcs\/[^/]+\/presence-commands$/.test(instance)) {

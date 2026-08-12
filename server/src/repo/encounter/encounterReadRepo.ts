@@ -7,6 +7,7 @@ import {
   combatEndCommandResponseSchema,
   encounterPublicSchema,
   legalCombatActionAllowlistSchema,
+  useConsumableCommandResultSchema,
   utcIsoTimestampSchema,
   type CombatState,
   type CombatLogEntry,
@@ -19,7 +20,7 @@ import {
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
 import { buildCombatActionPlans } from "./combatActionPlan.js";
-import { buildUseConsumableLegalActions, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
+import { buildUseConsumableLegalActions, mayActForConsumable, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
@@ -51,6 +52,8 @@ export interface EncounterReadRepository {
   getUseConsumableLegalActions(principal:string,combatId:string):UseConsumableLegalAction[];
   /** Reads one immutable repository-only consumable result by its internal command identity. */
   getUseConsumableCommandResult(principal:string,commandId:string):UseConsumableCommandResult|null;
+  /** Reads one immutable consumable result in its combat by the caller's command key. */
+  getUseConsumableCommandResultByKey(principal:string,combatId:string,idempotencyKey:string):UseConsumableCommandResult|null;
 }
 
 /** Creates the database-backed read repository for encounter state. */
@@ -200,7 +203,20 @@ export function createEncounterReadRepository(
       receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
     return combatCommandResultResponseSchema.parse({ operation: "end", result });
   };
+  const getUseConsumableCommandResultByKey=(principal:string,combatId:string,idempotencyKey:string):UseConsumableCommandResult|null=>{
+    const rows=db.prepare(`SELECT command.actor_id,encounter.campaign_id,receipt.canonical_result_json
+      FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt USING(encounter_id,command_id)
+      JOIN encounter ON encounter.encounter_id=command.encounter_id
+      WHERE command.encounter_id=? AND command.idempotency_key=? AND command.command_type='resolve_action'
+        AND json_extract(command.canonical_request_json,'$.kind')='use-consumable'`)
+      .all(combatId,idempotencyKey) as Array<{actor_id:string|null;campaign_id:string;canonical_result_json:string}>;
+    if(rows.length>1)throw new Error("consumable result identity is ambiguous within combat");
+    const row=rows[0];
+    if(!row?.actor_id||!mayActForConsumable(db,principal,row.campaign_id,row.actor_id))return null;
+    return useConsumableCommandResultSchema.parse(JSON.parse(row.canonical_result_json));
+  };
   return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
     getUseConsumableLegalActions:(principal,combatId)=>db.transaction(()=>buildUseConsumableLegalActions(db,principal,combatId)).deferred(),
-    getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred() };
+    getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred(),
+    getUseConsumableCommandResultByKey:(principal,combatId,key)=>db.transaction(()=>getUseConsumableCommandResultByKey(principal,combatId,key)).deferred() };
 }

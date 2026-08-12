@@ -124,11 +124,14 @@ import { encounterLifecycleHttpRoutes } from "./encounterLifecycle.js";
 import type { EncounterRepository } from "../../../repo/encounterRepo.js";
 import { combatReadsHttpRoutes } from "./combatReads.js";
 import { combatCommandsHttpRoutes } from "./combatCommands.js";
+import { combatConsumablesHttpRoutes } from "./combatConsumables.js";
 import { worldHttpRoutes } from "./worldRoutes.js";
 import type { WorldRepository } from "../../../repo/worldRepo.js";
 import {npcHttpRoutes} from "./npcRoutes.js";
 import {factionHttpRoutes} from "./factionRoutes.js";
 import { npcPresenceHttpRoutes } from "./npcPresenceRoutes.js";
+import { companionAdministrationHttpRoutes } from "./companionAdministration.js";
+import type { CompanionRepository } from "../../../repo/companionRepo.js";
 import type { AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
@@ -155,10 +158,13 @@ export interface CampaignListRepository extends
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">>,
   Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult">>,
+  Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
   Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
+  Partial<Pick<CompanionRepository,
+    "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
   getAdventureTurnByInitialIdempotencyKey?: AdventureTurnRepository["getAdventureTurnByInitialIdempotencyKey"];
@@ -291,6 +297,8 @@ type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActo
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
+type CompanionAdministrationHttpLaneRepository = Pick<CompanionRepository,
+  "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">;
 type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnByInitialIdempotencyKey" | "getAdventureTurnNarration" | "createAdventureTurn"
   | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
   & Required<Pick<CampaignListRepository, "getCampaign">>;
@@ -436,6 +444,11 @@ function assertCombatCommandRepository(repository: CampaignListRepository): asse
   if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function")
     throw new UnsupportedCampaignRepositoryError();
 }
+type CombatConsumableLaneRepository=Pick<EncounterRepository,"getUseConsumableLegalActions"|"useConsumable"|"getUseConsumableCommandResultByKey">;
+function assertCombatConsumableRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&CombatConsumableLaneRepository{
+  if(typeof repository.getUseConsumableLegalActions!=="function"||typeof repository.useConsumable!=="function"
+    ||typeof repository.getUseConsumableCommandResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();
+}
 function assertWorldHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&WorldHttpLaneRepository{
   if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function")throw new UnsupportedCampaignRepositoryError();
 }
@@ -451,6 +464,14 @@ function assertNpcPresenceHttpRepository(
   if (typeof repository.getNpcCast !== "function" || typeof repository.mutateNpcPresence !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
+}
+function assertCompanionAdministrationHttpRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & CompanionAdministrationHttpLaneRepository {
+  const methods: Array<keyof CompanionAdministrationHttpLaneRepository> = [
+    "getCompanionManagement", "createCompanion", "createCompanionGrant", "revokeCompanionGrant",
+  ];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
   const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnByInitialIdempotencyKey", "getAdventureTurnNarration", "createAdventureTurn",
@@ -592,12 +613,20 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const combatCommandRepositoryAccessor = (): CombatCommandLaneRepository => {
     const repository=getCampaignRepository();assertCombatCommandRepository(repository);return repository;
   };
+  const consumableRepositoryAccessor=():CombatConsumableLaneRepository=>{
+    const repository=getCampaignRepository();assertCombatConsumableRepository(repository);return repository;
+  };
   const worldRepositoryAccessor=():WorldHttpLaneRepository=>{const repository=getCampaignRepository();assertWorldHttpRepository(repository);return repository;};
   const npcRepositoryAccessor=():NpcHttpLaneRepository=>{const repository=getCampaignRepository();assertNpcHttpRepository(repository);return repository;};
   const factionRepositoryAccessor=():FactionHttpLaneRepository=>{const repository=getCampaignRepository();assertFactionHttpRepository(repository);return repository;};
   const npcPresenceRepositoryAccessor = (): NpcPresenceHttpLaneRepository => {
     const repository = getCampaignRepository();
     assertNpcPresenceHttpRepository(repository);
+    return repository;
+  };
+  const companionRepositoryAccessor = (): CompanionAdministrationHttpLaneRepository => {
+    const repository = getCampaignRepository();
+    assertCompanionAdministrationHttpRepository(repository);
     return repository;
   };
   const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository as unknown as AdventureTurnLaneRepository & Repository; };
@@ -631,10 +660,12 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(encounterLifecycleHttpRoutes, { encounterRepositoryAccessor });
   await app.register(combatReadsHttpRoutes, { combatRepositoryAccessor });
   await app.register(combatCommandsHttpRoutes, { combatCommandRepositoryAccessor });
+  await app.register(combatConsumablesHttpRoutes, { consumableRepositoryAccessor });
   await app.register(worldHttpRoutes,{worldRepositoryAccessor});
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});
   await app.register(npcPresenceHttpRoutes, { npcPresenceRepositoryAccessor });
+  await app.register(companionAdministrationHttpRoutes, { companionRepositoryAccessor });
   await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });

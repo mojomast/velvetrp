@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
-import { commandActorPower, getActorPowers, getCombatCommandResult, getCombatLog, getCombatState, resolveCombatAction } from "./api";
+import { commandActorPower,commandCombatConsumable,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatState,resolveCombatAction } from "./api";
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
 import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
 import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./api";
 import { commandNpcPresence, getCampaignPresentCast } from "./api";
+import {canonicalUseConsumableRequestFrame} from "@velvet/contracts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -345,6 +346,40 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
     await expect(commandActorPower("actor",{powerRef:power,targetIds:[],choices:[],expectedRevision:1,idempotencyKey:"self-key"})).resolves.toEqual(powerResponse);
     await expect(getCombatCommandResult("campaign","combat","result-key")).resolves.toEqual(result);
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/rpg/v1/campaigns/campaign/combats/combat/command-results/result-key");
+  });
+});
+
+describe("M5.3 combat consumable API bindings",()=>{
+  const item={kind:"item" as const,packId:"pack",packVersion:"1",definitionId:"tonic"};
+  const action={legalActionId:"consume:legal",kind:"use-consumable" as const,actingCombatantId:"one",inventoryEntryId:"entry",item,quantity:1 as const,actionCost:"action" as const,targetPolicy:"beneficial-only-self-or-ally" as const,target:{combatantId:"one",relation:"self" as const,actorBacked:true},effectPlan:{effectCount:1,effects:[{effectOrdinal:0,effect:{kind:"resource" as const,resource:"health" as const,amount:2}}]}};
+  const command={legalActionId:action.legalActionId,inventoryEntryId:"entry",item,quantity:1 as const,targetCombatantId:"one",targetActorBacked:true,expectedCombatRevision:2,expectedActingM15Revision:3,expectedTargetM15Revision:3,idempotencyKey:"consume-key"};
+  const result={resolution:{actionId:"resolved",legalActionId:action.legalActionId,kind:"use-consumable" as const,actingCombatantId:"one",target:action.target,targetPolicy:action.targetPolicy,actionCost:"action" as const,consumed:{inventoryEntryId:"entry",item,quantity:1 as const},effectPlan:action.effectPlan,outcome:{targetCombatantId:"one",settlements:[{kind:"combat-hp-resource" as const,effectOrdinal:0,resource:"health" as const,requested:2,applied:2,before:3,after:5}]},combatRevisionBefore:2,combatRevisionAfter:3,actingM15Revision:{before:3,after:4},targetM15Revision:null},requestBinding:{requestEvidence:command,canonicalRequestDigest:"a".repeat(64),idempotencyKey:"consume-key"},receipt:{idempotencyKey:"consume-key",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"}};
+  const boundResult=async()=>{const bytes=new TextEncoder().encode(canonicalUseConsumableRequestFrame(command)),digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),(byte)=>byte.toString(16).padStart(2,"0")).join("");return{...result,requestBinding:{...result.requestBinding,canonicalRequestDigest:digest}};};
+
+  it("uses exact no-store routes and never turns a result read into a POST",async()=>{
+    const exact=await boundResult(),fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify([action]),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify(exact),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify(exact),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(getCombatConsumableActions("combat")).resolves.toEqual([action]);await expect(commandCombatConsumable("combat",command)).resolves.toEqual(exact);await expect(getCombatConsumableResult("combat",command)).resolves.toEqual(exact);
+    expect(fetchMock.mock.calls.map(([url,init])=>[url,(init as RequestInit).method??"GET",(init as RequestInit).cache])).toEqual([
+      ["/api/rpg/v1/combats/combat/consumable-actions","GET","no-store"],
+      ["/api/rpg/v1/combats/combat/consumable-actions/commands","POST","no-store"],
+      ["/api/rpg/v1/combats/combat/consumable-actions/results/consume-key","GET","no-store"],
+    ]);
+  });
+
+  it("fails closed on modifiers and mismatched committed results",async()=>{
+    const modifier={...action,effectPlan:{effectCount:1,effects:[{effectOrdinal:0,effect:{kind:"modifier",statistic:"check",amount:1,duration:"instant"}}]}};
+    const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify([modifier]),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify({...result,requestBinding:{...result.requestBinding,requestEvidence:{...command,inventoryEntryId:"other"}}}),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(getCombatConsumableActions("combat")).rejects.toThrow(/unsupported effect/);await expect(commandCombatConsumable("combat",command)).rejects.toThrow();expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects exact-result evidence, digest, and key mismatches",async()=>{
+    const exact=await boundResult();
+    for(const mismatch of [{...exact,requestBinding:{...exact.requestBinding,requestEvidence:{...command,inventoryEntryId:"other"}}},
+      {...exact,requestBinding:{...exact.requestBinding,canonicalRequestDigest:"b".repeat(64)}},
+      {...exact,requestBinding:{...exact.requestBinding,idempotencyKey:"other"}}]){
+      vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify(mismatch),{status:200})));
+      await expect(getCombatConsumableResult("combat",command)).rejects.toThrow();
+    }
   });
 });
 

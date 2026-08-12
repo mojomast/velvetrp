@@ -1,4 +1,4 @@
-import type { CombatLegalAction } from "@velvet/contracts";
+import type { CombatLegalAction, UseConsumableLegalAction } from "@velvet/contracts";
 import { useEffect, useMemo, useState } from "react";
 
 export interface LegalActionTrayProps {
@@ -7,6 +7,8 @@ export interface LegalActionTrayProps {
   disabled?: boolean;
   busy?: boolean;
   onSubmit: (action: CombatLegalAction, targetIds: string[]) => void;
+  consumableActions?:readonly UseConsumableLegalAction[];
+  onUseConsumable?:(action:UseConsumableLegalAction)=>void;
 }
 
 type SupportedKind = "attack" | "flee" | "end-turn";
@@ -18,7 +20,7 @@ const actionLabel = (kind: SupportedKind) => kind === "end-turn" ? "End turn" : 
  * Builds every control from the current server allowlist. Unsupported protocol
  * kinds are structurally absent until the action resolution contract supports them.
  */
-export function LegalActionTray({ legalActions, combatantLabels = new Map(), disabled = false, busy = false, onSubmit }: LegalActionTrayProps) {
+export function LegalActionTray({ legalActions, consumableActions=[],combatantLabels = new Map(), disabled = false, busy = false, onSubmit,onUseConsumable }: LegalActionTrayProps) {
   const actions = useMemo(() => legalActions.filter(supported), [legalActions]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null);
@@ -39,10 +41,14 @@ export function LegalActionTray({ legalActions, combatantLabels = new Map(), dis
 
   return <aside className="legal-action-tray" aria-labelledby="legal-actions-heading">
     <div className="legal-action-heading"><div><p className="eyebrow">CURRENT SERVER ALLOWLIST</p><h2 id="legal-actions-heading">Legal actions</h2></div>{busy && <span role="status">Resolving…</span>}</div>
-    {actions.length === 0 ? <p className="combat-empty">No supported legal actions were returned for this turn.</p> : <>
+    {actions.length === 0&&consumableActions.length===0 ? <p className="combat-empty">No supported legal actions were returned for this turn.</p> : <>
       <div className="legal-action-buttons" role="group" aria-label="Choose a server-returned legal action">
         {actions.map((action) => <button key={action.legalActionId} type="button" className={action.legalActionId === selectedId ? "is-selected" : ""} aria-pressed={action.legalActionId === selectedId} disabled={disabled || busy} onClick={() => choose(action)}>{actionLabel(action.kind)}</button>)}
       </div>
+      {consumableActions.length>0&&<section aria-labelledby="consumable-actions-heading"><h3 id="consumable-actions-heading">Consumables</h3><div className="legal-action-buttons">
+        {consumableActions.map((action)=><button key={action.legalActionId} type="button" disabled={disabled||busy||!onUseConsumable}
+          onClick={()=>onUseConsumable?.(action)}>Use {action.item.definitionId} on {combatantLabels.get(action.target.combatantId)??action.target.combatantId}</button>)}
+      </div><p className="combat-restriction">Quantity 1 · Cost: {consumableActions[0]?.actionCost}. Each option has exactly one server-selected target.</p></section>}
       {selected && selected.kind === "attack" && <fieldset className="legal-targets"><legend>Valid targets returned for this action</legend>
         {selected.targetIds.length === 0 ? <p className="combat-restriction">The server returned no valid targets.</p> : selected.targetIds.map((id) => <label key={id}><input type="radio" name={`target-${selected.legalActionId}`} checked={targetId === id} disabled={disabled || busy} onChange={() => { setTargetId(id); setReviewing(false); }} /><span><bdi dir="auto">{combatantLabels.get(id) ?? id}</bdi></span></label>)}
       </fieldset>}

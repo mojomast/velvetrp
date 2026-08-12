@@ -5,6 +5,7 @@ import { CombatTrackerPage, type CombatTrackerApi } from "./CombatTrackerPage";
 import { InitiativeRail } from "./InitiativeRail";
 import { LegalActionTray } from "./LegalActionTray";
 import { PowerLibraryPanel } from "./PowerLibraryPanel";
+import {ApiError} from "../../../api";
 
 const at = "2030-01-01T00:00:00.000Z";
 const combat: CombatReadResponse = {
@@ -27,6 +28,7 @@ const response: CombatActionCommandResponse = {
 };
 const emptyPowers = { known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 0 } as const;
 const emptyEffects = { effects: [], concentration: [], revision: 0 } as const;
+const consumable={legalActionId:"consume:legal",kind:"use-consumable" as const,actingCombatantId:"combatant-one",inventoryEntryId:"entry",item:{kind:"item" as const,packId:"pack",packVersion:"1",definitionId:"tonic"},quantity:1 as const,actionCost:"action" as const,targetPolicy:"beneficial-only-self-or-ally" as const,target:{combatantId:"combatant-one",relation:"self" as const,actorBacked:true},effectPlan:{effectCount:1,effects:[{effectOrdinal:0,effect:{kind:"resource" as const,resource:"health" as const,amount:2}}]}};
 
 function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
   return {
@@ -39,6 +41,9 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
     getEffects: vi.fn().mockResolvedValue(emptyEffects),
     getResources:vi.fn().mockResolvedValue({resources:[],revision:0}),
     usePower:vi.fn(),
+    getConsumableActions:vi.fn().mockResolvedValue([]),
+    useConsumable:vi.fn(),
+    getConsumableResult:vi.fn(),
     ...overrides,
   };
 }
@@ -61,6 +66,11 @@ describe("M3.5 server-authoritative combat controls", () => {
     expect(screen.getByText("Not supplied by this legal-action response")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     expect(submit).toHaveBeenCalledWith(combat.legalActions[0], ["combatant-two"]);
+  });
+
+  it("renders each supported consumable as one exact server-targeted quantity-one action",()=>{
+    const use=vi.fn();render(<LegalActionTray legalActions={[]} consumableActions={[consumable]} combatantLabels={new Map([["combatant-one","actor-one"]])} onSubmit={()=>undefined} onUseConsumable={use}/>);
+    const button=screen.getByRole("button",{name:/Use tonic on actor-one/});expect(screen.getByText(/Quantity 1 · Cost: action/)).toBeTruthy();fireEvent.click(button);expect(use).toHaveBeenCalledWith(consumable);
   });
 
   it("uses a native ordered list and keyboard-focusable buttons for the visual rail", () => {
@@ -159,5 +169,31 @@ describe("M3.5 server-authoritative combat controls", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review action" })); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     unmount(); resolve(response); await pending; await Promise.resolve();
     expect(service.resolveAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks an unknown consumable delivery, never replays POST, and reconciles only through exact result GET",async()=>{
+    const commandResult={resolution:{actionId:"resolved",legalActionId:consumable.legalActionId,kind:"use-consumable" as const,actingCombatantId:"combatant-one",target:consumable.target,targetPolicy:consumable.targetPolicy,actionCost:"action" as const,consumed:{inventoryEntryId:"entry",item:consumable.item,quantity:1 as const},effectPlan:consumable.effectPlan,outcome:{targetCombatantId:"combatant-one",settlements:[{kind:"combat-hp-resource" as const,effectOrdinal:0,resource:"health" as const,requested:2,applied:2,before:8,after:10}]},combatRevisionBefore:4,combatRevisionAfter:5,actingM15Revision:{before:0,after:1},targetM15Revision:null},requestBinding:{requestEvidence:{} as any,canonicalRequestDigest:"a".repeat(64),idempotencyKey:"pending"},receipt:{idempotencyKey:"pending",revisionBefore:4,revisionAfter:5,occurredAt:at}};
+    const use=vi.fn().mockRejectedValue(new Error("unknown")),read=vi.fn().mockImplementation((_combat,expected)=>Promise.resolve({...commandResult,requestBinding:{...commandResult.requestBinding,requestEvidence:expected,idempotencyKey:expected.idempotencyKey},receipt:{...commandResult.receipt,idempotencyKey:expected.idempotencyKey}}));
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:use,getConsumableResult:read});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");
+    fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/outcome is ambiguous/i);expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');
+    fireEvent.click(screen.getByRole("button",{name:"Read exact result & refresh"}));await waitFor(()=>expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull());expect(read).toHaveBeenCalledTimes(1);expect(use).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves the consumable lock when exact result reconciliation is unavailable",async()=>{
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn().mockRejectedValue(new Error("unknown")),getConsumableResult:vi.fn().mockRejectedValue(new Error("missing"))});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/outcome is ambiguous/i);fireEvent.click(screen.getByRole("button",{name:"Read exact result & refresh"}));await screen.findByText(/persistent lock remains/i);expect(screen.getByText(/Consumable outcome unresolved/)).toBeTruthy();expect(service.useConsumable).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts before POST when the durable consumable marker cannot be written and read back",async()=>{
+    const storage=vi.spyOn(Storage.prototype,"setItem").mockImplementation((key)=>{if(key.includes("combat-consumable"))throw new DOMException("quota");});
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn()});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/durable safety lock could not be stored/i);expect(service.useConsumable).not.toHaveBeenCalled();expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();storage.mockRestore();
+  });
+
+  it("clears stale consumable actions when their authoritative refresh fails",async()=>{
+    const actions=vi.fn().mockResolvedValueOnce([consumable]).mockRejectedValueOnce(new Error("offline"));const use=vi.fn().mockImplementation((_combat,command)=>Promise.resolve({resolution:{actionId:"resolved",legalActionId:consumable.legalActionId,kind:"use-consumable",actingCombatantId:"combatant-one",target:consumable.target,targetPolicy:consumable.targetPolicy,actionCost:"action",consumed:{inventoryEntryId:"entry",item:consumable.item,quantity:1},effectPlan:consumable.effectPlan,outcome:{targetCombatantId:"combatant-one",settlements:[{kind:"combat-hp-resource",effectOrdinal:0,resource:"health",requested:2,applied:2,before:8,after:10}]},combatRevisionBefore:4,combatRevisionAfter:5,actingM15Revision:{before:0,after:1},targetM15Revision:null},requestBinding:{requestEvidence:command,canonicalRequestDigest:"a".repeat(64),idempotencyKey:command.idempotencyKey},receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:4,revisionAfter:5,occurredAt:at}}));
+    const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/refresh is partial/i);expect(screen.queryByRole("button",{name:/Use tonic on actor-one/})).toBeNull();
+  });
+
+  it("clears the marker and refreshes after a definitive 409 without retrying POST",async()=>{
+    const actions=vi.fn().mockResolvedValue([consumable]),use=vi.fn().mockRejectedValue(new ApiError(409,"stale"));const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/rejected before commitment/i);await waitFor(()=>expect(actions.mock.calls.length).toBeGreaterThan(1));expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull();expect(use).toHaveBeenCalledTimes(1);
   });
 });

@@ -75,6 +75,16 @@ import type {
   NpcPresenceMutationHttpResponse,
 } from "@velvet/contracts";
 import {
+  companionAdministrationHttpCommandResponseSchema,
+  companionAdministrationHttpCommandSchema,
+  companionAdministrationHttpGetResponseSchema,
+} from "@velvet/contracts";
+import type {
+  CompanionAdministrationHttpCommand,
+  CompanionAdministrationHttpCommandResponse,
+  CompanionAdministrationHttpGetResponse,
+} from "@velvet/contracts";
+import {
   generationDraftApplyRequestSchema,
   generationDraftApplyResponseSchema,
   generationDraftCreateRequestSchema,
@@ -189,6 +199,10 @@ import {
   encounterListResponseSchema,
   encounterStartCommandRequestSchema,
   encounterStartCommandResponseSchema,
+  useConsumableCommandRequestSchema,
+  useConsumableCommandResultSchema,
+  useConsumableLegalActionSchema,
+  canonicalUseConsumableRequestFrame,
 } from "@velvet/contracts";
 import type {
   CombatActionCommandRequest,
@@ -202,6 +216,9 @@ import type {
   EncounterCreateRequest,
   EncounterPublic,
   EncounterStartCommandRequest,
+  UseConsumableCommandRequest,
+  UseConsumableCommandResult,
+  UseConsumableLegalAction,
 } from "@velvet/contracts";
 import {
   characterDraftHttpFinalizationResultSchema,
@@ -1631,6 +1648,43 @@ export async function getCombatState(combatId: string): Promise<CombatReadRespon
   return combatReadResponseSchema.parse(success.body);
 }
 
+export async function getCombatConsumableActions(combatId:string):Promise<UseConsumableLegalAction[]>{
+  const target=combatPath(combatId);
+  const success=await requestResponse<unknown>(`${target.path}/consumable-actions`,{cache:"no-store"});
+  requireStatus(success,200,"Combat consumable actions");
+  const actions=useConsumableLegalActionSchema.array().parse(success.body);
+  if(actions.some((action)=>action.effectPlan.effects.some(({effect})=>effect.kind==="modifier")))
+    throw new Error("Combat consumable actions included an unsupported effect");
+  return actions;
+}
+
+export async function commandCombatConsumable(combatId:string,input:UseConsumableCommandRequest):Promise<UseConsumableCommandResult>{
+  const target=combatPath(combatId),body=parseApiInput(()=>useConsumableCommandRequestSchema.parse(input));
+  const success=await requestResponse<unknown>(`${target.path}/consumable-actions/commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});
+  requireStatus(success,200,"Combat consumable command");
+  const response=useConsumableCommandResultSchema.parse(success.body);
+  await verifyConsumableResult(body,response);
+  return response;
+}
+
+/** Reads an immutable consumable result and cannot execute or replay the command. */
+export async function getCombatConsumableResult(combatId:string,expectedRequest:UseConsumableCommandRequest):Promise<UseConsumableCommandResult>{
+  const target=combatPath(combatId),expected=parseApiInput(()=>useConsumableCommandRequestSchema.parse(expectedRequest)),key=expected.idempotencyKey;
+  const success=await requestResponse<unknown>(`${target.path}/consumable-actions/results/${encodeURIComponent(key)}`,{cache:"no-store"});
+  requireStatus(success,200,"Combat consumable result");
+  const response=useConsumableCommandResultSchema.parse(success.body);
+  await verifyConsumableResult(expected,response);
+  return response;
+}
+
+async function verifyConsumableResult(expected:UseConsumableCommandRequest,result:UseConsumableCommandResult):Promise<void>{
+  const frame=new TextEncoder().encode(canonicalUseConsumableRequestFrame(expected));
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",frame)),(byte)=>byte.toString(16).padStart(2,"0")).join("");
+  if(JSON.stringify(result.requestBinding.requestEvidence)!==JSON.stringify(expected)
+    ||result.requestBinding.idempotencyKey!==expected.idempotencyKey||result.receipt.idempotencyKey!==expected.idempotencyKey
+    ||result.requestBinding.canonicalRequestDigest!==digest)throw new Error("Combat consumable result did not match the exact request");
+}
+
 export async function getCombatLog(combatId: string, query: CombatLogQuery): Promise<CombatLogResponse> {
   const target = combatPath(combatId);
   const input = parseApiInput(() => combatLogQuerySchema.parse(query));
@@ -2365,6 +2419,41 @@ export async function commandNpcPresence(campaignId: string, sessionId: string, 
   const response = npcPresenceMutationHttpResponseSchema.parse(success.body);
   if (response.receipt.kind !== body.mutation.kind || response.receipt.revisionBefore !== body.expectedRevision
     || response.receipt.revisionAfter !== body.expectedRevision + 1) throw new Error("NPC presence receipt did not match the request");
+  return response;
+}
+
+function companionAdministrationLane(campaignId: string, npcId: string): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const npc = parseApiInput(() => resourceIdSchema.parse(npcId));
+  return `/rpg/v1/campaigns/${encodeOpaquePathSegment(campaign)}/npcs/${encodeOpaquePathSegment(npc)}/companion-administration`;
+}
+
+/** Reads the strict owner/GM management projection for one path-owned companion. */
+export async function getCompanionAdministration(campaignId: string, npcId: string): Promise<CompanionAdministrationHttpGetResponse> {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const npc = parseApiInput(() => resourceIdSchema.parse(npcId));
+  const success = await requestResponse<unknown>(companionAdministrationLane(campaign, npc), { cache: "no-store" });
+  requireStatus(success, 200, "Companion administration read");
+  const response = companionAdministrationHttpGetResponseSchema.parse(success.body);
+  if (response.companion.campaignId !== campaign || response.companion.npcId !== npc) {
+    throw new Error("Companion administration response did not match the request");
+  }
+  return response;
+}
+
+/** Issues one companion administration command without automatic retry. */
+export async function commandCompanionAdministration(campaignId: string, npcId: string,
+  input: CompanionAdministrationHttpCommand): Promise<CompanionAdministrationHttpCommandResponse> {
+  const body = parseApiInput(() => companionAdministrationHttpCommandSchema.parse(input));
+  const success = await requestResponse<unknown>(`${companionAdministrationLane(campaignId, npcId)}/commands`, {
+    method: "POST", cache: "no-store", body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Companion administration command");
+  const response = companionAdministrationHttpCommandResponseSchema.parse(success.body);
+  if (response.receipt.kind !== body.kind || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+    throw new Error("Companion administration receipt did not match the request");
+  }
   return response;
 }
 export async function createCampaignNpc(campaignId: string, input: CreateCampaignNpcHttpRequest): Promise<ReturnType<typeof createCampaignNpcHttpResponseSchema.parse>> {
