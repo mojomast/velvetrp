@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { enemyTemplateCatalogReferenceSchema } from "./content-catalog.js";
+import {
+  damageTypeSchema,
+  enemyTemplateCatalogReferenceSchema,
+  itemCatalogDefinitionSchema,
+  itemCatalogReferenceSchema,
+} from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import {
   combatLogEventSchema,
@@ -10,6 +15,8 @@ import {
 } from "./encounters.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema } from "./rpg-characters.js";
+import { diceRollResultSchema } from "./rpg-dice.js";
+import { inventoryEntryIdSchema } from "./inventory.js";
 
 export const encounterNameSchema = z.string().trim().min(1).max(200);
 
@@ -312,6 +319,449 @@ export const combatCommandResultResponseSchema = z.discriminatedUnion("operation
   z.object({ operation: z.literal("end"), result: combatEndCommandResponseSchema }).strict(),
 ]);
 
+/** M5.3 prerequisite only. This action is not part of the live combat action or route unions. */
+export const USE_CONSUMABLE_ACTION_COST = "action" as const;
+export const useConsumableTargetPolicySchema = z.enum([
+  "damage-only-enemy",
+  "beneficial-only-self-or-ally",
+  "single-target",
+]);
+export const useConsumableEligibilityReasonSchema = z.enum([
+  "not-consumable",
+  "no-effects",
+  "unsupported-effect",
+  "spell-slot-level-identity-unavailable",
+  "noninstant-modifier",
+]);
+export const useConsumableEligibilitySchema = z.discriminatedUnion("eligible", [
+  z.object({ eligible: z.literal(true), targetPolicy: useConsumableTargetPolicySchema }).strict(),
+  z.object({
+    eligible: z.literal(false),
+    reasons: z.array(useConsumableEligibilityReasonSchema)
+      .min(1).max(useConsumableEligibilityReasonSchema.options.length)
+      .superRefine((reasons, context) => {
+        if (new Set(reasons).size !== reasons.length) {
+          context.addIssue({ code: "custom", message: "eligibility reasons must be unique" });
+        }
+      }),
+  }).strict(),
+]);
+
+export type UseConsumableCatalogItem = z.infer<typeof itemCatalogDefinitionSchema>;
+export type UseConsumableEligibility = z.infer<typeof useConsumableEligibilitySchema>;
+
+/** Pure catalog policy. Runtime must additionally verify ownership, quantity, turn, target, and revisions. */
+export const evaluateUseConsumableEligibility = (item: UseConsumableCatalogItem): UseConsumableEligibility => {
+  const reasons = new Set<z.infer<typeof useConsumableEligibilityReasonSchema>>();
+  if (item.mechanics.category !== "consumable") reasons.add("not-consumable");
+  if (item.mechanics.effects.length === 0) reasons.add("no-effects");
+
+  const polarities = new Set<"hostile" | "beneficial">();
+  let hasNeutralEffect = false;
+  for (const effect of item.mechanics.effects) {
+    if (effect.type === "damage") {
+      polarities.add("hostile");
+    } else if (effect.type === "healing") {
+      polarities.add("beneficial");
+    } else if (effect.type === "resource") {
+      // Item resource effects do not identify a spell-slot level, so they cannot be settled safely.
+      if (effect.resource === "spell-slot") reasons.add("spell-slot-level-identity-unavailable");
+      else if (effect.amount === 0) hasNeutralEffect = true;
+      else polarities.add(effect.amount < 0 ? "hostile" : "beneficial");
+    } else if (effect.type === "modifier") {
+      if (effect.duration !== "instant") reasons.add("noninstant-modifier");
+      if (effect.amount === 0) hasNeutralEffect = true;
+      else polarities.add(effect.amount < 0 ? "hostile" : "beneficial");
+    } else {
+      reasons.add("unsupported-effect");
+    }
+  }
+  if (hasNeutralEffect && polarities.size === 0) polarities.add("beneficial");
+  if (reasons.size > 0) return { eligible: false, reasons: [...reasons] };
+  return {
+    eligible: true,
+    targetPolicy: polarities.size > 1
+      ? "single-target"
+      : polarities.has("hostile") ? "damage-only-enemy" : "beneficial-only-self-or-ally",
+  };
+};
+
+export const useConsumableTargetSchema = z.object({
+  combatantId: resourceIdSchema,
+  relation: z.enum(["self", "ally", "enemy"]),
+  /** Private actor identity is server-derived and never appears in this contract. */
+  actorBacked: z.boolean(),
+}).strict();
+
+const useConsumableCatalogDiceSchema = z.object({
+  count: z.number().int().min(1).max(20),
+  sides: z.union([z.literal(4), z.literal(6), z.literal(8), z.literal(10), z.literal(12), z.literal(20)]),
+  modifier: z.number().int().min(-100).max(100),
+}).strict();
+export const useConsumableEffectDescriptorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("damage"), damageType: damageTypeSchema, dice: useConsumableCatalogDiceSchema }).strict(),
+  z.object({ kind: z.literal("healing"), dice: useConsumableCatalogDiceSchema.extend({ modifier: z.number().int().min(0).max(100) }).strict() }).strict(),
+  z.object({ kind: z.literal("resource"), resource: z.enum(["health", "guard", "focus"]), amount: z.number().int().min(-1_000_000).max(1_000_000) }).strict(),
+  z.object({ kind: z.literal("modifier"), statistic: z.enum(["check", "attack", "defense", "damage", "healing", "speed", "max-hp", "save-dc"]), amount: z.number().int().min(-1_000_000).max(1_000_000), duration: z.literal("instant") }).strict(),
+]);
+export const useConsumablePlannedEffectSchema = z.object({
+  effectOrdinal: z.number().int().min(0).max(15),
+  effect: useConsumableEffectDescriptorSchema,
+}).strict();
+export const useConsumableEffectPlanSchema = z.object({
+  effectCount: z.number().int().min(1).max(16),
+  effects: z.array(useConsumablePlannedEffectSchema).min(1).max(16),
+}).strict().superRefine((plan, context) => {
+  if (plan.effectCount !== plan.effects.length
+      || plan.effects.some((effect, index) => effect.effectOrdinal !== index)) {
+    context.addIssue({ code: "custom", message: "effect plan must contain every ordinal exactly once in order", path: ["effects"] });
+  }
+});
+
+const sameItemReference = (left: z.infer<typeof itemCatalogReferenceSchema>, right: z.infer<typeof itemCatalogReferenceSchema>) =>
+  left.kind === right.kind && left.packId === right.packId
+  && left.packVersion === right.packVersion && left.definitionId === right.definitionId;
+
+/** Derives the only trusted plan from a parsed eligible item and its exact pinned reference. */
+export const deriveUseConsumableEffectPlan = (
+  itemInput: unknown,
+  pinnedReference: z.infer<typeof itemCatalogReferenceSchema>,
+): z.infer<typeof useConsumableEffectPlanSchema> | null => {
+  const parsed = itemCatalogDefinitionSchema.safeParse(itemInput);
+  if (!parsed.success || !sameItemReference(parsed.data.reference, pinnedReference)
+      || !evaluateUseConsumableEligibility(parsed.data).eligible) return null;
+  const effects = parsed.data.mechanics.effects.map((effect, effectOrdinal) => {
+    if (effect.type === "damage") return { effectOrdinal, effect: { kind: "damage" as const, damageType: effect.damageType, dice: effect.dice } };
+    if (effect.type === "healing") return { effectOrdinal, effect: { kind: "healing" as const, dice: effect.dice } };
+    if (effect.type === "resource" && effect.resource !== "spell-slot") {
+      return { effectOrdinal, effect: { kind: "resource" as const, resource: effect.resource, amount: effect.amount } };
+    }
+    if (effect.type === "modifier" && effect.duration === "instant") {
+      return { effectOrdinal, effect: { kind: "modifier" as const, statistic: effect.statistic, amount: effect.amount, duration: effect.duration } };
+    }
+    return null;
+  });
+  if (effects.some((effect) => effect === null)) return null;
+  return useConsumableEffectPlanSchema.parse({ effectCount: effects.length, effects });
+};
+
+export const verifyUseConsumableEffectPlan = (item: unknown, pinnedReference: unknown, plan: unknown): boolean => {
+  try {
+    const reference = itemCatalogReferenceSchema.parse(pinnedReference);
+    const supplied = useConsumableEffectPlanSchema.parse(plan);
+    const derived = deriveUseConsumableEffectPlan(item, reference);
+    return derived !== null && JSON.stringify(supplied) === JSON.stringify(derived);
+  } catch {
+    return false;
+  }
+};
+
+/** One server-authored legal action pins one possession, catalog definition, and combat target. */
+export const useConsumableLegalActionSchema = z.object({
+  legalActionId: resourceIdSchema,
+  kind: z.literal("use-consumable"),
+  actingCombatantId: resourceIdSchema,
+  inventoryEntryId: inventoryEntryIdSchema,
+  item: itemCatalogReferenceSchema,
+  quantity: z.literal(1),
+  actionCost: z.literal(USE_CONSUMABLE_ACTION_COST),
+  targetPolicy: useConsumableTargetPolicySchema,
+  target: useConsumableTargetSchema,
+  effectPlan: useConsumableEffectPlanSchema,
+}).strict().superRefine((action, context) => {
+  const validRelation = action.targetPolicy === "damage-only-enemy"
+    ? action.target.relation === "enemy"
+    : action.targetPolicy === "beneficial-only-self-or-ally"
+      ? action.target.relation === "self" || action.target.relation === "ally"
+      : true;
+  if (!validRelation) {
+    context.addIssue({ code: "custom", message: "target relation must satisfy the consumable target policy", path: ["target"] });
+  }
+  if ((action.target.relation === "self") !== (action.target.combatantId === action.actingCombatantId)) {
+    context.addIssue({ code: "custom", message: "self relation must exactly match the acting combatant", path: ["target"] });
+  }
+});
+
+/** Caller intent repeats fixed identity pins, but never supplies catalog mechanics or settlement values. */
+export const useConsumableCommandRequestSchema = z.object({
+  legalActionId: resourceIdSchema,
+  inventoryEntryId: inventoryEntryIdSchema,
+  item: itemCatalogReferenceSchema,
+  quantity: z.literal(1),
+  targetCombatantId: resourceIdSchema,
+  targetActorBacked: z.boolean(),
+  expectedCombatRevision: expectedRevisionSchema,
+  expectedActingM15Revision: expectedRevisionSchema,
+  expectedTargetM15Revision: expectedRevisionSchema.nullable(),
+  idempotencyKey: idempotencyKeySchema,
+}).strict().refine((request) => request.targetActorBacked === (request.expectedTargetM15Revision !== null), {
+  message: "actor-backed targets require an expected target M1.5 revision",
+  path: ["expectedTargetM15Revision"],
+});
+
+const useConsumableAmountSchema = z.number().int().min(-1_000_000).max(1_000_000);
+const useConsumableCountSchema = z.number().int().min(0).max(1_000_000);
+const useConsumableEffectOrdinalSchema = z.number().int().min(0).max(15);
+const useConsumableModifierStatisticSchema = z.enum([
+  "check", "attack", "defense", "damage", "healing", "speed", "max-hp", "save-dc",
+]);
+
+export const useConsumableSettlementSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("combat-hp-damage"),
+    effectOrdinal: useConsumableEffectOrdinalSchema,
+    damageType: damageTypeSchema,
+    roll: diceRollResultSchema,
+    requested: useConsumableCountSchema,
+    adjustment: z.enum(["none", "resistance", "vulnerability", "immunity"]),
+    applied: useConsumableCountSchema,
+    before: useConsumableCountSchema,
+    after: useConsumableCountSchema,
+  }).strict().superRefine((settlement, context) => {
+    const adjusted = settlement.adjustment === "immunity" ? 0
+      : settlement.adjustment === "resistance" ? Math.floor(settlement.requested / 2)
+      : settlement.adjustment === "vulnerability" ? settlement.requested * 2
+      : settlement.requested;
+    if (settlement.requested !== Math.max(0, settlement.roll.total)
+        || settlement.applied !== Math.min(settlement.before, adjusted)
+        || settlement.after !== settlement.before - settlement.applied) {
+      context.addIssue({ code: "custom", message: "damage must equal clipped exact adjusted roll evidence", path: ["applied"] });
+    }
+  }),
+  z.object({
+    kind: z.literal("combat-hp-healing"),
+    effectOrdinal: useConsumableEffectOrdinalSchema,
+    roll: diceRollResultSchema,
+    requested: useConsumableCountSchema,
+    applied: useConsumableCountSchema,
+    before: useConsumableCountSchema,
+    after: useConsumableCountSchema,
+  }).strict().superRefine((settlement, context) => {
+    if (settlement.requested !== Math.max(0, settlement.roll.total)
+        || settlement.applied !== settlement.after - settlement.before
+        || settlement.applied > settlement.requested) {
+      context.addIssue({ code: "custom", message: "healing delta must be bounded by its roll evidence", path: ["applied"] });
+    }
+  }),
+  z.object({
+    kind: z.literal("combat-hp-resource"),
+    effectOrdinal: useConsumableEffectOrdinalSchema,
+    resource: z.literal("health"),
+    requested: useConsumableAmountSchema,
+    applied: useConsumableAmountSchema,
+    before: useConsumableCountSchema,
+    after: useConsumableCountSchema,
+  }).strict().superRefine((settlement, context) => {
+    if (settlement.applied !== settlement.after - settlement.before
+        || Math.abs(settlement.applied) > Math.abs(settlement.requested)
+        || (settlement.applied !== 0 && Math.sign(settlement.applied) !== Math.sign(settlement.requested))) {
+      context.addIssue({ code: "custom", message: "resource delta must be a bounded part of the requested change", path: ["applied"] });
+    }
+  }),
+  z.object({
+    kind: z.literal("actor-resource-delta"),
+    effectOrdinal: useConsumableEffectOrdinalSchema,
+    resource: z.enum(["guard", "focus"]),
+    requested: useConsumableAmountSchema,
+    applied: useConsumableAmountSchema,
+  }).strict().superRefine((settlement, context) => {
+    if (Math.abs(settlement.applied) > Math.abs(settlement.requested)
+        || (settlement.applied !== 0 && Math.sign(settlement.applied) !== Math.sign(settlement.requested))) {
+      context.addIssue({ code: "custom", message: "actor resource delta must be bounded by the requested amount", path: ["applied"] });
+    }
+  }),
+  z.object({
+    kind: z.literal("instant-modifier"),
+    effectOrdinal: useConsumableEffectOrdinalSchema,
+    statistic: useConsumableModifierStatisticSchema,
+    requested: useConsumableAmountSchema,
+    applied: useConsumableAmountSchema,
+    duration: z.literal("instant"),
+  }).strict().superRefine((settlement, context) => {
+    if (Math.abs(settlement.applied) > Math.abs(settlement.requested)
+        || (settlement.applied !== 0 && Math.sign(settlement.applied) !== Math.sign(settlement.requested))) {
+      context.addIssue({ code: "custom", message: "modifier settlement must be bounded by the requested amount", path: ["applied"] });
+    }
+  }),
+]);
+
+export const useConsumableOutcomeSchema = z.object({
+  targetCombatantId: resourceIdSchema,
+  settlements: z.array(useConsumableSettlementSchema).min(1).max(16),
+}).strict();
+
+export const useConsumableM15RevisionDeltaSchema = z.object({
+  before: revisionSchema,
+  after: revisionSchema,
+}).strict().refine((delta) => delta.after === delta.before + 1, "an M1.5 mutation advances exactly one revision");
+
+export const useConsumableResolutionSchema = z.object({
+  actionId: resourceIdSchema,
+  legalActionId: resourceIdSchema,
+  kind: z.literal("use-consumable"),
+  actingCombatantId: resourceIdSchema,
+  target: useConsumableTargetSchema,
+  targetPolicy: useConsumableTargetPolicySchema,
+  actionCost: z.literal(USE_CONSUMABLE_ACTION_COST),
+  consumed: z.object({
+    inventoryEntryId: inventoryEntryIdSchema,
+    item: itemCatalogReferenceSchema,
+    quantity: z.literal(1),
+  }).strict(),
+  effectPlan: useConsumableEffectPlanSchema,
+  outcome: useConsumableOutcomeSchema,
+  combatRevisionBefore: revisionSchema,
+  combatRevisionAfter: revisionSchema,
+  actingM15Revision: useConsumableM15RevisionDeltaSchema,
+  targetM15Revision: useConsumableM15RevisionDeltaSchema.nullable(),
+}).strict().superRefine((resolution, context) => {
+  if (resolution.combatRevisionAfter !== resolution.combatRevisionBefore + 1) {
+    context.addIssue({ code: "custom", message: "consumable use advances combat exactly one revision", path: ["combatRevisionAfter"] });
+  }
+  if (resolution.outcome.targetCombatantId !== resolution.target.combatantId) {
+    context.addIssue({ code: "custom", message: "outcome must bind the exact target combatant", path: ["outcome", "targetCombatantId"] });
+  }
+  const validRelation = resolution.targetPolicy === "damage-only-enemy"
+    ? resolution.target.relation === "enemy"
+    : resolution.targetPolicy === "beneficial-only-self-or-ally"
+      ? resolution.target.relation === "self" || resolution.target.relation === "ally"
+      : true;
+  if (!validRelation || ((resolution.target.relation === "self") !== (resolution.target.combatantId === resolution.actingCombatantId))) {
+    context.addIssue({ code: "custom", message: "resolved target must satisfy the exact target policy", path: ["target"] });
+  }
+  const selfTarget = resolution.target.relation === "self";
+  if ((selfTarget && resolution.targetM15Revision !== null)
+      || (!selfTarget && resolution.target.actorBacked !== (resolution.targetM15Revision !== null))) {
+    context.addIssue({ code: "custom", message: "distinct actor-backed targets require one target M1.5 revision; self uses the acting revision", path: ["targetM15Revision"] });
+  }
+  if (resolution.outcome.settlements.length !== resolution.effectPlan.effectCount
+      || resolution.outcome.settlements.some((settlement, index) => settlement.effectOrdinal !== index)) {
+    context.addIssue({ code: "custom", message: "settlements must bijectively follow the advertised effect plan", path: ["outcome", "settlements"] });
+  }
+  resolution.outcome.settlements.forEach((settlement, index) => {
+    const descriptor = resolution.effectPlan.effects[index]?.effect;
+    const rollMatches = (dice: { count: number; sides: number; modifier: number }, roll: z.infer<typeof diceRollResultSchema>) =>
+      roll.normalized.count === dice.count && roll.normalized.sides === dice.sides
+      && roll.normalized.modifier === dice.modifier && roll.normalized.selection.type === "all";
+    const matches = descriptor?.kind === "damage" && settlement.kind === "combat-hp-damage"
+      ? settlement.damageType === descriptor.damageType && rollMatches(descriptor.dice, settlement.roll)
+      : descriptor?.kind === "healing" && settlement.kind === "combat-hp-healing"
+        ? rollMatches(descriptor.dice, settlement.roll)
+        : descriptor?.kind === "resource" && descriptor.resource === "health" && settlement.kind === "combat-hp-resource"
+          ? settlement.resource === descriptor.resource && settlement.requested === descriptor.amount
+          : descriptor?.kind === "resource" && descriptor.resource !== "health" && settlement.kind === "actor-resource-delta"
+            ? settlement.resource === descriptor.resource && settlement.requested === descriptor.amount
+            : descriptor?.kind === "modifier" && settlement.kind === "instant-modifier"
+              ? settlement.statistic === descriptor.statistic && settlement.requested === descriptor.amount
+              : false;
+    if (!matches) context.addIssue({ code: "custom", message: "settlement must exactly match its catalog effect descriptor", path: ["outcome", "settlements", index] });
+  });
+  if (!resolution.target.actorBacked
+      && resolution.outcome.settlements.some((settlement) => settlement.kind === "actor-resource-delta")) {
+    context.addIssue({ code: "custom", message: "actor resources require an actor-backed target", path: ["outcome", "settlements"] });
+  }
+});
+
+export const useConsumableCanonicalRequestDigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export const USE_CONSUMABLE_REQUEST_FRAME_VERSION = "velvet.use-consumable-request.v1" as const;
+export const canonicalUseConsumableRequestFrame = (requestInput: unknown): string => {
+  const request = useConsumableCommandRequestSchema.parse(requestInput);
+  return JSON.stringify({
+    version: USE_CONSUMABLE_REQUEST_FRAME_VERSION,
+    legalActionId: request.legalActionId,
+    inventoryEntryId: request.inventoryEntryId,
+    item: {
+      kind: request.item.kind,
+      packId: request.item.packId,
+      packVersion: request.item.packVersion,
+      definitionId: request.item.definitionId,
+    },
+    quantity: request.quantity,
+    targetCombatantId: request.targetCombatantId,
+    targetActorBacked: request.targetActorBacked,
+    expectedCombatRevision: request.expectedCombatRevision,
+    expectedActingM15Revision: request.expectedActingM15Revision,
+    expectedTargetM15Revision: request.expectedTargetM15Revision,
+    idempotencyKey: request.idempotencyKey,
+  });
+};
+export type UseConsumableSha256 = (canonicalFrame: string) => string;
+export const verifyUseConsumableRequestDigest = (
+  request: unknown,
+  digest: unknown,
+  trustedSha256: UseConsumableSha256,
+): boolean => {
+  try {
+    const expected = useConsumableCanonicalRequestDigestSchema.parse(digest);
+    const actual = useConsumableCanonicalRequestDigestSchema.parse(trustedSha256(canonicalUseConsumableRequestFrame(request)));
+    return actual === expected;
+  } catch {
+    return false;
+  }
+};
+export const useConsumableCommandResultSchema = z.object({
+  resolution: useConsumableResolutionSchema,
+  requestBinding: z.object({
+    requestEvidence: useConsumableCommandRequestSchema,
+    canonicalRequestDigest: useConsumableCanonicalRequestDigestSchema,
+    idempotencyKey: idempotencyKeySchema,
+  }).strict(),
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict().superRefine((result, context) => {
+  if (result.receipt.revisionBefore !== result.resolution.combatRevisionBefore
+      || result.receipt.revisionAfter !== result.resolution.combatRevisionAfter) {
+    context.addIssue({ code: "custom", message: "receipt must bind the consumable combat revision", path: ["receipt"] });
+  }
+  if (result.requestBinding.idempotencyKey !== result.receipt.idempotencyKey) {
+    context.addIssue({ code: "custom", message: "request binding and receipt idempotency keys must match", path: ["requestBinding", "idempotencyKey"] });
+  }
+  const request = result.requestBinding.requestEvidence;
+  const resolution = result.resolution;
+  if (request.idempotencyKey !== result.requestBinding.idempotencyKey) {
+    context.addIssue({ code: "custom", message: "request evidence and binding idempotency keys must match", path: ["requestBinding", "requestEvidence", "idempotencyKey"] });
+  }
+  if (request.legalActionId !== resolution.legalActionId
+      || request.inventoryEntryId !== resolution.consumed.inventoryEntryId
+      || !sameItemReference(request.item, resolution.consumed.item)
+      || request.quantity !== resolution.consumed.quantity
+      || request.targetCombatantId !== resolution.target.combatantId
+      || request.targetActorBacked !== resolution.target.actorBacked) {
+    context.addIssue({ code: "custom", message: "resolution must bind every requested action identity", path: ["resolution"] });
+  }
+  if (request.expectedCombatRevision !== resolution.combatRevisionBefore
+      || request.expectedActingM15Revision !== resolution.actingM15Revision.before) {
+    context.addIssue({ code: "custom", message: "resolution must begin at the requested combat and acting M1.5 revisions", path: ["resolution"] });
+  }
+  if (resolution.target.relation === "self") {
+    if (!resolution.target.actorBacked
+        || request.expectedTargetM15Revision !== request.expectedActingM15Revision
+        || resolution.targetM15Revision !== null) {
+      context.addIssue({ code: "custom", message: "self target must alias the single acting M1.5 revision", path: ["resolution", "targetM15Revision"] });
+    }
+  } else if (request.expectedTargetM15Revision === null
+      ? resolution.targetM15Revision !== null
+      : resolution.targetM15Revision?.before !== request.expectedTargetM15Revision) {
+    context.addIssue({ code: "custom", message: "target M1.5 evidence must begin at the requested target revision", path: ["resolution", "targetM15Revision"] });
+  }
+});
+
+/** Trusted wrapper verification binds the exact canonical request, result digest, and receipt key. */
+export const verifyUseConsumableCommandResultBinding = (
+  requestInput: unknown,
+  resultInput: unknown,
+  trustedSha256: UseConsumableSha256,
+): boolean => {
+  try {
+    const request = useConsumableCommandRequestSchema.parse(requestInput);
+    const result = useConsumableCommandResultSchema.parse(resultInput);
+    return JSON.stringify(request) === JSON.stringify(result.requestBinding.requestEvidence)
+      && request.idempotencyKey === result.requestBinding.idempotencyKey
+      && verifyUseConsumableRequestDigest(request, result.requestBinding.canonicalRequestDigest, trustedSha256);
+  } catch {
+    return false;
+  }
+};
+
 export type EncounterCreateRequest = z.infer<typeof encounterCreateRequestSchema>;
 export type EncounterCombatantPublic = z.infer<typeof encounterCombatantPublicSchema>;
 export type EncounterPublic = z.infer<typeof encounterPublicSchema>;
@@ -330,3 +780,12 @@ export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSche
 export type CombatRewardGrantPublic = z.infer<typeof combatRewardGrantPublicSchema>;
 export type CombatEndCommandResponse = z.infer<typeof combatEndCommandResponseSchema>;
 export type CombatCommandResultResponse = z.infer<typeof combatCommandResultResponseSchema>;
+export type UseConsumableTargetPolicy = z.infer<typeof useConsumableTargetPolicySchema>;
+export type UseConsumableEffectDescriptor = z.infer<typeof useConsumableEffectDescriptorSchema>;
+export type UseConsumableEffectPlan = z.infer<typeof useConsumableEffectPlanSchema>;
+export type UseConsumableLegalAction = z.infer<typeof useConsumableLegalActionSchema>;
+export type UseConsumableCommandRequest = z.infer<typeof useConsumableCommandRequestSchema>;
+export type UseConsumableSettlement = z.infer<typeof useConsumableSettlementSchema>;
+export type UseConsumableOutcome = z.infer<typeof useConsumableOutcomeSchema>;
+export type UseConsumableResolution = z.infer<typeof useConsumableResolutionSchema>;
+export type UseConsumableCommandResult = z.infer<typeof useConsumableCommandResultSchema>;
