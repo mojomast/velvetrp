@@ -216,7 +216,7 @@ describe("initialize actor resource command", () => {
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
+      .toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -227,7 +227,7 @@ describe("initialize actor resource command", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
     db.close();
-    expect(() => factory()).toThrow("schema marker 44 contains foreign-key violation in campaigns");
+    expect(() => factory()).toThrow("schema marker 45 contains foreign-key violation in campaigns");
   });
 
   it("returns an exact historical retry before inactive and existing-resource checks", () => {
@@ -332,7 +332,7 @@ describe("initialize actor resource command", () => {
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow("schema marker 44 contains foreign-key violation in rpg_actor_resources");
+      .toThrow("schema marker 45 contains foreign-key violation in rpg_actor_resources");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -398,7 +398,7 @@ describe("initialize actor resource command", () => {
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
+      .toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -427,7 +427,7 @@ describe("initialize actor resource command", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
     db.close();
-    expect(() => factory()).toThrow(`schema marker 44 contains foreign-key violation in ${table}`);
+    expect(() => factory()).toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
   });
 
   it("consumes one valid event ID before exactly one clock reading", () => {
