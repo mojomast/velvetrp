@@ -4,6 +4,7 @@ import { createRepository } from "../../../src/repo/index.js";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_RACE } from "@velvet/contracts";
 import { createCompanionCoreV44 } from "../../../src/repo/db/migrations/v44_companion_core.js";
 import { COMPANION_CORE_V45_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v45_companion_principals.js";
+import { EXACT_CANDIDATE_V46_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v46_exact_candidates.js";
 
 const AT = "2035-01-01T00:00:00.000Z";
 const V42_TABLES = ["campaign_content_layout_attestation_v42", "campaign_content_revisions_v42", "campaign_content_receipts_v42", "campaign_content_commands_v42"];
@@ -239,6 +240,10 @@ export function buildCanonicalV43Fixture(): SupportWindowFixture {
 /** Builds canonical populated v44 companion history, including a durable-principal grant. */
 export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44CompanionFixture {
   const fixture = buildCanonicalV43Fixture();
+  const promote = new DatabaseDriver(databaseFile());
+  createCompanionCoreV44(promote);
+  promote.prepare("UPDATE meta SET value='44' WHERE key='schemaVersion'").run();
+  promote.close();
   let id = 0;
   const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `support-companion-${++id}` } });
   const grantorPrincipalId = "support-companion-gm";
@@ -272,6 +277,11 @@ export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44Compan
   const downgrade = new DatabaseDriver(databaseFile());
   downgrade.pragma("foreign_keys=OFF");
   downgrade.transaction(() => {
+    for (const [type, name] of [...EXACT_CANDIDATE_V46_MANAGED_OBJECTS].reverse()) {
+      if (type === "trigger") downgrade.exec(`DROP TRIGGER ${name}`);
+      if (type === "index") downgrade.exec(`DROP INDEX ${name}`);
+    }
+    for (const [, name] of [...EXACT_CANDIDATE_V46_MANAGED_OBJECTS].filter(([type]) => type === "table").reverse()) downgrade.exec(`DROP TABLE ${name}`);
     createCompanionCoreV44(downgrade);
     for (const table of V44_TABLES.filter((name) => name !== "companion_layout_attestation_v44")) {
       downgrade.exec(`INSERT INTO ${table} SELECT * FROM ${table.replace(/_v44$/, "_v45")}`);
@@ -288,4 +298,18 @@ export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44Compan
   downgrade.pragma("foreign_keys=ON");
   downgrade.close();
   return { ...fixture, actorId, grantId, grantorPrincipalId, granteePrincipalId };
+}
+
+/** Builds the same populated history at the supported v45 archive boundary. */
+export function buildCanonicalPopulatedV45CompanionFixture(): PopulatedV44CompanionFixture {
+  const fixture=buildCanonicalPopulatedV44CompanionFixture();
+  createRepository().close();
+  const db=new DatabaseDriver(databaseFile());db.pragma("foreign_keys=OFF");
+  db.transaction(()=>{
+    for(const [type,name] of [...EXACT_CANDIDATE_V46_MANAGED_OBJECTS].reverse()){
+      if(type==="trigger")db.exec(`DROP TRIGGER ${name}`);if(type==="index")db.exec(`DROP INDEX ${name}`);
+    }
+    for(const [,name] of [...EXACT_CANDIDATE_V46_MANAGED_OBJECTS].filter(([type])=>type==="table").reverse())db.exec(`DROP TABLE ${name}`);
+    db.prepare("UPDATE meta SET value='45' WHERE key='schemaVersion'").run();
+  })();db.close();return fixture;
 }
