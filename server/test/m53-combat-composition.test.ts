@@ -72,6 +72,91 @@ function durableState(db: DatabaseDriver.Database, campaignId: string, actorId: 
 }
 
 describe("M5.3 Slice 0 combat composition", () => {
+  it("uses an exact server-derived consumable atomically and replays without rerolling", async () => {
+    let rolls=0,sequence=0,duplicateIds=false;
+    const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date(at) },
+      ids:{nextId:()=>duplicateIds?"duplicate-fresh-id":`consume-${++sequence}`},rng:{integer:(minimum)=>{rolls++;return minimum;}} });
+    const campaign=repo.createCampaign("local-owner",{name:"Consumables"});
+    repo.installMechanicsStarterCatalog("local-owner");
+    repo.configureMechanicsStarterCatalog("local-owner",campaign.id,{expectedRevision:0,idempotencyKey:"pins"});
+    const persona=repo.createCharacter({name:"Tonic Bearer",age:30,archetype:"Warden",boundaries:"",fictionalConfirmed:true});
+    const draft=repo.createCharacterDraft("local-owner",campaign.id,{personaId:persona.id,controllerPrincipalId:"local-owner",
+      durability:"durable",allocation:{method:"standard-array",scores},idempotencyKey:"draft"});
+    const definitions=MECHANICS_STARTER_CATALOG.definitions;
+    const selected=repo.updateCharacterDraft("local-owner",draft.draft.id,{expectedRevision:0,idempotencyKey:"select",selections:{
+      race:definitions.find((value)=>value.reference.kind==="race")!.reference,
+      background:definitions.find((value)=>value.reference.kind==="background")!.reference,
+      class:definitions.find((value)=>value.reference.kind==="class")!.reference,starterGrant:"kit"}} as any);
+    const actorId=repo.finalizeCharacterDraft("local-owner",draft.draft.id,{expectedRevision:selected.draft.revision,idempotencyKey:"final"}).receipt.actorId;
+    const session=await createSession({characterId:persona.id,title:"Consumable combat"});
+    repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
+    const enemy={kind:"enemy-template" as const,packId:MECHANICS_STARTER_CATALOG.manifest.packId,
+      packVersion:MECHANICS_STARTER_CATALOG.manifest.packVersion,definitionId:"velvet:mechanics:enemy-template:gloam-mite"};
+    const created=repo.createEncounter("local-owner",campaign.id,{sessionId:session.id,name:"Tonic test",
+      combatants:[{kind:"actor",actorId,team:"allies"},{kind:"enemy",template:enemy,team:"enemies"}],idempotencyKey:"prepare"});
+    const combat=repo.startEncounter("local-owner",created.encounter.encounterId,{expectedRevision:1,idempotencyKey:"start"}).combat;
+    const acting=combat.combatants.find((value)=>value.combatantId===combat.currentCombatant)!;
+    expect(acting.kind).toBe("actor");
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    const itemRef=definitions.find((value)=>value.reference.kind==="item")!.reference;
+    db.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25
+      (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,'item',?)`)
+      .run(campaign.id,itemRef.packId,itemRef.packVersion,itemRef.definitionId);
+    db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,
+      item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+      VALUES('tonic-entry',?,?,?,?,'item',?,'stackable',1,NULL,NULL,0,?)`)
+      .run(campaign.id,actorId,itemRef.packId,itemRef.packVersion,itemRef.definitionId,at);
+    const entry={entry_id:"tonic-entry",item_pack_id:itemRef.packId,item_pack_version:itemRef.packVersion,item_definition_id:itemRef.definitionId};
+    const definitionRow=db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=?
+      AND kind='item' AND definition_id=?`).get(entry.item_pack_id,entry.item_pack_version,entry.item_definition_id) as {definition_json:string};
+    const tonic=JSON.parse(definitionRow.definition_json);
+    const modifierOnly=structuredClone(tonic);
+    modifierOnly.mechanics={...modifierOnly.mechanics,category:"consumable",stackable:true,slot:null,
+      effects:[{type:"modifier",statistic:"check",amount:1,duration:"instant"}]};
+    db.exec("DROP TRIGGER rpg_catalog_definitions_immutable_update");
+    db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
+      AND kind='item' AND definition_id=?`).run(JSON.stringify(modifierOnly),JSON.stringify(modifierOnly),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
+    expect(repo.getUseConsumableLegalActions("local-owner",combat.combatId)).toEqual([]);
+    tonic.mechanics={...tonic.mechanics,category:"consumable",stackable:true,slot:null,
+      effects:[{type:"healing",dice:{count:1,sides:4,modifier:0}}]};
+    db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=?,public_definition_json=? WHERE pack_id=? AND pack_version=?
+      AND kind='item' AND definition_id=?`).run(JSON.stringify(tonic),JSON.stringify(tonic),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
+    const action=repo.getUseConsumableLegalActions("local-owner",combat.combatId).find((value)=>value.target.relation==="self")!;
+    expect(action).toMatchObject({kind:"use-consumable",inventoryEntryId:entry.entry_id,target:{actorBacked:true,relation:"self"}});
+    const beforeRolls=rolls;
+    const command={legalActionId:action.legalActionId,inventoryEntryId:action.inventoryEntryId,item:action.item,quantity:1 as const,
+      targetCombatantId:action.target.combatantId,targetActorBacked:true,expectedCombatRevision:combat.revision,
+      expectedActingM15Revision:0,expectedTargetM15Revision:0,idempotencyKey:"use-tonic"};
+    const beforeDuplicate={rolls,inventory:db.prepare("SELECT quantity FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id),
+      combatCommands:(db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+      m15Commands:(db.prepare("SELECT count(*) count FROM rpg_m15_commands_v25 WHERE campaign_id=? AND actor_id=?").get(campaign.id,actorId) as {count:number}).count};
+    duplicateIds=true;
+    expect(()=>repo.useConsumable("local-owner",command)).toThrow("generated consumable identities are not unique");
+    duplicateIds=false;
+    expect({rolls,inventory:db.prepare("SELECT quantity FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id),
+      combatCommands:(db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as {count:number}).count,
+      m15Commands:(db.prepare("SELECT count(*) count FROM rpg_m15_commands_v25 WHERE campaign_id=? AND actor_id=?").get(campaign.id,actorId) as {count:number}).count})
+      .toEqual(beforeDuplicate);
+    const result=repo.useConsumable("local-owner",command);
+    expect(result.resolution).toMatchObject({effectPlan:action.effectPlan,actingM15Revision:{before:0,after:1},targetM15Revision:null});
+    expect(result.resolution.outcome.settlements.map((value)=>value.kind)).toEqual(["combat-hp-healing"]);
+    expect(rolls).toBe(beforeRolls+1);
+    expect(repo.useConsumable("local-owner",command)).toEqual(result);
+    expect(rolls).toBe(beforeRolls+1);
+    expect(db.prepare("SELECT 1 FROM rpg_inventory_entries_v25 WHERE entry_id=?").get(entry.entry_id)).toBeUndefined();
+    expect((db.prepare("SELECT count(*) count FROM rpg_m16_commands_v26 WHERE campaign_id=? AND actor_id=?")
+      .get(campaign.id,actorId) as {count:number}).count).toBe(0);
+    db.close();repo.close();
+    const reopened=createRepository({dataDir:process.env.VELVET_DATA_DIR!});
+    expect(reopened.getCombatState("local-owner",combat.combatId)?.revision).toBe(result.receipt.revisionAfter);
+    const verifyDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    const commandId=(verifyDb.prepare("SELECT command_id FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?")
+      .get(combat.combatId,command.idempotencyKey) as {command_id:string}).command_id;
+    verifyDb.close();
+    expect(reopened.getUseConsumableCommandResult("local-owner",commandId)).toEqual(result);
+    reopened.close();
+  });
+
   it("requires transaction-owned sealed plans and rolls back representative composition boundaries", async () => {
     const f = await fixture();
     const db = new DatabaseDriver(f.filename);

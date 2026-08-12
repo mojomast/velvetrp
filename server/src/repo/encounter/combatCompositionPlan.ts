@@ -70,6 +70,8 @@ type PlanInput = Readonly<{
   roundAfter: number;
   occurredAt: string;
   combatantChanges: readonly CombatantStateChange[];
+  /** Actor health is composed by another aggregate command in the same transaction. */
+  externallyMirroredActorIds?: readonly string[];
 }>;
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) =>
@@ -126,6 +128,7 @@ export function buildCombatCompositionPlan(
     if (!health || health.current !== change.hitPointsBefore) {
       throw new EncounterConflictError("actor health is not synchronized with active combat");
     }
+    if (input.externallyMirroredActorIds?.includes(row.actor_id)) continue;
     const revisionBefore = (db.prepare(`SELECT revision FROM rpg_m15_mutation_revisions_v25
       WHERE campaign_id=? AND actor_id=?`).get(input.campaignId, row.actor_id) as { revision: number } | undefined)?.revision ?? 0;
     const revisionAfter = revisionBefore + 1, commandId = nextId(ids);

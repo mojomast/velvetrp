@@ -23,3 +23,4 @@ export {
   type EncounterWriteDependencies,
   type EncounterWriteRepository,
 } from "./encounterWriteRepo.js";
+export { buildUseConsumableLegalActions, executeUseConsumable, type UseConsumableBoundary } from "./useConsumableRuntime.js";

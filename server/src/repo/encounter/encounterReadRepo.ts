@@ -13,10 +13,13 @@ import {
   type EncounterPublic,
   type LegalCombatActionAllowlist,
   type CombatCommandResultResponse,
+  type UseConsumableLegalAction,
+  type UseConsumableCommandResult,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
 import { buildCombatActionPlans } from "./combatActionPlan.js";
+import { buildUseConsumableLegalActions, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
@@ -44,6 +47,10 @@ export interface EncounterReadRepository {
   getCombatCommandResult(principal: string, campaignId: string, combatId: string, idempotencyKey: string): CombatCommandResultResponse | null;
   /** Returns validated public combat-log entries when the principal may view the encounter. */
   listCombatLog(principal: string, campaignId: string, encounterId: string): unknown[];
+  /** Repository-only legal actions; deliberately excluded from the live HTTP combat union. */
+  getUseConsumableLegalActions(principal:string,combatId:string):UseConsumableLegalAction[];
+  /** Reads one immutable repository-only consumable result by its internal command identity. */
+  getUseConsumableCommandResult(principal:string,commandId:string):UseConsumableCommandResult|null;
 }
 
 /** Creates the database-backed read repository for encounter state. */
@@ -170,7 +177,8 @@ export function createEncounterReadRepository(
     if (!encounter || !member(principal, campaignId)) return null;
     const row = db.prepare(`SELECT command.command_type,command.actor_id,receipt.canonical_result_json
       FROM combat_commands_v27 command JOIN combat_receipts_v27 receipt USING(encounter_id,command_id)
-      WHERE command.encounter_id=? AND command.idempotency_key=? AND command.command_type IN ('resolve_action','grant_rewards')`)
+      WHERE command.encounter_id=? AND command.idempotency_key=? AND command.command_type IN ('resolve_action','grant_rewards')
+        AND COALESCE(json_extract(command.canonical_request_json,'$.kind'),'')<>'use-consumable'`)
       .get(combatId, idempotencyKey) as { command_type: "resolve_action" | "grant_rewards"; actor_id: string | null; canonical_result_json: string } | undefined;
     if (!row) return null;
     if (row.command_type === "resolve_action" && !gm(principal, campaignId)
@@ -192,5 +200,7 @@ export function createEncounterReadRepository(
       receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
     return combatCommandResultResponseSchema.parse({ operation: "end", result });
   };
-  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult };
+  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
+    getUseConsumableLegalActions:(principal,combatId)=>db.transaction(()=>buildUseConsumableLegalActions(db,principal,combatId)).deferred(),
+    getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred() };
 }

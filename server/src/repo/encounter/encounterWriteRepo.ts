@@ -21,6 +21,8 @@ import {
   type EncounterCreateRequest,
   type EncounterStartCommandRequest,
   type LegalCombatActionAllowlist,
+  type UseConsumableCommandRequest,
+  type UseConsumableCommandResult,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 import {
@@ -34,6 +36,7 @@ import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot, EncounterRead
 import { buildCombatActionPlans } from "./combatActionPlan.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
+import { executeUseConsumable } from "./useConsumableRuntime.js";
 
 export type EncounterDependencies={clock:Clock;ids:IdGenerator;rng:RandomNumberGenerator};
 export type EncounterReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
@@ -64,6 +67,7 @@ export interface EncounterWriteRepository {
   endCombat(principal:string,combatId:string,input:CombatEndCommandRequest):EncounterResult<{campaignId:string;encounterId:string;encounter:EncounterLifecycleSnapshot;rewards:EncounterRewardGrantSnapshot[]}>;
   executeEncounterCommand(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   mutateEncounter(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
+  useConsumable(principal:string,input:UseConsumableCommandRequest):UseConsumableCommandResult;
 }
 
 /** Creates immediate-transaction commands backed by the authoritative read projection. */
@@ -434,7 +438,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
     }).immediate();
   };
   return {createEncounter:createLifecycleEncounter,startEncounter:startLifecycleEncounter,resolveCombatAction,endCombat,
-    executeEncounterCommand:execute,mutateEncounter:execute};
+    executeEncounterCommand:execute,mutateEncounter:execute,
+    useConsumable(principal,input){deps.assertFactoryMutation();return executeUseConsumable(db,deps,principal,input);}};
 }
 
 function replayAuthority(db:DatabaseDriver.Database,p:string,c:any,row:any){
