@@ -42,13 +42,14 @@ export type UseConsumableBoundary="inventory"|"m15"|"effects"|"combatant"|"comba
 function member(db:DatabaseDriver.Database,principal:string,campaignId:string):boolean{
   return Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(campaignId,principal));
 }
-function mayAct(db:DatabaseDriver.Database,principal:string,campaignId:string,actorId:string):boolean{
+export function mayActForConsumable(db:DatabaseDriver.Database,principal:string,campaignId:string,actorId:string):boolean{
   return Boolean(db.prepare(`SELECT 1 FROM campaign_memberships membership JOIN campaigns campaign ON campaign.id=membership.campaign_id
     LEFT JOIN campaign_actor_private_state state ON state.campaign_id=membership.campaign_id AND state.actor_id=?
     WHERE membership.campaign_id=? AND membership.principal_id=? AND (membership.role='gm'
       OR (membership.role='owner' AND campaign.owner_principal_id=membership.principal_id)
       OR state.controller_principal_id=membership.principal_id)`).get(actorId,campaignId,principal));
 }
+const mayAct=mayActForConsumable;
 function m15Revision(db:DatabaseDriver.Database,campaignId:string,actorId:string):number{
   return (db.prepare("SELECT revision FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=? AND actor_id=?")
     .get(campaignId,actorId) as {revision:number}|undefined)?.revision??0;
