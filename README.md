@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v44 revision 1 (`v44r1`)**. The trusted-local RPG API still has **97 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, and M5.1 added two NPC-presence operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete. Wave A has additionally delivered bounded slices rather than complete milestones: the additive empty M5.2 companion foundation and contracts, M5.3 Slice 0 authoritative combat-health composition, the pure M5.4 exact-candidate v1 contract/vector checkpoint, and the pure M5.5 verifiable-dice protocol/vector checkpoint.
+Current persistence is **schema v45 revision 1 (`v45r1`)**. The trusted-local RPG API still has **97 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, and M5.1 added two NPC-presence operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete. M5.2 remains In Progress/partial after repository-only companion administration, and M5.3 remains partial after authoritative combat-health composition and a delivered but not yet wired consumable contract prerequisite. M5.4 and M5.5 have delivered only their pure protocol/vector checkpoints.
 
 ## Security And Privacy
 
@@ -34,6 +34,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Server-resolved checks, powers, effects, encounters, legal combat actions, logs, and rewards
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Authoritative room-scoped NPC place, move, and remove commands with role-safe running-cast and stopped-history projections
+- Repository-only owner/GM companion creation and bounded grant creation/revocation, with member-safe public projections and durable replay after authority changes; no companion administration HTTP or UI is exposed yet
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
@@ -163,7 +164,7 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-For pre-release schema `v44r1`, canonical populated v42 and v43 databases migrating forward to v44 are the tested and supported startup compatibility window. The sequential lineage is v42 -> v43 -> v44. v43 adds empty NPC-presence storage without inferring presence; v44 additively creates empty immutable companion command/receipt and companion, proposal, decision, grant, revocation, and audit sidecars. It delivers no companion repository commands, routes, UI, or grant exercise. Historical v2-v41 migration code remains in the binary, but those startup paths are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+For pre-release schema `v45r1`, canonical populated v43 and v44 databases migrating forward to v45 are the tested and supported startup compatibility window. The sequential lineage is v43 -> v44 -> v45. v45 replaces the v44 companion sidecars while preserving every row and moves historical command, proposal, decision, grant, and revocation actors onto durable principals. Membership removal therefore neither invalidates nor pins retained companion history; current owner/GM authorization remains repository-derived from current campaign state. v42 and earlier startup paths are unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 

@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for schema v44 revision 1 (`v44r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for schema v45 revision 1 (`v45r1`). It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -26,14 +26,14 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 | --- | --- |
 | `db.ts` | Stable facade, dependency wiring, historical v2-v14 migration code, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
 | `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, schema startup, legacy import invocation, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | `SCHEMA_VERSION = 44`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
+| `db/schema.ts` | `SCHEMA_VERSION = 45`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
 | `db/migrations/*.ts` | Version-owned DDL, canonical object inventories/digests, data validation, backfill, and one-step migration functions. New schema behavior goes in the migration that introduces it. |
 | `db/legacyImport.ts` | One-way import of an otherwise-empty legacy `db.json` store into SQLite. It does not merge stores. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-Fresh creation and canonical populated v42-to-v44 and v43-to-v44 upgrades in the tested and supported pre-release compatibility window must converge on equivalent v44r1 DDL and validated preexisting data. The v42 path remains sequential v42 -> v43 -> v44, preserving immutable campaign-content lineage before v43 presence and v44 companion sidecars are introduced. Historical v2-v41 marker paths remain in the binary, but are untested and unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in supported v42/v43 inputs, unexpected v42/v43/v44 named artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
+Fresh creation and canonical populated v43-to-v45 and v44-to-v45 upgrades in the tested and supported pre-release compatibility window must converge on equivalent v45r1 DDL and validated preexisting data. The v43 path remains sequential v43 -> v44 -> v45. v45 replaces the v44 companion sidecars while preserving all rows and binds historical actors to durable principals instead of lifecycle-sensitive memberships. v42 and earlier marker paths are unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption, unexpected current/future named artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
 
-## Migrations v26-v44
+## Migrations v26-v45
 
 | Version | Additive responsibility |
 | --- | --- |
@@ -56,6 +56,7 @@ Fresh creation and canonical populated v42-to-v44 and v43-to-v44 upgrades in the
 | v42 | Additive immutable campaign-content commands, receipts, revisions, and layout attestation sealing reviewed atomic application. |
 | v43 | M5.1 room-scoped NPC-presence revisions, materialized current state, immutable commands/events/receipts, exact graph triggers, and canonical layout attestation. Migration owns no inferred presence and creates no backfill rows. |
 | v44 | M5.2 additive empty companion foundation: immutable revisioned commands/receipts and companion, presence-link, proposal, decision, grant, revocation, audit, and canonical layout-attestation sidecars. No repository commands, routes, UI, grant exercise, or inferred rows are delivered. |
+| v45 | Replaces the v44 companion sidecars while preserving all rows; historical command, proposal, decision, grant, and revocation principals reference durable principals so membership removal neither invalidates nor pins history. |
 
 ## Repository ownership
 
@@ -78,8 +79,9 @@ Fresh creation and canonical populated v42-to-v44 and v43-to-v44 upgrades in the
 | M4.5 | `generationDrafts.ts` and the encounter repository own typed encounter draft validation, reviewed authoritative encounter application, and role-safe projections. |
 | M4.6 | `campaignContentGeneration.ts`, `campaign/campaignContentWriteRepo.ts`, and the v41-v42 migrations own typed campaign-content drafts, conservative NPC baselines, and atomic reviewed campaign-content application with immutable receipts. |
 | M5.1 | `world/npcPresenceRepo.ts`, `world/npcPresenceReadRepo.ts`, `world/npcPresenceWriteRepo.ts`, and `db/migrations/v43_npc_presence.ts` own room-scoped NPC presence, role/lifecycle projections, command idempotency, graph integrity, detachment protection, and canonical v43 layout. |
-| M5.2 foundation | `db/migrations/v44_companion_core.ts` owns only the additive empty companion layout and attestation. Shared companion contracts define bounded immutable command/receipt, proposal/decision, grant/revocation, and audit shapes. Repository administration, projections, routes, UI, and grant exercise remain undelivered. |
+| M5.2 repository administration | `db/migrations/v45_companion_principals.ts` owns the durable-principal companion layout and v44 row-preserving migration. `companionRepo.ts` owns owner/GM creation from a persisted present NPC in an attached running session, bounded grant creation/revocation, management/public projections, revision/idempotency/receipt/audit, and replay after demotion or membership removal. Routes, UI, dismissal, proposal/decision administration, and grant exercise remain undelivered. |
 | M5.3 Slice 0 | `encounter/combatCompositionPlan.ts`, `encounter/combatCompositionExecutor.ts`, and encounter write composition own active-encounter HP authority, atomic actor-health mirroring through M15, round-wrap effect advancement, and concentration retention until replacement/removal. Consumable settlement remains outside this slice. |
+| M5.3 consumable prerequisite | Shared encounter contracts freeze the exact item, inventory entry, target, effect plan, canonical request digest, expected M15 revisions, and result evidence. They are not yet wired to a repository executor or live route, and existing route unions remain unchanged. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 
@@ -99,6 +101,8 @@ M5.1 presence reads execute in one deferred transaction: membership, scoped grap
 The v43 integrity boundary requires contiguous revisions from zero; one exact event and receipt per command; exact command/event/receipt NPC, state, location, revision, and timestamp bindings; valid principal/NPC/location ancestry; monotonic command time; and materialized state reconstructed exactly from the immutable ledger. Authorized corruption fails loudly; an outsider remains non-disclosing. Exact idempotency reuse returns the persisted receipt without dependency, clock, ID, lifecycle, or write use even after stop/detach. Changed reuse conflicts. Place transitions absent/left to present, move transitions present to a different location, remove transitions present to left, and a later place may begin a new presence interval.
 
 Both legacy direct detach and audited administration detach consult `hasAttachedRunningNpcPresence()` inside their immediate transaction. Only an attached running room with at least one materialized `present` row is blocked. Detach does not delete the v43 root, ledger, receipts, or state; stopped history and exact receipt replay remain available. Fresh commands continue to require attachment and a non-stopped lifecycle.
+
+M5.2 administration runs under one immediate transaction and derives current owner/GM authority from repository relationships. Creation requires an existing persisted `present` NPC in the attached running session. Grant creation and revocation are bounded, revisioned, idempotent, receipt-backed, and audited atomically. Exact issuer replay remains available after demotion or membership removal because v45 history references durable principals; this does not confer current authorization for a fresh command.
 
 ## Role-safe projections
 
