@@ -1,8 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
-import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
+import { CHARACTER_BUILDER_STANDARD_ARRAY, type CatalogDefinition, type CharacterBuilderAttributeScores,
+  type PublishContentCatalogInput } from "@velvet/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { createSession, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { calculateCatalogDigest, createSession, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import {
   createDeterministicE2EFixturesForOwnedRepository,
   createDeterministicE2ERepository,
@@ -22,6 +23,36 @@ const WAYLAMP = {
   packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
   definitionId: "velvet:mechanics:item:waylamp",
 };
+function consumableCatalog(): PublishContentCatalogInput {
+  const catalog = structuredClone(MECHANICS_STARTER_CATALOG) as PublishContentCatalogInput;
+  const packId = "velvet:fixture-consumables";
+  const replaceIdentity = (value: unknown, version: string): void => {
+    if (Array.isArray(value)) { value.forEach((child) => replaceIdentity(child, version)); return; }
+    if (value === null || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if ("packId" in record) record.packId = packId;
+    if ("packVersion" in record) record.packVersion = version;
+    Object.values(record).forEach((child) => replaceIdentity(child, version));
+  };
+  replaceIdentity(catalog, "1.0.0+000000000000");
+  catalog.idempotencyKey = "fixture-consumable-publication";
+  catalog.manifest.digest = "0".repeat(64);
+  const item = catalog.definitions.find((definition) => definition.reference.kind === "item");
+  const background = catalog.definitions.find((definition) => definition.reference.kind === "background");
+  if (item?.reference.kind !== "item" || background?.reference.kind !== "background") throw new Error("starter graph unavailable");
+  item.reference.definitionId = "velvet:fixture:item:tonic";
+  item.name = "Fixture Tonic";
+  item.mechanics = { ...item.mechanics, category: "consumable", stackable: true, slot: null,
+    effects: [{ type: "healing", dice: { count: 1, sides: 4, modifier: 0 } }] };
+  (background as Extract<CatalogDefinition, { reference: { kind: "background" } }>).mechanics.itemRefs = [item.reference];
+  const digest = calculateCatalogDigest(catalog);
+  replaceIdentity(catalog, `1.0.0+${digest.slice(0, 12)}`);
+  catalog.manifest.digest = digest;
+  return catalog;
+}
+const CONSUMABLE_CATALOG = consumableCatalog();
+const TONIC = { ...CONSUMABLE_CATALOG.definitions.find((definition) => definition.reference.kind === "item")!.reference,
+  kind: "item" as const };
 const scores = Object.fromEntries(
   ["might", "agility", "resolve", "insight", "presence", "craft"]
     .map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]),
@@ -39,7 +70,14 @@ function setup() {
   const { repository } = composition;
   const campaign = repository.createCampaign(OWNER, { name: "Deterministic fixture seam" });
   repository.installMechanicsStarterCatalog(OWNER);
-  repository.configureMechanicsStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "fixture-pins" });
+  repository.publishContentCatalog(OWNER, CONSUMABLE_CATALOG);
+  repository.configureCampaignCatalog(OWNER, campaign.id, {
+    rulesProfileId: MECHANICS_STARTER_CATALOG.manifest.compatibility.rulesProfileId,
+    contentPacks: [
+      { packId: MECHANICS_STARTER_CATALOG.manifest.packId, packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion },
+      { packId: CONSUMABLE_CATALOG.manifest.packId, packVersion: CONSUMABLE_CATALOG.manifest.packVersion },
+    ], expectedRevision: 0, idempotencyKey: "fixture-pins",
+  });
   const makeActor = (name: string, key: string) => {
     const persona = repository.createCharacter({ name, age: 30, archetype: "Warden", boundaries: "", fictionalConfirmed: true });
     const draft = repository.createCharacterDraft(OWNER, campaign.id, {
@@ -106,9 +144,9 @@ describe("deterministic E2E fixture repository", () => {
     expect(() => fixture.fixtures.materializeShortRestFocus({
       principalId: OWNER, campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0,
     })).toThrow(DeterministicE2EFixtureStaleError);
-    expect(() => fixture.fixtures.materializeShortRestFocus({
+    expect(fixture.fixtures.materializeShortRestFocus({
       principalId: OWNER, campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 1,
-    })).toThrow(DeterministicE2EFixtureStaleError);
+    })).toBeUndefined();
     fixture.repository.close();
   });
 
@@ -149,6 +187,76 @@ describe("deterministic E2E fixture repository", () => {
     expect(fixture.repository.getWallet(OWNER, fixture.campaignId, fixture.actorId)?.balances[0]?.minorUnits).toBe(20);
     db.close();
     fixture.repository.close();
+  });
+
+  it("materializes an exact generic pinned consumable without changing sealed catalog state or M1.5 audit", () => {
+    const fixture = setup();
+    const target = { principalId: OWNER, campaignId: fixture.campaignId, actorId: fixture.actorId,
+      entryId: "exact-tonic", item: TONIC, expectedRevision: 0 };
+    fixture.fixtures.materializePinnedItemExecution({ principalId: OWNER, campaignId: fixture.campaignId, item: TONIC });
+    const db = inspect();
+    const definitionBefore = db.prepare(`SELECT definition_json,public_definition_json,dependencies_json
+      FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+      .get(TONIC.packId, TONIC.packVersion, TONIC.definitionId);
+    const visibilityBefore = db.prepare(`SELECT * FROM rpg_catalog_definition_visibility
+      WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+      .get(TONIC.packId, TONIC.packVersion, TONIC.definitionId);
+    const publicationBefore = db.prepare(`SELECT manifest_digest,manifest_json,validation_report_json
+      FROM rpg_content_pack_publications WHERE pack_id=? AND pack_version=?`).get(TONIC.packId, TONIC.packVersion);
+    const attestationBefore = db.prepare(`SELECT * FROM rpg_catalog_publication_attestations
+      WHERE pack_id=? AND pack_version=?`).get(TONIC.packId, TONIC.packVersion);
+    const triggerBefore = db.prepare(`SELECT sql FROM sqlite_master
+      WHERE type='trigger' AND name='rpg_catalog_definitions_immutable_update'`).get();
+    const healthBefore = db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'")
+      .get(fixture.campaignId, fixture.actorId) as { current: number; max: number };
+
+    expect(fixture.fixtures.materializeConsumableEntry(target)).toBeUndefined();
+    expect(fixture.fixtures.materializeConsumableEntry(target)).toBeUndefined();
+    expect(fixture.repository.getActorInventorySnapshot(OWNER, fixture.campaignId, fixture.actorId)?.inventory.items)
+      .toContainEqual({ kind: "stackable", entryId: target.entryId, item: TONIC, quantity: 1 });
+    expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'")
+      .get(fixture.campaignId, fixture.actorId)).toEqual({ current: Math.max(1, healthBefore.max - 1), max: healthBefore.max });
+    expect(() => fixture.fixtures.materializeConsumableEntry({ ...target, actorId: fixture.otherActorId }))
+      .toThrow(DeterministicE2EFixtureConflictError);
+    expect(() => fixture.fixtures.materializeConsumableEntry({ ...target, principalId: "not-owner", entryId: "forbidden-tonic" }))
+      .toThrow(DeterministicE2EFixtureAuthorizationError);
+    expect(() => fixture.fixtures.materializeConsumableEntry({ ...target, expectedRevision: 1, entryId: "stale-tonic" }))
+      .toThrow(DeterministicE2EFixtureStaleError);
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_commands_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_receipts_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    expect(db.prepare(`SELECT definition_json,public_definition_json,dependencies_json FROM rpg_catalog_definitions
+      WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`).get(TONIC.packId, TONIC.packVersion, TONIC.definitionId)).toEqual(definitionBefore);
+    expect(db.prepare(`SELECT * FROM rpg_catalog_definition_visibility WHERE pack_id=? AND pack_version=?
+      AND kind='item' AND definition_id=?`).get(TONIC.packId, TONIC.packVersion, TONIC.definitionId)).toEqual(visibilityBefore);
+    expect(db.prepare(`SELECT manifest_digest,manifest_json,validation_report_json FROM rpg_content_pack_publications
+      WHERE pack_id=? AND pack_version=?`).get(TONIC.packId, TONIC.packVersion)).toEqual(publicationBefore);
+    expect(db.prepare(`SELECT * FROM rpg_catalog_publication_attestations WHERE pack_id=? AND pack_version=?`)
+      .get(TONIC.packId, TONIC.packVersion)).toEqual(attestationBefore);
+    expect(db.prepare(`SELECT sql FROM sqlite_master WHERE type='trigger' AND name='rpg_catalog_definitions_immutable_update'`).get())
+      .toEqual(triggerBefore);
+    expect(() => db.prepare(`UPDATE rpg_catalog_definitions SET definition_json=definition_json
+      WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?`)
+      .run(TONIC.packId, TONIC.packVersion, TONIC.definitionId)).toThrow("RPG catalog definitions are immutable");
+    db.close(); fixture.repository.close();
+  });
+
+  it("rolls back generic consumable inventory and health together", () => {
+    const fixture = setup();
+    fixture.fixtures.materializePinnedItemExecution({ principalId: OWNER, campaignId: fixture.campaignId, item: TONIC });
+    const db = inspect();
+    const health = db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'")
+      .get(fixture.campaignId, fixture.actorId);
+    db.exec(`CREATE TRIGGER deterministic_consumable_abort BEFORE INSERT ON rpg_inventory_entries_v25
+      WHEN NEW.entry_id='aborted-tonic' BEGIN SELECT RAISE(ABORT,'test consumable rejection'); END;`);
+    expect(() => fixture.fixtures.materializeConsumableEntry({ principalId: OWNER, campaignId: fixture.campaignId,
+      actorId: fixture.actorId, entryId: "aborted-tonic", item: TONIC, expectedRevision: 0 }))
+      .toThrow("test consumable rejection");
+    expect(db.prepare("SELECT 1 FROM rpg_inventory_entries_v25 WHERE entry_id='aborted-tonic'").get()).toBeUndefined();
+    expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'")
+      .get(fixture.campaignId, fixture.actorId)).toEqual(health);
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_receipts_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    db.close(); fixture.repository.close();
   });
 
   it("makes fixture state visible to normal commands on the shared connection", () => {

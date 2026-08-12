@@ -1,8 +1,39 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { characterSheetHttpResponseSchema } from "../../packages/contracts/src/index.js";
-import { MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
+import { characterSheetHttpResponseSchema, type CatalogDefinition, type PublishContentCatalogInput } from "../../packages/contracts/src/index.js";
+import { calculateCatalogDigest, MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+function consumableCatalog(): PublishContentCatalogInput {
+  const catalog = structuredClone(MECHANICS_STARTER_CATALOG) as PublishContentCatalogInput;
+  const packId = "velvet:e2e-consumables";
+  const replaceIdentity = (value: unknown, version: string): void => {
+    if (Array.isArray(value)) { value.forEach((child) => replaceIdentity(child, version)); return; }
+    if (value === null || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    if ("packId" in record) record.packId = packId;
+    if ("packVersion" in record) record.packVersion = version;
+    Object.values(record).forEach((child) => replaceIdentity(child, version));
+  };
+  replaceIdentity(catalog, "1.0.0+000000000000");
+  catalog.idempotencyKey = `${runId}-m5.3-consumable-publication`;
+  catalog.manifest.digest = "0".repeat(64);
+  catalog.manifest.name = "Velvet E2E Consumables";
+  const item = catalog.definitions.find((definition) => definition.reference.kind === "item");
+  if (!item || item.reference.kind !== "item") throw new Error("starter item definition is unavailable");
+  item.reference.definitionId = "velvet:e2e:item:restorative-tonic";
+  item.name = "Restorative Tonic";
+  item.description = "A deterministic immutable healing consumable for E2E coverage.";
+  item.mechanics = { ...item.mechanics, category: "consumable", stackable: true, slot: null,
+    effects: [{ type: "healing", dice: { count: 1, sides: 4, modifier: 0 } }] };
+  const background = catalog.definitions.find((definition) => definition.reference.kind === "background");
+  if (!background || background.reference.kind !== "background") throw new Error("starter background definition is unavailable");
+  (background as Extract<CatalogDefinition, { reference: { kind: "background" } }>).mechanics.itemRefs = [item.reference];
+  const digest = calculateCatalogDigest(catalog);
+  replaceIdentity(catalog, `1.0.0+${digest.slice(0, 12)}`);
+  catalog.manifest.digest = digest;
+  return catalog;
+}
 
 async function json<T>(request: APIRequestContext, method: string, path: string, data?: unknown, status?: number): Promise<T> {
   const response = await request.fetch(`/api${path}`, { method, data });
@@ -1537,4 +1568,223 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await expect(page.getByRole("button", { name: /^(?:Place|Move|Remove|Confirm remove)/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await assertNoPrivateClientState();
+});
+
+test("M5.2 companion administration creates, grants, revokes, and replays safely", async ({ request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M5.2-Actor`, age: 30, archetype: "Companion keeper",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-M5.2-Companion`,
+  });
+  const campaignId = campaign.campaign.id;
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId, contentPacks: [pin],
+    expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-m5.2-content`,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+      personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores },
+      idempotencyKey: `${runId}-m5.2-draft`,
+    },
+  );
+  const reference = (kind: "race" | "background" | "class") =>
+    fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(
+    request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+      expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m5.2-select`,
+      selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+    },
+  );
+  const finalized = await json<{ character: { id: string } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+      expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m5.2-finalize`,
+    }, 201,
+  );
+  const actorId = await actorForCampaignCharacter(request, campaignId, finalized.character.id);
+  const room = await json<{ id: string }>(request, "POST", "/sessions", {
+    characterId: persona.id, title: `${runId}-M5.2-Room`,
+  });
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId: room.id });
+  const npcPersona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M5.2-NPC-Persona`, age: 38, archetype: "Companion guide",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const npc = await json<{ npc: { npcId: string } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/npcs`, {
+    personaId: npcPersona.id, publicState: { name: `${runId}-M5.2-Guide` },
+    privateState: { goals: "Guide safely", gmNotes: "E2E only", merchantState: null },
+    expectedRevision: 0, idempotencyKey: `${runId}-m5.2-npc`,
+  }, 201);
+  await json(request, "POST", `/rpg/v1/campaigns/${campaignId}/rooms/${room.id}/npcs/${npc.npc.npcId}/presence-commands`, {
+    expectedRevision: 0, idempotencyKey: `${runId}-m5.2-presence`, mutation: { kind: "place", locationId: null },
+  }, 200);
+
+  const lane = `/rpg/v1/campaigns/${campaignId}/npcs/${npc.npc.npcId}/companion-administration`;
+  const createCommand = { kind: "companion-create" as const, sessionId: room.id, expectedRevision: 0,
+    idempotencyKey: `${runId}-m5.2-create` };
+  const created = await json<{ receipt: { kind: string; revisionBefore: number; revisionAfter: number; occurredAt: string } }>(
+    request, "POST", `${lane}/commands`, createCommand, 200,
+  );
+  expect(Object.keys(created.receipt)).toEqual(["kind", "revisionBefore", "revisionAfter", "occurredAt"]);
+  expect(JSON.stringify(created)).not.toMatch(/commandId|receiptId|grantId|digest|outcome|idempotencyKey/i);
+  expect(await json<typeof created>(request, "POST", `${lane}/commands`, createCommand, 200)).toEqual(created);
+  expect(await json<{ companion: { sessionId: string; revision: number; grants: unknown[] } }>(request, "GET", lane))
+    .toEqual({ companion: expect.objectContaining({ sessionId: room.id, revision: 1, grants: [] }) });
+
+  const currentAdministration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "POST", `/rpg/v1/campaigns/${campaignId}/memberships`, {
+    principalId: "e2e-membership-principal", role: "player", expectedRevision: currentAdministration.campaign.revision,
+    idempotencyKey: `${runId}-m5.2-member`,
+  }, 200);
+  const grantCommand = {
+    kind: "grant-create" as const, granteePrincipalId: "e2e-membership-principal",
+    allowedCommandFamilies: ["rest"], actorScope: { kind: "campaign-actor", actorId },
+    resourceScope: { kind: "actor-resources" }, maxSpend: 3, maxUses: 2,
+    startsAt: "2035-01-01T00:00:00.000Z", expiresAt: "2036-01-01T00:00:00.000Z",
+    confirmationPolicy: "always", expectedRevision: 1, idempotencyKey: `${runId}-m5.2-grant`,
+  };
+  const granted = await json<typeof created>(request, "POST", `${lane}/commands`, grantCommand, 200);
+  expect(Object.keys(granted.receipt)).toEqual(["kind", "revisionBefore", "revisionAfter", "occurredAt"]);
+  expect(JSON.stringify(granted)).not.toMatch(/commandId|receiptId|grantId|digest|outcome|idempotencyKey/i);
+  expect(await json<typeof granted>(request, "POST", `${lane}/commands`, grantCommand, 200)).toEqual(granted);
+  const management = await json<{ companion: { revision: number; grants: Array<{
+    grantId: string; granteePrincipalId: string; maxSpend: number | null; maxUses: number | null;
+    revokedAt: string | null; exercise: { available: false; reason: string };
+  }> } }>(request, "GET", lane);
+  expect(management.companion).toMatchObject({ revision: 2, grants: [{
+    granteePrincipalId: "e2e-membership-principal", maxSpend: 3, maxUses: 2, revokedAt: null,
+    exercise: { available: false, reason: "requires-authenticated-principal-boundary-l5" },
+  }] });
+  const grantId = management.companion.grants[0]!.grantId;
+  const revokeCommand = { kind: "grant-revoke" as const, grantId, reason: "Deterministic E2E revocation",
+    expectedRevision: 2, idempotencyKey: `${runId}-m5.2-revoke` };
+  const revoked = await json<typeof created>(request, "POST", `${lane}/commands`, revokeCommand, 200);
+  expect(Object.keys(revoked.receipt)).toEqual(["kind", "revisionBefore", "revisionAfter", "occurredAt"]);
+  expect(JSON.stringify(revoked)).not.toMatch(/commandId|receiptId|grantId|digest|outcome|idempotencyKey/i);
+  expect(await json<typeof revoked>(request, "POST", `${lane}/commands`, revokeCommand, 200)).toEqual(revoked);
+  const revokedManagement = await json<typeof management>(request, "GET", lane);
+  expect(revokedManagement.companion.revision).toBe(3);
+  expect(revokedManagement.companion.grants[0]).toMatchObject({
+    grantId, revokedAt: expect.any(String), exercise: { available: false },
+  });
+});
+
+test("M5.3 browser reconciles one committed consumable POST without replay", async ({ page, request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const consumables = consumableCatalog();
+  const consumablePin = { packId: consumables.manifest.packId, packVersion: consumables.manifest.packVersion };
+  const consumableItem = consumables.definitions.find((definition) => definition.reference.kind === "item")!.reference;
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const publishedConsumables = await json<{ catalog: { publication: { packId: string; packVersion: string; digest: string } } }>(
+    request, "POST", "/rpg/v1/content-packs", consumables,
+  );
+  expect(publishedConsumables.catalog.publication).toMatchObject({ ...consumablePin, digest: consumables.manifest.digest });
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-M5.3-Actor`, age: 30, archetype: "Tonic bearer",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const campaignName = `${runId}-M5.3-Consumable`;
+  const campaign = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", { name: campaignName });
+  const campaignId = campaign.campaign.id;
+  const administration = await json<{ campaign: { revision: number } }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`);
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId, contentPacks: [pin, consumablePin],
+    expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-m5.3-content`,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+    personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${runId}-m5.3-draft`,
+  });
+  const reference = (kind: "race" | "background" | "class") => fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+    expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-m5.3-select`,
+    selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+  });
+  const finalized = await json<{ character: { id: string } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+    expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-m5.3-finalize`,
+  }, 201);
+  const actorId = await actorForCampaignCharacter(request, campaignId, finalized.character.id);
+  const entryId = `${runId}-m5.3-tonic`;
+  const execution = await request.post("/api/__e2e/materialize-pinned-item-execution", {
+    data: { campaignId, item: consumableItem },
+  });
+  expect(execution.status()).toBe(204);
+  const materialized = await request.post("/api/__e2e/materialize-consumable-entry", {
+    data: { campaignId, actorId, entryId, item: consumableItem, expectedRevision: 0 },
+  });
+  expect(materialized.status()).toBe(204);
+  const room = await json<{ id: string }>(request, "POST", "/sessions", { characterId: persona.id, title: `${runId}-M5.3-Room` });
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId: room.id });
+  const encounter = await json<{ encounter: { encounterId: string; revision: number } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/encounters`, {
+    sessionId: room.id, name: `${runId}-M5.3-Encounter`, combatants: [{ kind: "actor", actorId, team: "allies" }],
+    idempotencyKey: `${runId}-m5.3-encounter`,
+  }, 201);
+  const started = await json<{ combat: { combatId: string; revision: number } }>(request, "POST", `/rpg/v1/encounters/${encounter.encounter.encounterId}/start-commands`, {
+    expectedRevision: encounter.encounter.revision, idempotencyKey: `${runId}-m5.3-start`,
+  }, 200);
+  const actionsPath = `/api/rpg/v1/combats/${started.combat.combatId}/consumable-actions`;
+  const actions = await json<Array<{ inventoryEntryId: string; item: typeof consumableItem; quantity: number; actionCost: string; target: { actorBacked: boolean } }>>(
+    request, "GET", `/rpg/v1/combats/${started.combat.combatId}/consumable-actions`,
+  );
+  expect(actions).toEqual([expect.objectContaining({ inventoryEntryId: entryId, item: consumableItem, quantity: 1, actionCost: "action",
+    target: expect.objectContaining({ actorBacked: true }) })]);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Campaigns" }).click();
+  await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open combat tracker" }).click();
+  await page.getByLabel("Campaign encounter").selectOption(started.combat.combatId);
+  await page.getByRole("button", { name: "Load combat" }).click();
+  await expect(page.getByRole("heading", { name: "Consumables" })).toBeVisible();
+  await expect(page.getByText("Quantity 1 · Cost: action.")).toBeVisible();
+  const use = page.getByRole("button", { name: `Use ${consumableItem.definitionId} on ${actorId}` });
+  await expect(use).toBeVisible();
+
+  const commandPath = `${actionsPath}/commands`;
+  const commandRequests: string[] = [];
+  page.on("request", (browserRequest) => {
+    if (new URL(browserRequest.url()).pathname === commandPath) commandRequests.push(browserRequest.method());
+  });
+  let committedPosts = 0;
+  await page.route(`**${commandPath}`, async (route) => {
+    committedPosts += 1;
+    const committed = await route.fetch();
+    expect(committed.status()).toBe(200);
+    await route.abort("failed");
+  });
+  await use.click();
+  await expect(page.getByText(/Consumable outcome is ambiguous/)).toBeVisible();
+  expect(committedPosts).toBe(1);
+  expect(commandRequests).toEqual(["POST"]);
+  await page.getByRole("button", { name: "Read exact result & refresh" }).click();
+  await expect(page.getByRole("heading", { name: "Confirmed consumable receipt" })).toBeVisible();
+  await expect(page.getByText("combat-hp-healing: 1")).toBeVisible();
+  expect(committedPosts).toBe(1);
+  expect(commandRequests).toEqual(["POST"]);
+  await page.unroute(`**${commandPath}`);
+
+  const inventory = await json<{ entries: Array<{ entryId: string }>; revision: number }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/actors/${actorId}/inventory`,
+  );
+  expect(inventory.entries.map((entry) => entry.entryId)).not.toContain(entryId);
+  expect(inventory.revision).toBe(1);
+  const combat = await json<{ revision: number }>(request, "GET", `/rpg/v1/combats/${started.combat.combatId}`);
+  expect(combat.revision).toBe(started.combat.revision + 1);
+  expect(await json<unknown[]>(request, "GET", `/rpg/v1/combats/${started.combat.combatId}/consumable-actions`)).toEqual([]);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Combat tracker" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Use .* on/ })).toHaveCount(0);
+  expect(committedPosts).toBe(1);
+  expect(commandRequests).toEqual(["POST"]);
 });

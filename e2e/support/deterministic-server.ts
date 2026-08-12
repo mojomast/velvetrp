@@ -1,7 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
+import { z } from "zod";
 import {
   economyCommandSchema,
+  itemCatalogReferenceSchema,
   resourceIdSchema,
   takeShortRestCommandSchema,
   worldVisibleLocationHttpSchema,
@@ -21,10 +23,11 @@ import type { RandomNumberGenerator } from "../../server/src/runtime.js";
 // different deterministic sequence or weaken production randomness.
 const reviewedDiceRng: RandomNumberGenerator = {
   integer(minInclusive, maxExclusive) {
-    if (minInclusive !== 1 || maxExclusive !== 3) {
-      throw new Error(`unexpected E2E dice RNG range [${minInclusive}, ${maxExclusive})`);
-    }
-    return 2;
+    if (minInclusive === 1 && maxExclusive === 3) return 2;
+    if (minInclusive === 1 && maxExclusive === 5) return 1;
+    if (minInclusive === 1 && maxExclusive === 21) return 10;
+    if (minInclusive === 0 && maxExclusive === 1000001) return 0;
+    throw new Error(`unexpected E2E RNG range [${minInclusive}, ${maxExclusive})`);
   },
 };
 
@@ -76,6 +79,10 @@ const materialize = (reply: { code(status: number): { send(body?: unknown): unkn
 
 const fixtureTargetBodySchema = takeShortRestCommandSchema.omit({ type: true, idempotencyKey: true });
 const waylampFixtureBodySchema = fixtureTargetBodySchema.extend({ entryId: resourceIdSchema });
+const pinnedItemExecutionBodySchema = z.object({ campaignId: resourceIdSchema, item: itemCatalogReferenceSchema }).strict();
+const consumableEntryFixtureBodySchema = fixtureTargetBodySchema.extend({
+  entryId: resourceIdSchema, item: itemCatalogReferenceSchema,
+});
 const campaignLocationFixtureBodySchema = worldVisibleLocationHttpSchema.extend({ campaignId: resourceIdSchema })
   .refine((location) => location.parentLocationId !== location.locationId, { path: ["parentLocationId"] });
 
@@ -107,6 +114,26 @@ app.post("/api/__e2e/materialize-waylamp", async (request, reply) => {
     return reply.code(400).send({ error: "invalid E2E Waylamp materialization request" });
   }
   return materialize(reply, () => fixtures.materializeWaylamp({
+    principalId: "local-owner", ...body.data,
+  }));
+});
+
+app.post("/api/__e2e/materialize-pinned-item-execution", async (request, reply) => {
+  const body = pinnedItemExecutionBodySchema.safeParse(request.body);
+  if (!body.success) {
+    return reply.code(400).send({ error: "invalid E2E pinned item execution request" });
+  }
+  return materialize(reply, () => fixtures.materializePinnedItemExecution({
+    principalId: "local-owner", ...body.data,
+  }));
+});
+
+app.post("/api/__e2e/materialize-consumable-entry", async (request, reply) => {
+  const body = consumableEntryFixtureBodySchema.safeParse(request.body);
+  if (!body.success) {
+    return reply.code(400).send({ error: "invalid E2E consumable entry materialization request" });
+  }
+  return materialize(reply, () => fixtures.materializeConsumableEntry({
     principalId: "local-owner", ...body.data,
   }));
 });

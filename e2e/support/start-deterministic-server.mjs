@@ -16,6 +16,7 @@ const child = spawn("npm", ["--prefix", "server", "exec", "--", "tsx", "e2e/supp
     VELVET_DATA_DIR: dataDir,
     FEATURE_RPG_CAMPAIGN: "true",
     FEATURE_RPG_MECHANICS: "true",
+    FEATURE_RPG_COMBAT: "true",
     OPENAI_BASE_URL: "http://127.0.0.1:18788/v1",
     OPENAI_MODEL: "velvet-e2e-model",
     OPENAI_API_KEY: "local-e2e-placeholder",
