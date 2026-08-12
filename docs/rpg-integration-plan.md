@@ -1,20 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v45r1; Wave A slices committed)
+## Current status (v46r1; Wave A slices committed)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v45 revision 1 (v45r1)**, with **102 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary. Canonical populated v43/v44->v45 startup upgrades are supported; v42 and earlier are unsupported.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 remains In Progress/partial after its authoritative companion management GET/closed command POST and client transport because no companion UI, grant exercise, dismissal, or proposal/decision administration exists. M5.3 remains In Progress/partial after its separate consumable action/command/exact-result lane and exact client UI/reconciliation flow because the legacy combat union is unchanged and other milestone scope remains. Commit `87d53ab` closes the consumable modifier decision by excluding all durations at the contract boundary: instant semantics are unavailable and noninstant modifiers are unsupported, with no descriptor, settlement, action, runtime, or successful historical consumable modifier result. Shared catalog/power contracts are unchanged and powers retain receipt-only instant behavior. M5.4 and M5.5 have completed only their pure no-schema contract/vector checkpoints. Remaining persistence, adapter, client, and policy work is ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v46 revision 1 (v46r1)**, with **102 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary. Canonical populated v44/v45->v46 startup upgrades are supported; v43 and earlier are unsupported.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 remains In Progress/partial after its authoritative companion management GET/closed command POST and client transport because no companion UI, grant exercise, dismissal, or proposal/decision administration exists; its v45 delivery wording is historical, not current support. M5.3 remains In Progress/partial after its separate consumable action/command/exact-result lane and exact client UI/reconciliation flow because the legacy combat union is unchanged and other milestone scope remains. M5.4 is In Progress/partial with exactly its v46 batches, candidates, supersessions, expiration observations, and attestation persistence foundation delivered. Decisions, receipt links, generation, execution, world adapter, provider advertising, routes, client, and E2E are absent. The normal application has no generator, so these tables remain empty outside direct repository use and tests. M5.5 has completed only its pure protocol checkpoint. Remaining integration is ordered and statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v43 and v44 databases upgrading to v45**. v42 and earlier migration code and archived tests do not constitute startup-upgrade support.
+- Supported executable migration coverage is for canonical populated **v44 and v45 databases upgrading to v46**. v43 and earlier migration code and archived tests do not constitute startup-upgrade support.
 - A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v45r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v46r1 status above.
 
 ## Original purpose (historical)
 
@@ -876,7 +876,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema **v45 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
+Velvet currently uses schema **v46 revision 1**. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
 
 | Version | Scope |
 |---|---|
@@ -913,12 +913,13 @@ Velvet currently uses schema **v45 revision 1**. The concise sequence below is a
 | v43 | Persisted session NPC presence, session-root revisions, optional locations, at-stop history, and layout attestation |
 | v44 | Additive empty companion foundation with immutable revisioned commands/receipts and companion, proposal, decision, grant, revocation, audit, and layout-attestation sidecars; no repository commands, routes, UI, or grant exercise |
 | v45 | Row-preserving replacement companion sidecars with durable historical principals; owner/GM companion and bounded grant administration exposed through authoritative management GET and receipt-only command POST plus client transport; no companion UI, proposal/decision administration, dismissal, public member HTTP, or grant exercise |
+| v46 | Persistence-only exact-candidate batches, candidates, explicit supersessions, expiration observations, and canonical layout attestation; no decisions, receipt links, generation, execution, world adapter, provider advertising, routes, client, or E2E |
 
 Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- The supported executable startup window is canonical populated v43 and v44 databases upgrading to v45; v42 and earlier migration implementations and archived tests are historical and unsupported.
+- The supported executable startup window is canonical populated v44 and v45 databases upgrading to v46; v43 and earlier migration implementations and archived tests are historical and unsupported. The v45 support wording in the M5.2 checkpoint is historical rather than current.
 - Existing characters and sessions receive no implicit RPG data.
 - Migration failures are loud and rollback completely.
 - Production migration instructions include a SQLite online backup.
