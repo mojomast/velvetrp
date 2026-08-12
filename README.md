@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v45 revision 1 (`v45r1`)**. The trusted-local RPG API still has **97 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, and M5.1 added two NPC-presence operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete. M5.2 remains In Progress/partial after repository-only companion administration, and M5.3 remains partial after authoritative combat-health composition and a delivered but not yet wired consumable contract prerequisite. M5.4 and M5.5 have delivered only their pure protocol/vector checkpoints.
+Current persistence is **schema v45 revision 1 (`v45r1`)**. The trusted-local RPG API still has **97 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, and M5.1 added two NPC-presence operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete. M5.2 remains In Progress/partial after repository-only companion administration, and M5.3 remains partial after authoritative combat-health composition and repository-only atomic consumable execution. M5.4 and M5.5 have delivered only their pure protocol/vector checkpoints.
 
 ## Security And Privacy
 
@@ -35,6 +35,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Authoritative room-scoped NPC place, move, and remove commands with role-safe running-cast and stopped-history projections
 - Repository-only owner/GM companion creation and bounded grant creation/revocation, with member-safe public projections and durable replay after authority changes; no companion administration HTTP or UI is exposed yet
+- Repository-only exact pinned consumable execution settles the supported damage, healing, and health/guard/focus resource subset atomically with inventory, combat, actor-resource, turn, effect-duration, log, event, and receipt state; dedicated legal-action/result readers are not live HTTP or client surfaces, and instant modifiers remain fail-closed
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
