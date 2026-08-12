@@ -55,6 +55,7 @@ import type { CampaignAdministrationRepository } from "../campaignAdministration
 import type { CharacterBuilderRepository } from "../characterBuilderRepo.js";
 import type { CharacterProgressionRepository } from "../characterProgressionRepo.js";
 import type { CheckRepository } from "../checkRepo.js";
+import type { CompanionReadRepository, CompanionRepository } from "../companionRepo.js";
 import type { ContentCatalogRepository } from "../contentCatalogRepo.js";
 import type { CampaignDiceEvent, CampaignDiceVisibleCharacterBinding } from "../diceRepo.js";
 import type { EconomyRepository } from "../economyRepo.js";
@@ -79,7 +80,7 @@ export type OriginalStarterSetupInspection =
   | { status: "unconfigured"; campaign: CampaignDetail }
   | { status: "exact"; campaign: CampaignDetail };
 
-export interface RepositoryUnitOfWork {
+export interface RepositoryUnitOfWork extends CompanionReadRepository {
   /** Read-only administration projection available inside one shared snapshot. */
   getCampaignAdministration: CampaignAdministrationRepository["getCampaignAdministration"];
   validateContentCatalog(input: unknown): import("@velvet/contracts").CatalogValidationReport;
@@ -180,7 +181,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;

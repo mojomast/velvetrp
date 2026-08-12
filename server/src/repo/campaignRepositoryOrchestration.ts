@@ -81,6 +81,7 @@ import { createPowerRepository, type PowerRepository } from "./powerRepo.js";
 import { createEffectRepository, type EffectRepository } from "./effectRepo.js";
 import { createEncounterRepository, type EncounterRepository } from "./encounterRepo.js";
 import { createWorldRepository, type WorldRepository } from "./worldRepo.js";
+import { createCompanionRepository } from "./companionRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
@@ -344,7 +345,13 @@ function runTransaction<T>(
     definitionProjection: DEFINITION_PROJECTION, definitionOrder: DEFINITION_ORDER, toRpgDefinition,
     verifyCatalogVisibilityProjection,
   });
+  const companionRepository = createCompanionRepository(db, dependencies, (operation) => {
+    assertActive();
+    if (operation === "write") throw new Error("companion mutation cannot run inside a repository transaction");
+  });
   const unitOfWork: RepositoryUnitOfWork = {
+    getCompanionManagement: companionRepository.getCompanionManagement,
+    getCompanionPublic: companionRepository.getCompanionPublic,
     getCampaignAdministration: (actorPrincipalId, campaignId) => {
       assertActive();
       return administrationRepository.getCampaignAdministration(actorPrincipalId, campaignId);
@@ -729,6 +736,12 @@ function createRepositoryComposition<T>(
   const storyRepository = createStoryRepository(db, { ...dependencies, guard: () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
   } });
+  const companionRepository = createCompanionRepository(db, dependencies, (operation) => {
+    assertOpen();
+    if (operation === "write" && transactionDepth > 0) {
+      throw new Error("companion mutation cannot run inside a repository transaction");
+    }
+  });
   const adventureTurnRepository = createAdventureTurnRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0 && atomicGenerationApplyDepth === 0) throw new Error("M1.10 operation cannot run inside a repository transaction");
   },{
@@ -750,6 +763,7 @@ function createRepositoryComposition<T>(
     ...effectRepository,
     ...encounterRepository,
     ...worldRepository,
+    ...companionRepository,
     ...questRepository,
     ...storyRepository,
     ...adventureTurnRepository,
