@@ -37,6 +37,7 @@ import { assertNpcPresenceLayoutV43, createNpcPresenceV43, migrate42to43 } from 
 import { assertCompanionCoreLayoutV44, createCompanionCoreV44, migrate43to44 } from "./db/migrations/v44_companion_core.js";
 import { assertCompanionCoreLayoutV45, migrate44to45 } from "./db/migrations/v45_companion_principals.js";
 import { assertExactCandidatesLayoutV46, createExactCandidatesV46, migrate45to46 } from "./db/migrations/v46_exact_candidates.js";
+import { assertExactCandidateExecutionsLayoutV47, createExactCandidateExecutionsV47, migrate46to47 } from "./db/migrations/v47_exact_candidate_executions.js";
 import {
   assertCampaignContentPacksHaveExactSealedPacks,
   createCampaignContentPackSealedPinTriggers,
@@ -48,7 +49,7 @@ import {
 
 
 configureSchema({
-  assertCampaignContentPacksHaveExactSealedPacks, assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureGenerationV35, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCampaignContentIntegrityV42, assertNpcPresenceLayoutV43, assertCompanionCoreLayoutV44, assertCompanionCoreLayoutV45, assertExactCandidatesLayoutV46, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29,
+  assertCampaignContentPacksHaveExactSealedPacks, assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureGenerationV35, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCampaignContentIntegrityV42, assertNpcPresenceLayoutV43, assertCompanionCoreLayoutV44, assertCompanionCoreLayoutV45, assertExactCandidatesLayoutV46, assertExactCandidateExecutionsLayoutV47, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29,
   assertCharacterProgressionLayoutV23, assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26,
   assertCombatFoundationLayoutV27, assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28,
   createCampaignAdministrationV15, createCampaignContentPackSealedPinTriggers, createCampaignEventMatchingTriggerV14,
@@ -63,7 +64,7 @@ configureSchema({
   migrate17to18, migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24,
   migrate24to25, migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, migrate38to39, migrate39to40, validateCharacterProgressionV23,
   validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25, validateM16PersistenceV26,
-  validateV20DraftAudit, validateWorldTravelNpcFactionV28, createCampaignContentGenerationV41, migrate40to41, createCampaignContentIntegrityV42, migrate41to42, createNpcPresenceV43, migrate42to43, createCompanionCoreV44, migrate43to44, migrate44to45, createExactCandidatesV46, migrate45to46,
+  validateV20DraftAudit, validateWorldTravelNpcFactionV28, createCampaignContentGenerationV41, migrate40to41, createCampaignContentIntegrityV42, migrate41to42, createNpcPresenceV43, migrate42to43, createCompanionCoreV44, migrate43to44, migrate44to45, createExactCandidatesV46, migrate45to46, createExactCandidateExecutionsV47, migrate46to47,
 });
 configureDatabaseConnection(ensureSchema, migrateLegacyIfPresent);
 configureRepositoryDatabase(getDb);

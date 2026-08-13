@@ -48,20 +48,22 @@ const characterInput = {
 };
 
 describe("schema", () => {
-  it("records the fresh v45r1 schema, current inventory, and foreign-key integrity", async () => {
+  it("records the fresh v47r1 schema, current inventory, and foreign-key integrity", async () => {
     const dir = process.env.VELVET_DATA_DIR as string;
     await listCharacters();
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = raw.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
     const revision = raw.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string };
-    expect(version.value).toBe("46");
+    expect(version.value).toBe("47");
     expect(revision.value).toBe("1");
     expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
     expect(raw.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND (name IN (
       'campaign_opening_narratives_v41', 'generated_campaign_quests_v41',
       'campaign_content_commands_v42', 'campaign_content_layout_attestation_v42'
-    ) OR name GLOB '*v43*' OR name GLOB '*v45*') ORDER BY name`).all()).toEqual([
+    ) OR name GLOB '*v43*' OR name GLOB '*v45*' OR name GLOB '*v46*' OR name GLOB '*v47*') ORDER BY name`).all()).toEqual(expect.arrayContaining([
       { name: "campaign_companions_v45" },
+      { name: "exact_candidate_executions_v47" },
+      { name: "exact_candidate_execution_layout_attestation_v47" },
       { name: "campaign_content_commands_v42" },
       { name: "campaign_content_layout_attestation_v42" },
       { name: "campaign_npc_presence_v43" },
@@ -83,7 +85,7 @@ describe("schema", () => {
       { name: "npc_presence_layout_attestation_v43" },
       { name: "npc_presence_receipts_v43" },
       { name: "npc_presence_session_revisions_v43" },
-    ]);
+    ]));
     expect(raw.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
     raw.close();
   });
