@@ -3,7 +3,6 @@ import type DatabaseDriver from "better-sqlite3";
 import {
   changeReputationCommandSchema,
   actorTravelCommandRequestSchema,
-  actorTravelCommandResponseSchema,
   campaignNpcHttpSchema,
   createCampaignNpcHttpRequestSchema,
   npcRelationshipCommandHttpRequestSchema,
@@ -25,15 +24,19 @@ import {
   type CampaignFactionHttp,type CreateCampaignFactionHttpRequest,type FactionReputationCommandHttpRequest,type FactionStandingHttp,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
-
-/** Raised when a principal lacks the authority required for a world operation. */
-export class WorldAuthorizationError extends Error { readonly code = "WORLD_FORBIDDEN"; }
-/** Raised when a command's expected world revision is no longer current. */
-export class WorldStaleError extends Error { readonly code = "WORLD_STALE"; }
-/** Raised when an idempotency key is reused for a different command. */
-export class WorldConflictError extends Error { readonly code = "WORLD_CONFLICT"; }
-/** Raised when a requested world resource or operation is unavailable. */
-export class WorldUnavailableError extends Error { readonly code = "WORLD_UNAVAILABLE"; }
+import { executeActorTravelInTransaction, executeLegacyTravelInTransaction } from "./actorTravelTransaction.js";
+export {
+  WorldAuthorizationError,
+  WorldConflictError,
+  WorldStaleError,
+  WorldUnavailableError,
+} from "./worldErrors.js";
+import {
+  WorldAuthorizationError,
+  WorldConflictError,
+  WorldStaleError,
+  WorldUnavailableError,
+} from "./worldErrors.js";
 
 /** Dependencies shared by world read and write repository composition. */
 export interface WorldDependencies { clock: Clock; ids: IdGenerator; }
@@ -173,87 +176,29 @@ export function createWorldWriteRepository(
     }).immediate();
   }
   function travel(principalId: string, sessionId: string, raw: TravelCommand): WorldReceipt {
-    context.guard(); return db.transaction(() => { const mutation = begin(principalId, sessionId, travelCommandSchema.parse(raw), "travel", () => { const command = raw as any; if (!gm(principalId, command.campaignId) && command.selectedPartyActorIds.some((actorId: string) => !controls(principalId, command.campaignId, actorId))) throw new WorldAuthorizationError("party control is required"); }); if (mutation.replay) return JSON.parse(mutation.replay.canonical_result_json); const command = mutation.command;
-      const route = db.prepare("SELECT * FROM campaign_location_connections_v28 WHERE campaign_id=? AND connection_id=?").get(command.campaignId, command.locationConnectionId) as any; if (!route || route.route_state !== "open" || route.visibility === "gm") throw new WorldUnavailableError("route is unavailable");
-      for (const actorId of command.selectedPartyActorIds) { const position = db.prepare("SELECT location_id FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=? AND session_id=?").get(command.campaignId, actorId, sessionId) as any; if (!position || position.location_id !== route.from_location_id) throw new WorldUnavailableError("party is not adjacent to route"); if ((route.visibility === "discovered" || route.requirement_kind === "discovery") && !db.prepare("SELECT 1 FROM campaign_location_discoveries_v28 WHERE campaign_id=? AND actor_id=? AND location_id=?").get(command.campaignId, actorId, route.to_location_id)) throw new WorldUnavailableError("route destination is undiscovered");
-        if(route.requirement_kind==="faction_reputation"){const total=(db.prepare(`SELECT coalesce(sum(delta),0) total FROM (
-          SELECT delta FROM campaign_reputation_ledger_v28 WHERE campaign_id=? AND actor_id=? AND faction_id=?
-          UNION ALL SELECT delta FROM campaign_faction_reputation_v32 WHERE campaign_id=? AND actor_id=? AND faction_id=?)`)
-          .get(command.campaignId,actorId,route.required_faction_id,command.campaignId,actorId,route.required_faction_id) as {total:number}).total;
-          if(total<route.minimum_reputation)throw new WorldUnavailableError("route requirement is not met");}}
-      const result: WorldReceipt = { travelId: command.travelId, destinationLocationId: route.to_location_id, receipt: { commandId: mutation.commandId, idempotencyKey: command.idempotencyKey, revisionBefore: mutation.before, revisionAfter: mutation.after, occurredAt: mutation.at } }; record(command, sessionId, "travel", command.selectedPartyActorIds[0], mutation, result, "travelled", { travelId: command.travelId, destinationLocationId: route.to_location_id }); for (const actorId of command.selectedPartyActorIds) { db.prepare("INSERT INTO world_travel_party_members_v28 VALUES(?,?,?,?)").run(command.campaignId, sessionId, mutation.commandId, actorId); db.prepare("UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=? WHERE campaign_id=? AND actor_id=? AND session_id=?").run(route.to_location_id, mutation.at, command.campaignId, actorId, sessionId); } db.prepare("INSERT INTO world_travel_destinations_v28 VALUES(?,?,?,?,?)").run(command.campaignId, sessionId, mutation.commandId, route.connection_id, route.to_location_id); return result;
-    }).immediate();
+    context.guard();const command=travelCommandSchema.parse(raw);
+    return db.transaction(()=>executeLegacyTravelInTransaction(db,context,principalId,sessionId,command)).immediate();
   }
   function travelActor(principalId:string,actorIdInput:string,input:ActorTravelCommandRequest):ActorTravelResult{
     context.guard();const actorId=resourceIdSchema.parse(actorIdInput),intent=actorTravelCommandRequestSchema.parse(input);
-    return db.transaction(()=>{
+    return db.transaction(() => {
       const actor=db.prepare("SELECT campaign_id FROM campaign_actors WHERE id=?").get(actorId) as {campaign_id:string}|undefined;
       if(!actor)throw new WorldUnavailableError("actor world state is unavailable");
-      const sessions=db.prepare("SELECT session_id FROM campaign_sessions WHERE campaign_id=? ORDER BY attached_at,session_id")
+      if(!intent.partyActorIds.includes(actorId))throw new WorldConflictError("route actor must belong to the travel party");
+      const persisted=db.prepare(`SELECT command.session_id,command.canonical_request_json FROM world_commands_v28 command
+        JOIN campaign_sessions attached ON attached.campaign_id=command.campaign_id AND attached.session_id=command.session_id
+        WHERE command.campaign_id=? AND command.actor_id=? AND command.idempotency_key=? AND command.command_type='travel'
+        ORDER BY command.session_id`).all(actor.campaign_id,actorId,intent.idempotencyKey) as Array<{session_id:string;canonical_request_json:string}>;
+      if(persisted.length>1)throw new WorldConflictError("travel replay is ambiguous");
+      if(persisted.length===1){
+        return executeActorTravelInTransaction(db,context,principalId,persisted[0]!.session_id,actorId,intent);
+      }
+      const sessions=db.prepare(`SELECT attached.session_id FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
+        WHERE attached.campaign_id=? AND session.state='active' AND session.stopped_at IS NULL ORDER BY attached.attached_at,attached.session_id`)
         .all(actor.campaign_id) as Array<{session_id:string}>;
       if(sessions.length===0)throw new WorldUnavailableError("campaign world session is unavailable");
       if(sessions.length!==1)throw new WorldConflictError("campaign world session is ambiguous");
-      const sessionId=sessions[0]!.session_id;
-      if(!intent.partyActorIds.includes(actorId))throw new WorldConflictError("route actor must belong to the travel party");
-      const travelId=`travel:${digest({campaignId:actor.campaign_id,sessionId,actorId,idempotencyKey:intent.idempotencyKey}).slice(0,40)}`;
-      const raw={type:"travel" as const,campaignId:actor.campaign_id,travelId,
-        locationConnectionId:intent.connectionId,selectedPartyActorIds:intent.partyActorIds,
-        expectedRevision:intent.expectedRevision,idempotencyKey:intent.idempotencyKey};
-      const mutation=begin(principalId,sessionId,raw,"travel",()=>{
-        if(!gm(principalId,actor.campaign_id)&&intent.partyActorIds.some((partyActorId)=>
-          !controls(principalId,actor.campaign_id,partyActorId)))throw new WorldAuthorizationError("party control is required");
-      });
-      if(mutation.replay)return JSON.parse(mutation.replay.canonical_result_json);
-      const command=mutation.command;
-      const route=db.prepare("SELECT * FROM campaign_location_connections_v28 WHERE campaign_id=? AND connection_id=?")
-        .get(command.campaignId,command.locationConnectionId) as any;
-      const isGm=gm(principalId,command.campaignId);
-      if(!route||route.route_state!=="open"||(!isGm&&route.visibility==="gm"))
-        throw new WorldUnavailableError("route is unavailable");
-      const positions:any[]=[];
-      for(const partyActorId of command.selectedPartyActorIds){
-        const position=db.prepare(`SELECT location_id,state_revision FROM campaign_actor_locations_v28
-          WHERE campaign_id=? AND actor_id=? AND session_id=?`).get(command.campaignId,partyActorId,sessionId) as any;
-        if(!position||position.location_id!==route.from_location_id)
-          throw new WorldUnavailableError("party is not adjacent to route");
-        if((route.visibility==="discovered"||route.requirement_kind==="discovery")
-          &&!db.prepare(`SELECT 1 FROM campaign_location_discoveries_v28
-            WHERE campaign_id=? AND actor_id=? AND location_id=?`).get(command.campaignId,partyActorId,route.to_location_id))
-          throw new WorldUnavailableError("route destination is undiscovered");
-        if(route.requirement_kind==="faction_reputation"){
-          const total=(db.prepare(`SELECT coalesce(sum(delta),0) total FROM (
-            SELECT delta FROM campaign_reputation_ledger_v28 WHERE campaign_id=? AND actor_id=? AND faction_id=?
-            UNION ALL SELECT delta FROM campaign_faction_reputation_v32 WHERE campaign_id=? AND actor_id=? AND faction_id=?)`)
-            .get(command.campaignId,partyActorId,route.required_faction_id,command.campaignId,partyActorId,route.required_faction_id) as {total:number}).total;
-          if(total<route.minimum_reputation)throw new WorldUnavailableError("route requirement is not met");
-        }
-        positions.push({actorId:partyActorId,revision:position.state_revision});
-      }
-      const discoveries=positions.map((position)=>{
-        const existing=db.prepare(`SELECT discovered_at FROM campaign_location_discoveries_v28
-          WHERE campaign_id=? AND actor_id=? AND location_id=?`).get(command.campaignId,position.actorId,route.to_location_id) as any;
-        return {actorId:position.actorId,locationId:route.to_location_id,discoveredAt:existing?.discovered_at??mutation.at};
-      });
-      const locations=positions.map((position)=>({actorId:position.actorId,locationId:route.to_location_id,
-        revision:position.revision+1,updatedAt:mutation.at}));
-      const result:ActorTravelResult={campaignId:command.campaignId,sessionId,locations,discoveries,
-        receipt:{commandId:mutation.commandId,idempotencyKey:command.idempotencyKey,
-          revisionBefore:mutation.before,revisionAfter:mutation.after,occurredAt:mutation.at}};
-      actorTravelCommandResponseSchema.parse({locations,discoveries,receipt:{idempotencyKey:result.receipt.idempotencyKey,
-        revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}});
-      record(command,sessionId,"travel",actorId,mutation,result,"travelled",{travelId,destinationLocationId:route.to_location_id});
-      for(const position of positions){
-        db.prepare("INSERT INTO world_travel_party_members_v28 VALUES(?,?,?,?)")
-          .run(command.campaignId,sessionId,mutation.commandId,position.actorId);
-        db.prepare(`UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=?
-          WHERE campaign_id=? AND actor_id=? AND session_id=?`)
-          .run(route.to_location_id,mutation.at,command.campaignId,position.actorId,sessionId);
-        db.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)")
-          .run(command.campaignId,position.actorId,route.to_location_id,mutation.at);
-      }
-      db.prepare("INSERT INTO world_travel_destinations_v28 VALUES(?,?,?,?,?)")
-        .run(command.campaignId,sessionId,mutation.commandId,route.connection_id,route.to_location_id);
-      return result;
+      return executeActorTravelInTransaction(db, context, principalId, sessions[0]!.session_id, actorId, intent);
     }).immediate();
   }
   function changeReputation(principalId: string, sessionId: string, raw: unknown): MutationReceipt {

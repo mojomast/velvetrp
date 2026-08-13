@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
 import { WorldAuthorizationError, WorldConflictError, WorldStaleError, WorldUnavailableError, createRepository, createSession, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { executeActorTravelInTransaction } from "../src/repo/world/internal.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -15,10 +16,13 @@ const scores: CharacterBuilderAttributeScores = Object.fromEntries(
 /** Builds finalized, controller-bound actors, then seeds only world state. */
 async function fixture() {
   let sequence = 0;
-  const repo = createRepository({
-    dataDir: process.env.VELVET_DATA_DIR!,
+  const dependencies = {
     clock: { now: () => new Date(at) },
     ids: { nextId: () => `m18-${++sequence}` },
+  };
+  const repo = createRepository({
+    dataDir: process.env.VELVET_DATA_DIR!,
+    ...dependencies,
   });
   const campaign = repo.createCampaign("local-owner", { name: "M1.8 world fixture" });
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
@@ -45,6 +49,7 @@ async function fixture() {
   const player = actor("Player", "world-player");
   const sessionPersona = repo.createCharacter({ name: "Session", age: 30, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
   const session = await createSession({ characterId: sessionPersona.id, title: "World session" });
+  db.prepare("UPDATE sessions SET state='active' WHERE id=?").run(session.id);
   repo.attachCampaignSession("local-owner", { campaignId: campaign.id, sessionId: session.id } as any);
 
   for (const [locationId, name, visibility] of [["origin", "Origin", "public"], ["destination", "Destination", "public"], ["secret", "Secret", "gm"]] as const) {
@@ -55,7 +60,7 @@ async function fixture() {
   for (const actorId of [owner.actorId, companion.actorId, player.actorId]) {
     db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(campaign.id, actorId, "origin", session.id, at);
   }
-  return { repo, db, campaignId: campaign.id, sessionId: session.id, owner, companion, player, actor };
+  return { repo, db, dependencies, campaignId: campaign.id, sessionId: session.id, owner, companion, player, actor };
 }
 
 describe("M1.8 world repository", () => {
@@ -81,6 +86,20 @@ describe("M1.8 world repository", () => {
     expect(() => f.repo.travel("local-owner", foreign.id, { ...command, travelId: "foreign", idempotencyKey: "foreign" })).toThrow(WorldUnavailableError);
     expect(f.repo.getWorldProjection("local-owner", f.campaignId, foreign.id)).toBeNull();
     f.db.close(); f.repo.close();
+  });
+
+  it("keeps legacy travel policy in parity for observers, GMs, and stopped sessions",async()=>{
+    const f=await fixture();const command:any={type:"travel",campaignId:f.campaignId,travelId:"legacy-policy",locationConnectionId:"road",
+      selectedPartyActorIds:[f.owner.actorId],expectedRevision:0,idempotencyKey:"legacy-policy"};
+    f.db.prepare("INSERT INTO principals VALUES('world-observer','Observer',0)").run();
+    f.db.prepare("INSERT INTO campaign_memberships VALUES(?,'world-observer','observer',?)").run(f.campaignId,at);
+    expect(()=>f.repo.executeWorldCommand("world-observer",f.sessionId,command)).toThrow(WorldAuthorizationError);
+    const hidden={...command,travelId:"hidden-gm",locationConnectionId:"secret-road",idempotencyKey:"hidden-gm"};
+    const first=f.repo.travel("local-owner",f.sessionId,hidden);expect(first.destinationLocationId).toBe("secret");
+    f.db.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id=?").run(at,f.sessionId);
+    expect(f.repo.travel("local-owner",f.sessionId,hidden)).toEqual(first);
+    expect(()=>f.repo.travel("local-owner",f.sessionId,{...hidden,travelId:"stopped-fresh",expectedRevision:1,idempotencyKey:"stopped-fresh"})).toThrow(WorldUnavailableError);
+    f.db.close();f.repo.close();
   });
 
   it("rejects non-adjacent, closed, hidden, undiscovered, and uncontrolled party travel", async () => {
@@ -125,6 +144,95 @@ describe("M1.8 world repository", () => {
     expect(f.repo.getCampaignWorld("local-owner",f.campaignId)).toMatchObject({revision:1});
     expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,{...command,expectedRevision:1})).toThrow(WorldConflictError);
     f.db.close();f.repo.close();
+  });
+
+  it("executes actor travel only inside the caller transaction and matches the public wrapper",async()=>{
+    const f=await fixture();
+    const command={connectionId:"road",partyActorIds:[f.owner.actorId,f.companion.actorId],expectedRevision:0,idempotencyKey:"transaction-travel"};
+    const before=f.db.prepare("SELECT count(*) count FROM world_commands_v28").get();
+    let clockCalls=0,idCalls=0;
+    const isolatedDependencies={clock:{now:()=>{clockCalls++;return new Date(at);}},ids:{nextId:()=>{idCalls++;return `adapter-${idCalls}`;}}};
+    expect(()=>executeActorTravelInTransaction(f.db,isolatedDependencies,"local-owner",f.sessionId,f.owner.actorId,command))
+      .toThrow("actor travel requires a caller-owned transaction");
+    expect(f.db.prepare("SELECT count(*) count FROM world_commands_v28").get()).toEqual(before);
+    expect({clockCalls,idCalls}).toEqual({clockCalls:0,idCalls:0});
+
+    f.db.exec("BEGIN IMMEDIATE");
+    const direct=executeActorTravelInTransaction(f.db,isolatedDependencies,"local-owner",f.sessionId,f.owner.actorId,command);
+    f.db.exec("ROLLBACK");
+    const publicResult=f.repo.travelActor("local-owner",f.owner.actorId,command);
+    expect({...direct,receipt:{...direct.receipt,commandId:publicResult.receipt.commandId}}).toEqual(publicResult);
+    expect(f.db.prepare("SELECT actor_id,location_id,state_revision FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id IN (?,?) ORDER BY actor_id")
+      .all(f.campaignId,f.owner.actorId,f.companion.actorId)).toEqual([f.owner.actorId,f.companion.actorId].sort()
+        .map((actor_id)=>({actor_id,location_id:"destination",state_revision:1})));
+    f.db.close();f.repo.close();
+  });
+
+  it("keeps actor travel replay independent and rechecks route, revision, and authority",async()=>{
+    const f=await fixture();
+    const command={connectionId:"road",partyActorIds:[f.player.actorId],expectedRevision:0,idempotencyKey:"actor-policy"};
+    f.db.prepare("UPDATE campaign_location_connections_v28 SET route_state='closed' WHERE campaign_id=? AND connection_id='road'").run(f.campaignId);
+    expect(()=>f.repo.travelActor("world-player",f.player.actorId,command)).toThrow(WorldUnavailableError);
+    f.db.prepare("UPDATE campaign_location_connections_v28 SET route_state='open' WHERE campaign_id=? AND connection_id='road'").run(f.campaignId);
+    expect(()=>f.repo.travelActor("world-player",f.player.actorId,{...command,expectedRevision:1,idempotencyKey:"actor-stale"})).toThrow(WorldStaleError);
+    expect(()=>f.repo.travelActor("world-player",f.owner.actorId,{...command,partyActorIds:[f.owner.actorId],idempotencyKey:"actor-authority"})).toThrow(WorldAuthorizationError);
+    const first=f.repo.travelActor("world-player",f.player.actorId,command);
+    f.db.prepare("UPDATE campaign_location_connections_v28 SET route_state='closed' WHERE campaign_id=? AND connection_id='road'").run(f.campaignId);
+    const replayDependencies={clock:{now:()=>{throw new Error("replay clock dependency");}},ids:{nextId:()=>{throw new Error("replay ID dependency");}}};
+    f.db.exec("BEGIN IMMEDIATE");
+    const replay=executeActorTravelInTransaction(f.db,replayDependencies,"world-player",f.sessionId,f.player.actorId,command);
+    f.db.exec("COMMIT");
+    expect(replay).toEqual(first);
+    f.db.prepare("DELETE FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=?").run(f.campaignId,f.player.actorId);
+    f.db.exec("BEGIN IMMEDIATE");
+    expect(()=>executeActorTravelInTransaction(f.db,replayDependencies,"world-player",f.sessionId,f.player.actorId,command)).toThrow(WorldAuthorizationError);
+    f.db.exec("ROLLBACK");
+    f.db.close();f.repo.close();
+  });
+
+  it("replays the old actor travel after stop and session rollover without dependencies",async()=>{
+    const f=await fixture();
+    const stoppedPersona=f.repo.createCharacter({name:"Stopped",age:30,archetype:"Guide",boundaries:"",fictionalConfirmed:true});
+    const stopped=await createSession({characterId:stoppedPersona.id,title:"Stopped"});
+    f.repo.attachCampaignSession("local-owner",{campaignId:f.campaignId,sessionId:stopped.id} as any);
+    f.db.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id=?").run(at,stopped.id);
+    const command={connectionId:"road",partyActorIds:[f.owner.actorId],expectedRevision:0,idempotencyKey:"running-only"};
+    const first=f.repo.travelActor("local-owner",f.owner.actorId,command);expect(first.sessionId).toBe(f.sessionId);
+    f.db.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id=?").run(at,f.sessionId);
+    const nextPersona=f.repo.createCharacter({name:"Next",age:30,archetype:"Guide",boundaries:"",fictionalConfirmed:true});
+    const next=await createSession({characterId:nextPersona.id,title:"Next"});f.db.prepare("UPDATE sessions SET state='active' WHERE id=?").run(next.id);
+    f.repo.attachCampaignSession("local-owner",{campaignId:f.campaignId,sessionId:next.id} as any);
+    expect(f.repo.travelActor("local-owner",f.owner.actorId,command)).toEqual(first);
+    expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,{...command,expectedRevision:1})).toThrow(WorldConflictError);
+    expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,{...command,idempotencyKey:"fresh-rollover"})).toThrow(WorldUnavailableError);
+    f.db.exec("BEGIN IMMEDIATE");
+    expect(executeActorTravelInTransaction(f.db,{clock:{now:()=>{throw new Error("clock");}},ids:{nextId:()=>{throw new Error("id");}}},
+      "local-owner",f.sessionId,f.owner.actorId,command)).toEqual(first);
+    f.db.exec("COMMIT");
+    const oldCommand=f.db.prepare("SELECT * FROM world_commands_v28 WHERE campaign_id=? AND session_id=? AND idempotency_key=?").get(f.campaignId,f.sessionId,command.idempotencyKey) as any;
+    const oldReceipt=f.db.prepare("SELECT * FROM world_receipts_v28 WHERE campaign_id=? AND session_id=? AND command_id=?").get(f.campaignId,f.sessionId,oldCommand.command_id) as any;
+    f.db.transaction(()=>{f.db.prepare("INSERT INTO world_mutation_revisions_v28 VALUES(?,?,1,?)").run(f.campaignId,next.id,at);
+      f.db.prepare("INSERT INTO world_commands_v28 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(f.campaignId,next.id,"ambiguous-command",oldCommand.actor_id,"travel",oldCommand.idempotency_key,
+        oldCommand.canonical_request_json,oldCommand.request_digest,0,1,at);
+      f.db.prepare("INSERT INTO world_receipts_v28 VALUES(?,?,?,?,?,?,?)").run(f.campaignId,next.id,"ambiguous-command",1,oldReceipt.canonical_result_json,oldReceipt.result_digest,at);})();
+    expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,command)).toThrow(WorldConflictError);
+    f.db.close();f.repo.close();
+  });
+
+  it("rejects two running attachments and rolls back a late SQLite-trigger failure",async()=>{
+    const f=await fixture();const secondPersona=f.repo.createCharacter({name:"Second",age:30,archetype:"Guide",boundaries:"",fictionalConfirmed:true});
+    const second=await createSession({characterId:secondPersona.id,title:"Second"});f.db.prepare("UPDATE sessions SET state='active' WHERE id=?").run(second.id);
+    f.repo.attachCampaignSession("local-owner",{campaignId:f.campaignId,sessionId:second.id} as any);
+    const command={connectionId:"road",partyActorIds:[f.owner.actorId],expectedRevision:0,idempotencyKey:"ambiguous"};
+    expect(()=>f.repo.travelActor("local-owner",f.owner.actorId,command)).toThrow(WorldConflictError);
+    f.db.prepare("UPDATE sessions SET state='closed',stopped_at=?,stop_reason='done' WHERE id=?").run(at,second.id);
+    f.db.exec(`CREATE TEMP TRIGGER actor_travel_late_failure BEFORE INSERT ON world_travel_destinations_v28
+      BEGIN SELECT RAISE(IGNORE); END;BEGIN IMMEDIATE`);
+    expect(()=>executeActorTravelInTransaction(f.db,f.dependencies,"local-owner",f.sessionId,f.owner.actorId,command)).toThrow(WorldConflictError);f.db.exec("ROLLBACK");
+    for(const table of ["world_mutation_revisions_v28","world_commands_v28","world_receipts_v28","world_events_v28","world_travel_party_members_v28","world_travel_destinations_v28","campaign_location_discoveries_v28"])
+      expect(f.db.prepare(`SELECT count(*) count FROM ${table}`).get()).toEqual({count:0});
+    expect(f.db.prepare("SELECT location_id,state_revision FROM campaign_actor_locations_v28 WHERE campaign_id=? AND session_id=? AND actor_id=?")
+      .get(f.campaignId,f.sessionId,f.owner.actorId)).toEqual({location_id:"origin",state_revision:0});f.db.close();f.repo.close();
   });
 
   it("projects only a player's discoveries, controlled locations, and no secret world state", async () => {

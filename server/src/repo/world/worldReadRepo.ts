@@ -1,7 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import { gmCampaignFactionsHttpResponseSchema,gmCampaignNpcsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,campaignWorldHttpResponseSchema, worldProjectionSchema,
   type CampaignWorldHttpResponse,type FactionStandingHttp,type GmCampaignFactionHttp,type GmCampaignNpcHttp,type NpcRelationshipHttp,type PlayerCampaignFactionHttp,type PlayerCampaignNpcHttp,type WorldProjection } from "@velvet/contracts";
-import { WorldConflictError } from "./worldWriteRepo.js";
+import { WorldConflictError } from "./worldErrors.js";
 
 /** Context required to run a world projection. */
 export interface WorldReadContext {

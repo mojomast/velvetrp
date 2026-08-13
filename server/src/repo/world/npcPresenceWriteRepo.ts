@@ -9,7 +9,7 @@ import {
 } from "@velvet/contracts";
 import { createCampaignRoomSessionLifecycleRepository } from "../campaign/campaignRoomSessionLifecycleRepo.js";
 import type { WorldDependencies } from "./worldWriteRepo.js";
-import { WorldAuthorizationError, WorldConflictError, WorldStaleError, WorldUnavailableError } from "./worldWriteRepo.js";
+import { WorldAuthorizationError, WorldConflictError, WorldStaleError, WorldUnavailableError } from "./worldErrors.js";
 import type { NpcPresenceReadInternals } from "./npcPresenceReadRepo.js";
 
 export interface NpcPresenceWriteRepository {
