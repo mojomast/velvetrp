@@ -13,6 +13,8 @@ import {
   computeExactCandidateActionDigest,
   computeExactCandidateEnvelopeDigest,
   computeExactCandidateQuoteDigest,
+  canonicalExactCandidateSelectionFrame,computeExactCandidateSelectionDigest,
+  canonicalExactCandidateExecutionResultFrame,computeExactCandidateExecutionResultDigest,verifyExactCandidateExecutionResult,
   exactCandidateKindSchema,
   exactCandidateQuoteSchema,
   exactCandidateSafeLabelSchema,
@@ -289,6 +291,16 @@ describe("exact candidate v1 closed protocol", () => {
 });
 
 describe("exact candidate execution-boundary vectors", () => {
+  it("freezes a strict injective canonical selection frame and digest",()=>{expect(canonicalExactCandidateSelectionFrame(selection())).toBe("{\"candidateId\":\"candidate-1\",\"choices\":[],\"domain\":\"velvet.exact-candidate.selection.v1\",\"kind\":\"actor.travel\",\"version\":\"v1\"}");
+    expect(computeExactCandidateSelectionDigest(selection(),crypto)).toBe("0a424bea3e89ef959918b1ca5f47d099cf326bec64c4ac0f6498f21d1474891d");expect(()=>canonicalExactCandidateSelectionFrame({...selection(),extra:true})).toThrow();});
+  it("freezes and verifies the complete execution result frame",()=>{const base=candidate(),linkedUnsigned={...base,execution:{state:"receipt-linked" as const,receiptId:"execution-1",binding:{...candidateBinding(base),commandId:"command-1"},linkedAt:"2030-01-01T00:00:30.000Z"}};
+    const linkedCandidate=sealCandidateState(linkedUnsigned),unsigned={version:"v1" as const,executionId:"execution-1",selection:selection(),canonicalSelectionDigest:computeExactCandidateSelectionDigest(selection(),crypto),linkedCandidate,
+      actorTravelResult:{campaignId:"campaign-1",sessionId:"session-1",locations:[{actorId:"actor-1",locationId:"location-2",revision:1,updatedAt:"2030-01-01T00:00:30.000Z"}],discoveries:[{actorId:"actor-1",locationId:"location-2",discoveredAt:"2030-01-01T00:00:30.000Z"}],receipt:{commandId:"command-1",idempotencyKey:`exact-candidate:${base.canonicalActionDigest}`,revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:30.000Z"}},canonicalResultDigest:"0".repeat(64)};
+    const result={...unsigned,canonicalResultDigest:computeExactCandidateExecutionResultDigest(unsigned,crypto)};expect(canonicalExactCandidateExecutionResultFrame(result)).toContain("\"domain\":\"velvet.exact-candidate.execution-result.v1\"");
+    expect(result.canonicalResultDigest).toBe("f8184bd63ad2138bb67512ef19546b30edadbb66f02b401b4486530490261bdd");expect(verifyExactCandidateExecutionResult(result,crypto)).toBe(true);
+    expect(verifyExactCandidateExecutionResult({...result,canonicalSelectionDigest:"f".repeat(64)},crypto)).toBe(false);expect(verifyExactCandidateExecutionResult({...result,canonicalResultDigest:"f".repeat(64)},crypto)).toBe(false);});
+  it("structurally rejects a receipt idempotency key not derived from the linked action",()=>{const base=candidate(),linked=sealCandidateState({...base,execution:{state:"receipt-linked" as const,receiptId:"execution-1",binding:{...candidateBinding(base),commandId:"command-1"},linkedAt:"2030-01-01T00:00:30.000Z"}});
+    const malformed={version:"v1",executionId:"execution-1",selection:selection(),canonicalSelectionDigest:"0".repeat(64),linkedCandidate:linked,actorTravelResult:{campaignId:"campaign-1",sessionId:"session-1",locations:[{actorId:"actor-1",locationId:"location-2",revision:1,updatedAt:"2030-01-01T00:00:30.000Z"}],discoveries:[{actorId:"actor-1",locationId:"location-2",discoveredAt:"2030-01-01T00:00:30.000Z"}],receipt:{commandId:"command-1",idempotencyKey:"wrong",revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:30.000Z"}},canonicalResultDigest:"0".repeat(64)};expect(verifyExactCandidateExecutionResult(malformed,crypto)).toBe(false);});
   it("accepts only the exact current selection without granting authority", () => {
     const result = validateExactCandidateSelection(selection(), [candidate()], context());
     expect(result).toMatchObject({ ok: true, authorityRecheckRequired: true });

@@ -3,12 +3,15 @@ import { canonicalAgentJson, canonicalSha256DigestSchema, type AgentJsonObject }
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { actorIdSchema, campaignIdSchema, principalIdSchema } from "./rpg-characters.js";
 import { locationConnectionIdSchema } from "./world.js";
+import { actorTravelCommandResponseSchema } from "./world-http.js";
 
 export const EXACT_CANDIDATE_PROTOCOL_VERSION = "v1" as const;
 export const EXACT_CANDIDATE_ACTION_FRAME = "velvet.exact-candidate.action.v1" as const;
 export const EXACT_CANDIDATE_ENVELOPE_FRAME = "velvet.exact-candidate.envelope.v1" as const;
 export const EXACT_CANDIDATE_QUOTE_VERSION = "v1" as const;
 export const EXACT_CANDIDATE_QUOTE_FRAME = "velvet.exact-candidate.quote.v1" as const;
+export const EXACT_CANDIDATE_SELECTION_FRAME = "velvet.exact-candidate.selection.v1" as const;
+export const EXACT_CANDIDATE_EXECUTION_RESULT_FRAME = "velvet.exact-candidate.execution-result.v1" as const;
 export const MAX_EXACT_CANDIDATES_PER_RESPONSE = 32;
 export const MAX_EXACT_CANDIDATE_LIFETIME_MS = 5 * 60 * 1_000;
 export const EXACT_CANDIDATE_TURN_CONNECTION_PREFIX = "adventure-turn:" as const;
@@ -396,6 +399,64 @@ export const exactCandidateSelectionResponseSchema = z.object({
   choices: z.tuple([]),
 }).strict();
 
+/** Canonical provider selection. It contains no mechanics arguments. */
+export function canonicalExactCandidateSelectionFrame(selection: unknown): string {
+  const parsed=exactCandidateSelectionResponseSchema.parse(selection);
+  return canonicalAgentJson({domain:EXACT_CANDIDATE_SELECTION_FRAME,...parsed});
+}
+export function computeExactCandidateSelectionDigest(selection:unknown,crypto:TrustedExactCandidateCrypto):string {
+  return canonicalSha256DigestSchema.parse(crypto.sha256(canonicalExactCandidateSelectionFrame(selection)));
+}
+
+const exactCandidateActorTravelResultSchema=actorTravelCommandResponseSchema.safeExtend({
+  campaignId:campaignIdSchema,sessionId:resourceIdSchema,
+  receipt:actorTravelCommandResponseSchema.shape.receipt.extend({commandId:resourceIdSchema}).strict(),
+}).strict();
+export const exactCandidateExecutionResultSchema=z.object({
+  version:exactCandidateVersionSchema,
+  executionId:resourceIdSchema,
+  selection:exactCandidateSelectionResponseSchema,
+  canonicalSelectionDigest:canonicalSha256DigestSchema,
+  linkedCandidate:internalExactCandidateSchema,
+  actorTravelResult:exactCandidateActorTravelResultSchema,
+  canonicalResultDigest:canonicalSha256DigestSchema,
+}).strict().superRefine((value,context)=>{
+  const execution=value.linkedCandidate.execution;
+  if(execution.state!=="receipt-linked"||execution.receiptId!==value.executionId
+    ||execution.binding.commandId!==value.actorTravelResult.receipt.commandId
+    ||execution.binding.candidateId!==value.selection.candidateId
+    ||value.linkedCandidate.candidateId!==value.selection.candidateId
+    ||value.linkedCandidate.kind!==value.selection.kind||value.linkedCandidate.version!==value.selection.version
+    ||execution.binding.canonicalActionDigest!==value.linkedCandidate.canonicalActionDigest
+    ||execution.binding.scope.campaignId!==value.linkedCandidate.scope.campaignId
+    ||execution.binding.scope.sessionId!==value.linkedCandidate.scope.sessionId
+    ||execution.binding.scope.actorId!==value.linkedCandidate.scope.actorId
+    ||execution.binding.scope.principalId!==value.linkedCandidate.scope.principalId
+    ||execution.binding.scope.connectionId!==value.linkedCandidate.scope.connectionId
+    ||value.actorTravelResult.campaignId!==value.linkedCandidate.scope.campaignId
+    ||value.actorTravelResult.sessionId!==value.linkedCandidate.scope.sessionId
+    ||value.actorTravelResult.receipt.revisionBefore!==value.linkedCandidate.expectedRevisions[0].revision
+    ||value.actorTravelResult.receipt.revisionAfter!==value.actorTravelResult.receipt.revisionBefore+1
+    ||value.actorTravelResult.receipt.idempotencyKey!==`exact-candidate:${value.linkedCandidate.canonicalActionDigest}`
+    ||value.actorTravelResult.receipt.occurredAt!==execution.linkedAt)context.addIssue({code:"custom",message:"execution result must bind one exact candidate receipt",path:["linkedCandidate","execution"]});
+});
+export function canonicalExactCandidateExecutionResultFrame(result:unknown):string {
+  const parsed=exactCandidateExecutionResultSchema.parse(result);
+  return canonicalAgentJson({domain:EXACT_CANDIDATE_EXECUTION_RESULT_FRAME,version:parsed.version,
+    executionId:parsed.executionId,selection:parsed.selection,canonicalSelectionDigest:parsed.canonicalSelectionDigest,
+    linkedCandidate:parsed.linkedCandidate,actorTravelResult:parsed.actorTravelResult});
+}
+export function computeExactCandidateExecutionResultDigest(result:unknown,crypto:TrustedExactCandidateCrypto):string {
+  return canonicalSha256DigestSchema.parse(crypto.sha256(canonicalExactCandidateExecutionResultFrame(result)));
+}
+/** Cryptographically verifies both nested selection and complete result frames without throwing. */
+export function verifyExactCandidateExecutionResult(result:unknown,crypto:TrustedExactCandidateCrypto):boolean {
+  try {const parsed=exactCandidateExecutionResultSchema.safeParse(result);return parsed.success
+    &&computeExactCandidateSelectionDigest(parsed.data.selection,crypto)===parsed.data.canonicalSelectionDigest
+    &&computeExactCandidateExecutionResultDigest(parsed.data,crypto)===parsed.data.canonicalResultDigest;
+  } catch {return false;}
+}
+
 export function projectExactCandidateForProvider(candidate: unknown, now: string): z.infer<typeof providerSafeExactCandidateSchema> {
   const parsed = internalExactCandidateSchema.parse(candidate);
   const parsedNow = utcIsoTimestampSchema.parse(now);
@@ -509,3 +570,4 @@ export function validateExactCandidateSelection(
 export type InternalExactCandidate = z.infer<typeof internalExactCandidateSchema>;
 export type ProviderSafeExactCandidate = z.infer<typeof providerSafeExactCandidateSchema>;
 export type ExactCandidateSelectionResponse = z.infer<typeof exactCandidateSelectionResponseSchema>;
+export type ExactCandidateExecutionResult = z.infer<typeof exactCandidateExecutionResultSchema>;
