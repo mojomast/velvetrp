@@ -16,6 +16,7 @@ import {
 type ItemReference = Extract<CatalogDefinitionReference, { kind: "item" }>;
 
 const FIXTURE_TIME = "2035-01-01T00:00:00.000Z";
+const TRAVEL_FIXTURE_TIME = "2000-01-01T00:00:00.000Z";
 const WAYLAMP = {
   kind: "item" as const,
   packId: MECHANICS_STARTER_CATALOG.manifest.packId,
@@ -67,6 +68,10 @@ export interface DeterministicE2EFixtures {
     name: string;
     description: string;
   }): void;
+  materializeTravelPrerequisite(input: {
+    campaignId:string;sessionId:string;actorId:string;originLocationId:string;destinationLocationId:string;
+    connectionId:string;originName:string;destinationName:string;
+  }):void;
 }
 
 type FixtureSqlParameter = string | number | bigint | Buffer | null;
@@ -322,7 +327,49 @@ export function createDeterministicE2EFixturesForOwnedRepository(
             location.name, location.description, FIXTURE_TIME);
       });
     },
+    materializeTravelPrerequisite(input){
+      const value={campaignId:resourceIdSchema.parse(input.campaignId),sessionId:resourceIdSchema.parse(input.sessionId),
+        actorId:resourceIdSchema.parse(input.actorId),originLocationId:resourceIdSchema.parse(input.originLocationId),
+        destinationLocationId:resourceIdSchema.parse(input.destinationLocationId),connectionId:resourceIdSchema.parse(input.connectionId),
+        originName:zString(input.originName),destinationName:zString(input.destinationName)};
+      if(value.originLocationId===value.destinationLocationId)conflict("travel fixture locations must differ");
+      immediate(()=>{
+        const owned=db.prepare(`SELECT 1 FROM campaigns campaign JOIN campaign_memberships membership
+          ON membership.campaign_id=campaign.id AND membership.principal_id='local-owner' AND membership.role='owner'
+          JOIN campaign_actors actor ON actor.campaign_id=campaign.id AND actor.id=?
+          JOIN campaign_sessions attached ON attached.campaign_id=campaign.id AND attached.session_id=?
+          JOIN sessions session ON session.id=attached.session_id AND session.state IN('setup','active') AND session.stopped_at IS NULL
+          WHERE campaign.id=? AND campaign.owner_principal_id='local-owner'`).get(value.actorId,value.sessionId,value.campaignId);
+        if(!owned)throw new DeterministicE2EFixtureAuthorizationError("deterministic travel fixture target is unavailable");
+        db.prepare("UPDATE sessions SET state='active' WHERE id=? AND state='setup' AND stopped_at IS NULL").run(value.sessionId);
+        const locations=[{id:value.originLocationId,name:value.originName},{id:value.destinationLocationId,name:value.destinationName}];
+        for(const location of locations){const existing=db.prepare(`SELECT location_id id,campaign_id campaignId,parent_location_id parentId,
+          public_name name,public_description description,visibility,created_at createdAt FROM campaign_locations_v28 WHERE location_id=?`).get(location.id) as Record<string,unknown>|undefined;
+          const exact={id:location.id,campaignId:value.campaignId,parentId:null,name:location.name,description:"",visibility:"public",createdAt:TRAVEL_FIXTURE_TIME};
+          if(existing&&!same(existing,exact))conflict("travel fixture location identity already has different state");
+          if(!existing)db.prepare("INSERT INTO campaign_locations_v28 VALUES(?,?,NULL,?,'','public',?)").run(location.id,value.campaignId,location.name,TRAVEL_FIXTURE_TIME);}
+        const existingConnection=db.prepare(`SELECT connection_id connectionId,campaign_id campaignId,from_location_id fromId,to_location_id toId,
+          visibility,route_state state,requirement_kind requirementKind,required_faction_id factionId,minimum_reputation minimum,created_at createdAt
+          FROM campaign_location_connections_v28 WHERE connection_id=?`).get(value.connectionId) as Record<string,unknown>|undefined;
+        const exactConnection={connectionId:value.connectionId,campaignId:value.campaignId,fromId:value.originLocationId,toId:value.destinationLocationId,
+          visibility:"public",state:"open",requirementKind:"none",factionId:null,minimum:null,createdAt:TRAVEL_FIXTURE_TIME};
+        if(existingConnection&&!same(existingConnection,exactConnection))conflict("travel fixture connection identity already has different state");
+        if(!existingConnection)db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,'public','open','none',NULL,NULL,?)")
+          .run(value.connectionId,value.campaignId,value.originLocationId,value.destinationLocationId,TRAVEL_FIXTURE_TIME);
+        const existingActor=db.prepare(`SELECT campaign_id campaignId,actor_id actorId,location_id locationId,session_id sessionId,state_revision revision,updated_at updatedAt
+          FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?`).get(value.campaignId,value.actorId) as Record<string,unknown>|undefined;
+        const exactActor={campaignId:value.campaignId,actorId:value.actorId,locationId:value.originLocationId,sessionId:value.sessionId,revision:0,updatedAt:TRAVEL_FIXTURE_TIME};
+        if(existingActor&&!same(existingActor,exactActor))conflict("travel fixture actor location already has different state");
+        if(!existingActor)db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)")
+          .run(value.campaignId,value.actorId,value.originLocationId,value.sessionId,TRAVEL_FIXTURE_TIME);
+      });
+    },
   };
+}
+
+function zString(value:unknown):string {
+  if(typeof value!=="string"||value.trim()!==value||value.length<1||value.length>200)throw new DeterministicE2EFixtureConflictError("travel fixture public name is invalid");
+  return value;
 }
 
 export function createDeterministicE2ERepository(

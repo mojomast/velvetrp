@@ -1570,6 +1570,54 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await assertNoPrivateClientState();
 });
 
+test("M5.4 CampaignPlay shows one provider-committed travel receipt across reload",async({page,request})=>{
+  const fixture=MECHANICS_STARTER_CATALOG,pin={packId:fixture.manifest.packId,packVersion:fixture.manifest.packVersion};
+  const persona=await json<{id:string}>(request,"POST","/characters",{name:`${runId}-M5.4-Traveler`,age:30,archetype:"Wayfinder",boundaries:"Fictional deterministic test only",fictionalConfirmed:true});
+  await json(request,"POST","/rpg/v1/content-packs",fixture);
+  const campaign=await json<{campaign:{id:string}}>(request,"POST","/rpg/v1/campaigns",{name:`${runId}-M5.4-Travel`});const campaignId=campaign.campaign.id;
+  const admin=await json<{campaign:{revision:number}}>(request,"GET",`/rpg/v1/campaigns/${campaignId}/administration`);
+  await json(request,"PUT",`/rpg/v1/campaigns/${campaignId}/content`,{rulesProfileId:fixture.manifest.compatibility.rulesProfileId,contentPacks:[pin],expectedRevision:admin.campaign.revision,idempotencyKey:`${runId}-m5.4-configure`});
+  const configuredAdmin=await json<{campaign:{revision:number}}>(request,"GET",`/rpg/v1/campaigns/${campaignId}/administration`);
+  await json(request,"PATCH",`/rpg/v1/campaigns/${campaignId}/administration`,{expectedRevision:configuredAdmin.campaign.revision,idempotencyKey:`${runId}-m5.4-publish`,status:"published"});
+  const scores={might:15,agility:14,resolve:13,insight:12,presence:10,craft:8};
+  const draft=await json<{draft:{id:string;revision:number}}>(request,"POST",`/rpg/v1/campaigns/${campaignId}/character-drafts`,{personaId:persona.id,durability:"durable",allocation:{method:"standard-array",scores},idempotencyKey:`${runId}-m5.4-draft`});
+  const reference=(kind:"race"|"background"|"class")=>fixture.definitions.find((definition)=>definition.reference.kind===kind)!.reference;
+  const selected=await json<{draft:{revision:number}}>(request,"PATCH",`/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`,{expectedRevision:draft.draft.revision,idempotencyKey:`${runId}-m5.4-select`,selections:{race:reference("race"),background:reference("background"),class:reference("class"),starterGrant:"kit"}});
+  const finalized=await json<{character:{id:string}}>(request,"POST",`/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`,{expectedRevision:selected.draft.revision,idempotencyKey:`${runId}-m5.4-finalize`},201);
+  const actorId=await actorForCampaignCharacter(request,campaignId,finalized.character.id);
+  const room=await json<{id:string}>(request,"POST","/sessions",{characterId:persona.id,title:`${runId}-M5.4-Room`});
+  await json(request,"PUT",`/rpg/v1/campaigns/${campaignId}/rooms`,{sessionId:room.id});
+  const destinationName=`${runId}-M5.4-Silver-Harbor`,privateSentinels=[`${runId}-m5.4-road`,`${runId}-m5.4-origin`,`${runId}-m5.4-destination`,`exact_actor_travel.select`,`providerCallId`,`candidateId`,`canonicalActionDigest`];
+  const prerequisite={campaignId,sessionId:room.id,actorId,originLocationId:`${runId}-m5.4-origin`,destinationLocationId:`${runId}-m5.4-destination`,connectionId:`${runId}-m5.4-road`,originName:`${runId}-M5.4-Old-Gate`,destinationName};
+  expect((await request.post("/api/__e2e/materialize-travel-prerequisite",{data:prerequisite})).status()).toBe(204);
+  expect((await request.post("/api/__e2e/materialize-travel-prerequisite",{data:prerequisite})).status()).toBe(204);
+  await json(request,"GET",`/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/play-bootstrap`);
+  const receiptMethods:string[]=[],productionTraffic:string[]=[];const relevant=(pathname:string)=>pathname==="/api/rpg/v1/adventure-turns/stream"||pathname.includes("/adventure-turns/")||/\/commands\/[^/]+\/receipt$/.test(pathname);
+  page.on("request",browserRequest=>{const url=new URL(browserRequest.url());
+    if(url.pathname.match(/\/commands\/[^/]+\/receipt$/))receiptMethods.push(browserRequest.method());
+    if(relevant(url.pathname))productionTraffic.push(browserRequest.postData()??"");});
+  page.on("response",async response=>{const url=new URL(response.url());if(relevant(url.pathname)&&response.request().resourceType()!=="eventsource")
+    productionTraffic.push(await response.text().catch(()=>""));});
+  await page.goto("/");await page.getByRole("button",{name:"Campaigns"}).click();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
+  await page.getByRole("button",{name:"Open attached room 1 of 1"}).click();
+  const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
+  await page.getByLabel("What do you do?").fill("Travel to the public harbor.");await page.getByRole("button",{name:"Declare action"}).click();
+  const submitted=await travelStream,submittedBody=submitted.postDataJSON() as {actorId:string;expectedRevision:number;idempotencyKey:string};expect(submittedBody).toMatchObject({actorId,expectedRevision:3});
+  const receiptRegion=page.getByRole("region",{name:"Committed mechanics"});await expect(receiptRegion.getByText("Travel completed")).toBeVisible({timeout:15_000});await expect(receiptRegion.getByText(destinationName)).toBeVisible();
+  expect(receiptMethods).toEqual(["GET"]);expect(await receiptRegion.getByText(destinationName).count()).toBe(1);
+  const assertSafe=async()=>{const state=`${await page.locator("body").innerText()}\n${await page.evaluate(()=>JSON.stringify(localStorage))}\n${await page.evaluate(()=>JSON.stringify(sessionStorage))}`;
+    for(const secret of privateSentinels){expect(state).not.toContain(secret);expect(productionTraffic.join("\n")).not.toContain(secret);}};
+  await assertSafe();await page.reload();const reloadedReceipt=page.getByRole("region",{name:"Committed mechanics"});await expect(reloadedReceipt.getByText("Travel completed")).toBeVisible();await expect(reloadedReceipt.getByText(destinationName)).toBeVisible();
+  expect(receiptMethods).toEqual(["GET","GET"]);expect(await reloadedReceipt.getByText(destinationName).count()).toBe(1);await assertSafe();
+  const world=await json<{currentLocations:Array<{actorId:string;locationId:string}>}>(request,"GET",`/rpg/v1/campaigns/${campaignId}/world`);
+  expect(world.currentLocations).toEqual([expect.objectContaining({actorId,locationId:prerequisite.destinationLocationId})]);
+  const turn=await json<{result:{turn:{turnId:string}}}>(request,"GET",`/rpg/v1/adventure-turns/reconcile-initial?campaignId=${campaignId}&sessionId=${encodeURIComponent(room.id)}&actorId=${actorId}&idempotencyKey=${submittedBody.idempotencyKey}`);
+  const evidence=await json<{executions:number;bindings:number;commands:number;events:number;revisionBefore:number;revisionAfter:number;actorRevision:number;locationId:string}>(request,"GET",
+    `/__e2e/campaigns/${campaignId}/turns/${turn.result.turn.turnId}/actors/${actorId}/travel-evidence`);
+  expect(evidence).toEqual({executions:1,bindings:1,commands:1,events:1,revisionBefore:0,revisionAfter:1,actorRevision:1,locationId:prerequisite.destinationLocationId});
+  expect(await (await request.get("http://127.0.0.1:18788/stats")).json()).toEqual({exactTravelSelections:1});
+});
+
 test("M5.2 companion administration creates, grants, revokes, and replays safely", async ({ request }) => {
   const fixture = MECHANICS_STARTER_CATALOG;
   const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };

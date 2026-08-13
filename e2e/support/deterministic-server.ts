@@ -85,6 +85,9 @@ const consumableEntryFixtureBodySchema = fixtureTargetBodySchema.extend({
 });
 const campaignLocationFixtureBodySchema = worldVisibleLocationHttpSchema.extend({ campaignId: resourceIdSchema })
   .refine((location) => location.parentLocationId !== location.locationId, { path: ["parentLocationId"] });
+const travelFixtureBodySchema=z.object({campaignId:resourceIdSchema,sessionId:resourceIdSchema,actorId:resourceIdSchema,
+  originLocationId:resourceIdSchema,destinationLocationId:resourceIdSchema,connectionId:resourceIdSchema,
+  originName:z.string().trim().min(1).max(200),destinationName:z.string().trim().min(1).max(200)}).strict();
 
 // This route exposes the one internal linkage fixture adapters need without
 // widening the public finalization response.
@@ -171,6 +174,45 @@ app.post("/api/__e2e/materialize-campaign-location", async (request, reply) => {
     return reply.code(400).send({ error: "invalid E2E campaign location materialization request" });
   }
   return materialize(reply, () => fixtures.materializeCampaignLocation(body.data));
+});
+
+// Creates prerequisites only; candidate issuance, provider selection, travel,
+// receipt linking, and world revision mutation all use production paths.
+app.post("/api/__e2e/materialize-travel-prerequisite",async(request,reply)=>{
+  const body=travelFixtureBodySchema.safeParse(request.body);
+  if(!body.success||Object.keys(request.query as Record<string,unknown>).length>0)return reply.code(400).send({error:"invalid E2E travel prerequisite"});
+  return materialize(reply,()=>fixtures.materializeTravelPrerequisite(body.data));
+});
+
+// Read-only, disposable evidence for exact-once assertions. All three known
+// identities must bind the same production turn before bounded counts return.
+app.get("/api/__e2e/campaigns/:campaignId/turns/:turnId/actors/:actorId/travel-evidence",async(request,reply)=>{
+  const params=request.params as Record<string,unknown>,campaignId=resourceIdSchema.safeParse(params.campaignId),
+    turnId=resourceIdSchema.safeParse(params.turnId),actorId=resourceIdSchema.safeParse(params.actorId);
+  if(!campaignId.success||!turnId.success||!actorId.success||Object.keys(request.query as Record<string,unknown>).length)
+    return reply.code(400).send({error:"invalid E2E travel evidence request"});
+  const evidenceDb=new DatabaseDriver(path.join(dataDir,"velvet.sqlite"),{readonly:true});
+  try{const turn=evidenceDb.prepare("SELECT 1 FROM adventure_turns WHERE id=? AND campaign_id=? AND actor_id=?").get(turnId.data,campaignId.data,actorId.data);
+    if(!turn)return reply.code(404).send({error:"E2E travel evidence unavailable"});
+    const counts=evidenceDb.prepare(`SELECT
+      (SELECT count(*) FROM exact_candidate_executions_v47 WHERE campaign_id=? AND turn_id=? AND actor_id=?) executions,
+      (SELECT count(*) FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?) bindings,
+      (SELECT count(*) FROM world_commands_v28 command JOIN exact_candidate_executions_v47 execution
+        ON execution.campaign_id=command.campaign_id AND execution.world_command_id=command.command_id
+        WHERE command.campaign_id=? AND execution.turn_id=? AND command.command_type='travel') commands,
+      (SELECT count(*) FROM world_events_v28 event JOIN exact_candidate_executions_v47 execution
+        ON execution.campaign_id=event.campaign_id AND execution.world_command_id=event.command_id
+        WHERE event.campaign_id=? AND execution.turn_id=? AND event.event_type='travelled') events`)
+      .get(campaignId.data,turnId.data,actorId.data,campaignId.data,turnId.data,campaignId.data,turnId.data,
+        campaignId.data,turnId.data) as Record<string,number>;
+    const world=evidenceDb.prepare(`SELECT command.expected_revision revisionBefore,command.resulting_revision revisionAfter,
+      position.state_revision actorRevision,position.location_id locationId
+      FROM exact_candidate_provider_bindings_v48 binding JOIN world_commands_v28 command
+        ON command.campaign_id=binding.campaign_id AND command.command_id=binding.world_command_id
+      JOIN campaign_actor_locations_v28 position ON position.campaign_id=binding.campaign_id AND position.actor_id=?
+      WHERE binding.campaign_id=? AND binding.turn_id=?`).get(actorId.data,campaignId.data,turnId.data) as Record<string,unknown>|undefined;
+    return reply.send({...counts,...world});
+  }finally{evidenceDb.close();}
 });
 
 // Production economy HTTP routes are intentionally outside this milestone.
