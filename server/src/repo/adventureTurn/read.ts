@@ -51,6 +51,10 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     WHERE campaign_id=? AND turn_id=? ORDER BY linked_at,link_id`).all(campaignId, root) as any[]).map((row) => ({
       linkId: row.link_id, campaignId, commandId: row.command_id, proposalId: row.proposal_id, sourceTurnId: root, linkedAt: row.linked_at,
     }));
+  const exactTravel = (db.prepare(`SELECT binding_id link_id,world_command_id command_id,linked_at FROM exact_candidate_provider_bindings_v48
+    WHERE campaign_id=? AND turn_id=? ORDER BY linked_at,binding_id`).all(campaignId, root) as any[]).map((row) => ({
+      linkId:row.link_id,campaignId,commandId:row.command_id,proposalId:null,sourceTurnId:root,linkedAt:row.linked_at,
+    }));
   const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
     .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
   if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
@@ -89,8 +93,8 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
       campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
   });
-  return { links: [...linked, ...recoverable, ...generalized].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
-    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length };
+  return { links: [...linked, ...recoverable, ...generalized,...exactTravel].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
+    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length+exactTravel.length };
 };
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */

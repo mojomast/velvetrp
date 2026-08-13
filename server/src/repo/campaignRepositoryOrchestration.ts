@@ -85,7 +85,7 @@ import { createCompanionRepository } from "./companionRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
-import { createExactCandidateRepository } from "./candidateRepo/index.js";
+import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import {
   CampaignDiceCharacterConflict,
@@ -753,6 +753,9 @@ function createRepositoryComposition<T>(
   const exactCandidateRepository=createExactCandidateRepository(db,dependencies,()=>{
     assertOpen();if(transactionDepth>0)throw new Error("exact candidate operation cannot run inside a repository transaction");
   });
+  const exactCandidateProviderBridge=createExactCandidateProviderBridgeRepository(db,dependencies,()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("exact candidate provider bridge cannot run inside a repository transaction");
+  },exactCandidateRepository);
   const repository: Repository = {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -772,6 +775,7 @@ function createRepositoryComposition<T>(
     ...storyRepository,
     ...adventureTurnRepository,
     ...exactCandidateRepository,
+    ...exactCandidateProviderBridge,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
       const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;

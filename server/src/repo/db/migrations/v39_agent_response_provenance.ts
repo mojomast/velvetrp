@@ -148,7 +148,7 @@ export function assertAgentResponseProvenanceV39(db: DatabaseDriver.Database): v
     WHERE claim.provider_call_id<>context.provider_call_id OR claim.campaign_id<>context.campaign_id OR claim.turn_id<>context.turn_id
       OR claim.claimed_at<context.bound_at OR claim.lease_expires_at<>run.deadline_at LIMIT 1`).get();
   if(badClaim)throw new Error("schema v39 provider dispatch claim malformed");
-  const allowed=new Set(["campaign_context.read","actor_resources.read","actor_inventory.read","actor_powers.read","combat_state.read","world_state.read","quest_state.read","actor_attribute.set","actor_dice.roll","combat_action.execute"]);
+    const allowed=new Set(["campaign_context.read","actor_resources.read","actor_inventory.read","actor_powers.read","combat_state.read","world_state.read","quest_state.read","actor_attribute.set","actor_dice.roll","combat_action.execute","exact_actor_travel.select"]);
   for(const context of db.prepare("SELECT * FROM agent_provider_contexts_v39").all() as any[]){
     let contextValue:any,requestValue:any;try{contextValue=JSON.parse(context.context_json);requestValue=JSON.parse(context.request_json);}catch{throw new Error("schema v39 context JSON malformed");}
     if(canonicalAgentJson(contextValue)!==context.context_json||canonicalAgentJson(requestValue)!==context.request_json
@@ -182,7 +182,8 @@ export function assertAgentResponseProvenanceV39(db: DatabaseDriver.Database): v
          throw new Error("schema v39 attribute candidates malformed");
        const expected=["campaign_context.read","world_state.read","quest_state.read"];if(encounter)expected.push("combat_state.read");
       const controlled=identity.audience?.kind==="player"&&identity.authority.control!=="none";if(controlled)expected.push("actor_resources.read","actor_inventory.read","actor_powers.read");
-       if(controlled&&!encounter){if(attributes.length)expected.push("actor_attribute.set");expected.push("actor_dice.roll");}
+        if(controlled&&!encounter){if(attributes.length)expected.push("actor_attribute.set");expected.push("actor_dice.roll");
+          if(Array.isArray(requestValue.exactCandidateProjection?.candidates)&&requestValue.exactCandidateProjection.candidates.length)expected.push("exact_actor_travel.select");}
       const ownsTurn=(controlled&&identity.audience?.kind==="player"&&identity.audience.actorId===encounter?.currentActorId)||(identity.audience?.kind==="enemy"&&identity.audience.combatantId===encounter?.currentCombatantId);
       if(candidates.length&&ownsTurn)expected.push("combat_action.execute");if(canonicalAgentJson(tools)!==canonicalAgentJson(expected))throw new Error("schema v39 advertised tools do not match authority snapshot");
     }

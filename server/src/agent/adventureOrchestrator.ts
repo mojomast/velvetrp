@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   AGENT_TOOL_REGISTRY_VERSION, POST_V38_AGENT_TOOL_REGISTRY_VERSION, agentRequestObjectSchema, canonicalAgentJson, resourceIdSchema,
+  projectExactCandidateForProvider,providerSafeExactCandidateListSchema,
   type AgentJsonObject, type PrivateAdventureTurn,
 } from "@velvet/contracts";
 import { assembleCampaignAgentContext, campaignContextBasketText, type CampaignAgentAudience,
@@ -79,13 +80,14 @@ function planningMessages(snapshot: CampaignAgentContextSnapshot, context: strin
   ];
 }
 
-function requestRecord(messages: CompletionMessage[], tools: readonly SelectedAdventureTool[]): AgentJsonObject {
+function requestRecord(messages: CompletionMessage[], tools: readonly SelectedAdventureTool[],exactCandidates:unknown): AgentJsonObject {
   return agentRequestObjectSchema.parse({
     messages: messages.map((message) => message.role === "assistant"
       ? { role: message.role, content: message.content, toolCalls: (message.toolCalls ?? []).map((call) => ({ ...call })) }
       : message.role === "tool" ? { role: message.role, toolCallId: message.toolCallId, content: message.content }
         : { role: message.role, content: message.content }),
-    advertisedTools: tools.map((tool) => tool.name),postV38ToolRegistryVersion:POST_V38_AGENT_TOOL_REGISTRY_VERSION,
+    advertisedTools: tools.map((tool) => tool.name),advertisedToolSchemas:tools.map((tool)=>tool.provider),
+    exactCandidateProjection:exactCandidates,postV38ToolRegistryVersion:POST_V38_AGENT_TOOL_REGISTRY_VERSION,
   });
 }
 
@@ -228,6 +230,20 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       return{turn:privateTurn(repository,turn.turnId),outcome:"in-progress",limitations:ADVENTURE_TOOL_LIMITATIONS};
     return{turn:privateTurn(repository,turn.turnId),outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
   }
+  // A settled exact-travel response may have committed v47 mechanics before
+  // the v48 accounting insert. Recover that evidence before deadline, session,
+  // world, or context freshness gates. Repository replay still requires the
+  // current exact principal authority; loss of that authority remains hidden.
+  if(earlyRecovery?.response?.status==="succeeded"){
+    const stored=earlyRecovery.response.response as any,call=stored?.calls?.length===1?stored.calls[0]:null;
+    if(stored?.result==="tool-calls"&&call?.toolName==="exact_actor_travel.select"){
+      const alreadyBound=turn.receiptLinks.length>0;
+      try{repository.bindExactCandidateProviderExecution(OWNER,{turnId:turn.turnId,providerCallId:earlyRecovery.providerCallId,
+        providerToolCallId:call.providerToolCallId,round:earlyRecovery.round,selection:call.arguments,requireCommittedExecution:true});
+        return{turn:privateTurn(repository,turn.turnId),outcome:alreadyBound?"completed":"mechanics-committed",limitations:ADVENTURE_TOOL_LIMITATIONS};}
+      catch{/* No committed v47 execution yet, or current authority was lost. Fresh execution follows only through normal gates. */}
+    }
+  }
   if (((turn.receiptLinks?.length ?? 0) > 0 || turn.toolCalls.every((call)=>call.status==="committed"))
     && ["mechanics-committed","narrating","completed"].includes(turn.state))
     return{turn,outcome:"completed",limitations:ADVENTURE_TOOL_LIMITATIONS};
@@ -255,13 +271,20 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   const { snapshot } = selectedContext;
   const basket = assembleCampaignAgentContext({ snapshot, declaration: turn.declaration });
   const basketText=campaignContextBasketText(basket);
-  const currentTools=selectAdventureTools(snapshot);
+  let exactTravel=providerSafeExactCandidateListSchema.parse({version:"v1",candidates:[]});
+  if(snapshot.audience.kind==="player"&&snapshot.audience.actorId===turn.actorId&&snapshot.authority.control!=="none"&&!snapshot.encounter){
+    try{const batch=repository.generateActorTravelCandidates(OWNER,{turnId:turn.turnId,
+      idempotencyKey:`provider-player:${digest(turn.turnId)}`,audienceMode:"player"});
+      exactTravel=providerSafeExactCandidateListSchema.parse({version:"v1",candidates:batch.candidates.map((candidate)=>projectExactCandidateForProvider(candidate,batch.issuedAt))});}
+    catch{/* Candidate generation is fail-closed; all established tools remain available. */}
+  }
+  const currentTools=selectAdventureTools(snapshot,exactTravel.candidates);
   const persistedToolNames=earlyRecovery?.response?.status==="succeeded"&&Array.isArray((earlyRecovery.request as any)?.advertisedTools)
     ?new Set((earlyRecovery.request as any).advertisedTools as string[]):null;
   const selected = persistedToolNames?currentTools.filter((tool)=>persistedToolNames.has(tool.name)):currentTools;
   if(persistedToolNames&&(selected.length!==persistedToolNames.size||selected.some((tool)=>!persistedToolNames.has(tool.name))))
     return{turn,outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};
-  const messages = planningMessages(snapshot, basketText, turn.declaration);
+  const messages = planningMessages(snapshot, `${basketText}\n\nExact travel options (provider-safe): ${canonicalAgentJson(exactTravel as never)}`, turn.declaration);
   const priorIds = new Set<string>();
   const existingPlanning = repository.getDurableAgentPlanningState(OWNER, turn.turnId);
   if(existingPlanning?.deadlineExceeded){const orphan=repository.getAgentProviderRecovery(OWNER,turn.turnId);if(orphan&&!orphan.response
@@ -350,6 +373,10 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       const stored=recovery.response.response as any;if(!stored||!Array.isArray(stored.calls))throw new Error("malformed inbox");
       const pseudo:ProviderCompletionResult={message:{role:"assistant",content:stored.calls.length?null:"complete",toolCalls:stored.calls.map((call:any)=>({id:call.providerToolCallId,name:call.toolName,arguments:canonicalAgentJson(call.arguments)}))},usage:null,model:{requestedModel:recovery.model,responseModel:null}};
       const batch=validateBatch(pseudo,selected,priorIds);const planning=repository.getDurableAgentPlanningState(OWNER,turn.turnId)!;
+      const travel=batch.calls.find((call)=>call.toolName==="exact_actor_travel.select");
+      if(travel){repository.bindExactCandidateProviderExecution(OWNER,{turnId:turn.turnId,providerCallId:recovery.providerCallId,
+        providerToolCallId:travel.providerToolCallId,round:recovery.round,selection:travel.arguments});
+        return{turn:privateTurn(repository,turn.turnId),outcome:"mechanics-committed",limitations:ADVENTURE_TOOL_LIMITATIONS};}
       const combat=batch.calls.find((call)=>call.toolName==="combat_action.execute");
       if(combat){const timeline=repository.getCampaignTimeline(OWNER,turn.campaignId,turn.timelineId);if(!timeline)throw new Error("timeline unavailable");
         turn=appendMutationProposal(repository,turn,combat,timeline.revision,dependencies.now(),snapshot,recovery.providerCallId);const position=turn.toolCalls.length-1;
@@ -359,8 +386,8 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
         return{turn,outcome:"mechanics-committed",limitations:ADVENTURE_TOOL_LIMITATIONS};}
       repository.persistAgentDecisionRound(OWNER,{turnId:turn.turnId,round:recovery.round,providerCallId:recovery.providerCallId,
         toolRegistryVersion:AGENT_TOOL_REGISTRY_VERSION,request:recovery.request,result:batch.result,
-         calls:batch.calls.map(({providerToolCallId,toolName,kind,arguments:args})=>({providerToolCallId,
-           toolName:toolName as Exclude<AdventureToolName,"combat_action.execute">,kind,arguments:args})),
+         calls:batch.calls.filter((call)=>call.toolName!=="exact_actor_travel.select").map(({providerToolCallId,toolName,kind,arguments:args})=>({providerToolCallId,
+           toolName:toolName as Exclude<AdventureToolName,"combat_action.execute"|"exact_actor_travel.select">,kind,arguments:args})),
         expectedCampaignRevision:turn.campaignRevision,expectedTurnRevision:turn.revision,expectedExecutionRevision:planning.executionRevision,
         idempotencyKey:key("agent-decision",turn.turnId,String(recovery.round))});
       return orchestrateAdventureTurn(repository,turn.turnId,dependencies,signal);
@@ -374,7 +401,7 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
         || planning.providerStarts >= planning.limits.providerCalls || planning.totalToolCalls >= planning.limits.toolCalls) break;
     const round = planning.decisionRounds + 1;
     const providerCallId = id("agent-provider", turn.turnId, String(round));
-    const request=requestRecord(messages,selected);
+    const request=requestRecord(messages,selected,exactTravel);
     let claim:{claimed:boolean;leaseExpiresAt:string;expired:boolean};
     try {
       claim=repository.claimAgentProviderRound(OWNER, { turnId: turn.turnId, providerCallId, provider: providerLabel(provider),
@@ -429,6 +456,13 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     if (afterOutcome.deadlineExceeded) {
       safeEnemyFallback(repository,snapshot,turn.turnId);return { turn, outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
     }
+    const travelMutation=batch.calls.find((call)=>call.toolName==="exact_actor_travel.select");
+    if(travelMutation){
+      try{repository.bindExactCandidateProviderExecution(OWNER,{turnId:turn.turnId,providerCallId,
+        providerToolCallId:travelMutation.providerToolCallId,round,selection:travelMutation.arguments});
+        return{turn:privateTurn(repository,turn.turnId),outcome:"mechanics-committed",limitations:ADVENTURE_TOOL_LIMITATIONS};}
+      catch{return{turn:privateTurn(repository,turn.turnId),outcome:"in-progress",limitations:ADVENTURE_TOOL_LIMITATIONS};}
+    }
     const combatMutation=batch.calls.find((call)=>call.toolName==="combat_action.execute");
     if(combatMutation){
       const timeline=repository.getCampaignTimeline(OWNER,turn.campaignId,turn.timelineId);
@@ -447,8 +481,8 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     }
     const persisted = repository.persistAgentDecisionRound(OWNER, { turnId: turn.turnId, round, providerCallId,
       toolRegistryVersion: AGENT_TOOL_REGISTRY_VERSION, request, result: batch.result,
-      calls: batch.calls.map(({ providerToolCallId, toolName, kind, arguments: args }) => ({ providerToolCallId,
-        toolName:toolName as Exclude<AdventureToolName,"combat_action.execute">, kind, arguments: args })),
+       calls: batch.calls.filter((call)=>call.toolName!=="exact_actor_travel.select").map(({ providerToolCallId, toolName, kind, arguments: args }) => ({ providerToolCallId,
+         toolName:toolName as Exclude<AdventureToolName,"combat_action.execute"|"exact_actor_travel.select">, kind, arguments: args })),
       expectedCampaignRevision: turn.campaignRevision, expectedTurnRevision: turn.revision,
       expectedExecutionRevision: afterOutcome.executionRevision,
       idempotencyKey: key("agent-decision", turn.turnId, String(round)) });

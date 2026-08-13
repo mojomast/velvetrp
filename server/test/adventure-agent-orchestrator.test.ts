@@ -1,7 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { POST_V38_AGENT_TOOL_REGISTRY_VERSION, adventureTurnStreamEventSchema } from "@velvet/contracts";
+import { POST_V38_AGENT_TOOL_REGISTRY_VERSION, adventureTurnStreamEventSchema,canonicalAgentJson,
+  canonicalExactCandidateActionFrame,canonicalExactCandidateEnvelopeFrame,computeExactCandidateActionDigest,
+  computeExactCandidateEnvelopeDigest,projectExactCandidateForProvider } from "@velvet/contracts";
 import type { ProviderCompletionResult } from "../src/provider/index.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { executeDeterministicEnemyFallback, orchestrateAdventureTurn,
@@ -12,9 +14,12 @@ import { createRepository } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 import { buildApp } from "../src/app.js";
 import { createServer } from "node:http";
+import {createHash} from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { completeWithProvider } from "../src/provider/index.js";
 import { deriveConfirmationPolicy } from "../src/agent/confirmationPolicy.js";
+import {narrationFallback} from "../src/routes/rpg/v1/adventureTurns.js";
+import {assertExactCandidateProviderBridgeLayoutV48} from "../src/repo/db/migrations/v48_exact_candidate_provider_bridge.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
@@ -40,6 +45,14 @@ function seed() {
   db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(at);
   db.prepare("INSERT INTO session_characters VALUES('session','persona',0)").run();
   db.prepare("INSERT INTO campaign_sessions VALUES('session',?,?)").run(campaign.id, at);
+  db.prepare("INSERT INTO campaign_locations_v28 VALUES('origin',?,NULL,'Old Gate','','public',?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_locations_v28 VALUES('destination',?,NULL,'Silver Harbor','','public',?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('safe-road',?,'origin','destination','public','open','none',NULL,NULL,?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_locations_v28 VALUES('gm-destination',?,NULL,'Secret Vault','','gm',?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_locations_v28 VALUES('gm-destination-two',?,NULL,'Hidden Annex','','gm',?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('gm-road',?,'origin','gm-destination','gm','open','none',NULL,NULL,?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('public-to-gm',?,'origin','gm-destination-two','public','open','none',NULL,NULL,?)").run(campaign.id,at);
+  db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,'origin','session',0,?)").run(campaign.id,"actor",at);
   db.close();
   return campaign;
 }
@@ -150,6 +163,198 @@ describe("server-selected adventure tool registry", () => {
 });
 
 describe("bounded adventure orchestrator", () => {
+  it("resolves inherited exact travel narration receipts for retry and swipe turns",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});const turn=repository.createAdventureTurn("local-owner",{
+      campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel onward",
+      expectedCampaignRevision:0,idempotencyKey:"inherited-travel"});const deps=dependencies([]);deps.now=()=>new Date(at);
+    deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+      return completion([{id:"inherited-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({
+        candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+    let root=(await orchestrateAdventureTurn(repository,turn.turnId,deps)).turn;const commandId=root.receiptLinks[0]!.commandId;
+    root=repository.updateAdventureTurnNarration("local-owner",{turnId:root.turnId,expectedTurnRevision:root.revision,expectedCampaignRevision:0,
+      idempotencyKey:"inherited-root-narrating",narrationStatus:"in-progress"});
+    root=repository.updateAdventureTurnNarration("local-owner",{turnId:root.turnId,expectedTurnRevision:root.revision,expectedCampaignRevision:0,
+      idempotencyKey:"inherited-root-done",narrationStatus:"completed",terminalState:"completed",fallbackNarration:"Arrived."});
+    const retry=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",
+      declaration:root.declaration,mode:"narration-retry",priorTurnId:root.turnId,expectedCampaignRevision:0,idempotencyKey:"inherited-retry"});
+    const swipe=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",
+      declaration:root.declaration,mode:"narration-swipe",priorTurnId:root.turnId,expectedCampaignRevision:0,idempotencyKey:"inherited-swipe"});
+    for(const derivative of [retry,swipe])expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",derivative.turnId,commandId))
+      .toEqual({destination:"Silver Harbor"});
+    const hidden=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));hidden.prepare(
+      "UPDATE campaign_location_connections_v28 SET visibility='gm' WHERE campaign_id=? AND connection_id='safe-road'").run(campaign.id);hidden.close();
+    for(const derivative of [retry,swipe])expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",derivative.turnId,commandId)).toBeNull();
+    const text=narrationFallback(root.declaration,[{kind:"travel",destination:"Silver Harbor"}]);
+    expect(text).toContain("Silver Harbor");expect(text).not.toMatch(/safe-road|gm-road|Secret Vault/);repository.close();
+  });
+  it("binds one exact provider travel selection and recovers without duplicate mechanics",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});const turn=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,
+      timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel onward",expectedCampaignRevision:0,idempotencyKey:"exact-travel"});
+    let calls=0;const deps=dependencies([]);deps.now=()=>new Date(at);deps.complete=async(input)=>{calls+=1;const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+      expect(tool.parameters.additionalProperties).toBe(false);expect(tool.parameters.properties.candidateId.enum).toHaveLength(1);
+      return completion([{id:"travel-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+    const result=await orchestrateAdventureTurn(repository,turn.turnId,deps);expect(result.outcome).toBe("mechanics-committed");
+    expect(result.turn.receiptLinks).toHaveLength(1);const recovered=await orchestrateAdventureTurn(repository,turn.turnId,deps);
+    expect(recovered.outcome).toBe("completed");expect(calls).toBe(1);
+    const state=repository.getCampaignWorld("local-owner",campaign.id)!;expect(state.currentLocations).toContainEqual(expect.objectContaining({actorId:"actor",locationId:"destination"}));
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    expect(db.prepare("SELECT provider_tool_call_id,round_number,tool_name FROM exact_candidate_provider_bindings_v48").get())
+      .toEqual({provider_tool_call_id:"travel-choice",round_number:1,tool_name:"exact_actor_travel.select"});
+    expect(JSON.parse((db.prepare("SELECT request_json FROM agent_provider_contexts_v39").get() as {request_json:string}).request_json))
+      .toMatchObject({exactCandidateProjection:{version:"v1",candidates:[{kind:"actor.travel"}]},advertisedToolSchemas:expect.arrayContaining([
+        expect.objectContaining({name:"exact_actor_travel.select",parameters:expect.objectContaining({additionalProperties:false})})])});
+    expect(db.prepare("SELECT count(*) count FROM world_commands_v28 WHERE command_type='travel'").get()).toEqual({count:1});db.close();repository.close();
+    const reopened=createRepository({clock:{now:()=>new Date(at)}});expect(reopened.getDurableAgentPlanningState("local-owner",turn.turnId))
+      .toMatchObject({decisionRounds:1,totalToolCalls:1,mutationCalls:1,executionRevision:2});
+    expect(reopened.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,result.turn.receiptLinks[0]!.commandId))
+      .toEqual({destination:"Silver Harbor",revisionBefore:0,revisionAfter:1,occurredAt:at});
+    const memberships=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    memberships.prepare("INSERT INTO principals VALUES('receipt-member','Member',0),('receipt-observer','Observer',0),('receipt-outsider','Outsider',0)").run();
+    memberships.prepare("INSERT INTO campaign_memberships VALUES(?,'receipt-member','player',?),(?,'receipt-observer','observer',?)")
+      .run(campaign.id,at,campaign.id,at);memberships.close();
+    for(const principal of ["receipt-member","receipt-observer"])
+      expect(reopened.getExactCandidateTravelPublicReceipt(principal,campaign.id,result.turn.receiptLinks[0]!.commandId))
+        .toEqual({destination:"Silver Harbor",revisionBefore:0,revisionAfter:1,occurredAt:at});
+    expect(reopened.getExactCandidateTravelPublicReceipt("receipt-outsider",campaign.id,result.turn.receiptLinks[0]!.commandId)).toBeNull();
+    expect(reopened.getExactCandidateTravelPublicReceipt("local-owner","wrong-campaign",result.turn.receiptLinks[0]!.commandId)).toBeNull();
+    expect(reopened.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,"wrong-command")).toBeNull();
+    expect(reopened.getExactCandidateTravelNarrationReceipt("local-owner",turn.turnId,result.turn.receiptLinks[0]!.commandId))
+      .toEqual({destination:"Silver Harbor"});
+    expect((await orchestrateAdventureTurn(reopened,turn.turnId,deps)).outcome).toBe("completed");reopened.close();
+    const staged=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    staged.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_delete_v48");
+    staged.prepare("DELETE FROM exact_candidate_provider_bindings_v48").run();
+    staged.prepare("UPDATE sessions SET state='stopped',stopped_at='2035-01-01T00:00:02.000Z' WHERE id='session'").run();
+    staged.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_delete_v48 BEFORE DELETE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");staged.close();
+    const late=createRepository({clock:{now:()=>new Date("2035-01-02T00:00:00.000Z")}});
+    expect((await orchestrateAdventureTurn(late,turn.turnId,deps)).outcome).toBe("mechanics-committed");
+    expect(late.getAdventureTurn("local-owner",turn.turnId)).toMatchObject({receiptLinks:[{commandId:result.turn.receiptLinks[0]!.commandId}]});late.close();
+    const once=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    expect(once.prepare("SELECT (SELECT count(*) FROM exact_candidate_provider_bindings_v48) bindings,(SELECT count(*) FROM world_commands_v28 WHERE command_type='travel') commands").get())
+      .toEqual({bindings:1,commands:1});once.close();
+    const narration=narrationFallback("Travel onward",[{kind:"travel",destination:"Silver Harbor"}]);
+    expect(narration).toContain("Silver Harbor");expect(narration).not.toContain("safe-road");expect(narration).not.toContain("Secret Vault");
+    const categories=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    categories.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
+    const original=categories.prepare("SELECT * FROM exact_candidate_provider_bindings_v48").get() as any;
+    for(const [column,value] of [["selection_json",'{"candidateId":"wrong","choices":[],"kind":"actor.travel","version":"v1"}'],
+      ["selection_digest","1".repeat(64)],["provider_call_id","wrong-call"],["provider_tool_call_id","wrong-tool-call"],
+      ["round_number",2],["execution_id","wrong-execution"],["world_command_id","wrong-command"],
+      ["linked_at","2035-01-01T00:00:03.000Z"]] as const){
+      categories.pragma("foreign_keys=OFF");categories.prepare(`UPDATE exact_candidate_provider_bindings_v48 SET ${column}=?`).run(value);
+      expect(()=>assertExactCandidateProviderBridgeLayoutV48(categories),column).toThrow();
+      categories.prepare(`UPDATE exact_candidate_provider_bindings_v48 SET ${column}=?`).run(original[column]);categories.pragma("foreign_keys=ON");
+    }
+    categories.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");categories.close();
+    const corrupt=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    corrupt.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
+    corrupt.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_digest=?").run("0".repeat(64));
+    corrupt.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");corrupt.close();
+    expect(()=>createRepository()).toThrow("provider binding attestation is malformed");
+    const mismatch=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));mismatch.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
+    const changed='{"candidates":[],"version":"v1"}';mismatch.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_json=?,provider_projection_digest=?")
+      .run(changed,createHash("sha256").update(changed).digest("hex"));
+    mismatch.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");mismatch.close();
+    expect(()=>createRepository()).toThrow("provider binding attestation is malformed");
+  });
+  it("scopes receipt integrity verification to the selected v48 binding",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});
+    const execute=async(idempotencyKey:string,choiceId:string)=>{const turn=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,
+      timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel",expectedCampaignRevision:0,idempotencyKey});
+      const deps=dependencies([]);deps.now=()=>new Date(at);deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+        return completion([{id:choiceId,name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+      return {turnId:turn.turnId,commandId:(await orchestrateAdventureTurn(repository,turn.turnId,deps)).turn.receiptLinks[0]!.commandId};};
+    const first=await execute("scoped-first","scoped-choice-first");
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO campaign_location_connections_v28 VALUES('return-road',?,'destination','origin','public','open','none',NULL,NULL,?)").run(campaign.id,at);db.close();
+    const second=await execute("scoped-second","scoped-choice-second");
+    const corrupt=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));corrupt.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
+    corrupt.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_digest=? WHERE world_command_id=?").run("0".repeat(64),second.commandId);corrupt.close();
+    expect(repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,first.commandId)).toEqual({destination:"Silver Harbor",revisionBefore:0,revisionAfter:1,occurredAt:at});
+    expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",first.turnId,first.commandId)).toEqual({destination:"Silver Harbor"});
+    expect(()=>repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,second.commandId)).toThrow(/provider binding attestation/);
+    expect(()=>repository.getExactCandidateTravelNarrationReceipt("local-owner",second.turnId,second.commandId)).toThrow(/provider binding attestation/);
+    const inspect=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true}),bindingStatement=inspect.prepare(
+      "SELECT provider_call_id,provider_tool_call_id,round_number,selection_json FROM exact_candidate_provider_bindings_v48 WHERE world_command_id=?");
+    const firstBinding=bindingStatement.get(first.commandId) as any,secondBinding=bindingStatement.get(second.commandId) as any;inspect.close();
+    expect(()=>repository.bindExactCandidateProviderExecution("local-owner",{turnId:second.turnId,providerCallId:secondBinding.provider_call_id,
+      providerToolCallId:secondBinding.provider_tool_call_id,round:secondBinding.round_number,selection:JSON.parse(secondBinding.selection_json)})).toThrow(/provider binding attestation/);
+    expect(repository.bindExactCandidateProviderExecution("local-owner",{turnId:first.turnId,providerCallId:firstBinding.provider_call_id,
+      providerToolCallId:firstBinding.provider_tool_call_id,round:firstBinding.round_number,selection:JSON.parse(firstBinding.selection_json)}).actorTravelResult.receipt.commandId).toBe(first.commandId);
+    repository.close();
+  });
+  it("limits discovered travel receipts to the still-authorized source-turn principal",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});const turn=repository.createAdventureTurn("local-owner",{
+      campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel onward",
+      expectedCampaignRevision:0,idempotencyKey:"discovered-receipt"});const deps=dependencies([]);deps.now=()=>new Date(at);
+    deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+      return completion([{id:"discovered-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+    const commandId=(await orchestrateAdventureTurn(repository,turn.turnId,deps)).turn.receiptLinks[0]!.commandId;
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO principals VALUES('other-player','Other player',0),('other-observer','Other observer',0)").run();
+    db.prepare("INSERT INTO campaign_memberships VALUES(?,'other-player','player',?),(?,'other-observer','observer',?)").run(campaign.id,at,campaign.id,at);
+    db.prepare("UPDATE campaign_location_connections_v28 SET visibility='discovered' WHERE campaign_id=? AND connection_id='safe-road'").run(campaign.id);
+    db.prepare("UPDATE campaign_locations_v28 SET visibility='discovered' WHERE campaign_id=? AND location_id='destination'").run(campaign.id);
+    db.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaign.id,"actor","destination",at);db.close();
+    expect(repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,commandId)).toEqual({destination:"Silver Harbor",revisionBefore:0,revisionAfter:1,occurredAt:at});
+    for(const principal of ["other-player","other-observer"])
+      expect(repository.getExactCandidateTravelPublicReceipt(principal,campaign.id,commandId)).toBeNull();
+    const lost=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));lost.pragma("foreign_keys=OFF");
+    lost.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='local-owner'").run(campaign.id);
+    lost.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='other-player' WHERE campaign_id=? AND actor_id='actor'").run(campaign.id);lost.close();
+    expect(repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,commandId)).toBeNull();
+    const hidden=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));hidden.prepare(
+      "UPDATE campaign_location_connections_v28 SET visibility='gm' WHERE campaign_id=? AND connection_id='safe-road'").run(campaign.id);hidden.close();
+    expect(repository.getExactCandidateTravelPublicReceipt("other-player",campaign.id,commandId)).toBeNull();repository.close();
+  });
+  it("masks discovered narration after root authority loss and for an unrelated derivative principal",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});const root=repository.createAdventureTurn("local-owner",{
+      campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel onward",expectedCampaignRevision:0,idempotencyKey:"narration-discovered"});
+    const deps=dependencies([]);deps.now=()=>new Date(at);deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+      return completion([{id:"narration-discovered-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+    let committed=(await orchestrateAdventureTurn(repository,root.turnId,deps)).turn;const commandId=committed.receiptLinks[0]!.commandId;
+    committed=repository.updateAdventureTurnNarration("local-owner",{turnId:committed.turnId,expectedTurnRevision:committed.revision,expectedCampaignRevision:0,idempotencyKey:"narration-discovered-progress",narrationStatus:"in-progress"});
+    committed=repository.updateAdventureTurnNarration("local-owner",{turnId:committed.turnId,expectedTurnRevision:committed.revision,expectedCampaignRevision:0,idempotencyKey:"narration-discovered-done",narrationStatus:"completed",terminalState:"completed",fallbackNarration:"Done"});
+    const retry=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:committed.declaration,mode:"narration-retry",priorTurnId:committed.turnId,expectedCampaignRevision:0,idempotencyKey:"narration-discovered-retry"});
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));db.prepare("INSERT INTO principals VALUES('derivative-other','Other',0)").run();
+    db.prepare("INSERT INTO campaign_memberships VALUES(?,'derivative-other','player',?)").run(campaign.id,at);
+    db.prepare("UPDATE campaign_location_connections_v28 SET visibility='discovered' WHERE campaign_id=? AND connection_id='safe-road'").run(campaign.id);
+    db.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaign.id,"actor","destination",at);db.close();
+    expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",retry.turnId,commandId)).toEqual({destination:"Silver Harbor"});
+    expect(repository.getExactCandidateTravelNarrationReceipt("derivative-other",retry.turnId,commandId)).toBeNull();
+    const lost=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));lost.pragma("foreign_keys=OFF");lost.prepare(
+      "UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='local-owner'").run(campaign.id);lost.prepare(
+      "UPDATE campaign_actor_private_state SET controller_principal_id='derivative-other' WHERE campaign_id=? AND actor_id='actor'").run(campaign.id);lost.close();
+    expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",retry.turnId,commandId)).toBeNull();repository.close();
+  });
+  it("rejects coordinated candidate batch and provider projection tampering",async()=>{
+    const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});const turn=repository.createAdventureTurn("local-owner",{
+      campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"Travel onward",
+      expectedCampaignRevision:0,idempotencyKey:"coordinated-tamper"});const deps=dependencies([]);deps.now=()=>new Date(at);
+    deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
+      return completion([{id:"tamper-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
+    await orchestrateAdventureTurn(repository,turn.turnId,deps);repository.close();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    const triggerNames=["exact_candidates_v46_immutable_update_v46","exact_candidate_batches_v46_immutable_update_v46",
+      "exact_candidate_provider_bindings_v48_immutable_update_v48","agent_provider_contexts_v39_update_v39"];
+    const triggerSql=triggerNames.map((name)=>(db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?").get(name) as {sql:string}).sql);
+    for(const name of triggerNames)db.exec(`DROP TRIGGER ${name}`);
+    const row=db.prepare("SELECT * FROM exact_candidates_v46 ORDER BY position LIMIT 1").get() as any,candidate=JSON.parse(row.envelope_json);
+    candidate.label.routeOption=32;const crypto={sha256:(value:string)=>createHash("sha256").update(value).digest("hex")};
+    candidate.canonicalActionDigest=computeExactCandidateActionDigest(candidate,crypto);candidate.canonicalEnvelopeDigest=computeExactCandidateEnvelopeDigest(candidate,crypto);
+    db.prepare(`UPDATE exact_candidates_v46 SET action_frame=?,action_digest=?,envelope_frame=?,envelope_digest=?,envelope_json=? WHERE candidate_id=?`)
+      .run(canonicalExactCandidateActionFrame(candidate),candidate.canonicalActionDigest,canonicalExactCandidateEnvelopeFrame(candidate),candidate.canonicalEnvelopeDigest,JSON.stringify(candidate),row.candidate_id);
+    const candidates=(db.prepare("SELECT envelope_json FROM exact_candidates_v46 WHERE batch_id=? ORDER BY position").all(row.batch_id) as any[]).map((item)=>JSON.parse(item.envelope_json));
+    const requestDigest=crypto.sha256(canonicalAgentJson({turnId:turn.turnId,worldRevision:0,candidates} as never));
+    db.prepare("UPDATE exact_candidate_batches_v46 SET request_digest=? WHERE batch_id=?").run(requestDigest,row.batch_id);
+    const projection={version:"v1",candidates:candidates.map((value)=>projectExactCandidateForProvider(value,value.issuedAt))};const projectionJson=canonicalAgentJson(projection as never);
+    db.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_json=?,provider_projection_digest=?").run(projectionJson,crypto.sha256(projectionJson));
+    const context=db.prepare("SELECT context_id,request_json FROM agent_provider_contexts_v39").get() as any,request=JSON.parse(context.request_json);
+    request.exactCandidateProjection=projection;const tool=request.advertisedToolSchemas.find((item:any)=>item.name==="exact_actor_travel.select");
+    tool.parameters.properties.candidateId.enum=projection.candidates.map((value:any)=>value.candidateId);const requestJson=canonicalAgentJson(request);
+    db.prepare("UPDATE agent_provider_contexts_v39 SET request_json=?,request_digest=? WHERE context_id=?").run(requestJson,crypto.sha256(requestJson),context.context_id);
+    for(const sql of triggerSql)db.exec(sql);db.close();
+    expect(()=>createRepository()).toThrow(/candidate|provider (binding|projection)/);
+  });
   it("scopes identical provider call IDs across turns and campaigns",()=>{
     const first=seed();let repository=createRepository({clock:{now:()=>new Date(at)}});
     const second=repository.createCampaign("local-owner",{name:"Other provider campaign"});repository.close();
@@ -256,7 +461,8 @@ describe("bounded adventure orchestrator", () => {
     });
     expect(events.map((event) => event.type)).toEqual(["turn_started", "agent_status", "tool_proposed",
       "mechanics_committed", "agent_status", "narration_delta", "terminal"]);
-    expect(response.body).not.toMatch(/private-call|1d20|promptTokens|providerCalls|argumentsJson|executionBinding|local-owner/);
+    for(const event of events)expect(JSON.stringify(event)).not.toMatch(/private-call|promptTokens|providerCalls|argumentsJson|executionBinding|local-owner/);
+    expect(events.some((event)=>JSON.stringify(event).includes('"expression":"1d20"'))).toBe(false);
     expect((wire as any).tools.find((tool:any)=>tool.function.name==="actor_dice.roll").function).toMatchObject({strict:true,parameters:{additionalProperties:false}});
     await app.close();await new Promise<void>((resolve)=>providerServer.close(()=>resolve()));
     const audit=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});

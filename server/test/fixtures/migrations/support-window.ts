@@ -7,6 +7,7 @@ import { COMPANION_CORE_V45_MANAGED_OBJECTS } from "../../../src/repo/db/migrati
 import { EXACT_CANDIDATE_V46_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v46_exact_candidates.js";
 import { migrate44to45 } from "../../../src/repo/db/migrations/v45_companion_principals.js";
 import { EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v47_exact_candidate_executions.js";
+import { EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS } from "../../../src/repo/db/migrations/v48_exact_candidate_provider_bridge.js";
 
 const AT = "2035-01-01T00:00:00.000Z";
 const V42_TABLES = ["campaign_content_layout_attestation_v42", "campaign_content_revisions_v42", "campaign_content_receipts_v42", "campaign_content_commands_v42"];
@@ -246,6 +247,9 @@ export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44Compan
   createCompanionCoreV44(promote);
   promote.prepare("UPDATE meta SET value='44' WHERE key='schemaVersion'").run();
   migrate44to45(promote);
+  // This fixture starts from a rewound current database, so later canonical
+  // shells already exist; temporarily restore the current marker for setup.
+  promote.prepare("UPDATE meta SET value='48' WHERE key='schemaVersion'").run();
   promote.close();
   let id = 0;
   const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `support-companion-${++id}` } });
@@ -280,6 +284,8 @@ export function buildCanonicalPopulatedV44CompanionFixture(): PopulatedV44Compan
   const downgrade = new DatabaseDriver(databaseFile());
   downgrade.pragma("foreign_keys=OFF");
   downgrade.transaction(() => {
+    for (const [type,name] of [...EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS].reverse()){if(type==="trigger")downgrade.exec(`DROP TRIGGER ${name}`);if(type==="index")downgrade.exec(`DROP INDEX ${name}`);}
+    for(const [,name] of [...EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS].filter(([type])=>type==="table").reverse())downgrade.exec(`DROP TABLE ${name}`);
     for (const [type,name] of [...EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS].reverse()){if(type==="trigger")downgrade.exec(`DROP TRIGGER ${name}`);if(type==="index")downgrade.exec(`DROP INDEX ${name}`);}
     for(const [,name] of [...EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS].filter(([type])=>type==="table").reverse())downgrade.exec(`DROP TABLE ${name}`);
     for (const [type, name] of [...EXACT_CANDIDATE_V46_MANAGED_OBJECTS].reverse()) {

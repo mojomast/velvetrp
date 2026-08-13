@@ -13,6 +13,7 @@ import {
 import type { Clock, IdGenerator } from "../../runtime.js";
 import { evaluateActorTravelPolicy } from "../world/actorTravelPolicy.js";
 import { executeActorTravelInTransaction } from "../world/internal.js";
+import {verifyExactCandidateIssuanceBatch} from "./issuanceVerifier.js";
 import { ExactCandidateAuthorizationError, ExactCandidateConflictError, ExactCandidateExpiredError,
   ExactCandidateIntegrityError, ExactCandidateUnavailableError } from "./errors.js";
 
@@ -30,7 +31,7 @@ const connection=(turnId:string)=>resourceIdSchema.parse(`adventure-turn:${resou
 const scopeEqual=(a:InternalExactCandidate,b:InternalExactCandidate)=>canonicalAgentJson(a.scope)===canonicalAgentJson(b.scope);
 
 export interface IssueExactCandidateBatchInput {turnId:string;idempotencyKey:string;worldRevision:number;candidates:readonly InternalExactCandidate[]}
-export interface GenerateActorTravelCandidatesInput {turnId:string;idempotencyKey:string}
+export interface GenerateActorTravelCandidatesInput {turnId:string;idempotencyKey:string;audienceMode?:"principal"|"player"}
 export interface ExecuteExactActorTravelCandidateInput {turnId:string;selection:ExactCandidateSelectionResponse}
 export interface ExactCandidateBatch {batchId:string;turnId:string;connectionId:string;worldRevision:number;issuedAt:string;expiresAt:string;candidates:InternalExactCandidate[]}
 export interface ExactCandidateRepository {
@@ -41,6 +42,8 @@ export interface ExactCandidateRepository {
   getExactCandidate(principalId:string,candidateId:string):InternalExactCandidate|null;
   observeExactCandidateExpiry(principalId:string,candidateId:string):InternalExactCandidate;
   supersedeExactCandidate(principalId:string,sourceCandidateId:string,replacementCandidateId:string):InternalExactCandidate;
+  /** Integrity-only committed read used after a separate public membership gate. */
+  verifyExactCandidateExecution(candidateId:string):ExactCandidateExecutionResult;
 }
 
 export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGenerator},guard:()=>void):ExactCandidateRepository {
@@ -109,11 +112,8 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
   };
   /** Reconstructs immutable issuance only; derived lifecycle observations never alter the batch request digest. */
   const originalBatch=(batchRow:BatchRow,owner:TurnRow):{rows:CandidateRow[];candidates:InternalExactCandidate[]}=>{try{
-    verifyBatchTurn(batchRow,owner);const rows=db.prepare("SELECT * FROM exact_candidates_v46 WHERE batch_id=? ORDER BY position").all(batchRow.batch_id) as CandidateRow[];
-    if(rows.length!==batchRow.candidate_count||rows.some((candidate,index)=>candidate.position!==index+1))throw new Error("batch positions are not exact contiguous 1..N");
-    const candidates=rows.map((candidate)=>verifyCandidate(candidate,batchRow));
-    if(requestDigest(batchRow.turn_id,batchRow.world_revision,candidates)!==batchRow.request_digest)throw new Error("batch request digest mismatch");
-    return {rows,candidates};
+    verifyBatchTurn(batchRow,owner);const verified=verifyExactCandidateIssuanceBatch(db,batchRow.batch_id);
+    return {rows:verified.rows as CandidateRow[],candidates:verified.candidates};
   }catch(error){if(error instanceof ExactCandidateIntegrityError)throw error;throw new ExactCandidateIntegrityError("candidate batch integrity verification failed",{cause:error});}};
   const executionRow=(candidateId:string)=>db.prepare("SELECT * FROM exact_candidate_executions_v47 WHERE candidate_id=?").get(candidateId) as any|undefined;
   const verifyExecution=(row:any,original:InternalExactCandidate):ExactCandidateExecutionResult=>{try{
@@ -224,7 +224,17 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
       return persisted;}).immediate();
   };
   return {
+    verifyExactCandidateExecution(candidateId){resourceIdSchema.parse(candidateId);
+      const row=db.prepare("SELECT * FROM exact_candidates_v46 WHERE candidate_id=?").get(candidateId) as CandidateRow|undefined;
+      if(!row)throw new ExactCandidateUnavailableError("candidate execution is unavailable");
+      const batchRow=db.prepare("SELECT * FROM exact_candidate_batches_v46 WHERE batch_id=?").get(row.batch_id) as BatchRow|undefined;
+      const owner=batchRow&&turn(batchRow.turn_id);if(!batchRow||!owner)throw new ExactCandidateIntegrityError("candidate execution ancestry is unavailable");
+      const issuance=originalBatch(batchRow,owner),original=issuance.candidates.find((candidate)=>candidate.candidateId===candidateId);
+      const execution=executionRow(candidateId);if(!original||!execution)throw new ExactCandidateIntegrityError("candidate execution evidence is unavailable");
+      return verifyExecution(execution,original);},
     generateActorTravelCandidates(principalId,input){guard();resourceIdSchema.parse(principalId);resourceIdSchema.parse(input.turnId);resourceIdSchema.parse(input.idempotencyKey);
+      const audienceMode=input.audienceMode??"principal";
+      if(audienceMode==="player"&&!input.idempotencyKey.startsWith("provider-player:"))throw new ExactCandidateConflictError("player candidate batch key is invalid");
       const replay=readByIssueKey(principalId,input.turnId,input.idempotencyKey);if(replay)return replay;
       return db.transaction(()=>{
         const concurrentReplay=readByIssueKey(principalId,input.turnId,input.idempotencyKey);if(concurrentReplay)return concurrentReplay;
@@ -246,7 +256,7 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
         const routes=(db.prepare(`SELECT connection_id FROM campaign_location_connections_v28
           WHERE campaign_id=? ORDER BY connection_id COLLATE BINARY`).all(row.campaign_id) as Array<{connection_id:string}>)
           .map(({connection_id})=>evaluateActorTravelPolicy(db,{campaignId:row.campaign_id,sessionId:row.session_id,
-            actorId:row.actor_id,principalId,partyActorIds:[row.actor_id],connectionId:connection_id,requireRunningSession:true}))
+            actorId:row.actor_id,principalId,partyActorIds:[row.actor_id],connectionId:connection_id,requireRunningSession:true,audienceMode}))
           .filter((result):result is Extract<typeof result,{allowed:true}>=>result.allowed)
           .map((result)=>result.route);
         if(routes.length>MAX_EXACT_CANDIDATES_PER_RESPONSE)throw new ExactCandidateConflictError("legal route count exceeds exact candidate limit");
@@ -286,8 +296,10 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
         const boundary=validateExactCandidateSelection(selection,batch.candidates,{campaignId:owner.campaign_id,sessionId:owner.session_id,
           actorId:owner.actor_id,principalId,connectionId:connection(owner.id),now:at,observedRevisions:{world:revision}},crypto);
         if(!boundary.ok)throw new ExactCandidateConflictError(`candidate selection rejected: ${boundary.code}`);
+        const providerPlayer=located.batchRow.idempotency_key.startsWith("provider-player:");
         const policy=evaluateActorTravelPolicy(db,{campaignId:owner.campaign_id,sessionId:owner.session_id,actorId:owner.actor_id,principalId,
-          partyActorIds:boundary.candidate.privateParameters.partyActorIds,connectionId:boundary.candidate.privateParameters.connectionId,requireRunningSession:true});
+          partyActorIds:boundary.candidate.privateParameters.partyActorIds,connectionId:boundary.candidate.privateParameters.connectionId,
+          requireRunningSession:true,audienceMode:providerPlayer?"player":"principal"});
         if(!policy.allowed)throw new ExactCandidateUnavailableError("candidate route is unavailable");
         const executionId=id(),worldKey=`exact-candidate:${boundary.candidate.canonicalActionDigest}`;
         const actorTravelResult=executeActorTravelInTransaction(db,{clock:{now:()=>new Date(at)},ids:deps.ids},principalId,owner.session_id,owner.actor_id,

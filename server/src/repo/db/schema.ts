@@ -13,6 +13,7 @@ import { COMPANION_CORE_V44_MANAGED_OBJECTS } from "./migrations/v44_companion_c
 import { COMPANION_CORE_V45_MANAGED_OBJECTS } from "./migrations/v45_companion_principals.js";
 import { EXACT_CANDIDATE_V46_MANAGED_OBJECTS } from "./migrations/v46_exact_candidates.js";
 import { EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS } from "./migrations/v47_exact_candidate_executions.js";
+import { EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS } from "./migrations/v48_exact_candidate_provider_bridge.js";
 
 type SchemaDependency = (db: DatabaseDriver.Database) => void;
 type SchemaDependencies = Record<
@@ -21,7 +22,7 @@ type SchemaDependencies = Record<
   | "assertWorldNarrativeV32" | "assertQuestDomainV33" | "assertStoryDomainV34" | "assertAdventureGenerationV35" | "assertAdventureHardeningV36" | "assertToolExecutionBindingsV37" | "assertDurableAgentExecutionV38" | "assertAgentResponseProvenanceV39" | "assertConfirmationPolicyV40" | "assertCampaignContentIntegrityV42" | "assertNpcPresenceLayoutV43" | "assertCompanionCoreLayoutV44" | "assertCompanionCoreLayoutV45"
   | "assertCharacterBuilderLayoutV22" | "assertCharacterLayoutV29" | "assertCharacterProgressionLayoutV23"
   | "assertCharacterProgressionLayoutV24" | "assertChecksPowersEffectsLayoutV26" | "assertCombatFoundationLayoutV27"
-  | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28" | "assertExactCandidatesLayoutV46" | "assertExactCandidateExecutionsLayoutV47"
+  | "assertResourcesInventoryEconomyRestLayoutV25" | "assertWorldTravelNpcFactionLayoutV28" | "assertExactCandidatesLayoutV46" | "assertExactCandidateExecutionsLayoutV47" | "assertExactCandidateProviderBridgeLayoutV48"
   | "createCampaignAdministrationV15" | "createCampaignContentPackSealedPinTriggers" | "createCampaignEventMatchingTriggerV14"
   | "createCampaignImportStagingV30" | "createEncounterLifecycleV31" | "createWorldNarrativeV32" | "createQuestDomainV33" | "createStoryDomainV34" | "createAdventureGenerationV35"
   | "createCharacterBuilderIntegrityV21" | "createCharacterBuilderIntegrityV22" | "createCharacterBuilderProvenanceV20"
@@ -29,12 +30,12 @@ type SchemaDependencies = Record<
   | "createCharacterProgressionV23" | "createChecksPowersEffectsV26" | "createCombatFoundationV27"
   | "createContentCatalogV16" | "createContentCatalogV17" | "createContentCatalogV18" | "createQuestsV29r2"
   | "createResourcesInventoryEconomyRestV25" | "createRpgCommandAuditV14" | "createSchemaV11"
-  | "createTimelineRevisionV12" | "createWorldTravelNpcFactionV28" | "createAdventureHardeningV36" | "createToolExecutionBindingsV37" | "createDurableAgentExecutionV38" | "createAgentResponseProvenanceV39" | "createConfirmationPolicyV40" | "createNpcPresenceV43" | "createCompanionCoreV44" | "createExactCandidatesV46" | "createExactCandidateExecutionsV47"
+  | "createTimelineRevisionV12" | "createWorldTravelNpcFactionV28" | "createAdventureHardeningV36" | "createToolExecutionBindingsV37" | "createDurableAgentExecutionV38" | "createAgentResponseProvenanceV39" | "createConfirmationPolicyV40" | "createNpcPresenceV43" | "createCompanionCoreV44" | "createExactCandidatesV46" | "createExactCandidateExecutionsV47" | "createExactCandidateProviderBridgeV48"
   | "migrate2to3" | "migrate3to4" | "migrate4to5" | "migrate5to6" | "migrate6to7" | "migrate7to8"
   | "migrate8to9" | "migrate9to10" | "migrate10to11" | "migrate11to12" | "migrate12to13" | "migrate13to14"
   | "migrate14to15" | "migrate15to16" | "migrate16to17" | "migrate17to18" | "migrate18to19" | "migrate19to20"
   | "migrate20to21" | "migrate21to22" | "migrate22to23" | "migrate23to24" | "migrate24to25" | "migrate25to26"
-  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38" | "migrate38to39" | "migrate39to40" | "migrate40to41" | "createCampaignContentGenerationV41" | "migrate41to42" | "createCampaignContentIntegrityV42" | "migrate42to43" | "migrate43to44" | "migrate44to45" | "migrate45to46" | "migrate46to47"
+  | "migrate26to27" | "migrate27to28" | "migrate28to29" | "migrate29to30" | "migrate30to31" | "migrate31to32" | "migrate32to33" | "migrate33to34" | "migrate34to35" | "migrate35to36" | "migrate36to37" | "migrate37to38" | "migrate38to39" | "migrate39to40" | "migrate40to41" | "createCampaignContentGenerationV41" | "migrate41to42" | "createCampaignContentIntegrityV42" | "migrate42to43" | "migrate43to44" | "migrate44to45" | "migrate45to46" | "migrate46to47" | "migrate47to48"
   | "validateCharacterProgressionV23" | "validateCharacterProgressionV24" | "validateCombatFoundationV27"
   | "validateM15PersistenceV25" | "validateM16PersistenceV26" | "validateV20DraftAudit"
   | "validateWorldTravelNpcFactionV28",
@@ -52,7 +53,7 @@ function getSchemaDependencies(): SchemaDependencies {
   return schemaDependencies;
 }
 
-export const SCHEMA_VERSION = "47";
+export const SCHEMA_VERSION = "48";
 export const SCHEMA_REVISION = "1";
 
 const V34_TABLE_DROP_ORDER = ["story_layout_attestation_v34", "story_discoveries_v34", "story_clue_sources_v34", "story_clues_v34",
@@ -89,6 +90,8 @@ const V46_ARTIFACTS = new Set(EXACT_CANDIDATE_V46_MANAGED_OBJECTS.map(([type, na
 const V46_TABLES = EXACT_CANDIDATE_V46_MANAGED_OBJECTS.filter(([type]) => type === "table").map(([, name]) => name);
 const V47_ARTIFACTS=new Set(EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS.map(([type,name])=>`${type}:${name}`));
 const V47_TABLES=EXACT_CANDIDATE_EXECUTION_V47_MANAGED_OBJECTS.filter(([type])=>type==="table").map(([,name])=>name);
+const V48_ARTIFACTS=new Set(EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS.map(([type,name])=>`${type}:${name}`));
+const V48_TABLES=EXACT_CANDIDATE_PROVIDER_V48_MANAGED_OBJECTS.filter(([type])=>type==="table").map(([,name])=>name);
 
 function v43Artifacts(db: DatabaseDriver.Database): Array<{ type: string; name: string }> {
   // SQL-null SQLite autoindexes are generated from managed table constraints, not independent artifacts.
@@ -116,10 +119,11 @@ function v46Artifacts(db: DatabaseDriver.Database): Array<{ type: string; name: 
     AND (name GLOB '*v46*' OR tbl_name IN (${V46_TABLES.map(() => "?").join(",")})) ORDER BY type,name`).all(...V46_TABLES) as Array<{type:string;name:string}>;
 }
 function v47Artifacts(db:DatabaseDriver.Database):Array<{type:string;name:string}>{return db.prepare(`SELECT type,name FROM sqlite_master WHERE type IN ('table','index','trigger') AND sql IS NOT NULL AND (name GLOB '*v47*' OR tbl_name IN (${V47_TABLES.map(()=>"?").join(",")})) ORDER BY type,name`).all(...V47_TABLES) as Array<{type:string;name:string}>;}
+function v48Artifacts(db:DatabaseDriver.Database):Array<{type:string;name:string}>{return db.prepare(`SELECT type,name FROM sqlite_master WHERE type IN ('table','index','trigger') AND sql IS NOT NULL AND (name GLOB '*v48*' OR tbl_name IN (${V48_TABLES.map(()=>"?").join(",")})) ORDER BY type,name`).all(...V48_TABLES) as Array<{type:string;name:string}>;}
 
 /** Read-only guard before cleanup; database-wide FK checking applies to supported migration inputs. */
 function preflightPersistedIntegrity(db: DatabaseDriver.Database, marker: string): void {
-  if (["43","44","45","46","47"].includes(marker)) {
+  if (["43","44","45","46","47","48"].includes(marker)) {
     const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string; rowid: number; parent: string; fkid: number } | undefined;
     if (foreignKeyIssue) throw new Error(`schema marker ${marker} contains foreign-key violation in ${foreignKeyIssue.table}`);
   }
@@ -139,6 +143,8 @@ function preflightPersistedIntegrity(db: DatabaseDriver.Database, marker: string
   if (unexpectedV46Artifact) throw new Error(`schema marker ${marker} contains unexpected v46 artifact ${unexpectedV46Artifact.name}`);
   const unexpectedV47Artifact=v47Artifacts(db).find(({type,name})=>!V47_ARTIFACTS.has(`${type}:${name}`));
   if(unexpectedV47Artifact)throw new Error(`schema marker ${marker} contains unexpected v47 artifact ${unexpectedV47Artifact.name}`);
+  const unexpectedV48Artifact=v48Artifacts(db).find(({type,name})=>!V48_ARTIFACTS.has(`${type}:${name}`));
+  if(unexpectedV48Artifact)throw new Error(`schema marker ${marker} contains unexpected v48 artifact ${unexpectedV48Artifact.name}`);
 
   const hasTable = (name: string) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name));
   for (const [table, draftColumn] of [
@@ -268,6 +274,10 @@ function cleanupFutureExactCandidateExecutionsV47(db:DatabaseDriver.Database,mar
   try{getSchemaDependencies().assertExactCandidateExecutionsLayoutV47(db);}catch(error){throw new Error(`schema marker ${marker} contains malformed future v47 artifacts`,{cause:error});}
   if((db.prepare("SELECT count(*) count FROM exact_candidate_executions_v47").get() as {count:number}).count)throw new Error(`schema marker ${marker} contains populated future v47 artifact exact_candidate_executions_v47`);
   db.transaction(()=>{for(const {type,name} of [...artifacts].reverse()){if(type==="trigger")db.exec(`DROP TRIGGER "${name}"`);if(type==="index")db.exec(`DROP INDEX "${name}"`);}for(const table of [...V47_TABLES].reverse())db.exec(`DROP TABLE "${table}"`);})();}
+function cleanupFutureExactCandidateProviderV48(db:DatabaseDriver.Database,marker:string):void {const artifacts=v48Artifacts(db);if(!artifacts.length)return;
+  try{getSchemaDependencies().assertExactCandidateProviderBridgeLayoutV48(db);}catch(error){throw new Error(`schema marker ${marker} contains malformed future v48 artifacts`,{cause:error});}
+  if((db.prepare("SELECT count(*) count FROM exact_candidate_provider_bindings_v48").get() as {count:number}).count)throw new Error(`schema marker ${marker} contains populated future v48 artifact exact_candidate_provider_bindings_v48`);
+  db.transaction(()=>{for(const {type,name} of [...artifacts].reverse()){if(type==="trigger")db.exec(`DROP TRIGGER "${name}"`);if(type==="index")db.exec(`DROP INDEX "${name}"`);}for(const table of [...V48_TABLES].reverse())db.exec(`DROP TABLE "${table}"`);})();}
 
 /** Removes only a canonical empty v38 shell from a rewound historical fixture. */
 function cleanupFutureDurableAgentExecutionV38(db: DatabaseDriver.Database, marker: string): void {
@@ -386,17 +396,17 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   const {
     assertCampaignImportStagingV30, assertEncounterLifecycleV31, assertWorldNarrativeV32, assertQuestDomainV33, assertStoryDomainV34, assertAdventureHardeningV36, assertToolExecutionBindingsV37, assertDurableAgentExecutionV38, assertAgentResponseProvenanceV39, assertConfirmationPolicyV40, assertCampaignContentIntegrityV42, assertCharacterBuilderLayoutV22, assertCharacterLayoutV29, assertCharacterProgressionLayoutV23,
     assertCharacterProgressionLayoutV24, assertChecksPowersEffectsLayoutV26, assertCombatFoundationLayoutV27,
-    assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28, assertNpcPresenceLayoutV43, assertCompanionCoreLayoutV44, assertCompanionCoreLayoutV45, assertExactCandidatesLayoutV46, assertExactCandidateExecutionsLayoutV47,
+    assertResourcesInventoryEconomyRestLayoutV25, assertWorldTravelNpcFactionLayoutV28, assertNpcPresenceLayoutV43, assertCompanionCoreLayoutV44, assertCompanionCoreLayoutV45, assertExactCandidatesLayoutV46, assertExactCandidateExecutionsLayoutV47, assertExactCandidateProviderBridgeLayoutV48,
     createCampaignAdministrationV15, createCampaignEventMatchingTriggerV14, createCampaignImportStagingV30, createCharacterBuilderIntegrityV21,
     createCharacterBuilderIntegrityV22, createCharacterBuilderProvenanceV20, createCharacterBuilderV19,
     createCharacterLayoutV29, createCharacterProgressionIntegrityV24, createCharacterProgressionV23,
     createChecksPowersEffectsV26, createCombatFoundationV27, createContentCatalogV16, createContentCatalogV17,
-     createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createStoryDomainV34, createAdventureGenerationV35, createAdventureHardeningV36, createToolExecutionBindingsV37, createDurableAgentExecutionV38, createAgentResponseProvenanceV39, createConfirmationPolicyV40, createCampaignContentGenerationV41, createNpcPresenceV43, createCompanionCoreV44, createExactCandidatesV46, createExactCandidateExecutionsV47, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
+     createContentCatalogV18, createEncounterLifecycleV31, createWorldNarrativeV32, createQuestDomainV33, createStoryDomainV34, createAdventureGenerationV35, createAdventureHardeningV36, createToolExecutionBindingsV37, createDurableAgentExecutionV38, createAgentResponseProvenanceV39, createConfirmationPolicyV40, createCampaignContentGenerationV41, createNpcPresenceV43, createCompanionCoreV44, createExactCandidatesV46, createExactCandidateExecutionsV47, createExactCandidateProviderBridgeV48, createQuestsV29r2, createResourcesInventoryEconomyRestV25, createRpgCommandAuditV14,
     createSchemaV11, createTimelineRevisionV12, createWorldTravelNpcFactionV28, migrate2to3, migrate3to4,
     migrate4to5, migrate5to6, migrate6to7, migrate7to8, migrate8to9, migrate9to10, migrate10to11,
     migrate11to12, migrate12to13, migrate13to14, migrate14to15, migrate15to16, migrate16to17, migrate17to18,
     migrate18to19, migrate19to20, migrate20to21, migrate21to22, migrate22to23, migrate23to24, migrate24to25,
-    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, migrate38to39, migrate39to40, migrate42to43, migrate43to44, migrate44to45, migrate45to46, migrate46to47, validateCharacterProgressionV23,
+    migrate25to26, migrate26to27, migrate27to28, migrate28to29, migrate29to30, migrate30to31, migrate31to32, migrate32to33, migrate33to34, migrate34to35, migrate35to36, migrate36to37, migrate37to38, migrate38to39, migrate39to40, migrate42to43, migrate43to44, migrate44to45, migrate45to46, migrate46to47, migrate47to48, validateCharacterProgressionV23,
     validateCharacterProgressionV24, validateCombatFoundationV27, validateM15PersistenceV25,
     validateM16PersistenceV26, validateV20DraftAudit, validateWorldTravelNpcFactionV28,
   } = getSchemaDependencies();
@@ -452,7 +462,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
                         createCompanionCoreV44(db);
                          migrate44to45(db);
                           migrate45to46(db);
-                          migrate46to47(db);
+                           migrate46to47(db);
+                           migrate47to48(db);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaVersion', ?)").run(SCHEMA_VERSION);
       db.prepare("INSERT INTO meta (key, value) VALUES ('schemaRevision', ?)").run(SCHEMA_REVISION);
     })();
@@ -478,6 +489,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     assertCompanionCoreLayoutV45(db);
     assertExactCandidatesLayoutV46(db);
     assertExactCandidateExecutionsLayoutV47(db);
+    assertExactCandidateProviderBridgeLayoutV48(db);
     validateV20DraftAudit(db);
     validateCharacterProgressionV24(db);
     validateM15PersistenceV25(db);
@@ -487,8 +499,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     return;
   }
   let version = row.value;
-  // v44 is outside the support window. Reject before future-shell cleanup or any artifact mutation.
-  if (version === "44") throw new Error(`unsupported schemaVersion 44; expected ${SCHEMA_VERSION}`);
+  // v45 and earlier are outside the two-version support window. Reject before any cleanup or mutation.
+  if (Number(version) <= 45) throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   const futureBuilderArtifact = Number(version) < 19 && db.prepare(`SELECT type,name FROM sqlite_master
     WHERE name GLOB '*character*_v19*' LIMIT 1`).get() as
       { type: string; name: string } | undefined;
@@ -599,6 +611,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
       DROP TABLE quest_domain_receipts_v33;DROP TABLE quest_domain_commands_v33;DROP TABLE quest_domain_revisions_v33;
       DROP INDEX IF EXISTS uq_quest_reward_ancestry_v33;DROP INDEX IF EXISTS uq_quest_campaign_id_v33;`);
   }
+  if(Number(version)<48)cleanupFutureExactCandidateProviderV48(db,version);
   if(Number(version)<47)cleanupFutureExactCandidateExecutionsV47(db,version);
   if(Number(version)<46)cleanupFutureExactCandidatesV46(db,version);
   if(Number(version)<45)cleanupFutureCompanionCoreV45(db,version);
@@ -803,6 +816,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   if(version==="44"){migrate44to45(db);version="45";}
   if(version==="45"){migrate45to46(db);version="46";}
   if(version==="46"){migrate46to47(db);version="47";}
+  if(version==="47"){migrate47to48(db);version="48";}
   if (version !== SCHEMA_VERSION) {
     throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
   }
@@ -831,6 +845,7 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
   assertCompanionCoreLayoutV45(db);
   assertExactCandidatesLayoutV46(db);
   assertExactCandidateExecutionsLayoutV47(db);
+  assertExactCandidateProviderBridgeLayoutV48(db);
   validateV20DraftAudit(db);
   validateCharacterProgressionV23(db);
   validateCharacterProgressionV24(db);

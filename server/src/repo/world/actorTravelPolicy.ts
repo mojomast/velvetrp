@@ -36,6 +36,8 @@ export function evaluateActorTravelPolicy(
     partyActorIds: readonly string[];
     connectionId: string;
     requireRunningSession: boolean;
+    /** Provider player decisions never inherit owner/GM hidden-route visibility. */
+    audienceMode?: "principal" | "player";
     /** Replay authorization checks identity and exact party authority without consulting mutable route state. */
     authorityOnly?: boolean;
   },
@@ -52,6 +54,7 @@ export function evaluateActorTravelPolicy(
     return { allowed: false, reason: "session-unavailable" };
 
   const isGm = membership.role === "owner" || membership.role === "gm";
+  const maySeeGmRoutes=isGm&&input.audienceMode!=="player";
   for (const partyActorId of input.partyActorIds) {
     const actor = db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?")
       .get(input.campaignId, partyActorId);
@@ -63,11 +66,14 @@ export function evaluateActorTravelPolicy(
   if (input.authorityOnly) return { allowed: true, route: { connectionId: input.connectionId,
     fromLocationId: "", toLocationId: "", visibility: "", requirementKind: "" }, positions: [] };
 
-  const row = db.prepare(`SELECT connection_id,from_location_id,to_location_id,visibility,route_state,
-      requirement_kind,required_faction_id,minimum_reputation
-    FROM campaign_location_connections_v28 WHERE campaign_id=? AND connection_id=?`)
+  const row = db.prepare(`SELECT connection.connection_id,connection.from_location_id,connection.to_location_id,
+      connection.visibility,connection.route_state,connection.requirement_kind,connection.required_faction_id,
+      connection.minimum_reputation,destination.visibility destination_visibility
+    FROM campaign_location_connections_v28 connection JOIN campaign_locations_v28 destination
+      ON destination.campaign_id=connection.campaign_id AND destination.location_id=connection.to_location_id
+    WHERE connection.campaign_id=? AND connection.connection_id=?`)
     .get(input.campaignId, input.connectionId) as any;
-  if (!row || row.route_state !== "open" || (!isGm && row.visibility === "gm"))
+  if (!row || row.route_state !== "open" || (!maySeeGmRoutes && (row.visibility === "gm" || row.destination_visibility === "gm")))
     return { allowed: false, reason: "route-unavailable" };
 
   const positions: ActorTravelPosition[] = [];
@@ -75,7 +81,7 @@ export function evaluateActorTravelPolicy(
     const position = db.prepare(`SELECT location_id,state_revision FROM campaign_actor_locations_v28
       WHERE campaign_id=? AND session_id=? AND actor_id=?`).get(input.campaignId, input.sessionId, partyActorId) as any;
     if (!position || position.location_id !== row.from_location_id) return { allowed: false, reason: "not-adjacent" };
-    if ((row.visibility === "discovered" || row.requirement_kind === "discovery")
+    if ((row.visibility === "discovered" || row.destination_visibility === "discovered" || row.requirement_kind === "discovery")
       && !db.prepare(`SELECT 1 FROM campaign_location_discoveries_v28 WHERE campaign_id=? AND actor_id=? AND location_id=?`)
         .get(input.campaignId, partyActorId, row.to_location_id)) return { allowed: false, reason: "undiscovered" };
     if (row.requirement_kind === "faction_reputation") {

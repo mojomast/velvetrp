@@ -1,4 +1,5 @@
-import { diceExpressionSchema, resourceIdSchema, type AgentJsonObject } from "@velvet/contracts";
+import { diceExpressionSchema, exactCandidateSelectionResponseSchema, providerSafeExactCandidateListSchema, resourceIdSchema,
+  type AgentJsonObject, type ProviderSafeExactCandidate } from "@velvet/contracts";
 import { z } from "zod";
 import type { CampaignAgentContextBasket, CampaignAgentContextSnapshot } from "../context.js";
 import type { CompletionFunctionTool, CompletionJsonValue } from "../provider/index.js";
@@ -7,13 +8,14 @@ import type { Repository } from "../repo/index.js";
 export type AdventureToolName =
   | "campaign_context.read" | "actor_resources.read" | "actor_inventory.read" | "actor_powers.read"
   | "combat_state.read" | "world_state.read" | "quest_state.read"
-  | "actor_attribute.set" | "actor_dice.roll" | "combat_action.execute";
+  | "actor_attribute.set" | "actor_dice.roll" | "combat_action.execute" | "exact_actor_travel.select";
 
 const emptyArguments = z.object({}).strict();
 const attributeArguments = z.object({ attributeCandidateId: resourceIdSchema,
   attributeCandidateDigest:z.string().length(64).regex(/^[0-9a-f]+$/),value: z.number().int().min(-1_000).max(1_000) }).strict();
 const diceArguments = z.object({ expression: diceExpressionSchema }).strict();
 const combatArguments=z.object({legalActionId:resourceIdSchema,legalActionDigest:z.string().length(64).regex(/^[0-9a-f]+$/)}).strict();
+const exactTravelArguments=exactCandidateSelectionResponseSchema;
 
 export interface SelectedAdventureTool {
   name: AdventureToolName;
@@ -51,18 +53,23 @@ const DEFINITIONS: Record<AdventureToolName, SelectedAdventureTool> = {
       parameters: objectSchema({ expression: { type: "string", minLength: 3, maxLength: 128 } }, ["expression"]) } },
   "combat_action.execute": {name:"combat_action.execute",kind:"mutation",confirmation:"required",argumentsSchema:combatArguments,
     provider:{name:"combat_action.execute",description:"Select one exact currently advertised combat action by ID and digest.",parameters:objectSchema({
-      legalActionId:{type:"string",pattern:"^[A-Za-z0-9._:-]+$",maxLength:128},legalActionDigest:{type:"string",pattern:"^[0-9a-f]{64}$"}},["legalActionId","legalActionDigest"]) }},
+       legalActionId:{type:"string",pattern:"^[A-Za-z0-9._:-]+$",maxLength:128},legalActionDigest:{type:"string",pattern:"^[0-9a-f]{64}$"}},["legalActionId","legalActionDigest"]) }},
+  "exact_actor_travel.select": {name:"exact_actor_travel.select",kind:"mutation",confirmation:"never",argumentsSchema:exactTravelArguments as never,
+    provider:{name:"exact_actor_travel.select",description:"Select exactly one server-issued travel option. Supply no destination, party, revision, or other mechanics arguments.",parameters:objectSchema({
+      candidateId:{type:"string",pattern:"^[A-Za-z0-9._:-]+$",maxLength:128},kind:{type:"string",enum:["actor.travel"]},
+      version:{type:"string",enum:["v1"]},choices:{type:"array",maxItems:0}},["candidateId","kind","version","choices"]) }},
 };
 
 export const ADVENTURE_TOOL_LIMITATIONS = Object.freeze([
   "Resource initialization is unavailable because provider-supplied current/max totals are forbidden.",
-  "Power use, important inventory changes, purchases, transfers, rest, travel, combat start, quest/story changes, and GM override remain unavailable until this context supplies exact authoritative opaque candidates and command quotes.",
+  "Power use, important inventory changes, purchases, transfers, rest, combat start, quest/story changes, and GM override remain unavailable until this context supplies exact authoritative opaque candidates and command quotes.",
   "Companion mutation is unavailable because there is no persisted companion authority model; generated world changes remain unavailable pending M4.6 candidate generation.",
   "Deletion, import, settings, prompts, authentication, policy, memory approval, arbitrary dispatch, SQL, filesystem, and network tools do not exist.",
 ]);
 
 /** Selects the closed v1 registry from server-derived authority and exact encounter state. */
-export function selectAdventureTools(snapshot: CampaignAgentContextSnapshot): readonly SelectedAdventureTool[] {
+export function selectAdventureTools(snapshot: CampaignAgentContextSnapshot, exactTravelCandidates:readonly ProviderSafeExactCandidate[]=[]): readonly SelectedAdventureTool[] {
+  providerSafeExactCandidateListSchema.parse({version:"v1",candidates:exactTravelCandidates});
   const names: AdventureToolName[] = ["campaign_context.read", "world_state.read", "quest_state.read"];
   if (snapshot.encounter) names.push("combat_state.read");
   const actorAudience = snapshot.audience.kind === "player" && snapshot.audience.actorId === snapshot.encounter?.currentActorId;
@@ -71,9 +78,13 @@ export function selectAdventureTools(snapshot: CampaignAgentContextSnapshot): re
   // Generic actor mutations are deliberately absent during combat: combat permits
   // only the exact action plans returned by the authoritative planner.
   if (controlsActor && !snapshot.encounter) {if(snapshot.attributeCandidates.length)names.push("actor_attribute.set");names.push("actor_dice.roll");}
+  if(controlsActor&&!snapshot.encounter&&exactTravelCandidates.length)names.push("exact_actor_travel.select");
   const enemyTurn=snapshot.audience.kind==="enemy"&&snapshot.encounter?.currentCombatantId===snapshot.audience.combatantId;
   if(snapshot.encounter?.legalActionCandidates.length&&((actorAudience&&controlsActor)||enemyTurn))names.push("combat_action.execute");
   return names.map((name) => name==="combat_action.execute"?{...DEFINITIONS[name],confirmation:enemyTurn?"never":"required"}
+    :name==="exact_actor_travel.select"?{...DEFINITIONS[name],provider:{...DEFINITIONS[name].provider,parameters:objectSchema({
+      candidateId:{type:"string",enum:exactTravelCandidates.map((candidate)=>candidate.candidateId)},kind:{type:"string",enum:["actor.travel"]},
+      version:{type:"string",enum:["v1"]},choices:{type:"array",maxItems:0}},["candidateId","kind","version","choices"])}}
     :name==="actor_attribute.set"?{...DEFINITIONS[name],provider:{...DEFINITIONS[name].provider,parameters:objectSchema({
       attributeCandidateId:{type:"string",enum:snapshot.attributeCandidates.map((candidate)=>candidate.candidateId)},
       attributeCandidateDigest:{type:"string",enum:snapshot.attributeCandidates.map((candidate)=>candidate.digest)},

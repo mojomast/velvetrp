@@ -31,8 +31,10 @@ export interface AdventureTurnAgentExecutionRepository {
 
 const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
 function executionRevision(db: Database, row: TurnRow): number {
-  return (db.prepare(`SELECT COALESCE(max(resulting_execution_revision),0) revision FROM agent_execution_operations_v38
-    WHERE campaign_id=? AND turn_id=?`).get(row.campaign_id, row.id) as { revision: number }).revision;
+  return (db.prepare(`SELECT max(revision) revision FROM (
+    SELECT COALESCE(max(resulting_execution_revision),0) revision FROM agent_execution_operations_v38 WHERE campaign_id=? AND turn_id=?
+    UNION ALL SELECT COALESCE(max(resulting_execution_revision),0) revision FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?)`)
+    .get(row.campaign_id,row.id,row.campaign_id,row.id) as { revision: number }).revision;
 }
 
 function latestTurnRevision(db: Database, row: TurnRow): { revision: number; state: string } {
@@ -152,19 +154,22 @@ export function createAdventureTurnAgentExecutionRepository(
       });
     const decisionRounds = (db.prepare(`SELECT max(rounds) count FROM (
       SELECT count(*) rounds FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?
-      UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?)`)
-      .get(row.campaign_id, row.id,row.campaign_id,row.id) as { count: number }).count;
+      UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?
+      UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?)`)
+      .get(row.campaign_id,row.id,row.campaign_id,row.id,row.campaign_id,row.id) as { count: number }).count;
     const postV38Mutations=(db.prepare(`SELECT count(*) count FROM agent_mutation_accounting_v40 item WHERE campaign_id=? AND turn_id=?
       AND NOT EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan WHERE replan.proposal_id=item.proposal_id)`)
       .get(row.campaign_id,row.id) as {count:number}).count;
     const providerStarts = (db.prepare("SELECT count(*) count FROM provider_call_metadata WHERE campaign_id=? AND turn_id=? AND phase='started'")
       .get(row.campaign_id, row.id) as { count: number }).count;
+    const exactTravel=(db.prepare("SELECT count(*) count FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?")
+      .get(row.campaign_id,row.id) as {count:number}).count;
     return durableAgentPlanningStateSchema.parse({ turnId: row.id, toolRegistryVersion: run.tool_registry_version,
       executionRevision: executionRevision(db, row),
       limits: { decisionRounds: run.max_decision_rounds, toolCalls: run.max_tool_calls, mutationCalls: run.max_mutation_calls,
         providerCalls: run.max_provider_calls, durationMs: run.max_duration_ms }, startedAt: run.started_at, deadlineAt: run.deadline_at,
-       decisionRounds, toolCalls: calls, totalToolCalls:calls.length+postV38Mutations,
-       mutationCalls: calls.filter((call) => call.kind === "mutation").length+postV38Mutations,
+       decisionRounds, toolCalls: calls, totalToolCalls:calls.length+postV38Mutations+exactTravel,
+       mutationCalls: calls.filter((call) => call.kind === "mutation").length+postV38Mutations+exactTravel,
       providerStarts, deadlineExceeded: now() >= run.deadline_at });
   };
 

@@ -60,11 +60,12 @@ describe("v46 exact candidate persistence",()=>{
     expect(r.issueExactCandidateBatch("player",issue(ids.turnId,"turn-principal",values)).candidates.map(({candidateId})=>candidateId)).toEqual(["turn-principal-candidate"]);expect({clockCalls,idCalls}).toEqual({clockCalls:1,idCalls:1});r.close();});
 });
 
-function seedTravelWorld(ids:{campaignId:string;turnId:string},routes:Array<{id:string;visibility?:"public"|"discovered"|"gm";state?:"open"|"closed";requirement?:"none"|"discovery"|"faction_reputation";minimum?:number}>){
+function seedTravelWorld(ids:{campaignId:string;turnId:string},routes:Array<{id:string;visibility?:"public"|"discovered"|"gm";destinationVisibility?:"public"|"discovered"|"gm";state?:"open"|"closed";requirement?:"none"|"discovery"|"faction_reputation";minimum?:number}>){
   const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");
   const location=db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'','public',?)");
   location.run("origin",ids.campaignId,"Origin",AT);
-  for(const route of routes)location.run(`destination-${route.id}`,ids.campaignId,`Destination ${route.id}`,AT);
+  for(const route of routes)db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'',?,?)")
+    .run(`destination-${route.id}`,ids.campaignId,`Destination ${route.id}`,route.destinationVisibility??"public",AT);
   if(routes.some((route)=>route.requirement==="faction_reputation"))db.prepare("INSERT INTO campaign_factions_v28 VALUES('faction',?,'Faction','public',?)").run(ids.campaignId,AT);
   const connection=db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?,?)");
   for(const route of routes)connection.run(route.id,ids.campaignId,"origin",`destination-${route.id}`,route.visibility??"public",route.state??"open",route.requirement??"none",route.requirement==="faction_reputation"?"faction":null,route.requirement==="faction_reputation"?(route.minimum??0):null,AT);
@@ -87,6 +88,17 @@ describe("M5.4 actor.travel candidate generation",()=>{
     {id:"gm-open",visibility:"gm"},{id:"gm-discovery",visibility:"gm",requirement:"discovery"},{id:"gm-reputation",visibility:"gm",requirement:"faction_reputation",minimum:1},
   ]);const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
     const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"gm"}).candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["gm-open"]);r.close();});
+
+  it("requires player-safe connection and destination for provider generation and execution",()=>{const ids=seed();seedTravelWorld(ids,[
+    {id:"safe"},{id:"public-hidden-destination",destinationVisibility:"gm"},
+  ]);const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
+    const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"provider-player:visibility",audienceMode:"player"});
+    expect(batch.candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["safe"]);
+    const manual=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"manual-gm"});expect(manual.candidates).toHaveLength(2);
+    const hidden=manual.candidates.find((value)=>value.privateParameters.connectionId==="public-hidden-destination")!;
+    const raw=new DatabaseDriver(file());raw.exec("DROP TRIGGER exact_candidate_batches_v46_immutable_update_v46");
+    raw.prepare("UPDATE exact_candidate_batches_v46 SET idempotency_key='provider-player:forged' WHERE batch_id=?").run(manual.batchId);raw.close();
+    expect(()=>r.executeExactActorTravelCandidate("player",{turnId:ids.turnId,selection:{candidateId:hidden.candidateId,kind:"actor.travel",version:"v1",choices:[]}})).toThrow();r.close();});
 
   it("persists an exact empty batch",()=>{const ids=seed();seedTravelWorld(ids,[{id:"closed",state:"closed"}]);const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"empty-generated"}).candidates).toEqual([]);r.close();});
 

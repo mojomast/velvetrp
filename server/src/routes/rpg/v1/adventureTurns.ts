@@ -44,7 +44,8 @@ const key = (prefix: string, ...parts: string[]) => `${prefix}:${createHash("sha
 const fallback = (declaration: string) => `${FALLBACK_PREFIX}${declaration}`.slice(0, 8_000);
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; roundBefore: number; roundAfter: number };
+type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; roundBefore: number; roundAfter: number }
+  | {kind:"travel";destination:string};
 const activeNarrationDispatches = new Map<string, Promise<{ turn: PrivateAdventureTurn; text: string }>>();
 function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn): NarrationReceipt[] | null {
   const values: NarrationReceipt[] = [];
@@ -61,16 +62,18 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
       values.push({ kind: "mechanic", event: { type: event.type, data } });
       continue;
     }
+    const travel=repo.getExactCandidateTravelNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(travel){values.push({kind:"travel",destination:travel.destination});continue;}
     const combat = repo.getAgentCombatReceipt(OWNER, turn.campaignId, link.commandId);
     if (!combat || typeof combat.resolution.roundBefore !== "number" || typeof combat.resolution.roundAfter !== "number") return null;
     values.push({ kind: "combat", roundBefore: combat.resolution.roundBefore, roundAfter: combat.resolution.roundAfter });
   }
   return values;
 }
-function narrationFallback(declaration: string, values: readonly NarrationReceipt[]): string {
+export function narrationFallback(declaration: string, values: readonly NarrationReceipt[]): string {
   if (values.length === 0) return fallback(declaration);
   return `${MECHANICS_FALLBACK_PREFIX}${declaration}\n\nCommitted results: ${values.map((value) => value.kind === "combat"
-    ? `combat advanced from round ${value.roundBefore} to ${value.roundAfter}`
+    ? `combat advanced from round ${value.roundBefore} to ${value.roundAfter}` : value.kind==="travel"?`the actor travelled to ${value.destination}`
     : `${value.event.type}: ${JSON.stringify(value.event.data)}`).join("; ")}`.slice(0, 8_000);
 }
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
