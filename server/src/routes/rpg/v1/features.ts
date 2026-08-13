@@ -186,6 +186,7 @@ export interface CampaignListRepository extends
   listPublicCampaignEvents?(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
   getCommandReceipt?: Repository["getCommandReceipt"];
   getAgentCombatReceipt?:Repository["getAgentCombatReceipt"];
+  getExactCandidateTravelPublicReceipt?:Repository["getExactCandidateTravelPublicReceipt"];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -273,6 +274,7 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   listPublicCampaignEvents(actorPrincipalId: string, campaignId: string, timelineId: string, afterRevision: number, limit: number): CampaignEventPage;
   getCommandReceipt: Repository["getCommandReceipt"];
   getAgentCombatReceipt:Repository["getAgentCombatReceipt"];
+  getExactCandidateTravelPublicReceipt:Repository["getExactCandidateTravelPublicReceipt"];
 };
 type QuestLaneRepository = Pick<QuestRepository,
   "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
@@ -386,7 +388,8 @@ function assertCampaignHistoryRepository(
     || typeof repository.getCampaignAdministrationReceipt !== "function"
     || typeof repository.listPublicCampaignEvents !== "function"
     || typeof repository.getCommandReceipt !== "function"
-    || typeof repository.getAgentCombatReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
+    || typeof repository.getAgentCombatReceipt!=="function"
+    || typeof repository.getExactCandidateTravelPublicReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {

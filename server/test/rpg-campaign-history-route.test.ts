@@ -20,6 +20,7 @@ function setup() {
   const repo = {
     getCommandReceipt: vi.fn(() => mechanicReceipt),
     getAgentCombatReceipt:vi.fn(()=>null as any),
+    getExactCandidateTravelPublicReceipt:vi.fn(()=>null as any),
     getCampaignAdministrationReceipt: vi.fn(() => null as typeof administrationReceipt | null),
     listCampaignTimelineHistory: vi.fn(() => []), listPublicCampaignEvents: vi.fn(),
     createCampaignCheckpoint: vi.fn(), listCampaignCheckpoints: vi.fn(), forkCampaignTimeline: vi.fn(),
@@ -55,6 +56,24 @@ describe("campaign history receipt route", () => {
       resolution:{actionId:"action",legalActionId:"end-turn",kind:"end-turn",actingCombatantId:"enemy",targetIds:[],outcomes:[],roundBefore:1,roundAfter:2,currentCombatantBefore:"enemy",currentCombatantAfter:"hero"}});
     const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/commands/combat-command/receipt"});expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({receipt:{kind:"combat",revisionBefore:3,revisionAfter:4,occurredAt:at,roundBefore:1,roundAfter:2}});expect(response.body).not.toContain("end-turn");expect(repo.getCampaignAdministrationReceipt).not.toHaveBeenCalled();await app.close();
+  });
+  it("returns the exact public travel receipt with no private provider or world identity",async()=>{
+    process.env.FEATURE_RPG_CAMPAIGN="true";const{app,repo}=setup();repo.getCommandReceipt.mockReturnValue(null as never);
+    repo.getExactCandidateTravelPublicReceipt.mockReturnValue({destination:"Glass Harbor",revisionBefore:5,revisionAfter:6,occurredAt:at});
+    const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/commands/travel-command/receipt"});
+    expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({receipt:{kind:"travel",destination:"Glass Harbor",revisionBefore:5,revisionAfter:6,occurredAt:at}});
+    for(const hidden of ["travel-command","candidate","provider","locationId","connectionId","actorId","principalId","digest"])
+      expect(response.body).not.toContain(hidden);
+    expect(repo.getExactCandidateTravelPublicReceipt).toHaveBeenCalledWith("local-owner","campaign","travel-command");
+    expect(repo.getCampaignAdministrationReceipt).not.toHaveBeenCalled();await app.close();
+  });
+  it("preserves masked not-found semantics when a discovered travel receipt is not authorized",async()=>{
+    process.env.FEATURE_RPG_CAMPAIGN="true";const{app,repo}=setup();repo.getCommandReceipt.mockReturnValue(null as never);
+    repo.getExactCandidateTravelPublicReceipt.mockReturnValue(null as never);
+    const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/commands/discovered-travel/receipt"});
+    expect(response.statusCode).toBe(404);expect(response.body).not.toContain("discovered-travel");
+    expect(repo.getExactCandidateTravelPublicReceipt).toHaveBeenCalledWith("local-owner","campaign","discovered-travel");await app.close();
   });
 
   it("returns not found when neither role-authorized repository exposes the command", async () => {

@@ -60,11 +60,17 @@ describe("campaign history HTTP contracts", () => {
         data: { valueBefore: 10, valueAfter: 12 } } };
     const administration = { kind: "administration", type: "checkpoint_created",
       revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z" };
+    const travel = { kind: "travel", destination: "Glass Harbor", revisionBefore: 3, revisionAfter: 4,
+      occurredAt: "2030-01-01T00:00:00.000Z" };
     expect(campaignHistoryHttpPublicReceiptSchema.parse(mechanic)).toEqual(mechanic);
     expect(campaignHistoryHttpPublicReceiptSchema.parse(administration)).toEqual(administration);
+    expect(campaignHistoryHttpPublicReceiptSchema.parse(travel)).toEqual(travel);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...mechanic, commandId: "command" }).success).toBe(false);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...administration, data: { private: true } }).success).toBe(false);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...mechanic, event: { ...mechanic.event, actorId: "actor" } }).success).toBe(false);
+    for (const privateKey of ["commandId", "candidateId", "providerCallId", "locationId", "connectionId", "actorId", "principalId", "digest"]) {
+      expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...travel, [privateKey]: "private" }).success).toBe(false);
+    }
   });
 
   it("uses strict checkpoint, fork, and recap create envelopes", () => {

@@ -32,7 +32,7 @@ const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.
 type CampaignHistoryRepository = Pick<CampaignAdministrationRepository,
   "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt" | "getAgentCombatReceipt">;
+  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt" | "getAgentCombatReceipt" | "getExactCandidateTravelPublicReceipt">;
 
 export interface CampaignHistoryHttpOptions {
   campaignHistoryRepositoryAccessor: () => CampaignHistoryRepository;
@@ -158,6 +158,8 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
       const combat=typeof repository.getAgentCombatReceipt==="function"?repository.getAgentCombatReceipt(LOCAL_OWNER,campaignId,request.params.commandId):null;
       if(combat)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat",revisionBefore:combat.revisionBefore,
         revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,roundBefore:combat.resolution.roundBefore,roundAfter:combat.resolution.roundAfter}}));
+      const travel=repository.getExactCandidateTravelPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(travel)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"travel",...travel}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
       if (administration === null) return unavailable(request, reply);
       const safe = publicReceipt(administration, campaignId, request.params.commandId);

@@ -27,6 +27,7 @@ function eventSummary(event: CampaignHistoryHttpEvent): { text: string; technica
 function receiptDetail(receipt: CampaignHistoryHttpPublicReceipt): string {
   if (receipt.kind === "administration") return `${receipt.type.replaceAll("_", " ")} committed revision ${receipt.revisionAfter}.`;
   if(receipt.kind==="combat")return `Combat advanced from round ${receipt.roundBefore} to ${receipt.roundAfter}.`;
+  if(receipt.kind==="travel")return `Travel completed to ${receipt.destination}.`;
   const event = receipt.event;
   if (event.type === "actor_attribute_set") return `Attribute changed: ${event.data.valueBefore} → ${event.data.valueAfter}.`;
   if (event.type === "actor_resource_initialized") return `Resource initialized: ${event.data.current} of ${event.data.max}.`;

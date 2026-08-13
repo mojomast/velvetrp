@@ -139,6 +139,11 @@ describe("M3.8 public campaign receipt API binding", () => {
       event: { type: "actor_attribute_set", data: { attributeId: "strength", valueBefore: 10, valueAfter: 12 } } } }), { status: 200 })));
     await expect(getCampaignCommandReceipt("campaign", "command")).rejects.toThrow();
   });
+  it("accepts only the exact public travel receipt without extra calls",async()=>{
+    const receipt={kind:"travel",destination:"Glass Harbor",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"};
+    const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify({receipt}),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(getCampaignCommandReceipt("campaign","travel-command")).resolves.toEqual({receipt});expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("missing audited RPG command wrappers", () => {
