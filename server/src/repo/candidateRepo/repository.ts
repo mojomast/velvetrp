@@ -7,6 +7,7 @@ import {
   resourceIdSchema, utcIsoTimestampSchema, type InternalExactCandidate,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
+import { evaluateActorTravelPolicy } from "../world/actorTravelPolicy.js";
 import { ExactCandidateAuthorizationError, ExactCandidateConflictError, ExactCandidateExpiredError,
   ExactCandidateIntegrityError, ExactCandidateUnavailableError } from "./errors.js";
 
@@ -24,8 +25,10 @@ const connection=(turnId:string)=>resourceIdSchema.parse(`adventure-turn:${resou
 const scopeEqual=(a:InternalExactCandidate,b:InternalExactCandidate)=>canonicalAgentJson(a.scope)===canonicalAgentJson(b.scope);
 
 export interface IssueExactCandidateBatchInput {turnId:string;idempotencyKey:string;worldRevision:number;candidates:readonly InternalExactCandidate[]}
+export interface GenerateActorTravelCandidatesInput {turnId:string;idempotencyKey:string}
 export interface ExactCandidateBatch {batchId:string;turnId:string;connectionId:string;worldRevision:number;issuedAt:string;expiresAt:string;candidates:InternalExactCandidate[]}
 export interface ExactCandidateRepository {
+  generateActorTravelCandidates(principalId:string,input:GenerateActorTravelCandidatesInput):ExactCandidateBatch;
   issueExactCandidateBatch(principalId:string,input:IssueExactCandidateBatchInput):ExactCandidateBatch;
   getExactCandidateBatch(principalId:string,batchId:string):ExactCandidateBatch|null;
   getExactCandidate(principalId:string,candidateId:string):InternalExactCandidate|null;
@@ -119,37 +122,92 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
     const batchRow=db.prepare("SELECT * FROM exact_candidate_batches_v46 WHERE batch_id=?").get(row.batch_id) as BatchRow|undefined;
     if(!batchRow)throw new ExactCandidateIntegrityError("candidate batch is unavailable");verifyBatchTurn(batchRow,owner);return{row,batchRow};
   };
+  const readByIssueKey=(principalId:string,turnId:string,idempotencyKey:string):ExactCandidateBatch|null=>{
+    resourceIdSchema.parse(turnId);resourceIdSchema.parse(idempotencyKey);
+    const row=db.prepare("SELECT batch_id FROM exact_candidate_batches_v46 WHERE turn_id=? AND principal_id=? AND idempotency_key=?")
+      .get(turnId,principalId,idempotencyKey) as {batch_id:string}|undefined;
+    return row?readBatch(principalId,row.batch_id):null;
+  };
+  const issue=(principalId:string,input:IssueExactCandidateBatchInput,generatedAt?:string):ExactCandidateBatch=>{
+    resourceIdSchema.parse(input.turnId);resourceIdSchema.parse(input.idempotencyKey);
+    if(!Number.isSafeInteger(input.worldRevision)||input.worldRevision<0||input.worldRevision>Number.MAX_SAFE_INTEGER-1)throw new ExactCandidateConflictError("world revision is invalid");
+    if(input.candidates.length>MAX_EXACT_CANDIDATES_PER_RESPONSE)throw new ExactCandidateConflictError("candidate batch exceeds 32 routes");
+    const owner=turn(input.turnId);
+    if(!owner||owner.principal_id!==principalId||!issueAuthority(principalId,owner))
+      throw new ExactCandidateAuthorizationError("candidate issuance is unavailable");
+    const parsed=input.candidates.map((candidate,index)=>{const value=internalExactCandidateSchema.parse(candidate);
+      if(value.scope.campaignId!==owner.campaign_id||value.scope.sessionId!==owner.session_id||value.scope.actorId!==owner.actor_id||value.scope.principalId!==principalId
+        ||value.scope.connectionId!==connection(input.turnId)||value.expectedRevisions[0].revision!==input.worldRevision||value.label.routeOption!==index+1
+        ||value.privateParameters.partyActorIds[0]!==value.scope.actorId||value.confirmation.requirement!=="not-required"||value.quote.kind!=="not-applicable"
+        ||value.policy.result!=="allowed"||value.supersession.state!=="current"||value.execution.state!=="unexecuted")throw new ExactCandidateConflictError("candidate does not match exact turn scope and policy");
+      if(computeExactCandidateActionDigest(value,crypto)!==value.canonicalActionDigest||computeExactCandidateEnvelopeDigest(value,crypto)!==value.canonicalEnvelopeDigest)throw new ExactCandidateIntegrityError("candidate digest is invalid");return value;});
+    const requestedDigest=requestDigest(input.turnId,input.worldRevision,parsed);
+    const existing=db.prepare("SELECT * FROM exact_candidate_batches_v46 WHERE turn_id=? AND principal_id=? AND idempotency_key=?").get(input.turnId,principalId,input.idempotencyKey) as BatchRow|undefined;
+    if(existing){if(existing.request_digest!==requestedDigest)throw new ExactCandidateConflictError("idempotency key was reused");const replay=readBatch(principalId,existing.batch_id);if(!replay)throw new ExactCandidateUnavailableError("candidate batch is unavailable");return replay;}
+    const serverIssuedAt=generatedAt??now();
+    const issuedAt=parsed[0]?.issuedAt??serverIssuedAt;const expiresAt=parsed[0]?.expiresAt??new Date(Date.parse(issuedAt)+MAX_EXACT_CANDIDATE_LIFETIME_MS).toISOString();
+    if(issuedAt!==serverIssuedAt)throw new ExactCandidateConflictError("candidate issuance time must equal server time");
+    if(parsed.some((value)=>value.issuedAt!==issuedAt||value.expiresAt!==expiresAt))throw new ExactCandidateConflictError("batch lifetime must be exact");
+    const candidateIds=parsed.map((value)=>value.candidateId);
+    if(new Set(candidateIds).size!==candidateIds.length)throw new ExactCandidateConflictError("candidate IDs must be unique");
+    if(candidateIds.length&&db.prepare(`SELECT 1 FROM exact_candidates_v46 WHERE candidate_id IN (${candidateIds.map(()=>"?").join(",")}) LIMIT 1`).get(...candidateIds))
+      throw new ExactCandidateConflictError("candidate ID collision");
+    return db.transaction(()=>{const batchId=id();db.prepare(`INSERT INTO exact_candidate_batches_v46 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(batchId,owner.campaign_id,input.turnId,owner.session_id,owner.actor_id,principalId,input.idempotencyKey,connection(input.turnId),parsed.length,input.worldRevision,issuedAt,expiresAt,requestedDigest);
+      const insert=db.prepare(`INSERT INTO exact_candidates_v46 VALUES(${Array.from({length:25},()=>"?").join(",")})`);
+      parsed.forEach((value,index)=>insert.run(value.candidateId,batchId,index+1,value.scope.campaignId,input.turnId,value.scope.sessionId,value.scope.actorId,
+        value.scope.principalId,value.scope.connectionId,value.kind,value.version,value.expectedRevisions[0].revision,value.issuedAt,value.expiresAt,value.policy.result,
+        value.policy.reason,value.confirmation.requirement,value.quote.kind,value.supersession.state,value.execution.state,canonicalExactCandidateActionFrame(value),
+        value.canonicalActionDigest,canonicalExactCandidateEnvelopeFrame(value),value.canonicalEnvelopeDigest,JSON.stringify(value)));
+      const persisted=readBatch(principalId,batchId);
+      if(!persisted)throw new ExactCandidateIntegrityError("persisted candidate batch is unavailable after insert");
+      return persisted;}).immediate();
+  };
   return {
-    issueExactCandidateBatch(principalId,input){guard();resourceIdSchema.parse(input.turnId);resourceIdSchema.parse(input.idempotencyKey);
-      if(!Number.isSafeInteger(input.worldRevision)||input.worldRevision<0||input.worldRevision>Number.MAX_SAFE_INTEGER-1)throw new ExactCandidateConflictError("world revision is invalid");
-      if(input.candidates.length>MAX_EXACT_CANDIDATES_PER_RESPONSE)throw new ExactCandidateConflictError("candidate batch exceeds 32 routes");
-      const owner=turn(input.turnId);
-      if(!owner||owner.principal_id!==principalId||!issueAuthority(principalId,owner))
-        throw new ExactCandidateAuthorizationError("candidate issuance is unavailable");
-      const parsed=input.candidates.map((candidate,index)=>{const value=internalExactCandidateSchema.parse(candidate);
-        if(value.scope.campaignId!==owner.campaign_id||value.scope.sessionId!==owner.session_id||value.scope.actorId!==owner.actor_id||value.scope.principalId!==principalId
-          ||value.scope.connectionId!==connection(input.turnId)||value.expectedRevisions[0].revision!==input.worldRevision||value.label.routeOption!==index+1
-          ||value.privateParameters.partyActorIds[0]!==value.scope.actorId||value.confirmation.requirement!=="not-required"||value.quote.kind!=="not-applicable"
-          ||value.policy.result!=="allowed"||value.supersession.state!=="current"||value.execution.state!=="unexecuted")throw new ExactCandidateConflictError("candidate does not match exact turn scope and policy");
-        if(computeExactCandidateActionDigest(value,crypto)!==value.canonicalActionDigest||computeExactCandidateEnvelopeDigest(value,crypto)!==value.canonicalEnvelopeDigest)throw new ExactCandidateIntegrityError("candidate digest is invalid");return value;});
-      const requestedDigest=requestDigest(input.turnId,input.worldRevision,parsed);
-      const existing=db.prepare("SELECT * FROM exact_candidate_batches_v46 WHERE turn_id=? AND principal_id=? AND idempotency_key=?").get(input.turnId,principalId,input.idempotencyKey) as BatchRow|undefined;
-      if(existing){if(existing.request_digest!==requestedDigest)throw new ExactCandidateConflictError("idempotency key was reused");const replay=readBatch(principalId,existing.batch_id);if(!replay)throw new ExactCandidateUnavailableError("candidate batch is unavailable");return replay;}
-      const serverIssuedAt=now();
-      const issuedAt=parsed[0]?.issuedAt??serverIssuedAt;const expiresAt=parsed[0]?.expiresAt??new Date(Date.parse(issuedAt)+MAX_EXACT_CANDIDATE_LIFETIME_MS).toISOString();
-      if(issuedAt!==serverIssuedAt)throw new ExactCandidateConflictError("candidate issuance time must equal server time");
-      if(parsed.some((value)=>value.issuedAt!==issuedAt||value.expiresAt!==expiresAt))throw new ExactCandidateConflictError("batch lifetime must be exact");
-      return db.transaction(()=>{const batchId=id();db.prepare(`INSERT INTO exact_candidate_batches_v46 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-        .run(batchId,owner.campaign_id,input.turnId,owner.session_id,owner.actor_id,principalId,input.idempotencyKey,connection(input.turnId),parsed.length,input.worldRevision,issuedAt,expiresAt,requestedDigest);
-        const insert=db.prepare(`INSERT INTO exact_candidates_v46 VALUES(${Array.from({length:25},()=>"?").join(",")})`);
-        parsed.forEach((value,index)=>insert.run(value.candidateId,batchId,index+1,value.scope.campaignId,input.turnId,value.scope.sessionId,value.scope.actorId,
-          value.scope.principalId,value.scope.connectionId,value.kind,value.version,value.expectedRevisions[0].revision,value.issuedAt,value.expiresAt,value.policy.result,
-          value.policy.reason,value.confirmation.requirement,value.quote.kind,value.supersession.state,value.execution.state,canonicalExactCandidateActionFrame(value),
-          value.canonicalActionDigest,canonicalExactCandidateEnvelopeFrame(value),value.canonicalEnvelopeDigest,JSON.stringify(value)));
-        const persisted=readBatch(principalId,batchId);
-        if(!persisted)throw new ExactCandidateIntegrityError("persisted candidate batch is unavailable after insert");
-        return persisted;}).immediate();
+    generateActorTravelCandidates(principalId,input){guard();resourceIdSchema.parse(principalId);resourceIdSchema.parse(input.turnId);resourceIdSchema.parse(input.idempotencyKey);
+      const replay=readByIssueKey(principalId,input.turnId,input.idempotencyKey);if(replay)return replay;
+      return db.transaction(()=>{
+        const concurrentReplay=readByIssueKey(principalId,input.turnId,input.idempotencyKey);if(concurrentReplay)return concurrentReplay;
+        const row=db.prepare(`SELECT turn.id,turn.campaign_id,turn.session_id,turn.actor_id,turn.principal_id,membership.role
+          FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id AND campaign.active_timeline_id=turn.timeline_id
+          JOIN campaign_memberships membership ON membership.campaign_id=turn.campaign_id AND membership.principal_id=?
+          JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
+          JOIN sessions session ON session.id=attached.session_id JOIN campaign_actors actor ON actor.campaign_id=turn.campaign_id AND actor.id=turn.actor_id
+          JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
+          JOIN session_characters participant ON participant.session_id=turn.session_id AND participant.character_id=character.character_id
+          LEFT JOIN campaign_actor_private_state control ON control.campaign_id=turn.campaign_id AND control.actor_id=turn.actor_id
+          WHERE turn.id=? AND turn.principal_id=? AND campaign.lifecycle_status IN ('draft','published')
+            AND session.state='active' AND session.stopped_at IS NULL AND membership.role<>'observer'
+            AND (membership.role IN ('owner','gm') OR (membership.role='player' AND control.controller_principal_id=?))`)
+          .get(principalId,input.turnId,principalId,principalId) as (TurnRow&{role:string})|undefined;
+        if(!row)throw new ExactCandidateAuthorizationError("authoritative current turn authority is unavailable");
+        const revision=(db.prepare(`SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?`)
+          .get(row.campaign_id,row.session_id) as {revision:number}|undefined)?.revision??0;
+        const routes=(db.prepare(`SELECT connection_id FROM campaign_location_connections_v28
+          WHERE campaign_id=? ORDER BY connection_id COLLATE BINARY`).all(row.campaign_id) as Array<{connection_id:string}>)
+          .map(({connection_id})=>evaluateActorTravelPolicy(db,{campaignId:row.campaign_id,sessionId:row.session_id,
+            actorId:row.actor_id,principalId,partyActorIds:[row.actor_id],connectionId:connection_id,requireRunningSession:true}))
+          .filter((result):result is Extract<typeof result,{allowed:true}>=>result.allowed)
+          .map((result)=>result.route);
+        if(routes.length>MAX_EXACT_CANDIDATES_PER_RESPONSE)throw new ExactCandidateConflictError("legal route count exceeds exact candidate limit");
+        const issuedAt=now(),expiresAt=new Date(Date.parse(issuedAt)+MAX_EXACT_CANDIDATE_LIFETIME_MS).toISOString();
+        const candidateIds=routes.map(()=>id());
+        if(new Set(candidateIds).size!==candidateIds.length)throw new ExactCandidateConflictError("generated candidate IDs must be unique");
+        const candidates=routes.map((route,index)=>{
+          const unsigned:any={candidateId:candidateIds[index]!,kind:"actor.travel",version:"v1",purpose:"execute-once",
+            scope:{campaignId:row.campaign_id,sessionId:row.session_id,actorId:row.actor_id,principalId,connectionId:connection(row.id),authorizationEffect:"none"},
+            label:{format:"message-key-v1",key:"candidate.actor.travel.label",routeOption:index+1},summary:{format:"message-key-v1",key:"candidate.actor.travel.summary"},
+            canonicalActionDigest:"0".repeat(64),canonicalEnvelopeDigest:"0".repeat(64),privateParameters:{kind:"actor.travel",connectionId:route.connectionId,partyActorIds:[row.actor_id]},
+            expectedRevisions:[{domain:"world",revision}],policy:{kind:"actor.travel",result:"allowed",reason:"legal-visible-connection"},
+            confirmation:{requirement:"not-required",decision:{state:"not-applicable"}},quote:{kind:"not-applicable"},issuedAt,expiresAt,
+            supersession:{state:"current"},execution:{state:"unexecuted"},executionRequiresAuthorityRecheck:true};
+          const action={...unsigned,canonicalActionDigest:computeExactCandidateActionDigest(unsigned,crypto)};
+          return internalExactCandidateSchema.parse({...action,canonicalEnvelopeDigest:computeExactCandidateEnvelopeDigest(action,crypto)});
+        });
+        return issue(principalId,{turnId:row.id,idempotencyKey:input.idempotencyKey,worldRevision:revision,candidates},issuedAt);
+      }).immediate();
     },
+    issueExactCandidateBatch(principalId,input){guard();return issue(principalId,input);},
     getExactCandidateBatch:readBatch,
     getExactCandidate(principalId,candidateId){const located=locateAuthorized(principalId,candidateId);return located?current(located.row,located.batchRow):null;},
     observeExactCandidateExpiry(principalId,candidateId){guard();const located=locateAuthorized(principalId,candidateId);if(!located)throw new ExactCandidateUnavailableError("candidate is unavailable");

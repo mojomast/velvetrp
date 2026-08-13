@@ -59,3 +59,60 @@ describe("v46 exact candidate persistence",()=>{
     db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46").get()).toEqual({count:0});expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46").get()).toEqual({count:0});db.close();
     expect(r.issueExactCandidateBatch("player",issue(ids.turnId,"turn-principal",values)).candidates.map(({candidateId})=>candidateId)).toEqual(["turn-principal-candidate"]);expect({clockCalls,idCalls}).toEqual({clockCalls:1,idCalls:1});r.close();});
 });
+
+function seedTravelWorld(ids:{campaignId:string;turnId:string},routes:Array<{id:string;visibility?:"public"|"discovered"|"gm";state?:"open"|"closed";requirement?:"none"|"discovery"|"faction_reputation";minimum?:number}>){
+  const db=new DatabaseDriver(file());db.pragma("foreign_keys=OFF");
+  const location=db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,NULL,?,'','public',?)");
+  location.run("origin",ids.campaignId,"Origin",AT);
+  for(const route of routes)location.run(`destination-${route.id}`,ids.campaignId,`Destination ${route.id}`,AT);
+  if(routes.some((route)=>route.requirement==="faction_reputation"))db.prepare("INSERT INTO campaign_factions_v28 VALUES('faction',?,'Faction','public',?)").run(ids.campaignId,AT);
+  const connection=db.prepare("INSERT INTO campaign_location_connections_v28 VALUES(?,?,?,?,?,?,?,?,?,?)");
+  for(const route of routes)connection.run(route.id,ids.campaignId,"origin",`destination-${route.id}`,route.visibility??"public",route.state??"open",route.requirement??"none",route.requirement==="faction_reputation"?"faction":null,route.requirement==="faction_reputation"?(route.minimum??0):null,AT);
+  db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(ids.campaignId,"actor","origin","session",AT);
+  db.close();
+}
+
+describe("M5.4 actor.travel candidate generation",()=>{
+  it("generates only legal player routes in stable binary order with private exact parameters",()=>{const ids=seed();seedTravelWorld(ids,[
+    {id:"route-b"},{id:"route-a"},{id:"closed",state:"closed"},{id:"gm-only",visibility:"gm"},
+    {id:"undiscovered",visibility:"discovered"},{id:"discovery-required",requirement:"discovery"},
+    {id:"reputation-denied",requirement:"faction_reputation",minimum:1},{id:"reputation-allowed",requirement:"faction_reputation",minimum:0},
+  ]);const db=new DatabaseDriver(file());db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(ids.campaignId,"actor","destination-discovery-required",AT);db.close();
+    const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"generate"});
+    expect(batch.worldRevision).toBe(0);expect(batch.candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["discovery-required","reputation-allowed","route-a","route-b"]);
+    expect(batch.candidates.map((value)=>value.label.routeOption)).toEqual([1,2,3,4]);expect(batch.candidates.every((value)=>value.policy.reason==="legal-visible-connection"&&value.privateParameters.partyActorIds[0]==="actor")).toBe(true);
+    expect(JSON.stringify(batch.candidates.map(({label,summary})=>({label,summary})))).not.toContain("route-");r.close();});
+
+  it("applies GM visibility while retaining discovery and faction requirements",()=>{const ids=seed();seedTravelWorld(ids,[
+    {id:"gm-open",visibility:"gm"},{id:"gm-discovery",visibility:"gm",requirement:"discovery"},{id:"gm-reputation",visibility:"gm",requirement:"faction_reputation",minimum:1},
+  ]);const db=new DatabaseDriver(file());db.prepare("UPDATE campaign_memberships SET role='gm' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
+    const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"gm"}).candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["gm-open"]);r.close();});
+
+  it("persists an exact empty batch",()=>{const ids=seed();seedTravelWorld(ids,[{id:"closed",state:"closed"}]);const r=repo();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"empty-generated"}).candidates).toEqual([]);r.close();});
+
+  it("fails closed above 32 legal routes without writes",()=>{const ids=seed();seedTravelWorld(ids,Array.from({length:33},(_,index)=>({id:`route-${String(index).padStart(2,"0")}`})));const r=repo();expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"overflow"})).toThrow(ExactCandidateConflictError);r.close();
+    const db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});expect(db.prepare("SELECT count(*) count FROM exact_candidates_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});db.close();});
+
+  it.each([
+    {name:"persisted collision",ids:["persisted-candidate"]},
+    {name:"duplicate generated IDs",ids:["duplicate","duplicate"]},
+  ])("rejects $name without persisting a generated batch",({ids:generatedIds})=>{const ids=seed();seedTravelWorld(ids,[{id:"road-a"},{id:"road-b"}]);
+    if(generatedIds[0]==="persisted-candidate"){const setup=repo();setup.issueExactCandidateBatch("player",issue(ids.turnId,"prior",[candidate(ids.campaignId,ids.turnId,"persisted-candidate",1,"road-a")]));setup.close();}
+    let index=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>new Date(AT)},ids:{nextId:()=>generatedIds[index++]??`unused-${index}`}});
+    expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"collision"})).toThrow(ExactCandidateConflictError);r.close();
+    const db=new DatabaseDriver(file(),{readonly:true});expect(db.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE idempotency_key='collision'").get()).toEqual({count:0});db.close();});
+
+  it("replays before world, clock, and ID dependencies and exposes no tuple lookup",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);let clockCalls=0,idCalls=0;const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>`generated-${++idCalls}`}});
+    const first=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"});const before={clockCalls,idCalls};const db=new DatabaseDriver(file());db.prepare("DELETE FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id='actor'").run(ids.campaignId);db.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);db.close();
+    expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"})).toThrow(ExactCandidateAuthorizationError);expect({clockCalls,idCalls}).toEqual(before);
+    expect("getExactCandidateBatchByIssueKey" in r).toBe(false);
+    const restore=new DatabaseDriver(file());restore.prepare("UPDATE campaign_memberships SET role='player' WHERE campaign_id=? AND principal_id='player'").run(ids.campaignId);restore.close();expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"replay-first"})).toEqual(first);expect({clockCalls,idCalls}).toEqual(before);r.close();});
+
+  it("rejects stale turn authority and session semantics without issuing",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);const db=new DatabaseDriver(file());db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);db.close();const r=repo();expect(()=>r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stale"})).toThrow(ExactCandidateAuthorizationError);r.close();
+    const audit=new DatabaseDriver(file(),{readonly:true});expect(audit.prepare("SELECT count(*) count FROM exact_candidate_batches_v46 WHERE turn_id=?").get(ids.turnId)).toEqual({count:0});audit.close();});
+  it("replays a generated batch after its session stops while current authority remains",()=>{const ids=seed();seedTravelWorld(ids,[{id:"road"}]);let clockCalls=0,idCalls=0;
+    const r=createRepository({dataDir:process.env.VELVET_DATA_DIR!,clock:{now:()=>{clockCalls++;return new Date(AT);}},ids:{nextId:()=>`stopped-replay-${++idCalls}`}});
+    const first=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stopped-replay"}),before={clockCalls,idCalls};
+    const db=new DatabaseDriver(file());db.prepare("UPDATE sessions SET state='closed',stopped_at=? WHERE id='session'").run(AT);db.close();
+    expect(r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"stopped-replay"})).toEqual(first);expect({clockCalls,idCalls}).toEqual(before);r.close();});
+});
