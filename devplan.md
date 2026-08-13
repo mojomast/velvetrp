@@ -35,7 +35,8 @@ Current persistence is `v46r1`; canonical populated `v44/v45 -> v46` startup upg
 
 ## Approved queue
 
-- [ ] Next: separately design/review the connection-scoped authoritative world travel candidate adapter, generator, and execution path; execution receipt linking requires a later additive schema
+- [✅] M5.4 travel prerequisites delivered: authoritative candidate generation and the connection-scoped world travel adapter now share one fail-closed policy; commits `bd921b8`, `c05a289`. Candidate selection/execution is not delivered
+- [ ] Next: design and allocate the additive receipt-link schema, then atomically execute an exact selected candidate through the world adapter before any provider or client exposure
 - [ ] Build Later: closed rules IR, licensed offline ingestion (blocked on promoted/delivered mutable authoring unless a separately approved immutable-draft-only path), ephemeral simulation, remote tenancy/authenticated sessions and exercisable grants, harness overrides, proactive automation/tools
 - [ ] Approved Build Unscheduled: append-only multiclass, mutable logical unpinned pack authoring over immutable revisions, zones/range bands, boss phases, autonomous parties
 
