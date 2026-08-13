@@ -1,7 +1,7 @@
 # Migration Test Archive
 
 These tests are intentionally archived during the pre-release supported/tested
-window for startup upgrades from v43 or v44 to v45. They preserve historical
+window for startup upgrades from canonical populated v46 or v47 to v48. They preserve historical
 migration coverage without running in Vitest. Archive presence does not mean
 that startup upgrades from v2 through v39 are supported.
 
@@ -12,8 +12,8 @@ Versioned suites use the `.archived.ts` suffix; reactivate one by restoring its
 ## Active Coverage Discoverability
 
 The active executable supported-window coverage is in
-`migration-support-window.test.ts`; v45-specific migration coverage is in
-`migration-v45.test.ts`. Both remain discoverable by the server test command.
+`migration-support-window.test.ts`; active version-specific coverage is in
+`migration-v47.test.ts` and `migration-v48.test.ts`. These remain discoverable by the server test command. v45 and earlier startup markers are unsupported.
 
 ## Versioned Inventory
 
