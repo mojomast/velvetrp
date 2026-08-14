@@ -6,7 +6,7 @@ import { MAX_CAMPAIGN_CHARACTER_ROSTER, MAX_PRIVATE_NOTES_LENGTH } from "@velvet
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -343,7 +343,7 @@ describe("role-sensitive campaign-character queries", () => {
       }
     })();
     db.close();
-    const reopened = createRepository({ dataDir: dataDir() });
+    const reopened = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => reopened.getCampaignCharacterRoster("gm", campaignId))
       .toThrow("campaign character roster is malformed");
     expect(reopened.getCampaignCharacterRoster("nonmember", campaignId)).toBeNull();

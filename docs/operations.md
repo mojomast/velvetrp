@@ -42,7 +42,7 @@ Use this canonical invocation so each run has a unique in-memory temp directory 
 )
 ```
 
-The health command assumes dependencies and Playwright Chromium are already installed; it does not install either. It runs deterministic E2E only and excludes opt-in live-provider E2E. Migration-support tests are already discovered by `npm test`, so there is no duplicate focused migration phase.
+The health command assumes dependencies and Playwright Chromium are already installed; it does not install either. It runs deterministic E2E only and excludes opt-in live-provider E2E.
 
 Hosted CI mirrors the same four health phases exactly once each, in order and fail-fast, after installing dependencies and Chromium. The distinct `npm run ci` script performs its own clean install, typecheck, build, and unit/integration tests, but omits deterministic E2E and is not the final/release health gate.
 
@@ -54,7 +54,7 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | --- | --- | --- | --- |
 | `HOST` | server-runtime | `127.0.0.1` | API bind address. Keep loopback. |
 | `PORT` | server-runtime | `8787` | API port. |
-| `VELVET_DATA_DIR` | server-runtime | `<process.cwd()>/data` | SQLite and legacy-import directory. Set an absolute path explicitly. |
+| `VELVET_DATA_DIR` | server-runtime | `<process.cwd()>/data` | SQLite data directory. Set an absolute path explicitly. |
 | `VELVET_SSE_HEARTBEAT_MS` | server-runtime | `15000` | Legacy token and durable-adventure heartbeat input; use a positive finite integer. Room SSE has no heartbeat. |
 | `VELVET_API_URL` | client-development | `http://localhost:8787` | Vite development proxy target; not embedded in the built client. |
 | `OPENROUTER_BASE_URL` | server-runtime | Unset | Initial provider URL; a defined value takes precedence over `OPENAI_BASE_URL`. |
@@ -84,7 +84,7 @@ The root `.env.example` is complete for supported user-facing server-runtime and
 
 Malformed `VELVET_SSE_HEARTBEAT_MS` values are explicitly repaired to 15 seconds by durable adventure SSE, while the legacy token stream passes the numeric value directly to its timer. Use only a positive finite integer for both families; [Streaming](streaming.md) owns their exact transport differences.
 
-## Data directory and startup migrations
+## Data directory and current schema
 
 Always configure one explicit absolute data directory so startup location, service working directory, backups, and live tests cannot silently select different databases:
 
@@ -92,21 +92,15 @@ Always configure one explicit absolute data directory so startup location, servi
 export VELVET_DATA_DIR=/home/example/.local/share/velvet
 ```
 
-The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For pre-release schema `v53r1`, populated v46-v52 databases are the tested and supported forward-startup inputs. Marker paths outside v46-v53, including v45 and earlier or a future marker, are rejected before cleanup, migration dependency resolution, or mutation. Supported input revisions must already be revision 1. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in migration inputs, unexpected managed artifacts, and cross-campaign generation-draft ancestry. Current startup then verifies the complete version-owned layouts through v53 and prior domain integrity. There is no separate migration command and no supported automatic downgrade.
+The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. A missing or empty database executes `server/src/repo/db/currentSchema.sql` atomically. A nonempty database must have the exact current tables, indexes, triggers, and views and must pass SQLite `quick_check` and `foreign_key_check` before repository use.
 
-Each one-version migration commits its schema work and marker atomically. A v46-v52 startup can traverse multiple such transactions, so a failure in a later step may leave a valid intermediate marker that the same release can resume after the cause is fixed; it does not roll the entire chain back to the original version. Do not use resumability as a backup strategy. Recreate unsupported development databases or restore a protected pre-upgrade backup with a compatible build.
+Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`. Startup never upgrades, backfills, rewinds, cleans historical artifacts, imports `db.json`, or resumes a migration chain. A schema mismatch fails with the database path and directs the developer to delete/recreate it.
 
-The v43 migration creates five NPC-presence data tables empty: the room-scoped revision root, materialized state, and immutable command, event, and receipt tables. It deliberately performs **no presence backfill**: campaign NPC roster membership, NPC metadata, actor locations, room participants, messages, and narrative context do not prove that an NPC is present. The v44 migration created the initial empty companion sidecars. The v45 migration replaces those sidecars and preserves all rows while changing historical command, proposal, decision, grant, and revocation actor references to durable principals. Removing a campaign membership therefore no longer invalidates or pins companion history. Live companion administration authorization still derives from the repository's current owner/GM relationships; durable history is evidence, not current authority.
-
-The v46 migration adds immutable exact-candidate issuance and lifecycle history. The additive v47 migration performs an empty backfill and adds one immutable attested execution-link layout; v48 binds provider selection/execution evidence. Repository execution atomically binds exact selection to deterministic world travel and reconstructs replay cryptographically. Provider/adventure travel, receipt-only HTTP/client display, and provider-committed candidate E2E are delivered. Live candidate generation/selection HTTP/client APIs remain absent. Existing manual world travel remains exposed as before and is not candidate-backed.
-
-v49 adds immutable character-draft reroll history. v50 records campaign-generation calls and accepted artifacts; v51 adds exact starter materialization, combat reward settlement, and campaign starting-location provenance; v52 adds sparse generation jobs/attempts, dependency-aware accepted candidates, and NPC placement intents; v53 adds explicit append-only public material delivery. Current startup validates each layout and foreign-key integrity.
+NPC presence starts empty because roster membership, NPC metadata, actor locations, room participants, messages, and narrative context do not prove presence. Companion authorization derives from current owner/GM relationships while durable history remains evidence rather than current authority. Exact-candidate execution binds provider selection to deterministic world travel and reconstructs replay from persisted evidence. Existing manual world travel remains separate.
 
 The current trusted-local RPG boundary has 111 counted explicit operations, excluding feature discovery and implicit HEAD. Companion administration adds an authoritative owner/GM management GET and a closed receipt-only command POST under `/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration`; there is client transport but no companion UI or delegated grant exercise. Consumables add action GET, command POST, and exact-result GET under `/rpg/v1/combats/:combatId/consumable-actions`. Before consumable POST, the browser must persist its ambiguity marker; it must not automatically retry, and recovery reads the exact result then refreshes combat, log, and actions. Consumable modifiers of every duration are contract-ineligible: instant semantics are unavailable and noninstant modifiers are unsupported, so no modifier descriptor, settlement, legal action, or runtime path exists. No successful historical consumable modifier result exists. Shared catalog/power contracts are unchanged, including receipt-only instant modifiers for powers. Later operations cover reroll, actor placement, combat reward reads/claim/reconciliation, generated foundation/planning, and material publication/read. Deterministic Playwright E2E covers companion, consumable recovery, and provider-committed travel. A separate deterministic server integration test covers the generated-campaign journey through real repository and HTTP composition without an external provider.
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
-
-An old `db.json` in the data directory can be imported once into an empty SQLite roleplay store. If SQLite already contains characters, sessions, or messages, import is skipped and the legacy file is left in place with a warning. Preserve both files until the result is verified.
 
 ## Build and start
 
@@ -131,27 +125,9 @@ The API server does not serve the web client. `npm run build` writes static asse
 
 Keep the static listener and reverse proxy loopback-only as well. Do not set `HOST=0.0.0.0`, publish the API port, or expose it through a public proxy. Fixed `local-owner`, caller-header rejection, and the remote-authentication feature flag are not authentication.
 
-## Backup before migration
+## Recreate development data
 
-Back up before the first start of every upgraded build. Startup may migrate immediately, so the backup must happen while the old build is still stopped or before switching the service executable.
-
-Preferred approaches:
-
-1. Stop Velvet cleanly, verify no process has the database open, and copy the entire explicit `VELVET_DATA_DIR` to protected storage. A stopped full-directory copy captures SQLite, any WAL/SHM sidecars, legacy import evidence, and permissions.
-2. If downtime is impossible, use SQLite's online backup API/tool against `velvet.sqlite`; do not copy only the main database file while WAL mode is live.
-3. Record the application revision and data-directory path with the backup. Restrict backup access because the provider API key is stored unencrypted in SQLite.
-
-After upgrading, verify health, startup logs, provider public state, and representative reads before deleting the backup. Never test a backup by opening the only copy with a newer build: that can migrate it.
-
-## Restore
-
-1. Stop Velvet and all processes using the database.
-2. Move the failed/current data directory aside without deleting it.
-3. Restore the complete stopped directory backup, or restore a verified SQLite online-backup file as `velvet.sqlite` into a clean directory.
-4. Restore restrictive ownership and permissions.
-5. Start the application revision that created or supports that backup, still bound to loopback, and verify `/api/health` plus representative data.
-
-Do not merge database files, omit a live WAL file, edit the schema marker, or expect a newer migrated database to work with an older build. If migration startup fails, retain logs, the untouched pre-migration backup, and the failed database for diagnosis.
+Stop Velvet before removing a development database. Delete `velvet.sqlite` together with its `velvet.sqlite-wal` and `velvet.sqlite-shm` sidecars, then restart to create the current schema. Do not edit schema metadata or merge SQLite files. If any development data matters, export it through a current application feature before changing the schema; the repository provides no compatibility or restore path for older schemas.
 
 ## Testing
 
@@ -173,12 +149,12 @@ If `<source-dir>/velvet.sqlite` exists, live E2E clones it with the SQLite onlin
 | Symptom | Action |
 | --- | --- |
 | Wrong or empty data appears | Print the service working directory and explicit `VELVET_DATA_DIR`; check whether both root `data` and `server/data` exist. Stop before moving anything. |
-| Startup fails during schema work | Stop retries, preserve the failing directory and logs, and restore a pre-upgrade backup with its compatible build. Do not edit SQLite manually. |
+| Startup reports a schema mismatch | Stop Velvet, delete `velvet.sqlite` and its WAL/SHM sidecars, then restart to create the current development schema. |
 | `SQLITE_BUSY` or lock errors | Ensure only intended Velvet processes use the database and that backup tooling uses SQLite online backup while live. The configured busy timeout is 5 seconds. |
 | Client loads but API calls 404 | Configure the static origin to proxy `/api` to loopback port 8787. `VELVET_API_URL` affects Vite development only. |
 | API is unreachable | Check `HOST`, `PORT`, process logs, and `/api/health`. Keep the listener on `127.0.0.1`. |
 | RPG UI/routes are absent | Query `/api/rpg/v1/features`; use exact lowercase `true` and satisfy campaign -> mechanics -> combat dependencies. |
-| NPC roster exists but present cast is empty | This is expected after v43 migration and whenever no explicit room presence command has committed. Roster membership is not presence and startup performs no backfill. |
+| NPC roster exists but present cast is empty | This is expected whenever no explicit room presence command has committed. Roster membership is not presence. |
 | Room detach reports a conflict | A running attached room with at least one currently present NPC cannot detach. Remove each NPC from the present cast first, or stop the room; do not delete or edit presence rows. |
 | Streams stall behind a proxy | Disable response buffering/transformation and allow long-lived responses. Review family-specific heartbeat behavior in [Streaming](streaming.md). |
 | Provider settings ignore environment | A stored row wins and `.env` is not auto-loaded. See [Provider configuration](provider-configuration.md). |

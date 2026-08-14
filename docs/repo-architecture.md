@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for schema v53 revision 1 (`v53r1`). v49-v53 add character reroll history, reviewed campaign-generation provenance and expansion, exact starter/reward/placement settlement, and explicit public material delivery without changing historical attested layouts. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for the single current development schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -20,51 +20,21 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 
 ## Database facade and modules
 
-`server/src/repo/db.ts` remains the compatibility facade and wiring root, not the sole implementation file. It imports every migration dependency, configures schema and connection modules, configures the legacy singleton provider, retains historical v2-v14 migration implementation, and re-exports connection lifecycle functions.
+`server/src/repo/db.ts` remains the compatibility facade and configures the legacy named-wrapper singleton provider. Schema initialization and connection behavior have direct imports rather than migration dependency injection.
 
 | Owner | Responsibility |
 | --- | --- |
-| `db.ts` | Stable facade, dependency wiring, historical v2-v14 migration code, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
-| `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, schema startup, legacy import invocation, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | `SCHEMA_VERSION = 53`, `SCHEMA_REVISION = 1`, supported v46-v52 input policy, fresh-schema construction, sequential migration order, revision handling, future-artifact classification, startup assertions, and migration rollback boundaries. |
-| `db/migrations/*.ts` | Version-owned DDL, canonical object inventories/digests, data validation, backfill, and one-step migration functions. New schema behavior goes in the migration that introduces it. |
-| `db/legacyImport.ts` | One-way import of an otherwise-empty legacy `db.json` store into SQLite. It does not merge stores. |
+| `db.ts` | Stable facade, singleton-provider wiring, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
+| `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, current-schema startup, singleton lifecycle, and factory connection opening. |
+| `db/schema.ts` | Atomic empty-database initialization, complete current-object inventory comparison, SQLite `quick_check`, foreign-key validation, and the delete/recreate failure message. Existing-database validation is read-only. |
+| `db/currentSchema.sql` | Sole DDL and required seed-data authority for a newly created database. Schema changes edit this file directly. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-Fresh creation and populated v46-v52 upgrades in the tested support window converge on equivalent v53r1 DDL and validated preexisting data. v45 and earlier, malformed, and future marker paths are unsupported and reject before cleanup, dependency resolution, or mutation; supported inputs must already use revision 1. Automatic downgrade is unsupported. Recreate unsupported development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in migration inputs, unexpected managed artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Each one-version migration transaction preserves prior immutable history and fails without advancing that step's marker. The complete v46-v52 chain is resumable rather than wrapped in one transaction, so an error in a later step can leave a valid intermediate marker; operators must retain a pre-upgrade backup.
+A missing or empty database creates the complete schema and required local-owner/reference rows in one transaction. Any nonempty database must match every current table, index, trigger, and view exactly and pass physical and foreign-key checks. Startup never upgrades, backfills, rewinds, cleans historical artifacts, imports `db.json`, or mutates a mismatched database. Version suffixes retained in domain table names are identifiers used by current repository SQL, not a supported migration lineage.
 
-## Migrations v26-v53
+## Current schema contents
 
-| Version | Additive responsibility |
-| --- | --- |
-| v26 | M1.6 actor mutation revisions; immutable check, power, and effect commands/events/receipts; normalized check results, power costs, active effects, modifiers, and lifecycle. |
-| v27 | M1.7 combat foundation: encounters, combatants, initiative/turn state, combat audit, logs, reward bundles, and recorded claims. |
-| v28 | M1.8 location graph, discoveries, travel state/audit, actor locations, NPC/faction ancestry, relationships, and reputation ledger. |
-| v29r1/r2 | V29r1 character-layout attestation, then v29r2 retained storyline/quest/clue/reward/objective-completion compatibility tables only. Authoritative quest and story persistence arrives in v33 and v34. |
-| v30 | Immutable campaign-import dry-run staging used to bind later apply to an exact validated package. |
-| v31 | Encounter lifecycle and enemy-template provenance sidecars over the v27 combat foundation. |
-| v32 | Revisioned world-narrative command/event/receipt history plus role-sensitive NPC/faction metadata, relationships, and reputation state. |
-| v33 | Authoritative quest definitions, dependency-ordered objectives, progress, reward claims, journal projections, and quest audit. |
-| v34 | Authoritative story graph, node state, edges, plot points/answers, clues/sources/discoveries, and story audit. |
-| v35 | M1.10 durable adventure turns, tool proposals, confirmations, provider-call metadata, generation drafts, reviews, and final receipt links. |
-| v36 | Adventure coordination command/event/receipt ledgers, exact turn-mechanics links, generation-draft apply receipts, and hardened v35 layout/data validation. |
-| v37 | Exact server-owned proposal execution bindings tying each proposal to its idempotency key, command type, source turn, timeline, and actor; ambiguous historical receipts reject migration. |
-| v38 | Durable bounded agent execution, decision rounds, tool calls, provider starts, and recovery state. |
-| v39 | Agent provider-response provenance, dispatch claims, combat proposal bindings, and generalized receipts. |
-| v40 | Confirmation policy, authority evidence, expiry operations, mutation accounting, and replan requirements. |
-| v41 | Reviewed campaign-content generation drafts and projections. |
-| v42 | Additive immutable campaign-content commands, receipts, revisions, and layout attestation sealing reviewed atomic application. |
-| v43 | M5.1 room-scoped NPC-presence revisions, materialized current state, immutable commands/events/receipts, exact graph triggers, and canonical layout attestation. Migration owns no inferred presence and creates no backfill rows. |
-| v44 | M5.2 additive empty companion foundation: immutable revisioned commands/receipts and companion, presence-link, proposal, decision, grant, revocation, audit, and canonical layout-attestation sidecars. No repository commands, routes, UI, grant exercise, or inferred rows are delivered. |
-| v45 | Replaces the v44 companion sidecars while preserving all rows; historical command, proposal, decision, grant, and revocation principals reference durable principals so membership removal neither invalidates nor pins history. |
-| v46 | Adds immutable exact-candidate batches, candidates, explicit supersessions, expiration observations, and canonical layout attestation with static DDL, a reviewed digest, and empty backfill. |
-| v47 | Adds one immutable attested exact-candidate execution-link table with empty backfill. It binds canonical selection/result evidence to the original v46 candidate and exact world command, receipt, event, destination, and party sidecars. Repository reconstruction remains the cryptographic authority. |
-| v48 | Adds immutable provider-safe projection, strict tool schema, settled provider call/tool/round/selection, execution, and accounting bindings with empty backfill. Startup reconstructs issuance-time projection from the complete v46 batch and validates v47/world ancestry. |
-| v49 | Adds immutable full server-roll character-draft reroll history bound to draft revisions. |
-| v50 | Adds durable campaign-generation call coordination, provider provenance/usage, and immutable accepted artifact storage. |
-| v51 | Adds exact-once starter inventory/wallet materialization, combat reward settlement linkage, and optional campaign starting-location provenance. |
-| v52 | Adds sparse generation jobs and attempts, candidate/dependency/accepted artifacts, and durable generated NPC placement intents. |
-| v53 | Adds revisioned immutable commands, receipts, and player-safe projections for explicit public handout and scene-prompt delivery. |
+`currentSchema.sql` contains the complete roleplay, campaign administration, catalog, character builder/progression, resources, combat, world, quest, story, durable adventure, agent, NPC presence, companion, exact-candidate, reroll, campaign-generation, settlement, placement, and material-delivery schema. Runtime repositories own the behavior and integrity of those domains; the SQL file owns only their current persistent layout and required initial rows.
 
 ## Repository ownership
 
@@ -85,16 +55,16 @@ Fresh creation and populated v46-v52 upgrades in the tested support window conve
 | M4.1 | `campaign/campaignAgentContextReadRepo.ts` owns focused campaign/session/audience snapshots for server orchestrators. The factory facade wraps each read in one deferred SQLite transaction so membership, role/control, target ancestry, visible state, current combat, legal actions, and authorized target-private facts share one snapshot. `server/src/context.ts` owns the independent whole-line UTF-16 budgets and precedence assembly outside persistence. |
 | M4.2-M4.4 | `agent/adventureOrchestrator.ts`, `agent/toolRegistry.ts`, and `agent/confirmationPolicy.ts` own bounded provider orchestration, role-selected tools, deterministic command bridging, durable confirmation/resume, and receipt-aware narration. Durable execution and response provenance are persisted through the v38-v40 repository boundary. |
 | M4.5 | `generationDrafts.ts` and the encounter repository own typed encounter draft validation, reviewed authoritative encounter application, and role-safe projections. |
-| M4.6 | `campaignContentGeneration.ts`, `campaign/campaignContentWriteRepo.ts`, and the v41-v42 migrations own typed campaign-content drafts, conservative NPC baselines, and atomic reviewed campaign-content application with immutable receipts. |
-| M5.1 | `world/npcPresenceRepo.ts`, `world/npcPresenceReadRepo.ts`, `world/npcPresenceWriteRepo.ts`, and `db/migrations/v43_npc_presence.ts` own room-scoped NPC presence, role/lifecycle projections, command idempotency, graph integrity, detachment protection, and canonical v43 layout. |
-| M5.2 companion administration | `db/migrations/v45_companion_principals.ts` owns the durable-principal companion layout and v44 row-preserving migration. `companionRepo.ts` owns owner/GM creation from a persisted present NPC in an attached running session, bounded grant creation/revocation, management/public projections, revision/idempotency/receipt/audit, and replay after demotion or membership removal. The fixed-local-owner HTTP lane exposes an authoritative management GET and closed receipt-only command POST; the client has transport only. UI, dismissal, proposal/decision administration, public member HTTP, and grant exercise remain undelivered. |
+| M4.6 | `campaignContentGeneration.ts` and `campaign/campaignContentWriteRepo.ts` own typed campaign-content drafts, conservative NPC baselines, and atomic reviewed campaign-content application with immutable receipts. |
+| M5.1 | `world/npcPresenceRepo.ts`, `world/npcPresenceReadRepo.ts`, and `world/npcPresenceWriteRepo.ts` own room-scoped NPC presence, role/lifecycle projections, command idempotency, graph integrity, and detachment protection. |
+| M5.2 companion administration | `companionRepo.ts` owns owner/GM creation from a persisted present NPC in an attached running session, bounded grant creation/revocation, management/public projections, revision/idempotency/receipt/audit, and replay after demotion or membership removal. The fixed-local-owner HTTP lane exposes an authoritative management GET and closed receipt-only command POST; the client has transport only. UI, dismissal, proposal/decision administration, public member HTTP, and grant exercise remain undelivered. |
 | M5.3 Slice 0 | `encounter/combatCompositionPlan.ts`, `encounter/combatCompositionExecutor.ts`, and encounter write composition own active-encounter HP authority, atomic actor-health mirroring through M15, round-wrap effect advancement, and concentration retention until replacement/removal. |
 | M5.3 consumables | Shared encounter contracts freeze the exact item, inventory entry, target, effect plan, canonical request digest, expected M15 revisions, and result evidence. `encounter/useConsumableRuntime.ts` owns server-derived legal actions and one immediate-transaction execution for exact pinned category-`consumable` quantity one. The runtime applies effects in catalog order for damage, healing, and health/guard/focus resources. Every modifier duration is ineligible at the consumable contract boundary: instant modifiers report unavailable semantics and noninstant modifiers report unsupported duration; no modifier descriptor, settlement, legal action, or runtime path exists. No successful historical consumable modifier result exists. Shared catalog and power modifier contracts are unchanged, and powers retain receipt-only instant-modifier outcomes. `combatConsumables.ts` exposes separate legal-action, command, and exact-result routes without widening the legacy combat union; the client renders exact server target, quantity, and action cost and uses durable no-retry reconciliation. |
-| M5.4 exact candidates | `candidateRepo/`, `v46_exact_candidates.ts`, `v47_exact_candidate_executions.ts`, and `v48_exact_candidate_provider_bridge.ts` own issuance, lifecycle, immutable execution/provider bindings, atomic travel, recovery, receipt projection, and safe narration. Receipt-only HTTP/client display and provider-committed candidate E2E are delivered; live candidate generation/selection HTTP/client APIs remain absent. Existing manual travel remains public and separate. |
-| v49 character rerolls | `characterBuilder/characterBuilderWriteRepo.ts` and `db/migrations/v49_character_rerolls.ts` own server-generated reroll execution, draft revision/idempotency, immutable dice allocation history, and replay without rerolling. |
-| v50/v52 campaign generation | `campaignGenerationRepo.ts`, `campaignContentGeneration.ts`, and the v50/v52 migrations own paid-call coordination, attempts/usage, sparse candidates, accepted-key dependencies, standard-domain materialization, generated planning, and NPC placement intents. Provider calls stay outside repository transactions. |
-| v51 grants, rewards, and placement | Character finalization owns exact starter materialization; `encounter/encounterReadRepo.ts` and `encounter/encounterWriteRepo.ts` own recipient-safe reward reads, claim settlement, and exact result reconstruction; `world/worldWriteRepo.ts` owns GM bootstrap placement. `db/migrations/v51_grants_rewards_placement.ts` owns their immutable linkage. |
-| v53 material delivery | `campaignGenerationRepo.ts` and `db/migrations/v53_campaign_material_delivery.ts` own owner/GM publication, delivery revision/idempotency, immutable receipts, and player-safe explicitly published projections. |
+| M5.4 exact candidates | `candidateRepo/` owns issuance, lifecycle, immutable execution/provider bindings, atomic travel, recovery, receipt projection, and safe narration. Receipt-only HTTP/client display and provider-committed candidate E2E are delivered; live candidate generation/selection HTTP/client APIs remain absent. Existing manual travel remains public and separate. |
+| Character rerolls | `characterBuilder/characterBuilderWriteRepo.ts` owns server-generated reroll execution, draft revision/idempotency, immutable dice allocation history, and replay without rerolling. |
+| Campaign generation | `campaignGenerationRepo.ts` and `campaignContentGeneration.ts` own paid-call coordination, attempts/usage, sparse candidates, accepted-key dependencies, standard-domain materialization, generated planning, and NPC placement intents. Provider calls stay outside repository transactions. |
+| Grants, rewards, and placement | Character finalization owns exact starter materialization; `encounter/encounterReadRepo.ts` and `encounter/encounterWriteRepo.ts` own recipient-safe reward reads, claim settlement, and exact result reconstruction; `world/worldWriteRepo.ts` owns GM bootstrap placement. |
+| Material delivery | `campaignGenerationRepo.ts` owns owner/GM publication, delivery revision/idempotency, immutable receipts, and player-safe explicitly published projections. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 
@@ -141,7 +111,7 @@ M5.2 client support is transport-only over the authoritative owner/GM management
 
 - Repository behavior tests use temporary data directories, real SQLite connections, deterministic clock/ID/RNG ports, restart/reopen checks, exact retry versus changed-key conflict cases, stale revisions, authorization loss, cross-campaign isolation, and nested-transaction guards.
 - Role-projection tests assert exact object keys and absence of private text/identities, outsider nondisclosure, membership-rooted SQL, and fail-loud behavior for authorized corruption.
-- Migration tests cover fresh creation and each relevant historical marker, populated backfills, canonical object inventory/digest attestation, fresh/migrated parity, immutable triggers, malformed or future artifacts, late failures, and unchanged marker/data after rollback.
+- Schema bootstrap tests cover atomic fresh creation, required seed data, exact current-object inventory, SQLite safety settings, unchanged current-schema reopen, and read-only rejection of unknown, modified, or corrupt databases.
 - Contract tests validate shared schemas independently; route tests validate HTTP adaptation and reconciliation; client tests validate durable-state rendering without replacing repository tests.
 - Run focused Vitest files while developing, then `npm --workspace velvet-mvp-server run typecheck` and `npm --workspace velvet-mvp-server test`. Changes spanning contracts or client behavior require the root `npm run typecheck` and `npm test`.
 

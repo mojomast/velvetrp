@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -84,6 +84,14 @@ function seed(): void {
 
 function factory(options: { id?: string; at?: string } = {}) {
   return createRepository({
+    dataDir: process.env.VELVET_DATA_DIR as string,
+    ids: { nextId: vi.fn(() => options.id ?? "event-one") },
+    clock: { now: vi.fn(() => new Date(options.at ?? AT)) },
+  });
+}
+
+function corruptionFactory(options: { id?: string; at?: string } = {}) {
+  return createCorruptionTestRepository({
     dataDir: process.env.VELVET_DATA_DIR as string,
     ids: { nextId: vi.fn(() => options.id ?? "event-one") },
     clock: { now: vi.fn(() => new Date(options.at ?? AT)) },
@@ -214,7 +222,7 @@ describe("set actor attribute command", () => {
         BEGIN INSERT INTO command_write_order(name) VALUES ('receipt'); END;
     `);
     db.close();
-    const repository = factory();
+    const repository = corruptionFactory();
     repository.executeSetActorAttribute("local-owner", envelope);
     repository.close();
     const verify = new DatabaseDriver(dbPath(), { readonly: true });
@@ -242,7 +250,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => repository.executeSetActorAttribute(principal, envelope)).toThrow("command unavailable");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -255,7 +263,7 @@ describe("set actor attribute command", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
     db.close();
-    const repository = factory();
+    const repository = corruptionFactory();
     expect(repository.executeSetActorAttribute("gm", envelope).revisionAfter).toBe(1);
     repository.close();
   });
@@ -366,7 +374,7 @@ describe("set actor attribute command", () => {
     db.prepare("DELETE FROM command_receipts").run();
     db.prepare("DELETE FROM campaign_events").run();
     db.close();
-    const retry = factory();
+    const retry = corruptionFactory();
     expect(() => retry.executeSetActorAttribute("local-owner", envelope)).toThrow("retry is incomplete");
     retry.close();
   });
@@ -382,7 +390,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const retry = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const retry = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => retry.executeSetActorAttribute("local-owner", envelope)).toThrow("retry is invalid");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -405,7 +413,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const retry = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const retry = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => retry.executeSetActorAttribute("gm", envelope)).toThrow(/retry is (?:incomplete|invalid)/);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -429,7 +437,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const retry = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const retry = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => retry.executeSetActorAttribute("gm", envelope)).toThrow();
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
@@ -459,7 +467,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "event-max");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     const boundary = { ...envelope, expectedRevision: lastExpected };
@@ -515,7 +523,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     expect(() => repository.executeSetActorAttribute("local-owner", envelope)).toThrow();
@@ -534,7 +542,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     expect(() => repository.executeSetActorAttribute("local-owner", envelope)).toThrow("target unavailable");
@@ -553,7 +561,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     expect(() => repository.executeSetActorAttribute("local-owner", envelope)).toThrow("target unavailable");
@@ -645,7 +653,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "event-one");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     expect(() => repository.executeSetActorAttribute("local-owner", envelope)).toThrow("rejected");
@@ -676,7 +684,7 @@ describe("set actor attribute command", () => {
     db.close();
     const nextId = vi.fn(() => "event-one");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now },
     });
     expect(() => repository.executeSetActorAttribute("local-owner", envelope)).toThrow("after rejected");

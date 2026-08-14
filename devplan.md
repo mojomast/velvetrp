@@ -1,9 +1,10 @@
 # Development Plan
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Current persistence is `v53r1`, populated `v46-v52 -> v53` startup upgrades are supported, and the checked trusted-local RPG inventory has 111 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with no startup upgrades, and the checked trusted-local RPG inventory has 111 counted operations plus feature discovery.
 
 ## Delivered
 
+- [✅] Add an explicit test-only repository seam for domain corruption fixtures while retaining strict production schema validation.
 - [x] M1.1-M1.10: core RPG persistence and deterministic mechanics.
 - [x] M2.1-M2.11: trusted-local RPG HTTP surfaces.
 - [x] M3.1-M3.8: RPG client workflows.
@@ -30,4 +31,4 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 
 ## Next
 
-Scope the closed declarative rules IR milestone with exact consumers, contract boundaries, migration impact, and exclusions before implementation.
+Scope the closed declarative rules IR milestone with exact consumers, contract boundaries, current-schema impact, and exclusions before implementation.

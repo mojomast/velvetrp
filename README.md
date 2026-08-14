@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v53 revision 1 (`v53r1`)**. Populated v46-v52 databases upgrading to v53 are supported; v45 and earlier are unsupported. The trusted-local RPG API has **111 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include companion transport, bounded consumables, provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, and explicit player-safe material publication. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); live exact-candidate generation/selection HTTP and client APIs remain absent.
+Development persistence uses one current schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`; startup never upgrades an older schema. The trusted-local RPG API has **111 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include companion transport, bounded consumables, provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, and explicit player-safe material publication. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); live exact-candidate generation/selection HTTP and client APIs remain absent.
 
 ## Security And Privacy
 
@@ -149,7 +149,7 @@ Fastify server
 Shared @velvet/contracts Zod schemas
   -> request, response, persistence-boundary validation
 Repository and deterministic command services
-  -> SQLite migrations, transactions, revisions, events, and receipts
+  -> SQLite current-schema initialization, transactions, revisions, events, and receipts
 Provider adapter
   -> OpenAI-compatible /chat/completions or local stub
 ```
@@ -157,7 +157,7 @@ Provider adapter
 The npm workspace is organized as:
 
 - `packages/contracts/`: shared runtime contracts and inferred TypeScript types
-- `server/`: Fastify composition, roleplay/RPG routes, context and provider services, repositories, and migrations
+- `server/`: Fastify composition, roleplay/RPG routes, context and provider services, repositories, and the current SQLite schema
 - `client/`: React application and typed API/SSE consumers
 - `e2e/`: deterministic and opt-in live Playwright workflows
 - `docs/`: API, architecture, roadmap, streaming, provider, and harness references
@@ -168,7 +168,7 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-For pre-release schema `v53r1`, populated v46-v52 databases are tested and supported forward-startup inputs. v45 and earlier startup paths are unsupported. Supported migration steps are transactional and preserve validated preexisting rows, but a multi-version startup can stop at an intermediate committed marker if a later step fails; retain the pre-upgrade backup and retry only after diagnosis. Automatic downgrade is unsupported. Recreate unsupported development databases or restore backups with compatible builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+A missing or empty database is initialized atomically from `server/src/repo/db/currentSchema.sql`. Every nonempty database must match that schema exactly and pass SQLite quick and foreign-key checks. Startup does not migrate, backfill, clean up, rewind, or import historical data. Stop the server and delete/recreate the local database after any schema change. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 
@@ -181,7 +181,7 @@ For pre-release schema `v53r1`, populated v46-v52 databases are tested and suppo
 
 ## Testing
 
-For local development, run the owning workspace typecheck and only the test file(s) affected by the change, for example `npm run test --workspace velvet-mvp-server -- test/repo.test.ts`. Run `npm test` for broad or cross-workspace changes, or before merging when CI is unavailable. CI is the normal full validation gate and runs all unit tests plus deterministic E2E. Run `npm run test:e2e` locally when behavior crosses browser, API, streaming, persistence, or migration boundaries. Run live E2E only when intentionally validating a configured provider. Test totals are intentionally omitted because they change frequently.
+For local development, run the owning workspace typecheck and only the test file(s) affected by the change, for example `npm run test --workspace velvet-mvp-server -- test/repo.test.ts`. Run `npm test` for broad or cross-workspace changes, or before merging when CI is unavailable. CI is the normal full validation gate and runs all unit tests plus deterministic E2E. Run `npm run test:e2e` locally when behavior crosses browser, API, streaming, or persistence boundaries. Run live E2E only when intentionally validating a configured provider. Test totals are intentionally omitted because they change frequently.
 
 ## Policy Status
 
@@ -194,7 +194,7 @@ The current policy layer is limited, not a comprehensive content-moderation syst
 | [Documentation index](docs/README.md) | Complete guide inventory and authority hierarchy |
 | [Roadmap](docs/ROADMAP.md) | Current dependency-ordered milestones and deferred scope |
 | [API reference](docs/api.md) | HTTP behavior, contracts, flags, and RPG operation inventory |
-| [Operations](docs/operations.md) | Setup, environment, storage, migration, backup, and release gates |
+| [Operations](docs/operations.md) | Setup, environment, disposable development storage, and release gates |
 | [Campaign generation](docs/campaign-generation.md) | Reviewed generation, selective application, planning, and material delivery |
 | [Gameplay agent instructions](docs/interactive-gameplay-agent-instructions.md) | Trusted-local API workflow and reconciliation guidance |
 | [RPG integration plan](docs/rpg-integration-plan.md) | Product and mechanics integration design |

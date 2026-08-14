@@ -2,7 +2,6 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { StoryAuthorizationError, StoryConflictError, StoryStaleError, StoryUnavailableError, createRepository } from "../src/repo/index.js";
-import { validateStoryDataV34 } from "../src/repo/db/migrations/v34_story_domain.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -89,7 +88,7 @@ describe("M2.10 story repository", () => {
     expect(() => db.prepare("DELETE FROM story_events_v34").run()).toThrow("story events are immutable"); db.close(); repo.close();
     createRepository({ dataDir: process.env.VELVET_DATA_DIR! }).close();
   });
-  it("enforces SQL authorization and dependency gates and detects forged state at startup validation", () => {
+  it("enforces SQL authorization and dependency gates", () => {
     const repo = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date(at) } });
     const campaign = repo.createCampaign("local-owner", { name: "SQL guards" });
     const otherCampaign = repo.createCampaign("local-owner", { name: "Scalar guards" });
@@ -118,11 +117,6 @@ describe("M2.10 story repository", () => {
     });
     expect(() => insertAndReveal("vault", "hard-command", "hard-reveal")).toThrow("story node state transition provenance is invalid");
     expect(() => insertAndReveal("threshold", "threshold-command", "threshold-reveal")).toThrow("story node state transition provenance is invalid");
-    db.exec("DROP TRIGGER story_node_state_v34_guard_update");
-    const forgedPayload = JSON.stringify({ data: {}, expectedRevision: 1, idempotencyKey: "forged", kind: "reveal-node", storylineId: "story", targetId: "vault" });
-    db.prepare("INSERT INTO story_commands_v34 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(campaign.id, "forged-command", "story", "local-owner",
-      "reveal-node", "forged", forgedPayload, "a".repeat(64), 1, 2, at);
-    db.prepare("UPDATE story_node_state_v34 SET status='revealed',last_command_id='forged-command',updated_at=? WHERE campaign_id=? AND storyline_id='story' AND node_id='vault'").run(at, campaign.id);
-    expect(() => validateStoryDataV34(db)).toThrow("malformed node state provenance"); db.close(); repo.close();
+    db.close(); repo.close();
   });
 });

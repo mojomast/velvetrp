@@ -7,7 +7,7 @@ import {
   createRepository,
 } from "../src/repo/index.js";
 import type { DetachCampaignSessionInput } from "../src/types.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -322,7 +322,7 @@ describe("factory campaign-session detachment", () => {
     db.exec(`CREATE TRIGGER reject_detachment BEFORE DELETE ON campaign_sessions
       BEGIN SELECT RAISE(ABORT, 'detachment rejected'); END;`);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(() => repository.detachCampaignSession("local-owner", {
       campaignId: "campaign-one", sessionId: "session/attached",

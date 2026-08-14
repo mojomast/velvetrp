@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -185,7 +185,7 @@ describe("listCampaignEvents dice projection", () => {
     }
     repository.close();
     corrupt("UPDATE campaign_commands SET dice_count=2 WHERE command_id='window-command-0'");
-    const guarded = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const guarded = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => guarded.listRecentCampaignDiceEvents("local-owner", "campaign", "timeline-old"))
       .toThrow("audit record is incomplete");
     expect(guarded.listRecentCampaignDiceEvents("outsider", "campaign", "timeline-old")).toEqual([]);
@@ -287,7 +287,7 @@ describe("listCampaignEvents dice projection", () => {
 
   it("denies a stale owner identity while retaining GM access and outsider masking", () => {
     seed(); execute(); corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
-    const repository=createRepository({dataDir:process.env.VELVET_DATA_DIR as string});
+    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
     expect(repository.listCampaignEvents("local-owner","campaign","timeline-old")).toEqual([]);
     expect(repository.listCampaignEvents("gm","campaign","timeline-old")).toHaveLength(1);
     expect(repository.listCampaignEvents("outsider","campaign","timeline-old")).toEqual([]);
@@ -304,7 +304,7 @@ describe("listCampaignEvents dice projection", () => {
       INSERT INTO rpg_dice_terms VALUES ('orphan-term',0,4,1)`],
   ])("isolates cross-campaign %s corruption", (_label,mutation) => {
     seed(); execute(); corrupt(mutation);
-    const repository=createRepository({dataDir:process.env.VELVET_DATA_DIR as string});
+    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
     expect(repository.listCampaignEvents("local-owner","campaign","timeline-old"))
       .toHaveLength(1);
     expect(() => repository.listCampaignEvents("local-owner","campaign-other","timeline-other"))
@@ -391,7 +391,7 @@ describe("listCampaignEvents dice projection", () => {
     seed();
     execute();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.listCampaignEvents("observer", "campaign", "timeline-old"))
       .toThrow("audit record is incomplete");
     expect(repository.listCampaignEvents("outsider", "campaign", "timeline-old")).toEqual([]);

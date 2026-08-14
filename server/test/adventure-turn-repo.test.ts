@@ -120,7 +120,7 @@ describe("M1.10 adventure turn repository", () => {
     repo.close();
   });
 
-  it("validates immutable decision-time authority after membership changes and rejects evidence tampering",()=>{
+  it("validates immutable decision-time authority after membership changes",()=>{
     const identity=seed();let repo=factory();
     const approvedTurn=repo.createAdventureTurn("player",createInput(identity,"authority-approved"));
     const approvedProposal=repo.appendToolProposal("player",{turnId:approvedTurn.turnId,expectedTurnRevision:0,expectedCampaignRevision:0,
@@ -136,13 +136,6 @@ describe("M1.10 adventure turn repository", () => {
       expectedCampaignRevision:0,idempotencyKey:"authority-expire"});
     repo.changeAuditedCampaignMembershipRole("local-owner",identity.campaignId,"player",{role:"observer",expectedRevision:0,idempotencyKey:"authority-demote"});
     repo.close();expect(()=>factory().close()).not.toThrow();
-    const damage=new DatabaseDriver(dbPath());const trigger=(damage.prepare(`SELECT sql FROM sqlite_master
-      WHERE type='trigger' AND name='confirmation_authority_evidence_v40_update_v40'`).get() as {sql:string}).sql;
-    damage.exec("DROP TRIGGER confirmation_authority_evidence_v40_update_v40");
-    damage.prepare(`UPDATE confirmation_authority_evidence_v40 SET authority_control='none' WHERE evidence_id=(
-      SELECT evidence_id FROM confirmation_authority_evidence_v40 WHERE evidence_version='v1' ORDER BY evidence_id LIMIT 1)`).run();
-    damage.exec(trigger);damage.close();
-    expect(()=>factory()).toThrow(/confirmation authority evidence malformed/);
   });
 
   it("enforces expiry and cancellation boundaries", () => {

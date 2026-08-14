@@ -54,6 +54,7 @@ import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import { createCharacterSync } from "./characterRepo.js";
 import { createLoreEntrySync } from "./loreRepo.js";
 import { openRepositoryDatabase, resolveDataDir } from "./db.js";
+import { openRepositoryDatabaseForCorruptionTests } from "./db/connection.js";
 import {
   createCampaignAdministrationRepository,
   type CampaignAdministrationRepository,
@@ -577,13 +578,14 @@ function runTransaction<T>(
 function createRepositoryComposition<T>(
   options: CreateRepositoryOptions,
   createPrivateExtension?: (db: DatabaseDriver.Database, assertOpen: () => void) => T,
+  openDatabase: (dir: string) => DatabaseDriver.Database = openRepositoryDatabase,
 ): { repository: Repository; privateExtension: T | undefined } {
   const dependencies: RepositoryDependencies = {
     clock: options.clock ?? systemRuntime.clock,
     ids: options.ids ?? systemRuntime.ids,
     rng: options.rng ?? systemRuntime.rng,
   };
-  const db = openRepositoryDatabase(path.resolve(options.dataDir ?? resolveDataDir()), dependencies);
+  const db = openDatabase(path.resolve(options.dataDir ?? resolveDataDir()));
   const campaignCommandWriteOperations = createCampaignCommandWriteOperations(db, dependencies);
   const campaignEventReadRepository = createCampaignEventReadRepository(db);
   const campaignCommandRepository = createCampaignCommandRepository({
@@ -1153,6 +1155,11 @@ function createRepositoryComposition<T>(
 
 export function createRepository(options: CreateRepositoryOptions = {}): Repository {
   return createRepositoryComposition(options).repository;
+}
+
+/** @internal Test fixture seam; skips only current-schema validation on the owned database. */
+export function createRepositoryForCorruptionTests(options: CreateRepositoryOptions = {}): Repository {
+  return createRepositoryComposition(options, undefined, openRepositoryDatabaseForCorruptionTests).repository;
 }
 
 /** @internal Testing-only fixture seam; the owned database is never exposed. */

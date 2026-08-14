@@ -1,20 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v53r1; original plan retained as history)
+## Current status (disposable schema; original plan retained as history)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v53 revision 1 (v53r1)**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary. Populated v46-v52 startup upgrades are supported; v45 and earlier are unsupported.
+- Current development persistence uses **one disposable schema with no startup upgrades**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
 - Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, exact travel, character rerolls, reviewed campaign expansion, starter/reward/placement settlement, and explicit material publication. Remaining integration and exclusions are statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage runs populated **v46-v52 databases through full startup to v53**. v45 and earlier migration code and archived tests do not constitute startup-upgrade support.
+- Historical migration notes below describe earlier checkpoints only. Current startup accepts only an exact current schema; schema changes require database recreation.
 - A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v53r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the disposable-schema status above.
 
 ## Original purpose (historical)
 
@@ -59,7 +59,6 @@ Primary Velvet integration points:
 - `server/src/routes/roleplay/interactions.ts`
 - `server/src/routes/roleplay/generationService.ts`
 - `server/src/routes/roleplay/generationRegistry.ts`
-- `server/src/legacy.ts`
 - `server/src/memory.ts`
 - `client/src/App.tsx`
 - `client/src/roleplay/CharacterLibraryPage.tsx`

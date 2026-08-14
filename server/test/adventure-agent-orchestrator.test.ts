@@ -19,7 +19,7 @@ import type { AddressInfo } from "node:net";
 import { completeWithProvider } from "../src/provider/index.js";
 import { deriveConfirmationPolicy } from "../src/agent/confirmationPolicy.js";
 import {narrationFallback} from "../src/routes/rpg/v1/adventureTurns.js";
-import {assertExactCandidateProviderBridgeLayoutV48} from "../src/repo/db/migrations/v48_exact_candidate_provider_bridge.js";
+import { assertExactCandidateProviderBinding } from "../src/repo/candidateRepo/providerBindingIntegrity.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
@@ -242,7 +242,7 @@ describe("bounded adventure orchestrator", () => {
       ["round_number",2],["execution_id","wrong-execution"],["world_command_id","wrong-command"],
       ["linked_at","2035-01-01T00:00:03.000Z"]] as const){
       categories.pragma("foreign_keys=OFF");categories.prepare(`UPDATE exact_candidate_provider_bindings_v48 SET ${column}=?`).run(value);
-      expect(()=>assertExactCandidateProviderBridgeLayoutV48(categories),column).toThrow();
+      expect(() => assertExactCandidateProviderBinding(categories, original.binding_id), column).toThrow();
       categories.prepare(`UPDATE exact_candidate_provider_bindings_v48 SET ${column}=?`).run(original[column]);categories.pragma("foreign_keys=ON");
     }
     categories.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");categories.close();
@@ -250,12 +250,18 @@ describe("bounded adventure orchestrator", () => {
     corrupt.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
     corrupt.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_digest=?").run("0".repeat(64));
     corrupt.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");corrupt.close();
-    expect(()=>createRepository()).toThrow("provider binding attestation is malformed");
+    const corrupted = createRepository();
+    expect(() => corrupted.getExactCandidateTravelPublicReceipt("local-owner", campaign.id, result.turn.receiptLinks[0]!.commandId))
+      .toThrow("exact-candidate provider binding is malformed");
+    corrupted.close();
     const mismatch=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));mismatch.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
     const changed='{"candidates":[],"version":"v1"}';mismatch.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_json=?,provider_projection_digest=?")
       .run(changed,createHash("sha256").update(changed).digest("hex"));
     mismatch.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");mismatch.close();
-    expect(()=>createRepository()).toThrow("provider binding attestation is malformed");
+    const mismatched = createRepository();
+    expect(() => mismatched.getExactCandidateTravelPublicReceipt("local-owner", campaign.id, result.turn.receiptLinks[0]!.commandId))
+      .toThrow("exact-candidate provider binding is malformed");
+    mismatched.close();
   });
   it("scopes receipt integrity verification to the selected v48 binding",async()=>{
     const campaign=seed(),repository=createRepository({clock:{now:()=>new Date(at)}});
@@ -272,13 +278,13 @@ describe("bounded adventure orchestrator", () => {
     corrupt.prepare("UPDATE exact_candidate_provider_bindings_v48 SET provider_projection_digest=? WHERE world_command_id=?").run("0".repeat(64),second.commandId);corrupt.close();
     expect(repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,first.commandId)).toEqual({destination:"Silver Harbor",revisionBefore:0,revisionAfter:1,occurredAt:at});
     expect(repository.getExactCandidateTravelNarrationReceipt("local-owner",first.turnId,first.commandId)).toEqual({destination:"Silver Harbor"});
-    expect(()=>repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,second.commandId)).toThrow(/provider binding attestation/);
-    expect(()=>repository.getExactCandidateTravelNarrationReceipt("local-owner",second.turnId,second.commandId)).toThrow(/provider binding attestation/);
+    expect(()=>repository.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,second.commandId)).toThrow(/exact-candidate provider binding/);
+    expect(()=>repository.getExactCandidateTravelNarrationReceipt("local-owner",second.turnId,second.commandId)).toThrow(/exact-candidate provider binding/);
     const inspect=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true}),bindingStatement=inspect.prepare(
       "SELECT provider_call_id,provider_tool_call_id,round_number,selection_json FROM exact_candidate_provider_bindings_v48 WHERE world_command_id=?");
     const firstBinding=bindingStatement.get(first.commandId) as any,secondBinding=bindingStatement.get(second.commandId) as any;inspect.close();
     expect(()=>repository.bindExactCandidateProviderExecution("local-owner",{turnId:second.turnId,providerCallId:secondBinding.provider_call_id,
-      providerToolCallId:secondBinding.provider_tool_call_id,round:secondBinding.round_number,selection:JSON.parse(secondBinding.selection_json)})).toThrow(/provider binding attestation/);
+      providerToolCallId:secondBinding.provider_tool_call_id,round:secondBinding.round_number,selection:JSON.parse(secondBinding.selection_json)})).toThrow(/exact-candidate provider binding/);
     expect(repository.bindExactCandidateProviderExecution("local-owner",{turnId:first.turnId,providerCallId:firstBinding.provider_call_id,
       providerToolCallId:firstBinding.provider_tool_call_id,round:firstBinding.round_number,selection:JSON.parse(firstBinding.selection_json)}).actorTravelResult.receipt.commandId).toBe(first.commandId);
     repository.close();
@@ -333,7 +339,8 @@ describe("bounded adventure orchestrator", () => {
       expectedCampaignRevision:0,idempotencyKey:"coordinated-tamper"});const deps=dependencies([]);deps.now=()=>new Date(at);
     deps.complete=async(input)=>{const tool=input.tools?.find((item)=>item.name==="exact_actor_travel.select") as any;
       return completion([{id:"tamper-choice",name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId:tool.parameters.properties.candidateId.enum[0],kind:"actor.travel",version:"v1",choices:[]})}]);};
-    await orchestrateAdventureTurn(repository,turn.turnId,deps);repository.close();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    const committed=await orchestrateAdventureTurn(repository,turn.turnId,deps),commandId=committed.turn.receiptLinks[0]!.commandId;
+    repository.close();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
     const triggerNames=["exact_candidates_v46_immutable_update_v46","exact_candidate_batches_v46_immutable_update_v46",
       "exact_candidate_provider_bindings_v48_immutable_update_v48","agent_provider_contexts_v39_update_v39"];
     const triggerSql=triggerNames.map((name)=>(db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?").get(name) as {sql:string}).sql);
@@ -353,7 +360,9 @@ describe("bounded adventure orchestrator", () => {
     tool.parameters.properties.candidateId.enum=projection.candidates.map((value:any)=>value.candidateId);const requestJson=canonicalAgentJson(request);
     db.prepare("UPDATE agent_provider_contexts_v39 SET request_json=?,request_digest=? WHERE context_id=?").run(requestJson,crypto.sha256(requestJson),context.context_id);
     for(const sql of triggerSql)db.exec(sql);db.close();
-    expect(()=>createRepository()).toThrow(/candidate|provider (binding|projection)/);
+    const corrupted=createRepository();
+    expect(()=>corrupted.getExactCandidateTravelPublicReceipt("local-owner",campaign.id,commandId)).toThrow(/candidate|provider (binding|projection)/);
+    corrupted.close();
   });
   it("scopes identical provider call IDs across turns and campaigns",()=>{
     const first=seed();let repository=createRepository({clock:{now:()=>new Date(at)}});

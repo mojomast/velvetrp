@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -154,7 +154,7 @@ describe("campaign session attachment queries", () => {
   ])("denies invalid campaign-owner authority: %s", (_label, mutation) => {
     seed();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignSessionAttachments(ownerA, campaignA)).toEqual([]);
     expect(repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession)).toBeNull();
     repository.close();
@@ -167,7 +167,7 @@ describe("campaign session attachment queries", () => {
   ])("fails loudly for an authorized selected %s but masks outsiders", (_label, mutation) => {
     seed();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA))
       .toThrow("campaign session attachment is malformed");
     expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession))
@@ -182,7 +182,7 @@ describe("campaign session attachment queries", () => {
     seed();
     corrupt(`UPDATE campaign_memberships SET created_at = 'invalid-owner-time'
       WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.listCampaignSessionAttachments(ownerA, campaignA))
       .toThrow("campaign session attachment is malformed");
     expect(() => repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession))
@@ -195,7 +195,7 @@ describe("campaign session attachment queries", () => {
     seed();
     corrupt(`UPDATE campaign_sessions SET attached_at = 'invalid'
       WHERE session_id = '${otherSession}'`);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignSessionAttachments(ownerA, campaignA)).toHaveLength(3);
     expect(repository.getCampaignSessionAttachment(ownerA, campaignA, firstSession)?.sessionId).toBe(firstSession);
     expect(() => repository.listCampaignSessionAttachments(ownerB, campaignB))

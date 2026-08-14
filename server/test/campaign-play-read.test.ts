@@ -3,7 +3,7 @@ import path from "node:path";
 import { ORIGINAL_STARTER_BACKGROUND, ORIGINAL_STARTER_CLASS, ORIGINAL_STARTER_RACE } from "@velvet/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
@@ -115,7 +115,7 @@ describe("campaign play bootstrap repository", () => {
   ])("fails loudly for authorized %s corruption", (_label, mutation) => {
     const seeded = seed();
     corrupt(mutation);
-    const repo = createRepository();
+    const repo = createCorruptionTestRepository();
     expect(() => repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId))
       .toThrow("campaign play bootstrap is malformed");
     expect(repo.getCampaignPlayBootstrap("missing", seeded.campaignId, seeded.sessionId)).toBeNull();

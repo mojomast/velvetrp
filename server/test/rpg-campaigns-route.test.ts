@@ -10,7 +10,7 @@ import {
   CampaignRenameUnavailableError,
   createRepository,
 } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 process.env.NODE_ENV = "test";
 useTmpDataDir();
@@ -930,7 +930,7 @@ describe("POST /api/rpg/v1/campaigns", () => {
       db.close();
       const nextId = vi.fn(() => "unused");
       const clockNow = vi.fn(() => new Date("2030-01-01T00:00:00.000Z"));
-      const repository = createRepository({ dataDir, ids: { nextId }, clock: { now: clockNow } });
+      const repository = createCorruptionTestRepository({ dataDir, ids: { nextId }, clock: { now: clockNow } });
       const app = buildApp({ campaignRepositoryFactory: () => repository });
 
       const response = await app.inject({

@@ -26,8 +26,16 @@ function dbPath(): string {
   return path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite");
 }
 
-function markCorruptFixtureAsV46(db: DatabaseDriver.Database): void {
-  db.prepare("UPDATE meta SET value = '46' WHERE key = 'schemaVersion'").run();
+function withoutTriggers(db: DatabaseDriver.Database, names: string[], action: () => void): void {
+  const rows = db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
+    .all(...names) as Array<{ name: string; sql: string }>;
+  if (rows.length !== names.length) throw new Error("corruption fixture triggers are incomplete");
+  try {
+    for (const { name } of rows) db.exec(`DROP TRIGGER ${name}`);
+    action();
+  } finally {
+    for (const { sql } of rows) db.exec(sql);
+  }
 }
 
 function seed(): void {
@@ -170,6 +178,7 @@ describe("initialize actor resource command", () => {
 
   it("writes command, resource, timeline, event, and receipt in order", () => {
     seed();
+    const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec(`
       CREATE TABLE resource_write_order (position INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);
@@ -180,7 +189,6 @@ describe("initialize actor resource command", () => {
       CREATE TRIGGER order_receipt AFTER INSERT ON command_receipts BEGIN INSERT INTO resource_write_order(name) VALUES ('receipt'); END;
     `);
     db.close();
-    const repository = factory();
     repository.executeInitializeActorResource("local-owner", envelope);
     repository.close();
     const verify = new DatabaseDriver(dbPath(), { readonly: true });
@@ -216,12 +224,11 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
-    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
+      .toThrow(`foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -231,9 +238,8 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
-    markCorruptFixtureAsV46(db);
     db.close();
-    expect(() => factory()).toThrow("schema marker 46 contains foreign-key violation in campaigns");
+    expect(() => factory()).toThrow("foreign-key violation in campaigns");
   });
 
   it("returns an exact historical retry before inactive and existing-resource checks", () => {
@@ -334,12 +340,11 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("INSERT INTO rpg_actor_resources VALUES ('campaign-two', 'actor-one', 'hp', 1, 2)").run();
-    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow("schema marker 46 contains foreign-key violation in rpg_actor_resources");
+      .toThrow("foreign-key violation in rpg_actor_resources");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -372,15 +377,15 @@ describe("initialize actor resource command", () => {
   });
 
   it.each([
-    ["missing audit", "DROP TRIGGER command_receipts_prevent_delete; DROP TRIGGER campaign_events_prevent_delete; DELETE FROM command_receipts; DELETE FROM campaign_events;", "incomplete"],
-    ["changed event payload", "DROP TRIGGER campaign_events_prevent_update; UPDATE campaign_events SET resource_current = 6;", "invalid"],
-  ])("rejects malformed retry: %s", (_label, mutation, message) => {
+    ["missing audit", ["command_receipts_prevent_delete", "campaign_events_prevent_delete"], "DELETE FROM command_receipts; DELETE FROM campaign_events;", "incomplete"],
+    ["changed event payload", ["campaign_events_prevent_update"], "UPDATE campaign_events SET resource_current = 6;", "invalid"],
+  ])("rejects malformed retry: %s", (_label, triggers, mutation, message) => {
     seed();
     const first = factory();
     first.executeInitializeActorResource("local-owner", envelope);
     first.close();
     const db = new DatabaseDriver(dbPath());
-    db.exec(mutation);
+    withoutTriggers(db, triggers, () => db.exec(mutation));
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
@@ -401,12 +406,11 @@ describe("initialize actor resource command", () => {
     first.close();
     const db = new DatabaseDriver(dbPath());
     db.exec(mutation);
-    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
+      .toThrow(`foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -417,13 +421,13 @@ describe("initialize actor resource command", () => {
     first.executeInitializeActorResource("local-owner", envelope);
     first.close();
     const db = new DatabaseDriver(dbPath());
-    db.exec("DROP TRIGGER campaign_timelines_advance_revision");
-    db.pragma("ignore_check_constraints = ON");
-    db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-one'").run(revision);
+    withoutTriggers(db, ["campaign_timelines_advance_revision"], () => {
+      db.pragma("ignore_check_constraints = ON");
+      db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-one'").run(revision);
+      db.pragma("ignore_check_constraints = OFF");
+    });
     db.close();
-    const retry = factory();
-    expect(() => retry.executeInitializeActorResource("gm", envelope)).toThrow();
-    retry.close();
+    expect(() => factory()).toThrow("SQLite quick_check failed");
   });
 
   it.each([
@@ -434,9 +438,8 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
-    markCorruptFixtureAsV46(db);
     db.close();
-    expect(() => factory()).toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
+    expect(() => factory()).toThrow(`foreign-key violation in ${table}`);
   });
 
   it("consumes one valid event ID before exactly one clock reading", () => {
@@ -472,12 +475,12 @@ describe("initialize actor resource command", () => {
 
   it("accepts the final safe revision and rejects expected-revision overflow", () => {
     seed();
+    const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec("DROP TRIGGER campaign_timelines_advance_revision");
     db.prepare("UPDATE campaign_timelines SET revision = ? WHERE id = 'timeline-one'")
       .run(Number.MAX_SAFE_INTEGER - 1);
     db.close();
-    const repository = factory();
     expect(repository.executeInitializeActorResource("local-owner", {
       ...envelope, expectedRevision: Number.MAX_SAFE_INTEGER - 1,
     }).revisionAfter).toBe(Number.MAX_SAFE_INTEGER);
@@ -496,10 +499,10 @@ describe("initialize actor resource command", () => {
   ])("rolls back all state when %s fails", (table, timing) => {
     seed();
     const before = snapshot();
+    const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER reject_write ${timing} ON ${table} BEGIN SELECT RAISE(ABORT, 'rejected'); END`);
     db.close();
-    const repository = factory();
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("rejected");
     expect(snapshot()).toEqual(before);
     repository.close();
@@ -514,10 +517,10 @@ describe("initialize actor resource command", () => {
   ])("rolls back full state when an %s trigger fails", (table, timing) => {
     seed();
     const before = snapshot();
+    const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER reject_after ${timing} ON ${table} BEGIN SELECT RAISE(ABORT, 'after rejected'); END`);
     db.close();
-    const repository = factory();
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("after rejected");
     expect(snapshot()).toEqual(before);
     repository.close();
@@ -526,10 +529,10 @@ describe("initialize actor resource command", () => {
   it("rolls back command and resource when the conditional timeline write loses", () => {
     seed();
     const before = snapshot();
+    const repository = factory();
     const db = new DatabaseDriver(dbPath());
     db.exec("CREATE TRIGGER ignore_timeline BEFORE UPDATE ON campaign_timelines BEGIN SELECT RAISE(IGNORE); END");
     db.close();
-    const repository = factory();
     expect(() => repository.executeInitializeActorResource("local-owner", envelope)).toThrow("revision changed");
     expect(snapshot()).toEqual(before);
     repository.close();

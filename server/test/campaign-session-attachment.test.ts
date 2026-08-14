@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { CampaignSessionAttachmentConflictError, createRepository } from "../src/repo/index.js";
 import type { AttachCampaignSessionInput } from "../src/types.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -161,7 +161,7 @@ describe("factory campaign-session attachment", () => {
     seed();
     corrupt(mutation);
     const clockNow = vi.fn(() => new Date());
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
     expect(() => repository.attachCampaignSession("local-owner", {
       campaignId: "campaign-one", sessionId: "session/legacy value",
     })).toThrow("campaign room session graph is malformed");
@@ -188,7 +188,7 @@ describe("factory campaign-session attachment", () => {
     } else if (mutation) corrupt(mutation);
     const clockNow = vi.fn(() => new Date());
     const nextId = vi.fn(() => "unused");
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow }, ids: { nextId } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow }, ids: { nextId } });
     let thrown: unknown;
     try {
       repository.attachCampaignSession("local-owner", {
@@ -210,7 +210,7 @@ describe("factory campaign-session attachment", () => {
     initial.attachCampaignSession("local-owner", { campaignId: "campaign-one", sessionId: "session/legacy value" });
     initial.close();
     corrupt("DELETE FROM sessions WHERE id = 'session/legacy value'");
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: vi.fn() } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: vi.fn() } });
     expect(() => repository.attachCampaignSession("local-owner", {
       campaignId: "campaign-one", sessionId: "session/legacy value",
     })).toThrow("campaign session attachment has no session parent");
@@ -326,7 +326,7 @@ describe("factory campaign-session attachment", () => {
       BEGIN SELECT RAISE(ABORT, 'attachment rejected'); END;`);
     db.close();
     const clockNow = vi.fn(() => new Date(fixedAt));
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
     expect(() => repository.attachCampaignSession("local-owner", {
       campaignId: "campaign-one", sessionId: "session/legacy value",

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { ConfigureCampaignContentInput } from "../src/types.js";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -250,7 +250,7 @@ describe("factory campaign content configuration", () => {
       db.prepare("UPDATE rpg_content_packs SET tags = 'not-json' WHERE pack_id = 'pack-core' AND pack_version = '1.0.0'").run();
     }
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow();
     repository.close();
     expect(snapshot().profiles).toHaveLength(stage === "retry" ? 1 : 0);
@@ -263,7 +263,7 @@ describe("factory campaign content configuration", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = ? AND principal_id = ?").run(campaignId, ownerId);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow("malformed campaign ownership");
     repository.close();
   });
@@ -278,7 +278,7 @@ describe("factory campaign content configuration", () => {
     const db = new DatabaseDriver(dbPath());
     db.exec(trigger);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.configureCampaignContent(ownerId, campaignId, input)).toThrow(`${stage} insertion failed`);
     repository.close();
     expect(snapshot().profiles).toEqual([]);

@@ -1,5 +1,4 @@
 import DatabaseDriver from "better-sqlite3";
-import { createHash } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -7,7 +6,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   CHARACTER_BUILDER_STANDARD_ARRAY,
   adventureTurnStreamEventSchema,
-  canonicalAgentJson,
   type CharacterBuilderAttributeScores,
 } from "@velvet/contracts";
 import { buildApp } from "../src/app.js";
@@ -18,9 +16,8 @@ import {
   createRepository,
   type Repository,
 } from "../src/repo/index.js";
-import { CONFIRMATION_POLICY_V40_MANAGED_OBJECTS, restorePreV40CoordinationGuards } from "../src/repo/db/migrations/v40_confirmation_policy.js";
 import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
-import { removeFutureCampaignContentGenerationSchema, useTmpDataDir } from "./helpers.js";
+import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -320,127 +317,5 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     db.close();
     expect(fixture.provider.requests).toHaveLength(1);
     await restarted.close();
-  });
-});
-
-function removeV40ToGenuineV39(): void {
-  const db = new DatabaseDriver(dbFile());
-  db.pragma("foreign_keys=OFF");
-  removeFutureCampaignContentGenerationSchema(db);
-  for (const [type, name] of [...CONFIRMATION_POLICY_V40_MANAGED_OBJECTS].reverse()) {
-    db.exec(`DROP ${type === "trigger" ? "TRIGGER" : "TABLE"} IF EXISTS "${name}"`);
-  }
-  restorePreV40CoordinationGuards(db);
-  db.prepare("UPDATE meta SET value='39' WHERE key='schemaVersion'").run();
-  db.close();
-}
-
-async function populatedV39Fixture() {
-  const seeded = await seedCampaign();
-  const db = new DatabaseDriver(dbFile());
-  db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('legacy-controller','Legacy controller',0)").run();
-  db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,'legacy-controller','player',?)")
-    .run(seeded.campaign.id, AT);
-  db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='legacy-controller' WHERE campaign_id=? AND actor_id=?")
-    .run(seeded.campaign.id, seeded.actorId);
-  db.close();
-  const repo = createRepository({ clock: { now: () => new Date(AT) } });
-  const result: Record<string, { turnId: string; proposalId: string }> = {};
-  for (const state of ["pending", "approved", "rejected"] as const) {
-    const turn = repo.createAdventureTurn(OWNER, { campaignId: seeded.campaign.id, timelineId: seeded.campaign.activeTimelineId,
-      sessionId: seeded.sessionId, actorId: seeded.actorId, declaration: `Legacy ${state}`, expectedCampaignRevision: 1,
-      idempotencyKey: `legacy-turn-${state}` });
-    const proposed = repo.appendToolProposal(OWNER, { turnId: turn.turnId, toolName: "roll-check", arguments: { expression: "1d20",
-      expectedTimelineRevision: 0 }, requiresConfirmation: true, confirmationExpiresAt: EXPIRES,
-      expectedTurnRevision: 0, expectedCampaignRevision: 1, idempotencyKey: `legacy-proposal-${state}` });
-    const waiting = repo.waitForToolConfirmation(OWNER, { turnId: turn.turnId, expectedTurnRevision: 1,
-      expectedCampaignRevision: 1, idempotencyKey: `legacy-wait-${state}` });
-    const proposalId = proposed.toolCalls[0]!.proposal.proposalId;
-    if (state !== "pending") repo.decideToolProposals("legacy-controller", { turnId: turn.turnId, proposalIds: [proposalId],
-      decision: state, expectedTurnRevision: waiting.revision, expectedCampaignRevision: 1, idempotencyKey: `legacy-decision-${state}` });
-    result[state] = { turnId: turn.turnId, proposalId };
-  }
-  repo.close();
-  removeV40ToGenuineV39();
-  return { ...seeded, result };
-}
-
-// Archived: the pre-release supported/tested window is v40/v41 -> v42.
-describe.skip("genuine populated v39 to v40 acceptance", () => {
-  it("backfills exact legacy policy and evidence, refuses legacy execution, and stays stable after authority changes", async () => {
-    const fixture = await populatedV39Fixture();
-    let repo = createRepository({ clock: { now: () => new Date(AT) } });
-    const db = new DatabaseDriver(dbFile(), { readonly: true });
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({ value: "42" });
-    const policies = db.prepare(`SELECT proposal_id,policy_version,category,requires_confirmation,required_authorizer,
-      safe_summary_json,proposed_command_digest,observed_domain_revisions_json,attested_at
-      FROM confirmation_policy_attestations_v40 ORDER BY proposal_id`).all() as any[];
-    expect(policies).toHaveLength(3);
-    for (const policy of policies) {
-      expect(policy).toMatchObject({ policy_version: "legacy-v40-backfill-v1", category: "ambiguous-consequential-change",
-        requires_confirmation: 1, required_authorizer: "controller", attested_at: AT });
-      expect(JSON.parse(policy.safe_summary_json)).toEqual({ consequences: [{ kind: "attribute-change",
-        text: "A character value will change" }], summary: "Apply a consequential character change." });
-      expect(JSON.parse(policy.observed_domain_revisions_json)).toEqual([
-        { domain: "campaign", revision: 1 }, { domain: "turn", revision: 0 }, { domain: "timeline", revision: 0 },
-      ]);
-      const proposal = db.prepare("SELECT tool_name,arguments_json FROM tool_proposals WHERE proposal_id=?").get(policy.proposal_id) as any;
-      expect(policy.proposed_command_digest).toBe(createHash("sha256").update(canonicalAgentJson({ toolName: proposal.tool_name,
-        arguments: JSON.parse(proposal.arguments_json) } as never)).digest("hex"));
-    }
-    const evidence = db.prepare("SELECT * FROM confirmation_authority_evidence_v40 ORDER BY proposal_id").all() as any[];
-    expect(evidence).toHaveLength(2);
-    for (const item of evidence) {
-      expect(item).toMatchObject({ evidence_version: "legacy-v40-backfill-v1", authority_role: null, authority_control: null,
-        principal_id: "legacy-controller", required_authorizer: "controller", attested_at: AT });
-      const exact = { evidenceVersion: "legacy-v40-backfill-v1", authorityProven: false, decisionId: item.decision_id,
-        campaignId: fixture.campaign.id, turnId: item.turn_id, proposalId: item.proposal_id, principalId: "legacy-controller",
-        decision: item.decision, actorId: fixture.actorId, requiredAuthorizer: "controller", policyDigest: item.policy_digest, attestedAt: AT };
-      expect(item.evidence_json).toBe(canonicalAgentJson(exact as never));
-      expect(item.evidence_digest).toBe(createHash("sha256").update(item.evidence_json).digest("hex"));
-    }
-    expect(repo.getAdventureTurn(OWNER, fixture.result.pending!.turnId)).toMatchObject({ state: "awaiting-confirmation" });
-    expect(repo.getAdventureTurn(OWNER, fixture.result.approved!.turnId)).toMatchObject({ state: "confirmed" });
-    expect(repo.getAdventureTurn(OWNER, fixture.result.rejected!.turnId)).toMatchObject({ state: "cancelled" });
-    db.close();
-    const execution = repo.executeApprovedAgentProposalAtomically(OWNER, fixture.result.approved!.turnId,
-      fixture.result.approved!.proposalId);
-    expect(execution).toMatchObject({ status: "replan", reason: "policy-stale" });
-    repo.close();
-    const changed = new DatabaseDriver(dbFile());
-    changed.prepare("UPDATE campaign_memberships SET role='observer' WHERE campaign_id=? AND principal_id='legacy-controller'")
-      .run(fixture.campaign.id);
-    changed.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE campaign_id=? AND actor_id=?")
-      .run(OWNER, fixture.campaign.id, fixture.actorId);
-    expect(changed.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(fixture.result.approved!.turnId))
-      .toEqual({ count: 0 });
-    changed.close();
-    repo = createRepository({ clock: { now: () => new Date(AT) } });
-    expect(repo.getAdventureTurn(OWNER, fixture.result.approved!.turnId)).toMatchObject({ state: "declared" });
-    repo.close();
-  });
-
-  it.each(["policy", "evidence"] as const)("rejects startup after migrated legacy %s tampering", async (kind) => {
-    await populatedV39Fixture();
-    createRepository({ clock: { now: () => new Date(AT) } }).close();
-    const db = new DatabaseDriver(dbFile());
-    if (kind === "policy") {
-      const trigger = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='confirmation_policy_attestations_v40_update_v40'")
-        .get() as { sql: string }).sql;
-      db.exec("DROP TRIGGER confirmation_policy_attestations_v40_update_v40");
-      db.prepare("UPDATE confirmation_policy_attestations_v40 SET proposed_command_digest=? WHERE proposal_id=(SELECT proposal_id FROM confirmation_policy_attestations_v40 ORDER BY proposal_id LIMIT 1)")
-        .run("0".repeat(64));
-      db.exec(trigger);
-    } else {
-      const trigger = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='confirmation_authority_evidence_v40_update_v40'")
-        .get() as { sql: string }).sql;
-      db.exec("DROP TRIGGER confirmation_authority_evidence_v40_update_v40");
-      db.prepare("UPDATE confirmation_authority_evidence_v40 SET evidence_digest=? WHERE evidence_id=(SELECT evidence_id FROM confirmation_authority_evidence_v40 ORDER BY evidence_id LIMIT 1)")
-        .run("0".repeat(64));
-      db.exec(trigger);
-    }
-    db.close();
-    expect(() => createRepository({ clock: { now: () => new Date(AT) } })).toThrow(kind === "policy"
-      ? /proposal policy malformed/ : /confirmation authority evidence malformed/);
   });
 });

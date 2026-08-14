@@ -20,7 +20,7 @@ import {
   CampaignContentConfigurationAuthorizationError,
   CampaignContentConfigurationConflictError,
 } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, makeTmpDataDir, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 process.env.NODE_ENV = "test";
@@ -395,7 +395,7 @@ describe("original starter setup repository integration", () => {
       definitions: db.prepare("SELECT * FROM rpg_definitions ORDER BY pack_id, pack_version, kind, definition_id").all(),
     });
     db.close();
-    const reopened = createRepository({ dataDir: dir });
+    const reopened = createCorruptionTestRepository({ dataDir: dir });
     expect(reopened.inspectOriginalStarterSetup("local-owner", campaign.id)).toEqual({ status: "conflict" });
     expect(() => createOriginalStarterSetupService(reopened).setup(campaign.id))
       .toThrow(OriginalStarterSetupConflictError);
@@ -425,7 +425,7 @@ describe("original starter setup repository integration", () => {
       .run(ORIGINAL_STARTER_PACK_ID, ORIGINAL_STARTER_PACK_VERSION);
     db.close();
 
-    const reopened = createRepository({ dataDir: dir });
+    const reopened = createCorruptionTestRepository({ dataDir: dir });
     expect(reopened.inspectOriginalStarterSetup("local-owner", campaign.id)).toEqual({ status: "conflict" });
     expect(() => createOriginalStarterSetupService(reopened).setup(campaign.id))
       .toThrow(OriginalStarterSetupConflictError);
@@ -508,7 +508,7 @@ describe("original starter setup repository integration", () => {
       db.close();
 
       process.env.FEATURE_RPG_CAMPAIGN = "true";
-      const app = buildApp({ campaignRepositoryFactory: () => createRepository({ dataDir: dir }) });
+      const app = buildApp({ campaignRepositoryFactory: () => createCorruptionTestRepository({ dataDir: dir }) });
       const response = await app.inject({
         method: "PUT",
         url: `/api/rpg/v1/campaigns/${campaign.id}/starter-setup`,
@@ -554,7 +554,7 @@ describe("original starter setup repository integration", () => {
     db.prepare("UPDATE campaigns SET name = '' WHERE id = ?").run(campaign.id);
     db.close();
 
-    const reopened = createRepository({ dataDir: dir });
+    const reopened = createCorruptionTestRepository({ dataDir: dir });
     expect(() => reopened.inspectOriginalStarterSetup("local-owner", campaign.id)).toThrow();
     reopened.close();
   });

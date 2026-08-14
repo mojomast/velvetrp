@@ -17,11 +17,11 @@ npm run typecheck --workspace velvet-mvp-server
 npm run test --workspace velvet-mvp-server -- test/repo.test.ts
 ```
 
-Use the owning workspace typecheck and the affected test file(s) for focused changes. Add related tests when changing a shared contract, route, repository boundary, or migration. Run `npm test` only for broad or cross-workspace changes, before merging when CI is unavailable, or after focused validation finds a regression.
+Use the owning workspace typecheck and the affected test file(s) for focused changes. Add related tests when changing a shared contract, route, repository boundary, or current schema. Run `npm test` only for broad or cross-workspace changes, before merging when CI is unavailable, or after focused validation finds a regression.
 
-Use `npm run health` as the final/release gate: typecheck -> build -> `npm test` -> deterministic E2E, exactly once each and fail-fast. Migration-support tests are already discovered by `npm test`; do not add a duplicate focused migration phase. See the [canonical unique `/dev/shm` invocation and prerequisites](docs/operations.md#release-health-gate).
+Use `npm run health` as the final/release gate: typecheck -> build -> `npm test` -> deterministic E2E, exactly once each and fail-fast. See the [canonical unique `/dev/shm` invocation and prerequisites](docs/operations.md#release-health-gate).
 
-Run `npm run test:e2e` for behavior spanning the browser, API, streaming, persistence, or migration boundaries. This suite is deterministic, uses disposable services/data, and makes no paid provider calls.
+Run `npm run test:e2e` for behavior spanning the browser, API, streaming, or persistence boundaries. This suite is deterministic, uses disposable services/data, and makes no paid provider calls.
 
 Live E2E is a different opt-in check:
 
@@ -33,8 +33,8 @@ It uses a temporary backup with the configured provider and may incur cost. Do n
 
 ## Contracts, Routes, And Persistence
 
-- Prefer additive shared contracts and migrations. Do not silently weaken strict schemas or overwrite historical data.
-- Keep migration ordering, current schema constants, fresh-database creation, sequential upgrades, and layout/integrity validation aligned.
+- Prefer additive shared contracts. Do not silently weaken strict schemas or overwrite historical data.
+- Keep `currentSchema.sql`, fresh-database creation, exact-schema checks, and repository queries aligned. Development databases are disposable after schema changes.
 - Route changes require matching contracts, feature-dependency checks, safe problem responses, authorization/projection tests, client handling where applicable, and updates to `docs/api.md`.
 - Retry-sensitive mutations must preserve revisions, idempotency, atomic writes, immutable events/receipts, and authoritative reconciliation after ambiguous delivery.
 - Never add arbitrary filesystem paths, SQL, network access, permission changes, or hidden-state exposure to RPG/provider tool surfaces.

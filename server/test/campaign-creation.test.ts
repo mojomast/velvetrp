@@ -7,7 +7,7 @@ import {
   createRepository,
 } from "../src/repo/index.js";
 import type { CreateCampaignInput } from "../src/types.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -150,7 +150,7 @@ describe("factory campaign creation", () => {
       db.close();
       const nextId = vi.fn(() => "unused");
       const clockNow = vi.fn(() => new Date(fixedAt));
-      const repository = createRepository({
+      const repository = createCorruptionTestRepository({
         dataDir: dataDir(),
         ids: { nextId },
         clock: { now: clockNow },
@@ -267,7 +267,7 @@ describe("factory campaign creation", () => {
       BEGIN SELECT RAISE(ABORT, 'membership rejected'); END;`);
     db.close();
     const ids = ["campaign-rolled-back", "timeline-rolled-back"];
-    const repository = createRepository({
+    const repository = createCorruptionTestRepository({
       dataDir: dataDir(),
       ids: { nextId: () => ids.shift()! },
       clock: { now: () => new Date(fixedAt) },

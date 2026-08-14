@@ -7,7 +7,7 @@ import { ActorResourceConflictError, ActorResourceStaleError, EncounterConflictE
 import { buildCombatCompositionPlan, type CombatantStateChange } from "../src/repo/encounter/combatCompositionPlan.js";
 import { executeCombatCompositionPlan, type CombatCompositionBoundary } from "../src/repo/encounter/combatCompositionExecutor.js";
 import { executeUseConsumable, type UseConsumableBoundary } from "../src/repo/encounter/useConsumableRuntime.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
@@ -276,7 +276,7 @@ describe("M5.3 Slice 0 combat composition", () => {
       CREATE TRIGGER combat_receipts_v27_immutable_delete BEFORE DELETE ON combat_receipts_v27 BEGIN SELECT RAISE(ABORT,'combat receipts are immutable'); END;
       CREATE TRIGGER combat_mutation_revisions_v27_retain BEFORE DELETE ON combat_mutation_revisions_v27 BEGIN SELECT RAISE(ABORT,'combat mutation revisions are retained'); END;`);
     db.close();repo.close();
-    const reopened=createRepository({dataDir:process.env.VELVET_DATA_DIR!});
+    const reopened=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR!});
     expect(reopened.getCombatState("local-owner",combat.combatId)?.revision).toBe(result.receipt.revisionAfter);
     const verifyDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
     const commandId=(verifyDb.prepare("SELECT command_id FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?")
@@ -299,7 +299,7 @@ describe("M5.3 Slice 0 combat composition", () => {
       expect(consumableRollbackState(db, f.campaignId, f.actorId, f.combat.combatId)).toEqual(before);
       db.close();
 
-      const reopened = createRepository({ dataDir: path.dirname(f.filename) });
+      const reopened = createCorruptionTestRepository({ dataDir: path.dirname(f.filename) });
       expect({ combat: reopened.getCombatState("local-owner", f.combat.combatId),
         effects: reopened.listActiveEffects("local-owner", f.campaignId, f.actorId),
         resources: reopened.getActorResourceSnapshot("local-owner", f.campaignId, f.actorId) }).toEqual(f.publicState);

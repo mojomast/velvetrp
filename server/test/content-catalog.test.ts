@@ -11,7 +11,7 @@ import {
   createRepository,
 } from "../src/repo/index.js";
 import type { CatalogDefinition, CatalogDefinitionKind, PublishContentCatalogInput } from "@velvet/contracts";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const dataDir = () => process.env.VELVET_DATA_DIR as string;
@@ -594,7 +594,7 @@ describe("validated immutable content catalog", () => {
     db.exec(`CREATE TRIGGER fail_catalog_publication BEFORE INSERT ON rpg_content_pack_publications
       WHEN NEW.validation_level='validated-v1' BEGIN SELECT RAISE(ABORT,'injected publication failure'); END`);
     db.close();
-    const repo = createRepository({ dataDir: dataDir() });
+    const repo = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repo.installMechanicsStarterCatalog("local-owner")).toThrow("injected publication failure");
     repo.close();
     const inspect = new DatabaseDriver(dbPath(), { readonly: true });

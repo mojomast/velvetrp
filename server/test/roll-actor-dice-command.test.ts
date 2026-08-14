@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import * as repoModule from "../src/repo/index.js";
 import { createRepository } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -68,12 +68,30 @@ function factory(values: number[] = [10], options: { id?: string; at?: string } 
     clock: { now: vi.fn(() => new Date(options.at ?? AT)) } });
 }
 
+function corruptionFactory(values: number[] = [10], options: { id?: string; at?: string } = {}) {
+  let index = 0;
+  return createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
+    rng: { integer: vi.fn(() => values[index++]!) },
+    ids: { nextId: vi.fn(() => options.id ?? "event-one") },
+    clock: { now: vi.fn(() => new Date(options.at ?? AT)) } });
+}
+
 function guardedFactory(values: number[] = [10]) {
   let index = 0;
   const rng = vi.fn(() => values[index++]!);
   const id = vi.fn(() => "unused-event");
   const clock = vi.fn(() => new Date(AT));
   const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
+    rng: { integer: rng }, ids: { nextId: id }, clock: { now: clock } });
+  return { repository, rng, id, clock };
+}
+
+function corruptionGuardedFactory(values: number[] = [10]) {
+  let index = 0;
+  const rng = vi.fn(() => values[index++]!);
+  const id = vi.fn(() => "unused-event");
+  const clock = vi.fn(() => new Date(AT));
+  const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string,
     rng: { integer: rng }, ids: { nextId: id }, clock: { now: clock } });
   return { repository, rng, id, clock };
 }
@@ -222,7 +240,7 @@ describe("roll actor dice command", () => {
     ["owner disagreement","UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign-one'","local-owner"],
   ])("denies corrupt authorization: %s before every dependency", (_label,sql,principal) => {
     seed(); const db=new DatabaseDriver(dbPath()); db.pragma("foreign_keys=OFF"); if(sql.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.exec(sql); db.close();
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice(principal,base)).toThrow("command unavailable");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -230,12 +248,12 @@ describe("roll actor dice command", () => {
   it("retains valid GM authority despite persisted owner disagreement", () => {
     seed(); const db=new DatabaseDriver(dbPath()); db.pragma("foreign_keys=OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign-one'").run(); db.close();
-    const repository=factory(); expect(repository.executeRollActorDice("gm",base).revisionAfter).toBe(1); repository.close();
+    const repository=corruptionFactory(); expect(repository.executeRollActorDice("gm",base).revisionAfter).toBe(1); repository.close();
   });
 
   it.each(["player","observer","app","missing"])("does not disclose known versus unknown command identity to %s", (principal) => {
     seed(); const first=factory(); first.executeRollActorDice("local-owner",base); first.close();
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     for (const commandId of [base.commandId,"unknown-command"]) {
       expect(() => guarded.repository.executeRollActorDice(principal,{...base,commandId})).toThrow("command unavailable");
     }
@@ -307,7 +325,7 @@ describe("roll actor dice command", () => {
     ["expression",{command:{type:"roll_actor_dice",payload:{expression:"1d6"}}}],
   ])("rejects same-pair envelope disagreement by %s before every dependency", (_label,patch) => {
     seed(); const first=factory(); first.executeRollActorDice("local-owner",base); first.close();
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("local-owner",{...base,...patch} as CommandEnvelope)).toThrow("identity collision");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -321,7 +339,7 @@ describe("roll actor dice command", () => {
   ])("rejects a malformed persisted command %s before every dependency", (column,value) => {
     seed(); executeBase("1d20",[10]);
     corruptRetry(`UPDATE campaign_commands SET ${column}=? WHERE command_id='command-one'`,[value]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",base)).toThrow("identity collision");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -335,7 +353,7 @@ describe("roll actor dice command", () => {
   ])("rejects a malformed retry event %s before every dependency", (column,value) => {
     seed(); const {envelope}=executeBase();
     corruptRetry(`UPDATE campaign_events SET ${column}=? WHERE event_id='event-one'`,[value]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -346,7 +364,7 @@ describe("roll actor dice command", () => {
   ])("rejects a malformed retry receipt %s before every dependency", (column,value) => {
     seed(); const {envelope}=executeBase();
     corruptRetry(`UPDATE command_receipts SET ${column}=? WHERE command_id='command-one'`,[value]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -358,7 +376,7 @@ describe("roll actor dice command", () => {
   ])("rejects a malformed retry roll %s before every dependency", (column,value) => {
     seed(); const {envelope}=executeBase();
     corruptRetry(`UPDATE rpg_dice_rolls SET ${column}=? WHERE event_id='event-one'`,[value]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -381,7 +399,7 @@ describe("roll actor dice command", () => {
     ["wrong selection","UPDATE rpg_dice_terms SET kept=0 WHERE position=0"],
   ])("rejects malformed retry terms: %s with zero dependencies", (_label,sql) => {
     seed(); const {envelope}=executeBase(); corruptRetry(sql);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -389,7 +407,7 @@ describe("roll actor dice command", () => {
   it("rejects a later-index tie selected in persisted terms", () => {
     seed(); const {envelope}=executeBase("3d6kh1",[4,4,1]);
     corruptRetry("UPDATE rpg_dice_terms SET kept=CASE position WHEN 0 THEN 0 WHEN 1 THEN 1 ELSE kept END");
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow("retry is invalid");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -402,7 +420,7 @@ describe("roll actor dice command", () => {
     ["gapped history","UPDATE campaign_events SET revision=2; UPDATE campaign_timelines SET revision=2 WHERE id='timeline-one'"],
   ])("rejects malformed retry history: %s before every dependency", (_label,sql) => {
     seed(); const {envelope}=executeBase(); corruptRetry(sql);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow(/retry is (?:incomplete|invalid)|Invalid/);
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -421,7 +439,7 @@ describe("roll actor dice command", () => {
     ["sheet campaign disagreement", "UPDATE rpg_campaign_sheets SET campaign_id='campaign-two' WHERE id='sheet-one'"],
   ])("rejects exact retry actor ancestry corruption: %s with zero dependencies", (_label,sql) => {
     seed(); const {envelope}=executeBase(); corruptRetry(sql);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",envelope)).toThrow("retry is incomplete");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -442,7 +460,7 @@ describe("roll actor dice command", () => {
       ...base,commandId:"command-two",idempotencyKey:"key-two",expectedRevision:1,
       command:{type:"roll_actor_dice",payload:{expression:"1d20adv"}},
     }); repository.close();
-    corruptRetry(sql); const guarded=guardedFactory();
+    corruptRetry(sql); const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",base)).toThrow("retry is invalid");
     expect(first.revisionAfter).toBe(1); expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -473,7 +491,7 @@ describe("roll actor dice command", () => {
     else repository.executeInitializeActorResource("gm",{...later,
       command:{type:"initialize_actor_resource",payload:{name:"MP",current:3,max:9}}});
     repository.close(); corruptRetry(sql);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",base)).toThrow("retry is invalid");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -483,7 +501,7 @@ describe("roll actor dice command", () => {
     ["expression",{command:{type:"roll_actor_dice",payload:{expression:"1d6"}}}],
   ])("detects shared identity collision by %s before RNG", (_label,patch) => {
     seed(); const first=factory(); first.executeRollActorDice("local-owner",base); first.close();
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("local-owner",{...base,...patch} as CommandEnvelope)).toThrow("identity collision");
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -550,7 +568,7 @@ describe("roll actor dice command", () => {
     ["actor campaign disagreement","UPDATE campaign_actors SET campaign_id='campaign-two' WHERE id='actor-one'"],
   ])("rejects complete actor ancestry corruption: %s", (_label,sql) => {
     seed(); const before=snapshot(); const db=new DatabaseDriver(dbPath()); db.pragma("foreign_keys=OFF"); db.exec(sql); db.close();
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("local-owner",base)).toThrow("target unavailable");
     expectNoDependencies(guarded);
     expect(snapshot().commands).toEqual(before.commands); guarded.repository.close();
@@ -560,7 +578,7 @@ describe("roll actor dice command", () => {
     seed(); const db=new DatabaseDriver(dbPath()); db.exec("DROP TRIGGER campaign_timelines_advance_revision");
     db.prepare("UPDATE campaign_timelines SET revision=? WHERE id='timeline-one'")
       .run(Number.MAX_SAFE_INTEGER-1); db.close();
-    const repository=factory(); const receipt=repository.executeRollActorDice("local-owner",
+    const repository=corruptionFactory(); const receipt=repository.executeRollActorDice("local-owner",
       {...base,expectedRevision:Number.MAX_SAFE_INTEGER-1});
     expect(receipt.revisionAfter).toBe(Number.MAX_SAFE_INTEGER); repository.close();
   });
@@ -575,7 +593,7 @@ describe("roll actor dice command", () => {
   it.each(["zero",0.5,-1,Number.MAX_SAFE_INTEGER+1])
   ("rejects malformed persisted active revision %s before every dependency", (revision) => {
     seed(); corruptRetry("UPDATE campaign_timelines SET revision=? WHERE id='timeline-one'",[revision]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("local-owner",base)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -584,7 +602,7 @@ describe("roll actor dice command", () => {
   ("rejects malformed persisted retry revision %s before every dependency", (revision) => {
     seed(); executeBase("1d20",[10]);
     corruptRetry("UPDATE campaign_timelines SET revision=? WHERE id='timeline-one'",[revision]);
-    const guarded=guardedFactory();
+    const guarded=corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDice("gm",base)).toThrow();
     expectNoDependencies(guarded); guarded.repository.close();
   });
@@ -611,7 +629,7 @@ describe("roll actor dice command", () => {
       CREATE TRIGGER wo_d AFTER INSERT ON rpg_dice_terms BEGIN INSERT INTO write_order(name) VALUES ('term-'||NEW.position); END;
       CREATE TRIGGER wo_e AFTER INSERT ON campaign_events BEGIN INSERT INTO write_order(name) VALUES ('event'); END;
       CREATE TRIGGER wo_p AFTER INSERT ON command_receipts BEGIN INSERT INTO write_order(name) VALUES ('receipt'); END;`); db.close();
-    const repository=factory([2,4,6]); repository.executeRollActorDice("local-owner",{...base,command:{type:"roll_actor_dice",payload:{expression:"3d6"}}}); repository.close();
+    const repository=corruptionFactory([2,4,6]); repository.executeRollActorDice("local-owner",{...base,command:{type:"roll_actor_dice",payload:{expression:"3d6"}}}); repository.close();
     const verify=new DatabaseDriver(dbPath(),{readonly:true}); expect((verify.prepare("SELECT name FROM write_order ORDER BY pos").all() as Array<{name:string}>).map(x=>x.name))
       .toEqual(["command","timeline","roll","term-0","term-1","term-2","event","receipt"]); verify.close();
   });
@@ -631,7 +649,7 @@ describe("roll actor dice command", () => {
   ])("rolls back at the %s boundary", (_label, timing, when) => {
     seed(); const before=snapshot(); const db=new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER injected_failure ${timing} ${when} BEGIN SELECT RAISE(ABORT,'injected'); END;`); db.close();
-    const repository=factory([1,2,3]);
+    const repository=corruptionFactory([1,2,3]);
     expect(() => repository.executeRollActorDice("local-owner",{...base,
       command:{type:"roll_actor_dice",payload:{expression:"3d6"}}})).toThrow("injected");
     repository.close(); expect(snapshot()).toEqual(before);
@@ -641,7 +659,7 @@ describe("roll actor dice command", () => {
     seed(); const before=snapshot(); const db=new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER steal_revision AFTER INSERT ON campaign_commands
       BEGIN UPDATE campaign_timelines SET revision=revision+1 WHERE id=NEW.timeline_id; END;`); db.close();
-    const repository=factory(); expect(() => repository.executeRollActorDice("local-owner",base)).toThrow("revision changed");
+    const repository=corruptionFactory(); expect(() => repository.executeRollActorDice("local-owner",base)).toThrow("revision changed");
     repository.close(); expect(snapshot()).toEqual(before);
   });
 
@@ -649,7 +667,7 @@ describe("roll actor dice command", () => {
     seed(); const before=snapshot(); const db=new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER omit_event BEFORE INSERT ON campaign_events BEGIN SELECT RAISE(IGNORE); END;
       CREATE TRIGGER omit_receipt BEFORE INSERT ON command_receipts BEGIN SELECT RAISE(IGNORE); END;`); db.close();
-    const repository=factory();
+    const repository=corruptionFactory();
     expect(() => repository.executeRollActorDice("local-owner",base)).toThrow("receipt was not persisted");
     expect(snapshot()).toEqual(before); repository.close();
   });
@@ -657,7 +675,7 @@ describe("roll actor dice command", () => {
   it("requires receipt insert changes===1 and exactly rolls back receipt-only RAISE(IGNORE)", () => {
     seed(); const before=snapshot(); const db=new DatabaseDriver(dbPath());
     db.exec("CREATE TRIGGER omit_receipt_only BEFORE INSERT ON command_receipts BEGIN SELECT RAISE(IGNORE); END;");
-    db.close(); const repository=factory([10]);
+    db.close(); const repository=corruptionFactory([10]);
     expect(() => repository.executeRollActorDice("local-owner",base)).toThrow("receipt was not persisted");
     repository.close(); expect(snapshot()).toEqual(before);
   });
@@ -704,7 +722,7 @@ describe("roll actor dice command", () => {
     });
     preflightRepository.close();
     const writer = await startLockedWrite(dbPath(), [...writes]);
-    const guarded = guardedFactory();
+    const guarded = corruptionGuardedFactory();
     expect(() => guarded.repository.executeRollActorDiceForVisibleCharacter("local-owner", base, binding))
       .toThrow(repoModule.CampaignDiceCharacterConflict);
     await writer.done;

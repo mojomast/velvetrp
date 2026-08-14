@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -105,7 +105,7 @@ describe("campaign membership queries", () => {
   ])("denies a structurally invalid campaign-owner authority: %s", (_name, mutation) => {
     seed();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignMemberships(ownerA, campaignA)).toEqual([]);
     expect(repository.getCampaignMembership(ownerA, campaignA, player)).toBeNull();
     repository.close();
@@ -205,7 +205,7 @@ describe("campaign membership queries", () => {
   ])("fails loudly for authorized selected %s while masking outsiders", (_name, mutation) => {
     seed();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.listCampaignMemberships(ownerA, campaignA))
       .toThrow("campaign membership is malformed");
     expect(repository.listCampaignMemberships(applicationOwner, campaignA)).toEqual([]);
@@ -217,7 +217,7 @@ describe("campaign membership queries", () => {
     seed();
     corrupt(`UPDATE campaign_memberships SET created_at = 'invalid-owner-time'
       WHERE campaign_id = '${campaignA}' AND principal_id = '${ownerA}'`);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.getCampaignMembership(ownerA, campaignA, player))
       .toThrow("campaign membership is malformed");
     expect(repository.getCampaignMembership(applicationOwner, campaignA, player)).toBeNull();
@@ -228,7 +228,7 @@ describe("campaign membership queries", () => {
     seed();
     corrupt(`UPDATE campaign_memberships SET created_at = 'invalid'
       WHERE campaign_id = '${campaignB}' AND principal_id = '${ownerB}'`);
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(repository.listCampaignMemberships(ownerA, campaignA)).toHaveLength(4);
     expect(repository.getCampaignMembership(ownerA, campaignA, ownerA)?.role).toBe("owner");
     expect(() => repository.getCampaignMembership(ownerB, campaignB, ownerB))

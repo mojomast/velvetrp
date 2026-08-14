@@ -6,7 +6,7 @@ import {
   CampaignRenameUnavailableError,
   createRepository,
 } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -147,7 +147,7 @@ describe("factory stale-safe campaign rename", () => {
     }
     db.close();
     const clockNow = vi.fn(() => new Date(firstRenameAt));
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
     let failure: unknown;
     try {
       repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
@@ -170,7 +170,7 @@ describe("factory stale-safe campaign rename", () => {
     if (kind === "missing") db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-one' AND role = 'owner'").run();
     else db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.renameCampaignIfUnchanged("other-owner", "campaign-one", {
       name: "Denied", expectedUpdatedAt: initialAt,
     })).toThrow(CampaignRenameUnavailableError);
@@ -209,7 +209,7 @@ describe("factory stale-safe campaign rename", () => {
       BEGIN SELECT RAISE(ABORT, 'rename rejected'); END;`);
     db.close();
     const sqlClock = vi.fn(() => new Date(firstRenameAt));
-    const failing = createRepository({ dataDir: dataDir(), clock: { now: sqlClock } });
+    const failing = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: sqlClock } });
     expect(() => failing.renameCampaignIfUnchanged("local-owner", "campaign-one", {
       name: "No", expectedUpdatedAt: "2030-04-05T06:07:08.010Z",
     })).toThrow("rename rejected");
@@ -226,7 +226,7 @@ describe("factory stale-safe campaign rename", () => {
       BEGIN SELECT RAISE(IGNORE); END;`);
     db.close();
     const clockNow = vi.fn(() => new Date(firstRenameAt));
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
     expect(() => repository.renameCampaignIfUnchanged("local-owner", "campaign-one", {
       name: "Lost", expectedUpdatedAt: initialAt,
     })).toThrow(CampaignRenameStaleError);

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { AddCampaignMembershipInput } from "../src/types.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -238,7 +238,7 @@ describe("factory campaign membership addition", () => {
           BEGIN SELECT RAISE(ABORT, 'campaign update rejected'); END;`);
     db.close();
     const clockNow = vi.fn(() => new Date(memberAt));
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
     expect(() => repository.addCampaignMembership("local-owner", "campaign-one", {
       principalId: "principal-target", role: "gm",

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { RenameCampaignInput } from "../src/types.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -228,7 +228,7 @@ describe("factory campaign rename", () => {
       BEGIN SELECT RAISE(ABORT, 'rename rejected'); END;`);
     db.close();
     const clockNow = vi.fn(() => new Date(renamedAt));
-    const repository = createRepository({ dataDir: dataDir(), clock: { now: clockNow } });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir(), clock: { now: clockNow } });
 
     expect(() => repository.renameCampaign("local-owner", "campaign-one", { name: "Renamed" }))
       .toThrow("rename rejected");

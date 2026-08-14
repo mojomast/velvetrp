@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { CampaignRole } from "@velvet/contracts";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -213,7 +213,7 @@ describe("authorized campaign queries", () => {
         BEGIN SELECT RAISE(ABORT, 'membership write rejected'); END;
     `);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(repository.listCampaigns(actorId)).toHaveLength(4);
     expect(repository.getCampaign(actorId, "campaign-c")?.actorRole).toBe("observer");
@@ -230,7 +230,7 @@ describe("authorized campaign queries", () => {
     db.prepare(`INSERT INTO campaign_memberships (campaign_id, principal_id, role, created_at)
       VALUES ('campaign-b', 'second-owner', 'owner', '2030-02-02T00:00:00.000Z')`).run();
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(repository.getCampaign(actorId, "campaign-z")).toBeNull();
     expect(() => repository.getCampaign("local-owner", "campaign-b"))
@@ -264,7 +264,7 @@ describe("authorized campaign queries", () => {
         db.prepare("DELETE FROM principals WHERE id = 'local-owner'").run();
       }
       db.close();
-      const repository = createRepository({ dataDir: dataDir() });
+      const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
       expect(() => repository.getCampaign(actorId, campaignId))
         .toThrow("campaign owner authorization is malformed");
@@ -281,7 +281,7 @@ describe("authorized campaign queries", () => {
     db.prepare("DELETE FROM campaign_memberships WHERE campaign_id = 'campaign-b' AND role = 'owner'").run();
     db.prepare("DELETE FROM principals WHERE id = ?").run(actorId);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(repository.getCampaign(actorId, "campaign-b")).toBeNull();
     expect(repository.listCampaigns(actorId)).toEqual([]);
@@ -298,7 +298,7 @@ describe("authorized campaign queries", () => {
     db.prepare("DELETE FROM principals WHERE id = ?").run(actorId);
     deleteCampaignForCorruptionTest(db,"campaign-c");db.prepare("DELETE FROM campaigns WHERE id = 'campaign-c'").run();
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(repository.listCampaigns(actorId)).toEqual([]);
     expect(repository.getCampaign(actorId, "campaign-c")).toBeNull();
@@ -312,7 +312,7 @@ describe("authorized campaign queries", () => {
     db.prepare(`UPDATE campaign_memberships SET created_at = 'not-canonical'
       WHERE campaign_id = 'campaign-b' AND principal_id = ?`).run(actorId);
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => repository.getCampaign(actorId, "campaign-b")).toThrow();
     expect(() => repository.listCampaigns(actorId)).toThrow();
     repository.close();
@@ -324,7 +324,7 @@ describe("authorized campaign queries", () => {
     campaignDb.pragma("ignore_check_constraints = ON");
     campaignDb.prepare("UPDATE campaigns SET name = '' WHERE id = 'campaign-c'").run();
     campaignDb.close();
-    const campaignRepository = createRepository({ dataDir: dataDir() });
+    const campaignRepository = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => campaignRepository.getCampaign(actorId, "campaign-c")).toThrow();
     expect(campaignRepository.getCampaign("missing-principal", "campaign-c")).toBeNull();
     campaignRepository.close();

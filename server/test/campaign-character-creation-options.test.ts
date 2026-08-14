@@ -12,7 +12,7 @@ import {
   ORIGINAL_STARTER_RULES_PROFILE,
 } from "@velvet/contracts";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -65,6 +65,15 @@ function seed(options: { configure?: boolean; personas?: Array<[string, string, 
 
 function read(actor = "local-owner", campaign = "campaign-one") {
   const repository = createRepository({ dataDir: dataDir() });
+  try {
+    return repository.getCampaignCharacterCreationOptions(actor, campaign);
+  } finally {
+    repository.close();
+  }
+}
+
+function corruptionRead(actor = "local-owner", campaign = "campaign-one") {
+  const repository = createCorruptionTestRepository({ dataDir: dataDir() });
   try {
     return repository.getCampaignCharacterCreationOptions(actor, campaign);
   } finally {
@@ -149,8 +158,8 @@ describe("getCampaignCharacterCreationOptions", () => {
 
   it.each(["", " \t\n "])("loudly rejects authorized empty/whitespace-only persisted name %j", (name) => {
     seed({ personas: [["bad-name", name, AT]] });
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
-    expect(read("player")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("player")).toBeNull();
   });
 
   it.each(["local-owner", "gm"])("allows creation-authority %s", (actor) => {
@@ -281,8 +290,8 @@ describe("getCampaignCharacterCreationOptions", () => {
       }
     })();
     db.close();
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
-    expect(read("player")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("player")).toBeNull();
   });
 
   it("fails loudly for authorized campaign pack-pin overflow while denied callers remain masked", () => {
@@ -301,8 +310,8 @@ describe("getCampaignCharacterCreationOptions", () => {
       }
     })();
     db.close();
-    expect(() => read("local-owner")).toThrow("campaign character creation options are malformed");
-    expect(read("observer")).toBeNull();
+    expect(() => corruptionRead("local-owner")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("observer")).toBeNull();
   });
 
   it("returns null for an unconfigured campaign", () => {
@@ -313,8 +322,8 @@ describe("getCampaignCharacterCreationOptions", () => {
   it("attributes persona corruption before returning null for unconfigured campaigns", () => {
     seed({ configure: false });
     corrupt("UPDATE characters SET fictional_confirmed = 0 WHERE id = 'persona-A'");
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
-    expect(read("player")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("player")).toBeNull();
   });
 
   it("returns null when the reviewed starter is not the sole configured pack", () => {
@@ -381,53 +390,53 @@ describe("getCampaignCharacterCreationOptions", () => {
   ])("loudly rejects authorized %s corruption but masks it from denied actors", (_label, sql) => {
     seed();
     corrupt(sql);
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
-    expect(read("player")).toBeNull();
-    expect(read("outsider")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("player")).toBeNull();
+    expect(corruptionRead("outsider")).toBeNull();
   });
 
   it("masks a stale owner before owner corruption while an intact GM sees it loudly", () => {
     seed();
     corrupt("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'");
-    expect(read("local-owner")).toBeNull();
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("local-owner")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
   });
 
   it("requires parent-backed creation authority", () => {
     seed();
     corrupt("DELETE FROM principals WHERE id = 'gm'");
-    expect(read("gm")).toBeNull();
+    expect(corruptionRead("gm")).toBeNull();
   });
 
   it("loudly requires an exact sole owner", () => {
     seed();
     corrupt("UPDATE campaign_memberships SET role = 'gm' WHERE campaign_id = 'campaign-one' AND role = 'owner'");
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
   });
 
   it("loudly requires campaigns.owner_role to remain exact owner", () => {
     seed();
     corrupt("UPDATE campaigns SET owner_role = 'gm' WHERE id = 'campaign-one'");
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
-    expect(read("player")).toBeNull();
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
+    expect(corruptionRead("player")).toBeNull();
   });
 
   it("loudly requires an active timeline parent", () => {
     seed();
     corrupt("DELETE FROM campaign_timelines WHERE id = 'timeline-one'");
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
   });
 
   it("loudly rejects attributable persona corruption", () => {
     seed();
     corrupt("UPDATE characters SET name = '' WHERE id = 'persona-A'");
-    expect(() => read("local-owner")).toThrow("campaign character creation options are malformed");
+    expect(() => corruptionRead("local-owner")).toThrow("campaign character creation options are malformed");
   });
 
   it("loudly rejects attributable campaign-link corruption", () => {
     seed();
     addLink("campaign-one", "orphan-link", "persona-A");
     corrupt("DELETE FROM characters WHERE id = 'persona-A'");
-    expect(() => read("gm")).toThrow("campaign character creation options are malformed");
+    expect(() => corruptionRead("gm")).toThrow("campaign character creation options are malformed");
   });
 });

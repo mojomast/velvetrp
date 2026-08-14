@@ -5,7 +5,7 @@ import { canonicalAgentJson, exactCandidateSelectionResponseSchema,
 import type { ExactCandidateRepository } from "./repository.js";
 import { ExactCandidateConflictError, ExactCandidateIntegrityError, ExactCandidateUnavailableError } from "./errors.js";
 import type { Clock, IdGenerator } from "../../runtime.js";
-import {assertExactCandidateProviderBindingV48} from "../db/migrations/v48_exact_candidate_provider_bridge.js";
+import { assertExactCandidateProviderBinding } from "./providerBindingIntegrity.js";
 
 export interface BindExactCandidateProviderExecutionInput {
   turnId:string;providerCallId:string;providerToolCallId:string;round:number;selection:unknown;requireCommittedExecution?:boolean;
@@ -23,7 +23,7 @@ export function createExactCandidateProviderBridgeRepository(db:DatabaseDriver.D
   const sha=(value:string)=>createHash("sha256").update(value).digest("hex");
   const verifyBoundExecution=(binding:any,principalId:string,turnId:string,selection:ReturnType<typeof exactCandidateSelectionResponseSchema.parse>)=>{
     if(binding.turn_id!==turnId||binding.provider_call_id===undefined)throw new ExactCandidateIntegrityError("provider exact-candidate binding ancestry is invalid");
-    assertExactCandidateProviderBindingV48(db,binding.binding_id);
+    assertExactCandidateProviderBinding(db,binding.binding_id);
     if(binding.provider_call_id!==undefined&&binding.selection_json!==canonicalAgentJson(selection as never))
       throw new ExactCandidateConflictError("provider exact-candidate binding changed");
     return candidates.executeExactActorTravelCandidate(principalId,{turnId,selection});
@@ -53,10 +53,9 @@ export function createExactCandidateProviderBridgeRepository(db:DatabaseDriver.D
               AND discovery.location_id=execution.destination_location_id)))`)
       .get(principalId,campaignId,commandId,principalId,principalId) as {binding_id:string;turn_id:string;selection_json:string;principal_id:string;destination:string}|undefined;
     if(!authorized)return null;
-    // Startup/layout attestation verifies the complete v48 provider ancestry.
-    // Candidate execution replay then verifies the complete v46/v47 issuance,
+    // Candidate execution replay verifies the complete issuance,
     // selection, world command, receipt, event, destination, and party evidence.
-    assertExactCandidateProviderBindingV48(db,authorized.binding_id);
+    assertExactCandidateProviderBinding(db,authorized.binding_id);
     const selection=exactCandidateSelectionResponseSchema.parse(JSON.parse(authorized.selection_json));
     const execution=candidates.verifyExactCandidateExecution(selection.candidateId);
     if(execution.actorTravelResult.receipt.commandId!==commandId||execution.linkedCandidate.scope.campaignId!==campaignId)
@@ -87,7 +86,7 @@ export function createExactCandidateProviderBridgeRepository(db:DatabaseDriver.D
           SELECT 1 FROM campaign_location_discoveries_v28 discovery WHERE discovery.campaign_id=binding.campaign_id
             AND discovery.actor_id=execution.actor_id AND discovery.location_id=execution.destination_location_id))`)
        .get(turnId,turnId,principalId,commandId,principalId,principalId) as any;
-     if(!row)return null;assertExactCandidateProviderBindingV48(db,row.binding_id);
+     if(!row)return null;assertExactCandidateProviderBinding(db,row.binding_id);
      const selection=exactCandidateSelectionResponseSchema.parse(JSON.parse(row.selection_json)),execution=candidates.verifyExactCandidateExecution(selection.candidateId);
      if(row.root_turn_id!==row.turn_id||row.root_campaign_id!==row.campaign_id||execution.linkedCandidate.scope.campaignId!==row.campaign_id
        ||execution.actorTravelResult.receipt.commandId!==commandId)throw new ExactCandidateIntegrityError("travel narration receipt ancestry is invalid");

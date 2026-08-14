@@ -2,21 +2,21 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current status (v53r1; campaign expansion delivered)
+## Current status (disposable schema; campaign expansion delivered)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v53 revision 1 (v53r1)**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. Populated v46-v52 upgrades are supported; v45 and earlier are unsupported. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Current development persistence uses **one disposable schema with no startup upgrades**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
 - Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, provider/adventure exact travel, rerolls, campaign generation/expansion, starter and reward settlement, actor placement, generated story materialization, and explicit material publication. Remaining exclusions and next work are statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage runs populated **v46-v52 databases through full startup to v53**. v45 and earlier do not constitute startup-upgrade support.
+- Historical migration notes below describe earlier checkpoints only. Current startup accepts only an exact current schema; schema changes require database recreation.
 - M5.1 persists a campaign NPC in a running attached session's present cast, optionally with a role-visible location, and retains a stopped session's cast as structurally distinct at-stop history. Presence does not add the NPC to the explicit legacy 1-12 session participant list, make it an autonomous speaker, create a campaign-NPC speech bridge, or imply that the full campaign-visible NPC roster is present.
 
 ## Point-in-time language
 
-Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v53r1 status or the normative sources above.
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the disposable-schema status or the normative sources above.
 
 ## Historical Slice 98 closeout
 
@@ -48,11 +48,10 @@ server/src/app.ts (Fastify composition root)
   `-- repo/index.ts (public persistence barrel)
         |-- named legacy domain repositories via repoContext.ts
         `-- composed Repository factory via campaignRepositoryOrchestration.ts and focused facades
-              `-- db.ts (compatibility facade and wiring root)
+              `-- db.ts (compatibility facade and singleton wiring)
                     |-- db/connection.ts
                     |-- db/schema.ts
-                    |-- db/migrations/*.ts
-                    `-- db/legacyImport.ts
+                    `-- db/currentSchema.sql
 ```
 
 `app.ts` owns server-wide hooks, malformed-route compatibility, request IDs, logging redaction, dependency selection, and plugin registration. It does not own roleplay interaction or generation handlers. `interactions.ts` owns the legacy generation-facing routes; `generationService.ts` owns reusable buffered/streamed generation pipelines, SSE writing, context assembly, scene synthesis, and summary updates; `generationRegistry.ts` owns process-local concurrency and abort coordination and is shared by interaction and session-lifecycle routes.

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { InstallContentPackInput } from "@velvet/contracts";
 import { createRepository } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, makeTmpDataDir, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -279,7 +279,7 @@ describe("content-pack installation", () => {
       const db = new DatabaseDriver(dbPath(dir));
       db.exec(trigger);
       db.close();
-      const repository = createRepository({ dataDir: dir });
+      const repository = createCorruptionTestRepository({ dataDir: dir });
       expect(() => repository.installContentPack(ownerId, input)).toThrow(`injected ${stage} failure`);
       expect(contentSnapshot(dir)).toEqual({ profiles: [], packs: [], definitions: [], selections: [], pins: [] });
       repository.close();

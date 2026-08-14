@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -165,7 +165,7 @@ describe("campaign timeline queries", () => {
     });
     repository.close();
     corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign';");
-    repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("local-owner", "campaign")).toEqual([]);
     expect(repository.listCampaignTimelines("gm", "campaign")).toHaveLength(3);
     expect(repository.getCampaignTimeline("local-owner", "campaign", "timeline-z-history")).toBeNull();
@@ -194,7 +194,7 @@ describe("campaign timeline queries", () => {
   ])("fails loudly for authorized %s corruption while masking outsiders", (_label, sql, timelineId) => {
     seed();
     corrupt(sql);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.listCampaignTimelines("observer", "campaign"))
       .toThrow("campaign timeline aggregate is malformed");
     expect(() => repository.getCampaignTimeline("observer", "campaign", timelineId))
@@ -211,7 +211,7 @@ describe("campaign timeline queries", () => {
   it("does not attribute completely free dice terms", () => {
     seed();
     corrupt("INSERT INTO rpg_dice_terms VALUES ('free-event',0,6,1)");
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
     expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history")).not.toBeNull();
     repository.close();
@@ -220,7 +220,7 @@ describe("campaign timeline queries", () => {
   it("isolates cross-campaign corruption and preserves outsider masking", () => {
     seed();
     corrupt(`INSERT INTO command_receipts VALUES ('other-campaign','orphan',0,1,'orphan-event')`);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
     expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history")).not.toBeNull();
     expect(() => repository.listCampaignTimelines("other-owner", "other-campaign"))
@@ -244,7 +244,7 @@ describe("campaign timeline queries", () => {
         selection_type,selection_count,modifier,total)
       VALUES ('event-attribute','other-campaign','orphan-roll','1d6',1,6,'all',NULL,0,4);
       INSERT INTO rpg_dice_terms VALUES ('event-attribute',0,4,1)`);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.listCampaignTimelines("observer", "campaign")).toHaveLength(3);
     expect(repository.getCampaignTimeline("observer", "campaign", "timeline-z-history"))
       .toMatchObject({ revision: 3 });
@@ -260,7 +260,7 @@ describe("campaign timeline queries", () => {
   it("still attributes local orphan terms when their owning local roll is missing", () => {
     seed();
     corrupt("DELETE FROM rpg_dice_rolls WHERE campaign_id='campaign' AND event_id='event-dice'");
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     for (const principal of ["local-owner", "gm", "player", "observer"]) {
       expect(() => repository.listCampaignTimelines(principal, "campaign"))
         .toThrow("campaign timeline aggregate is malformed");

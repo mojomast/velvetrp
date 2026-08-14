@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository, type RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -84,6 +84,15 @@ function read(actorId = "read-owner", id = campaignId) {
   }
 }
 
+function corruptionRead(actorId = "read-owner", id = campaignId) {
+  const repository = createCorruptionTestRepository({ dataDir: dataDir() });
+  try {
+    return repository.getCampaignContentConfiguration(actorId, id);
+  } finally {
+    repository.close();
+  }
+}
+
 function corrupt(sql: string): void {
   const db = new DatabaseDriver(dbPath());
   db.pragma("foreign_keys = OFF");
@@ -124,9 +133,9 @@ describe("getCampaignContentConfiguration", () => {
     seed();
     corrupt(`PRAGMA foreign_keys = OFF;
       UPDATE campaigns SET owner_principal_id = 'read-gm' WHERE id = '${campaignId}';`);
-    expect(read("read-owner")).toBeNull();
+    expect(corruptionRead("read-owner")).toBeNull();
     for (const member of ["read-gm", "read-player", "read-observer"]) {
-      expect(read(member)?.campaignId).toBe(campaignId);
+      expect(corruptionRead(member)?.campaignId).toBe(campaignId);
     }
   });
 
@@ -214,19 +223,19 @@ describe("getCampaignContentConfiguration", () => {
     seed();
     corrupt(`UPDATE campaign_memberships SET created_at = 'not-a-canonical-timestamp'
       WHERE campaign_id = '${campaignId}' AND principal_id = '${member}'`);
-    expect(() => read(member)).toThrow("campaign content configuration is malformed");
-    expect(read(applicationOwnerId)).toBeNull();
-    expect(read(otherCampaignOnlyId)).toBeNull();
-    expect(read(member, emptyCampaignId)?.campaignId).toBe(emptyCampaignId);
+    expect(() => corruptionRead(member)).toThrow("campaign content configuration is malformed");
+    expect(corruptionRead(applicationOwnerId)).toBeNull();
+    expect(corruptionRead(otherCampaignOnlyId)).toBeNull();
+    expect(corruptionRead(member, emptyCampaignId)?.campaignId).toBe(emptyCampaignId);
   });
 
   it.each(members)("denies a malformed %s authorizing role and keeps cross-campaign membership masked", (member) => {
     seed();
     corrupt(`UPDATE campaign_memberships SET role = 'future-role'
       WHERE campaign_id = '${campaignId}' AND principal_id = '${member}'`);
-    expect(read(member)).toBeNull();
-    expect(read(otherCampaignOnlyId)).toBeNull();
-    expect(read(member, emptyCampaignId)?.campaignId).toBe(emptyCampaignId);
+    expect(corruptionRead(member)).toBeNull();
+    expect(corruptionRead(otherCampaignOnlyId)).toBeNull();
+    expect(corruptionRead(member, emptyCampaignId)?.campaignId).toBe(emptyCampaignId);
   });
 
   it.each([
@@ -254,10 +263,10 @@ describe("getCampaignContentConfiguration", () => {
         VALUES ('other-profile', 'Other', 'Other profile', '[]');`);
     }
     corrupt(mutation);
-    expect(() => read("read-observer")).toThrow("campaign content configuration is malformed");
-    expect(read(applicationOwnerId)).toBeNull();
-    expect(read("missing-principal")).toBeNull();
-    expect(read(otherCampaignOnlyId)).toBeNull();
+    expect(() => corruptionRead("read-observer")).toThrow("campaign content configuration is malformed");
+    expect(corruptionRead(applicationOwnerId)).toBeNull();
+    expect(corruptionRead("missing-principal")).toBeNull();
+    expect(corruptionRead(otherCampaignOnlyId)).toBeNull();
   });
 
   it.each([
@@ -285,11 +294,11 @@ describe("getCampaignContentConfiguration", () => {
     seed();
     corrupt(mutation);
     for (const member of members) {
-      expect(() => read(member)).toThrow("campaign content configuration is malformed");
+      expect(() => corruptionRead(member)).toThrow("campaign content configuration is malformed");
     }
-    expect(read(applicationOwnerId)).toBeNull();
-    expect(read("missing-principal")).toBeNull();
-    expect(read(otherCampaignOnlyId)).toBeNull();
+    expect(corruptionRead(applicationOwnerId)).toBeNull();
+    expect(corruptionRead("missing-principal")).toBeNull();
+    expect(corruptionRead(otherCampaignOnlyId)).toBeNull();
   });
 
   it("rejects duplicate pack IDs and more than 64 pins from corrupted storage", () => {
@@ -300,7 +309,7 @@ describe("getCampaignContentConfiguration", () => {
       );
       INSERT INTO campaign_content_packs SELECT * FROM campaign_content_packs_strict;
       INSERT INTO campaign_content_packs VALUES ('${campaignId}', 'pack-A', '10', 'profile-read');`);
-    expect(() => read("read-owner")).toThrow("campaign content configuration is malformed");
+    expect(() => corruptionRead("read-owner")).toThrow("campaign content configuration is malformed");
 
     // Re-seed a separate clean database through the per-test fixture is unnecessary: remove
     // the duplicate, then create 65 complete exact packs and pins in the permissive table.
@@ -319,20 +328,20 @@ describe("getCampaignContentConfiguration", () => {
       insertPin.run(campaignId, packId);
     }
     db.close();
-    expect(() => read("read-player")).toThrow("campaign content configuration is malformed");
-    expect(read(applicationOwnerId)).toBeNull();
+    expect(() => corruptionRead("read-player")).toThrow("campaign content configuration is malformed");
+    expect(corruptionRead(applicationOwnerId)).toBeNull();
   });
 
   it("does not leak or import a corrupted configuration from another campaign", () => {
     seed();
     corrupt(`DROP TRIGGER rpg_content_packs_prevent_update;
       UPDATE rpg_content_packs SET sealed = 0 WHERE pack_id = 'pack-A';`);
-    expect(() => read("read-owner", campaignId)).toThrow("campaign content configuration is malformed");
-    expect(read("read-owner", emptyCampaignId)).toEqual({
+    expect(() => corruptionRead("read-owner", campaignId)).toThrow("campaign content configuration is malformed");
+    expect(corruptionRead("read-owner", emptyCampaignId)).toEqual({
       campaignId: emptyCampaignId,
       rulesProfileId: "profile-read",
       contentPacks: [],
     });
-    expect(read("read-owner", unconfiguredCampaignId)).toBeNull();
+    expect(corruptionRead("read-owner", unconfiguredCampaignId)).toBeNull();
   });
 });

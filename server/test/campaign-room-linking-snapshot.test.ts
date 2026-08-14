@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 const at = "2030-01-01T00:00:00.000Z";
@@ -127,7 +127,7 @@ describe("campaign room linking snapshot", () => {
         fictional_confirmed, is_real_person, created_at FROM poisoned_characters`);
     const poison = vi.fn(() => { throw new Error("private presentation evaluated"); });
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }))
-      .toThrow("schema v22 builder canonical SQL is incompatible");
+      .toThrow(/does not match the current development schema \(unexpected table poisoned_characters\)/);
     expect(poison).not.toHaveBeenCalled();
   });
 
@@ -137,7 +137,7 @@ describe("campaign room linking snapshot", () => {
   ])("accepts %s matching owner IDs for GM room reads", (_label, ownerId) => {
     seed();
     corrupt(matchingOwnerIdMutation(`'${ownerId}'`));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.getCampaignRoomLinkingSnapshot("gm", "campaign")).toMatchObject({
       campaignId: "campaign",
       attached: [{ sessionId: " room/attached " }],
@@ -154,7 +154,7 @@ describe("campaign room linking snapshot", () => {
   ])("masks non-authorizing snapshot state before attributable parsing: %s", (_label, mutation) => {
     seed();
     corrupt(mutation);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(repository.getCampaignRoomLinkingSnapshot("local-owner", "campaign")).toBeNull();
     repository.close();
   });
@@ -164,7 +164,7 @@ describe("campaign room linking snapshot", () => {
     corrupt(`INSERT INTO principals VALUES ('gm', 'GM', 0);
       INSERT INTO campaign_memberships VALUES ('campaign', 'gm', 'gm', '${at}');
       UPDATE campaign_memberships SET created_at = 'invalid' WHERE campaign_id = 'campaign' AND principal_id = 'gm'`);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.getCampaignRoomLinkingSnapshot("gm", "campaign"))
       .toThrow("campaign room linking authority is malformed");
     repository.close();

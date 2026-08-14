@@ -56,7 +56,7 @@ The exact hosted names `api.openai.com`, `openrouter.ai`, `requesty.ai`, and `ro
 
 ## Credentials and backups
 
-The API key is stored as plain JSON inside the `provider` table in `<resolved data directory>/velvet.sqlite`. It is not encrypted at rest. See [Data directory and startup migrations](operations.md#data-directory-and-startup-migrations) for resolution rules. Database files, SQLite online backups, copied data directories, filesystem snapshots, and live-E2E source databases therefore contain the key and must be protected as secrets.
+The API key is stored as plain JSON inside the `provider` table in `<resolved data directory>/velvet.sqlite`. It is not encrypted at rest. See [Data directory and current schema](operations.md#data-directory-and-current-schema) for resolution rules. Database files, SQLite online backups, copied data directories, filesystem snapshots, and live-E2E source databases therefore contain the key and must be protected as secrets.
 
 Restrict data-directory and backup permissions, avoid syncing them to untrusted storage, and rotate the provider key after suspected disclosure. `GET /api/provider` redacts the key, but that does not protect direct database access.
 

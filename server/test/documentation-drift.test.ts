@@ -4,7 +4,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
-import { SCHEMA_REVISION, SCHEMA_VERSION } from "../src/repo/db/schema.js";
 import { rpgV1Routes } from "../src/routes/rpg/v1/features.js";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -56,7 +55,6 @@ function markdownFiles(): string[] {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => path.posix.join("docs", entry.name));
   const maintainedInternal = [
-    "server/test/MIGRATION_TEST_ARCHIVE.md",
     "server/src/content/mechanicsStarterCatalog.provenance.md",
     "server/src/content/originalStarterManifest.provenance.md",
   ];
@@ -395,7 +393,7 @@ function directEnvironmentUsage(): { keys: Set<string>; dynamic: string[] } {
 
 function documentedEnvironment(): Map<string, string> {
   const source = read("docs/operations.md");
-  const section = source.slice(source.indexOf("## Environment"), source.indexOf("## Data directory and startup migrations"));
+  const section = source.slice(source.indexOf("## Environment"), source.indexOf("## Data directory and current schema"));
   const inventory = new Map<string, string>();
   for (const match of section.matchAll(/^\| `([A-Z][A-Z0-9_]*)` \| ([a-z-]+) \|/gm)) {
     expect(inventory.has(match[1]!), `duplicate environment inventory key ${match[1]}`).toBe(false);
@@ -405,19 +403,17 @@ function documentedEnvironment(): Map<string, string> {
 }
 
 describe("documentation drift guards", () => {
-  it("keeps designated current schema and operation claims aligned", () => {
-    const schema = `v${SCHEMA_VERSION}r${SCHEMA_REVISION}`;
+  it("keeps designated disposable-schema and operation claims aligned", () => {
     const schemaClaims: Array<[string, string]> = [
-      ["README.md", `schema v${SCHEMA_VERSION} revision ${SCHEMA_REVISION} (\`${schema}\`)`],
-      ["docs/api.md", `schema v${SCHEMA_VERSION} revision ${SCHEMA_REVISION}`],
-      ["docs/operations.md", `schema \`${schema}\``],
-      ["docs/repo-architecture.md", `schema v${SCHEMA_VERSION} revision ${SCHEMA_REVISION} (\`${schema}\`)`],
-      ["docs/ROADMAP.md", `schema ${schema}`],
-      ["devplan.md", `persistence is \`${schema}\``],
-      ["handoff.md", `Persistence: schema \`${schema}\``],
-      ["docs/roleplay-architecture-2026.md", `schema **v${SCHEMA_VERSION} revision ${SCHEMA_REVISION} (${schema})**`],
-      ["docs/rpg-integration-plan.md", `schema **v${SCHEMA_VERSION} revision ${SCHEMA_REVISION} (${schema})**`],
-      ["server/test/MIGRATION_TEST_ARCHIVE.md", `Schema ${schema}`],
+      ["README.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
+      ["docs/api.md", "Development databases use one current schema and are disposable"],
+      ["docs/operations.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
+      ["docs/repo-architecture.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
+      ["docs/ROADMAP.md", "Development persistence uses one current disposable schema with no startup upgrades"],
+      ["devplan.md", "Development persistence uses one current disposable schema with no startup upgrades"],
+      ["handoff.md", "Persistence: one current disposable development schema"],
+      ["docs/roleplay-architecture-2026.md", "one disposable schema with no startup upgrades"],
+      ["docs/rpg-integration-plan.md", "one disposable schema with no startup upgrades"],
     ];
     for (const [relativePath, claim] of schemaClaims) expect(read(relativePath), relativePath).toContain(claim);
 

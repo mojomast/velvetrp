@@ -6,8 +6,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - Runtime code and shared Zod contracts own executable behavior and wire validation.
 - [API reference](api.md) owns current HTTP behavior and the sole parseable RPG operation inventory.
-- [Operations](operations.md) owns setup, configuration classification, migration support, backup/restore, and release-gate guidance.
-- [Repository architecture](repo-architecture.md) owns current persistence structure, migration lineage, module ownership, and transaction conventions.
+- [Operations](operations.md) owns setup, configuration classification, disposable development data, and release-gate guidance.
+- [Repository architecture](repo-architecture.md) owns current persistence structure, schema ownership, module ownership, and transaction conventions.
 - [RPG roadmap](ROADMAP.md) alone owns current milestone status and remaining product scope.
 - Root [`devplan.md`](../devplan.md) is a compact delivered/pending ledger; it cannot override the roadmap.
 - Root [`handoff.md`](../handoff.md) owns the immediate engineering baseline and next task.
@@ -18,11 +18,11 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [API reference](api.md) - Current HTTP routes, request/response contracts, feature gates, error handling, and reconciliation rules.
 - [Streaming](streaming.md) - Current SSE contracts for legacy token/swipe, room, and durable M2.11 adventure streams.
 - [Customizable harness](customizable-harness.md) - Current prompt/harness fields, limits, template behavior, and context assembly.
-- [Repository architecture](repo-architecture.md) - Normative implementation ownership, persistence boundaries, migration lineage, and source-code map. It is not an HTTP contract.
+- [Repository architecture](repo-architecture.md) - Normative implementation ownership, persistence boundaries, current-schema ownership, and source-code map. It is not an HTTP contract.
 
 ## Operational guides
 
-- [Operations](operations.md) - Node 22 setup, environment, local deployment, storage, migration backup/restore, testing, and troubleshooting.
+- [Operations](operations.md) - Node 22 setup, environment, local deployment, disposable storage, testing, and troubleshooting.
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
 - [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
 - [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.

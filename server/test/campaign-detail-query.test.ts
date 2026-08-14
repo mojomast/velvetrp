@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -131,7 +131,7 @@ describe("campaign detail aggregate query", () => {
     db.prepare(`UPDATE campaign_memberships SET created_at = 'not-canonical'
       WHERE campaign_id = 'campaign-detail' AND principal_id = 'local-owner'`).run();
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     for (const role of ["gm", "player", "observer"] as const) {
       expect(() => repository.getCampaignDetail(`detail-${role}`, "campaign-detail"))
@@ -150,7 +150,7 @@ describe("campaign detail aggregate query", () => {
     db.exec("DROP TRIGGER rpg_content_packs_prevent_delete");
     db.prepare("DELETE FROM rpg_content_packs WHERE pack_id = 'pack-a' AND pack_version = '1.0.0'").run();
     db.close();
-    const repository = createRepository({ dataDir: dataDir() });
+    const repository = createCorruptionTestRepository({ dataDir: dataDir() });
 
     expect(() => repository.getCampaignDetail("local-owner", "campaign-detail"))
       .toThrow("campaign content configuration is malformed");

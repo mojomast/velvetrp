@@ -10,7 +10,7 @@ import {
   CampaignCharacterPersonaUnavailableError,
   createRepository,
 } from "../src/repo/index.js";
-import { makeTmpDataDir, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, makeTmpDataDir, useTmpDataDir } from "./helpers.js";
 import { startLockedWrite } from "./lock-worker.js";
 
 useTmpDataDir();
@@ -170,7 +170,7 @@ describe("campaign-character creation", () => {
     db.pragma("ignore_check_constraints = ON");
     db.prepare("UPDATE campaigns SET owner_role = 'gm' WHERE id = 'campaign-one'").run();
     db.close();
-    const repository = factory();
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.createCampaignCharacter("player", input))
       .toThrow(CampaignCharacterCreationUnavailableError);
     expect(() => repository.createCampaignCharacter("gm", input))
@@ -304,7 +304,7 @@ describe("campaign-character creation", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => repository.createCampaignCharacter("local-owner", input))
       .toThrow("campaign character creation content graph is malformed");
     expect(nextId).not.toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe("campaign-character creation", () => {
     db.pragma("foreign_keys = OFF");
     db.prepare("DELETE FROM campaign_actors WHERE id = 'actor'").run();
     db.close();
-    const duplicate = factory();
+    const duplicate = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => duplicate.createCampaignCharacter("local-owner", input))
       .toThrow("campaign character aggregate is incomplete");
     expect(() => duplicate.createCampaignCharacter("local-owner", input))
@@ -390,7 +390,7 @@ describe("campaign-character creation", () => {
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
-    const duplicate = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    const duplicate = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
     expect(() => duplicate.createCampaignCharacter("local-owner", input)).toThrow();
     expect(() => duplicate.createCampaignCharacter("local-owner", input)).not.toThrow(CampaignCharacterCreationConflictError);
     expect(nextId).not.toHaveBeenCalled();
@@ -432,7 +432,11 @@ describe("campaign-character creation", () => {
     const db = new DatabaseDriver(dbPath());
     db.exec(`CREATE TRIGGER reject_group BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, 'group rejected'); END`);
     db.close();
-    const repository = factory();
+    const repository = createCorruptionTestRepository({
+      dataDir: process.env.VELVET_DATA_DIR as string,
+      ids: { nextId: vi.fn().mockReturnValueOnce("campaign-character").mockReturnValueOnce("sheet").mockReturnValueOnce("actor") },
+      clock: { now: () => new Date(AT) },
+    });
     expect(() => repository.createCampaignCharacter("local-owner", input)).toThrow("group rejected");
     repository.close();
     const check = new DatabaseDriver(dbPath(), { readonly: true });

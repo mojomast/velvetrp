@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, deleteCampaignForCorruptionTest, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -282,7 +282,7 @@ describe("RPG content queries", () => {
     `);
     db.prepare("UPDATE rpg_rules_profiles SET tags = 'not-json' WHERE rules_profile_id = 'profile-a'").run();
     db.close();
-    const corrupt = createRepository({ dataDir: dataDir() });
+    const corrupt = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => corrupt.getRulesProfile(ownerId, { rulesProfileId: "profile-a" })).toThrow();
     expect(() => corrupt.getCampaignRulesProfile("campaign-owner", campaignId)).toThrow();
     corrupt.close();
@@ -296,7 +296,7 @@ describe("RPG content queries", () => {
     corruptPackDb.prepare("UPDATE rpg_rules_profiles SET tags = '[]' WHERE rules_profile_id = 'profile-a'").run();
     corruptPackDb.prepare("UPDATE rpg_content_packs SET tags = '[1]' WHERE pack_id = 'pack-core' AND pack_version = '2.0.0'").run();
     corruptPackDb.close();
-    const corruptPack = createRepository({ dataDir: dataDir() });
+    const corruptPack = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => corruptPack.getContentPack(ownerId, packTwo)).toThrow();
     expect(() => corruptPack.listCampaignContentPacks("campaign-owner", campaignId)).toThrow();
     corruptPack.close();
@@ -311,7 +311,7 @@ describe("RPG content queries", () => {
     corruptDefinitionDb.prepare(`UPDATE rpg_definitions SET tags = '["bad tag"]'
       WHERE pack_id = 'pack-core' AND pack_version = '2.0.0' AND kind = 'class' AND definition_id = 'fighter'`).run();
     corruptDefinitionDb.close();
-    const corruptDefinition = createRepository({ dataDir: dataDir() });
+    const corruptDefinition = createCorruptionTestRepository({ dataDir: dataDir() });
     expect(() => corruptDefinition.getContentPackDefinition(ownerId, classReference)).toThrow();
     expect(() => corruptDefinition.getCampaignContentPackDefinition("campaign-owner", campaignId, classReference)).toThrow();
     corruptDefinition.close();

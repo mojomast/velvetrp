@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CommandEnvelope } from "@velvet/contracts";
 import { createRepository } from "../src/repo/index.js";
 import type { RepositoryUnitOfWork } from "../src/repo/index.js";
-import { useTmpDataDir } from "./helpers.js";
+import { createCorruptionTestRepository, useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
 
@@ -157,7 +157,7 @@ describe("getCommandReceipt dice projection", () => {
 
   it("denies a stale owner identity while retaining GM access and outsider masking", () => {
     seed(); executeDice(); corrupt("UPDATE campaigns SET owner_principal_id='gm' WHERE id='campaign'");
-    const repository=createRepository({dataDir:process.env.VELVET_DATA_DIR as string});
+    const repository=createCorruptionTestRepository({dataDir:process.env.VELVET_DATA_DIR as string});
     expect(repository.getCommandReceipt("local-owner","campaign","dice-command")).toBeNull();
     expect(repository.getCommandReceipt("gm","campaign","dice-command")?.events).toHaveLength(1);
     expect(repository.getCommandReceipt("outsider","campaign","dice-command")).toBeNull();
@@ -241,7 +241,7 @@ describe("getCommandReceipt dice projection", () => {
     ["roll-only identity", "DELETE FROM command_receipts; DELETE FROM campaign_events; DELETE FROM campaign_commands; UPDATE campaign_timelines SET revision=0"],
   ])("fails loudly for authorized %s corruption while masking outsiders", (_label, mutation) => {
     seed(); executeDice(); corrupt(mutation);
-    const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
+    const repository = createCorruptionTestRepository({ dataDir: process.env.VELVET_DATA_DIR as string });
     expect(() => repository.getCommandReceipt("observer", "campaign", "dice-command")).toThrow();
     expect(repository.getCommandReceipt("outsider", "campaign", "dice-command")).toBeNull();
     repository.close();
