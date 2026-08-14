@@ -72,13 +72,15 @@ export const combatCommandsHttpRoutes:FastifyPluginAsync<CombatCommandsHttpOptio
       if(!combatId.success||!bundleId.success)return notFound(request,reply);if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat reward claim request is invalid");
       try{const result=options.combatCommandRepositoryAccessor().claimCombatReward(LOCAL_OWNER,combatId.data,bundleId.data,body.data);
         const reward=options.combatCommandRepositoryAccessor().listCombatRewards(LOCAL_OWNER,combatId.data)?.find((value)=>value.rewardBundleId===bundleId.data);
-        if(!reward||reward.claim.state!=="claimed")throw new Error("claimed reward projection is unavailable");
+        if(!reward||reward.claim.state!=="claimed"||reward.claim.rewardClaimId!==body.data.rewardClaimId||result.encounterId!==combatId.data
+          ||result.receipt.idempotencyKey!==body.data.idempotencyKey||result.receipt.revisionBefore!==body.data.expectedRevision
+          ||result.receipt.revisionAfter!==body.data.expectedRevision+1)throw new Error("claimed reward projection is unavailable");
         return reply.code(200).send(combatRewardClaimResponseSchema.parse({reward,receipt:{idempotencyKey:result.receipt.idempotencyKey,
           revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
       }catch(error){if(error instanceof EncounterAuthorizationError||error instanceof EncounterUnavailableError)return notFound(request,reply);
         if(error instanceof EncounterStaleError)return sendApiProblem(request,reply,409,"RPG_COMBAT_STALE","Combat state is stale; refresh before trying again");
         if(error instanceof EncounterConflictError)return sendApiProblem(request,reply,409,"RPG_REWARD_CLAIM_CONFLICT","Combat reward is already claimed or conflicts with current state");
-        request.log.error({operation:"combat-reward-claim"},"RPG combat reward claim failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Combat reward claim outcome could not be confirmed");}
+        request.log.error({operation:"combat-reward-claim"},"RPG combat reward claim failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Combat reward claim outcome could not be confirmed; reconcile the exact claim result and do not automatically retry");}
     });
   app.get<{Params:{campaignId:string;combatId:string;idempotencyKey:string};Querystring:Record<string,unknown>}>(
     "/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey",{exposeHeadRoute:false,onRequest:async(request,reply)=>{

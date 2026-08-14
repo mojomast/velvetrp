@@ -2,22 +2,21 @@
 
 Engineering-focused, non-explicit design notes for consensual adult fictional roleplay.
 
-## Current status (v48r1; Wave A slices delivered)
+## Current status (v53r1; campaign expansion delivered)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. If this design/history document conflicts with one of those sources about present behavior, the normative source wins.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v48 revision 1 (v48r1)**, with **102 explicit trusted-local RPG HTTP operations**. Canonical populated v46/v47->v48 upgrades are supported; v45 and earlier are unsupported. Provider/adventure exact travel, receipt-only HTTP/client display, and provider-committed candidate E2E are delivered; live candidate generation/selection HTTP/client APIs remain absent. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 and M5.3 remain partial as documented. M5.4 remains In Progress/partial after v46 issuance/lifecycle, v47 atomic execution, v48 provider/adventure exact travel, receipt-only HTTP/client display, and provider-committed travel E2E. Live candidate generation/selection HTTP/client APIs are absent; API remains 102 and existing manual travel remains exposed. M5.5 has only its pure protocol checkpoint. Remaining integration and later slices are statused by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v53 revision 1 (v53r1)**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. Populated v46-v52 upgrades are supported; v45 and earlier are unsupported. The boundary uses fixed `local-owner`; it is unauthenticated loopback-only convenience, not a remote-safe or multi-user identity boundary.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, provider/adventure exact travel, rerolls, campaign generation/expansion, starter and reward settlement, actor placement, generated story materialization, and explicit material publication. Remaining exclusions and next work are statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v46 and v47 databases upgrading to v48**. v45 and earlier do not constitute startup-upgrade support. v46 preserves issuance/lifecycle history, v47 preserves execution links, and v48 adds empty-backfill provider binding/accounting.
-- M5.4 v46 persistence commits are `e0ef5f8`, `a690e3a`, and `71393a9`; travel prerequisite commits are `bd921b8` and `c05a289`; later v47/v48 and receipt-display work remains in current history/uncommitted work as documented. Focused contract/server/client/typecheck groups and provider-committed travel E2E pass.
+- Supported executable migration coverage runs populated **v46-v52 databases through full startup to v53**. v45 and earlier do not constitute startup-upgrade support.
 - M5.1 persists a campaign NPC in a running attached session's present cast, optionally with a role-visible location, and retains a stopped session's cast as structurally distinct at-stop history. Presence does not add the NPC to the explicit legacy 1-12 session participant list, make it an autonomous speaker, create a campaign-NPC speech bridge, or imply that the full campaign-visible NPC roster is present.
 
 ## Point-in-time language
 
-Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v48r1 status or the normative sources above.
+Every historical slice, gate, schema, operation-count, and migration entry below is a ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that named checkpoint; they do not override the v53r1 status or the normative sources above.
 
 ## Historical Slice 98 closeout
 

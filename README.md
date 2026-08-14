@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Current persistence is **schema v48 revision 1 (`v48r1`)**. Canonical populated v46 and v47 databases upgrading to v48 are supported; v45 and earlier are unsupported. The trusted-local RPG API has **102 explicitly registered HTTP operations**, excluding `GET /api/rpg/v1/features`: the historical M2.11 baseline was 92, M4.6 added three reviewed campaign-content draft operations for the preserved 95-operation checkpoint, M5.1 added two NPC-presence operations, and the current partial M5.2/M5.3 slices add two companion-administration and three consumable operations. Roadmap milestones M1-M3, **M4.1-M4.6**, and **M5.1** are complete. M5.2 remains In Progress/partial because it has transport but no companion UI or grant exercise; M5.3 remains partial because its bounded consumable path excludes instant-modifier runtime semantics and the legacy combat union remains unchanged. M5.4 remains In Progress/partial: v46 delivered exact-candidate issuance/lifecycle, v47 delivered atomic execution, and v48 delivers provider/adventure exact travel, receipt-only HTTP/client display, and provider-committed travel E2E. Live candidate generation/selection HTTP/client APIs remain absent. Existing manual world travel remains exposed through the unchanged public route and is separate from candidate execution. M5.5 has delivered only its pure protocol/vector checkpoint.
+Current persistence is **schema v53 revision 1 (`v53r1`)**. Populated v46-v52 databases upgrading to v53 are supported; v45 and earlier are unsupported. The trusted-local RPG API has **111 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include companion transport, bounded consumables, provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, and explicit player-safe material publication. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); live exact-candidate generation/selection HTTP and client APIs remain absent.
 
 ## Security And Privacy
 
@@ -31,13 +31,16 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Campaign lifecycle, settings, memberships, rooms, timelines, checkpoints, recaps, import, and export
 - Immutable content-pack validation/publication, exact campaign pins, and built-in starter choices
 - Character drafts, finalization, derived sheets, XP, level advancement, resources, inventory, economy, and rest
+- Full server-roll character-draft rerolls with immutable roll history and exact replay
 - Server-resolved checks, powers, effects, encounters, legal combat actions, logs, and rewards
+- Exact-once starter inventory/wallet materialization, GM actor placement, and recipient-safe combat reward claim/reconciliation
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Authoritative room-scoped NPC place, move, and remove commands with role-safe running-cast and stopped-history projections
 - Fixed-local-owner companion management GET and closed receipt-only command POST for owner/GM creation and bounded grant creation/revocation, plus client transport only; there is no companion UI, grant exercise, dismissal, proposal/decision administration, or public member HTTP projection
 - Exact pinned consumable action GET, command POST, and exact-result GET settle the supported quantity-one damage, healing, and health/guard/focus subset atomically; the combat UI uses only the server target and action cost, persists ambiguity before POST, never retries automatically, and reconciles exact result plus combat/log/actions, while instant modifiers remain fail-closed
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
+- Reviewed sparse campaign generation/expansion with standard quest/story/world materialization, inert encounter planning, and explicit public handout/scene-prompt delivery
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
 - A role-selected, bounded provider tool loop with deterministic command bridging, durable resume, and receipt-aware narration and recovery
 
@@ -80,7 +83,7 @@ The Vite development server proxies `/api` to `VELVET_API_URL`, defaulting to `h
 
 ### Provider Configuration
 
-The root `.env.example` uses OpenRouter variables. `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` are supported fallbacks; `server/.env.example` shows those legacy-compatible names. Environment values provide defaults while no provider row exists; after settings are saved through the application, persisted settings take precedence. Local OpenAI-compatible loopback providers can run without a key.
+The root `.env.example` is the complete user-facing server-runtime/client-development example and uses recommended OpenRouter overrides. `OPENAI_BASE_URL`, `OPENAI_MODEL`, and `OPENAI_API_KEY` are legacy-compatible fallbacks; `server/.env.example` is an intentionally narrower server/OpenAI sample. Environment values provide bootstrap defaults while no provider row exists; after settings are saved through the application, persisted settings take precedence. A defined OpenRouter value, including an empty string, suppresses its OpenAI fallback. Local OpenAI-compatible loopback providers can run without a key.
 
 See [Provider configuration](docs/provider-configuration.md) for URL restrictions, supported settings, persistence, and transmission behavior.
 
@@ -165,7 +168,7 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-For pre-release schema `v47r1`, canonical populated v45 and v46 databases migrating forward to v47 are the tested and supported startup compatibility window. v45 preserves companion history through durable principals; v46 adds immutable exact-candidate issuance and lifecycle persistence; v47 adds empty-backfill immutable execution links for repository-only exact selection and atomic actor travel. v44 and earlier startup paths are unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore backups from compatible builds. Back up the database before moving it between builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+For pre-release schema `v53r1`, populated v46-v52 databases are tested and supported forward-startup inputs. v45 and earlier startup paths are unsupported. Supported migration steps are transactional and preserve validated preexisting rows, but a multi-version startup can stop at an intermediate committed marker if a later step fails; retain the pre-upgrade backup and retry only after diagnosis. Automatic downgrade is unsupported. Recreate unsupported development databases or restore backups with compatible builds. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 
@@ -188,8 +191,12 @@ The current policy layer is limited, not a comprehensive content-moderation syst
 
 | Document | Purpose |
 | --- | --- |
+| [Documentation index](docs/README.md) | Complete guide inventory and authority hierarchy |
 | [Roadmap](docs/ROADMAP.md) | Current dependency-ordered milestones and deferred scope |
 | [API reference](docs/api.md) | HTTP behavior, contracts, flags, and RPG operation inventory |
+| [Operations](docs/operations.md) | Setup, environment, storage, migration, backup, and release gates |
+| [Campaign generation](docs/campaign-generation.md) | Reviewed generation, selective application, planning, and material delivery |
+| [Gameplay agent instructions](docs/interactive-gameplay-agent-instructions.md) | Trusted-local API workflow and reconciliation guidance |
 | [RPG integration plan](docs/rpg-integration-plan.md) | Product and mechanics integration design |
 | [Roleplay architecture](docs/roleplay-architecture-2026.md) | Roleplay context and generation architecture, including historical notes |
 | [Repository architecture](docs/repo-architecture.md) | Repository boundaries and transaction conventions |

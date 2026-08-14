@@ -472,7 +472,7 @@ describe("campaign-character creation", () => {
     seed(dir);
     const lock = await startLockedWrite(dbPath(dir), [{
       sql: "UPDATE campaigns SET name = name WHERE id = 'campaign-one'",
-    }], 100);
+    }], 2_000);
     const repository = factory({ dir });
     expect(lock.isReleased()).toBe(false);
     expect(repository.createCampaignCharacter("local-owner", input).campaignCharacter.id).toBe("campaign-character");

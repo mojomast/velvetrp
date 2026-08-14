@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for schema v48 revision 1 (`v48r1`). v48 additively binds exact provider travel selection to execution without changing historical attested layouts. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for schema v53 revision 1 (`v53r1`). v49-v53 add character reroll history, reviewed campaign-generation provenance and expansion, exact starter/reward/placement settlement, and explicit public material delivery without changing historical attested layouts. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -26,14 +26,14 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 | --- | --- |
 | `db.ts` | Stable facade, dependency wiring, historical v2-v14 migration code, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
 | `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, schema startup, legacy import invocation, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | `SCHEMA_VERSION = 48`, `SCHEMA_REVISION = 1`, fresh-schema construction, sequential migration order, revision repair, future-artifact classification, startup assertions, and migration rollback boundaries. |
+| `db/schema.ts` | `SCHEMA_VERSION = 53`, `SCHEMA_REVISION = 1`, supported v46-v52 input policy, fresh-schema construction, sequential migration order, revision handling, future-artifact classification, startup assertions, and migration rollback boundaries. |
 | `db/migrations/*.ts` | Version-owned DDL, canonical object inventories/digests, data validation, backfill, and one-step migration functions. New schema behavior goes in the migration that introduces it. |
 | `db/legacyImport.ts` | One-way import of an otherwise-empty legacy `db.json` store into SQLite. It does not merge stores. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-Fresh creation and canonical populated v46-to-v48 and v47-to-v48 upgrades in the tested support window converge on equivalent v48r1 DDL and validated preexisting data. v46 owns exact-candidate issuance/lifecycle history, v47 owns immutable execution links, and v48 adds immutable provider request/tool/selection/execution binding and accounting with empty backfill. v45 and earlier marker paths are unsupported. Automatic downgrade is unsupported. Recreate older development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption, unexpected current/future named artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Migrations run transactionally, preserve prior immutable history, and fail without advancing the marker when ancestry or provenance cannot be proved.
+Fresh creation and populated v46-v52 upgrades in the tested support window converge on equivalent v53r1 DDL and validated preexisting data. v45 and earlier, malformed, and future marker paths are unsupported and reject before cleanup, dependency resolution, or mutation; supported inputs must already use revision 1. Automatic downgrade is unsupported. Recreate unsupported development databases or restore them from backups made by compatible builds. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in migration inputs, unexpected managed artifacts, and cross-campaign generation-draft ancestry. Schema markers are not permission to accept partial, extra, modified, or populated future artifacts. Each one-version migration transaction preserves prior immutable history and fails without advancing that step's marker. The complete v46-v52 chain is resumable rather than wrapped in one transaction, so an error in a later step can leave a valid intermediate marker; operators must retain a pre-upgrade backup.
 
-## Migrations v26-v48
+## Migrations v26-v53
 
 | Version | Additive responsibility |
 | --- | --- |
@@ -60,6 +60,11 @@ Fresh creation and canonical populated v46-to-v48 and v47-to-v48 upgrades in the
 | v46 | Adds immutable exact-candidate batches, candidates, explicit supersessions, expiration observations, and canonical layout attestation with static DDL, a reviewed digest, and empty backfill. |
 | v47 | Adds one immutable attested exact-candidate execution-link table with empty backfill. It binds canonical selection/result evidence to the original v46 candidate and exact world command, receipt, event, destination, and party sidecars. Repository reconstruction remains the cryptographic authority. |
 | v48 | Adds immutable provider-safe projection, strict tool schema, settled provider call/tool/round/selection, execution, and accounting bindings with empty backfill. Startup reconstructs issuance-time projection from the complete v46 batch and validates v47/world ancestry. |
+| v49 | Adds immutable full server-roll character-draft reroll history bound to draft revisions. |
+| v50 | Adds durable campaign-generation call coordination, provider provenance/usage, and immutable accepted artifact storage. |
+| v51 | Adds exact-once starter inventory/wallet materialization, combat reward settlement linkage, and optional campaign starting-location provenance. |
+| v52 | Adds sparse generation jobs and attempts, candidate/dependency/accepted artifacts, and durable generated NPC placement intents. |
+| v53 | Adds revisioned immutable commands, receipts, and player-safe projections for explicit public handout and scene-prompt delivery. |
 
 ## Repository ownership
 
@@ -86,6 +91,10 @@ Fresh creation and canonical populated v46-to-v48 and v47-to-v48 upgrades in the
 | M5.3 Slice 0 | `encounter/combatCompositionPlan.ts`, `encounter/combatCompositionExecutor.ts`, and encounter write composition own active-encounter HP authority, atomic actor-health mirroring through M15, round-wrap effect advancement, and concentration retention until replacement/removal. |
 | M5.3 consumables | Shared encounter contracts freeze the exact item, inventory entry, target, effect plan, canonical request digest, expected M15 revisions, and result evidence. `encounter/useConsumableRuntime.ts` owns server-derived legal actions and one immediate-transaction execution for exact pinned category-`consumable` quantity one. The runtime applies effects in catalog order for damage, healing, and health/guard/focus resources. Every modifier duration is ineligible at the consumable contract boundary: instant modifiers report unavailable semantics and noninstant modifiers report unsupported duration; no modifier descriptor, settlement, legal action, or runtime path exists. No successful historical consumable modifier result exists. Shared catalog and power modifier contracts are unchanged, and powers retain receipt-only instant-modifier outcomes. `combatConsumables.ts` exposes separate legal-action, command, and exact-result routes without widening the legacy combat union; the client renders exact server target, quantity, and action cost and uses durable no-retry reconciliation. |
 | M5.4 exact candidates | `candidateRepo/`, `v46_exact_candidates.ts`, `v47_exact_candidate_executions.ts`, and `v48_exact_candidate_provider_bridge.ts` own issuance, lifecycle, immutable execution/provider bindings, atomic travel, recovery, receipt projection, and safe narration. Receipt-only HTTP/client display and provider-committed candidate E2E are delivered; live candidate generation/selection HTTP/client APIs remain absent. Existing manual travel remains public and separate. |
+| v49 character rerolls | `characterBuilder/characterBuilderWriteRepo.ts` and `db/migrations/v49_character_rerolls.ts` own server-generated reroll execution, draft revision/idempotency, immutable dice allocation history, and replay without rerolling. |
+| v50/v52 campaign generation | `campaignGenerationRepo.ts`, `campaignContentGeneration.ts`, and the v50/v52 migrations own paid-call coordination, attempts/usage, sparse candidates, accepted-key dependencies, standard-domain materialization, generated planning, and NPC placement intents. Provider calls stay outside repository transactions. |
+| v51 grants, rewards, and placement | Character finalization owns exact starter materialization; `encounter/encounterReadRepo.ts` and `encounter/encounterWriteRepo.ts` own recipient-safe reward reads, claim settlement, and exact result reconstruction; `world/worldWriteRepo.ts` owns GM bootstrap placement. `db/migrations/v51_grants_rewards_placement.ts` owns their immutable linkage. |
+| v53 material delivery | `campaignGenerationRepo.ts` and `db/migrations/v53_campaign_material_delivery.ts` own owner/GM publication, delivery revision/idempotency, immutable receipts, and player-safe explicitly published projections. |
 
 Legacy persona, settings, session, message, memory, lore, and summary aggregates remain owned by their corresponding `*Repo.ts` files. Services own prompt construction, provider calls, summary generation, and memory extraction; repositories persist already-decided state.
 

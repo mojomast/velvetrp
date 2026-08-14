@@ -50,31 +50,39 @@ Hosted CI mirrors the same four health phases exactly once each, in order and fa
 
 Velvet does not auto-load `.env`. Export variables in the shell or configure them in the process supervisor before startup.
 
-| Variable | Default | Operational meaning |
-| --- | --- | --- |
-| `HOST` | `127.0.0.1` | API bind address. Keep loopback. |
-| `PORT` | `8787` | API port. |
-| `VELVET_DATA_DIR` | `<process.cwd()>/data` | SQLite and legacy-import directory. Set an absolute path explicitly. |
-| `VELVET_SSE_HEARTBEAT_MS` | `15000` | Token/adventure heartbeat interval. Use a positive finite integer; room SSE has no heartbeat. |
-| `VELVET_API_URL` | `http://localhost:8787` | Vite development proxy target, read by `client/vite.config.ts`; not a runtime setting embedded in the built client. |
-| `OPENROUTER_BASE_URL` | None | Initial provider URL; takes precedence over `OPENAI_BASE_URL`. |
-| `OPENROUTER_MODEL` | None | Initial model; takes precedence over `OPENAI_MODEL`. |
-| `OPENROUTER_API_KEY` | None | Initial key; takes precedence over `OPENAI_API_KEY`. |
-| `OPENROUTER_HTTP_REFERER` | Blank | Initial OpenRouter referer. |
-| `OPENROUTER_APP_TITLE` | `Velvet` | Initial OpenRouter title. |
-| `OPENAI_BASE_URL` | Built-in OpenAI URL | Provider URL fallback. |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Model fallback. |
-| `OPENAI_API_KEY` | Blank | Key fallback. |
-| `FEATURE_VOICE`, `FEATURE_IMAGES` | Disabled | Discovery flags only; enabled only by exact lowercase `true`. |
-| `FEATURE_RPG_CAMPAIGN` | Disabled | Base RPG campaign/API rollout flag. |
-| `FEATURE_RPG_MECHANICS` | Disabled | Mechanics routes require this and campaign. |
-| `FEATURE_RPG_COMBAT` | Disabled | Combat routes require combat, mechanics, and campaign. |
-| `FEATURE_RPG_STUDIO` | Disabled | Studio UI rollout flag; useful only with campaign capability. |
-| `FEATURE_REMOTE_AUTHENTICATION` | Disabled | Discovery/roadmap flag only. Setting it does not add authentication or make deployment remote-safe. |
-| `VELVET_E2E_LIVE` | Disabled | Exact `1` opts into paid/live provider E2E. |
-| `VELVET_E2E_SOURCE_DATA_DIR` | `<repository>/server/data` | Source directory checked by live E2E for `velvet.sqlite`. |
+| Variable | Category | Default | Operational meaning |
+| --- | --- | --- | --- |
+| `HOST` | server-runtime | `127.0.0.1` | API bind address. Keep loopback. |
+| `PORT` | server-runtime | `8787` | API port. |
+| `VELVET_DATA_DIR` | server-runtime | `<process.cwd()>/data` | SQLite and legacy-import directory. Set an absolute path explicitly. |
+| `VELVET_SSE_HEARTBEAT_MS` | server-runtime | `15000` | Legacy token and durable-adventure heartbeat input; use a positive finite integer. Room SSE has no heartbeat. |
+| `VELVET_API_URL` | client-development | `http://localhost:8787` | Vite development proxy target; not embedded in the built client. |
+| `OPENROUTER_BASE_URL` | server-runtime | Unset | Initial provider URL; a defined value takes precedence over `OPENAI_BASE_URL`. |
+| `OPENROUTER_MODEL` | server-runtime | Unset | Initial model; a defined value takes precedence over `OPENAI_MODEL`. |
+| `OPENROUTER_API_KEY` | server-runtime | Unset | Initial key; a defined value takes precedence over `OPENAI_API_KEY`. Keep empty in examples. |
+| `OPENROUTER_HTTP_REFERER` | server-runtime | Blank | Initial OpenRouter referer. |
+| `OPENROUTER_APP_TITLE` | server-runtime | `Velvet` | Initial OpenRouter title. |
+| `OPENAI_BASE_URL` | server-runtime | `https://api.openai.com/v1` | Provider URL fallback. |
+| `OPENAI_MODEL` | server-runtime | `gpt-4o-mini` | Model fallback. |
+| `OPENAI_API_KEY` | server-runtime | Blank | Key fallback. Keep empty in examples. |
+| `FEATURE_VOICE` | server-runtime | Disabled | Voice discovery flag; exact lowercase `true` only. |
+| `FEATURE_IMAGES` | server-runtime | Disabled | Image discovery flag; exact lowercase `true` only. |
+| `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
+| `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |
+| `FEATURE_RPG_COMBAT` | server-runtime | Disabled | Combat routes require combat, mechanics, and campaign. |
+| `FEATURE_RPG_STUDIO` | server-runtime | Disabled | Studio UI rollout flag; useful only with campaign and mechanics. |
+| `FEATURE_REMOTE_AUTHENTICATION` | server-runtime | Disabled | Discovery flag only. It adds no authentication and does not make deployment remote-safe. |
+| `NODE_ENV` | internal | Unset | Exact `test` disables automatic Fastify logging; ordinary operators should not use it as a privacy control. |
+| `VELVET_E2E_LIVE` | live-test | Disabled | Exact `1` opts into paid/live provider tests. Not a production setting. |
+| `VELVET_E2E_SOURCE_DATA_DIR` | live-test | `<repository>/server/data` | Source directory checked by live E2E for `velvet.sqlite`. Not a production data-directory override. |
+| `PLANNING_BOARD_PORT` | internal-tool | `8789` | Loopback planning-board port. |
+| `PLANNING_BOARD_STATE` | internal-tool | `<repository>/.velvet/planning-board.json` | Planning-board state file. |
 
-Feature values are case-sensitive: only `true` enables feature flags. Provider environment variables are bootstrap defaults; a stored provider row wins. See [Provider configuration](provider-configuration.md).
+Feature values are case-sensitive: only `true` enables feature flags. Provider environment variables are raw bootstrap defaults; a stored provider row wins. Because precedence uses defined-value semantics, an explicitly blank `OPENROUTER_*` value suppresses the corresponding `OPENAI_*` fallback. See [Provider configuration](provider-configuration.md).
+
+The root `.env.example` is complete for supported user-facing server-runtime and client-development keys. `server/.env.example` is intentionally a smaller server-only sample using the legacy-compatible OpenAI names. Live-test and internal-tool keys are classified here or in their owning guide rather than presented as ordinary production configuration. Deterministic E2E supplies disposable `HOST`, `PORT`, `VELVET_DATA_DIR`, feature, and local fake-provider values itself; it has no separate user configuration key and does not make paid provider calls.
+
+Malformed `VELVET_SSE_HEARTBEAT_MS` values are explicitly repaired to 15 seconds by durable adventure SSE, while the legacy token stream passes the numeric value directly to its timer. Use only a positive finite integer for both families; [Streaming](streaming.md) owns their exact transport differences.
 
 ## Data directory and startup migrations
 
@@ -84,13 +92,17 @@ Always configure one explicit absolute data directory so startup location, servi
 export VELVET_DATA_DIR=/home/example/.local/share/velvet
 ```
 
-The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For pre-release schema `v48r1`, canonical populated v46 and v47 databases migrating to v48 are the tested and supported forward-startup inputs. Marker paths for v45 and earlier are unsupported. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in supported inputs, unexpected current/future named artifacts, and cross-campaign generation-draft ancestry. Current v48 startup verifies issuance, execution, and provider-binding layouts, attestations, canonical projections/selections, and durable ancestry in addition to prior integrity checks. There is no separate migration command and no supported automatic downgrade. Recreate older development databases or restore a backup from a compatible build.
+The server creates the directory, attempts mode `0700`, and opens `VELVET_DATA_DIR/velvet.sqlite` with WAL, foreign keys, and a 5-second busy timeout. Schema verification and sequential migrations run automatically when the database opens. For pre-release schema `v53r1`, populated v46-v52 databases are the tested and supported forward-startup inputs. Marker paths outside v46-v53, including v45 and earlier or a future marker, are rejected before cleanup, migration dependency resolution, or mutation. Supported input revisions must already be revision 1. Before marker or artifact mutation, startup preflight rejects database-wide persisted foreign-key corruption in migration inputs, unexpected managed artifacts, and cross-campaign generation-draft ancestry. Current startup then verifies the complete version-owned layouts through v53 and prior domain integrity. There is no separate migration command and no supported automatic downgrade.
+
+Each one-version migration commits its schema work and marker atomically. A v46-v52 startup can traverse multiple such transactions, so a failure in a later step may leave a valid intermediate marker that the same release can resume after the cause is fixed; it does not roll the entire chain back to the original version. Do not use resumability as a backup strategy. Recreate unsupported development databases or restore a protected pre-upgrade backup with a compatible build.
 
 The v43 migration creates five NPC-presence data tables empty: the room-scoped revision root, materialized state, and immutable command, event, and receipt tables. It deliberately performs **no presence backfill**: campaign NPC roster membership, NPC metadata, actor locations, room participants, messages, and narrative context do not prove that an NPC is present. The v44 migration created the initial empty companion sidecars. The v45 migration replaces those sidecars and preserves all rows while changing historical command, proposal, decision, grant, and revocation actor references to durable principals. Removing a campaign membership therefore no longer invalidates or pins companion history. Live companion administration authorization still derives from the repository's current owner/GM relationships; durable history is evidence, not current authority.
 
 The v46 migration adds immutable exact-candidate issuance and lifecycle history. The additive v47 migration performs an empty backfill and adds one immutable attested execution-link layout; v48 binds provider selection/execution evidence. Repository execution atomically binds exact selection to deterministic world travel and reconstructs replay cryptographically. Provider/adventure travel, receipt-only HTTP/client display, and provider-committed candidate E2E are delivered. Live candidate generation/selection HTTP/client APIs remain absent. Existing manual world travel remains exposed as before and is not candidate-backed.
 
-The current trusted-local RPG boundary has 102 explicit operations. Companion administration adds an authoritative owner/GM management GET and a closed receipt-only command POST under `/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration`; there is client transport but no companion UI or delegated grant exercise. Consumables add action GET, command POST, and exact-result GET under `/rpg/v1/combats/:combatId/consumable-actions`. Before consumable POST, the browser must persist its ambiguity marker; it must not automatically retry, and recovery reads the exact result then refreshes combat, log, and actions. Consumable modifiers of every duration are contract-ineligible: instant semantics are unavailable and noninstant modifiers are unsupported, so no modifier descriptor, settlement, legal action, or runtime path exists. No successful historical consumable modifier result exists. Shared catalog/power contracts are unchanged, including receipt-only instant modifiers for powers. The current deterministic E2E suite passes 16 cases, including companion create/grant/revoke/replay, response-after-commit consumable reload reconciliation, and provider-committed travel receipt reload. Its fixture support is harness-only and uses a coherent custom immutable published pack; catalog attestation is unchanged.
+v49 adds immutable character-draft reroll history. v50 records campaign-generation calls and accepted artifacts; v51 adds exact starter materialization, combat reward settlement, and campaign starting-location provenance; v52 adds sparse generation jobs/attempts, dependency-aware accepted candidates, and NPC placement intents; v53 adds explicit append-only public material delivery. Current startup validates each layout and foreign-key integrity.
+
+The current trusted-local RPG boundary has 111 counted explicit operations, excluding feature discovery and implicit HEAD. Companion administration adds an authoritative owner/GM management GET and a closed receipt-only command POST under `/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration`; there is client transport but no companion UI or delegated grant exercise. Consumables add action GET, command POST, and exact-result GET under `/rpg/v1/combats/:combatId/consumable-actions`. Before consumable POST, the browser must persist its ambiguity marker; it must not automatically retry, and recovery reads the exact result then refreshes combat, log, and actions. Consumable modifiers of every duration are contract-ineligible: instant semantics are unavailable and noninstant modifiers are unsupported, so no modifier descriptor, settlement, legal action, or runtime path exists. No successful historical consumable modifier result exists. Shared catalog/power contracts are unchanged, including receipt-only instant modifiers for powers. Later operations cover reroll, actor placement, combat reward reads/claim/reconciliation, generated foundation/planning, and material publication/read. Deterministic Playwright E2E covers companion, consumable recovery, and provider-committed travel. A separate deterministic server integration test covers the generated-campaign journey through real repository and HTTP composition without an external provider.
 
 If `VELVET_DATA_DIR` is unset or blank, the fallback is `data` under the process's current working directory. Consequently, root `npm run dev` defaults to `<repository>/data`, while a command started with `server` as its working directory defaults to `<repository>/server/data`. Do not rely on this fallback in persistent operation.
 

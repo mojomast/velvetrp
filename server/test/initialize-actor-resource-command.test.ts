@@ -26,8 +26,8 @@ function dbPath(): string {
   return path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite");
 }
 
-function markCorruptFixtureAsV45(db: DatabaseDriver.Database): void {
-  db.prepare("UPDATE meta SET value = '45' WHERE key = 'schemaVersion'").run();
+function markCorruptFixtureAsV46(db: DatabaseDriver.Database): void {
+  db.prepare("UPDATE meta SET value = '46' WHERE key = 'schemaVersion'").run();
 }
 
 function seed(): void {
@@ -216,12 +216,12 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
-    markCorruptFixtureAsV45(db);
+    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
+      .toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -231,9 +231,9 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
-    markCorruptFixtureAsV45(db);
+    markCorruptFixtureAsV46(db);
     db.close();
-    expect(() => factory()).toThrow("schema marker 45 contains foreign-key violation in campaigns");
+    expect(() => factory()).toThrow("schema marker 46 contains foreign-key violation in campaigns");
   });
 
   it("returns an exact historical retry before inactive and existing-resource checks", () => {
@@ -334,12 +334,12 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("INSERT INTO rpg_actor_resources VALUES ('campaign-two', 'actor-one', 'hp', 1, 2)").run();
-    markCorruptFixtureAsV45(db);
+    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow("schema marker 45 contains foreign-key violation in rpg_actor_resources");
+      .toThrow("schema marker 46 contains foreign-key violation in rpg_actor_resources");
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -401,12 +401,12 @@ describe("initialize actor resource command", () => {
     first.close();
     const db = new DatabaseDriver(dbPath());
     db.exec(mutation);
-    markCorruptFixtureAsV45(db);
+    markCorruptFixtureAsV46(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
     expect(() => createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } }))
-      .toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
+      .toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
     expect(nextId).not.toHaveBeenCalled();
     expect(now).not.toHaveBeenCalled();
   });
@@ -434,9 +434,9 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
-    markCorruptFixtureAsV45(db);
+    markCorruptFixtureAsV46(db);
     db.close();
-    expect(() => factory()).toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
+    expect(() => factory()).toThrow(`schema marker 46 contains foreign-key violation in ${table}`);
   });
 
   it("consumes one valid event ID before exactly one clock reading", () => {

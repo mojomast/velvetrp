@@ -22,10 +22,8 @@ describe("schema v48 provider exact-travel bridge migration",()=>{
     const before=db.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").all();db.close();
     expect(()=>createRepository()).toThrow("unsupported schemaVersion 45; expected 53");db=new DatabaseDriver(file(),{readonly:true});
     expect(db.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").all()).toEqual(before);db.close();});
-  it("rejects projection digest tampering on reopen",()=>{createRepository().close();const db=new DatabaseDriver(file());
+  it("rejects provider-layout DDL tampering",()=>{createRepository().close();const db=new DatabaseDriver(file());
     db.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");
-    // Empty layouts remain valid; the populated-row tamper lane is covered by
-    // the orchestrator integration fixture where complete FK evidence exists.
-    db.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'v48 provider bindings are immutable');END");
-    expect(()=>assertExactCandidateProviderBridgeLayoutV48(db)).not.toThrow();db.close();});
+    db.exec("CREATE TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48 BEFORE UPDATE ON exact_candidate_provider_bindings_v48 BEGIN SELECT RAISE(ABORT,'wrong guard');END");
+    expect(()=>assertExactCandidateProviderBridgeLayoutV48(db)).toThrow("schema v48 provider bridge attestation is incompatible");db.close();});
 });

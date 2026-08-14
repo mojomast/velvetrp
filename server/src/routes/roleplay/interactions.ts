@@ -147,8 +147,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           harness,
           preset: getPromptPreset(session.presetId),
         });
-      } catch (err) {
-        request.log.error({ err }, "room routing failed; using deterministic fallback");
+      } catch {
+        request.log.error({ operation: "room-routing" }, "room routing failed; using deterministic fallback");
         selection = {
           speakerIds: fallbackRoomSpeakers(session.participants, session.primaryCharacterId, content, maxSpeakers),
           source: "fallback" as const,
@@ -251,8 +251,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           harness,
           preset: getPromptPreset(session.presetId),
         });
-      } catch (err) {
-        request.log.error({ err }, "room continuation routing failed; using deterministic fallback");
+      } catch {
+        request.log.error({ operation: "room-continuation-routing" }, "room continuation routing failed; using deterministic fallback");
         selection = {
           speakerIds: fallbackRoomSpeakers(session.participants, session.primaryCharacterId, routingContent, maxSpeakers),
           source: "fallback" as const,

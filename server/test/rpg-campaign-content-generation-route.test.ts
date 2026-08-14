@@ -1,7 +1,9 @@
 import DatabaseDriver from "better-sqlite3";
+import Fastify from "fastify";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
+import { campaignContentGenerationHttpRoutes } from "../src/routes/rpg/v1/campaignContentGeneration.js";
 import { createRepository, updateProviderSettings } from "../src/repo/index.js";
 import { createSession, transitionSession } from "../src/repo/sessionRepo.js";
 import { useTmpDataDir } from "./helpers.js";
@@ -74,5 +76,27 @@ describe("campaign-content section generation",()=>{
     const database=db();expect((database.prepare("SELECT count(*) count FROM encounter_lifecycle_v31 WHERE campaign_id=?").get(campaign.id) as any).count).toBe(0);const accepted=database.prepare("SELECT artifact_kind,server_resource_id FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND artifact_kind IN ('story-node','story-relationship','clue','encounter','handout','scene-prompt')").all(campaign.id) as any[];expect(accepted.every((row)=>row.server_resource_id)).toBe(true);database.close();
     expect(repo.getCampaignPublishedMaterials("reader",campaign.id)?.materials).toEqual([]);const publish={artifactKey:"bell-rubbing",expectedRevision:0,idempotencyKey:"publish-bell"},first=await app.inject({method:"POST",url:`/api/rpg/v1/campaigns/${campaign.id}/material-publications`,headers:{"content-type":"application/json"},payload:publish}),replay=await app.inject({method:"POST",url:`/api/rpg/v1/campaigns/${campaign.id}/material-publications`,headers:{"content-type":"application/json"},payload:publish});expect(first.statusCode,first.body).toBe(200);expect(replay.json()).toEqual(first.json());const player=repo.getCampaignPublishedMaterials("reader",campaign.id)!;expect(player.materials.map((item)=>item.title)).toEqual(["Bell rubbing"]);expect(JSON.stringify(player)).not.toMatch(/SECRET KEY|Cipher key/);
     const privatePublish=await app.inject({method:"POST",url:`/api/rpg/v1/campaigns/${campaign.id}/material-publications`,headers:{"content-type":"application/json"},payload:{artifactKey:"gm-cipher",expectedRevision:1,idempotencyKey:"publish-secret"}});expect(privatePublish.statusCode).toBe(404);await app.close();
+  });
+
+  it("treats a mismatched post-publication projection as commit-ambiguous",async()=>{
+    enable();let committed=false;const app=Fastify({logger:false});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>({publishCampaignMaterial:()=>{committed=true;return {material:{artifactKey:"other-handout",resourceId:"material",kind:"handout",title:"Other",content:"Other content",publishedAt:"2035-01-01T00:00:00.000Z"},receipt:{idempotencyKey:"publish",revisionBefore:0,revisionAfter:1,occurredAt:"2035-01-01T00:00:00.000Z"}};}} as any)});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaigns/campaign/material-publications",headers:{"content-type":"application/json"},payload:{artifactKey:"public-handout",expectedRevision:0,idempotencyKey:"publish"}});
+    expect(committed).toBe(true);expect(response.statusCode).toBe(503);expect(response.json()).toMatchObject({code:"RPG_GENERATION_UNAVAILABLE",detail:expect.stringContaining("could not be confirmed")});expect(response.body).toContain("do not automatically retry");await app.close();
+  });
+
+  it("treats a malformed post-apply projection as commit-ambiguous",async()=>{
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Apply ambiguity"});let malform=false;const proxy=new Proxy(repo as any,{get(target,key){const value=target[key];if(key==="applyCampaignContentGenerationDraftAtomically")return (...args:any[])=>{const result=value.apply(target,args);return malform?{...result,draftId:"other-draft",applyReceipt:{...result.applyReceipt,draftId:"other-draft"}}:result;};return typeof value==="function"?value.bind(target):value;}});const app=buildApp({campaignRepositoryFactory:()=>proxy,campaignContentGeneration:async()=>content});
+    const created=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"apply-ambiguous")});malform=true;const response=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${created.json().draft.draftId}/apply`,headers:{"content-type":"application/json"},payload:{expectedRevision:0,idempotencyKey:"apply-ambiguous-write",selectedArtifactKeys:["rainy-opening","old-road","mara"]}});
+    expect(response.statusCode).toBe(503);expect(response.json()).toMatchObject({code:"RPG_GENERATION_UNAVAILABLE",detail:expect.stringContaining("could not be confirmed")});expect(repo.getCampaignGeneratedFoundation("local-owner",campaign.id)?.opening).not.toBeNull();expect(response.body).toContain("do not automatically retry");await app.close();
+  });
+
+  it("rejects a generated read bound to another campaign",async()=>{
+    enable();const app=Fastify({logger:false});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>({getCampaignGeneratedFoundation:()=>({campaignId:"other-campaign",revision:0,opening:null})} as any)});
+    const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/generated-foundation"});expect(response.statusCode).toBe(500);expect(response.body).not.toContain("other-campaign");await app.close();
+  });
+
+  it("does not log provider-controlled generation error text",async()=>{
+    enable();const messages:string[]=[];const stream={write:(message:string)=>{messages.push(message);}};const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Log redaction"});const app=Fastify({logger:{level:"error",stream} as any});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>repo,generateCampaignContent:async()=>{throw new Error("PRIVATE_PROVIDER_ECHO");}});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"log-redaction")});expect(response.statusCode).toBe(503);expect(messages.join("\n")).not.toContain("PRIVATE_PROVIDER_ECHO");expect(response.body).not.toContain("PRIVATE_PROVIDER_ECHO");await app.close();
   });
 });

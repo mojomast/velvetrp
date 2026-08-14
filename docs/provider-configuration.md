@@ -16,6 +16,8 @@ When no provider row exists, defaults are resolved at runtime in this order:
 
 Reads construct environment/built-in defaults first and overlay the stored provider JSON. Each field present in a stored row therefore wins; fields absent from an older partial row inherit current defaults. Normal API saves write the complete profile, so changing environment variables does not replace saved settings. Update the stored profile through the UI/API, or use a fresh data directory, when changing bootstrap defaults.
 
+Environment-family precedence uses defined-value semantics, not a nonblank test. An explicitly empty `OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`, or `OPENROUTER_API_KEY` therefore suppresses the corresponding nonempty `OPENAI_*` fallback. Unset or remove the OpenRouter assignment to use that fallback.
+
 The application does not auto-load `.env`. Node receives only variables exported by the parent process or service manager. For an interactive shell:
 
 ```bash
@@ -50,7 +52,7 @@ The profile includes `baseUrl`, `model`, `streaming`, `requestTimeoutSeconds` (1
 
 Null samplers are omitted from requests. `startReplyWith` becomes a server-generated system instruction. `pricing.promptPerMillion` and `pricing.completionPerMillion` are nullable USD estimates clamped to 0-1,000,000 when saved; cost is unavailable unless both are set. `streaming: true` selects the legacy token stream in the chat UI, not the room or durable adventure transport; see [Streaming](streaming.md).
 
-Hosted OpenAI, OpenRouter, and Requesty URLs require a nonblank key to become usable. Loopback and other allowed HTTPS OpenAI-compatible endpoints can be keyless. Missing/blank URL, invalid runtime URL, or a required missing key selects the deterministic local stub whose marker begins `[local stub`. A remote provider HTTP failure instead produces the generation lane's safe fallback and records `providerError` where that API exposes it.
+The exact hosted names `api.openai.com`, `openrouter.ai`, `requesty.ai`, and `router.requesty.ai` require a nonblank key to become usable. Loopback and other allowed HTTPS OpenAI-compatible endpoints can be keyless; configured credentials are withheld from arbitrary HTTPS hosts. Missing/blank URL, invalid runtime URL, or a required missing key selects the deterministic local stub whose marker begins `[local stub`. A remote provider HTTP failure instead produces the generation lane's safe fallback and records `providerError` where that API exposes it.
 
 ## Credentials and backups
 
@@ -58,7 +60,7 @@ The API key is stored as plain JSON inside the `provider` table in `<resolved da
 
 Restrict data-directory and backup permissions, avoid syncing them to untrusted storage, and rotate the provider key after suspected disclosure. `GET /api/provider` redacts the key, but that does not protect direct database access.
 
-Velvet sends `Authorization: Bearer <key>` only when the destination's exact host is one of `api.openai.com`, `openrouter.ai`, `requesty.ai`, `router.requesty.ai`, or a loopback host. A configured key is not sent to other HTTPS hosts. OpenRouter `HTTP-Referer` and `X-Title` headers are sent only to OpenRouter hosts.
+Velvet sends `Authorization: Bearer <key>` only when the destination's exact host is one of `api.openai.com`, `openrouter.ai`, `requesty.ai`, `router.requesty.ai`, or a loopback host. A configured key is not sent to other HTTPS hosts. OpenRouter `HTTP-Referer` and `X-Title` headers are sent only to the exact `openrouter.ai` host.
 
 ## Outbound context and privacy
 
@@ -70,12 +72,13 @@ For OpenRouter, Velvet can send `allow_fallbacks`, `require_parameters`, routing
 
 ## Live provider tests
 
-The low-level server test makes one real OpenRouter request only when `OPENROUTER_API_KEY` is exported. It uses the corresponding `OPENROUTER_*` values rather than the stored SQLite profile:
+The low-level server test makes one real OpenRouter request only when both exact `VELVET_E2E_LIVE=1` and a nonblank `OPENROUTER_API_KEY` are exported. It uses the corresponding `OPENROUTER_*` values rather than the stored SQLite profile:
 
 ```bash
 set -a
 source .env
 set +a
+export VELVET_E2E_LIVE=1
 npm --prefix server run test -- llm.test.ts
 ```
 

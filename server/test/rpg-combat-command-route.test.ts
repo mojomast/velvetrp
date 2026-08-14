@@ -83,6 +83,12 @@ describe("M2.9 combat command routes",()=>{
     }
   });
 
+  it("treats a mismatched reward claim projection as commit-ambiguous",async()=>{
+    enable();const claimed={...reward,claim:{state:"claimed" as const,rewardClaimId:"claim",claimedAt:at}};const app=buildApp({campaignRepositoryFactory:()=>repository({claimCombatReward:()=>({encounterId:"other-combat",status:"completed",receipt:{commandId:"private",idempotencyKey:"claim-key",revisionBefore:4,revisionAfter:5,occurredAt:at}}),listCombatRewards:()=>[claimed]})});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/combats/combat/rewards/bundle/claim-commands",headers:{"content-type":"application/json"},payload:{rewardClaimId:"claim",expectedRevision:4,idempotencyKey:"claim-key"}});
+    expect(response.statusCode).toBe(500);expect(response.body).toContain("do not automatically retry");expect(response.body).not.toContain("other-combat");await app.close();
+  });
+
   it("gates and normalizes query, media, body, path, stale, conflict, and corrupt output",async()=>{
     let accesses=0,calls=0;const gated=buildApp({campaignRepositoryFactory:()=>{accesses++;return repository({resolveCombatAction:()=>{calls++;throw new Error();}});}});
     const body={legalActionId:"end-turn",targetIds:[],choices:[],expectedRevision:2,idempotencyKey:"turn"};

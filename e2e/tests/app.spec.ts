@@ -350,8 +350,11 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
   const actorId = await actorForCampaignCharacter(request, campaign.campaign.id, finalized.character.id);
   const inventoryPath = `/rpg/v1/campaigns/${campaign.campaign.id}/actors/${actorId}/inventory`;
   const commandPath = `${inventoryPath}-commands`;
-  const initial = await json<{ entries: unknown[]; equipment: unknown[]; capacity: number; revision: number }>(request, "GET", inventoryPath);
-  expect(initial).toMatchObject({ entries: [], equipment: [], capacity: 1000, revision: 0 });
+  const initial = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { kind: string; definitionId: string }; quantity?: number }>; equipment: unknown[]; capacity: number; revision: number }>(request, "GET", inventoryPath);
+  expect(initial).toMatchObject({ equipment: [], capacity: 1000, revision: 0 });
+  expect(initial.entries).toEqual([expect.objectContaining({
+    kind: "stackable", quantity: 1, item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" },
+  })]);
 
   const entryId = `${runId}-waylamp`;
   const materialized = await request.post("/api/__e2e/materialize-waylamp", {
@@ -359,10 +362,12 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
   });
   expect(materialized.status()).toBe(204);
   const stocked = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { definitionId: string } }>; equipment: unknown[]; revision: number }>(request, "GET", inventoryPath);
-  expect(stocked).toMatchObject({
-    entries: [{ kind: "instanced", entryId, item: { ...pin, definitionId: "velvet:mechanics:item:waylamp" } }],
-    equipment: [], revision: initial.revision,
-  });
+  expect(stocked).toMatchObject({ equipment: [], revision: initial.revision });
+  expect(stocked.entries).toHaveLength(2);
+  expect(stocked.entries).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: "stackable", item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" } }),
+    { kind: "instanced", entryId, item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" } },
+  ]));
 
   const equip = { kind: "equip" as const, slot: "hand" as const, entryId, expectedRevision: stocked.revision, idempotencyKey: `${runId}-m2.7-equip` };
   const equipped = await json<{ inventory: { equipment: Array<{ slot: string; entryId: string }>; revision: number }; receipt: { kind: string; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", commandPath, equip, 200);
@@ -376,9 +381,10 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
   const unequip = { kind: "unequip" as const, slot: "hand" as const, expectedRevision: equipped.inventory.revision, idempotencyKey: `${runId}-m2.7-unequip` };
   const unequipped = await json<{ inventory: { entries: unknown[]; equipment: unknown[]; revision: number }; receipt: { kind: string; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", commandPath, unequip, 200);
   expect(unequipped).toMatchObject({
-    inventory: { entries: [{ entryId }], equipment: [], revision: equipped.inventory.revision + 1 },
+    inventory: { equipment: [], revision: equipped.inventory.revision + 1 },
     receipt: { kind: "unequip", revisionBefore: equipped.inventory.revision, revisionAfter: equipped.inventory.revision + 1, idempotencyKey: unequip.idempotencyKey },
   });
+  expect(unequipped.inventory.entries).toEqual(expect.arrayContaining([expect.objectContaining({ entryId })]));
 
 });
 
@@ -584,7 +590,9 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     expect(ambiguousRequests).toEqual(["PUT", "GET"]);
     await expect(page.getByRole("button", { name: /Attach eligible room/ })).toHaveCount(0);
     await page.unroute(`**/api/rpg/v1/campaigns/${campaignId}/rooms`);
+    await page.getByText("Campaign details & maintenance", { exact: true }).click();
     const renamedCampaignName = `${campaignName}-renamed`;
+    await expect(page.getByLabel("Campaign name")).toBeVisible();
     await page.getByLabel("Campaign name").fill(renamedCampaignName);
     await page.getByRole("button", { name: "Rename campaign" }).click();
     await expect(page.getByRole("heading", { name: renamedCampaignName })).toBeVisible();
@@ -613,6 +621,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     expect(createPosts).toHaveLength(1);
     await page.reload();
     await expect(page.getByRole("heading", { name: renamedCampaignName })).toBeVisible();
+    await page.getByText("Campaign details & maintenance", { exact: true }).click();
     await expect(page.getByText("velvet:rules:original-narrative").first()).toBeVisible();
     await expect(page.getByText(/Content configuration is read-only/i)).toBeVisible();
     await expect(page.getByRole("list", { name: "Campaign characters" }).getByText(starterPersonaName, { exact: true })).toBeVisible();
@@ -709,6 +718,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.getByRole("button", { name: "Activate mechanics starter" }).click();
     await expect(page.getByText(/Mechanics starter setup is complete/i)).toBeAttached();
     expect(mechanicsSetupRequests).toEqual(["PUT", "GET"]);
+    await page.getByText("Campaign details & maintenance", { exact: true }).click();
     await expect(page.getByText("velvet:rules:starter-v1")).toBeVisible();
     await expect(page.getByText(/Content configuration is read-only/i)).toBeVisible();
     const mechanicsDetail = await json<{ campaign: { content: unknown } }>(

@@ -45,4 +45,9 @@ describe("M2.10 world routes",()=>{
     expect(overlong.statusCode).toBe(404);expect(overlong.json()).toMatchObject({code:"RPG_ACTOR_WORLD_NOT_FOUND",
       instance:"/api/rpg/v1/actors/:actorId/travel-commands"});expect(calls).toBe(0);await app.close();
   });
+  it("treats a mismatched placement projection as commit-ambiguous",async()=>{
+    enable();const app=buildApp({campaignRepositoryFactory:()=>repository({placeActor:()=>({campaignId:"other-campaign",sessionId:"session",location:world.currentLocations[0],receipt:{...travel.receipt,idempotencyKey:"place",revisionBefore:2,revisionAfter:3}})})});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/placement-commands",headers:{"content-type":"application/json"},payload:{campaignId:"campaign",locationId:"origin",expectedRevision:2,idempotencyKey:"place"}});
+    expect(response.statusCode).toBe(500);expect(response.body).toContain("do not automatically retry");expect(response.body).not.toContain("other-campaign");await app.close();
+  });
 });

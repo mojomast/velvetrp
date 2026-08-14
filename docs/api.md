@@ -20,7 +20,128 @@ Structured and normal HTTP responses include `X-Request-Id`. Intentionally prese
 
 `GET /rpg/v1/features` exposes the M0 RPG boundary as `{ campaign, mechanics, combat, studio, remoteAuthentication }`. Every flag defaults to `false` and is enabled only by the exact value `true` in `FEATURE_RPG_CAMPAIGN`, `FEATURE_RPG_MECHANICS`, `FEATURE_RPG_COMBAT`, `FEATURE_RPG_STUDIO`, or `FEATURE_REMOTE_AUTHENTICATION`. These are rollout controls, not authorization.
 
-Current persistence is schema v48 revision 1; canonical populated v46/v47->v48 upgrades are supported and v45 and earlier are unsupported. The trusted-local RPG surface currently has 102 explicit method-and-route registrations under `/api/rpg/v1`, excluding the separately registered `GET /rpg/v1/features` discovery operation and every implicit `HEAD` alias. A path registered for two methods counts as two operations. The historical M2.11 baseline was 92 operations: 14 pre-M2 compatibility operations, 40 operations across M2.1-M2.3 and M2.5-M2.7, 3 in M2.4, 5 in M2.8, 8 in M2.9, 14 in M2.10, and 8 in M2.11. Completed M4.6 added 3 reviewed campaign-content draft operations, preserving the historical 95-operation checkpoint. M5.1 added 2 NPC-presence operations for 97; the partial M5.2 companion lane adds 2 and the partial M5.3 consumable lane adds 3, bringing the current total to 102. M5.4 provider/adventure exact travel binding, recovery, safe narration, and receipt-only HTTP/client display reuse existing routes and add no operation; neither does the M5.5 pure protocol checkpoint. There is no live candidate generation/selection HTTP or client selection surface. Deterministic E2E does cover provider-committed travel through the production candidate/provider/execution/receipt path. The existing manual actor travel operation remains exposed with its current request/response contract and is separate from candidate execution. Campaign administration and transfer require the campaign feature; mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, generation-draft, M5.1 presence, and M5.2 companion routes require campaign plus mechanics; encounter, combat, M4.6 campaign-content draft, and M5.3 consumable routes require campaign plus mechanics plus combat.
+Current persistence is schema v53 revision 1. Populated v46-v52 databases are supported forward-startup inputs and v45 and earlier are unsupported; each migration step is transactional, but the multi-step chain is resumable rather than one all-versions transaction. The trusted-local RPG surface has 111 counted explicit method/path operations. The inventory below includes all 112 explicit non-HEAD registrations and classifies `GET /api/rpg/v1/features` separately as discovery. The published count excludes that one discovery row and every Fastify-generated `HEAD` alias. A path registered for multiple methods counts once per method. Runtime Fastify registration is the executable authority; this table is the sole checked documentation inventory.
+
+Campaign administration and transfer require the campaign feature. Mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and most generation routes require campaign plus mechanics. Encounter, combat, reviewed campaign-content generation, and generated foundation/planning/material routes require campaign plus mechanics plus combat. Feature flags remain rollout controls, not permissions. There is no live exact-candidate generation/selection HTTP or client selection surface; the existing manual actor travel operation remains separate from provider-selected exact-candidate execution.
+
+## RPG operation inventory
+
+<!-- rpg-operation-inventory:start -->
+| Method | Route | Inventory class |
+| --- | --- | --- |
+| `GET` | `/api/rpg/v1/features` | discovery |
+| `DELETE` | `/api/rpg/v1/campaigns/:campaignId/administration` | operation |
+| `DELETE` | `/api/rpg/v1/campaigns/:campaignId/memberships/:principalId` | operation |
+| `DELETE` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId` | operation |
+| `GET` | `/api/rpg/v1/actors/:actorId/effects` | operation |
+| `GET` | `/api/rpg/v1/actors/:actorId/powers` | operation |
+| `GET` | `/api/rpg/v1/adventure-turns/:turnId` | operation |
+| `GET` | `/api/rpg/v1/adventure-turns/reconcile-initial` | operation |
+| `GET` | `/api/rpg/v1/campaign-content-drafts/:draftId` | operation |
+| `GET` | `/api/rpg/v1/campaigns` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/inventory` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/resources` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/wallet` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/administration` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/characters` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/sheet` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/workspace` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/characters/creation-options` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/checkpoints` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/combats/:combatId/rewards/:rewardBundleId/claim-results/:claimIdentity` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/commands/:commandId/receipt` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/content` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/content-packs/:packId/versions/:packVersion` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/dice-rolls` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/encounters` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/events` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/export` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/factions` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/generated-foundation` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/generated-planning` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/memberships` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/npcs` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/published-materials` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/quests` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/recaps` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/present-cast` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/shops/:shopId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/story` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/timelines` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/world` | operation |
+| `GET` | `/api/rpg/v1/combats/:combatId` | operation |
+| `GET` | `/api/rpg/v1/combats/:combatId/consumable-actions` | operation |
+| `GET` | `/api/rpg/v1/combats/:combatId/consumable-actions/results/:idempotencyKey` | operation |
+| `GET` | `/api/rpg/v1/combats/:combatId/log` | operation |
+| `GET` | `/api/rpg/v1/combats/:combatId/rewards` | operation |
+| `GET` | `/api/rpg/v1/content-packs` | operation |
+| `GET` | `/api/rpg/v1/content-packs/:packId/versions/:packVersion` | operation |
+| `GET` | `/api/rpg/v1/generation-drafts/:draftId` | operation |
+| `PATCH` | `/api/rpg/v1/campaigns/:campaignId` | operation |
+| `PATCH` | `/api/rpg/v1/campaigns/:campaignId/administration` | operation |
+| `PATCH` | `/api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId` | operation |
+| `PATCH` | `/api/rpg/v1/campaigns/:campaignId/memberships/:principalId` | operation |
+| `POST` | `/api/rpg/v1/actors/:actorId/check-commands` | operation |
+| `POST` | `/api/rpg/v1/actors/:actorId/effect-commands` | operation |
+| `POST` | `/api/rpg/v1/actors/:actorId/placement-commands` | operation |
+| `POST` | `/api/rpg/v1/actors/:actorId/power-commands` | operation |
+| `POST` | `/api/rpg/v1/actors/:actorId/travel-commands` | operation |
+| `POST` | `/api/rpg/v1/adventure-turns/:turnId/confirm` | operation |
+| `POST` | `/api/rpg/v1/adventure-turns/stream` | operation |
+| `POST` | `/api/rpg/v1/campaign-content-drafts` | operation |
+| `POST` | `/api/rpg/v1/campaign-content-drafts/:draftId/apply` | operation |
+| `POST` | `/api/rpg/v1/campaign-imports` | operation |
+| `POST` | `/api/rpg/v1/campaign-imports/:importId/apply` | operation |
+| `POST` | `/api/rpg/v1/campaigns` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/economy-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/inventory-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/resource-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/rest-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/character-drafts` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/reroll` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/characters` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression/apply` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/progression/preview` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/characters/:campaignCharacterId/xp-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/checkpoints` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/dice-rolls` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/encounters` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/factions` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/material-publications` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/memberships` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/npcs` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration/commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/quests` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/recaps` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/npcs/:npcId/presence-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/storylines` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/timeline-forks` | operation |
+| `POST` | `/api/rpg/v1/combats/:combatId/action-commands` | operation |
+| `POST` | `/api/rpg/v1/combats/:combatId/consumable-actions/commands` | operation |
+| `POST` | `/api/rpg/v1/combats/:combatId/end-commands` | operation |
+| `POST` | `/api/rpg/v1/combats/:combatId/rewards/:rewardBundleId/claim-commands` | operation |
+| `POST` | `/api/rpg/v1/content-packs` | operation |
+| `POST` | `/api/rpg/v1/content-packs/validate` | operation |
+| `POST` | `/api/rpg/v1/encounters/:encounterId/start-commands` | operation |
+| `POST` | `/api/rpg/v1/factions/:factionId/reputation-commands` | operation |
+| `POST` | `/api/rpg/v1/generation-drafts` | operation |
+| `POST` | `/api/rpg/v1/generation-drafts/:draftId/apply` | operation |
+| `POST` | `/api/rpg/v1/npcs/:npcId/relationship-commands` | operation |
+| `POST` | `/api/rpg/v1/quests/:questId/commands` | operation |
+| `POST` | `/api/rpg/v1/storylines/:storylineId/commands` | operation |
+| `PUT` | `/api/rpg/v1/campaigns/:campaignId/content` | operation |
+| `PUT` | `/api/rpg/v1/campaigns/:campaignId/mechanics-starter-setup` | operation |
+| `PUT` | `/api/rpg/v1/campaigns/:campaignId/rooms` | operation |
+| `PUT` | `/api/rpg/v1/campaigns/:campaignId/starter-setup` | operation |
+<!-- rpg-operation-inventory:end -->
 
 **Historical Slice 98 checkpoint:** exactly 98 M0 slices were complete at v14r1 and exactly 13 campaign HTTP operations. Slice 98 was documentation-only closeout and added no feature, code, test, contract, route, operation, schema, migration, dependency, backup, or commit. Its gate passed typecheck, build, 1,993 unit tests plus 1 skip, and 1 deterministic E2E; live E2E was not run. This preserved ledger describes that checkpoint, not current persistence.
 
@@ -65,7 +186,7 @@ Slice 88 changes no schema or HTTP operation count. Its first-review remediation
 
 Setup has dual authority: fixed `local-owner` must be the sole canonical local application owner and the campaign pointer's sole canonical owner membership/principal. Inspection validates attributable campaign data before raw configuration identity, allowing exact configured starter namespace failures to become stable conflicts without hiding unrelated corruption. One preflight snapshot and both specialized immediate write transactions validate the full authority graph, campaign setup state, reserved exact profile, reserved pack across all versions, and complete/captured definition namespace before the first write. Exact manifest installation runs first, exact configuration second, then authoritative detail proof. This is convergent, not atomic: an install may remain after a valid first commit. Missing, extra, malformed, captured, wrong-version, unsealed, or incomplete reserved state conflicts without overwrite or repair. There is no hidden retry or automatic startup. The client exposes setup only to an exact owner, requires confirmation, binds success to owner/exact content, and uses GET—not an automatic PUT—to reconcile ambiguity. In-app back navigation is disabled while a mutation is in memory and reload receives a warning, but browsers cannot guarantee reload cancellation; a completed full reload remains ambiguous and must not be treated as permission to retry.
 
-All 102 current RPG operations, excluding the feature read and implicit HEAD aliases, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
+All 111 counted current RPG operations, plus the separately classified feature-discovery GET, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
 
 Schema v15 and the public repository barrel provide campaign lifecycle/settings, audited membership and room administration, checkpoint/fork, recap, role-safe log/receipt reads, and bounded import/export operations. Transfer packages carry strict public gameplay events and portable actor mechanics while omitting private actor state, idempotency keys, credentials, local paths, and usage history. M2.1-M2.11 now expose the reviewed trusted-local HTTP surface for these and the later mechanics domains.
 
@@ -329,7 +450,7 @@ The server writes `: heartbeat` SSE comments every `VELVET_SSE_HEARTBEAT_MS`, de
 
 Generation kind is exactly `encounter`, `location`, `npc`, `faction`, `quest`, `storyline`, or `content-pack`; `brief` is trimmed, nonblank, and at most 8,000 characters, and `constraints` contains at most 64 trimmed nonblank strings of at most 1,000 characters. The M2.11 create lane is deterministic user-brief fallback, not provider generation. Its exact provenance is `{ source: "user-brief", method: "deterministic-fallback", applicationScope: "draft-review" }`; each change is `{ changeId, summary, content: { brief, constraints } }`; each validation issue is `{ path, code, severity, message }`. Draft field order is `{ draftId, campaignId, kind, state, revision, createdAt, updatedAt }`, with state `staged`, `in-review`, `approved`, `rejected`, `applied`, or `cancelled`.
 
-At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registers `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; all three currently require campaign plus mechanics plus combat. The current GET registration does not disable Fastify's implicit HEAD alias, so HEAD currently follows that GET route. That implicit alias is excluded from both the historical 95-operation checkpoint and the current 102 explicit-operation count. These statements record current evidenced registration behavior only; the M2.11 baseline guarantees above are not extended to the M4.6 routes.
+At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registered `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; v50-v53 expanded that lane and added generated foundation/planning and material-delivery operations described below. These routes require campaign plus mechanics plus combat. The campaign-content draft GET and the three generated campaign GETs do not disable Fastify's implicit HEAD aliases; discovery has an implicit HEAD as well. Every implicit alias is excluded from the historical 95-operation checkpoint and current 111-operation convention. The M2.11 baseline guarantees above are not retroactively extended to these later routes.
 
 ### NPC presence (M5.1, 2 operations)
 
@@ -353,6 +474,32 @@ Room detachment is refused while an attached running room has any currently `pre
 ### Companion administration (M5.2 partial, 2 operations)
 
 Both operations require campaign and mechanics features and fixed trusted-local `local-owner`. `GET /rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration` is the authoritative owner/GM management read. `POST /rpg/v1/campaigns/:campaignId/npcs/:npcId/companion-administration/commands` accepts the closed `companion-create`, `grant-create`, or `grant-revoke` command union with expected revision and idempotency key and returns only `{ receipt: { kind, revisionBefore, revisionAfter, occurredAt } }`. Campaign and NPC identity are path-owned; writes are authoritative, atomic, idempotent, and receipt-only safe. The client exposes transport functions only: there is no companion UI, public member HTTP projection, delegated grant exercise, dismissal, or proposal/decision administration.
+
+### v49-v53 gameplay and generation additions (9 operations)
+
+| Method | Route | Strict request | Success |
+| --- | --- | --- | --- |
+| `POST` | `/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/reroll` | `{ expectedRevision, idempotencyKey }`; no query; JSON only | `200 { draft, receipt }` with a new complete server-roll allocation |
+| `POST` | `/rpg/v1/actors/:actorId/placement-commands` | `{ campaignId, locationId, expectedRevision, idempotencyKey }`; no query; JSON only | `200 { location, receipt }` |
+| `GET` | `/rpg/v1/combats/:combatId/rewards` | No query | `200 { rewards }` with recipient-visible bundles and claim state |
+| `POST` | `/rpg/v1/combats/:combatId/rewards/:rewardBundleId/claim-commands` | `{ rewardClaimId, expectedRevision, idempotencyKey }`; no query; JSON only | `200 { reward, receipt }` with claimed state |
+| `GET` | `/rpg/v1/campaigns/:campaignId/combats/:combatId/rewards/:rewardBundleId/claim-results/:claimIdentity` | No query; `claimIdentity` is the original idempotency key or reward-claim ID | `200 { reward, requestBinding, receipt }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/generated-foundation` | No query | `200 { campaignId, revision, opening }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/generated-planning` | No query or body | `200 { campaignId, deliveryRevision, encounters, deliverables }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/published-materials` | No query or body | `200 { campaignId, revision, materials }` |
+| `POST` | `/rpg/v1/campaigns/:campaignId/material-publications` | `{ artifactKey, expectedRevision, idempotencyKey }`; no query; JSON only | `200 { material, receipt }` |
+
+Reroll requires campaign plus mechanics and fixed `local-owner`. The path binds the exact campaign and draft before mutation. Only a live server-roll draft is eligible; the server generates and persists all dice, advances the draft revision once, and returns the same public draft/receipt projection as other draft mutations. Exact key/request replay returns the immutable result without rerolling; stale, expired, incomplete, unavailable, and conflict outcomes use the existing character-draft errors. The response omits controller, role, command, and private persona state. Reconcile ambiguity with the draft GET and never retry automatically.
+
+Actor placement requires campaign plus mechanics and repository-derived owner/GM authority. It is the safe bootstrap path used when no designated generated start has already placed the actor. Actor identity is path-owned; campaign, location, expected world revision, and key are strict body evidence. Missing/denied actor or world state is non-disclosing `404 RPG_ACTOR_WORLD_NOT_FOUND`; stale state is `409 RPG_WORLD_STALE`; an occupied, cross-campaign, or otherwise incompatible placement is `409 RPG_PLACEMENT_CONFLICT`. The receipt proves one world revision advance and exposes no principal or command ID. Reconcile an ambiguous 500 with campaign world state before any deliberate retry.
+
+Combat reward operations require campaign plus mechanics plus combat. Reward list and claim projections expose only bounded bundle ID, recipient actor ID, creation time, typed rewards, and `unclaimed` or exact claimed state. The recipient controller and owner/GM may list bundles, but claim and exact-result authority belongs only to the current recipient controller. Missing, denied, malformed, and cross-bound values are the same non-disclosing `404 RPG_COMBAT_NOT_FOUND`. Claim stale/conflict outcomes are typed 409s. A claim atomically settles the immutable reward claim and recipient wallet once. An unexpected claim response is ambiguous: the client must use the exact claim-result GET, then refresh rewards and wallet, without replaying POST. The exact-result read never executes a command; it verifies campaign/combat/bundle/recipient, original request evidence, canonical request digest, claim state, and receipt, while omitting private command/controller records. Its `404` does not prove non-commit or authorize automatic replay.
+
+Generated campaign reads and material publication require campaign plus mechanics plus combat and fixed `local-owner`; all reject queries and use no-store responses. `generated-foundation` returns the latest accepted public outline or `opening: null`. `generated-planning` is the GM projection for inert encounter concepts and generated handout/scene-prompt candidates; it creates no encounter or combat rows. `published-materials` is the player-safe projection and contains only explicitly published public handouts or scene prompts. Publication requires current owner/GM authority, an accepted public handout/scene-prompt with a materialized resource, and the current delivery revision. It appends one command, receipt, and projection; exact replay converges, changed reuse/stale state conflicts, and GM-only artifacts remain non-disclosing. A lost publication response is reconciled through `published-materials`; POST is never automatically retried.
+
+The reviewed campaign-content draft lane now accepts a nonempty subset of outline, arcs, locations, factions, NPCs, quests, encounter concepts, clues, story, handouts, and scene prompts. Candidate responses remove faction GM notes and NPC private goals. Apply requires `{ expectedRevision, idempotencyKey, selectedArtifactKeys }`, validates dependency closure and stale digests, and materializes selected standard-domain records atomically. Concurrent exact provider requests coalesce; failed paid calls require explicit `retryFailedAttempt` acknowledgement and are never silently repeated. See [Campaign generation and expansion](campaign-generation.md) for section limits, privacy, provider observability, NPC placement reconciliation, and deliberate exclusions.
+
+For these nine additions, feature denial is `404 RPG_ROUTE_NOT_FOUND` before repository access and every query is `400 RPG_INVALID_REQUEST`. JSON writes without the accepted JSON media type are `415 RPG_UNSUPPORTED_MEDIA_TYPE`; malformed or schema-invalid bodies are `400 RPG_INVALID_REQUEST`. Reroll path/authority absence is `404 CHARACTER_DRAFT_NOT_FOUND`; its exact stale, expired, incomplete, conflict, unavailable, and internal mappings are the character-draft codes above. Placement absence is `404 RPG_ACTOR_WORLD_NOT_FOUND`, stale is `409 RPG_WORLD_STALE`, conflict is `409 RPG_PLACEMENT_CONFLICT`, and an unexpected `500 RPG_INTERNAL_ERROR` is commit-ambiguous and instructs world reconciliation. Reward absence/denial is `404 RPG_COMBAT_NOT_FOUND`; claim stale is `409 RPG_COMBAT_STALE`, claim conflict is `409 RPG_REWARD_CLAIM_CONFLICT`, and an unexpected claim `500 RPG_INTERNAL_ERROR` is ambiguous. Generated campaign reads use non-disclosing `404 RPG_CAMPAIGN_NOT_FOUND` and structured `500 RPG_INTERNAL_ERROR` for malformed output or repository failure. Material publication uses `404 RPG_GENERATION_DRAFT_NOT_FOUND` for unavailable authority/artifact, `409 RPG_GENERATION_DRAFT_CONFLICT` for stale or changed replay, and `503 RPG_GENERATION_UNAVAILABLE` for unexpected failure. Publication and campaign-content apply 503 responses are explicitly commit-ambiguous; reconcile their authoritative reads and do not automatically retry.
 
 For the eight M2.11 baseline operations, malformed requests return `400 RPG_INVALID_REQUEST`; wrong write media returns `415 RPG_UNSUPPORTED_MEDIA_TYPE`; disabled or unsupported routes return `404 RPG_ROUTE_NOT_FOUND`. Missing or denied turns return `404 RPG_ADVENTURE_TURN_NOT_FOUND`; stale turns return `409 RPG_ADVENTURE_TURN_STALE`; expired or conflicting turn commands return `409 RPG_ADVENTURE_TURN_CONFLICT`. Missing or denied drafts return `404 RPG_GENERATION_DRAFT_NOT_FOUND`; stale drafts return `409 RPG_GENERATION_DRAFT_STALE`; draft conflicts return `409 RPG_GENERATION_DRAFT_CONFLICT`. Problem instances use only safe route templates and never echo IDs, queries, bodies, tokens, tool arguments, or private bindings. Unexpected repository, persistence, output, or stream-setup failures are redacted `500 RPG_INTERNAL_ERROR`. A lost response, malformed terminal frame, disconnect, or unexpected 500 is write-ambiguous: reconcile with the authoritative no-store turn or draft GET before any manual action and never automatically repeat the write. Stream-side failures attempt terminal `error` with the latest durable projection when the connection and state remain available.
 

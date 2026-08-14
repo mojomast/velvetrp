@@ -25,12 +25,15 @@ export const worldHttpRoutes:FastifyPluginAsync<WorldHttpOptions>=async(app,opti
       const actorId=resourceIdSchema.safeParse(request.params.actorId),body=actorPlacementCommandRequestSchema.safeParse(request.body);if(!actorId.success)return actorNotFound(request,reply);
       if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor placement request is invalid");
       try{const result=options.worldRepositoryAccessor().placeActor(LOCAL_OWNER,actorId.data,body.data);
+        if(result.campaignId!==body.data.campaignId||result.location.actorId!==actorId.data||result.location.locationId!==body.data.locationId
+          ||result.receipt.idempotencyKey!==body.data.idempotencyKey||result.receipt.revisionBefore!==body.data.expectedRevision
+          ||result.receipt.revisionAfter!==body.data.expectedRevision+1)throw new Error("actor placement result binding is invalid");
         return reply.code(200).send(actorPlacementCommandResponseSchema.parse({location:result.location,receipt:{idempotencyKey:result.receipt.idempotencyKey,
           revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
       }catch(error){if(error instanceof WorldAuthorizationError||error instanceof WorldUnavailableError)return actorNotFound(request,reply);
         if(error instanceof WorldStaleError)return sendApiProblem(request,reply,409,"RPG_WORLD_STALE","World state is stale; refresh before trying again");
         if(error instanceof WorldConflictError)return sendApiProblem(request,reply,409,"RPG_PLACEMENT_CONFLICT","Actor placement conflicts with current world state");
-        request.log.error({operation:"actor-placement"},"RPG actor placement failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Actor placement could not be completed");}
+        request.log.error({operation:"actor-placement"},"RPG actor placement failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Actor placement outcome could not be confirmed; reconcile world state and do not automatically retry");}
     });
   app.get<{Params:{campaignId:string};Querystring:Record<string,unknown>}>("/campaigns/:campaignId/world",{
     exposeHeadRoute:false,onRequest:async(request,reply)=>{reply.header("cache-control","no-store");

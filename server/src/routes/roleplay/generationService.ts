@@ -114,9 +114,9 @@ export async function runCharacterPipeline(input: {
     );
     replyText = generated.text;
     usage = generated.usage;
-  } catch (err) {
+  } catch {
     providerError = true;
-    log.error({ err }, "LLM generation failed; persisting safe fallback reply");
+    log.error({}, "LLM generation failed; persisting safe fallback reply");
     replyText = SAFE_FALLBACK_REPLY;
   }
   const cleanedReplyText = cleanCharacterReply(replyText, session.participants);
@@ -174,11 +174,11 @@ async function streamCharacterPipeline(input: {
       signal,
     );
     usage = generated.usage;
-  } catch (err) {
+  } catch {
     if (violations) return boundaryOutcome(violations);
     if (signal.aborted) return { kind: "aborted" };
     providerError = true;
-    log.error({ err }, "LLM generation failed; persisting safe fallback reply");
+    log.error({}, "LLM generation failed; persisting safe fallback reply");
     full = SAFE_FALLBACK_REPLY;
   }
   if (violations) return boundaryOutcome(violations);
@@ -308,8 +308,8 @@ export async function runSseGeneration(input: {
       });
     }
     sse.end();
-  } catch (err) {
-    request.log.error({ err }, "streamed generation failed");
+  } catch {
+    request.log.error({ operation: "streamed-generation" }, "streamed generation failed");
     finished = true;
     if (sse) {
       sse.send("error", { error: "streamed generation failed" });
@@ -346,8 +346,8 @@ export async function maybeUpdateSummary(
         await updateSessionSynthesizedSource(sessionId, synthesized.text);
         if (synthesized.usage) await recordUsageEvent(sessionId, "scene_synthesis", synthesized.usage);
       }
-    } catch (error) {
-      log.warn({ sessionId, error }, "scene synthesis skipped");
+    } catch {
+      log.warn({ sessionId }, "scene synthesis skipped");
     }
   }
   if (activeBranch.length > harness.recentTurns && (force || shouldUpdateSummary(activeBranch.length))) {

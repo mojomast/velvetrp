@@ -1,9 +1,8 @@
 # Migration Test Archive
 
-These tests are intentionally archived during the pre-release supported/tested
-window for startup upgrades from canonical populated v46 or v47 to v48. They preserve historical
-migration coverage without running in Vitest. Archive presence does not mean
-that startup upgrades from v2 through v39 are supported.
+These tests preserve historical one-step migration behavior without running in
+Vitest. Archive presence does not imply current startup support. Schema v53r1
+supports populated v46-v52 startup inputs; v45 and earlier are unsupported.
 
 Versioned suites use the `.archived.ts` suffix; reactivate one by restoring its
 `.test.ts` suffix. Embedded suites remain in their owning files as
@@ -11,9 +10,15 @@ Versioned suites use the `.archived.ts` suffix; reactivate one by restoring its
 
 ## Active Coverage Discoverability
 
-The active executable supported-window coverage is in
-`migration-support-window.test.ts`; active version-specific coverage is in
-`migration-v47.test.ts` and `migration-v48.test.ts`. These remain discoverable by the server test command. v45 and earlier startup markers are unsupported.
+`migration-support-window.test.ts` is the active product-support authority. It
+runs populated v46-v52 databases through full startup, checks preexisting rows,
+fresh/current DDL parity, foreign keys, marker/revision handling, and rejection
+without mutation. Active version-specific suites (`migration-v45.test.ts` and
+`migration-v47.test.ts` through `migration-v53.test.ts`, except that v49 is
+covered by the support matrix and v50 full-startup case) retain focused
+historical layout, migration-step, rollback, and tamper evidence. All are
+discovered by the existing server test command. The v45 suite validates a
+historical fixture only and does not claim current startup support.
 
 ## Versioned Inventory
 
@@ -24,6 +29,7 @@ The active executable supported-window coverage is in
 - `migration-v42.archived.ts`
 - `migration-v43.archived.ts`
 - `migration-v44.archived.ts`
+- `migration-v46.archived.ts`
 
 ## Cleanup Adaptation
 

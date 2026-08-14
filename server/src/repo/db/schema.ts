@@ -55,6 +55,9 @@ function getSchemaDependencies(): SchemaDependencies {
 
 export const SCHEMA_VERSION = "53";
 export const SCHEMA_REVISION = "1";
+export const SUPPORTED_MIGRATION_INPUTS = ["46", "47", "48", "49", "50", "51", "52"] as const;
+
+const ACCEPTED_SCHEMA_VERSIONS = new Set<string>([...SUPPORTED_MIGRATION_INPUTS, SCHEMA_VERSION]);
 
 const V34_TABLE_DROP_ORDER = ["story_layout_attestation_v34", "story_discoveries_v34", "story_clue_sources_v34", "story_clues_v34",
   "story_plot_point_answers_v34", "story_plot_points_v34", "story_edges_v34", "story_node_state_v34", "story_nodes_v34",
@@ -123,7 +126,7 @@ function v48Artifacts(db:DatabaseDriver.Database):Array<{type:string;name:string
 
 /** Read-only guard before cleanup; database-wide FK checking applies to supported migration inputs. */
 function preflightPersistedIntegrity(db: DatabaseDriver.Database, marker: string): void {
-  if (["43","44","45","46","47","48"].includes(marker)) {
+  if ((SUPPORTED_MIGRATION_INPUTS as readonly string[]).includes(marker)) {
     const foreignKeyIssue = db.prepare("PRAGMA foreign_key_check").get() as { table: string; rowid: number; parent: string; fkid: number } | undefined;
     if (foreignKeyIssue) throw new Error(`schema marker ${marker} contains foreign-key violation in ${foreignKeyIssue.table}`);
   }
@@ -279,25 +282,75 @@ function cleanupFutureExactCandidateProviderV48(db:DatabaseDriver.Database,marke
   if((db.prepare("SELECT count(*) count FROM exact_candidate_provider_bindings_v48").get() as {count:number}).count)throw new Error(`schema marker ${marker} contains populated future v48 artifact exact_candidate_provider_bindings_v48`);
   db.transaction(()=>{for(const {type,name} of [...artifacts].reverse()){if(type==="trigger")db.exec(`DROP TRIGGER "${name}"`);if(type==="index")db.exec(`DROP INDEX "${name}"`);}for(const table of [...V48_TABLES].reverse())db.exec(`DROP TABLE "${table}"`);})();}
 
-/** Rewound migration fixtures may contain only empty additive v49-v53 shells. */
-function cleanupEmptyFutureCampaignShells(db:DatabaseDriver.Database,marker:string):void{
-  const groups=[
-    {version:53,tables:["campaign_material_deliveries_v53","campaign_material_delivery_receipts_v53","campaign_material_delivery_commands_v53","campaign_material_delivery_revisions_v53"]},
-    {version:52,tables:["generated_npc_placement_intents_v52","campaign_generation_accepted_artifacts_v52","campaign_generation_dependencies_v52","campaign_generation_candidate_artifacts_v52","campaign_generation_attempts_v52","campaign_generation_jobs_v52"]},
-    {version:51,tables:["campaign_starting_locations_v51","combat_reward_settlements_v51","character_starter_materializations_v51"]},
-    {version:50,tables:["campaign_generation_artifacts_v50","campaign_generation_calls_v50"]},
-    {version:49,tables:["character_draft_rerolls_v49"]},
-  ];
-  for(const group of groups){if(Number(marker)>=group.version)continue;
-    const present=group.tables.filter((table)=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
-    if(!present.length)continue;
-    if(present.length!==group.tables.length)throw new Error(`schema marker ${marker} contains malformed future v${group.version} artifacts`);
-    for(const table of present)if((db.prepare(`SELECT count(*) count FROM "${table}"`).get() as {count:number}).count)
-      throw new Error(`schema marker ${marker} contains populated future v${group.version} artifact ${table}`);
-    db.transaction(()=>{const artifacts=db.prepare(`SELECT type,name FROM sqlite_master WHERE (name GLOB '*v${group.version}*' OR tbl_name IN (${present.map(()=>"?").join(",")})) AND sql IS NOT NULL ORDER BY type DESC`).all(...present) as Array<{type:string;name:string}>;
-      for(const artifact of artifacts)if(artifact.type==="trigger")db.exec(`DROP TRIGGER "${artifact.name}"`);
-      for(const artifact of artifacts)if(artifact.type==="index")db.exec(`DROP INDEX "${artifact.name}"`);
-      for(const table of present)db.exec(`DROP TABLE "${table}"`);})();
+interface FutureCampaignShellGroup {
+  version: number;
+  tables: readonly string[];
+  create: (db: DatabaseDriver.Database) => void;
+}
+
+type SchemaArtifact = { type: string; name: string; tbl_name: string; sql: string };
+
+function campaignShellArtifacts(db: DatabaseDriver.Database, group: FutureCampaignShellGroup): SchemaArtifact[] {
+  return (db.prepare(`SELECT type,name,tbl_name,sql FROM sqlite_master
+    WHERE sql IS NOT NULL AND (name GLOB ? OR tbl_name IN (${group.tables.map(() => "?").join(",")}))
+    ORDER BY type,name`).all(`*v${group.version}*`, ...group.tables) as SchemaArtifact[])
+    .map((artifact) => ({ ...artifact, sql: artifact.sql.replace(/\s+/g, " ").trim() }));
+}
+
+function assertCanonicalCampaignLayouts(
+  db: DatabaseDriver.Database,
+  marker: string,
+  groups: readonly FutureCampaignShellGroup[],
+): void {
+  for (const group of groups) {
+    if (Number(marker) < group.version) continue;
+    const canonical = new DatabaseDriver(":memory:");
+    try {
+      group.create(canonical);
+      if (JSON.stringify(campaignShellArtifacts(db, group)) !== JSON.stringify(campaignShellArtifacts(canonical, group))) {
+        throw new Error(`schema v${group.version} campaign layout is incompatible`);
+      }
+    } finally {
+      canonical.close();
+    }
+  }
+}
+
+/** Rewound fixtures may contain only complete canonical empty v49-v53 shells. */
+function cleanupEmptyFutureCampaignShells(
+  db: DatabaseDriver.Database,
+  marker: string,
+  groups: readonly FutureCampaignShellGroup[],
+): void {
+  const removable: Array<{ group: FutureCampaignShellGroup; artifacts: SchemaArtifact[] }> = [];
+  for (const group of groups) {
+    if (Number(marker) >= group.version) continue;
+    const artifacts = campaignShellArtifacts(db, group);
+    if (artifacts.length === 0) continue;
+    const present = group.tables.filter((table) => db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+    if (present.length !== group.tables.length) throw new Error(`schema marker ${marker} contains malformed future v${group.version} artifacts`);
+    for (const table of present) {
+      if ((db.prepare(`SELECT count(*) count FROM "${table}"`).get() as { count: number }).count) {
+        throw new Error(`schema marker ${marker} contains populated future v${group.version} artifact ${table}`);
+      }
+    }
+    const canonical = new DatabaseDriver(":memory:");
+    try {
+      group.create(canonical);
+      if (JSON.stringify(artifacts) !== JSON.stringify(campaignShellArtifacts(canonical, group))) {
+        throw new Error(`schema marker ${marker} contains malformed future v${group.version} artifacts`);
+      }
+    } finally {
+      canonical.close();
+    }
+    removable.push({ group, artifacts });
+  }
+  for (const { group, artifacts } of removable) {
+    db.transaction(() => {
+      for (const artifact of artifacts) if (artifact.type === "trigger") db.exec(`DROP TRIGGER "${artifact.name}"`);
+      for (const artifact of artifacts) if (artifact.type === "index") db.exec(`DROP INDEX "${artifact.name}"`);
+      for (const table of group.tables) db.exec(`DROP TABLE "${table}"`);
+    })();
   }
 }
 
@@ -419,6 +472,8 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'meta'",
   ).get();
   if (!hasMeta) {
+    const existingObject = db.prepare("SELECT name FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' LIMIT 1").get() as { name: string } | undefined;
+    if (existingObject) throw new Error(`unsupported schemaVersion missing; expected ${SCHEMA_VERSION}`);
     db.exec(`
       CREATE TABLE meta (
         key TEXT PRIMARY KEY,
@@ -427,6 +482,14 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     `);
   }
   const row = db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string } | undefined;
+  if (row && !ACCEPTED_SCHEMA_VERSIONS.has(row.value)) {
+    throw new Error(`unsupported schemaVersion ${row.value}; expected ${SCHEMA_VERSION}`);
+  }
+  if (row) assertCurrentSchemaRevision(db);
+  if (!row) {
+    const existingObject = db.prepare("SELECT name FROM sqlite_master WHERE sql IS NOT NULL AND name<>'meta' AND name NOT LIKE 'sqlite_%' LIMIT 1").get() as { name: string } | undefined;
+    if (existingObject) throw new Error(`unsupported schemaVersion missing; expected ${SCHEMA_VERSION}`);
+  }
   preflightPersistedIntegrity(db, row?.value ?? "unversioned");
   // Do not resolve migration dependencies until persisted migration inputs have
   // passed the read-only preflight. Current-schema domain assertions remain the
@@ -533,10 +596,53 @@ export function ensureSchema(db: DatabaseDriver.Database): void {
     validateWorldTravelNpcFactionV28(db);
     return;
   }
+  const campaignLayouts = [
+    { version: 53, tables: ["campaign_material_deliveries_v53", "campaign_material_delivery_receipts_v53", "campaign_material_delivery_commands_v53", "campaign_material_delivery_revisions_v53"], create: createCampaignMaterialDeliveryV53 },
+    { version: 52, tables: ["generated_npc_placement_intents_v52", "campaign_generation_accepted_artifacts_v52", "campaign_generation_dependencies_v52", "campaign_generation_candidate_artifacts_v52", "campaign_generation_attempts_v52", "campaign_generation_jobs_v52"], create: createCampaignGenerationExpansionV52 },
+    { version: 51, tables: ["campaign_starting_locations_v51", "combat_reward_settlements_v51", "character_starter_materializations_v51"], create: createGrantsRewardsPlacementV51 },
+    { version: 50, tables: ["campaign_generation_artifacts_v50", "campaign_generation_calls_v50"], create: createCampaignGenerationV50 },
+    { version: 49, tables: ["character_draft_rerolls_v49"], create: createCharacterRerollsV49 },
+  ] as const;
+  // Supported persisted inputs must be fully valid before cleanup or a migration can mutate them.
+  assertCharacterBuilderLayoutV22(db);
+  assertCharacterProgressionLayoutV23(db);
+  assertCharacterProgressionLayoutV24(db);
+  assertResourcesInventoryEconomyRestLayoutV25(db);
+  assertChecksPowersEffectsLayoutV26(db);
+  assertCombatFoundationLayoutV27(db);
+  assertWorldTravelNpcFactionLayoutV28(db);
+  assertCharacterLayoutV29(db);
+  assertCampaignImportStagingV30(db);
+  assertEncounterLifecycleV31(db);
+  assertWorldNarrativeV32(db);
+  assertQuestDomainV33(db);
+  assertStoryDomainV34(db);
+  assertToolExecutionBindingsV37(db);
+  assertDurableAgentExecutionV38(db);
+  assertAgentResponseProvenanceV39(db);
+  assertConfirmationPolicyV40(db);
+  assertCampaignContentIntegrityV42(db);
+  assertNpcPresenceLayoutV43(db);
+  assertCompanionCoreLayoutV45(db);
+  const persistedVersion = Number(row.value);
+  assertCanonicalCampaignLayouts(db, row.value, campaignLayouts);
+  if (persistedVersion >= 46) assertExactCandidatesLayoutV46(db);
+  if (persistedVersion >= 47) assertExactCandidateExecutionsLayoutV47(db);
+  if (persistedVersion >= 48) assertExactCandidateProviderBridgeLayoutV48(db);
+  if (persistedVersion >= 49) assertCharacterRerollsLayoutV49(db);
+  if (persistedVersion >= 50) assertCampaignGenerationLayoutV50(db);
+  if (persistedVersion >= 51) assertGrantsRewardsPlacementLayoutV51(db);
+  if (persistedVersion >= 52) assertCampaignGenerationExpansionLayoutV52(db);
+  if (persistedVersion >= 53) assertCampaignMaterialDeliveryLayoutV53(db);
+  validateV20DraftAudit(db);
+  validateCharacterProgressionV23(db);
+  validateCharacterProgressionV24(db);
+  validateM15PersistenceV25(db);
+  validateM16PersistenceV26(db);
+  validateCombatFoundationV27(db);
+  validateWorldTravelNpcFactionV28(db);
   let version = row.value;
-  // v45 and earlier are outside the two-version support window. Reject before any cleanup or mutation.
-  if (Number(version) <= 45) throw new Error(`unsupported schemaVersion ${version}; expected ${SCHEMA_VERSION}`);
-  cleanupEmptyFutureCampaignShells(db,version);
+  cleanupEmptyFutureCampaignShells(db, version, campaignLayouts);
   const futureBuilderArtifact = Number(version) < 19 && db.prepare(`SELECT type,name FROM sqlite_master
     WHERE name GLOB '*character*_v19*' LIMIT 1`).get() as
       { type: string; name: string } | undefined;

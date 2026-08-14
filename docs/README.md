@@ -2,6 +2,17 @@
 
 Documents are grouped by their primary role. Normative documents describe current contracts and repository architecture; implementation notes and plans do not override them.
 
+## Authority and ownership
+
+- Runtime code and shared Zod contracts own executable behavior and wire validation.
+- [API reference](api.md) owns current HTTP behavior and the sole parseable RPG operation inventory.
+- [Operations](operations.md) owns setup, configuration classification, migration support, backup/restore, and release-gate guidance.
+- [Repository architecture](repo-architecture.md) owns current persistence structure, migration lineage, module ownership, and transaction conventions.
+- [RPG roadmap](ROADMAP.md) alone owns current milestone status and remaining product scope.
+- Root [`devplan.md`](../devplan.md) is a compact delivered/pending ledger; it cannot override the roadmap.
+- Root [`handoff.md`](../handoff.md) owns the immediate engineering baseline and next task.
+- Historical and dated plans preserve rationale and checkpoints but never override these current authorities.
+
 ## Normative reference
 
 - [API reference](api.md) - Current HTTP routes, request/response contracts, feature gates, error handling, and reconciliation rules.
@@ -13,11 +24,14 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - [Operations](operations.md) - Node 22 setup, environment, local deployment, storage, migration backup/restore, testing, and troubleshooting.
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
+- [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
+- [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.
+- [Planning board](planning-board.md) - Internal contributor workflow for the repository-specific planning board.
 
 ## Planning and historical records
 
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
-- [Revision 2 integration plan](revision-2-integration-plan.md) - Approved post-M4 actionable execution design, subordinate to roadmap scope and status.
+- [Revision 2 integration plan](revision-2-integration-plan.md) - Preserved approved post-M4 execution design at its saved checkpoint; historical rather than current next-work authority.
 - [RPG integration plan](rpg-integration-plan.md) - Original integration design and historical operation ledgers; current implementation can be newer.
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.
 - [Roleplay product/feature snapshot (2026)](trending-roleplay-features-2026.md) - Dated internal planning snapshot, not external research, provenance, a commitment, or a contract.

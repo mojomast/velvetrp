@@ -1,20 +1,20 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
-## Current status (v48r1; Wave A slices delivered)
+## Current status (v53r1; original plan retained as history)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current persistence is schema **v48 revision 1 (v48r1)**, with **102 explicit trusted-local RPG HTTP operations**. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary. Canonical populated v46/v47->v48 startup upgrades are supported; v45 and earlier are unsupported. Provider/adventure exact travel, receipt-only HTTP/client display, and provider-committed candidate E2E are delivered; live candidate generation/selection HTTP/client APIs remain absent.
-- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. M5.2 and M5.3 remain partial as documented. M5.4 is In Progress/partial with v46 issuance/lifecycle, v47 atomic execution, v48 provider/adventure exact travel, receipt-only HTTP/client display, and provider-committed travel E2E delivered. Live candidate generation/selection HTTP/client APIs are absent; API remains 102 and existing manual travel remains exposed. M5.5 has completed only its pure protocol checkpoint. Remaining integration is ordered and statused only by [ROADMAP.md](ROADMAP.md).
+- Current persistence is schema **v53 revision 1 (v53r1)**, with **111 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary. Populated v46-v52 startup upgrades are supported; v45 and earlier are unsupported.
+- Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, exact travel, character rerolls, reviewed campaign expansion, starter/reward/placement settlement, and explicit material publication. Remaining integration and exclusions are statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
-- Supported executable migration coverage is for canonical populated **v46 and v47 databases upgrading to v48**. v45 and earlier migration code and archived tests do not constitute startup-upgrade support.
+- Supported executable migration coverage runs populated **v46-v52 databases through full startup to v53**. v45 and earlier migration code and archived tests do not constitute startup-upgrade support.
 - A campaign NPC's persona reference remains identity metadata. M5.1 can persist an NPC in a running attached session's present cast, with an optional role-visible location, and retains a stopped session's cast as at-stop history. Presence does not make the NPC a legacy session participant or autonomous speaker, does not create a campaign-NPC speech bridge, and does not imply that the full campaign NPC roster is present.
 
 ## Checkpoint language
 
-Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v48r1 status above.
+Every dated slice, gate, schema, operation-count, migration, and handoff entry below is a point-in-time ledger for its named checkpoint/commit. Words such as **current**, **next**, **remaining**, **absent**, **unchanged**, and **unimplemented** inside those entries apply only at that checkpoint and do not override the v53r1 status above.
 
 ## Original purpose (historical)
 
@@ -876,7 +876,7 @@ Key screens:
 
 ## Migration Sequence
 
-Velvet currently uses schema **v47 revision 1**. Canonical populated v45 and v46 databases are the supported forward-startup inputs; v44 and earlier are unsupported. The concise sequence below is a migration-history summary; [ROADMAP.md](ROADMAP.md) and [repo-architecture.md](repo-architecture.md) are normative for current milestone and repository ownership details.
+The concise sequence below is the original plan's historical migration summary through v47; it is not a current schema or support-window claim. [ROADMAP.md](ROADMAP.md), [operations.md](operations.md), and [repo-architecture.md](repo-architecture.md) are normative for current status and migration policy.
 
 | Version | Scope |
 |---|---|
@@ -920,9 +920,9 @@ Migration requirements:
 
 - Every migration is atomic and advances `meta.schemaVersion` in the same transaction.
 - Fresh installations create the latest schema directly.
-- The supported executable startup window is canonical populated v46 and v47 databases upgrading to v48; v45 and earlier migration implementations and archived tests are historical and unsupported. Historical support-window wording remains scoped to its named checkpoint.
+- At the later v48 checkpoint, the supported executable startup window was canonical populated v46 and v47 databases upgrading to v48. That historical window does not override current operations guidance.
 - Existing characters and sessions receive no implicit RPG data.
-- Migration failures are loud and rollback completely.
+- Each migration step fails loudly and rolls its own transaction back completely; a later failure in a multi-step startup can leave a valid intermediate marker.
 - Production migration instructions include a SQLite online backup.
 - Additive tables preserve prior data; binaries still enforce the exact supported schema version, and destructive down-migrations are not provided.
 

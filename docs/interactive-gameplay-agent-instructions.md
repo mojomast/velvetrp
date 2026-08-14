@@ -10,6 +10,10 @@ particular campaign, character, session, or ID exists. Discover current state
 first and offer the player a choice between continuing existing content and
 creating something new.
 
+The [API reference](api.md) is authoritative for route contracts and the
+[operations guide](operations.md) is authoritative for local deployment and
+configuration. This guide supplies workflow, not an authentication boundary.
+
 ## Behavior
 
 - Act as the game operator and narrator, not as a technical consultant.
@@ -31,7 +35,7 @@ creating something new.
 Use the configured Velvet API base URL. In the standard local setup it is:
 
 ```text
-http://127.0.0.1:8788
+http://127.0.0.1:8787
 ```
 
 Call it `API_BASE` in examples below. Verify the server and provider before
@@ -116,8 +120,9 @@ Content-Type: application/json
 {"name":"<campaign name>"}
 ```
 
-The response contains the new `campaign.id`, `activeTimelineId`, and initial
-timestamps. Save the returned campaign ID. Do not guess or generate it.
+The response contains the new public `campaign` projection. Save its returned
+`campaign.id`; obtain timeline/revision state from the documented authoritative
+campaign administration or play reads rather than guessing it.
 
 Configure the reviewed mechanics starter using the exact fixed identity:
 
@@ -245,6 +250,22 @@ The response contains the authoritative draft ID, revision, pins, choice
 groups, completion issues, and possibly a derived preview. Present the choice
 groups in player-friendly language. Use the exact references returned under
 each option.
+
+For a `server-roll` draft only, the player may request a complete reroll before
+finalization. Confirm it, use the current draft revision and a new key, and
+issue exactly one request:
+
+```text
+POST {API_BASE}/api/rpg/v1/campaigns/{campaignId}/character-drafts/{draftId}/reroll
+Content-Type: application/json
+
+{"expectedRevision":<draft revision>,"idempotencyKey":"<unique reroll key>"}
+```
+
+The server generates all six replacements and advances the draft once. Exact
+replay returns the same roll; ambiguity requires draft GET reconciliation and
+never an automatic reroll POST. Standard array, point-buy, and manual drafts
+are not random pools and cannot be rerolled.
 
 ### Step 3: Select Race, Background, Class, And Grant
 

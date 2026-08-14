@@ -2,6 +2,8 @@
 
 `npm run planning-board` starts a small, standalone roadmap planning board in the foreground at `http://127.0.0.1:8789`; stop this foreground process with `Ctrl-C`.
 
+`PLANNING_BOARD_PORT` overrides port 8789, and `PLANNING_BOARD_STATE` overrides the default `<repository>/.velvet/planning-board.json` state path. These are internal-tool settings, not Velvet server runtime configuration. The board host is fixed to `127.0.0.1` and cannot be broadened by an environment variable.
+
 To launch it in the background and record its PID, run:
 
 ```sh

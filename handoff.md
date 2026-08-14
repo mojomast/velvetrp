@@ -1,6 +1,20 @@
 # Handoff
-## Completed: Client generalized combat receipt repair
-## Next Task: Build Later: closed rules IR, licensed offline ingestion, ephemeral simulation, remote tenancy/authenticated sessions and exercisable grants, harness overrides, proactive automation/tools
-## Context: MechanicReceiptCard now narrows the top-level public receipt discriminator before reading mechanic-only event data and narrows the generalized combat outcome discriminator before outcome-specific reads. Combat action and outcome labels are readable and expose no internal action, legal-action, or combatant IDs. The combat test fixture now satisfies the authoritative contract instead of omitting required action/outcome fields. CampaignDetailDice's privacy check examines rendered text for generic identity tokens while retaining the exact private campaign-ID check against full HTML, avoiding false positives from CSS class names. Concurrent work stabilized the campaign-character contention test: pre-change isolated reruns failed 7/11 at 44-47ms because the parent processed the worker's lock message partway through its 100ms hold, while production still used BEGIN IMMEDIATE and committed after release. Shared atomic post-COMMIT state now proves the actual ordering without wall-clock inference. Preserve all concurrent changes.
-## Files Modified: client/src/components/rpg/play/MechanicReceiptCard.tsx; client/src/components/rpg/play/MechanicReceiptCard.test.tsx; client/src/roleplay/CampaignDetailDice.test.tsx; server/test/lock-worker.ts; server/test/campaign-character-creation.test.ts; devplan.md; handoff.md
-## Validation: client focused tests passed 26 and client typecheck passed; stabilized exact server test passed 10/10, full campaign-character-creation file passed 45, server workspace typecheck passed, and task-file diff check passed.
+
+## Current Baseline
+
+- Persistence: schema `v53r1`; populated v46-v52 databases are supported forward-startup inputs, while v45 and earlier are unsupported.
+- HTTP: 111 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
+- Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
+- Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns migration/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
+
+## Completed
+
+Drift remediation aligned migration policy/tests, current release and API documentation, v49-v53 architecture/status, document ownership, configuration examples/guidance, and deterministic executable drift checks. `drift-remediation-plan.md` contains decisions, research, validation, review dispositions, and completion evidence.
+
+## Next Task
+
+Scope the closed declarative rules IR milestone with exact consumers, contract boundaries, migration impact, and exclusions before implementation. Do not promote live exact-candidate selection, companion grant exercise, remote tenancy, or other later work implicitly.
+
+## Validation
+
+See the completion record in `drift-remediation-plan.md` for focused commands, independent reviews, `git diff --check`, and the canonical `/dev/shm` health gate.
