@@ -41,6 +41,7 @@ export function CombatLog({ entries, nextAfterSequence, loading = false, error =
     {entries.length === 0 && !loading && !error && <p className="combat-empty">No combat events returned.</p>}
     <ol>{entries.map((entry) => <li key={entry.logEntryId}>
       <div><strong>{title(entry)}</strong><span>#{entry.sequence}</span></div>
+      <p className="combat-narration">{entry.narration}</p>
       {detail(entry) && <p><bdi dir="auto">{detail(entry)}</bdi></p>}
       <time dateTime={entry.occurredAt}>{entry.occurredAt}</time>
     </li>)}</ol>

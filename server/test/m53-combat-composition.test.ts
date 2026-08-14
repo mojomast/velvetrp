@@ -216,7 +216,7 @@ describe("M5.3 Slice 0 combat composition", () => {
     tonic.mechanics={...tonic.mechanics,category:"consumable",stackable:true,slot:null,
       effects:[{type:"healing",dice:{count:1,sides:4,modifier:0}}]};
     updateDefinition.run(JSON.stringify(tonic),JSON.stringify(tonic),entry.item_pack_id,entry.item_pack_version,entry.item_definition_id);
-    const action=repo.getUseConsumableLegalActions("local-owner",combat.combatId).find((value)=>value.target.relation==="self")!;
+    const action=repo.getUseConsumableLegalActions("local-owner",combat.combatId).find((value)=>value.inventoryEntryId===entry.entry_id&&value.target.relation==="self")!;
     expect(action).toMatchObject({kind:"use-consumable",inventoryEntryId:entry.entry_id,target:{actorBacked:true,relation:"self"}});
     const beforeRolls=rolls;
     const command={legalActionId:action.legalActionId,inventoryEntryId:action.inventoryEntryId,item:action.item,quantity:1 as const,

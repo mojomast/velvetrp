@@ -37,6 +37,7 @@ import { CampaignSettingsForm } from "./CampaignSettingsForm";
 import { MembershipManager } from "./MembershipManager";
 import { TimelineCheckpointPanel } from "./TimelineCheckpointPanel";
 import { CampaignContentPicker } from "../content/CampaignContentPicker";
+import { CampaignGeneratorPanel } from "./CampaignGeneratorPanel";
 
 export interface CampaignAdministrationPageProps {
   campaignId: string;
@@ -370,6 +371,8 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       <TimelineCheckpointPanel timelines={timelines} activeTimelineId={activeTimelineId} checkpoints={checkpoints} canMutate={owner} busy={busy} mutationLocked={mutationLocked}
         onCreateCheckpoint={(label, timelineId, timelineRevision) => void mutate("checkpoint", () => createCampaignCheckpoint(campaignId, { label, timelineId, timelineRevision, expectedRevision, idempotencyKey: idempotencyKey("checkpoint") }))}
         onFork={(checkpoint) => void mutate("fork", () => forkCampaignTimeline(campaignId, { checkpointId: checkpoint.id, expectedRevision, idempotencyKey: idempotencyKey("fork") }, checkpoint))} />
+
+      {owner && <CampaignGeneratorPanel campaignId={campaignId} disabled={mutationLocked || refreshing} />}
 
       {(catalogContent || catalogError) && <section className="admin-section campaign-catalog-section">
         {catalogContent && <CampaignContentPicker actorRole={campaign.actorRole} current={catalogContent} publications={catalogPublications} expectedRevision={expectedRevision} busy={busy || catalogInspecting} mutationLocked={mutationLocked}

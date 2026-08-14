@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
+import { settleCombatRewardV51 } from "../grantSettlementRepo.js";
 import {
   encounterCommandSchema,
   combatActionCommandRequestSchema,
@@ -68,6 +69,7 @@ export interface EncounterWriteRepository {
   executeEncounterCommand(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   mutateEncounter(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   useConsumable(principal:string,input:UseConsumableCommandRequest):UseConsumableCommandResult;
+  claimCombatReward(principal:string,combatId:string,rewardBundleId:string,input:{rewardClaimId:string;expectedRevision:number;idempotencyKey:string}):EncounterResult<{encounterId:string;status:string}>;
 }
 
 /** Creates immediate-transaction commands backed by the authoritative read projection. */
@@ -357,7 +359,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             .run(id(deps),row.campaign_id,rewardBundleId,rewardAmount,rewardCurrency.code,rewardCurrency.reference.packId,
               rewardCurrency.reference.packVersion,rewardCurrency.reference.definitionId,at);
           rewards.push({campaignId:row.campaign_id,encounterId:combatId,rewardBundleId,recipientActorId,createdAt:at,
-            rewards:[{kind:"currency",currency:rewardCurrency.reference,amount:rewardAmount}]});
+            rewards:[{kind:"currency",currency:rewardCurrency.reference,amount:rewardAmount}],claim:{state:"unclaimed"}});
         });
       }
       advanceRevision(db,combatId,after,at);
@@ -438,6 +440,15 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
     }).immediate();
   };
   return {createEncounter:createLifecycleEncounter,startEncounter:startLifecycleEncounter,resolveCombatAction,endCombat,
+    claimCombatReward(principal,combatId,rewardBundleId,input){
+      const bundle=db.prepare(`SELECT campaign_id,reward_bundle_id,recipient_actor_id FROM reward_bundle
+        WHERE encounter_id=? AND reward_bundle_id=? AND recipient_actor_id IN(SELECT actor_id FROM campaign_actor_private_state WHERE controller_principal_id=?)`)
+        .get(combatId,rewardBundleId,principal) as any;
+      if(!bundle)throw new EncounterUnavailableError("reward bundle unavailable");
+      return execute(principal,{type:"claim_reward_bundle",campaignId:bundle.campaign_id,encounterId:combatId,
+        rewardClaimId:input.rewardClaimId,rewardBundleId:bundle.reward_bundle_id,recipientActorId:bundle.recipient_actor_id,
+        claimedAt:now(deps),expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey});
+    },
     executeEncounterCommand:execute,mutateEncounter:execute,
     useConsumable(principal,input){deps.assertFactoryMutation();return executeUseConsumable(db,deps,principal,input);}};
 }
@@ -494,10 +505,10 @@ function claim(db:DatabaseDriver.Database,d:EncounterDependencies,p:string,c:Ext
   if(!bundle) throw new EncounterUnavailableError("reward bundle unavailable");
   if(db.prepare("SELECT 1 FROM reward_claim_v27 WHERE reward_bundle_id=?").get(c.rewardBundleId)) throw new EncounterConflictError("reward bundle already claimed");
   const result=receipt(c,commandId,b,a,at,e.status);
-  // v27 deliberately persists a recorded, unsettled currency claim only. There is no safe wallet
-  // stream composition here; this command must not mutate a wallet or pretend it paid currency.
   protocol(db,d,c,request,commandId,null,b,a,at,result,"rewards_granted",{kind:"reward_claimed",rewardClaimId:c.rewardClaimId},"reward",0);
   db.prepare("INSERT INTO reward_claim_v27(reward_claim_id,campaign_id,reward_bundle_id,encounter_id,command_id,claim_state,claimed_at) VALUES(?,?,?,?,?,'recorded',?)").run(c.rewardClaimId,c.campaignId,c.rewardBundleId,c.encounterId,commandId,at);
+  settleCombatRewardV51(db,d.ids,{campaignId:c.campaignId,encounterId:c.encounterId,rewardBundleId:c.rewardBundleId,
+    recipientActorId:c.recipientActorId,rewardClaimId:c.rewardClaimId,occurredAt:at});
   advanceRevision(db,c.encounterId,a,at);return result;
 }
 function advance(db:DatabaseDriver.Database,d:EncounterDependencies,p:string,c:any,request:string,e:any,b:number,a:number,at:string,commandId:string){

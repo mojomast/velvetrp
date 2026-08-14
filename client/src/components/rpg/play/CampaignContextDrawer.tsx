@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { ActorResourcesHttpGetResponse, CampaignWorldHttpResponse, EncounterPublic, NpcCastHttp, NpcPresenceMutationHttpRequest, NpcPresenceMutationHttpResponse } from "@velvet/contracts";
-import { ApiError, ApiInputError, commandNpcPresence as defaultCommandNpcPresence, getCampaignPresentCast as defaultGetCampaignPresentCast } from "../../../api";
+import { Fragment, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ActorResourcesHttpGetResponse, CampaignPublishedMaterials, CampaignWorldHttpResponse, EncounterPublic, NpcCastHttp, NpcPresenceMutationHttpRequest, NpcPresenceMutationHttpResponse } from "@velvet/contracts";
+import { ApiError, ApiInputError, commandNpcPresence as defaultCommandNpcPresence, getCampaignPresentCast as defaultGetCampaignPresentCast, getCampaignPublishedMaterials as defaultGetCampaignPublishedMaterials } from "../../../api";
 import { beginNpcPresenceMutation, clearNpcPresenceMutation, markNpcPresenceAmbiguous, markNpcPresenceReconciliation, reconcileNpcPresenceMutation, releaseNpcPresenceMutation, useNpcPresenceMutation } from "../narrativeMutationRegistry";
+import type { CampaignContextWidget } from "./campaignWorkbenchPreferences";
 
 type Audience = "gm" | "player";
 type Load<T> = { state: "loading"; stale?: T } | { state: "ready"; value: T } | { state: "error"; stale?: T };
@@ -20,6 +21,7 @@ export interface CampaignContextDrawerApi {
   getCombatState: (combatId: string) => Promise<{ round: number; currentCombatant: string | null }>;
   getCampaignPresentCast?: (campaignId: string, sessionId: string, audience: Audience) => Promise<NpcCastHttp>;
   commandNpcPresence?: (campaignId: string, sessionId: string, npcId: string, input: NpcPresenceMutationHttpRequest) => Promise<NpcPresenceMutationHttpResponse>;
+  getCampaignPublishedMaterials?: (campaignId:string)=>Promise<CampaignPublishedMaterials>;
 }
 
 export interface CampaignContextDrawerProps {
@@ -30,6 +32,7 @@ export interface CampaignContextDrawerProps {
   audience: Audience;
   authorizationGeneration: number;
   api: CampaignContextDrawerApi;
+  widgets?: readonly CampaignContextWidget[];
 }
 
 function status<T>(load: Load<T>, empty: boolean, label: string) {
@@ -56,13 +59,15 @@ function safeCast(value: NpcCastHttp, audience: Audience): CastView {
 const presenceKey = () => `presence-ui-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
 /** Loads and renders only server projections; it performs no authoritative calculations. */
-export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, playableActorIds, audience, authorizationGeneration, api }: CampaignContextDrawerProps) {
+export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, playableActorIds, audience, authorizationGeneration, api,
+  widgets = ["location", "cast", "objectives", "resources", "encounter"] }: CampaignContextDrawerProps) {
   const [world, setWorld] = useState<Load<CampaignWorldHttpResponse>>({ state: "loading" });
   const [roster, setRoster] = useState<Load<NamedNpc[]>>({ state: "loading" });
   const [cast, setCast] = useState<Load<CastView>>({ state: "loading" });
   const [objectives, setObjectives] = useState<Load<Objective[]>>({ state: "loading" });
   const [resources, setResources] = useState<Load<ActorResourcesHttpGetResponse | null>>({ state: "loading" });
   const [encounters, setEncounters] = useState<Load<EncounterView>>({ state: "loading" });
+  const [materials,setMaterials]=useState<Load<CampaignPublishedMaterials>>({state:"loading"});
   const [notice, setNotice] = useState<string | null>(null);
   const [placeNpcId, setPlaceNpcId] = useState(""); const [placeLocationId, setPlaceLocationId] = useState("");
   const [moveLocations, setMoveLocations] = useState<Record<string, string>>({}); const [removeNpcId, setRemoveNpcId] = useState<string | null>(null);
@@ -74,6 +79,7 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
   const previousAuthorizationRef = useRef({ audience, campaignId, sessionId });
   const getCast = api.getCampaignPresentCast ?? defaultGetCampaignPresentCast;
   const commandPresence = api.commandNpcPresence ?? defaultCommandNpcPresence;
+  const getPublishedMaterials=api.getCampaignPublishedMaterials??defaultGetCampaignPublishedMaterials;
 
   useLayoutEffect(() => {
     if (audience !== "gm") clearNpcPresenceMutation(campaignId, sessionId);
@@ -99,7 +105,7 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
 
   useEffect(() => {
     let current = true; operationGeneration.current += 1; setNotice(null); setRemoveNpcId(null);
-    setWorld({ state: "loading" }); setRoster({ state: "loading" }); setCast({ state: "loading" }); setObjectives({ state: "loading" }); setResources({ state: "loading" }); setEncounters({ state: "loading" });
+    setWorld({ state: "loading" }); setRoster({ state: "loading" }); setCast({ state: "loading" }); setObjectives({ state: "loading" }); setResources({ state: "loading" }); setEncounters({ state: "loading" });setMaterials({state:"loading"});
     const previousAuthorization = previousAuthorizationRef.current;
     if (previousAuthorization.audience === "gm" && audience !== "gm") {
       // A downgrade drops the GM-only in-memory lock for privacy. This can forfeit
@@ -114,8 +120,9 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
     void api.listCampaignQuests(campaignId, audience).then((value) => { if (!current) return; const active = new Set(value.data.quests.filter((quest) => quest.status === "active").map((quest) => quest.questId)); setObjectives({ state: "ready", value: value.data.objectives.filter((objective) => active.has(objective.questId) && objective.completedAt === null).map((objective) => ({ id: objective.objectiveId, description: objective.description, progress: objective.progress, target: objective.targetProgress })) }); }).catch(() => { if (current) setObjectives({ state: "error" }); });
     if (actorEligible && selectedActorId) void api.getActorResources(campaignId, selectedActorId).then((value) => { if (current) setResources({ state: "ready", value }); }).catch(() => { if (current) setResources({ state: "error" }); }); else setResources({ state: "ready", value: null });
     void api.listCampaignEncounters(campaignId).then(async ({ encounters: rows }) => { const roomRows = rows.filter((entry) => entry.sessionId === sessionId); const active = roomRows.find((entry) => entry.status === "active" && entry.combatId !== null); let activeCombat: EncounterView["activeCombat"] = null; if (active?.combatId) try { const combat = await api.getCombatState(active.combatId); activeCombat = { round: combat.round, currentCombatant: combat.currentCombatant }; } catch { /* encounter status remains useful */ } if (current) setEncounters({ state: "ready", value: { encounters: roomRows, activeCombat } }); }).catch(() => { if (current) setEncounters({ state: "error" }); });
+    void getPublishedMaterials(campaignId).then((value)=>{if(current)setMaterials({state:"ready",value});}).catch(()=>{if(current)setMaterials({state:"error"});});
     return () => { current = false; operationGeneration.current += 1; };
-  }, [api, campaignId, sessionId, selectedActorId, actorEligible, audience, authorizationGeneration, refreshCast]);
+  }, [api, campaignId, sessionId, selectedActorId, actorEligible, audience, authorizationGeneration, refreshCast,getPublishedMaterials]);
 
   useEffect(() => { if (notice) statusRef.current?.focus(); }, [notice]);
   useEffect(() => {
@@ -133,6 +140,7 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
   const objectiveValue = objectives.state === "ready" ? objectives.value : objectives.stale;
   const resourceValue = resources.state === "ready" ? resources.value : resources.stale;
   const encounterValue = encounters.state === "ready" ? encounters.value : encounters.stale;
+  const materialValue=materials.state==="ready"?materials.value:materials.stale;
   const availableNpcs = rosterValue?.filter((npc) => !castValue?.members.some((member) => member.id === npc.id)) ?? [];
   const canManage = audience === "gm" && castValue?.state === "running";
 
@@ -172,15 +180,19 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
     }
   }
 
-  return <aside className="campaign-context-drawer" aria-label="Campaign context" aria-live="polite"><details open><summary>Campaign context</summary>
-    {audience === "gm" && (notice || lock) && <div ref={statusRef} tabIndex={-1} role="alert"><p>{notice ?? "An NPC presence command still requires authoritative reconciliation. No command will be repeated."}</p>{lock && <button type="button" className="ghost" onClick={() => void refreshCast(true)}>Refresh present cast</button>}</div>}
-    <section><h2>Current location</h2>{status(world, !location, "visible location")}{location && <><p><strong>{location.name}</strong></p><p>{location.description}</p><h3>Visible exits from this location</h3>{exits.length ? <ul>{exits.map((exit) => <li key={exit.connectionId}>{worldValue?.visibleLocations.find((entry) => entry.locationId === exit.toLocationId)?.name ?? "Visible destination"}</li>)}</ul> : <p>No server-visible exits from this origin.</p>}</>}</section>
-    <section className="campaign-cast-management"><h2>{castValue?.state === "stopped" ? "Present at stop/history" : castValue?.state === "running" ? "NPCs present now" : "NPC presence"}</h2>{cast.state === "loading" && !cast.stale && <p role="status">Loading present cast...</p>}{cast.state === "error" && !cast.stale && <p role="alert">Present cast could not be loaded.</p>}{castValue?.state === "running" && castValue.members.length === 0 && <p>No NPCs marked present.</p>}{castValue?.state === "stopped" && castValue.members.length === 0 && <p>No NPCs were present at stop/history.</p>}{castValue?.members.length ? <ul>{castValue.members.map((npc) => <li key={npc.id}><span>{npc.name}{npc.locationLabel ? ` - ${npc.locationLabel}` : ""}</span>{canManage && <span className="campaign-cast-actions"><label>Move {npc.name}<select aria-label={presenceControlLabel("Move", npc, " location")} value={moveLocations[npc.id] ?? npc.locationId ?? ""} onChange={(event) => setMoveLocations((values) => ({ ...values, [npc.id]: event.target.value }))}><option value="">Unknown or undisclosed location</option>{worldValue?.visibleLocations.map((place) => <option key={place.locationId} value={place.locationId}>{place.name}</option>)}</select></label><button type="button" className="ghost" aria-label={presenceControlLabel("Move", npc)} disabled={Boolean(lock)} onClick={() => void mutate(npc.id, { kind: "move", locationId: Object.prototype.hasOwnProperty.call(moveLocations, npc.id) ? moveLocations[npc.id] || null : npc.locationId })}>Move {npc.name}</button><button type="button" className="ghost" aria-label={presenceControlLabel("Remove", npc)} disabled={Boolean(lock)} onClick={(event) => { removeOriginRef.current = event.currentTarget; setRemoveNpcId(npc.id); }}>Remove {npc.name}</button></span>}</li>)}</ul> : null}
+  const widgetContent: Record<CampaignContextWidget, ReactNode> = {
+    location: <section><h2>Current location</h2>{status(world, !location, "visible location")}{location && <><p><strong>{location.name}</strong></p><p>{location.description}</p><h3>Visible exits from this location</h3>{exits.length ? <ul>{exits.map((exit) => <li key={exit.connectionId}>{worldValue?.visibleLocations.find((entry) => entry.locationId === exit.toLocationId)?.name ?? "Visible destination"}</li>)}</ul> : <p>No server-visible exits from this origin.</p>}</>}</section>,
+    cast: <section className="campaign-cast-management"><h2>{castValue?.state === "stopped" ? "Present at stop/history" : castValue?.state === "running" ? "NPCs present now" : "NPC presence"}</h2>{cast.state === "loading" && !cast.stale && <p role="status">Loading present cast...</p>}{cast.state === "error" && !cast.stale && <p role="alert">Present cast could not be loaded.</p>}{castValue?.state === "running" && castValue.members.length === 0 && <p>No NPCs marked present.</p>}{castValue?.state === "stopped" && castValue.members.length === 0 && <p>No NPCs were present at stop/history.</p>}{castValue?.members.length ? <ul>{castValue.members.map((npc) => <li key={npc.id}><span>{npc.name}{npc.locationLabel ? ` - ${npc.locationLabel}` : ""}</span>{canManage && <span className="campaign-cast-actions"><label>Move {npc.name}<select aria-label={presenceControlLabel("Move", npc, " location")} value={moveLocations[npc.id] ?? npc.locationId ?? ""} onChange={(event) => setMoveLocations((values) => ({ ...values, [npc.id]: event.target.value }))}><option value="">Unknown or undisclosed location</option>{worldValue?.visibleLocations.map((place) => <option key={place.locationId} value={place.locationId}>{place.name}</option>)}</select></label><button type="button" className="ghost" aria-label={presenceControlLabel("Move", npc)} disabled={Boolean(lock)} onClick={() => void mutate(npc.id, { kind: "move", locationId: Object.prototype.hasOwnProperty.call(moveLocations, npc.id) ? moveLocations[npc.id] || null : npc.locationId })}>Move {npc.name}</button><button type="button" className="ghost" aria-label={presenceControlLabel("Remove", npc)} disabled={Boolean(lock)} onClick={(event) => { removeOriginRef.current = event.currentTarget; setRemoveNpcId(npc.id); }}>Remove {npc.name}</button></span>}</li>)}</ul> : null}
       {canManage && availableNpcs.length > 0 && <fieldset className="campaign-cast-place"><legend>Place an NPC</legend><label>NPC<select value={placeNpcId} onChange={(event) => setPlaceNpcId(event.target.value)}><option value="">Choose NPC</option>{availableNpcs.map((npc) => <option key={npc.id} value={npc.id}>{npc.name}</option>)}</select></label><label>Place location<select value={placeLocationId} onChange={(event) => setPlaceLocationId(event.target.value)}><option value="">Unknown or undisclosed location</option>{worldValue?.visibleLocations.map((place) => <option key={place.locationId} value={place.locationId}>{place.name}</option>)}</select></label><button type="button" className="primary" disabled={!placeNpcId || Boolean(lock)} onClick={() => void mutate(placeNpcId, { kind: "place", locationId: placeLocationId || null })}>Place NPC</button></fieldset>}
       {removeNpcId && canManage && <div className="campaign-removal-confirmation" role="group" aria-label="Confirm NPC removal"><p>Remove {castValue.members.find((npc) => npc.id === removeNpcId)?.name} from the present cast?</p><button ref={confirmRemoveRef} type="button" className="primary" disabled={Boolean(lock)} onClick={() => void mutate(removeNpcId, { kind: "remove" }).finally(closeRemoval)}>Confirm remove</button><button type="button" className="ghost" onClick={closeRemoval}>Cancel</button></div>}
-    </section>
-    <section><h2>Active objectives</h2>{status(objectives, !objectiveValue?.length, "active objectives")}{objectiveValue?.length ? <ul>{objectiveValue.map((objective) => <li key={objective.id}>{objective.description} <span>{objective.progress} / {objective.target}</span></li>)}</ul> : null}</section>
-    <section><h2>Party resources</h2>{status(resources, !resourceValue?.resources.length, "party resources")}{resourceValue?.resources.length ? <ul>{resourceValue.resources.map((resource) => <li key={resource.name}>{resource.name}: {resource.current} / {resource.max}</li>)}</ul> : null}</section>
-    <section><h2>Encounter status</h2>{status(encounters, !encounterValue?.encounters.length, "encounters")}{encounterValue?.encounters.length ? <ul>{encounterValue.encounters.map((entry) => <li key={entry.encounterId}>{entry.name}: {entry.status}</li>)}</ul> : null}{encounterValue?.activeCombat && <p>Active combat: round {encounterValue.activeCombat.round}; current combatant {encounterValue.activeCombat.currentCombatant ?? "not assigned"}.</p>}</section>
+    </section>,
+    objectives: <section><h2>Active objectives</h2>{status(objectives, !objectiveValue?.length, "active objectives")}{objectiveValue?.length ? <ul>{objectiveValue.map((objective) => <li key={objective.id}>{objective.description} <span>{objective.progress} / {objective.target}</span></li>)}</ul> : null}</section>,
+    resources: <section><h2>Party resources</h2>{status(resources, !resourceValue?.resources.length, "party resources")}{resourceValue?.resources.length ? <ul>{resourceValue.resources.map((resource) => <li key={resource.name}>{resource.name}: {resource.current} / {resource.max}</li>)}</ul> : null}</section>,
+    encounter: <section><h2>Encounter status</h2>{status(encounters, !encounterValue?.encounters.length, "encounters")}{encounterValue?.encounters.length ? <ul>{encounterValue.encounters.map((entry) => <li key={entry.encounterId}>{entry.name}: {entry.status}</li>)}</ul> : null}{encounterValue?.activeCombat && <p>Active combat: round {encounterValue.activeCombat.round}; current combatant {encounterValue.activeCombat.currentCombatant ?? "not assigned"}.</p>}</section>,
+  };
+  return <aside id="campaign-context-panel" className="campaign-context-drawer" aria-label="Campaign context" tabIndex={-1}><details open><summary>Campaign context</summary>
+    {audience === "gm" && (notice || lock) && <div ref={statusRef} tabIndex={-1} role="alert"><p>{notice ?? "An NPC presence command still requires authoritative reconciliation. No command will be repeated."}</p>{lock && <button type="button" className="ghost" onClick={() => void refreshCast(true)}>Refresh present cast</button>}</div>}
+    {widgets.map((widget) => <Fragment key={widget}>{widgetContent[widget]}</Fragment>)}
+    <section><h2>Delivered materials</h2>{status(materials,!materialValue?.materials.length,"delivered materials")}{materialValue?.materials.length?<ul>{materialValue.materials.map((item)=><li key={item.resourceId}><strong>{item.title}</strong><p>{item.content}</p></li>)}</ul>:null}</section>
   </details></aside>;
 }

@@ -12,6 +12,7 @@ import {
   encounterRewardSchema,
   encounterStatusSchema,
   rewardBundleIdSchema,
+  rewardClaimIdSchema,
 } from "./encounters.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema } from "./rpg-characters.js";
@@ -201,6 +202,7 @@ export const combatLogEntryPublicSchema = z.object({
   sequence: z.number().int().min(1).max(1_000_000),
   occurredAt: utcIsoTimestampSchema,
   event: combatLogEventSchema,
+  narration: z.string().trim().min(1).max(1_000),
 }).strict();
 
 export const combatLogResponseSchema = z.object({
@@ -293,7 +295,64 @@ export const combatRewardGrantPublicSchema = z.object({
   recipientActorId: actorIdSchema,
   createdAt: utcIsoTimestampSchema,
   rewards: z.array(encounterRewardSchema).min(1).max(128),
+  claim: z.discriminatedUnion("state", [
+    z.object({ state: z.literal("unclaimed") }).strict(),
+    z.object({ state: z.literal("claimed"), rewardClaimId: rewardClaimIdSchema, claimedAt: utcIsoTimestampSchema }).strict(),
+  ]),
 }).strict();
+
+export const combatRewardListResponseSchema = z.object({ rewards: z.array(combatRewardGrantPublicSchema).max(32) }).strict();
+export const combatRewardClaimRequestSchema = z.object({
+  rewardClaimId: rewardClaimIdSchema, expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema,
+}).strict();
+export const combatRewardClaimResponseSchema = z.object({
+  reward: combatRewardGrantPublicSchema.refine((reward) => reward.claim.state === "claimed", "claimed reward is required"),
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict();
+
+const sha256DigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
+export const combatRewardClaimResultResponseSchema = z.object({
+  reward: combatRewardGrantPublicSchema.refine((reward) => reward.claim.state === "claimed", "claimed reward is required"),
+  requestBinding: z.object({
+    campaignId: resourceIdSchema,
+    combatId: resourceIdSchema,
+    rewardBundleId: rewardBundleIdSchema,
+    recipientActorId: actorIdSchema,
+    claimedAt: utcIsoTimestampSchema,
+    requestEvidence: combatRewardClaimRequestSchema,
+    canonicalRequestDigest: sha256DigestSchema,
+  }).strict(),
+  receipt: encounterCommandReceiptPublicSchema,
+}).strict().superRefine((response, context) => {
+  const binding=response.requestBinding,claim=response.reward.claim;
+  if(response.reward.rewardBundleId!==binding.rewardBundleId||response.reward.recipientActorId!==binding.recipientActorId
+      ||claim.state!=="claimed"||claim.rewardClaimId!==binding.requestEvidence.rewardClaimId||claim.claimedAt!==binding.claimedAt
+      ||response.receipt.idempotencyKey!==binding.requestEvidence.idempotencyKey
+      ||response.receipt.revisionBefore!==binding.requestEvidence.expectedRevision
+      ||response.receipt.revisionAfter!==binding.requestEvidence.expectedRevision+1){
+    context.addIssue({code:"custom",message:"claim result must match its exact request and receipt"});
+  }
+});
+
+/** Reconstructs the exact persisted claim command without exposing its raw command record. */
+export function canonicalCombatRewardClaimRequestFrame(input:{campaignId:string;combatId:string;rewardBundleId:string;
+  recipientActorId:string;claimedAt:string;request:CombatRewardClaimRequest}):string{
+  const request=combatRewardClaimRequestSchema.parse(input.request);
+  return JSON.stringify({campaignId:resourceIdSchema.parse(input.campaignId),claimedAt:utcIsoTimestampSchema.parse(input.claimedAt),
+    encounterId:resourceIdSchema.parse(input.combatId),expectedRevision:request.expectedRevision,idempotencyKey:request.idempotencyKey,
+    recipientActorId:actorIdSchema.parse(input.recipientActorId),rewardBundleId:rewardBundleIdSchema.parse(input.rewardBundleId),
+    rewardClaimId:request.rewardClaimId,type:"claim_reward_bundle"});
+}
+
+export function verifyCombatRewardClaimResultBinding(expected:{campaignId:string;combatId:string;rewardBundleId:string;
+  recipientActorId:string;request:CombatRewardClaimRequest},result:CombatRewardClaimResultResponse,sha256:(value:string)=>string):boolean{
+  try{
+    const parsed=combatRewardClaimResultResponseSchema.parse(result),binding=parsed.requestBinding;
+    if(binding.campaignId!==expected.campaignId||binding.combatId!==expected.combatId||binding.rewardBundleId!==expected.rewardBundleId
+        ||binding.recipientActorId!==expected.recipientActorId||JSON.stringify(binding.requestEvidence)!==JSON.stringify(combatRewardClaimRequestSchema.parse(expected.request)))return false;
+    return sha256(canonicalCombatRewardClaimRequestFrame({...expected,claimedAt:binding.claimedAt}))===binding.canonicalRequestDigest;
+  }catch{return false;}
+}
 
 export const combatEndCommandResponseSchema = z.object({
   encounter: encounterPublicSchema,
@@ -756,6 +815,9 @@ export type CombatActionResolution = z.infer<typeof combatActionResolutionSchema
 export type CombatActionCommandResponse = z.infer<typeof combatActionCommandResponseSchema>;
 export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSchema>;
 export type CombatRewardGrantPublic = z.infer<typeof combatRewardGrantPublicSchema>;
+export type CombatRewardClaimRequest = z.infer<typeof combatRewardClaimRequestSchema>;
+export type CombatRewardClaimResponse = z.infer<typeof combatRewardClaimResponseSchema>;
+export type CombatRewardClaimResultResponse = z.infer<typeof combatRewardClaimResultResponseSchema>;
 export type CombatEndCommandResponse = z.infer<typeof combatEndCommandResponseSchema>;
 export type CombatCommandResultResponse = z.infer<typeof combatCommandResultResponseSchema>;
 export type UseConsumableTargetPolicy = z.infer<typeof useConsumableTargetPolicySchema>;

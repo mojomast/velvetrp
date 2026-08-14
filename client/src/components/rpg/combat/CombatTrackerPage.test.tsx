@@ -1,11 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { CombatActionCommandResponse, CombatReadResponse } from "@velvet/contracts";
+import type { CombatActionCommandResponse, CombatReadResponse, CombatRewardGrantPublic } from "@velvet/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CombatTrackerPage, type CombatTrackerApi } from "./CombatTrackerPage";
 import { InitiativeRail } from "./InitiativeRail";
 import { LegalActionTray } from "./LegalActionTray";
 import { PowerLibraryPanel } from "./PowerLibraryPanel";
 import {ApiError} from "../../../api";
+import {CombatRewards} from "./CombatRewards";
 
 const at = "2030-01-01T00:00:00.000Z";
 const combat: CombatReadResponse = {
@@ -29,6 +30,8 @@ const response: CombatActionCommandResponse = {
 const emptyPowers = { known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 0 } as const;
 const emptyEffects = { effects: [], concentration: [], revision: 0 } as const;
 const consumable={legalActionId:"consume:legal",kind:"use-consumable" as const,actingCombatantId:"combatant-one",inventoryEntryId:"entry",item:{kind:"item" as const,packId:"pack",packVersion:"1",definitionId:"tonic"},quantity:1 as const,actionCost:"action" as const,targetPolicy:"beneficial-only-self-or-ally" as const,target:{combatantId:"combatant-one",relation:"self" as const,actorBacked:true},effectPlan:{effectCount:1,effects:[{effectOrdinal:0,effect:{kind:"resource" as const,resource:"health" as const,amount:2}}]}};
+const reward:CombatRewardGrantPublic={rewardBundleId:"bundle-one",recipientActorId:"actor-one",createdAt:at,rewards:[{kind:"currency",currency:{kind:"currency",packId:"pack",packVersion:"1",definitionId:"gold"},amount:25}],claim:{state:"unclaimed"}};
+const claimedReward:CombatRewardGrantPublic={...reward,claim:{state:"claimed",rewardClaimId:"reward-claim",claimedAt:at}};
 
 function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
   return {
@@ -44,6 +47,10 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
     getConsumableActions:vi.fn().mockResolvedValue([]),
     useConsumable:vi.fn(),
     getConsumableResult:vi.fn(),
+    listRewards:vi.fn().mockResolvedValue([]),
+    claimReward:vi.fn().mockImplementation((_combatId,_bundleId,_actorId,command)=>Promise.resolve({reward:{...claimedReward,claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}},receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:command.expectedRevision,revisionAfter:command.expectedRevision+1,occurredAt:at}})),
+    getRewardClaimResult:vi.fn().mockRejectedValue(new ApiError(404,"absent")),
+    getWallet:vi.fn().mockResolvedValue({wallet:{balances:[]},revision:0}),
     ...overrides,
   };
 }
@@ -82,6 +89,13 @@ describe("M3.5 server-authoritative combat controls", () => {
     buttons[0]!.focus();
     expect(document.activeElement).toBe(buttons[0]);
     expect(buttons[0]!.getAttribute("aria-current")).toBe("step");
+  });
+
+  it.each([1280,390])("renders explicit unclaimed and claimed reward state at %ipx",(width)=>{
+    Object.defineProperty(window,"innerWidth",{configurable:true,value:width});
+    render(<CombatRewards rewards={[reward,claimedReward]} claimableActorId="actor-one" onClaim={()=>undefined}/>);
+    expect(screen.getByText("Unclaimed")).toBeTruthy();expect(screen.getByText("Claimed")).toBeTruthy();
+    expect(screen.getByRole("button",{name:"Claim reward"})).toBeTruthy();expect(screen.getByText("Explicit settlement")).toBeTruthy();
   });
 
   it("submits only a server-planned self power with the contract's empty target request",()=>{
@@ -195,5 +209,69 @@ describe("M3.5 server-authoritative combat controls", () => {
 
   it("clears the marker and refreshes after a definitive 409 without retrying POST",async()=>{
     const actions=vi.fn().mockResolvedValue([consumable]),use=vi.fn().mockRejectedValue(new ApiError(409,"stale"));const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/rejected before commitment/i);await waitFor(()=>expect(actions.mock.calls.length).toBeGreaterThan(1));expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull();expect(use).toHaveBeenCalledTimes(1);
+  });
+
+  it("claims once, confirms settlement from reward reads, and refreshes the bound actor wallet",async()=>{
+    localStorage.setItem("velvet.combat-actor-id.v2:campaign","actor-one");
+    const claim=vi.fn().mockImplementation((_combatId,_bundleId,_actorId,command)=>Promise.resolve({reward:{...claimedReward,claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}},receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:4,revisionAfter:5,occurredAt:at}}));
+    const list=vi.fn().mockImplementation(()=>{const command=claim.mock.calls[0]?.[3];return Promise.resolve(command?[{...claimedReward,claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}}]:[reward]);});
+    const wallet=vi.fn().mockResolvedValue({wallet:{balances:[]},revision:3});
+    const service=api({listRewards:list,claimReward:claim,getWallet:wallet});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Unclaimed");fireEvent.click(screen.getByRole("button",{name:"Claim reward"}));
+    await screen.findByText(/authoritative rewards and recipient wallet refreshed/i);expect(screen.getByText("Claimed")).toBeTruthy();
+    expect(claim).toHaveBeenCalledTimes(1);expect(claim.mock.calls[0]?.slice(0,3)).toEqual(["combat-one","bundle-one","actor-one"]);expect(wallet.mock.calls.length).toBeGreaterThan(1);
+    expect(localStorage.getItem("velvet.combat-reward-claim.v1:campaign:combat-one")).toBeNull();
+  });
+
+  it("keeps an ambiguous claim locked, never replays it, and reconciles the exact claim from reads",async()=>{
+    localStorage.setItem("velvet.combat-actor-id.v2:campaign","actor-one");
+    const claim=vi.fn().mockRejectedValue(new Error("connection lost"));
+    const list=vi.fn().mockImplementation(()=>{const command=claim.mock.calls[0]?.[3];return Promise.resolve(command?[{...claimedReward,claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}}]:[reward]);});
+    const service=api({listRewards:list,claimReward:claim});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Unclaimed");fireEvent.click(screen.getByRole("button",{name:"Claim reward"}));await screen.findByText(/delivery is ambiguous/i);
+    expect(localStorage.getItem("velvet.combat-reward-claim.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');fireEvent.click(screen.getByRole("button",{name:/Read exact claim result/}));
+    await screen.findByText(/Claim settlement confirmed by authoritative reward state/i);expect(screen.getByText("Claimed")).toBeTruthy();expect(claim).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocks an ambiguous unclaimed projection when the exact committed claim exists, then refreshes without replay",async()=>{
+    localStorage.setItem("velvet.combat-actor-id.v2:campaign","actor-one");
+    const claim=vi.fn().mockRejectedValue(new ApiError(500,"ambiguous")),list=vi.fn().mockResolvedValue([reward]);
+    const exact=vi.fn().mockImplementation((_campaignId,_combatId,_bundleId,_actorId,command)=>Promise.resolve({reward:{...claimedReward,
+      claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}},requestBinding:{campaignId:"campaign",combatId:"combat-one",
+        rewardBundleId:"bundle-one",recipientActorId:"actor-one",claimedAt:at,requestEvidence:command,canonicalRequestDigest:"a".repeat(64)},
+      receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:command.expectedRevision,revisionAfter:command.expectedRevision+1,occurredAt:at}}));
+    const wallet=vi.fn().mockResolvedValue({wallet:{balances:[]},revision:1});
+    render(<CombatTrackerPage api={api({listRewards:list,claimReward:claim,getRewardClaimResult:exact,getWallet:wallet})} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Unclaimed");fireEvent.click(screen.getByRole("button",{name:"Claim reward"}));await screen.findByText(/delivery is ambiguous/i);
+    fireEvent.click(screen.getByRole("button",{name:/Read exact claim result/}));
+    await screen.findByText(/Exact claim result confirmed; authoritative rewards and recipient wallet refreshed/i);
+    expect(screen.getByText("Claimed")).toBeTruthy();expect(localStorage.getItem("velvet.combat-reward-claim.v1:campaign:combat-one")).toBeNull();
+    expect(exact).toHaveBeenCalledTimes(1);expect(claim).toHaveBeenCalledTimes(1);expect(list.mock.calls.length).toBeGreaterThan(1);expect(wallet.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("clears a definitively stale unclaimed intent after refresh without replaying it",async()=>{
+    localStorage.setItem("velvet.combat-actor-id.v2:campaign","actor-one");const claim=vi.fn().mockRejectedValue(new ApiError(409,"stale"));
+    const service=api({listRewards:vi.fn().mockResolvedValue([reward]),claimReward:claim});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Unclaimed");fireEvent.click(screen.getByRole("button",{name:"Claim reward"}));await screen.findByText(/rejected before settlement/i);
+    expect(claim).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-reward-claim.v1:campaign:combat-one")).toBeNull();expect(screen.getByText("Unclaimed")).toBeTruthy();
+  });
+
+  it("shows a conflicting authoritative settlement and never retries the stale claim",async()=>{
+    localStorage.setItem("velvet.combat-actor-id.v2:campaign","actor-one");const claim=vi.fn().mockRejectedValue(new ApiError(409,"conflict"));
+    const list=vi.fn().mockImplementation(()=>Promise.resolve(claim.mock.calls.length?[{...claimedReward,claim:{state:"claimed",rewardClaimId:"other-claim",claimedAt:at}}]:[reward]));
+    const service=api({listRewards:list,claimReward:claim});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Unclaimed");fireEvent.click(screen.getByRole("button",{name:"Claim reward"}));await screen.findByText(/Bundle settlement conflict confirmed/i);
+    expect(screen.getByText("Claimed")).toBeTruthy();expect(claim).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-reward-claim.v1:campaign:combat-one")).toBeNull();
+  });
+
+  it("omits non-recipient rewards and never exposes a claim action",async()=>{
+    const claim=vi.fn();const service=api({listRewards:vi.fn().mockResolvedValue([]),claimReward:claim});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText(/No reward bundles are visible to this recipient/i);expect(screen.queryByRole("button",{name:"Claim reward"})).toBeNull();expect(claim).not.toHaveBeenCalled();
+  });
+
+  it("preserves already claimed state when a later reward refresh fails",async()=>{
+    const list=vi.fn().mockResolvedValueOnce([claimedReward]).mockRejectedValueOnce(new Error("offline"));
+    const logs=vi.fn().mockRejectedValue(new Error("offline"));const service=api({listRewards:list,getCombatLog:logs});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Claimed");fireEvent.click(screen.getByRole("button",{name:"Retry log"}));await screen.findByText(/Existing claimed state is preserved/i);expect(screen.getByText("Claimed")).toBeTruthy();
   });
 });

@@ -11,6 +11,9 @@ import {
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatCommandResultResponseSchema,
+  canonicalCombatRewardClaimRequestFrame,
+  combatRewardClaimResultResponseSchema,
+  verifyCombatRewardClaimResultBinding,
   evaluateUseConsumableEligibility,
   canonicalUseConsumableRequestFrame,
   deriveUseConsumableEffectPlan,
@@ -55,9 +58,9 @@ describe("encounter HTTP contracts",()=>{
   it("validates bounded append-only combat log pages",()=>{
     expect(combatLogQuerySchema.parse({afterSequence:"0",limit:"50"})).toEqual({afterSequence:0,limit:50});
     expect(combatLogQuerySchema.safeParse({afterSequence:0,limit:101}).success).toBe(false);
-    const entries=[{logEntryId:"log-1",sequence:1,occurredAt:at,event:{kind:"encounter_created" as const}},
+    const entries=[{logEntryId:"log-1",sequence:1,occurredAt:at,event:{kind:"encounter_created" as const},narration:"The encounter begins."},
       {logEntryId:"log-2",sequence:2,occurredAt:at,event:{kind:"combatant_state_changed" as const,
-        combatantId:"combatant",hitPoints:8,status:"active" as const}}];
+        combatantId:"combatant",hitPoints:8,status:"active" as const},narration:"The combatant remains active."}];
     expect(combatLogResponseSchema.parse({entries,nextAfterSequence:2})).toEqual({entries,nextAfterSequence:2});
     expect(combatLogResponseSchema.safeParse({entries:[...entries].reverse(),nextAfterSequence:null}).success).toBe(false);
     expect(combatLogResponseSchema.safeParse({entries,nextAfterSequence:1}).success).toBe(false);
@@ -88,11 +91,31 @@ describe("encounter HTTP contracts",()=>{
     const completed={encounterId:"encounter",sessionId:"session",name:"Bridge ambush",status:"completed" as const,
       combatId:"encounter",combatants:[combatant],revision:6,createdAt:at,updatedAt:at};
     const reward={rewardBundleId:"bundle",recipientActorId:"actor",createdAt:at,rewards:[{kind:"currency" as const,
-      currency:{kind:"currency" as const,packId:"pack",packVersion:"1.0.0",definitionId:"glimmer"},amount:1}]};
+      currency:{kind:"currency" as const,packId:"pack",packVersion:"1.0.0",definitionId:"glimmer"},amount:1}],claim:{state:"unclaimed" as const}};
     const response={encounter:completed,rewards:[reward],receipt:{idempotencyKey:"end",revisionBefore:5,revisionAfter:6,occurredAt:at}};
     expect(combatEndCommandResponseSchema.parse(response)).toEqual(response);
     expect(combatEndCommandResponseSchema.safeParse({...response,encounter:{...completed,status:"active"}}).success).toBe(false);
     expect(combatEndCommandResponseSchema.safeParse({...response,rewards:[reward,reward]}).success).toBe(false);
+  });
+
+  it("binds exact reward claim results to campaign, combat, recipient, bundle, and request digest",()=>{
+    const request={rewardClaimId:"claim-1",expectedRevision:6,idempotencyKey:"claim-key"};
+    const binding={campaignId:"campaign",combatId:"combat",rewardBundleId:"bundle",recipientActorId:"actor",claimedAt:at,request};
+    const frame=canonicalCombatRewardClaimRequestFrame(binding);
+    const digest=createHash("sha256").update(frame).digest("hex");
+    const result={reward:{rewardBundleId:"bundle",recipientActorId:"actor",createdAt:at,rewards:[{kind:"currency" as const,
+      currency:{kind:"currency" as const,packId:"pack",packVersion:"1",definitionId:"gold"},amount:2}],
+      claim:{state:"claimed" as const,rewardClaimId:"claim-1",claimedAt:at}},requestBinding:{campaignId:binding.campaignId,combatId:binding.combatId,
+        rewardBundleId:binding.rewardBundleId,recipientActorId:binding.recipientActorId,claimedAt:binding.claimedAt,requestEvidence:request,canonicalRequestDigest:digest},
+      receipt:{idempotencyKey:"claim-key",revisionBefore:6,revisionAfter:7,occurredAt:at}};
+    expect(frame).toBe(`{"campaignId":"campaign","claimedAt":"${at}","encounterId":"combat","expectedRevision":6,"idempotencyKey":"claim-key","recipientActorId":"actor","rewardBundleId":"bundle","rewardClaimId":"claim-1","type":"claim_reward_bundle"}`);
+    expect(combatRewardClaimResultResponseSchema.parse(result)).toEqual(result);
+    const sha256=(value:string)=>createHash("sha256").update(value).digest("hex");
+    expect(verifyCombatRewardClaimResultBinding(binding,result,sha256)).toBe(true);
+    expect(verifyCombatRewardClaimResultBinding({...binding,request:{...request,expectedRevision:5}},result,sha256)).toBe(false);
+    expect(verifyCombatRewardClaimResultBinding({...binding,rewardBundleId:"other"},result,sha256)).toBe(false);
+    expect(combatRewardClaimResultResponseSchema.safeParse({...result,requestBinding:{...result.requestBinding,recipientActorId:"other"}}).success).toBe(false);
+    expect(combatRewardClaimResultResponseSchema.safeParse({...result,privateCommand:{controllerPrincipalId:"secret"}}).success).toBe(false);
   });
 
   describe("standalone M5.3 consumable prerequisite",()=>{

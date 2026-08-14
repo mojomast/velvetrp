@@ -474,9 +474,9 @@ describe("campaign-character creation", () => {
       sql: "UPDATE campaigns SET name = name WHERE id = 'campaign-one'",
     }], 100);
     const repository = factory({ dir });
-    const started = Date.now();
+    expect(lock.isReleased()).toBe(false);
     expect(repository.createCampaignCharacter("local-owner", input).campaignCharacter.id).toBe("campaign-character");
-    expect(Date.now() - started).toBeGreaterThanOrEqual(50);
+    expect(lock.isReleased()).toBe(true);
     await lock.done;
     repository.close();
   });

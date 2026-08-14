@@ -69,6 +69,7 @@ import type { QuestRepository } from "../questRepo.js";
 import type { StoryRepository } from "../storyRepo.js";
 import type { RestRepository } from "../restRepo.js";
 import type { WorldRepository } from "../worldRepo.js";
+import type { CampaignGenerationRepository } from "../campaignGenerationRepo.js";
 
 export interface RepositoryDependencies {
   clock: Clock;
@@ -183,7 +184,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;

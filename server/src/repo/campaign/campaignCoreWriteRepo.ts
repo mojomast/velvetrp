@@ -17,6 +17,7 @@ import {
   utcIsoTimestampSchema,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { reconcileGeneratedNpcPlacementsV52 } from "../campaignGenerationRepo.js";
 import type {
   AddCampaignMembershipInput,
   AttachCampaignSessionInput,
@@ -282,6 +283,7 @@ export function attachCampaignSessionSync(
     if (lifecycle === "stopped") throw new CampaignSessionAttachmentConflictError("stopped sessions cannot be attached to campaigns");
     const attachedAt = utcIsoTimestampSchema.parse(clock.now().toISOString());
     db.prepare("INSERT INTO campaign_sessions (campaign_id, session_id, attached_at) VALUES (?, ?, ?)").run(normalized.campaignId, normalized.sessionId, attachedAt);
+    reconcileGeneratedNpcPlacementsV52(db, normalized.campaignId, attachedAt);
     return campaignSessionAttachmentSchema.parse({ campaignId: normalized.campaignId, sessionId: normalized.sessionId, attachedAt });
   }).immediate();
 }

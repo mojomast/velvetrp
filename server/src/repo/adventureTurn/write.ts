@@ -65,7 +65,7 @@ export interface AdventureTurnWriteRepository {
   /** Reviews, applies the authoritative encounter command, and seals one draft in one SQLite transaction. */
   applyEncounterGenerationDraftAtomically(principalId: string, input: DraftMutationInput): { draft: PrivateGenerationDraft; encounterId: string };
   /** Applies a reviewed content bundle through the campaign-content command service. */
-  applyCampaignContentGenerationDraftAtomically(principalId: string, input: DraftMutationInput): PrivateGenerationDraft;
+  applyCampaignContentGenerationDraftAtomically(principalId: string, input: DraftMutationInput & { selectedArtifactKeys: string[] }): PrivateGenerationDraft;
 }
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) => nested && typeof nested === "object" && !Array.isArray(nested)

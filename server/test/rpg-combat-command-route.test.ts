@@ -18,7 +18,7 @@ const encounter={campaignId:"campaign",encounterId:"combat",sessionId:"session",
   combatId:"combat",combatants:[{combatantId:"actor-combatant",kind:"actor" as const,team:"allies" as const,actorId:"actor"}],
   revision:4,createdAt:at,updatedAt:at};
 const reward={campaignId:"campaign",encounterId:"combat",rewardBundleId:"bundle",recipientActorId:"actor",createdAt:at,
-  rewards:[{kind:"currency" as const,currency:{kind:"currency" as const,packId:"pack",packVersion:"1.0.0",definitionId:"glimmer"},amount:1}]};
+  rewards:[{kind:"currency" as const,currency:{kind:"currency" as const,packId:"pack",packVersion:"1.0.0",definitionId:"glimmer"},amount:1}],claim:{state:"unclaimed" as const}};
 
 afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;delete process.env.FEATURE_RPG_COMBAT;});
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";process.env.FEATURE_RPG_COMBAT="true";};
@@ -28,6 +28,8 @@ function repository(overrides:Record<string,unknown>={}){
   endCombat:()=>({campaignId:"campaign",encounterId:"combat",encounter,rewards:[reward],
     receipt:{commandId:"private",idempotencyKey:"end",revisionBefore:3,revisionAfter:4,occurredAt:at}}),
   getCombatCommandResult:()=>({operation:"action",result:{resolution,combat:Object.fromEntries(Object.entries(combat).filter(([key])=>key!=="campaignId"&&key!=="encounterId")),receipt:{idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}}),
+  getCombatRewardClaimResult:()=>null,
+  listCombatRewards:()=>[reward],claimCombatReward:()=>({encounterId:"combat",status:"completed",receipt:{commandId:"private",idempotencyKey:"claim",revisionBefore:4,revisionAfter:5,occurredAt:at}}),
   close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;
 }
 
@@ -58,6 +60,27 @@ describe("M2.9 combat command routes",()=>{
       rewards:[Object.fromEntries(Object.entries(reward).filter(([key])=>key!=="campaignId"&&key!=="encounterId"))],
       receipt:{idempotencyKey:"end",revisionBefore:3,revisionAfter:4,occurredAt:at}});
     expect(calls).toEqual([["action","local-owner","combat",actionBody],["end","local-owner","combat",endBody]]);await app.close();
+  });
+
+  it("reads only an exact recipient-safe committed reward claim result",async()=>{
+    enable();const claimed={...reward,claim:{state:"claimed" as const,rewardClaimId:"claim",claimedAt:at}};
+    const exact={reward:Object.fromEntries(Object.entries(claimed).filter(([key])=>key!=="campaignId"&&key!=="encounterId")),
+      requestBinding:{campaignId:"campaign",combatId:"combat",rewardBundleId:"bundle",recipientActorId:"actor",claimedAt:at,
+        requestEvidence:{rewardClaimId:"claim",expectedRevision:4,idempotencyKey:"claim-key"},canonicalRequestDigest:"a".repeat(64)},
+      receipt:{idempotencyKey:"claim-key",revisionBefore:4,revisionAfter:5,occurredAt:at}};
+    const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repository({getCombatRewardClaimResult:(...args:any[])=>{calls.push(args);return exact;}})});
+    const url="/api/rpg/v1/campaigns/campaign/combats/combat/rewards/bundle/claim-results/claim-key";
+    const response=await app.inject({method:"GET",url,headers:{authorization:"Bearer attacker","x-principal-id":"attacker"}});
+    expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");expect(response.json()).toEqual(exact);
+    expect(response.body).not.toContain("commandId");expect(response.body).not.toContain("controller");
+    expect(calls).toEqual([["local-owner","campaign","combat","bundle","claim-key"]]);
+    expect((await app.inject({method:"GET",url:`${url}?request=changed`})).statusCode).toBe(400);await app.close();
+
+    for(const hidden of [null,{...exact,requestBinding:{...exact.requestBinding,recipientActorId:"other"}}]){
+      const hiddenApp=buildApp({campaignRepositoryFactory:()=>repository({getCombatRewardClaimResult:()=>hidden})});
+      const hiddenResponse=await hiddenApp.inject({method:"GET",url});
+      expect(hiddenResponse.statusCode).toBe(hidden===null?404:500);expect(hiddenResponse.body).not.toContain("other");await hiddenApp.close();
+    }
   });
 
   it("gates and normalizes query, media, body, path, stale, conflict, and corrupt output",async()=>{

@@ -13,6 +13,7 @@ const travel={campaignId:"campaign",sessionId:"session",
 afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;});
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";};
 function repository(overrides:Record<string,unknown>={}){return {getCampaignWorld:()=>world,travelActor:()=>travel,
+  placeActor:()=>({campaignId:"campaign",sessionId:"session",location:world.currentLocations[0],receipt:travel.receipt}),
   close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;}
 
 describe("M2.10 world routes",()=>{

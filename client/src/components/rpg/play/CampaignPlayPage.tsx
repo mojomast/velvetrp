@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adventureTurnResumeTokenSchema, idempotencyKeySchema, resourceIdSchema } from "@velvet/contracts";
 import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnInitialReconcileRequest,
   AdventureTurnStreamEvent, CampaignPlayBootstrap } from "@velvet/contracts";
@@ -8,6 +8,9 @@ import { AdventureActionComposer } from "./AdventureActionComposer";
 import { CampaignContextDrawer, type CampaignContextDrawerApi } from "./CampaignContextDrawer";
 import { ConfirmationBanner } from "./ConfirmationBanner";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
+import { CampaignQuickPanel, type CampaignQuickPanelApi } from "./CampaignQuickPanel";
+import { CAMPAIGN_CONTEXT_WIDGETS, DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES, useCampaignWorkbenchPreferences,
+  type CampaignContextWidget, type CampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
 
 /** Delivery-only handle. Cancelling it never cancels the durable adventure turn. */
 export interface AdventureTurnStreamHandle {
@@ -23,7 +26,7 @@ type PlayStreamRequest =
     expectedRevision: number; idempotencyKey: string };
 
 /** Narrow API required by the durable campaign play shell. */
-export interface CampaignPlayApi extends CampaignContextDrawerApi, MechanicReceiptApi {
+export interface CampaignPlayApi extends CampaignContextDrawerApi, CampaignQuickPanelApi, MechanicReceiptApi {
   getCampaignPlayBootstrap: (campaignId: string, sessionId: string) => Promise<CampaignPlayBootstrap>;
   streamAdventureTurn: (request: PlayStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void) => AdventureTurnStreamHandle;
   getAdventureTurn: (turnId: string, expected: AdventureTurnClientBinding) => Promise<AdventureTurnGetResponse>;
@@ -46,6 +49,9 @@ export interface CampaignPlayPageProps {
   initialTurnId?: string;
   authorizationCanAct?: boolean;
   focusHeading?: boolean;
+  onNavigate?: (destination: "campaign" | "combat" | "world" | "cast" | "quests" | "story" | "history" | "administration") => void;
+  combatAvailable?: boolean;
+  studioAvailable?: boolean;
 }
 
 type StreamPhase = "idle" | "streaming" | "awaiting-confirmation" | "ambiguous" | "terminal";
@@ -56,6 +62,53 @@ const stateKey = (campaignId: string, sessionId: string) => `velvet.campaign-pla
 const lockKey = (campaignId: string, sessionId: string) => `velvet.campaign-play-submit.v1:${campaignId}:${sessionId}`;
 const confirmationKey = (turnId: string) => `velvet.adventure-confirm.v1:${turnId}`;
 const idempotency = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `turn-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const widgetLabels: Record<CampaignContextWidget, string> = { location: "Location", cast: "Present cast", objectives: "Objectives", resources: "Party resources", encounter: "Encounter" };
+
+function clampPaneWidth(value: number) { return Math.max(220, Math.min(520, Math.round(value))); }
+
+function PanelSeparator({ side, value, controls, label, onChange, onCollapse }: { side: "left" | "right"; value: number; controls: string; label: string;
+  onChange: (value: number) => void; onCollapse: () => void }) {
+  function resize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX; const startWidth = value;
+    const move = (next: PointerEvent) => onChange(clampPaneWidth(startWidth + (side === "left" ? next.clientX - startX : startX - next.clientX)));
+    const stop = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop);
+  }
+  return <div className="campaign-panel-separator" role="separator" aria-label={label} aria-controls={controls} aria-orientation="vertical"
+    aria-valuemin={220} aria-valuemax={520} aria-valuenow={value} tabIndex={0} onPointerDown={resize} onKeyDown={(event) => {
+      const inward = side === "left" ? "ArrowRight" : "ArrowLeft"; const outward = side === "left" ? "ArrowLeft" : "ArrowRight";
+      if (event.key === inward) { event.preventDefault(); onChange(clampPaneWidth(value + (event.shiftKey ? 64 : 16))); }
+      if (event.key === outward) { event.preventDefault(); onChange(clampPaneWidth(value - (event.shiftKey ? 64 : 16))); }
+      if (event.key === "Home") { event.preventDefault(); onChange(220); }
+      if (event.key === "End") { event.preventDefault(); onChange(520); }
+      if (event.key === "Enter") { event.preventDefault(); onCollapse(); }
+    }} />;
+}
+
+function WorkbenchPreferencesDialog({ dialogRef, preferences, onChange }: { dialogRef: React.RefObject<HTMLDialogElement>; preferences: CampaignWorkbenchPreferences;
+  onChange: (value: CampaignWorkbenchPreferences) => void }) {
+  const moveWidget = (widget: CampaignContextWidget, direction: -1 | 1) => {
+    const index = preferences.widgets.indexOf(widget); const target = index + direction;
+    if (index < 0 || target < 0 || target >= preferences.widgets.length) return;
+    const widgets = [...preferences.widgets]; [widgets[index], widgets[target]] = [widgets[target]!, widgets[index]!];
+    onChange({ ...preferences, widgets });
+  };
+  return <dialog ref={dialogRef} className="workbench-dialog" aria-labelledby="workbench-preferences-heading"><form method="dialog">
+    <header><div><p className="eyebrow">LOCAL DISPLAY</p><h2 id="workbench-preferences-heading">Campaign workbench</h2></div><button className="ghost" value="close">Close</button></header>
+    <div className="workbench-preference-grid"><label>Theme<select value={preferences.theme} onChange={(event) => onChange({ ...preferences, theme: event.target.value as CampaignWorkbenchPreferences["theme"] })}><option value="system">System</option><option value="light">Light</option><option value="dark">Velvet dark</option><option value="contrast">High contrast</option></select></label>
+      <label>Layout density<select value={preferences.density} onChange={(event) => onChange({ ...preferences, density: event.target.value as CampaignWorkbenchPreferences["density"] })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label></div>
+    <fieldset><legend>Panels</legend><label><input type="checkbox" checked={preferences.contextVisible} onChange={(event) => onChange({ ...preferences, contextVisible: event.target.checked })} /> Campaign context</label><label><input type="checkbox" checked={preferences.quickToolsVisible} onChange={(event) => onChange({ ...preferences, quickToolsVisible: event.target.checked })} /> Character quick tools</label></fieldset>
+    <fieldset><legend>Context widgets and order</legend>{CAMPAIGN_CONTEXT_WIDGETS.map((widget) => { const index = preferences.widgets.indexOf(widget); const enabled = index >= 0; return <div className="widget-preference" key={widget}><label><input type="checkbox" checked={enabled} onChange={(event) => onChange({ ...preferences, widgets: event.target.checked ? [...preferences.widgets, widget] : preferences.widgets.filter((item) => item !== widget) })} /> {widgetLabels[widget]}</label><div className="button-row"><button type="button" className="ghost" aria-label={`Move ${widgetLabels[widget]} earlier`} disabled={!enabled || index === 0} onClick={() => moveWidget(widget, -1)}>Up</button><button type="button" className="ghost" aria-label={`Move ${widgetLabels[widget]} later`} disabled={!enabled || index === preferences.widgets.length - 1} onClick={() => moveWidget(widget, 1)}>Down</button></div></div>; })}</fieldset>
+    <button type="button" className="ghost" onClick={() => onChange({ ...DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES, widgets: [...CAMPAIGN_CONTEXT_WIDGETS] })}>Reset workbench</button>
+  </form></dialog>;
+}
+
+function ShortcutDialog({ dialogRef }: { dialogRef: React.RefObject<HTMLDialogElement> }) {
+  return <dialog ref={dialogRef} className="workbench-dialog shortcut-dialog" aria-labelledby="shortcut-heading"><form method="dialog"><header><div><p className="eyebrow">KEYBOARD MAP</p><h2 id="shortcut-heading">Campaign shortcuts</h2></div><button className="ghost" value="close">Close</button></header><dl>
+    <div><dt><kbd>F6</kbd></dt><dd>Move to the next visible workbench pane</dd></div><div><dt><kbd>Shift</kbd> + <kbd>F6</kbd></dt><dd>Move to the previous pane</dd></div><div><dt><kbd>Alt</kbd> + <kbd>1</kbd></dt><dd>Focus campaign context</dd></div><div><dt><kbd>Alt</kbd> + <kbd>2</kbd></dt><dd>Focus narration and action workspace</dd></div><div><dt><kbd>Alt</kbd> + <kbd>3</kbd></dt><dd>Focus character quick tools</dd></div><div><dt><kbd>?</kbd></dt><dd>Open this keyboard map outside text fields</dd></div>
+  </dl><p>Splitters use arrow keys, Shift + arrow for larger steps, Home/End for minimum/maximum, and Enter to collapse.</p></form></dialog>;
+}
 
 function readSafeState(campaignId: string, sessionId: string): SafeState {
   try {
@@ -82,7 +135,8 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 
 /** Coordinates bootstrap, exact durable reconciliation, SSE delivery, confirmation, and the accessible play grid. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, children, onBack, onUnavailable,
-  onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading }: CampaignPlayPageProps) {
+  onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
+  onNavigate, combatAvailable = false, studioAvailable = false }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
     try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
       if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
@@ -103,6 +157,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const activeRef = useRef(true);
   const headingRef = useRef<HTMLHeadingElement>(null); const composerRef = useRef<HTMLTextAreaElement>(null);
   const headingFocusedRef = useRef(false);
+  const [preferences, setPreferences] = useCampaignWorkbenchPreferences();
+  const preferencesDialogRef = useRef<HTMLDialogElement>(null); const shortcutDialogRef = useRef<HTMLDialogElement>(null);
+  const centerRef = useRef<HTMLElement>(null);
   const unavailableRef = useRef(onUnavailable); const selectedChangeRef = useRef(onSelectedActorChange); const turnChangeRef = useRef(onTurnIdChange);
   unavailableRef.current = onUnavailable; selectedChangeRef.current = onSelectedActorChange; turnChangeRef.current = onTurnIdChange;
 
@@ -157,6 +214,17 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     return () => { activeRef.current = false; streamRef.current?.cancelDelivery(); streamRef.current = null; };
   }, [authorizationGeneration, clearAdventureState, refreshBootstrap]);
   useEffect(() => { if (focusHeading && bootstrap && !headingFocusedRef.current) { headingFocusedRef.current = true; headingRef.current?.focus(); } }, [bootstrap, focusHeading]);
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      const target = event.target; const editing = target instanceof Element && target.matches("input, textarea, select, [contenteditable=true]");
+      if (event.key === "?" && !editing && !event.altKey && !event.ctrlKey && !event.metaKey) { event.preventDefault(); shortcutDialogRef.current?.showModal(); return; }
+      const panes = [preferences.contextVisible ? document.getElementById("campaign-context-panel") : null, centerRef.current,
+        preferences.quickToolsVisible ? document.getElementById("campaign-quick-tools") : null].filter((pane): pane is HTMLElement => pane !== null);
+      if (event.key === "F6" && panes.length) { event.preventDefault(); const current = panes.findIndex((pane) => pane === document.activeElement || pane.contains(document.activeElement)); const next = (current + (event.shiftKey ? panes.length - 1 : 1)) % panes.length; panes[next]?.focus(); return; }
+      if (event.altKey && ["1", "2", "3"].includes(event.key)) { const pane = [document.getElementById("campaign-context-panel"), centerRef.current, document.getElementById("campaign-quick-tools")][Number(event.key) - 1]; if (pane) { event.preventDefault(); pane.focus(); } }
+    };
+    window.addEventListener("keydown", keydown); return () => window.removeEventListener("keydown", keydown);
+  }, [preferences.contextVisible, preferences.quickToolsVisible]);
 
   const initialReconciledRef = useRef<string | null>(null);
   useEffect(() => {
@@ -272,23 +340,35 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const actionable = authorizationCanAct && bootstrap.session.adventureEligible && bootstrap.session.active
     && bootstrap.principal.role !== "observer" && bootstrap.playableActors.length > 0;
   const audience = bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player";
-  return <main className="campaign-play-page"><header className="campaign-play-header"><div><button className="back-link" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CAMPAIGN PLAY</p><h1 ref={headingRef} tabIndex={-1}>Adventure room</h1></div>
-    <p className="play-phase" role="status">{phase.replace("-", " ")}</p></header>
+  const playBlocker = !authorizationCanAct || bootstrap.principal.role === "observer" ? "Observer access is read-only."
+    : !bootstrap.session.active ? "This attached room has stopped and is read-only."
+      : !bootstrap.session.adventureEligible ? "Adventure turns are unavailable. Publish the campaign and use an attached active room with a finalized participating character."
+        : bootstrap.playableActors.length === 0 ? "No controlled actor is available in this room. Review character finalization, room participants, and campaign control." : null;
+  const navigate = (destination: Parameters<NonNullable<CampaignPlayPageProps["onNavigate"]>>[0]) => onNavigate?.(destination);
+  const gridStyle = { "--campaign-context-width": `${preferences.contextWidth}px`, "--campaign-quick-width": `${preferences.quickToolsWidth}px` } as CSSProperties;
+  return <main className="campaign-play-page"><header className="campaign-play-header"><div><button className="back-link" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CAMPAIGN COMMAND CENTER</p><h1 ref={headingRef} tabIndex={-1}>Adventure room</h1></div>
+    <div className="campaign-play-status"><span>{bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name ?? "No acting character"}</span><p className="play-phase" role="status">{phase.replace("-", " ")}</p><small>Campaign revision {bootstrap.expectedRevision}</small></div></header>
+    <nav className="campaign-play-nav" aria-label="Campaign command navigation"><button className="ghost" onClick={() => navigate("campaign")}>Campaign</button>{combatAvailable && <button className="ghost" onClick={() => navigate("combat")}>Combat</button>}{studioAvailable && <><button className="ghost" onClick={() => navigate("world")}>World</button><button className="ghost" onClick={() => navigate("cast")}>Cast</button><button className="ghost" onClick={() => navigate("quests")}>Quests</button><button className="ghost" onClick={() => navigate("story")}>Story</button></>}<button className="ghost" onClick={() => navigate("history")}>History</button>{audience === "gm" && <button className="ghost" onClick={() => navigate("administration")}>GM tools</button>}<span className="campaign-nav-spacer" /><button className="ghost" aria-label="Campaign workbench preferences" onClick={() => preferencesDialogRef.current?.showModal()}>Display</button><button className="ghost" aria-label="Campaign keyboard shortcuts" onClick={() => shortcutDialogRef.current?.showModal()}>Shortcuts</button></nav>
     {error && <p className="play-error" role="alert">{error}</p>}
+    {playBlocker && <section className="play-prerequisite" role="status"><div><p className="eyebrow">PLAY READINESS</p><h2>Action declaration unavailable</h2></div><p>{playBlocker}</p><button className="ghost" onClick={() => navigate("campaign")}>Review campaign readiness</button></section>}
     {pendingInitial && phase === "ambiguous" && actionable && <div className="play-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button className="primary" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
     {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="play-reconcile"><p>A known turn needs authoritative reconciliation.</p><button className="primary" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
-    <div className="campaign-play-grid"><CampaignContextDrawer key={`${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} api={api} />
-      <section className="campaign-play-center" aria-label="Campaign room conversation"><div className="embedded-room-chat">{children}</div>
-        {turn?.narrationStatus.text && <article className="adventure-narration"><h2>Adventure narration</h2><p>{turn.narrationStatus.text}</p>{turn.receipts.length === 0 && <p className="no-tools-label">No mechanics committed (no tools). The current response does not identify whether narration used a fallback.</p>}</article>}
+    <div className={`campaign-play-grid ${preferences.contextVisible ? "has-context" : ""} ${preferences.quickToolsVisible ? "has-quick-tools" : ""}`} style={gridStyle}>
+      {preferences.contextVisible && <><CampaignContextDrawer key={`${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} api={api} widgets={preferences.widgets} /><PanelSeparator side="left" value={preferences.contextWidth} controls="campaign-context-panel" label="Resize campaign context" onChange={(contextWidth) => setPreferences({ ...preferences, contextWidth })} onCollapse={() => setPreferences({ ...preferences, contextVisible: false })} /></>}
+      <section ref={centerRef} tabIndex={-1} className="campaign-play-center" aria-label="Campaign narration and actions">{actionable && <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={bootstrap.principal.role} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
+          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} onActorChange={setActor} onSubmit={(declaration) => void submit(declaration)} composerRef={composerRef} />}
+        <div className="embedded-room-chat">{children}</div>
+        {turn?.narrationStatus.text && <article className="adventure-narration"><h2>Adventure narration</h2><p>{turn.narrationStatus.text}</p>{turn.receipts.length === 0 && <p className="no-tools-label">No mechanics were needed. {turn.narrationStatus.source === "provider-assisted" ? "The scene was narrated from public campaign context." : "Provider narration failed, so a deterministic fallback is shown."}</p>}</article>}
         {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
           onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} />}
         {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} />}
         {actionable && turn && ["completed", "cancelled", "failed"].includes(turn.turn.state) && <div className="adventure-variant-controls" aria-label="Adventure narration alternatives">
           <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
           <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
-        {actionable && <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={bootstrap.principal.role} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
-          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} onActorChange={setActor} onSubmit={(declaration) => void submit(declaration)} composerRef={composerRef} />}
-      </section></div>
+      </section>
+      {preferences.quickToolsVisible && <><PanelSeparator side="right" value={preferences.quickToolsWidth} controls="campaign-quick-tools" label="Resize character quick tools" onChange={(quickToolsWidth) => setPreferences({ ...preferences, quickToolsWidth })} onCollapse={() => setPreferences({ ...preferences, quickToolsVisible: false })} /><CampaignQuickPanel campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} api={api} /></>}
+    </div>
     {actionable && streamRef.current && <button className="ghost cancel-delivery" onClick={cancelLiveDelivery}>Stop receiving live updates</button>}
+    <WorkbenchPreferencesDialog dialogRef={preferencesDialogRef} preferences={preferences} onChange={setPreferences} /><ShortcutDialog dialogRef={shortcutDialogRef} />
   </main>;
 }

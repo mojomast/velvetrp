@@ -15,12 +15,12 @@ function rewind47(){createRepository().close();const db=new DatabaseDriver(file(
 
 describe("schema v48 provider exact-travel bridge migration",()=>{
   it("upgrades v47 additively with attested empty binding history",()=>{rewind47();createRepository().close();const db=new DatabaseDriver(file());
-    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"48"});assertExactCandidateProviderBridgeLayoutV48(db);
+    expect(db.prepare("SELECT value FROM meta WHERE key='schemaVersion'").get()).toEqual({value:"53"});assertExactCandidateProviderBridgeLayoutV48(db);
     expect(db.prepare("SELECT layout_digest FROM exact_candidate_provider_layout_attestation_v48").get()).toEqual({layout_digest:EXACT_CANDIDATE_PROVIDER_V48_LAYOUT_DIGEST});
     expect(db.prepare("SELECT count(*) count FROM exact_candidate_provider_bindings_v48").get()).toEqual({count:0});expect(db.pragma("foreign_key_check")).toEqual([]);db.close();});
   it("rejects v45 before mutation",()=>{createRepository().close();let db=new DatabaseDriver(file());db.prepare("UPDATE meta SET value='45' WHERE key='schemaVersion'").run();
     const before=db.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").all();db.close();
-    expect(()=>createRepository()).toThrow("unsupported schemaVersion 45; expected 48");db=new DatabaseDriver(file(),{readonly:true});
+    expect(()=>createRepository()).toThrow("unsupported schemaVersion 45; expected 53");db=new DatabaseDriver(file(),{readonly:true});
     expect(db.prepare("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").all()).toEqual(before);db.close();});
   it("rejects projection digest tampering on reopen",()=>{createRepository().close();const db=new DatabaseDriver(file());
     db.exec("DROP TRIGGER exact_candidate_provider_bindings_v48_immutable_update_v48");

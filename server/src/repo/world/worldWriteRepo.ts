@@ -17,6 +17,7 @@ import {
   type TravelCommand,
   type ActorTravelCommandRequest,
   type ActorTravelCommandResponse,
+  type ActorPlacementCommandRequest,
   type CampaignNpcHttp,
   type CreateCampaignNpcHttpRequest,
   type NpcRelationshipCommandHttpRequest,
@@ -75,6 +76,7 @@ export interface WorldWriteRepository {
   travelActor(principalId:string,actorId:string,input:ActorTravelCommandRequest):ActorTravelResult;
   /** Sets an actor's session location with GM authority. */
   setActorLocation(principalId: string, sessionId: string, command: unknown): MutationReceipt;
+  placeActor(principalId:string,actorId:string,input:ActorPlacementCommandRequest):MutationReceipt&{campaignId:string;sessionId:string;location:{actorId:string;locationId:string;revision:number;updatedAt:string}};
   /** Creates a campaign location with GM authority. */
   createLocation(principalId: string, input: unknown): { locationId: string; campaignId: string };
   /** Creates a directed campaign location connection with GM authority. */
@@ -168,6 +170,20 @@ export function createWorldWriteRepository(
     context.guard(); return db.transaction(() => { const mutation = begin(principalId, sessionId, setActorLocationCommandSchema.parse(raw), "set_actor_location", () => requireGm(principalId, (raw as any).campaignId)); if (mutation.replay) return JSON.parse(mutation.replay.canonical_result_json); const command = mutation.command;
       if (!db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(command.campaignId, command.actorId) || !db.prepare("SELECT 1 FROM campaign_locations_v28 WHERE campaign_id=? AND location_id=?").get(command.campaignId, command.locationId)) throw new WorldUnavailableError("actor or location is unavailable"); const result = receipt(mutation, command.idempotencyKey); record(command, sessionId, "set_actor_location", command.actorId, mutation, result, "actor_location_set", { actorId: command.actorId, locationId: command.locationId });
       const existing = db.prepare("SELECT 1 FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=? AND session_id=?").get(command.campaignId, command.actorId, sessionId); if (existing) db.prepare("UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=? WHERE campaign_id=? AND actor_id=? AND session_id=?").run(command.locationId, mutation.at, command.campaignId, command.actorId, sessionId); else db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(command.campaignId, command.actorId, command.locationId, sessionId, mutation.at); return result;
+    }).immediate();
+  }
+  function placeActor(principalId:string,actorIdInput:string,input:ActorPlacementCommandRequest){
+    context.guard();const actorId=resourceIdSchema.parse(actorIdInput),intent=input;
+    return db.transaction(()=>{requireGm(principalId,intent.campaignId);
+      if(db.prepare("SELECT 1 FROM campaign_actor_locations_v28 WHERE campaign_id=? AND actor_id=?").get(intent.campaignId,actorId))throw new WorldConflictError("actor is already placed");
+      const sessions=db.prepare(`SELECT attached.session_id FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
+        WHERE attached.campaign_id=? AND session.state='active' AND session.stopped_at IS NULL`).all(intent.campaignId) as Array<{session_id:string}>;
+      if(sessions.length!==1)throw new WorldConflictError("campaign world session is ambiguous");
+      const result=setActorLocation(principalId,sessions[0]!.session_id,{type:"set_actor_location",campaignId:intent.campaignId,actorId,
+        locationId:intent.locationId,expectedRevision:intent.expectedRevision,idempotencyKey:intent.idempotencyKey});
+      db.prepare("INSERT OR IGNORE INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(intent.campaignId,actorId,intent.locationId,result.receipt.occurredAt);
+      return {campaignId:intent.campaignId,sessionId:sessions[0]!.session_id,location:{actorId,locationId:intent.locationId,revision:0,
+        updatedAt:result.receipt.occurredAt},...result};
     }).immediate();
   }
   function discoverLocation(principalId: string, sessionId: string, raw: unknown): MutationReceipt {
@@ -298,6 +314,6 @@ export function createWorldWriteRepository(
   function createNpc(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); if (input.speechControl !== undefined && input.speechControl !== "manual") throw new WorldUnavailableError("NPC AI speech is unavailable"); const persona = db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(input.personaId) as any; if (!persona || persona.fictional_confirmed !== 1 || persona.is_real_person !== 0) throw new WorldUnavailableError("NPC persona must be fictional and confirmed"); if (db.prepare("SELECT 1 FROM campaign_actors a JOIN campaign_characters cc ON cc.id=a.campaign_character_id AND cc.campaign_id=a.campaign_id WHERE a.campaign_id=? AND cc.character_id=?").get(campaignId, input.personaId)) throw new WorldConflictError("a campaign character cannot be NPC-controlled"); const npcId = input.npcId ?? id(); db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)").run(npcId, campaignId, input.personaId, "manual", String(input.name).trim(), now()); return { npcId, campaignId }; }
   function executeWorldCommand(principalId: string, sessionId: string, input: unknown): WorldReceipt | MutationReceipt { const command = worldCommandSchema.parse(input); switch (command.type) { case "travel": return travel(principalId, sessionId, command); case "set_actor_location": return setActorLocation(principalId, sessionId, command); case "discover_location": return discoverLocation(principalId, sessionId, command); case "change_reputation": return changeReputation(principalId, sessionId, command); } }
 
-  return { executeWorldCommand, travel,travelActor, setActorLocation, createLocation, createLocationConnection, createNpc,
+  return { executeWorldCommand, travel,travelActor, setActorLocation,placeActor, createLocation, createLocationConnection, createNpc,
     changeReputation,createCampaignNpc,changeNpcRelationship,createCampaignFaction,changeFactionReputation };
 }

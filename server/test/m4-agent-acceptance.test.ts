@@ -186,6 +186,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(fixture.provider.requests[1]).toMatchObject({ tool_choice: "none" });
     expect(fixture.provider.requests[1].tools).toBeUndefined();
     expect(JSON.parse(fixture.provider.requests[1].messages[1].content)).toEqual({ declaration: "Set my might precisely",
+      publicContext: { summary: [], recap: [], cast: ["Aster."], world: [], quests: [], canon: [] },
       receipts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }] });
     await restarted.close();
 

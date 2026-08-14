@@ -13,6 +13,7 @@ afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATUR
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";process.env.FEATURE_RPG_COMBAT="true";};
 function repository(overrides:Record<string,unknown>={}){
   return {getCombatState:()=>combat,listCombatLogPage:()=>({campaignId:"campaign",encounterId:"combat",entries:[entry],nextAfterSequence:3}),
+    listCombatRewards:()=>[],
     close(){},listCampaigns:()=>[],...overrides} as unknown as CampaignListRepository;
 }
 
@@ -29,7 +30,7 @@ describe("M2.9 combat read routes",()=>{
       legalActions:combat.legalActions,revision:4});expect(state.body).not.toContain("campaignId");expect(state.body).not.toContain("encounterId");
     const log=await app.inject({method:"GET",url:"/api/rpg/v1/combats/combat/log?afterSequence=2&limit=1",headers:hostile});
     expect(log.statusCode).toBe(200);expect(log.headers["cache-control"]).toBe("no-store");
-    expect(log.json()).toEqual({entries:[{logEntryId:"log",sequence:3,occurredAt:at,event:entry.event}],nextAfterSequence:3});
+    expect(log.json()).toEqual({entries:[{logEntryId:"log",sequence:3,occurredAt:at,event:entry.event,narration:"A combatant remains active with 8 HP."}],nextAfterSequence:3});
     expect(log.body).not.toContain("campaignId");expect(log.body).not.toContain("encounterId");
     expect(calls).toEqual([["combat","local-owner","combat"],["log","local-owner","combat",2,1]]);await app.close();
   });

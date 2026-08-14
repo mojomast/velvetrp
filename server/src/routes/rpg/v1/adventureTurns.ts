@@ -3,6 +3,7 @@ import {
   adventureTurnConfirmRequestSchema, adventureTurnConfirmResponseSchema, adventureTurnGetResponseSchema,
   adventureTurnInitialReconcileRequestSchema, adventureTurnInitialReconcileResponseSchema, adventureTurnResumeTokenSchema,
   adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, resourceIdSchema,
+  combatActionResolutionSchema,
   type AdventureTurnStreamEvent, type PrivateAdventureTurn, type AdventureTurnHttpProposal,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
@@ -44,9 +45,12 @@ const key = (prefix: string, ...parts: string[]) => `${prefix}:${createHash("sha
 const fallback = (declaration: string) => `${FALLBACK_PREFIX}${declaration}`.slice(0, 8_000);
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; roundBefore: number; roundAfter: number }
+type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn";
+  outcome:{kind:"damage";damageType:"physical";requested:1;applied:number;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"defeated"}
+    |{kind:"status";statusAfter:"fled"}|{kind:"none"};roundBefore: number; roundAfter: number }
   | {kind:"travel";destination:string};
-const activeNarrationDispatches = new Map<string, Promise<{ turn: PrivateAdventureTurn; text: string }>>();
+type NarrationResult={turn:PrivateAdventureTurn;text:string;source:"provider-assisted"|"deterministic-fallback"};
+const activeNarrationDispatches = new Map<string, Promise<NarrationResult>>();
 function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn): NarrationReceipt[] | null {
   const values: NarrationReceipt[] = [];
   for (const link of turn.receiptLinks) {
@@ -65,22 +69,26 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
     const travel=repo.getExactCandidateTravelNarrationReceipt(OWNER,turn.turnId,link.commandId);
     if(travel){values.push({kind:"travel",destination:travel.destination});continue;}
     const combat = repo.getAgentCombatReceipt(OWNER, turn.campaignId, link.commandId);
-    if (!combat || typeof combat.resolution.roundBefore !== "number" || typeof combat.resolution.roundAfter !== "number") return null;
-    values.push({ kind: "combat", roundBefore: combat.resolution.roundBefore, roundAfter: combat.resolution.roundAfter });
+    const resolution=combatActionResolutionSchema.safeParse(combat?.resolution);if(!combat||!resolution.success)return null;
+    const outcome=resolution.data.outcomes[0];
+    values.push({kind:"combat",action:resolution.data.kind,outcome:outcome?.kind==="damage"?{kind:"damage",damageType:outcome.damageType,
+      requested:outcome.requested,applied:outcome.applied,hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
+      :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.data.roundBefore,roundAfter:resolution.data.roundAfter});
   }
   return values;
 }
 export function narrationFallback(declaration: string, values: readonly NarrationReceipt[]): string {
   if (values.length === 0) return fallback(declaration);
   return `${MECHANICS_FALLBACK_PREFIX}${declaration}\n\nCommitted results: ${values.map((value) => value.kind === "combat"
-    ? `combat advanced from round ${value.roundBefore} to ${value.roundAfter}` : value.kind==="travel"?`the actor travelled to ${value.destination}`
+    ? value.outcome.kind==="damage"?`${value.action} dealt ${value.outcome.applied} ${value.outcome.damageType} damage; the target has ${value.outcome.hitPointsAfter} HP and is ${value.outcome.statusAfter}${value.roundAfter!==value.roundBefore?`; round ${value.roundBefore} advanced to ${value.roundAfter}`:""}`
+      :value.outcome.kind==="status"?`the combatant fled during round ${value.roundBefore}`:`the combatant ended their turn in round ${value.roundBefore}${value.roundAfter!==value.roundBefore?`; round ${value.roundAfter} began`:""}` : value.kind==="travel"?`the actor travelled to ${value.destination}`
     : `${value.event.type}: ${JSON.stringify(value.event.data)}`).join("; ")}`.slice(0, 8_000);
 }
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
-  signal: AbortSignal): Promise<{ turn: PrivateAdventureTurn; text: string }> {
+  signal: AbortSignal): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
   const fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
-  if (!safeReceipts) return { turn, text: fallbackText };
+  if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
   const start = turn.providerCalls.find((call) => call.callId === callId && call.phase === "started");
   const started = Boolean(start);
@@ -97,18 +105,18 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
     try {
       const harness = await (dependencies?.getHarness() ?? Promise.resolve(defaultHarnessSettings())).catch(defaultHarnessSettings);
       const result = await (dependencies?.complete ?? completeWithProvider)({ provider, harness, preset: getPromptPreset("default"), toolChoice: "none", signal,
-        messages: [{ role: "system", content: "You are an RPG narrator. Narrate only the supplied display-safe declaration and committed receipt facts. Do not mention IDs, tools, providers, private state, permissions, or unprovided facts. Do not invent mechanics or numeric outcomes. Return narration only." },
-          { role: "user", content: JSON.stringify({ declaration: turn.declaration, receipts: safeReceipts }) }] });
-      // Model prose is untrusted input.  A receipt's public projection is the
-      // only narration contract: never persist or stream model-authored text,
-      // even when it appears to follow the prompt.  This also makes retries
-      // deterministic and prevents prompt injection from crossing this lane.
+        messages: [{ role: "system", content: "Write concise second-person RPG scene narration grounded only in the supplied public canon, declaration, and committed receipts. Do not mention IDs, tools, providers, private state, permissions, hidden statistics, or unprovided facts. Never invent damage, movement, rewards, items, conditions, success, or any other mechanic. If there are no receipts, narrate atmosphere, reactions, dialogue, or observation without asserting a state change. Return narration only." },
+          { role: "user", content: JSON.stringify({ declaration: turn.declaration, receipts: safeReceipts,
+            publicContext: publicNarrationContext(repo,turn) }) }] });
       if (result.message.toolCalls?.length || typeof result.message.content !== "string") throw new Error("invalid narration response");
+      const providerText=result.message.content.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").trim();
+      if(!providerText||providerText.length>6_000)throw new Error("invalid narration response");
       turn = repo.recordProviderCallOutcome(OWNER, { turnId: turn.turnId, callId, provider: provider.providerType || "openai-compatible",
         model: provider.model.trim() || "unconfigured", attempt: 1, outcome: "succeeded", outcomeCode: "ok", promptTokens: result.usage?.promptTokens ?? null,
         completionTokens: result.usage?.completionTokens ?? null, expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
         idempotencyKey: key("narration-provider-outcome", turn.turnId) });
-      return { turn, text: fallbackText };
+      const facts=safeReceipts.length?`\n\nCommitted results: ${narrationFallback(turn.declaration,safeReceipts).split("\n\nCommitted results: ")[1]??""}`:"";
+      return { turn, text:`${providerText}${facts}`.slice(0,8_000),source:"provider-assisted" };
     } catch {
       const current = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
       if (!current.providerCalls.some((call) => call.callId === callId && call.phase !== "started")) turn = repo.recordProviderCallOutcome(OWNER, { turnId: current.turnId, callId,
@@ -117,10 +125,15 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       else turn = current;
     }
   }
-  return { turn, text: fallbackText };
+  return { turn, text: fallbackText,source:"deterministic-fallback" };
+}
+function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
+  const snapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
+  if(!snapshot)return{};return{canon:snapshot.humanCanon,world:snapshot.visibleWorld,cast:snapshot.visibleCast,
+    quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
-  signal: AbortSignal): Promise<{ turn: PrivateAdventureTurn; text: string }> {
+  signal: AbortSignal): Promise<NarrationResult> {
   const callId = key("narration-provider", turn.turnId);
   const active = activeNarrationDispatches.get(callId);
   if (active) return active;
@@ -186,8 +199,11 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
 }
 function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
   const token = resumeToken(turn);
+  const narration=repo.getAdventureTurnNarration(OWNER,turn.turnId);const callId=key("narration-provider",turn.turnId);
+  const providerSucceeded=turn.providerCalls.some((call)=>call.callId===callId&&call.phase==="succeeded");
   return adventureTurnGetResponseSchema.parse({ turn: projectTurn(turn), proposals: proposals(turn), confirmation: confirmation(turn),
-    receipts: receipts(turn), narrationStatus: { status: turn.narrationStatus, text: repo.getAdventureTurnNarration(OWNER, turn.turnId) },
+    receipts: receipts(turn), narrationStatus: { status: turn.narrationStatus, text:narration,
+      source:narration?(providerSucceeded?"provider-assisted":"deterministic-fallback"):null },
     ...(token ? { resumeToken: token } : {}) });
 }
 

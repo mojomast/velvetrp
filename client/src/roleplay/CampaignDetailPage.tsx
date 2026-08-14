@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, type CampaignDetail } from "../api";
-import type { CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
+import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, type CampaignDetail } from "../api";
+import type { CampaignAdministrationHttpResponse, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignPlayBootstrap, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
 
 export interface CampaignDetailPageProps {
   campaignId: string;
@@ -424,6 +424,9 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const [diceResult, setDiceResult] = useState<DiceResult | null>(null);
   const [rooms, setRooms] = useState<CampaignRoomLinkingResponse | null>(null);
   const [roomsPhase, setRoomsPhase] = useState<"loading" | "ready" | "failed">("loading");
+  const [administration, setAdministration] = useState<CampaignAdministrationHttpResponse["campaign"] | null>(null);
+  const [administrationPhase, setAdministrationPhase] = useState<"loading" | "ready" | "failed">("loading");
+  const [roomPlayability, setRoomPlayability] = useState<{ state: "idle" | "loading" | "ready" | "failed"; rooms: CampaignPlayBootstrap[] }>({ state: "idle", rooms: [] });
   const [completedRoomsRefresh, setCompletedRoomsRefresh] = useState<{ request: number; succeeded: boolean } | null>(null);
   const [roomResult, setRoomResult] = useState<{ text: string; alert: boolean } | null>(null);
   const [roomActivity, setRoomActivity] = useState<"idle" | "writing" | "reconciling" | "refreshing">("idle");
@@ -1048,7 +1051,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       });
     } else {
       void loadRoster(false, true);
-      if (!setupOptionsRefreshCampaigns.has(campaignId)) void loadOptions(false, true);
+      if (!mechanicsEnabled && !setupOptionsRefreshCampaigns.has(campaignId)) void loadOptions(false, true);
     }
     return () => {
       mountedRef.current = false;
@@ -1247,6 +1250,32 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       pendingPeerCreateRef.current = null;
     }
   }, [applyCreateReconciliation, campaign, campaignId, loading]);
+
+  useEffect(() => {
+    if (loading || !campaign || campaign.id !== campaignId) return;
+    let current = true; setAdministration(null); setAdministrationPhase("loading");
+    void getCampaignAdministration(campaignId).then(({ campaign: value }) => { if (current) { setAdministration(value); setAdministrationPhase("ready"); } })
+      .catch(() => { if (current) setAdministrationPhase("failed"); });
+    return () => { current = false; };
+  }, [campaign, campaignId, loading]);
+
+  useEffect(() => {
+    const candidates = roomsPhase === "ready" ? rooms?.attached.filter((room) => !room.stopped) ?? [] : [];
+    if (!mechanicsEnabled || candidates.length === 0) { setRoomPlayability({ state: "idle", rooms: [] }); return; }
+    let current = true; setRoomPlayability({ state: "loading", rooms: [] });
+    void Promise.allSettled(candidates.map((room) => getCampaignPlayBootstrap(campaignId, room.sessionId))).then((results) => {
+      if (!current) return;
+      const values = results.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      setRoomPlayability({ state: values.length ? "ready" : "failed", rooms: values });
+    });
+    return () => { current = false; };
+  }, [campaignId, mechanicsEnabled, rooms, roomsPhase]);
+
+  useEffect(() => {
+    if (!mechanicsEnabled || loading || !campaign || campaign.id !== campaignId || !isOriginalStarterConfigured(campaign)
+      || setupOptionsRefreshCampaigns.has(campaignId) || optionsPhase !== "loading") return;
+    void loadOptions(false, true);
+  }, [campaign, campaignId, loadOptions, loading, mechanicsEnabled, optionsPhase]);
 
   useEffect(() => {
     if (loading || !campaign || campaign.id !== campaignId
@@ -1842,12 +1871,30 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const diceBusy = dicePhase === "writing" || dicePhase === "reconciling";
   const roomBusy = roomActivity === "writing" || roomActivity === "reconciling";
   const pageBusy = renameBusy || setupBusy || createBusy || diceBusy || roomBusy || sharedMutationPending || roomOpenPending;
+  const configuredForPlay = mechanicsEnabled && campaign?.content.status === "configured";
+  const rosterReady = rosterPhase === "ready" && roster.length > 0;
+  const activeRooms = rooms?.attached.filter((room) => !room.stopped) ?? [];
+  const published = administration?.status === "published";
+  const controlledRoom = roomPlayability.rooms.find((room) => room.principal.control !== "none" && room.playableActors.length > 0);
+  const playableRoom = roomPlayability.rooms.find((room) => room.session.active && room.session.adventureEligible
+    && room.principal.control !== "none" && room.playableActors.length > 0);
+  const readinessReady = configuredForPlay && rosterReady && activeRooms.length > 0 && published && Boolean(playableRoom);
+  const readinessSteps = [
+    { label: "Playable content", ready: configuredForPlay, unknown: false, help: configuredForPlay ? "Mechanics content is configured." : mechanicsEnabled ? "Activate or pin compatible mechanics content." : "Campaign mechanics are unavailable." },
+    { label: "Finalized character", ready: rosterReady, unknown: rosterPhase === "loading" || rosterPhase === "failed" || rosterPhase === "unsupported", help: rosterReady ? "A campaign character exists. Finalization and control are verified by the play bootstrap." : "Build and finalize a campaign character." },
+    { label: "Attached active room", ready: activeRooms.length > 0, unknown: roomsPhase !== "ready", help: activeRooms.length ? `${activeRooms.length} active attached ${activeRooms.length === 1 ? "room" : "rooms"}.` : "Start a Velvet room with the matching persona, then attach it here." },
+    { label: "Published campaign", ready: published, unknown: administrationPhase !== "ready", help: published ? "Campaign lifecycle is published." : administration ? `Current lifecycle: ${administration.status}.` : "Campaign lifecycle could not be verified." },
+    { label: "Controlled actor", ready: Boolean(controlledRoom), unknown: activeRooms.length > 0 && (roomPlayability.state === "loading" || roomPlayability.state === "failed"), help: controlledRoom ? `${controlledRoom.playableActors.length} authorized ${controlledRoom.playableActors.length === 1 ? "actor is" : "actors are"} available in an attached room.` : activeRooms.length === 0 ? "Attach an active room before actor control can be verified." : "Room bootstrap has not verified an authorized actor; this roster does not expose actor or control identities." },
+  ];
   return <main className="page library-page campaign-page"><section className="campaign-shell" aria-labelledby="campaign-detail-heading">
-    <header className="library-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">TRUSTED LOCAL CAMPAIGN</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <div className="button-row">{mechanicsEnabled&&studioRolloutAvailable&&<>{(["world","cast","journal","story"] as const).map((studio)=><button key={studio} data-campaign-studio={studio} ref={(node)=>{studioButtonRefs.current[studio]=node}} className="ghost" disabled={pageBusy} onClick={()=>onOpenStudio(studio)}>{studio==="world"?"World":studio==="cast"?"Cast & factions":studio==="journal"?"Quest journal":"Story studio"}</button>)}{onOpenHistory&&<button className="ghost" disabled={pageBusy} onClick={onOpenHistory}>History & recaps</button>}{campaign.actorRole==="owner"&&onOpenTransfer&&<button className="ghost" disabled={pageBusy} onClick={()=>onOpenTransfer(campaign.name)}>Import / export</button>}</>}{onOpenCombat && <button ref={combatButtonRef} className="primary" disabled={pageBusy} onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button></div>}</header>
+    <header className="library-header campaign-command-header"><div><button className="back-link" disabled={pageBusy && !roomOpenPending} onClick={() => { if (!pageBusy || roomOpenPending) onBack(); }}>← Campaigns</button><p className="eyebrow">CAMPAIGN COMMAND CENTER</p><h1 ref={detailHeadingRef} tabIndex={-1} className="title" id="campaign-detail-heading">{campaign?.name ?? "Campaign detail"}</h1></div>{campaign && <span className={`campaign-readiness-badge ${readinessReady ? "is-ready" : ""}`}>{readinessReady ? "Ready to play" : "Setup required"}</span>}</header>
+    {campaign && <nav className="campaign-command-nav" aria-label="Campaign tools"><span>Play</span>{onOpenCombat && <button ref={combatButtonRef} className="ghost" disabled={pageBusy} onClick={onOpenCombat}>Open combat tracker</button>}<span>World</span>{mechanicsEnabled&&studioRolloutAvailable&&(["world","cast","journal","story"] as const).map((studio)=><button key={studio} data-campaign-studio={studio} ref={(node)=>{studioButtonRefs.current[studio]=node}} className="ghost" disabled={pageBusy} onClick={()=>onOpenStudio(studio)}>{studio==="world"?"World":studio==="cast"?"Cast & factions":studio==="journal"?"Quest journal":"Story studio"}</button>)}<span>Records</span>{onOpenHistory&&<button className="ghost" disabled={pageBusy} onClick={onOpenHistory}>History & recaps</button>}{campaign.actorRole==="owner"&&onOpenTransfer&&<button className="ghost" disabled={pageBusy} onClick={()=>onOpenTransfer(campaign.name)}>Import / export</button>}<button className="ghost" disabled={pageBusy} onClick={() => onOpenAdministration(campaign.name)}>Administration</button></nav>}
     <section className="library-panel campaign-detail-panel" aria-busy={loading}>
       {loading && <p className="empty-state" role="status">Loading campaign…</p>}
       {!loading && failed && <div className="empty-state large" role="alert"><p>Campaign could not be loaded.</p><button className="ghost" onClick={() => void load()}>Retry</button></div>}
       {!loading && campaign && <>
+        <section className="campaign-readiness" aria-labelledby="campaign-readiness-heading"><header><div><p className="eyebrow">PLAY READINESS</p><h2 id="campaign-readiness-heading">{readinessReady ? "Campaign ready" : "Path to a playable turn"}</h2></div><span>{readinessSteps.filter((step) => step.ready).length} / {readinessSteps.length}</span></header><ol>{readinessSteps.map((step) => <li className={step.ready ? "is-ready" : step.unknown ? "is-unknown" : "is-blocked"} key={step.label}><span aria-hidden="true">{step.ready ? "Ready" : step.unknown ? "Verify" : "Needed"}</span><div><strong>{step.label}</strong><p>{step.help}</p></div></li>)}</ol><div className="readiness-actions">{!configuredForPlay && campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <button className="primary" type="button" onClick={() => { setSetupChoice("mechanics"); document.getElementById("starter-setup-heading")?.scrollIntoView({ block: "start" }); }}>Configure mechanics</button>}{configuredForPlay && !rosterReady && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}{configuredForPlay && rosterReady && activeRooms.length === 0 && <button className="primary" type="button" onClick={() => roomsHeadingRef.current?.scrollIntoView({ block: "start" })}>Review rooms</button>}{activeRooms.length > 0 && !published && <button className="primary" type="button" onClick={() => onOpenAdministration(campaign.name)}>Publish in administration</button>}{readinessReady && playableRoom && <button className="primary" type="button" disabled={pageBusy} onClick={() => onOpenRoom(playableRoom.sessionId)}>{roomOpenPending ? "Opening room..." : "Enter command center"}</button>}<button className="ghost" type="button" onClick={() => void Promise.all([load(false), loadRoster(true), loadRooms(true)])}>Refresh readiness</button></div></section>
+        <details className="campaign-maintenance"><summary>Campaign details & maintenance</summary><div className="campaign-maintenance-content">
         {campaign.actorRole === "owner" && <form className="campaign-rename" onSubmit={(event) => void submitRename(event)} aria-busy={pageBusy}>
           <div><label htmlFor="campaign-rename-name">Campaign name</label><input ref={renameInputRef} id="campaign-rename-name" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={200} required disabled={pageBusy} /></div>
           <button className="primary" type="submit" disabled={pageBusy}>{renamePhase === "writing" ? "Renaming…" : renamePhase === "reconciling" ? "Refreshing…" : "Rename campaign"}</button>
@@ -1863,6 +1910,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             <div><dt>Content packs</dt><dd>{campaign.content.contentPacks.length === 0 ? "None" : <ul className="identifier-list">{campaign.content.contentPacks.map((pack) => <li key={pack.packId}><code>{pack.packId}</code> <span>version</span> <code>{pack.packVersion}</code></li>)}</ul>}</dd></div>
           </>}
         </dl>
+        </div></details>
         <section className="campaign-rooms" aria-labelledby="campaign-rooms-heading" aria-busy={roomsPhase === "loading" || roomActivity !== "idle"}>
           <div className="campaign-rooms-heading">
             <h2 ref={roomsHeadingRef} tabIndex={-1} id="campaign-rooms-heading">Rooms</h2>

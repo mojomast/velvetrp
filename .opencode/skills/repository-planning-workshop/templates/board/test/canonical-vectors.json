@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "accepted": [
+    {
+      "name": "nested-and-prefixed-digest",
+      "json": "{\"b\":[true,null,\"é\"],\"a\":1}",
+      "canonical": "{\"a\":1,\"b\":[true,null,\"é\"]}",
+      "sha256": "sha256:9488dd13ca33d3291f5a91a1833dfa164811755ffba538c2b340780f8c31a0cb"
+    },
+    {
+      "name": "unicode-scalar-key-order-and-control-escape",
+      "json": "{\"😀\":2,\"\":1,\"a\\n\":3}",
+      "canonical": "{\"a\\u000a\":3,\"\":1,\"😀\":2}",
+      "sha256": "sha256:6ac20be22fb2386f3dca6f3238ac13cd52da60958aad499f3cc39d21f2764047"
+    }
+  ],
+  "rejected": [
+    { "name": "duplicate-object-key", "json": "{\"a\":1,\"a\":2}" },
+    { "name": "canonically-equivalent-non-nfc", "json": "{\"value\":\"e\\u0301\"}" },
+    { "name": "lone-surrogate", "json": "{\"value\":\"\\ud800\"}" },
+    { "name": "unsafe-integer", "json": "9007199254740992" },
+    { "name": "negative-zero", "json": "-0" },
+    { "name": "fraction", "json": "1.5" }
+  ]
+}

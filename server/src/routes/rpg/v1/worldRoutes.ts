@@ -1,4 +1,4 @@
-import { actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignWorldHttpResponseSchema,resourceIdSchema } from "@velvet/contracts";
+import { actorPlacementCommandRequestSchema,actorPlacementCommandResponseSchema,actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignWorldHttpResponseSchema,resourceIdSchema } from "@velvet/contracts";
 import type {FastifyPluginAsync,FastifyRequest} from "fastify";
 import {readRpgFeatureFlags} from "../../../features.js";
 import {sendApiProblem} from "../../../http/problem.js";
@@ -6,7 +6,7 @@ import {WorldAuthorizationError,WorldConflictError,WorldStaleError,WorldUnavaila
 
 const LOCAL_OWNER="local-owner";
 const APPLICATION_JSON=/^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type WorldHttpRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
+type WorldHttpRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"placeActor">;
 export interface WorldHttpOptions{worldRepositoryAccessor:()=>WorldHttpRepository;}
 function enabled(){const flags=readRpgFeatureFlags();return flags.campaign&&flags.mechanics;}
 function campaignNotFound(request:FastifyRequest,reply:Parameters<typeof sendApiProblem>[1]){
@@ -17,6 +17,21 @@ function actorNotFound(request:FastifyRequest,reply:Parameters<typeof sendApiPro
 }
 
 export const worldHttpRoutes:FastifyPluginAsync<WorldHttpOptions>=async(app,options)=>{
+  app.post<{Params:{actorId:string};Querystring:Record<string,unknown>;Body:unknown}>("/actors/:actorId/placement-commands",{
+    onRequest:async(request,reply)=>{reply.header("cache-control","no-store");if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0){await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor placement does not accept query parameters");return;}
+      const contentType=request.headers["content-type"];if(typeof contentType!=="string"||!APPLICATION_JSON.test(contentType))await sendApiProblem(request,reply,415,"RPG_UNSUPPORTED_MEDIA_TYPE","Actor placement requires application/json");},
+    errorHandler:(_error,request,reply)=>sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor placement request is invalid")},async(request,reply)=>{
+      const actorId=resourceIdSchema.safeParse(request.params.actorId),body=actorPlacementCommandRequestSchema.safeParse(request.body);if(!actorId.success)return actorNotFound(request,reply);
+      if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor placement request is invalid");
+      try{const result=options.worldRepositoryAccessor().placeActor(LOCAL_OWNER,actorId.data,body.data);
+        return reply.code(200).send(actorPlacementCommandResponseSchema.parse({location:result.location,receipt:{idempotencyKey:result.receipt.idempotencyKey,
+          revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
+      }catch(error){if(error instanceof WorldAuthorizationError||error instanceof WorldUnavailableError)return actorNotFound(request,reply);
+        if(error instanceof WorldStaleError)return sendApiProblem(request,reply,409,"RPG_WORLD_STALE","World state is stale; refresh before trying again");
+        if(error instanceof WorldConflictError)return sendApiProblem(request,reply,409,"RPG_PLACEMENT_CONFLICT","Actor placement conflicts with current world state");
+        request.log.error({operation:"actor-placement"},"RPG actor placement failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Actor placement could not be completed");}
+    });
   app.get<{Params:{campaignId:string};Querystring:Record<string,unknown>}>("/campaigns/:campaignId/world",{
     exposeHeadRoute:false,onRequest:async(request,reply)=>{reply.header("cache-control","no-store");
       if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}

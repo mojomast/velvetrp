@@ -4,6 +4,9 @@ import {
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatCommandResultResponseSchema,
+  combatRewardClaimRequestSchema,
+  combatRewardClaimResponseSchema,
+  combatRewardClaimResultResponseSchema,
   idempotencyKeySchema,
   resourceIdSchema,
   type CombatState,
@@ -23,7 +26,7 @@ import {
 
 const LOCAL_OWNER="local-owner";
 const APPLICATION_JSON=/^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"endCombat"|"getCombatCommandResult">;
+type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"endCombat"|"getCombatCommandResult"|"claimCombatReward"|"listCombatRewards"|"getCombatRewardClaimResult">;
 export interface CombatCommandsHttpOptions{combatCommandRepositoryAccessor:()=>CombatCommandRepository;}
 
 function enabled():boolean{const flags=readRpgFeatureFlags();return flags.campaign&&flags.mechanics&&flags.combat;}
@@ -44,6 +47,39 @@ function publicEncounter(value:ReturnType<CombatCommandRepository["endCombat"]>[
 }
 
 export const combatCommandsHttpRoutes:FastifyPluginAsync<CombatCommandsHttpOptions>=async(app,options)=>{
+  app.get<{Params:{campaignId:string;combatId:string;rewardBundleId:string;claimIdentity:string};Querystring:Record<string,unknown>}>(
+    "/campaigns/:campaignId/combats/:combatId/rewards/:rewardBundleId/claim-results/:claimIdentity",{exposeHeadRoute:false,
+      onRequest:async(request,reply)=>{reply.header("cache-control","no-store");if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+        if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0)await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat reward claim result does not accept query parameters");}},
+    async(request,reply)=>{
+      const campaignId=resourceIdSchema.safeParse(request.params.campaignId),combatId=resourceIdSchema.safeParse(request.params.combatId),
+        bundleId=resourceIdSchema.safeParse(request.params.rewardBundleId),identity=idempotencyKeySchema.safeParse(request.params.claimIdentity);
+      if(!campaignId.success||!combatId.success||!bundleId.success||!identity.success)return notFound(request,reply);
+      try{const result=options.combatCommandRepositoryAccessor().getCombatRewardClaimResult(LOCAL_OWNER,campaignId.data,combatId.data,bundleId.data,identity.data);
+        if(result===null)return notFound(request,reply);const response=combatRewardClaimResultResponseSchema.parse(result),binding=response.requestBinding;
+        if(binding.campaignId!==campaignId.data||binding.combatId!==combatId.data||binding.rewardBundleId!==bundleId.data
+            ||(binding.requestEvidence.idempotencyKey!==identity.data&&binding.requestEvidence.rewardClaimId!==identity.data))throw new Error("claim result route binding is invalid");
+        return reply.code(200).send(response);
+      }catch{request.log.error({operation:"combat-reward-claim-result"},"RPG combat reward claim result read failed");
+        return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Combat reward claim result could not be loaded");}
+    });
+  app.post<{Params:{combatId:string;rewardBundleId:string};Querystring:Record<string,unknown>;Body:unknown}>("/combats/:combatId/rewards/:rewardBundleId/claim-commands",{
+    onRequest:async(request,reply)=>{reply.header("cache-control","no-store");if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0){await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat reward claim does not accept query parameters");return;}
+      const contentType=request.headers["content-type"];if(typeof contentType!=="string"||!APPLICATION_JSON.test(contentType))await sendApiProblem(request,reply,415,"RPG_UNSUPPORTED_MEDIA_TYPE","Combat reward claim requires application/json");},
+    errorHandler:(_error,request,reply)=>sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat reward claim request is invalid")},async(request,reply)=>{
+      const combatId=resourceIdSchema.safeParse(request.params.combatId),bundleId=resourceIdSchema.safeParse(request.params.rewardBundleId),body=combatRewardClaimRequestSchema.safeParse(request.body);
+      if(!combatId.success||!bundleId.success)return notFound(request,reply);if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Combat reward claim request is invalid");
+      try{const result=options.combatCommandRepositoryAccessor().claimCombatReward(LOCAL_OWNER,combatId.data,bundleId.data,body.data);
+        const reward=options.combatCommandRepositoryAccessor().listCombatRewards(LOCAL_OWNER,combatId.data)?.find((value)=>value.rewardBundleId===bundleId.data);
+        if(!reward||reward.claim.state!=="claimed")throw new Error("claimed reward projection is unavailable");
+        return reply.code(200).send(combatRewardClaimResponseSchema.parse({reward,receipt:{idempotencyKey:result.receipt.idempotencyKey,
+          revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
+      }catch(error){if(error instanceof EncounterAuthorizationError||error instanceof EncounterUnavailableError)return notFound(request,reply);
+        if(error instanceof EncounterStaleError)return sendApiProblem(request,reply,409,"RPG_COMBAT_STALE","Combat state is stale; refresh before trying again");
+        if(error instanceof EncounterConflictError)return sendApiProblem(request,reply,409,"RPG_REWARD_CLAIM_CONFLICT","Combat reward is already claimed or conflicts with current state");
+        request.log.error({operation:"combat-reward-claim"},"RPG combat reward claim failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Combat reward claim outcome could not be confirmed");}
+    });
   app.get<{Params:{campaignId:string;combatId:string;idempotencyKey:string};Querystring:Record<string,unknown>}>(
     "/campaigns/:campaignId/combats/:combatId/command-results/:idempotencyKey",{exposeHeadRoute:false,onRequest:async(request,reply)=>{
       reply.header("cache-control","no-store");
@@ -129,11 +165,11 @@ export const combatCommandsHttpRoutes:FastifyPluginAsync<CombatCommandsHttpOptio
         ||result.receipt.revisionAfter!==body.data.expectedRevision+1||result.encounter.revision!==result.receipt.revisionAfter)
         throw new Error("combat end result binding is invalid");
       const rewards=result.rewards.map((reward)=>{
-        const allowed=new Set(["campaignId","encounterId","rewardBundleId","recipientActorId","createdAt","rewards"]);
+        const allowed=new Set(["campaignId","encounterId","rewardBundleId","recipientActorId","createdAt","rewards","claim"]);
         if(Object.keys(reward).length!==allowed.size||Object.keys(reward).some((key)=>!allowed.has(key)))
           throw new Error("combat reward shape is invalid");
         return {rewardBundleId:reward.rewardBundleId,recipientActorId:reward.recipientActorId,
-          createdAt:reward.createdAt,rewards:reward.rewards};
+          createdAt:reward.createdAt,rewards:reward.rewards,claim:reward.claim};
       });
       return reply.code(200).send(combatEndCommandResponseSchema.parse({encounter:publicEncounter(result.encounter),rewards,
         receipt:{idempotencyKey:result.receipt.idempotencyKey,revisionBefore:result.receipt.revisionBefore,

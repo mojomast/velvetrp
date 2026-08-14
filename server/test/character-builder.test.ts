@@ -71,6 +71,10 @@ describe("character builder repository", () => {
       .toEqual({ current: finalized.receipt.derived.maxHp, max: finalized.receipt.derived.maxHp });
     expect(db.prepare("SELECT COUNT(*) count FROM character_derived_snapshots_v19 WHERE draft_id=?").get(updated.draft.id)).toEqual({ count: 1 });
     expect(db.prepare("SELECT COUNT(*) count FROM character_starting_grants_v19 WHERE draft_id=?").get(updated.draft.id)).toEqual({ count: 1 });
+    expect(db.prepare("SELECT materialization_kind FROM character_starter_materializations_v51 WHERE draft_id=?").get(updated.draft.id))
+      .toEqual({materialization_kind:grant==="kit"?"inventory":"wallet"});
+    if(grant==="kit")expect((db.prepare("SELECT sum(quantity) quantity FROM rpg_inventory_entries_v25 WHERE actor_id=?").get(finalized.receipt.actorId) as {quantity:number}).quantity).toBeGreaterThan(0);
+    else expect((db.prepare("SELECT sum(balance_minor) balance FROM rpg_wallets_v25 WHERE actor_id=?").get(finalized.receipt.actorId) as {balance:number}).balance).toBeGreaterThanOrEqual(0);
     db.close(); repo.close();
   });
 
@@ -105,6 +109,21 @@ describe("character builder repository", () => {
     const db = new DatabaseDriver(dbPath(), { readonly: true });
     expect(db.prepare("SELECT COUNT(*) count FROM character_drafts_v19 WHERE campaign_id=?").get(other.campaign.id)).toEqual({ count: 0 });
     db.close(); other.repo.close();
+  });
+
+  it("rerolls all server stats once and retains immutable roll history", () => {
+    let die = 3; const integer = vi.fn(() => die);
+    const { repo, persona, campaign } = setup({ rng: { integer } });
+    const created = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable", allocation: { method: "server-roll" }, idempotencyKey: "roll-create" });
+    die = 5;
+    const rerolled = repo.rerollCharacterDraft("local-owner", created.draft.id, { expectedRevision: 0, idempotencyKey: "roll-again" });
+    expect(rerolled.draft.revision).toBe(1); expect(rerolled.draft.allocation.scores.might).toBe(15); expect(integer).toHaveBeenCalledTimes(48);
+    expect(repo.rerollCharacterDraft("local-owner", created.draft.id, { expectedRevision: 0, idempotencyKey: "roll-again" })).toEqual(rerolled);
+    expect(integer).toHaveBeenCalledTimes(48);
+    const db = new DatabaseDriver(dbPath(), { readonly: true });
+    expect(db.prepare("SELECT revision,json_extract(allocation_json,'$.scores.might') might FROM character_draft_rerolls_v49 WHERE draft_id=?").get(created.draft.id)).toEqual({ revision: 1, might: 15 });
+    expect(JSON.parse((db.prepare("SELECT snapshot_json FROM character_draft_revisions_v19 WHERE draft_id=? AND revision=0").get(created.draft.id) as { snapshot_json: string }).snapshot_json).allocation.scores.might).toBe(9);
+    db.close(); repo.close();
   });
 
   it("rolls back an invalid midstream die without hidden RNG retry or audit rows", () => {

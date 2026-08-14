@@ -46,6 +46,27 @@ function events(body: string) {
 }
 
 describe("M2.11 adventure turn routes", () => {
+  it.each([
+    ["social", "I ask the ferryman what he saw", "The ferryman lowers his voice as rain ticks against the landing."],
+    ["exploration", "I study the carvings along the flooded arch", "Salt-bright lines emerge where your lamp crosses the weathered arch."],
+  ])("persists provider narration for read-only %s scenes", async (_kind, declaration, narration) => {
+    enable(); const campaign=seed();let calls=0;
+    const dependencies:AdventureAgentDependencies={complete:async()=>{calls+=1;return calls===1
+      ?{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}}
+      :{message:{role:"assistant",content:narration,toolCalls:[]},usage:{promptTokens:10,completionTokens:12,totalTokens:22},model:{requestedModel:"test",responseModel:"test"}};},
+      getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},
+      payload:{campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration,expectedRevision:0,idempotencyKey:`read-${_kind}`}});
+    expect(response.statusCode).toBe(200);const streamed=events(response.body),terminal=streamed.at(-1);
+    expect(streamed.find((event)=>event.type==="narration_delta")).toMatchObject({payload:{text:narration}});
+    expect(terminal).toMatchObject({type:"terminal",payload:{narrationStatus:{status:"completed",text:narration,source:"provider-assisted"},receipts:[]}});
+    if(terminal?.type!=="terminal")throw new Error("terminal missing");
+    const read=await app.inject({method:"GET",url:`/api/rpg/v1/adventure-turns/${terminal.payload.turn.turnId}`});
+    expect(read.json().narrationStatus).toEqual({status:"completed",text:narration,source:"provider-assisted"});
+    await app.close();
+  });
+
   it("persists fallback narration, replays duplicate initial requests, and reconciles after restart", async () => {
     enable(); process.env.VELVET_SSE_HEARTBEAT_MS = "1"; const campaign = seed();
     const payload = { campaignId: campaign.id, sessionId: "session", actorId: "actor", declaration: "I study the quiet door",
@@ -78,7 +99,7 @@ describe("M2.11 adventure turn routes", () => {
     expect(absent.json()).toEqual({ result: null });
     const read = await app.inject({ method: "GET", url: `/api/rpg/v1/adventure-turns/${turnId}` });
     expect(read.statusCode).toBe(200); expect(read.json()).toMatchObject({ turn: { turnId, state: "completed" }, proposals: [], receipts: [],
-      narrationStatus: { status: "completed", text: expect.stringContaining("without changing campaign state") } });
+      narrationStatus: { status: "completed", text: expect.stringContaining("without changing campaign state"),source:"deterministic-fallback" } });
     expect(read.body).not.toMatch(/providerCalls|argumentsJson|principalId/);
     await app.close();
   });

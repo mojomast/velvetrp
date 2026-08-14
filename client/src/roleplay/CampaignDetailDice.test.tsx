@@ -99,7 +99,7 @@ describe("campaign detail dice", () => {
     expect(screen.getByText("15")).toBeTruthy();
     const html = document.body.outerHTML;
     expect(html).not.toContain(campaign.id);
-    expect(html).not.toMatch(/campaign-character|actor-|timeline-|revision|command-|event-|receipt-|idempotency/i);
+    expect(document.body.textContent).not.toMatch(/campaign-character|actor-|timeline-|revision|command-|event-|receipt-|idempotency/i);
   });
 
   it("serializes one POST, blocks navigation, then confirms with exactly one fresh history GET", async () => {

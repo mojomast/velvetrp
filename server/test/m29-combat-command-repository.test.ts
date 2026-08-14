@@ -103,6 +103,27 @@ describe("M2.9 combat command repository",()=>{
     expect(repo.getCombatCommandResult("combat-observer",campaign.id,combat.combatId,endBody.idempotencyKey)).toBeNull();
     expect(repo.getCombatCommandResult("combat-unrelated",campaign.id,combat.combatId,endBody.idempotencyKey)).toBeNull();
     expect(repo.endCombat("local-owner",combat.combatId,endBody)).toEqual(ended);
+    const offered=repo.listCombatRewards("combat-controller-two",combat.combatId)!;expect(offered[0]?.claim).toEqual({state:"unclaimed"});
+    const claimBody={rewardClaimId:"reward-claim",expectedRevision:ended.encounter.revision,idempotencyKey:"claim-reward"};
+    repo.claimCombatReward("combat-controller-two",combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody);
+    expect(repo.listCombatRewards("combat-controller-two",combat.combatId)?.[0]?.claim).toMatchObject({state:"claimed",rewardClaimId:"reward-claim"});
+    const exactCounts=()=>{const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+      const value={commands:(db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=?").get(combat.combatId) as any).count,
+        settlements:(db.prepare("SELECT count(*) count FROM combat_reward_settlements_v51 WHERE encounter_id=?").get(combat.combatId) as any).count,
+        ledger:(db.prepare("SELECT count(*) count FROM rpg_currency_ledger_v25 WHERE campaign_id=? AND actor_id=? AND reference_type='reward-bundle'").get(campaign.id,actorId) as any).count};db.close();return value;};
+    const committedCounts=exactCounts(),exact=repo.getCombatRewardClaimResult("combat-controller-two",campaign.id,combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody.idempotencyKey);
+    expect(exact).toMatchObject({reward:{rewardBundleId:ended.rewards[0]!.rewardBundleId,recipientActorId:actorId,
+      claim:{state:"claimed",rewardClaimId:claimBody.rewardClaimId}},requestBinding:{campaignId:campaign.id,combatId:combat.combatId,
+      rewardBundleId:ended.rewards[0]!.rewardBundleId,recipientActorId:actorId,requestEvidence:claimBody},receipt:{idempotencyKey:claimBody.idempotencyKey}});
+    expect(exact?.requestBinding.canonicalRequestDigest).toMatch(/^[0-9a-f]{64}$/);
+    expect(repo.getCombatRewardClaimResult("combat-controller-two",campaign.id,combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody.rewardClaimId)).toEqual(exact);
+    expect(repo.getCombatRewardClaimResult("combat-controller-two",campaign.id,combat.combatId,ended.rewards[0]!.rewardBundleId,"absent")).toBeNull();
+    expect(repo.getCombatRewardClaimResult("combat-gm",campaign.id,combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody.idempotencyKey)).toBeNull();
+    expect(repo.getCombatRewardClaimResult("combat-controller",campaign.id,combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody.idempotencyKey)).toBeNull();
+    expect(repo.getCombatRewardClaimResult("combat-controller-two","other",combat.combatId,ended.rewards[0]!.rewardBundleId,claimBody.idempotencyKey)).toBeNull();
+    expect(exactCounts()).toEqual(committedCounts);
+    expect(()=>repo.claimCombatReward("combat-controller-two",combat.combatId,ended.rewards[0]!.rewardBundleId,{...claimBody,
+      expectedRevision:ended.encounter.revision+1,idempotencyKey:"claim-twice"})).toThrow(EncounterConflictError);
     expect(repo.getCombatCommandResult("local-owner",campaign.id,combat.combatId,endBody.idempotencyKey)).toEqual({operation:"end",result:{
       encounter:Object.fromEntries(Object.entries(ended.encounter).filter(([key])=>key!=="campaignId")),
       rewards:ended.rewards.map(({campaignId:_campaignId,encounterId:_encounterId,...reward})=>reward),
@@ -114,7 +135,7 @@ describe("M2.9 combat command repository",()=>{
     expect(()=>repo.endCombat("local-owner",combat.combatId,{expectedRevision:combat.revision,idempotencyKey:"stale-end"}))
       .toThrow(EncounterStaleError);
     expect(()=>repo.endCombat("local-owner",combat.combatId,{expectedRevision:ended.encounter.revision,idempotencyKey:"second-end"}))
-      .toThrow(EncounterConflictError);
+      .toThrow(EncounterStaleError);
     const log=repo.listCombatLogPage("local-owner",combat.combatId,0,100)!;
     expect(log.entries.map((entry)=>entry.event.kind)).toEqual(expect.arrayContaining(["combat_terminal","encounter_completed","rewards_granted"]));
     repo.close();
@@ -122,6 +143,6 @@ describe("M2.9 combat command repository",()=>{
     expect((db.prepare("SELECT count(*) count FROM reward_bundle WHERE encounter_id=?").get(combat.combatId) as {count:number}).count).toBe(1);
     expect((db.prepare("SELECT count(*) count FROM reward_entry_v27").get() as {count:number}).count).toBe(1);
     expect((db.prepare("SELECT count(*) count FROM combat_commands_v27 WHERE encounter_id=? AND command_type='grant_rewards'")
-      .get(combat.combatId) as {count:number}).count).toBe(1);db.close();
+      .get(combat.combatId) as {count:number}).count).toBe(2);db.close();
   });
 });

@@ -18,7 +18,8 @@ function api(overrides: Partial<CampaignContextDrawerApi> = {}): CampaignContext
     listCampaignNpcs: vi.fn().mockResolvedValue({ revision: 1, data: { npcs: [{ npcId: "npc", publicState: { name: "Roster Mira" } }, { npcId: "tala", publicState: { name: "Tala" } }] } }),
     listCampaignQuests: vi.fn().mockResolvedValue({ revision: 1, data: { quests: [{ questId: "quest", status: "active" }], objectives: [{ objectiveId: "objective", questId: "quest", description: "Open the gate", progress: 1, targetProgress: 2, completedAt: null }] } }),
     getActorResources: vi.fn().mockResolvedValue({ resources: [{ name: "health", current: 8, max: 10 }], revision: 1 }),
-    listCampaignEncounters: vi.fn().mockResolvedValue({ encounters: [] }), getCombatState: vi.fn(), ...overrides,
+    listCampaignEncounters: vi.fn().mockResolvedValue({ encounters: [] }), getCombatState: vi.fn(),
+    getCampaignPublishedMaterials:vi.fn().mockResolvedValue({campaignId:"campaign",revision:0,materials:[]}),...overrides,
   };
 }
 
@@ -33,6 +34,8 @@ describe("CampaignContextDrawer NPC presence", () => {
     expect(client.listCampaignNpcs).not.toHaveBeenCalled(); expect(screen.getByText("Road")).toBeTruthy(); expect(screen.getByText(/Open the gate/)).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/persona-secret|principal-secret|secret goal|secret note/);
   });
+
+  it("renders only server-published player materials",async()=>{const client=api({getCampaignPublishedMaterials:vi.fn().mockResolvedValue({campaignId:"campaign",revision:2,materials:[{artifactKey:"letter",resourceId:"material-letter",kind:"handout",title:"Delivered letter",content:"Meet at dawn.",publishedAt:at}]})});render(<CampaignContextDrawer {...props} audience="player" api={client}/>);await screen.findByText("Delivered letter");expect(screen.getByText("Meet at dawn.")).toBeTruthy();expect(document.body.textContent).not.toMatch(/GM only|unpublished/i);});
 
   it("distinguishes running empty presence from stopped cast history", async () => {
     const client = api({ getCampaignPresentCast: vi.fn().mockResolvedValueOnce(running("player", 5, [])).mockResolvedValueOnce({ audience: "player", state: "stopped", sessionRevision: 6, castHistory: [{ ...playerNpc("At Stop"), location: undefined, lastLocation: { label: "Road" }, leftAt: at }] }) });

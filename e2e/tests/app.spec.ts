@@ -1600,6 +1600,11 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
     productionTraffic.push(await response.text().catch(()=>""));});
   await page.goto("/");await page.getByRole("button",{name:"Campaigns"}).click();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
   await page.getByRole("button",{name:"Open attached room 1 of 1"}).click();
+  await page.setViewportSize({width:1366,height:768});await expect(page.getByLabel("What do you do?")).toBeVisible();
+  await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-desktop-1366x768.png"});
+  await page.setViewportSize({width:390,height:844});await expect(page.getByLabel("What do you do?")).toBeVisible();
+  await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-mobile-390x844.png",fullPage:true});
+  await page.setViewportSize({width:1366,height:768});
   const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
   await page.getByLabel("What do you do?").fill("Travel to the public harbor.");await page.getByRole("button",{name:"Declare action"}).click();
   const submitted=await travelStream,submittedBody=submitted.postDataJSON() as {actorId:string;expectedRevision:number;idempotencyKey:string};expect(submittedBody).toMatchObject({actorId,expectedRevision:3});

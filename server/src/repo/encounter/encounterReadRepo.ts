@@ -1,4 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
+import { createHash } from "node:crypto";
 import {
   combatStateSchema,
   combatLogSchema,
@@ -8,6 +9,8 @@ import {
   encounterPublicSchema,
   legalCombatActionAllowlistSchema,
   useConsumableCommandResultSchema,
+  combatRewardClaimResultResponseSchema,
+  encounterCommandSchema,
   utcIsoTimestampSchema,
   type CombatState,
   type CombatLogEntry,
@@ -16,6 +19,8 @@ import {
   type CombatCommandResultResponse,
   type UseConsumableLegalAction,
   type UseConsumableCommandResult,
+  type CombatRewardGrantPublic,
+  type CombatRewardClaimResultResponse,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
@@ -46,6 +51,10 @@ export interface EncounterReadRepository {
   getLegalCombatActionAllowlist(principal: string, campaignId: string, encounterId: string): LegalCombatActionAllowlist | null;
   /** Reads an existing immutable HTTP command result without executing or replaying it. */
   getCombatCommandResult(principal: string, campaignId: string, combatId: string, idempotencyKey: string): CombatCommandResultResponse | null;
+  /** Lists only reward bundles addressed to actors currently controlled by the principal (or every bundle for a GM). */
+  listCombatRewards(principal:string,combatId:string):CombatRewardGrantPublic[]|null;
+  /** Reads a settled claim only for its current recipient controller, by its original key or claim identity. */
+  getCombatRewardClaimResult(principal:string,campaignId:string,combatId:string,rewardBundleId:string,claimIdentity:string):CombatRewardClaimResultResponse|null;
   /** Returns validated public combat-log entries when the principal may view the encounter. */
   listCombatLog(principal: string, campaignId: string, encounterId: string): unknown[];
   /** Repository-only legal actions; deliberately excluded from the live HTTP combat union. */
@@ -70,6 +79,9 @@ export function createEncounterReadRepository(
   const gm = (principal: string, campaignId: string): boolean => Boolean(
     db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(campaignId, principal),
   );
+  const canonical=(value:unknown)=>JSON.stringify(value,(_key,item)=>item&&typeof item==="object"&&!Array.isArray(item)
+    ?Object.fromEntries(Object.keys(item).sort().map((key)=>[key,item[key]])):item);
+  const sha256=(value:string)=>createHash("sha256").update(value).digest("hex");
   const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,
     provenance.pack_id provenance_pack_id,provenance.pack_version provenance_pack_version,
     provenance.definition_id provenance_definition_id
@@ -198,8 +210,8 @@ export function createEncounterReadRepository(
     }
     const encounterResult = internal.encounter;
     const result = combatEndCommandResponseSchema.parse({ encounter: { encounterId: combatId, sessionId: encounterResult.sessionId, name: encounterResult.name,
-      status: encounterResult.status, combatId: encounterResult.combatId, combatants: encounterResult.combatants, revision: encounterResult.revision,
-      createdAt: encounterResult.createdAt, updatedAt: encounterResult.updatedAt }, rewards: internal.rewards.map(({ campaignId: _campaign, encounterId: _encounter, ...reward }: any) => reward),
+       status: encounterResult.status, combatId: encounterResult.combatId, combatants: encounterResult.combatants, revision: encounterResult.revision,
+       createdAt: encounterResult.createdAt, updatedAt: encounterResult.updatedAt }, rewards: internal.rewards.map(({ campaignId: _campaign, encounterId: _encounter, ...reward }: any) => ({...reward,claim:reward.claim??{state:"unclaimed"}})),
       receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
     return combatCommandResultResponseSchema.parse({ operation: "end", result });
   };
@@ -215,7 +227,62 @@ export function createEncounterReadRepository(
     if(!row?.actor_id||!mayActForConsumable(db,principal,row.campaign_id,row.actor_id))return null;
     return useConsumableCommandResultSchema.parse(JSON.parse(row.canonical_result_json));
   };
+  const listCombatRewards=(principal:string,combatId:string):CombatRewardGrantPublic[]|null=>{
+    const encounter=db.prepare("SELECT campaign_id FROM encounter WHERE encounter_id=?").get(combatId) as {campaign_id:string}|undefined;
+    if(!encounter||!member(principal,encounter.campaign_id))return null;
+    const rows=db.prepare(`SELECT bundle.*,claim.reward_claim_id,claim.claimed_at FROM reward_bundle bundle
+      LEFT JOIN reward_claim_v27 claim ON claim.reward_bundle_id=bundle.reward_bundle_id
+      WHERE bundle.encounter_id=? ORDER BY bundle.created_at,bundle.reward_bundle_id`).all(combatId) as any[];
+    return rows.filter((row)=>gm(principal,encounter.campaign_id)||controls(principal,encounter.campaign_id,row.recipient_actor_id)).map((row)=>{
+      const entries=db.prepare(`SELECT amount_minor,currency_pack_id,currency_pack_version,currency_definition_id
+        FROM reward_entry_v27 WHERE reward_bundle_id=? ORDER BY entry_ordinal`).all(row.reward_bundle_id) as any[];
+      return {rewardBundleId:row.reward_bundle_id,recipientActorId:row.recipient_actor_id,createdAt:row.created_at,
+        rewards:entries.map((entry)=>({kind:"currency" as const,currency:{kind:"currency" as const,packId:entry.currency_pack_id,
+          packVersion:entry.currency_pack_version,definitionId:entry.currency_definition_id},amount:entry.amount_minor})),
+        claim:row.reward_claim_id?{state:"claimed" as const,rewardClaimId:row.reward_claim_id,claimedAt:row.claimed_at}:{state:"unclaimed" as const}};
+    });
+  };
+  const getCombatRewardClaimResult=(principal:string,campaignId:string,combatId:string,rewardBundleId:string,claimIdentity:string):CombatRewardClaimResultResponse|null=>{
+    const rows=db.prepare(`SELECT bundle.recipient_actor_id,bundle.created_at bundle_created_at,claim.reward_claim_id,claim.claimed_at,
+        command.idempotency_key,command.canonical_request_json,command.request_digest,command.expected_revision,command.resulting_revision,
+        receipt.canonical_result_json,receipt.result_digest,receipt.occurred_at
+      FROM reward_bundle bundle
+      JOIN reward_claim_v27 claim ON claim.campaign_id=bundle.campaign_id AND claim.reward_bundle_id=bundle.reward_bundle_id AND claim.encounter_id=bundle.encounter_id
+      JOIN combat_reward_settlements_v51 settlement ON settlement.campaign_id=claim.campaign_id AND settlement.reward_bundle_id=claim.reward_bundle_id
+        AND settlement.encounter_id=claim.encounter_id AND settlement.recipient_actor_id=bundle.recipient_actor_id AND settlement.reward_claim_id=claim.reward_claim_id
+      JOIN combat_commands_v27 command ON command.encounter_id=claim.encounter_id AND command.command_id=claim.command_id
+      JOIN combat_receipts_v27 receipt ON receipt.encounter_id=command.encounter_id AND receipt.command_id=command.command_id
+        AND receipt.resulting_revision=command.resulting_revision
+      WHERE bundle.campaign_id=? AND bundle.encounter_id=? AND bundle.reward_bundle_id=?
+        AND (command.idempotency_key=? OR claim.reward_claim_id=?)`)
+      .all(campaignId,combatId,rewardBundleId,claimIdentity,claimIdentity) as any[];
+    if(rows.length>1)throw new Error("combat reward claim result identity is ambiguous");
+    const row=rows[0];
+    if(!row||!controls(principal,campaignId,row.recipient_actor_id))return null;
+    const request=encounterCommandSchema.parse(JSON.parse(row.canonical_request_json));
+    const internalResult=JSON.parse(row.canonical_result_json);
+    if(request.type!=="claim_reward_bundle"||request.campaignId!==campaignId||request.encounterId!==combatId
+        ||request.rewardBundleId!==rewardBundleId||request.recipientActorId!==row.recipient_actor_id
+        ||request.rewardClaimId!==row.reward_claim_id||request.claimedAt!==row.claimed_at
+        ||request.idempotencyKey!==row.idempotency_key||request.expectedRevision!==row.expected_revision
+        ||row.resulting_revision!==row.expected_revision+1||row.request_digest!==sha256(canonical(request))
+        ||row.result_digest!==sha256(canonical(internalResult))||internalResult?.encounterId!==combatId
+        ||internalResult?.receipt?.idempotencyKey!==row.idempotency_key||internalResult?.receipt?.revisionBefore!==row.expected_revision
+        ||internalResult?.receipt?.revisionAfter!==row.resulting_revision||internalResult?.receipt?.occurredAt!==row.occurred_at)
+      throw new Error("combat reward claim receipt graph is invalid");
+    const entries=db.prepare(`SELECT amount_minor,currency_pack_id,currency_pack_version,currency_definition_id
+      FROM reward_entry_v27 WHERE campaign_id=? AND reward_bundle_id=? ORDER BY entry_ordinal`).all(campaignId,rewardBundleId) as any[];
+    const reward={rewardBundleId,recipientActorId:row.recipient_actor_id,createdAt:row.bundle_created_at,
+      rewards:entries.map((entry)=>({kind:"currency" as const,currency:{kind:"currency" as const,packId:entry.currency_pack_id,
+        packVersion:entry.currency_pack_version,definitionId:entry.currency_definition_id},amount:entry.amount_minor})),
+      claim:{state:"claimed" as const,rewardClaimId:row.reward_claim_id,claimedAt:row.claimed_at}};
+    return combatRewardClaimResultResponseSchema.parse({reward,requestBinding:{campaignId,combatId,rewardBundleId,
+      recipientActorId:row.recipient_actor_id,claimedAt:row.claimed_at,requestEvidence:{rewardClaimId:request.rewardClaimId,
+        expectedRevision:request.expectedRevision,idempotencyKey:request.idempotencyKey},canonicalRequestDigest:row.request_digest},
+      receipt:{idempotencyKey:row.idempotency_key,revisionBefore:row.expected_revision,revisionAfter:row.resulting_revision,occurredAt:row.occurred_at}});
+  };
   return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
+    listCombatRewards,getCombatRewardClaimResult,
     getUseConsumableLegalActions:(principal,combatId)=>db.transaction(()=>buildUseConsumableLegalActions(db,principal,combatId)).deferred(),
     getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred(),
     getUseConsumableCommandResultByKey:(principal,combatId,key)=>db.transaction(()=>getUseConsumableCommandResultByKey(principal,combatId,key)).deferred() };

@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { render, screen } from "@testing-library/react";
+import type { CampaignHistoryHttpPublicReceiptResponse } from "@velvet/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
 
@@ -16,11 +17,22 @@ describe("MechanicReceiptCard", () => {
     expect(screen.getAllByText("Not recorded for this mechanic")).toHaveLength(2);
     expect(screen.getByRole("region", { name: "Committed mechanics" })).toBeTruthy();
   });
-  it("resolves and renders an authoritative generalized combat receipt",async()=>{
-    const getCampaignCommandReceipt=vi.fn().mockResolvedValue({receipt:{kind:"combat",revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:00.000Z",
-      roundBefore:1,roundAfter:2}});
+  it("resolves and renders an authoritative generalized combat receipt without private IDs",async()=>{
+    const response = { receipt: { kind: "combat", revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z",
+      action: "attack", outcome: { kind: "damage", damageType: "physical", requested: 1, applied: 1,
+        hitPointsBefore: 8, hitPointsAfter: 7, statusAfter: "active" }, roundBefore: 1, roundAfter: 2 } } satisfies CampaignHistoryHttpPublicReceiptResponse;
+    const getCampaignCommandReceipt=vi.fn().mockResolvedValue(response);
     render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"combat-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
-    await screen.findByText("Combat update");expect(screen.getByText("Action resolved")).toBeTruthy();expect(screen.getByText("1 → 2")).toBeTruthy();expect(getCampaignCommandReceipt).toHaveBeenCalledWith("campaign","combat-command");
+    await screen.findByText("Combat update");expect(screen.getByText("Attack")).toBeTruthy();expect(screen.getByText("1 physical damage")).toBeTruthy();
+    expect(screen.getByText("7 HP, active")).toBeTruthy();expect(screen.getByText("1 → 2")).toBeTruthy();expect(getCampaignCommandReceipt).toHaveBeenCalledWith("campaign","combat-command");
+    expect(document.body.textContent).not.toMatch(/combat-command|actionId|legalActionId|combatant/i);
+  });
+  it("renders a generalized combat action with no target outcome",async()=>{
+    const response = { receipt: { kind: "combat", revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z",
+      action: "end-turn", outcome: { kind: "none" }, roundBefore: 1, roundAfter: 2 } } satisfies CampaignHistoryHttpPublicReceiptResponse;
+    const getCampaignCommandReceipt=vi.fn().mockResolvedValue(response);
+    render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"combat-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
+    await screen.findByText("Combat update");expect(screen.getByText("End turn")).toBeTruthy();expect(screen.getByText("No direct target outcome")).toBeTruthy();
   });
   it("renders the public travel destination and durable receipt metadata",async()=>{
     const getCampaignCommandReceipt=vi.fn().mockResolvedValue({receipt:{kind:"travel",destination:"Glass Harbor",

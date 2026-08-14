@@ -12,6 +12,7 @@ export interface CharacterBuilderApi {
   create: (campaignId: string, input: CreateCharacterDraftHttpInput) => Promise<{ draft: CharacterDraftHttpView; receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft"> }>;
   get: (campaignId: string, draftId: string) => Promise<CharacterDraftHttpView>;
   update: (campaignId: string, draftId: string, input: UpdateCharacterDraftHttpInput) => Promise<{ draft: CharacterDraftHttpView; receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft"> }>;
+  reroll: (campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<{ draft: CharacterDraftHttpView; receipt: Omit<CharacterDraftMutationReceipt, "commandId" | "draft"> }>;
   finalize: (campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }) => Promise<CharacterDraftHttpFinalizationResult>;
   getSheet: (campaignId: string, campaignCharacterId: string) => Promise<CharacterSheetHttpResponse>;
 }
@@ -31,7 +32,7 @@ export interface CharacterBuilderPageProps {
 }
 
 type SaveState = "idle" | "saving" | "saved" | "stale" | "failed";
-type DraftLock = { token: symbol; phase: "writing" | "uncertain"; kind: "create" | "save" | "finalize"; message: string };
+type DraftLock = { token: symbol; phase: "writing" | "uncertain"; kind: "create" | "save" | "reroll" | "finalize"; message: string };
 interface AmbiguousCreateMarker { campaignId: string; personaId: string; idempotencyKey: string; startedAt: string }
 const AMBIGUOUS_CREATE_KEY = "velvet.character-builder.ambiguous-creates.v1";
 const draftLocks = new Map<string, DraftLock>();
@@ -172,6 +173,23 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
     }
   }
 
+  async function reroll() {
+    if (!draft || draft.allocation.method !== "server-roll") return; const key = lockKey(campaignId, draft.id); if (draftLocks.has(key)) return;
+    const token = Symbol(key); const expectedRevision = draft.revision; const generation = generationRef.current;
+    publish(key, { token, phase: "writing", kind: "reroll", message: "Rolling six new auditable attribute sets once…" }); setError(""); setNotice(""); setConfirmed(false);
+    try {
+      const result = await api.reroll(campaignId, draft.id, { expectedRevision, idempotencyKey: idempotency("draft-reroll") });
+      if (draftLocks.get(key)?.token !== token) return; publish(key, null);
+      if (!mountedRef.current || generationRef.current !== generation) return;
+      setDraft(result.draft); setSaveState("saved"); setNotice(`New roll saved at revision ${result.draft.revision}. The earlier roll remains in revision history.`); focus(generation, "status");
+    } catch (rerollError) {
+      if (draftLocks.get(key)?.token !== token) return;
+      const stale = rerollError instanceof ApiError && rerollError.status === 409;
+      if (knownNonCommit(rerollError)) publish(key, null); else publish(key, { token, phase: "uncertain", kind: "reroll", message: "Reroll outcome is uncertain. Refresh authoritative state; the roll will not be repeated." });
+      if (mountedRef.current) { setError(stale ? "Draft revision changed before the reroll. Refresh authoritative state." : knownNonCommit(rerollError) ? "The reroll was rejected and the current roll is unchanged." : "Reroll outcome is uncertain. Refresh before continuing."); focus(generationRef.current, "status"); }
+    }
+  }
+
   async function finalize() {
     if (!draft || !draft.completion.complete || !confirmed) return; const key = lockKey(campaignId, draft.id); if (draftLocks.has(key)) return;
     const token = Symbol(key); publish(key, { token, phase: "writing", kind: "finalize", message: "Finalizing once and refreshing the authoritative sheet…" }); setError(""); setNotice("");
@@ -232,6 +250,7 @@ export function CharacterBuilderPage({ campaignId, personas, initialDraftId, api
     {loading && !draft && <section className="builder-section" aria-busy="true"><p role="status">Loading draft…</p></section>}
     {error && !draft && initialDraftId && <button ref={retryRef} className="primary" onClick={() => void load()}>Retry draft</button>}
     {draft && <div className="character-builder-layout">
+      <section className="builder-section attribute-review" aria-labelledby="attribute-review-heading"><div className="builder-section-heading"><div><p className="eyebrow">BASE ATTRIBUTES</p><h2 id="attribute-review-heading">{draft.allocation.method === "server-roll" ? "Server roll" : draft.allocation.method.replace("-", " ")}</h2></div>{draft.allocation.method === "server-roll" && <button className="ghost" type="button" disabled={busy || Boolean(lock) || draft.status !== "active"} onClick={() => void reroll()}>Reroll all stats</button>}</div><div className="attribute-score-review">{Object.entries(draft.allocation.scores).map(([name, score]) => <div key={name}><span>{name}</span><strong>{score}</strong></div>)}</div>{draft.allocation.method === "server-roll" && <details><summary>Show auditable dice</summary><ul className="roll-term-list">{draft.allocation.terms.map((term) => <li key={term.attributeId}><strong>{term.attributeId}</strong>: {term.dice.map((die, index) => <span key={index} className={index === term.droppedIndex ? "is-dropped" : ""}>{die}</span>)} = {term.score}</li>)}</ul></details>}</section>
       <ChoiceGroupEditor groups={draft.choiceGroups} selections={draft.selections} disabled={busy || Boolean(lock) || draft.status !== "active"} onSelect={(selection) => void save(selection)} />
       {!draft.completion.complete && <section className="builder-section completion-issues" aria-labelledby="completion-heading"><h2 id="completion-heading">Complete required choices</h2><ul>{draft.completion.issues.map((issue, index) => <li key={`${issue.code}-${index}`}><button type="button" onClick={() => document.getElementById(issueTarget(issue.path))?.focus()}>{issue.message}</button></li>)}</ul></section>}
       {draft.derivedPreview && <DerivedStatsReview derived={draft.derivedPreview} startingGrants={draft.startingGrants} />}

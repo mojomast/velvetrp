@@ -156,8 +156,11 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
         } }));
       }
       const combat=typeof repository.getAgentCombatReceipt==="function"?repository.getAgentCombatReceipt(LOCAL_OWNER,campaignId,request.params.commandId):null;
-      if(combat)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat",revisionBefore:combat.revisionBefore,
-        revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,roundBefore:combat.resolution.roundBefore,roundAfter:combat.resolution.roundAfter}}));
+      if(combat){const resolution=combat.resolution as any,outcome=resolution.outcomes?.[0];return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat",revisionBefore:combat.revisionBefore,
+        revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,action:resolution.kind,
+        outcome:outcome?.kind==="damage"?{kind:"damage",damageType:outcome.damageType,requested:outcome.requested,applied:outcome.applied,
+          hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
+          :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
       const travel=repository.getExactCandidateTravelPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
       if(travel)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"travel",...travel}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);

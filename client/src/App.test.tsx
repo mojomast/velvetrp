@@ -433,7 +433,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
-      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/, handler: () => json({ turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Restored adventure narration" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/, handler: () => json({ turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Restored adventure narration", source: "provider-assisted" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
@@ -1475,6 +1475,17 @@ describe("character builder and advancement safety flows", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Point Buy" }));
     expect(await screen.findByText(/Point-buy budget: 25 \/ 27/)).toBeTruthy(); expect((create as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("Might score"), { target: { value: "15" } }); fireEvent.click(create); expect(onContinue).toHaveBeenCalledWith({ method: "point-buy", scores });
+  });
+
+  it("shows persisted dice and rerolls a server-roll draft once", async () => {
+    const allocation = { method: "server-roll", algorithm: "velvet-4d6-drop-first-lowest-v1", scores, terms: ["might", "agility", "resolve", "insight", "presence", "craft"].map((attributeId) => ({ attributeId, dice: [6, 5, 4, 1], droppedIndex: 3, score: scores[attributeId as keyof typeof scores] })) };
+    const rolledDraft = { ...draft(), allocation };
+    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(rolledDraft), update: vi.fn(), reroll: vi.fn().mockResolvedValue({ draft: { ...rolledDraft, revision: 2 }, receipt: { revisionBefore: 1, revisionAfter: 2 } }), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    const reroll = await screen.findByRole("button", { name: "Reroll all stats" });
+    fireEvent.click(screen.getByText("Show auditable dice")); expect(screen.getByText("might", { selector: "strong" })).toBeTruthy();
+    fireEvent.click(reroll); expect(await screen.findByText(/New roll saved at revision 2/)).toBeTruthy();
+    expect(api.reroll).toHaveBeenCalledTimes(1);
   });
 
   it("renders every crossed level and leaves the reviewed preview after one rejected apply", async () => {

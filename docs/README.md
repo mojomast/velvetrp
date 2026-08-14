@@ -17,6 +17,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 ## Planning and historical records
 
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
+- [Revision 2 integration plan](revision-2-integration-plan.md) - Approved post-M4 actionable execution design, subordinate to roadmap scope and status.
 - [RPG integration plan](rpg-integration-plan.md) - Original integration design and historical operation ledgers; current implementation can be newer.
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.
 - [Roleplay product/feature snapshot (2026)](trending-roleplay-features-2026.md) - Dated internal planning snapshot, not external research, provenance, a commitment, or a contract.

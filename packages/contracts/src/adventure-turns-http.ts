@@ -87,6 +87,7 @@ export const adventureTurnHttpConfirmationSchema = z.discriminatedUnion("state",
 export const adventureTurnHttpNarrationStatusSchema = z.object({
   status: narrationStatusSchema,
   text: z.string().min(1).max(8_000).nullable(),
+  source: z.enum(["provider-assisted", "deterministic-fallback"]).nullable(),
 }).strict();
 
 /** Exact role-safe reconciliation response for an adventure turn. */

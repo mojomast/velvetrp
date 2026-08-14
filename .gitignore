@@ -6,3 +6,4 @@ server/data/
 *.log
 test-results/
 playwright-report/
+.velvet/

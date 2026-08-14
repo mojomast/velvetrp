@@ -26,6 +26,10 @@ function dbPath(): string {
   return path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite");
 }
 
+function markCorruptFixtureAsV45(db: DatabaseDriver.Database): void {
+  db.prepare("UPDATE meta SET value = '45' WHERE key = 'schemaVersion'").run();
+}
+
 function seed(): void {
   createRepository({ dataDir: process.env.VELVET_DATA_DIR as string }).close();
   const db = new DatabaseDriver(dbPath());
@@ -212,6 +216,7 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     if(mutation.startsWith("DELETE FROM campaigns"))deleteCampaignForCorruptionTest(db,"campaign-one");db.prepare(mutation).run();
+    markCorruptFixtureAsV45(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
@@ -226,6 +231,7 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("UPDATE campaigns SET owner_principal_id = 'gm' WHERE id = 'campaign-one'").run();
+    markCorruptFixtureAsV45(db);
     db.close();
     expect(() => factory()).toThrow("schema marker 45 contains foreign-key violation in campaigns");
   });
@@ -328,6 +334,7 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare("INSERT INTO rpg_actor_resources VALUES ('campaign-two', 'actor-one', 'hp', 1, 2)").run();
+    markCorruptFixtureAsV45(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
@@ -394,6 +401,7 @@ describe("initialize actor resource command", () => {
     first.close();
     const db = new DatabaseDriver(dbPath());
     db.exec(mutation);
+    markCorruptFixtureAsV45(db);
     db.close();
     const nextId = vi.fn(() => "unused");
     const now = vi.fn(() => new Date(AT));
@@ -426,6 +434,7 @@ describe("initialize actor resource command", () => {
     const db = new DatabaseDriver(dbPath());
     db.pragma("foreign_keys = OFF");
     db.prepare(mutation).run();
+    markCorruptFixtureAsV45(db);
     db.close();
     expect(() => factory()).toThrow(`schema marker 45 contains foreign-key violation in ${table}`);
   });

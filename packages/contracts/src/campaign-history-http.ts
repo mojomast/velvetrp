@@ -93,7 +93,13 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
   }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
     "receipt revision must advance once"),
   z.object({kind:z.literal("combat"),revisionBefore:revisionSchema,revisionAfter:revisionSchema,
-    occurredAt:z.string().datetime({offset:false,precision:3}),roundBefore:revisionSchema,roundAfter:revisionSchema}).strict()
+    occurredAt:z.string().datetime({offset:false,precision:3}),action:z.enum(["attack","flee","end-turn"]),
+    outcome:z.discriminatedUnion("kind",[
+      z.object({kind:z.literal("damage"),damageType:z.literal("physical"),requested:z.literal(1),applied:z.number().int().min(0).max(1),
+        hitPointsBefore:z.number().int().min(0).max(1_000_000),hitPointsAfter:z.number().int().min(0).max(1_000_000),statusAfter:z.enum(["active","defeated"])}).strict(),
+      z.object({kind:z.literal("status"),statusAfter:z.literal("fled")}).strict(),
+      z.object({kind:z.literal("none")}).strict(),
+    ]),roundBefore:revisionSchema,roundAfter:revisionSchema}).strict()
     .refine((value)=>value.revisionAfter===value.revisionBefore+1,"receipt revision must advance once"),
   z.object({
     kind: z.literal("travel"),

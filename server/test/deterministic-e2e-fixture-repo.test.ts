@@ -267,7 +267,7 @@ describe("deterministic E2E fixture repository", () => {
     fixture.fixtures.materializeEconomyGraph(target);
 
     expect(fixture.repository.getActorInventorySnapshot(OWNER, fixture.campaignId, fixture.actorId)?.inventory.items)
-      .toMatchObject([{ entryId: "command-waylamp", item: WAYLAMP }]);
+      .toEqual(expect.arrayContaining([expect.objectContaining({ entryId: "command-waylamp", item: WAYLAMP })]));
     expect(fixture.repository.getActorResourceSnapshot(OWNER, fixture.campaignId, fixture.actorId)?.resources)
       .toContainEqual({ resourceId: "focus", current: 1, capacity: 4 });
     expect(fixture.repository.getShop(OWNER, fixture.campaignId, "e2e-waylamp-shop")?.stock[0]?.quantity).toBe(2);

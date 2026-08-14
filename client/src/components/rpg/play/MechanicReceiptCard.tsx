@@ -21,17 +21,52 @@ export interface MechanicReceiptCardProps {
 }
 
 type Receipt = CampaignHistoryHttpPublicReceiptResponse["receipt"];
-type Load = { campaignId:string;api:MechanicReceiptApi;commandId:string;
-  state:"loading"|"error"|"ready";receipt?:Receipt };
+type LoadIdentity = { campaignId: string; api: MechanicReceiptApi; commandId: string };
+type Load = LoadIdentity & (
+  | { state: "loading" }
+  | { state: "error" }
+  | { state: "ready"; receipt: Receipt }
+);
+
+type CombatReceipt = Extract<Receipt, { kind: "combat" }>;
+
+function combatActionLabel(action: CombatReceipt["action"]): string {
+  switch (action) {
+    case "attack": return "Attack";
+    case "flee": return "Flee";
+    case "end-turn": return "End turn";
+  }
+}
+
+function CombatOutcome({ outcome }: { outcome: CombatReceipt["outcome"] }) {
+  switch (outcome.kind) {
+    case "damage":
+      return <>
+        <div><dt>Outcome</dt><dd>{outcome.applied} {outcome.damageType} damage</dd></div>
+        <div><dt>Target condition</dt><dd>{outcome.hitPointsAfter} HP, {outcome.statusAfter}</dd></div>
+      </>;
+    case "status":
+      return <div><dt>Outcome</dt><dd>Fled</dd></div>;
+    case "none":
+      return <div><dt>Outcome</dt><dd>No direct target outcome</dd></div>;
+  }
+}
 
 function ReceiptBody({ receipt }: { receipt: Receipt }) {
-  if(receipt.kind==="travel")return <><dl><div><dt>Travel completed</dt><dd>{receipt.destination}</dd></div>
+  if (receipt.kind === "travel") return <dl>
+    <div><dt>Travel completed</dt><dd>{receipt.destination}</dd></div>
     <div><dt>World travel revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div>
-    <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div></dl></>;
-  if(receipt.kind==="combat")return <><dl><div><dt>Combat update</dt><dd>Action resolved</dd></div>
+    <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
+  </dl>;
+  if (receipt.kind === "combat") return <dl>
+    <div><dt>Combat update</dt><dd>{combatActionLabel(receipt.action)}</dd></div>
+    <CombatOutcome outcome={receipt.outcome} />
     <div><dt>Round</dt><dd>{receipt.roundBefore} → {receipt.roundAfter}</dd></div>
-    <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div></dl></>;
-  if (receipt.kind !== "mechanic") return <p>This receipt contains campaign administration metadata, not a mechanic.</p>;
+    <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
+  </dl>;
+  if (receipt.kind === "administration") return <p>This receipt contains campaign administration metadata, not a mechanic.</p>;
+
+  // The top-level receipt discriminator is narrowed before mechanic-only event data is read.
   const event = receipt.event;
   return <>
     {event.type === "actor_dice_rolled" && <dl>
@@ -86,7 +121,7 @@ export function MechanicReceiptCard({ campaignId, links, api }: MechanicReceiptC
       return <article className="mechanic-receipt-card" key={`${link.commandId}:${link.proposalId}`}>
       {!load || load.state === "loading" ? <p role="status">Loading committed mechanic…</p>
         : load.state === "error" ? <p role="alert">Committed mechanic could not be displayed. The durable turn remains authoritative.</p>
-          : <ReceiptBody receipt={load.receipt!} />}
+          : <ReceiptBody receipt={load.receipt} />}
     </article>; })}
   </section>;
 }

@@ -46,7 +46,16 @@ export interface CharacterBuilderViewMappers {
 
 /** Reads a draft's raw database projection by identifier. */
 export function rowFor(db: DatabaseDriver.Database, draftId: string): DraftRow | undefined {
-  return db.prepare("SELECT * FROM character_drafts_v19 WHERE id=?").get(draftId) as DraftRow | undefined;
+  return db.prepare(`SELECT draft.*,COALESCE((SELECT reroll.allocation_json FROM character_draft_rerolls_v49 reroll
+    WHERE reroll.draft_id=draft.id ORDER BY reroll.revision DESC LIMIT 1),draft.allocation_json) allocation_json
+    FROM character_drafts_v19 draft WHERE draft.id=?`).get(draftId) as DraftRow | undefined;
+}
+
+/** Resolves the latest immutable reroll, falling back to the creation allocation. */
+export function allocationFor(db: DatabaseDriver.Database, row: DraftRow) {
+  const reroll = db.prepare("SELECT allocation_json FROM character_draft_rerolls_v49 WHERE draft_id=? ORDER BY revision DESC LIMIT 1")
+    .get(row.id) as { allocation_json: string } | undefined;
+  return characterBuilderAllocationSchema.parse(JSON.parse(reroll?.allocation_json ?? row.allocation_json));
 }
 
 /** Reads and validates the ordered content-publication pins stored for a draft. */
@@ -64,7 +73,7 @@ export function buildView(
   mappers: CharacterBuilderViewMappers,
 ): CharacterDraftView {
   const pins = pinsFor(db, row.id);
-  const allocation = characterBuilderAllocationSchema.parse(JSON.parse(row.allocation_json));
+  const allocation = allocationFor(db, row);
   const selections = characterBuilderSelectionsSchema.parse(JSON.parse(row.selections_json));
   const definitions = mappers.catalogForPins(db, row.rules_profile_id, pins);
   const effectiveExpiry = row.expires_at !== null && row.expires_at <= now;

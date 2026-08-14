@@ -29,6 +29,7 @@ function repository() {
     createCharacterDraft: vi.fn(() => ({ draft, receipt: { draftId: "draft-1", commandId: "command-1", idempotencyKey: "idem-1", type: "create", revisionBefore: 0, revisionAfter: 0, occurredAt: draft.createdAt, draft } })),
     getCharacterDraft: vi.fn(() => draft),
     updateCharacterDraft: vi.fn(() => ({ draft: { ...draft, revision: 1, updatedAt: "2036-01-01T00:00:01.000Z" }, receipt: { draftId: "draft-1", commandId: "command-2", idempotencyKey: "idem-2", type: "update", revisionBefore: 0, revisionAfter: 1, occurredAt: "2036-01-01T00:00:01.000Z", draft: { ...draft, revision: 1, updatedAt: "2036-01-01T00:00:01.000Z" } } })),
+    rerollCharacterDraft: vi.fn(() => { const rolled = { ...draft, revision: 1, allocation: { method: "server-roll", algorithm: "velvet-4d6-drop-first-lowest-v1", scores: { might: 15, agility: 15, resolve: 15, insight: 15, presence: 15, craft: 15 }, terms: ["might", "agility", "resolve", "insight", "presence", "craft"].map((attributeId) => ({ attributeId, dice: [6, 5, 4, 1], droppedIndex: 3, score: 15 })) }, updatedAt: "2036-01-01T00:00:01.000Z" }; return { draft: rolled, receipt: { draftId: "draft-1", commandId: "command-reroll", idempotencyKey: "idem-reroll", type: "update", revisionBefore: 0, revisionAfter: 1, occurredAt: rolled.updatedAt, draft: rolled } }; }),
     finalizeCharacterDraft: vi.fn(() => ({ draft: { ...draft, status: "finalized", revision: 1, updatedAt: occurredAt }, receipt: {
       draftId: "draft-1", commandId: "command-final", eventId: "event-final", idempotencyKey: "idem-final", revisionBefore: 0, revisionAfter: 1,
       occurredAt, campaignCharacterId: "character-final", sheetId: "sheet-final", actorId: "actor-final", derived, startingGrants: [],
@@ -91,6 +92,16 @@ describe("isolated character draft HTTP lane", () => {
     }, headers: { "content-type": "application/json" } });
     expect(response.statusCode, response.body).toBe(200); expect(repo.updateCharacterDraft).toHaveBeenCalledOnce();
     expect(repo.updateCharacterDraft).toHaveBeenCalledWith("local-owner", "draft-1", expect.objectContaining({ expectedRevision: 0, idempotencyKey: "idem-2" })); await app.close();
+  });
+  it("binds rerolls to the exact campaign, draft revision, and idempotency key", async () => {
+    const repo = repository(); const app = await appFor(repo);
+    const response = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign-1/character-drafts/draft-1/reroll", payload: {
+      expectedRevision: 0, idempotencyKey: "idem-reroll",
+    }, headers: { "content-type": "application/json" } });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ draft: { revision: 1, allocation: { method: "server-roll" } }, receipt: { revisionBefore: 0, revisionAfter: 1 } });
+    expect(repo.rerollCharacterDraft).toHaveBeenCalledWith("local-owner", "draft-1", { expectedRevision: 0, idempotencyKey: "idem-reroll" });
+    await app.close();
   });
   it("finalizes with only the strict public aggregate and a 201 receipt", async () => {
     const repo = repository(); const app = await appFor(repo);

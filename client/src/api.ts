@@ -31,8 +31,8 @@ import {
   campaignTransferHttpDryRunResponseSchema,
   campaignTransferHttpExportDocumentSchema,
 } from "@velvet/contracts";
-import { campaignContentApplyRequestSchema, campaignContentApplyResponseSchema, campaignContentDraftViewSchema, campaignContentGenerationRequestSchema } from "@velvet/contracts";
-import type { CampaignContentGenerationRequest } from "@velvet/contracts";
+import { campaignContentApplyRequestSchema, campaignContentApplyResponseSchema, campaignContentDraftViewSchema, campaignContentGenerationRequestSchema, campaignGeneratedFoundationSchema, campaignGeneratedPlanningSchema, campaignIdSchema, campaignMaterialPublishRequestSchema, campaignMaterialPublishResponseSchema, campaignPublishedMaterialsSchema } from "@velvet/contracts";
+import type { CampaignContentDraftView, CampaignContentGenerationRequest, CampaignGeneratedPlanning, CampaignPublishedMaterials } from "@velvet/contracts";
 import type {
   CampaignAdministrationHttpArchiveRequest,
   CampaignAdministrationHttpArchiveResponse,
@@ -191,6 +191,10 @@ import {
   combatCommandResultResponseSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
+  combatRewardClaimRequestSchema,
+  combatRewardClaimResponseSchema,
+  combatRewardClaimResultResponseSchema,
+  combatRewardListResponseSchema,
   combatLogQuerySchema,
   combatLogResponseSchema,
   combatReadResponseSchema,
@@ -203,6 +207,7 @@ import {
   useConsumableCommandResultSchema,
   useConsumableLegalActionSchema,
   canonicalUseConsumableRequestFrame,
+  canonicalCombatRewardClaimRequestFrame,
 } from "@velvet/contracts";
 import type {
   CombatActionCommandRequest,
@@ -210,6 +215,10 @@ import type {
   CombatCommandResultResponse,
   CombatEndCommandRequest,
   CombatEndCommandResponse,
+  CombatRewardClaimRequest,
+  CombatRewardClaimResponse,
+  CombatRewardClaimResultResponse,
+  CombatRewardGrantPublic,
   CombatLogQuery,
   CombatLogResponse,
   CombatReadResponse,
@@ -234,6 +243,7 @@ import {
   characterSheetHttpResponseSchema,
   createCharacterDraftHttpInputSchema,
   finalizeCharacterDraftHttpInputSchema,
+  rerollCharacterDraftHttpInputSchema,
   updateCharacterDraftHttpInputSchema,
 } from "@velvet/contracts";
 import type {
@@ -1340,6 +1350,19 @@ export async function updateCharacterDraft(campaignId: string, draftId: string, 
   return response;
 }
 
+/** Requests one new audited server roll; this wrapper never retries the POST. */
+export async function rerollCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftHttpMutation> {
+  const target = characterDraftPath(campaignId, draftId);
+  const body = parseApiInput(() => rerollCharacterDraftHttpInputSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/reroll`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Character draft reroll");
+  const response = characterDraftHttpMutationResultSchema.parse(success.body);
+  if (response.draft.campaignId !== target.campaignId || response.draft.id !== target.draftId || response.draft.allocation.method !== "server-roll"
+    || response.draft.revision !== body.expectedRevision + 1 || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== response.draft.revision) throw new Error("Character draft reroll response did not match the request");
+  return response;
+}
+
 /** Finalizes once and accepts only the strict public M2.6 receipt projection. */
 export async function finalizeCharacterDraft(campaignId: string, draftId: string, input: { expectedRevision: number; idempotencyKey: string }): Promise<CharacterDraftHttpFinalizationResult> {
   const target = characterDraftPath(campaignId, draftId);
@@ -1610,23 +1633,54 @@ export async function applyEncounterGenerationDraft(draftId: string, input: Gene
 }
 
 /** Requests a bounded campaign-content draft; provider internals never enter this projection. */
-export async function createCampaignContentDraft(input: CampaignContentGenerationRequest) {
+export interface CampaignContentApplyInput {
+  expectedRevision: number;
+  idempotencyKey: string;
+  selectedArtifactKeys: string[];
+}
+
+export interface CampaignMaterialPublishInput {
+  artifactKey: string;
+  expectedRevision: number;
+  idempotencyKey: string;
+}
+
+export async function createCampaignContentDraft(input: CampaignContentGenerationRequest): Promise<CampaignContentDraftView> {
   const body = parseApiInput(() => campaignContentGenerationRequestSchema.parse(input));
   const success = await requestResponse<unknown>("/rpg/v1/campaign-content-drafts", { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 201, "Campaign content generation");
-  return campaignContentDraftViewSchema.parse(success.body);
+  const response = campaignContentDraftViewSchema.parse(success.body);
+  if (response.draft.campaignId !== body.campaignId) throw new Error("Campaign content generation response did not match the request");
+  return response;
 }
-export async function getCampaignContentDraft(draftId: string) {
+export async function getCampaignContentDraft(draftId: string): Promise<CampaignContentDraftView> {
   const id = parseApiInput(() => resourceIdSchema.parse(draftId));
   const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}`, { cache: "no-store" });
   requireStatus(success, 200, "Campaign content draft");
-  return campaignContentDraftViewSchema.parse(success.body);
+  const response = campaignContentDraftViewSchema.parse(success.body);
+  if (response.draft.draftId !== id) throw new Error("Campaign content draft response did not match the request");
+  return response;
 }
-export async function applyCampaignContentDraft(draftId: string, input: { expectedRevision: number; idempotencyKey: string }) {
+export async function getCampaignGeneratedFoundation(campaignId: string) {
+  const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));
+  const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-foundation`,{cache:"no-store"});
+  requireStatus(success,200,"Campaign generated foundation");
+  return campaignGeneratedFoundationSchema.parse(success.body);
+}
+export async function getCampaignGeneratedPlanning(campaignId: string): Promise<CampaignGeneratedPlanning> {
+  const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));
+  const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/generated-planning`,{cache:"no-store"});
+  requireStatus(success,200,"Campaign generated planning");return campaignGeneratedPlanningSchema.parse(success.body);
+}
+export async function getCampaignPublishedMaterials(campaignId:string): Promise<CampaignPublishedMaterials>{const id=parseApiInput(()=>campaignIdSchema.parse(campaignId));const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/published-materials`,{cache:"no-store"});requireStatus(success,200,"Campaign published materials");return campaignPublishedMaterialsSchema.parse(success.body);}
+export async function publishCampaignMaterial(campaignId:string,input:CampaignMaterialPublishInput){const id=parseApiInput(()=>campaignIdSchema.parse(campaignId)),body=parseApiInput(()=>campaignMaterialPublishRequestSchema.parse(input));const success=await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/material-publications`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Campaign material publication");const response=campaignMaterialPublishResponseSchema.parse(success.body);if(response.material.artifactKey!==body.artifactKey||response.receipt.idempotencyKey!==body.idempotencyKey||response.receipt.revisionBefore!==body.expectedRevision)throw new Error("Campaign material publication response did not match the request");return response;}
+export async function applyCampaignContentDraft(draftId: string, input: CampaignContentApplyInput) {
   const id = parseApiInput(() => resourceIdSchema.parse(draftId)), body = parseApiInput(() => campaignContentApplyRequestSchema.parse(input));
   const success = await requestResponse<unknown>(`/rpg/v1/campaign-content-drafts/${encodeURIComponent(id)}/apply`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
   requireStatus(success, 200, "Campaign content apply");
-  return campaignContentApplyResponseSchema.parse(success.body);
+  const response = campaignContentApplyResponseSchema.parse(success.body);
+  if (response.draft.draftId !== id) throw new Error("Campaign content apply response did not match the request");
+  return response;
 }
 
 export async function startEncounter(encounterId: string, input: EncounterStartCommandRequest) {
@@ -1738,6 +1792,42 @@ export async function endCombat(combatId: string, input: CombatEndCommandRequest
     throw new Error("Combat end response did not match the request");
   }
   return response;
+}
+
+/** Reads recipient-visible reward state; `claim.state` is authoritative and survives reload. */
+export async function listCombatRewards(combatId:string):Promise<CombatRewardGrantPublic[]> {
+  const target=combatPath(combatId);const success=await requestResponse<unknown>(`${target.path}/rewards`,{cache:"no-store"});
+  requireStatus(success,200,"Combat rewards");return combatRewardListResponseSchema.parse(success.body).rewards;
+}
+
+/** Explicitly settles one reward bundle exactly once into the recipient's stores. */
+export async function claimCombatReward(combatId:string,rewardBundleId:string,recipientActorId:string,input:CombatRewardClaimRequest):Promise<CombatRewardClaimResponse>{
+  const target=combatPath(combatId),bundle=parseApiInput(()=>resourceIdSchema.parse(rewardBundleId)),recipient=parseApiInput(()=>resourceIdSchema.parse(recipientActorId)),body=parseApiInput(()=>combatRewardClaimRequestSchema.parse(input));
+  const success=await requestResponse<unknown>(`${target.path}/rewards/${encodeURIComponent(bundle)}/claim-commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});
+  requireStatus(success,200,"Combat reward claim");const response=combatRewardClaimResponseSchema.parse(success.body);
+  if(response.reward.rewardBundleId!==bundle||response.reward.recipientActorId!==recipient
+    ||response.reward.claim.state!=="claimed"||response.reward.claim.rewardClaimId!==body.rewardClaimId
+    ||response.receipt.idempotencyKey!==body.idempotencyKey||response.receipt.revisionBefore!==body.expectedRevision
+    ||response.receipt.revisionAfter!==body.expectedRevision+1)throw new Error("Combat reward claim did not match the request");
+  return response;
+}
+
+/** Reads one immutable settled claim; this endpoint never executes or replays the claim command. */
+export async function getCombatRewardClaimResult(campaignId:string,combatId:string,rewardBundleId:string,recipientActorId:string,
+  expectedRequest:CombatRewardClaimRequest):Promise<CombatRewardClaimResultResponse>{
+  const campaign=parseApiInput(()=>resourceIdSchema.parse(campaignId)),combat=parseApiInput(()=>resourceIdSchema.parse(combatId)),
+    bundle=parseApiInput(()=>resourceIdSchema.parse(rewardBundleId)),recipient=parseApiInput(()=>resourceIdSchema.parse(recipientActorId)),
+    expected=parseApiInput(()=>combatRewardClaimRequestSchema.parse(expectedRequest));
+  const path=`/rpg/v1/campaigns/${encodeURIComponent(campaign)}/combats/${encodeURIComponent(combat)}/rewards/${encodeURIComponent(bundle)}/claim-results/${encodeURIComponent(expected.idempotencyKey)}`;
+  const success=await requestResponse<unknown>(path,{cache:"no-store"});requireStatus(success,200,"Combat reward claim result");
+  const result=combatRewardClaimResultResponseSchema.parse(success.body),binding=result.requestBinding;
+  const frame=new TextEncoder().encode(canonicalCombatRewardClaimRequestFrame({campaignId:campaign,combatId:combat,rewardBundleId:bundle,
+    recipientActorId:recipient,claimedAt:binding.claimedAt,request:expected}));
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",frame)),(byte)=>byte.toString(16).padStart(2,"0")).join("");
+  if(binding.campaignId!==campaign||binding.combatId!==combat||binding.rewardBundleId!==bundle||binding.recipientActorId!==recipient
+      ||JSON.stringify(binding.requestEvidence)!==JSON.stringify(expected)||binding.canonicalRequestDigest!==digest
+      ||result.reward.rewardBundleId!==bundle||result.reward.recipientActorId!==recipient)throw new Error("Combat reward claim result did not match the exact request");
+  return result;
 }
 
 export async function getCharacterProgression(campaignId: string, campaignCharacterId: string): Promise<CharacterProgressionHttpState> {

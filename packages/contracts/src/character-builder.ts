@@ -215,6 +215,10 @@ export const updateCharacterDraftInputSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   selections: characterBuilderSelectionPatchSchema,
 }).strict();
+export const rerollCharacterDraftInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
 export const abandonCharacterDraftInputSchema = z.object({ expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema }).strict();
 export const finalizeCharacterDraftInputSchema = z.object({ expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema,
   progressionMode: z.enum(["xp", "milestone"]).optional() }).strict();
@@ -260,6 +264,7 @@ export type CharacterDraftView = z.infer<typeof characterDraftViewSchema>;
 export type CharacterDraftPin = z.infer<typeof characterDraftPinSchema>;
 export type CreateCharacterDraftInput = z.infer<typeof createCharacterDraftInputSchema>;
 export type UpdateCharacterDraftInput = z.infer<typeof updateCharacterDraftInputSchema>;
+export type RerollCharacterDraftInput = z.infer<typeof rerollCharacterDraftInputSchema>;
 export type AbandonCharacterDraftInput = z.infer<typeof abandonCharacterDraftInputSchema>;
 export type FinalizeCharacterDraftInput = z.infer<typeof finalizeCharacterDraftInputSchema>;
 export type CharacterDraftMutationReceipt = z.infer<typeof characterDraftMutationReceiptSchema>;

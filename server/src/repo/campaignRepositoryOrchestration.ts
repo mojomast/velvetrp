@@ -87,6 +87,7 @@ import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
+import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -756,6 +757,9 @@ function createRepositoryComposition<T>(
   const exactCandidateProviderBridge=createExactCandidateProviderBridgeRepository(db,dependencies,()=>{
     assertOpen();if(transactionDepth>0)throw new Error("exact candidate provider bridge cannot run inside a repository transaction");
   },exactCandidateRepository);
+  const campaignGenerationRepository=createCampaignGenerationRepository(db,dependencies,adventureTurnRepository,()=>{
+    assertOpen();if(transactionDepth>0)throw new Error("campaign generation operation cannot run inside a repository transaction");
+  });
   const repository: Repository = {
     ...administrationRepository,
     ...contentCatalogRepository,
@@ -776,6 +780,7 @@ function createRepositoryComposition<T>(
     ...adventureTurnRepository,
     ...exactCandidateRepository,
     ...exactCandidateProviderBridge,
+    ...campaignGenerationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
       const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
@@ -815,44 +820,6 @@ function createRepositoryComposition<T>(
     },
     // Deliberately small, closed command service: generated prose can create only
     // reviewed public world records and conservative, catalog-free NPC baselines.
-    applyCampaignContentGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
-      assertOpen(); const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
-      transactionDepth += 1; atomicGenerationApplyDepth += 1;
-      try { return db.transaction(() => {
-        const before = adventureTurnRepository.getGenerationDraft(principalId, input.draftId);
-        if (!before || !("stagedContent" in before)) throw new Error("generation draft is unavailable");
-        if (before.state === "applied") {
-          const command = db.prepare("SELECT idempotency_key FROM adventure_coordination_commands_v36 WHERE aggregate_kind='draft' AND aggregate_id=? AND mutation_type='draft-apply'").get(before.draftId) as { idempotency_key: string } | undefined;
-          if (command?.idempotency_key !== key("content-apply")) throw new AdventureTurnConflictError("idempotency key was reused");
-          return before;
-        }
-        // Draft creation captures the campaign revision.  Seal that observation
-        // in a dedicated content aggregate before any domain projection is
-        // written: a second independently staged draft cannot silently apply.
-        const priorContent = db.prepare("SELECT revision FROM campaign_content_revisions_v42 WHERE campaign_id=?").get(before.campaignId) as { revision: number } | undefined;
-        if (priorContent && priorContent.revision !== before.campaignRevision) throw new AdventureTurnConflictError("campaign content revision is stale");
-        const staged = stagedCampaignContentGenerationSchema.parse(before.stagedContent);
-        const reviewed = adventureTurnRepository.reviewGenerationDraft(principalId, { draftId: before.draftId, decision: "approved", expectedDraftRevision: input.expectedDraftRevision, expectedCampaignRevision: before.campaignRevision, idempotencyKey: key("content-review") });
-        const at = dependencies.clock.now().toISOString();
-        const next = () => resourceIdSchema.parse(dependencies.ids.nextId());
-        const commandId = next();
-        db.prepare("INSERT INTO campaign_content_commands_v42 VALUES(?,?,?,?,?,?,?)").run(commandId, before.campaignId, before.draftId, createHash("sha256").update(principalId).digest("hex"), key("content-apply"), before.campaignRevision, at);
-        for (const location of staged.locations) db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,'public',?)").run(next(), before.campaignId, null, location.name, location.description, at);
-        for (const faction of staged.factions) { const factionId = next(); db.prepare("INSERT INTO campaign_factions_v28(faction_id,campaign_id,public_name,visibility,created_at) VALUES(?,?,?,'public',?)").run(factionId, before.campaignId, faction.name, at); db.prepare("INSERT INTO campaign_faction_private_state_v28 VALUES(?,?,?)").run(before.campaignId, factionId, ""); }
-        for (const npc of staged.npcs) { const personaId = next(), npcId = next();
-          db.prepare("INSERT INTO characters (id,name,age,archetype,boundaries,fictional_confirmed,is_real_person,created_at) VALUES(?,?,18,?,'Generated fictional NPC',1,0,?)").run(personaId, npc.name, npc.archetype, at);
-          db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,'manual',?,?)").run(npcId, before.campaignId, personaId, npc.name, at);
-          db.prepare("INSERT INTO campaign_npc_private_state_v28 VALUES(?,?,?,?,NULL)").run(before.campaignId, npcId, npc.goals, "");
-          db.prepare("INSERT INTO campaign_npc_baseline_stats_v41 VALUES(?,?,10,10,10,'generated-deterministic-baseline')").run(before.campaignId, npcId);
-        }
-        for (const quest of staged.quests) db.prepare("INSERT INTO generated_campaign_quests_v41 VALUES(?,?,?,?,?)").run(before.campaignId, next(), quest.title, quest.description, before.draftId);
-        db.prepare("INSERT INTO campaign_opening_narratives_v41 VALUES(?,?,?,?,?)").run(before.campaignId, staged.opening, staged.premise, before.draftId, at);
-        db.prepare("INSERT INTO campaign_content_revisions_v42 VALUES(?,?,?,?)").run(before.campaignId, before.campaignRevision + 1, before.draftId, at);
-        const draft = adventureTurnRepository.applyGenerationDraft(principalId, { draftId: before.draftId, expectedDraftRevision: reviewed.revision, expectedCampaignRevision: reviewed.campaignRevision, idempotencyKey: key("content-apply"), result: { scope: "campaign-content" } });
-        db.prepare("INSERT INTO campaign_content_receipts_v42 VALUES(?,?,?,?,?,?)").run(next(), commandId, before.campaignId, before.draftId, at, JSON.stringify({ scope: "campaign-content" }));
-        return draft;
-      }).immediate(); } finally { atomicGenerationApplyDepth -= 1; transactionDepth -= 1; }
-    },
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
     configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>

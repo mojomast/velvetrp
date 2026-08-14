@@ -15,7 +15,7 @@ describe("ConfirmationBanner", () => {
   afterEach(() => { cleanup(); localStorage.clear(); });
   it("labels AI content and submits one exact selected batch", async () => {
     const confirmAdventureTurn = vi.fn().mockResolvedValue({ turn, resumeToken: "v1.dHVybg.ZGVjaXNpb24" });
-    const getAdventureTurn = vi.fn().mockResolvedValue({ turn, proposals: [proposal], confirmation: { state: "decided", decisions: [{ proposalId: "proposal", decision: "approved", decidedAt: at }] }, receipts: [], narrationStatus: { status: "none", text: null } });
+    const getAdventureTurn = vi.fn().mockResolvedValue({ turn, proposals: [proposal], confirmation: { state: "decided", decisions: [{ proposalId: "proposal", decision: "approved", decidedAt: at }] }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
     render(<ConfirmationBanner turnId="turn" revision={2} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
       binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={vi.fn()} />);
     expect(screen.getByText("AI suggestion", { selector: "strong" })).toBeTruthy(); expect(screen.getByText("Confirmation required")).toBeTruthy();
@@ -27,7 +27,7 @@ describe("ConfirmationBanner", () => {
 
   it("reconciles an ambiguous mutation by GET and never retries confirmation", async () => {
     const confirmAdventureTurn = vi.fn().mockRejectedValue(new Error("network"));
-    const getAdventureTurn = vi.fn().mockResolvedValue({ turn, proposals: [proposal], confirmation: { state: "pending", proposalIds: ["proposal"], expiresAt: proposal.confirmation.expiresAt }, receipts: [], narrationStatus: { status: "none", text: null } });
+    const getAdventureTurn = vi.fn().mockResolvedValue({ turn, proposals: [proposal], confirmation: { state: "pending", proposalIds: ["proposal"], expiresAt: proposal.confirmation.expiresAt }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
     render(<ConfirmationBanner turnId="turn" revision={2} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
       binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Reject selected batch" }));
@@ -66,7 +66,7 @@ describe("ConfirmationBanner", () => {
     const confirmAdventureTurn = vi.fn().mockRejectedValue(new Error("lost response"));
     const recovered = { turn: { ...turn, state: decision === "approved" ? "confirmed" as const : "cancelled" as const }, proposals: [proposal],
       confirmation: { state: "decided" as const, decisions: [{ proposalId: "proposal", decision, decidedAt: at }] }, receipts: [],
-      narrationStatus: { status: "none" as const, text: null }, resumeToken: "v1.dHVybg.ZGlnZXN0" };
+      narrationStatus: { status: "none" as const, text: null, source: null }, resumeToken: "v1.dHVybg.ZGlnZXN0" };
     const getAdventureTurn = vi.fn().mockResolvedValue(recovered); const onReconciled = vi.fn();
     render(<ConfirmationBanner turnId="turn" revision={2} proposals={[proposal]} proposalIds={["proposal"]} expiresAt={proposal.confirmation.expiresAt}
       binding={binding} api={{ confirmAdventureTurn, getAdventureTurn }} onReconciled={onReconciled} />);

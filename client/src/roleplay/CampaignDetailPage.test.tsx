@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import type { CampaignAdministrationReceipt } from "@velvet/contracts";
-import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
+import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
 import { CampaignAdministrationPage, resetCampaignAdministrationPageModuleStateForTests } from "../components/rpg/campaign/CampaignAdministrationPage";
 
@@ -18,6 +18,7 @@ vi.mock("../api", async (importOriginal) => ({
   setupOriginalStarter: vi.fn(),
   setupMechanicsStarter: vi.fn(),
   getCampaignAdministration: vi.fn(),
+  getCampaignPlayBootstrap: vi.fn(),
   listCampaignMemberships: vi.fn(),
   listCampaignTimelines: vi.fn(),
   listCampaignCheckpoints: vi.fn(),
@@ -57,6 +58,22 @@ describe("CampaignDetailPage", () => {
     vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [], eligible: [] });
     vi.mocked(listCampaignCharacters).mockRejectedValue(new ApiError(404, "unsupported"));
     vi.mocked(getCampaignCharacterCreationOptions).mockRejectedValue(new ApiError(404, "unsupported"));
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: unconfigured.id, actorRole: "gm", status: "draft", activeTimelineId: "timeline", revision: 0, updatedAt: unconfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
+    vi.mocked(getCampaignPlayBootstrap).mockResolvedValue({ campaignId: mechanicsConfigured.id, sessionId: "room", expectedRevision: 4, session: { attached: true, attachedAt: unconfigured.updatedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }] });
+  });
+
+  it("leads with explicit campaign readiness and opens the first ready room", async () => {
+    const open = vi.fn();
+    vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: mechanicsConfigured });
+    vi.mocked(listCampaignCharacters).mockResolvedValue({ characters: [{ id: "campaign-character", characterId: "persona", name: "Aria" }] });
+    vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [{ sessionId: "room", title: "Raincross", participantNames: ["Aria"], createdAt: unconfigured.createdAt, attachedAt: unconfigured.updatedAt, stopped: false }], eligible: [] });
+    vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: mechanicsConfigured.id, actorRole: "owner", status: "published", activeTimelineId: "timeline", revision: 4, updatedAt: mechanicsConfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
+    render(<CampaignDetailPage campaignId={mechanicsConfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} onOpenRoom={open} />);
+    await screen.findByRole("heading", { name: "Campaign ready" });
+    expect(screen.getByText("Ready to play")).toBeTruthy();
+    expect(screen.getByText("1 authorized actor is available in an attached room.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Enter command center" }));
+    expect(open).toHaveBeenCalledWith("room");
   });
 
   it("renders isolated auto-direction roster names in server order, including valid RTL, astral, duplicate, and maximum names", async () => {

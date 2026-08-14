@@ -34,6 +34,10 @@ function fixture() {
   const recipient = makeActor("Briar", "b");
   const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
   db.pragma("foreign_keys = ON");
+  // This legacy M1.5 fixture seeds exact inventory rows below. Character
+  // starter materialization is covered separately by character-builder tests.
+  db.prepare(`DELETE FROM rpg_inventory_entries_v25 WHERE entry_id IN (
+    SELECT materialized_resource_id FROM character_starter_materializations_v51 WHERE materialization_kind='inventory')`).run();
   const seedResource = (actorId: string, name: string, current: number, max: number) => db.prepare("INSERT OR REPLACE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?)").run(campaign.id, actorId, name, current, max);
   seedResource(actor, "health", 5, 10); seedResource(actor, "focus", 1, 4); seedResource(actor, "grit", 1, 3); seedResource(recipient, "health", 7, 10);
   for (const principal of ["source-player", "recipient-player", "third-player"]) {

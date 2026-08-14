@@ -55,7 +55,7 @@ describe("campaign history receipt route", () => {
     process.env.FEATURE_RPG_CAMPAIGN="true";const{app,repo}=setup();repo.getCommandReceipt.mockReturnValue(null as never);repo.getAgentCombatReceipt.mockReturnValue({revisionBefore:3,revisionAfter:4,occurredAt:at,
       resolution:{actionId:"action",legalActionId:"end-turn",kind:"end-turn",actingCombatantId:"enemy",targetIds:[],outcomes:[],roundBefore:1,roundAfter:2,currentCombatantBefore:"enemy",currentCombatantAfter:"hero"}});
     const response=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/commands/combat-command/receipt"});expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({receipt:{kind:"combat",revisionBefore:3,revisionAfter:4,occurredAt:at,roundBefore:1,roundAfter:2}});expect(response.body).not.toContain("end-turn");expect(repo.getCampaignAdministrationReceipt).not.toHaveBeenCalled();await app.close();
+    expect(response.json()).toEqual({receipt:{kind:"combat",revisionBefore:3,revisionAfter:4,occurredAt:at,action:"end-turn",outcome:{kind:"none"},roundBefore:1,roundAfter:2}});expect(response.body).not.toContain("enemy");expect(repo.getCampaignAdministrationReceipt).not.toHaveBeenCalled();await app.close();
   });
   it("returns the exact public travel receipt with no private provider or world identity",async()=>{
     process.env.FEATURE_RPG_CAMPAIGN="true";const{app,repo}=setup();repo.getCommandReceipt.mockReturnValue(null as never);

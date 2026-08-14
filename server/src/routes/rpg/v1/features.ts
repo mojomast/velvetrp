@@ -156,10 +156,10 @@ export interface CampaignListRepository extends
   Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
-  Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">>,
-  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult">>,
+  Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
+  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
   Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
-  Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor">>,
+  Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
   Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
@@ -254,7 +254,7 @@ function logCampaignOperationFailure(
 }
 
 type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
-  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft">
+  "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "rerollCharacterDraft" | "finalizeCharacterDraft">
   & Required<Pick<CampaignListRepository, "getCampaignCharacter" | "listActorResources">>;
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
@@ -293,9 +293,9 @@ type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
 type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">;
-type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage">;
-type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult">;
-type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor">;
+type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
+type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
+type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"placeActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
@@ -307,7 +307,10 @@ type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTu
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
   | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically" | "applyCampaignContentGenerationDraftAtomically">
-  & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>;
+  & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>
+  & Pick<Repository, "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
+    | "getCampaignGenerationContext" | "recordCampaignGenerationCandidate" | "getCampaignGeneratedFoundation"
+    | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -439,12 +442,12 @@ function assertEncounterLifecycleRepository(repository: CampaignListRepository):
       || typeof repository.startEncounter !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertCombatReadRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatReadLaneRepository {
-  if (typeof repository.getCombatState !== "function" || typeof repository.listCombatLogPage !== "function") {
+  if (typeof repository.getCombatState !== "function" || typeof repository.listCombatLogPage !== "function" || typeof repository.listCombatRewards !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
 }
 function assertCombatCommandRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
-  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function")
+  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function"||typeof repository.claimCombatReward!=="function"||typeof repository.listCombatRewards!=="function"||typeof repository.getCombatRewardClaimResult!=="function")
     throw new UnsupportedCampaignRepositoryError();
 }
 type CombatConsumableLaneRepository=Pick<EncounterRepository,"getUseConsumableLegalActions"|"useConsumable"|"getUseConsumableCommandResultByKey">;
@@ -453,7 +456,7 @@ function assertCombatConsumableRepository(repository:CampaignListRepository):ass
     ||typeof repository.getUseConsumableCommandResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertWorldHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&WorldHttpLaneRepository{
-  if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function")throw new UnsupportedCampaignRepositoryError();
+  if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function"||typeof repository.placeActor!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertNpcHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&NpcHttpLaneRepository{
   if(typeof repository.listCampaignNpcs!=="function"||typeof repository.createCampaignNpc!=="function"||typeof repository.changeNpcRelationship!=="function")throw new UnsupportedCampaignRepositoryError();
@@ -486,7 +489,10 @@ function assertCampaignPlayRepository(repository: CampaignListRepository): asser
 }
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
   const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
-    "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration"];
+    "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration",
+    "beginCampaignGenerationCall", "getCampaignGenerationCall", "finishCampaignGenerationCall",
+    "getCampaignGenerationContext", "recordCampaignGenerationCandidate", "getCampaignGeneratedFoundation",
+    "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial"];
   if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 

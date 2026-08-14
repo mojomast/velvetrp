@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Repository Planning Workshop</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="readiness.js" defer></script>
+  <script src="ui-helpers.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">Planning board</p>
+    <h1 id="project-title">Repository Planning Workshop</h1>
+    <p id="project-subtitle">Review scope, priorities, dependencies, risks, and open choices.</p>
+    <p id="status" class="status" role="status">Loading…</p>
+  </header>
+  <main>
+    <section aria-labelledby="intent-heading">
+      <h2 id="intent-heading">Intent</h2>
+      <div id="intent"></div>
+    </section>
+    <section aria-labelledby="scope-heading">
+      <div class="section-heading"><div><h2 id="scope-heading">Scope and priority</h2><p id="summary"></p></div></div>
+      <form class="filters" id="epic-filters">
+        <label>Search epics <input id="search" type="search"></label>
+        <label>Inclusion <select id="inclusion-filter"><option value="all">All</option><option value="included">Included</option><option value="excluded">Excluded</option></select></label>
+        <label>Priority <select id="priority-filter"><option value="all">All</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select></label>
+        <button type="button" id="clear-filters">Clear filters</button>
+      </form>
+      <div id="epic-groups"></div>
+    </section>
+
+    <section aria-labelledby="decisions-heading">
+      <div class="section-heading"><div><h2 id="decisions-heading">Decisions</h2><p>Recommendations are visible guidance and are never selected automatically.</p></div><label><input id="unanswered-only" type="checkbox"> Unanswered only</label></div>
+      <div id="decisions"></div>
+    </section>
+
+    <section aria-labelledby="blockers-heading">
+       <div class="section-heading"><div><h2 id="blockers-heading">Blockers</h2><p>Manifest blockers require a resolution note.</p></div></div>
+      <div id="blockers"></div>
+    </section>
+
+    <section aria-labelledby="notes-heading">
+      <h2 id="notes-heading">Overall notes</h2>
+      <label class="visually-hidden" for="overall-notes">Overall workshop notes</label>
+      <textarea id="overall-notes" rows="5"></textarea>
+    </section>
+
+    <section aria-labelledby="review-heading" class="review-panel">
+      <h2 id="review-heading">Review and save</h2>
+      <div id="readiness" class="readiness"></div>
+      <div class="actions">
+        <button type="button" id="request-ready">Request ready</button>
+        <button type="button" id="save">Save</button>
+        <button type="button" id="reload">Reload</button>
+        <button type="button" id="copy-brief">Copy review brief</button>
+        <button type="button" id="download-brief">Download review brief</button>
+      </div>
+      <p><strong>Review-only export:</strong> the downloaded or copied brief is readable and non-authoritative. Saved JSON state is authoritative.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -9,13 +9,13 @@ import {
 import {
   characterDraftFinalizationResultSchema, characterDraftHttpFinalizationResultSchema, characterDraftHttpViewSchema, characterDraftHttpMutationResultSchema,
   createCharacterDraftHttpInputSchema, updateCharacterDraftHttpInputSchema,
-  createCharacterDraftInputSchema, finalizeCharacterDraftHttpInputSchema,
+  createCharacterDraftInputSchema, finalizeCharacterDraftHttpInputSchema, rerollCharacterDraftHttpInputSchema,
   resourceIdSchema, type ActorResource, type CampaignCharacterRead,
 } from "@velvet/contracts";
 
 export interface CharacterBuilderHttpRoutesOptions {
   characterBuilderRepositoryAccessor: () => Pick<CharacterBuilderRepository,
-    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "finalizeCharacterDraft"> & {
+    "createCharacterDraft" | "getCharacterDraft" | "updateCharacterDraft" | "rerollCharacterDraft" | "finalizeCharacterDraft"> & {
       getCampaignCharacter(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
       listActorResources(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
     };
@@ -27,6 +27,7 @@ const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0
 const BASE = "/campaigns/:campaignId/character-drafts";
 const DETAIL = `${BASE}/:draftId`;
 const FINALIZE = `${DETAIL}/finalize`;
+const REROLL = `${DETAIL}/reroll`;
 
 function queryPresent(request: FastifyRequest): boolean {
   return (request.raw.url ?? request.url).includes("?");
@@ -126,6 +127,24 @@ export const characterBuilderHttpRoutes: FastifyPluginAsync<CharacterBuilderHttp
       const draft = safeDraft(result.draft, request.params.campaignId, request.params.draftId);
       const projected = characterDraftHttpMutationResultSchema.safeParse({ draft, receipt: receiptProjection(result.receipt as unknown as Record<string, unknown>) });
       if (!draft || !projected.success) throw new Error("invalid character draft projection");
+      return reply.send(projected.data);
+    } catch (error) { return mapFailure(request, reply, error); }
+  });
+
+  app.post<{ Params: { campaignId: string; draftId: string }; Body: unknown }>(REROLL, { exposeHeadRoute: false,
+    onRequest: async (req, rep) => { await before(req, rep, true); },
+    errorHandler: (_error, req, rep) => problem(req, rep, 400, "RPG_INVALID_REQUEST", "Character draft reroll request is invalid"),
+  }, async (request, reply) => {
+    const body = rerollCharacterDraftHttpInputSchema.safeParse(request.body);
+    if (!body.success) return problem(request, reply, 400, "RPG_INVALID_REQUEST", "Character draft reroll request is invalid");
+    try {
+      const repository = options.characterBuilderRepositoryAccessor();
+      const existing = safeDraft(repository.getCharacterDraft(LOCAL_OWNER, request.params.draftId), request.params.campaignId, request.params.draftId);
+      if (!existing) return problem(request, reply, 404, "CHARACTER_DRAFT_NOT_FOUND", "Character draft not found");
+      const result = repository.rerollCharacterDraft(LOCAL_OWNER, request.params.draftId, body.data);
+      const draft = safeDraft(result.draft, request.params.campaignId, request.params.draftId);
+      const projected = characterDraftHttpMutationResultSchema.safeParse({ draft, receipt: receiptProjection(result.receipt as unknown as Record<string, unknown>) });
+      if (!draft || !projected.success) throw new Error("invalid character draft reroll projection");
       return reply.send(projected.data);
     } catch (error) { return mapFailure(request, reply, error); }
   });

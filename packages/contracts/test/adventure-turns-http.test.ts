@@ -26,7 +26,7 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     expect(adventureTurnInitialReconcileRequestSchema.parse(locator)).toEqual(locator);
     expect(adventureTurnInitialReconcileRequestSchema.safeParse({ ...locator, declaration: "secret" }).success).toBe(false);
     expect(adventureTurnGetResponseSchema.parse({ turn, proposals: [], confirmation: { state: "none" }, receipts: [],
-      narrationStatus: { status: "completed", text: "Done" }, resumeToken: "v1.dHVybg.ZGlnZXN0" })).toBeTruthy();
+      narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" }, resumeToken: "v1.dHVybg.ZGlnZXN0" })).toBeTruthy();
   });
 
   it("closes and bounds the public SSE vocabulary", () => {

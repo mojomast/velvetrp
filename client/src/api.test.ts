@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
-import { commandActorPower,commandCombatConsumable,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatState,resolveCombatAction } from "./api";
+import { claimCombatReward,commandActorPower,commandCombatConsumable,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatRewardClaimResult,getCombatState,listCombatRewards,resolveCombatAction } from "./api";
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
 import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
 import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./api";
 import { commandNpcPresence, getCampaignPresentCast } from "./api";
-import {canonicalUseConsumableRequestFrame} from "@velvet/contracts";
+import {canonicalCombatRewardClaimRequestFrame,canonicalUseConsumableRequestFrame} from "@velvet/contracts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -55,7 +55,7 @@ describe("M3.7 adventure play API binding", () => {
   const at = "2030-01-01T00:00:00.000Z";
   const turn = { turnId: "turn", campaignId: "campaign", sessionId: "session", actorId: "actor", mode: "original" as const, priorTurnId: null, declaration: "I listen", state: "completed" as const, revision: 1, createdAt: at, updatedAt: at };
   const started = { type: "turn_started" as const, sequence: 0, timestamp: at, payload: { turn } };
-  const terminal = { type: "terminal" as const, sequence: 1, timestamp: at, payload: { outcome: "done" as const, turn, narrationStatus: { status: "completed" as const, text: "Done" }, receipts: [] } };
+  const terminal = { type: "terminal" as const, sequence: 1, timestamp: at, payload: { outcome: "done" as const, turn, narrationStatus: { status: "completed" as const, text: "Done", source: "provider-assisted" as const }, receipts: [] } };
   const binding = { campaignId: "campaign", sessionId: "session", actorId: "actor", turnId: "turn" };
 
   it("strictly parses CRLF chunks, a final unterminated frame, and exactly one terminal", () => {
@@ -82,7 +82,7 @@ describe("M3.7 adventure play API binding", () => {
 
   it("binds bootstrap, GET, confirmation, and stream response headers to exact identities", async () => {
     const bootstrap = { campaignId: "campaign", sessionId: "session", expectedRevision: 7, session: { attached: true, attachedAt: at, active: true, adventureEligible: true }, principal: { role: "player", control: "controlled" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
-    const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done" } };
+    const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" } };
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(bootstrap), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(durable), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ turn: { ...turn, state: "confirmed" }, resumeToken: "v1.dHVybg.ZGVjaXNpb24" }), { status: 200 }))
@@ -115,7 +115,7 @@ describe("M3.7 adventure play API binding", () => {
   });
 
   it("reconciles an exact initial key and rejects a mismatched recovered identity", async () => {
-    const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done" } };
+    const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" } };
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ result: durable }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ result: { ...durable, turn: { ...turn, actorId: "other" } } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock); const locator = { campaignId: "campaign", sessionId: "session", actorId: "actor", idempotencyKey: "initial" };
@@ -314,7 +314,7 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 0 }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(combat), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ entries: [{ logEntryId: "log", sequence: 8, occurredAt: "2030-01-01T00:00:00.000Z", event: { kind: "turn_advanced", combatantId: "one" } }], nextAfterSequence: 8 }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ entries: [{ logEntryId: "log", sequence: 8, occurredAt: "2030-01-01T00:00:00.000Z", event: { kind: "turn_advanced", combatantId: "one" }, narration: "The next combatant acts." }], nextAfterSequence: 8 }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     await getActorPowers("actor"); await getCombatState("combat"); await getCombatLog("combat", { afterSequence: 7, limit: 25 });
     expect(fetchMock.mock.calls.map(([url, init]) => [String(url), (init as RequestInit).cache])).toEqual([
@@ -351,6 +351,35 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
     await expect(commandActorPower("actor",{powerRef:power,targetIds:[],choices:[],expectedRevision:1,idempotencyKey:"self-key"})).resolves.toEqual(powerResponse);
     await expect(getCombatCommandResult("campaign","combat","result-key")).resolves.toEqual(result);
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/rpg/v1/campaigns/campaign/combats/combat/command-results/result-key");
+  });
+
+  it("reads recipient-visible rewards and strictly binds one claim response",async()=>{
+    const reward={rewardBundleId:"bundle",recipientActorId:"actor",createdAt:"2030-01-01T00:00:00.000Z",rewards:[{kind:"currency" as const,currency:{kind:"currency" as const,packId:"pack",packVersion:"1",definitionId:"gold"},amount:25}],claim:{state:"unclaimed" as const}};
+    const command={rewardClaimId:"claim",expectedRevision:2,idempotencyKey:"claim-key"};const claimed={...reward,claim:{state:"claimed" as const,rewardClaimId:"claim",claimedAt:"2030-01-01T00:00:00.000Z"}};
+    const response={reward:claimed,receipt:{idempotencyKey:"claim-key",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"}};
+    const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({rewards:[reward]}),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify(response),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(listCombatRewards("combat")).resolves.toEqual([reward]);await expect(claimCombatReward("combat","bundle","actor",command)).resolves.toEqual(response);
+    expect(fetchMock.mock.calls.map(([url,init])=>[url,(init as RequestInit).method??"GET",(init as RequestInit).cache])).toEqual([["/api/rpg/v1/combats/combat/rewards","GET","no-store"],["/api/rpg/v1/combats/combat/rewards/bundle/claim-commands","POST","no-store"]]);
+  });
+
+  it("rejects claim success mismatched to its actor, bundle, claim, or revision",async()=>{
+    const command={rewardClaimId:"claim",expectedRevision:2,idempotencyKey:"claim-key"},reward={rewardBundleId:"bundle",recipientActorId:"other",createdAt:"2030-01-01T00:00:00.000Z",rewards:[{kind:"currency",currency:{kind:"currency",packId:"pack",packVersion:"1",definitionId:"gold"},amount:25}],claim:{state:"claimed",rewardClaimId:"claim",claimedAt:"2030-01-01T00:00:00.000Z"}};
+    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({reward,receipt:{idempotencyKey:"claim-key",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"}}),{status:200})));
+    await expect(claimCombatReward("combat","bundle","actor",command)).rejects.toThrow(/did not match/);
+  });
+
+  it("reads an exact reward claim result without replay and rejects changed request evidence",async()=>{
+    const claimedAt="2030-01-01T00:00:00.000Z",command={rewardClaimId:"claim",expectedRevision:2,idempotencyKey:"claim-key"};
+    const bytes=new TextEncoder().encode(canonicalCombatRewardClaimRequestFrame({campaignId:"campaign",combatId:"combat",rewardBundleId:"bundle",recipientActorId:"actor",claimedAt,request:command}));
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),(byte)=>byte.toString(16).padStart(2,"0")).join("");
+    const result={reward:{rewardBundleId:"bundle",recipientActorId:"actor",createdAt:claimedAt,rewards:[{kind:"currency",currency:{kind:"currency",packId:"pack",packVersion:"1",definitionId:"gold"},amount:25}],claim:{state:"claimed",rewardClaimId:"claim",claimedAt}},
+      requestBinding:{campaignId:"campaign",combatId:"combat",rewardBundleId:"bundle",recipientActorId:"actor",claimedAt,requestEvidence:command,canonicalRequestDigest:digest},
+      receipt:{idempotencyKey:"claim-key",revisionBefore:2,revisionAfter:3,occurredAt:claimedAt}};
+    const fetchMock=vi.fn().mockImplementation(()=>Promise.resolve(new Response(JSON.stringify(result),{status:200})));vi.stubGlobal("fetch",fetchMock);
+    await expect(getCombatRewardClaimResult("campaign","combat","bundle","actor",command)).resolves.toEqual(result);
+    await expect(getCombatRewardClaimResult("campaign","combat","bundle","actor",{...command,expectedRevision:1})).rejects.toThrow(/exact request/);
+    expect(fetchMock.mock.calls.every(([,init])=>(init as RequestInit).method===undefined)).toBe(true);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rpg/v1/campaigns/campaign/combats/combat/rewards/bundle/claim-results/claim-key");
   });
 });
 

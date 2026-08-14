@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "manifestVersion": 1,
+  "generatedAt": "2026-08-10T00:00:00.000Z",
+  "project": { "displayName": "Repository Planning Workshop", "slug": "repository-planning-workshop" },
+  "intent": { "problem": "Plan a repository change from verified evidence and explicit user choices.", "affectedActors": ["Repository maintainers"], "successSignals": ["The approved plan has evidence-backed, testable milestones."], "constraints": ["Keep planning state isolated from application work."], "nonGoals": ["Implement the approved work during this workshop."], "horizon": "Before implementation begins" },
+  "researchBaseline": {
+    "capturedAt": "2026-08-10T00:00:00.000Z",
+    "head": "0000000000000000000000000000000000000000",
+    "branch": "main",
+    "status": [],
+    "dirtyEvidence": [],
+    "exclusions": [".git"],
+    "commandEvidence": [],
+    "digest": "sha256:a68f5ae8ac558c5ca0d4b95b0058e4099ed0f553c4ece3903fc45be9ca736a15"
+  },
+  "baselineDigest": "sha256:a68f5ae8ac558c5ca0d4b95b0058e4099ed0f553c4ece3903fc45be9ca736a15",
+  "manifestDigest": "sha256:8573ab1c39d84e88efc9a3815772722c41a10f228f9b90e693155953ad90e3d1",
+  "limits": { "overallNotesMax": 8000, "epicNotesMax": 2000, "decisionCustomMax": 2000, "blockerNoteMax": 2000 },
+  "evidence": [
+    {
+      "id": "EVIDENCE-001", "type": "file-line", "capturedAt": "2026-08-10T00:00:00.000Z", "baselineDigest": "sha256:a68f5ae8ac558c5ca0d4b95b0058e4099ed0f553c4ece3903fc45be9ca736a15", "confidence": "high", "note": "Example evidence for template validation.", "redactedResult": "The project needs a stable planning contract.", "resultTruncated": false,
+      "path": "README.md", "startLine": 1, "endLine": 1, "revision": "0000000000000000000000000000000000000000", "contentSha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "epics": [
+    {
+      "id": "EPIC-001", "title": "Define the core contract", "summary": "Agree on stable inputs, outputs, and ownership boundaries.", "problem": "The planning contract lacks explicit ownership boundaries.", "outcome": "A stable documented contract defines inputs, outputs, and owners.", "acceptanceSignals": ["Contract consumers can identify authoritative writes and outputs."], "classification": "missing", "evidenceIds": ["EVIDENCE-001"], "evidenceMap": { "observation": "The example identifies a need for a stable planning contract.", "hypothesis": "Undefined ownership causes contract churn.", "intervention": "Define the contract before dependent work.", "uncertainty": "Repository-specific owners require research." }, "dependsOnEpicIds": [], "requiredDecisionIds": ["DEC-001"], "initialEnabled": true, "initialDisposition": "Build", "suggestedPriority": "P1", "priorityScore": 6, "effort": "M", "horizon": "First delivery", "externalDependency": null,
+      "priorityBreakdown": { "impact": 3, "riskReduction": 2, "unblocks": 2, "confidence": 2, "costPenalty": -1 },
+      "scope": ["Define inputs, outputs, and ownership."], "exclusions": ["Implementation work"], "risks": ["Ambiguous ownership can create rework."], "changeMap": [{ "boundary": "Contract authority documentation", "confidence": "likely", "reason": "The contract must be documented for consumers." }]
+    },
+    {
+      "id": "EPIC-002", "title": "Build the validation path", "summary": "Add deterministic checks around the core contract.", "problem": "Contract changes can regress without deterministic validation.", "outcome": "Validation rejects invalid contract inputs and accepts valid ones.", "acceptanceSignals": ["Focused tests cover valid and invalid contract cases."], "classification": "missing", "evidenceIds": ["EVIDENCE-001"], "evidenceMap": { "observation": "The example calls for a stable contract.", "hypothesis": "Contract rules need executable checks to remain stable.", "intervention": "Add deterministic validation.", "uncertainty": "The production test boundary requires research." }, "dependsOnEpicIds": ["EPIC-001"], "requiredDecisionIds": [], "initialEnabled": true, "initialDisposition": "Build", "suggestedPriority": "P1", "priorityScore": 5, "effort": "M", "horizon": "After contract definition", "externalDependency": null,
+      "priorityBreakdown": { "impact": 2, "riskReduction": 3, "unblocks": 1, "confidence": 2, "costPenalty": -1 },
+      "scope": ["Validate success and failure cases."], "exclusions": [], "risks": ["Fixtures must represent failure cases."], "changeMap": [{ "boundary": "Validation test suite", "confidence": "likely", "reason": "Validation needs focused coverage." }]
+    },
+    {
+      "id": "EPIC-003", "title": "Prepare a guided rollout", "summary": "Document adoption, observability, and recovery steps.", "problem": "Users cannot safely adopt unoperationalized contract changes.", "outcome": "Operators have documented adoption and recovery steps.", "acceptanceSignals": ["Documentation describes rollout and recovery."], "classification": "missing", "evidenceIds": ["EVIDENCE-001"], "evidenceMap": { "observation": "The example requires rollout guidance.", "hypothesis": "Operational assumptions must be explicit.", "intervention": "Document rollout and recovery.", "uncertainty": "Actual operational dependencies require research." }, "dependsOnEpicIds": ["EPIC-002"], "requiredDecisionIds": [], "initialEnabled": true, "initialDisposition": "Build", "suggestedPriority": "P2", "priorityScore": 2, "effort": "S", "horizon": "Before adoption", "externalDependency": null,
+      "priorityBreakdown": { "impact": 2, "riskReduction": 1, "unblocks": 0, "confidence": 2, "costPenalty": -1 },
+      "scope": ["Document rollout and recovery."], "exclusions": [], "risks": ["Adoption may expose operating assumptions."], "changeMap": [{ "boundary": "Operations documentation", "confidence": "likely", "reason": "The outcome is operational guidance." }]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-001", "title": "Delivery sequence", "prompt": "How should the first delivery be sequenced?", "required": true, "dependsOnDecisionIds": [], "evidenceIds": ["EVIDENCE-001"],
+      "options": [
+        { "id": "DEC-001-OPT-01", "label": "Thin vertical slice", "implementationShape": "Deliver one end-to-end path first.", "benefits": ["Tests the whole path early."], "costsAndRisks": ["Limits initial breadth."], "migrationAndOperations": "Expand after validating the slice.", "evidenceIds": ["EVIDENCE-001"], "dependsOnEpicIds": [], "incompatibleOptionIds": [] },
+        { "id": "DEC-001-OPT-02", "label": "Foundation first", "implementationShape": "Complete shared contracts before UI delivery.", "benefits": ["Reduces contract churn."], "costsAndRisks": ["Delays user feedback."], "migrationAndOperations": "Roll out consumers after contracts stabilize.", "evidenceIds": ["EVIDENCE-001"], "dependsOnEpicIds": ["EPIC-001"], "incompatibleOptionIds": [] },
+        { "id": "DEC-001-OPT-03", "label": "Parallel tracks", "implementationShape": "Develop contracts and consumers concurrently.", "benefits": ["May finish sooner."], "costsAndRisks": ["Increases coordination cost."], "migrationAndOperations": "Integrate tracks behind validation gates.", "evidenceIds": ["EVIDENCE-001"], "dependsOnEpicIds": [], "incompatibleOptionIds": [] }
+      ],
+      "recommendedOptionId": "DEC-001-OPT-01", "recommendationRationale": "An end-to-end slice validates assumptions earliest.",
+      "customAnswer": { "allowed": true, "maxLength": 500, "validation": "single-line" }
+    }
+  ],
+  "blockers": []
+}

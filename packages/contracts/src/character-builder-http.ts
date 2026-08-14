@@ -40,6 +40,10 @@ export const updateCharacterDraftHttpInputSchema = z.object({
   expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema,
   selections: characterBuilderSelectionPatchSchema,
 }).strict();
+export const rerollCharacterDraftHttpInputSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
 
 /** Finalization uses the route's draft identity and does not expose progression policy yet. */
 export const finalizeCharacterDraftHttpInputSchema = z.object({
@@ -102,6 +106,7 @@ export const characterDraftHttpFinalizationResultSchema = z.object({
 export type CharacterDraftHttpView = z.infer<typeof characterDraftHttpViewSchema>;
 export type CreateCharacterDraftHttpInput = z.infer<typeof createCharacterDraftHttpInputSchema>;
 export type UpdateCharacterDraftHttpInput = z.infer<typeof updateCharacterDraftHttpInputSchema>;
+export type RerollCharacterDraftHttpInput = z.infer<typeof rerollCharacterDraftHttpInputSchema>;
 export type FinalizeCharacterDraftHttpInput = z.infer<typeof finalizeCharacterDraftHttpInputSchema>;
 export type CharacterDraftHttpFinalizationCharacter = z.infer<typeof characterDraftHttpFinalizationCharacterSchema>;
 export type CharacterDraftHttpFinalizationSheet = z.infer<typeof characterDraftHttpFinalizationSheetSchema>;

@@ -54,7 +54,7 @@ describe("schema", () => {
     const raw = new DatabaseDriver(path.join(dir, "velvet.sqlite"), { readonly: true });
     const version = raw.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as { value: string };
     const revision = raw.prepare("SELECT value FROM meta WHERE key = 'schemaRevision'").get() as { value: string };
-    expect(version.value).toBe("47");
+    expect(version.value).toBe("53");
     expect(revision.value).toBe("1");
     expect(raw.pragma("journal_mode", { simple: true })).toBe("wal");
     expect(raw.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND (name IN (

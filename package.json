@@ -12,6 +12,8 @@
     "dev": "npm run build --workspace @velvet/contracts && (npm --workspace velvet-mvp-server run dev & npm --workspace velvet-mvp-client run dev & wait)",
     "dev:server": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-server run dev",
     "dev:client": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-client run dev",
+    "planning-board": "node planning-board/server.js",
+    "test:planning-board": "node --test planning-board/test/*.test.js",
     "build": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-server run build && npm --workspace velvet-mvp-client run build",
     "typecheck": "npm run build --workspace @velvet/contracts && npm run typecheck --workspace @velvet/contracts && npm --workspace velvet-mvp-server run typecheck && npm --workspace velvet-mvp-client run typecheck && npm run typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
