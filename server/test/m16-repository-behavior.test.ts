@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CHARACTER_BUILDER_STANDARD_ARRAY, type CharacterBuilderAttributeScores } from "@velvet/contracts";
-import { ActorPowerConflictError, CheckUnavailableError, EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { ActorPowerConflictError, CheckUnavailableError, EffectImmuneError, M16AuthorizationError, M16ConflictError, M16StaleError, PowerInsufficientResourceError, PowerUnavailableError, createRepository, createSession, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
 import { useTmpDataDir } from "./helpers.js";
 
 useTmpDataDir();
@@ -66,7 +66,7 @@ function fixture() {
 }
 
 describe("M1.6 repository behavior", () => {
-  it("reads an actor-only authoritative powers snapshot with progression provenance and M1.6 revision", () => {
+  it("reads an actor-only authoritative powers snapshot with progression provenance and M1.6 revision", async () => {
     const f=fixture();
     const initial=f.repo.getActorPowerSnapshot("local-owner",f.source);
     expect(initial).not.toBeNull();
@@ -89,7 +89,7 @@ describe("M1.6 repository behavior", () => {
     const controllerDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     controllerDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='powers-controller' WHERE campaign_id=? AND actor_id=?").run(f.campaign,f.source);
     controllerDb.prepare("INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json) VALUES(?,?,?,?,?)")
-      .run(f.campaign,f.source,"focus","ability-recovery",JSON.stringify({recovery:"long-rest"}));
+       .run(f.campaign,f.source,"focus","ability-recovery",JSON.stringify({recovery:"long-rest"}));
     const finite=initial!.uses[0]!;
     controllerDb.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)")
       .run(f.campaign,finite.powerRef.packId,finite.powerRef.packVersion,finite.powerRef.kind,finite.powerRef.definitionId);
@@ -109,6 +109,15 @@ describe("M1.6 repository behavior", () => {
     expect(exhausted.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(0);
     expect(exhausted.legalNow.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.reasons).toContain("finite-uses-exhausted");
     expect(exhausted.legalCommands.some((command)=>command.powerRef.definitionId===finite.powerRef.definitionId)).toBe(false);
+    const sessionPersona=f.repo.createCharacter({name:"M16 Session",age:30,archetype:"Guide",boundaries:"",fictionalConfirmed:true});
+    const session=await createSession({characterId:sessionPersona.id,title:"M16 rest session"});
+    const worldDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    worldDb.prepare("UPDATE sessions SET state='active' WHERE id=?").run(session.id);
+    f.repo.attachCampaignSession("local-owner",{campaignId:f.campaign,sessionId:session.id} as any);
+    f.repo.createLocation("local-owner",{campaignId:f.campaign,locationId:"m16-camp",name:"M16 Camp",visibility:"public"});
+    worldDb.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,?,?,0,?)").run(f.campaign,f.source,"m16-camp",session.id,timestamp);
+    worldDb.close();
+    f.repo.establishCamp("local-owner",f.source,{campaignId:f.campaign,expectedRevision:0,idempotencyKey:"m16-camp"});
     f.repo.takeRest("local-owner",{type:"take_long_rest",campaignId:f.campaign,actorId:f.source,expectedRevision:0,idempotencyKey:"recover"});
     expect(f.repo.getActorPowerSnapshot("local-owner",f.source)!.uses.find((state)=>state.powerRef.definitionId===finite.powerRef.definitionId)?.current).toBe(finite.max);
     expect(f.repo.getActorPowerSnapshot("local-owner",f.source)?.revision).toBe(1);

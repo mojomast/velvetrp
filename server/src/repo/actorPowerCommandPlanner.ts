@@ -7,6 +7,27 @@ import {
 type Definition = any;
 export type ActorPowerCommandPlan = ReturnType<typeof actorPowerLegalCommandSchema.parse> & { definition: Definition };
 const key = (value: PowerReference) => `${value.kind}\0${value.packId}\0${value.packVersion}\0${value.definitionId}`;
+const MAGIC_MISSILE = "srd-5.1:spell:magic-missile";
+
+/** Only effects whose actor-power runtime has complete hit semantics may be exposed at range. */
+export function isSupportedRangedSpell(definition: Definition): boolean {
+  const mechanics = definition.mechanics;
+  return definition.reference.kind === "spell" && mechanics.range > 5
+    && (mechanics.target === "enemy" || mechanics.target === "single" || mechanics.target === "ally")
+    && (mechanics.attackType ?? "none") === "none" && (mechanics.saveType ?? "none") === "none"
+    && mechanics.effects.length > 0
+    && mechanics.effects.every((effect: any) => effect.type === "damage" || effect.type === "healing");
+}
+
+/** The starter catalog carries the range/target contract for these spells but
+ * intentionally omits effects until a runtime opts into them. */
+function executableSpellDefinition(definition: Definition): Definition {
+  if (definition.reference.kind !== "spell" || definition.reference.definitionId !== MAGIC_MISSILE
+    || (definition.mechanics.attackType ?? "none") !== "none" || (definition.mechanics.saveType ?? "none") !== "none") return definition;
+  return { ...definition, mechanics: { ...definition.mechanics, effects: Array.from({ length: 3 }, () => ({
+    type: "damage", damageType: "force", dice: { count: 1, sides: 4, modifier: 1 },
+  })) } };
+}
 
 function recoveredAt(db: DatabaseDriver.Database, campaignId: string, actorId: string, recovery: string): string | null {
   if (recovery === "short-rest" || recovery === "long-rest") {
@@ -32,8 +53,34 @@ function hasRequiredResources(db: DatabaseDriver.Database, campaignId: string, a
   });
 }
 
+function preparedSpellReferences(db: DatabaseDriver.Database, campaignId: string, actorId: string): PowerReference[] {
+  const actor = db.prepare(`SELECT actor.sheet_id, class.pack_id, class.pack_version, class.definition_id, class.level
+    FROM campaign_actors actor JOIN rpg_character_classes class
+      ON class.campaign_id=actor.campaign_id AND class.sheet_id=actor.sheet_id AND class.position=0
+    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId, actorId) as {
+      sheet_id: string; pack_id: string; pack_version: string; definition_id: string; level: number;
+    } | undefined;
+  if (!actor) return [];
+  const rows = db.prepare(`SELECT definition.definition_json FROM campaign_catalog_current_pins pin
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='class-level'`)
+    .all(campaignId, actor.pack_id, actor.pack_version) as Array<{ definition_json: string }>;
+  for (const row of rows) {
+    try {
+      const value = JSON.parse(row.definition_json);
+      if (value.mechanics?.level === actor.level
+        && value.mechanics.classRef?.definitionId === actor.definition_id
+        && value.mechanics.classRef?.packId === actor.pack_id
+        && value.mechanics.classRef?.packVersion === actor.pack_version) {
+        return (value.mechanics.preparedSpellRefs ?? []) as PowerReference[];
+      }
+    } catch { /* malformed catalog rows are ignored by the normal planner */ }
+  }
+  return [];
+}
+
 /** Shared read/write planner. It performs no mutation and is safe inside either transaction mode. */
-export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: string, actorId: string): ActorPowerCommandPlan[] {
+export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: string, actorId: string, includePreparedSpells = false): ActorPowerCommandPlan[] {
   const rows = db.prepare(`SELECT known.kind,known.pack_id,known.pack_version,known.definition_id,visibility.public_definition_json
     FROM campaign_actors actor JOIN character_known_powers_v23 known ON known.campaign_character_id=actor.campaign_character_id
     JOIN campaign_catalog_current_pins pin ON pin.campaign_id=actor.campaign_id AND pin.pack_id=known.pack_id AND pin.pack_version=known.pack_version
@@ -49,10 +96,22 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
     WHERE actor.campaign_id=? ORDER BY actor.id`).all(campaignId) as Array<{ actor_id: string; actor_kind:string; label: string | null }>;
   const publicTarget = (row: typeof targetRows[number]) => ({ actorId: row.actor_id,
     ...(typeof row.label === "string" && row.label.trim().length > 0 && row.label.trim().length <= 200 ? { label: row.label.trim() } : {}) });
+  const prepared = includePreparedSpells ? preparedSpellReferences(db, campaignId, actorId) : [];
+  const knownKeys = new Set(rows.map((row) => `${row.kind}\0${row.pack_id}\0${row.pack_version}\0${row.definition_id}`));
+  const preparedRows = prepared.filter((reference) => !knownKeys.has(key(reference))).map((reference) => ({
+    kind: reference.kind, pack_id: reference.packId, pack_version: reference.packVersion, definition_id: reference.definitionId,
+    public_definition_json: (db.prepare(`SELECT visibility.public_definition_json FROM campaign_catalog_current_pins pin
+      JOIN rpg_catalog_definition_visibility visibility ON visibility.pack_id=pin.pack_id AND visibility.pack_version=pin.pack_version
+        AND visibility.kind=? AND visibility.definition_id=? AND visibility.publicly_reachable=1
+      WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=?`).get(
+        reference.kind, reference.definitionId,
+        campaignId, reference.packId, reference.packVersion) as { public_definition_json: string } | undefined)?.public_definition_json ?? "",
+  }));
   const plans: ActorPowerCommandPlan[] = [];
-  for (const row of rows) {
+  for (const row of [...rows, ...preparedRows]) {
     const reference = powerReferenceSchema.parse({ kind: row.kind, packId: row.pack_id, packVersion: row.pack_version, definitionId: row.definition_id });
-    const definition: Definition = row.kind === "ability" ? abilityCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json)) : spellCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json));
+    if (!row.public_definition_json) continue;
+    const definition: Definition = executableSpellDefinition(row.kind === "ability" ? abilityCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json)) : spellCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json)));
     if (key(definition.reference) !== key(reference)) continue;
     const persistent = definition.mechanics.effects.filter((effect: any) => effect.type === "condition" || (effect.type === "modifier" && effect.duration !== "instant")).length;
     if (persistent > 1) continue;
@@ -69,21 +128,21 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
     }
     if (reference.kind === "spell" && definition.reference.kind === "spell" && definition.mechanics.level > 0) {
       const slotId = `slot-${definition.mechanics.level}`;
-      const slot = db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?").get(campaignId, actorId, slotId) as { current: number } | undefined;
+      const slot = db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name IN (?,?) ORDER BY CASE name WHEN ? THEN 0 ELSE 1 END LIMIT 1").get(campaignId, actorId, slotId, `spell-${slotId}`, slotId) as { current: number } | undefined;
       if (!slot || slot.current < 1) continue;
       costs.push({ kind: "slot", slotId, amount: 1 });
     }
     const targeting = definition.mechanics.target;
     // Outside combat, campaign player characters are the only authoritative ally set.
     // Enemy powers remain unavailable until the combat command path supports powers.
-    if (targeting === "enemy") continue;
+    if (targeting === "enemy" && reference.definitionId !== MAGIC_MISSILE && !isSupportedRangedSpell(definition)) continue;
     const validRows = (targeting === "self" ? targetRows.filter((target) => target.actor_id === actorId)
-      : targetRows.filter((target) => target.actor_id !== actorId && (targeting!=="ally"||target.actor_kind==="player-character")
+      : targetRows.filter((target) => target.actor_id !== actorId && (targeting !== "ally" || target.actor_kind === "player-character")
         && hasRequiredResources(db, campaignId, target.actor_id, definition))).slice(0,32);
     if (targeting === "self" && !hasRequiredResources(db, campaignId, actorId, definition)) continue;
     if (validRows.length === 0) continue;
     const effectKinds = [...new Set(definition.mechanics.effects.map((effect: any) => effect.type))];
-    const publicTargeting=targeting==="ally"?"single":targeting;
+    const publicTargeting=targeting==="ally"||targeting==="enemy"?"single":targeting;
     const maxTargets=publicTargeting==="self"?0:publicTargeting==="single"?1:validRows.length;
     const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting:publicTargeting, validTargets: validRows.map(publicTarget), maxTargets,costs,
       concentration: definition.reference.kind === "spell" ? definition.mechanics.concentration : false, effectKinds });

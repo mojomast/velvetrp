@@ -15,7 +15,7 @@ function stable(value: unknown): unknown {
 export const canonicalProgressionJson = (value: unknown): string => JSON.stringify(stable(value));
 export function canonicalStarterProgressionProfile(mode: "xp" | "milestone", rulesProfileId: string = STARTER_PROGRESSION_RULES_PROFILE_ID) {
   if (rulesProfileId === SRD_STARTER_PROGRESSION_RULES_PROFILE_ID) return { profileId: srdStarterProgressionProfileId(mode),
-    rulesProfileId, mode, maxLevel: 2, thresholds: STARTER_PROGRESSION_THRESHOLDS.slice(0, 2) } as const;
+    rulesProfileId, mode, maxLevel: STARTER_PROGRESSION_THRESHOLDS.length, thresholds: STARTER_PROGRESSION_THRESHOLDS } as const;
   return { profileId: starterProgressionProfileId(mode), rulesProfileId: STARTER_PROGRESSION_RULES_PROFILE_ID,
     mode, maxLevel: STARTER_PROGRESSION_THRESHOLDS.length, thresholds: STARTER_PROGRESSION_THRESHOLDS } as const;
 }

@@ -4,6 +4,7 @@ import {
   characterBuilderAllocationRequestSchema,
   characterBuilderAllocationSchema,
   characterBuilderPointBuyCost,
+  characterDraftViewSchema,
   characterDerivedCalculatorInputSchema,
   createCharacterDraftInputSchema,
 } from "../src/index.js";
@@ -34,5 +35,17 @@ describe("character builder contracts", () => {
       allocation: { method: "server-roll", results: [18] }, idempotencyKey: "key", privateNotes: "not a sheet concern" })).toThrow();
     expect(() => characterDerivedCalculatorInputSchema.parse({ scores: standardScores, racialBonuses: {}, classHp: 10,
       raceSpeed: 30, proficiencyBonus: 2, spellcastingAttribute: "resolve", maxHp: 999 })).toThrow();
+  });
+
+  it("models an optional exact prepared-spells group without changing legacy groups", () => {
+    const spell = { kind: "spell" as const, packId: "pack", packVersion: "1", definitionId: "bless" };
+    const group = { id: "prepared-spells" as const, required: true as const, options: [{ reference: spell, name: "Bless", description: "A blessing." }] };
+    expect(group.options[0]!.reference).toEqual(spell);
+    expect(() => characterDraftViewSchema.shape.choiceGroups.parse([
+      { id: "race", required: true, options: [{ reference: { kind: "race", packId: "pack", packVersion: "1", definitionId: "race" }, name: "Human", description: "A race." }] },
+      { id: "background", required: true, options: [{ reference: { kind: "background", packId: "pack", packVersion: "1", definitionId: "background" }, name: "Sage", description: "A background." }] },
+      { id: "class", required: true, options: [{ reference: { kind: "class", packId: "pack", packVersion: "1", definitionId: "class" }, name: "Cleric", description: "A class." }] },
+      { id: "starter-grant", required: true, options: ["kit", "currency"] }, group,
+    ])).not.toThrow();
   });
 });

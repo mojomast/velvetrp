@@ -13,6 +13,11 @@ export type ExactReference = CatalogDefinitionReference;
 export const progressionReferenceKey = (reference: ExactReference): string =>
   `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`;
 
+/** Metadata-only features can still carry safe HP/proficiency progression. */
+export const isExecutableClassLevel = (level: { tags: readonly string[] }): boolean =>
+  !level.tags.some((tag) =>
+    tag === "martial-archetype-gate" || tag === "subclass-gate" || tag === "feat-gate" || tag === "multiclass-gate");
+
 export interface ResolvedInitialPower {
   reference: Extract<ExactReference, { kind: "ability" | "spell" }>;
   source: "race" | "class-level";
@@ -41,7 +46,8 @@ export function resolveSelectedClassProgression(input: {
       throw new Error("selected class progression level has a mismatched class owner");
     }
     return parsed.data;
-  });
+  }).filter(isExecutableClassLevel);
+  if (!levels.length) throw new Error("selected class has no executable progression levels");
   const byLevel = new Map<number, (typeof levels)[number]>();
   const choiceIds = new Set<string>();
   for (const level of levels) {

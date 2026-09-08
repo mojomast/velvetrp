@@ -703,19 +703,32 @@ export function createCharacterBuilderWriteRepository(
           db.prepare(
             "INSERT INTO campaign_actor_private_state (actor_id,campaign_id,controller_principal_id,private_notes) VALUES (?,?,?,NULL)",
           ).run(actorId, row.campaign_id, row.controller_principal_id);
-          db.prepare(
-            "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,'health',?,?)",
-          ).run(row.campaign_id, actorId, derived.maxHp, derived.maxHp);
-          if (row.rules_profile_id === SRD_5_1_STARTER_RULES_PROFILE_ID) {
-            if (chosen.klass.reference.definitionId !== "srd-5.1:class:fighter" || chosen.klass.mechanics.hitDie !== 10) {
-              throw new CharacterBuilderUnavailableError("SRD rest resources require the supported d10 Fighter class");
-            }
-            const resourceInsert = db.prepare(
-              "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)",
-            );
-            resourceInsert.run(row.campaign_id, actorId, "hit-dice-d10", 1, 1);
-            resourceInsert.run(row.campaign_id, actorId, "exhaustion", 0, 6);
-          }
+           db.prepare(
+             "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,'health',?,?)",
+           ).run(row.campaign_id, actorId, derived.maxHp, derived.maxHp);
+           const raceResourceGrants = chosen.race.mechanics.resourceGrants ?? [];
+           const classResourceGrants = chosen.level.mechanics.resourceGrants ?? [];
+           const resourceGrants = new Map<string, { currentIncrease: number; maxIncrease: number }>();
+           for (const grant of [...raceResourceGrants, ...classResourceGrants]) {
+             const resourceId = grant.resourceId.replace(/^spell-slot-/, "slot-");
+             if (resourceId === "health") throw new CharacterBuilderUnavailableError("race resource grant cannot replace health");
+             const prior = resourceGrants.get(resourceId);
+             resourceGrants.set(resourceId, {
+               currentIncrease: (prior?.currentIncrease ?? 0) + grant.currentIncrease,
+               maxIncrease: (prior?.maxIncrease ?? 0) + grant.maxIncrease,
+             });
+           }
+           const insertResourceGrant = (resourceId: string, current: number, maximum: number) => db.prepare(
+             "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)",
+           ).run(row.campaign_id, actorId, resourceId, current, maximum);
+           for (const [resourceId, grant] of resourceGrants) insertResourceGrant(resourceId, grant.currentIncrease, grant.maxIncrease);
+           if (row.rules_profile_id === SRD_5_1_STARTER_RULES_PROFILE_ID) {
+             insertResourceGrant(`hit-dice-d${chosen.klass.mechanics.hitDie}`, 1, 1);
+             if (!resourceGrants.has("slot-1") && chosen.level.mechanics.preparedSpellRefs?.length) {
+               insertResourceGrant("slot-1", 2, 2);
+             }
+             insertResourceGrant("exhaustion", 0, 6);
+           }
           db.prepare(
             `INSERT INTO character_derived_snapshots_v19 (draft_id,campaign_id,campaign_character_id,sheet_id,actor_id,calculator_version,derived_json,created_at) VALUES (?,?,?,?,?,'velvet-character-derived-v1',?,?)`,
           ).run(
@@ -737,8 +750,10 @@ export function createCharacterBuilderWriteRepository(
               packVersion: chosen.klass.reference.packVersion,
               definitionId: chosen.klass.reference.definitionId,
             },
-            derived,
-            now,
+             derived,
+             preparedSpells: selections.preparedSpells,
+             preparedSpellSource: chosen.level.reference,
+             now,
             mode: normalized.progressionMode ?? "xp",
           });
           const grantInsert = db.prepare(
@@ -892,6 +907,9 @@ export function createCharacterBuilderWriteRepository(
               throw new CharacterBuilderUnavailableError(
                 "selection is not in the draft's exact pins",
               );
+          for (const reference of update.selections.preparedSpells ?? [])
+            if (!definitions.some((value) => value.reference.kind === "spell" && reads.refKey(value.reference) === reads.refKey(reference)))
+              throw new CharacterBuilderUnavailableError("prepared spell is not in the draft's exact pins");
           const selections = characterBuilderSelectionsSchema.parse({
             ...characterBuilderSelectionsSchema.parse(
               JSON.parse(row.selections_json),

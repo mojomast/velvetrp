@@ -10,6 +10,8 @@ import {
   classCatalogDefinitionSchema,
   classLevelCatalogDefinitionSchema,
   raceCatalogDefinitionSchema,
+  abilityCatalogDefinitionSchema,
+  spellCatalogDefinitionSchema,
   resourceIdSchema,
   utcIsoTimestampSchema,
   type CatalogDefinition,
@@ -28,6 +30,8 @@ type RaceCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "ra
 type BackgroundCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "background" } }>;
 type ClassCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class" } }>;
 type ClassLevelCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class-level" } }>;
+type SpellCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "spell" } }>;
+type AbilityCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "ability" } }>;
 export interface CharacterBuilderAuthority { role: Role; ownerPrincipalId: string }
 export interface CharacterBuilderCatalogContext { rulesProfileId: string; pins: CharacterDraftPin[]; definitions: CatalogDefinition[]; }
 
@@ -46,6 +50,8 @@ export interface CharacterBuilderReadRepository {
   selectedDefinitions(definitions: CatalogDefinition[], selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>): {
     race: RaceCatalogDefinition; background: BackgroundCatalogDefinition; klass: ClassCatalogDefinition; level: ClassLevelCatalogDefinition;
   } | null;
+  preparedSpellDefinitions(definitions: CatalogDefinition[], selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>): SpellCatalogDefinition[];
+  raceAbilityDefinitions(race: RaceCatalogDefinition, definitions: CatalogDefinition[]): AbilityCatalogDefinition[] | null;
   grantsFor(background: BackgroundCatalogDefinition, choice: "kit" | "currency"): CharacterStartingGrant[];
   samePins(current: CharacterBuilderCatalogContext, rulesProfileId: string, pins: CharacterDraftPin[]): boolean;
   viewMappers: CharacterBuilderViewMappers;
@@ -99,14 +105,14 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
     const rows = db.prepare(`SELECT pin.position,pin.pack_id,pin.pack_version,publication.manifest_digest,publication.validation_level,pack.sealed,pack.rules_profile_id FROM campaign_catalog_current_pins pin LEFT JOIN rpg_content_pack_publications publication ON publication.pack_id=pin.pack_id AND publication.pack_version=pin.pack_version LEFT JOIN rpg_content_packs pack ON pack.pack_id=pin.pack_id AND pack.pack_version=pin.pack_version WHERE pin.campaign_id=? ORDER BY pin.position`).all(campaignId) as Array<{ position: number; pack_id: string; pack_version: string; manifest_digest: string | null; validation_level: string | null; sealed: number | null; rules_profile_id: string | null }>;
     if (!rows.length || rows.some((row, index) => row.position !== index || row.validation_level !== "validated-v1" || row.sealed !== 1 || row.rules_profile_id !== selection.rules_profile_id)) throw new CharacterBuilderUnavailableError("campaign validated-v1 pins are incomplete");
     const pins = rows.map((row) => characterDraftPinSchema.parse({ packId: row.pack_id, packVersion: row.pack_version, publicationDigest: row.manifest_digest }));
-    const definitions: CatalogDefinition[] = []; const statement = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind IN ('race','background','class','class-level') ORDER BY kind COLLATE BINARY,definition_id COLLATE BINARY`);
+    const definitions: CatalogDefinition[] = []; const statement = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind IN ('race','background','class','class-level','spell','ability') ORDER BY kind COLLATE BINARY,definition_id COLLATE BINARY`);
     for (const pin of pins) for (const row of statement.all(pin.packId, pin.packVersion) as Array<{ definition_json: string }>) definitions.push(catalogDefinitionSchema.parse(JSON.parse(row.definition_json)));
     if (!definitions.some((value) => value.reference.kind === "race") || !definitions.some((value) => value.reference.kind === "background") || !definitions.some((value) => value.reference.kind === "class")) throw new CharacterBuilderUnavailableError("campaign catalog has no complete builder choices");
     return { rulesProfileId: selection.rules_profile_id, pins, definitions };
   };
   /** Reads the exact validated builder definitions represented by immutable draft pins. */
   const catalogForPins = (rulesProfileId: string, pins: CharacterDraftPin[]): CatalogDefinition[] => {
-    const definitions: CatalogDefinition[] = []; const statement = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions definition JOIN rpg_content_pack_publications publication ON publication.pack_id=definition.pack_id AND publication.pack_version=definition.pack_version JOIN rpg_content_packs pack ON pack.pack_id=publication.pack_id AND pack.pack_version=publication.pack_version WHERE definition.pack_id=? AND definition.pack_version=? AND publication.validation_level='validated-v1' AND publication.manifest_digest=? AND pack.sealed=1 AND pack.rules_profile_id=? AND definition.kind IN ('race','background','class','class-level') ORDER BY definition.kind COLLATE BINARY,definition.definition_id COLLATE BINARY`);
+    const definitions: CatalogDefinition[] = []; const statement = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions definition JOIN rpg_content_pack_publications publication ON publication.pack_id=definition.pack_id AND publication.pack_version=definition.pack_version JOIN rpg_content_packs pack ON pack.pack_id=definition.pack_id AND pack.pack_version=definition.pack_version WHERE definition.pack_id=? AND definition.pack_version=? AND publication.validation_level='validated-v1' AND publication.manifest_digest=? AND pack.sealed=1 AND pack.rules_profile_id=? AND definition.kind IN ('race','background','class','class-level','spell','ability') ORDER BY definition.kind COLLATE BINARY,definition.definition_id COLLATE BINARY`);
     for (const pin of pins) for (const row of statement.all(pin.packId, pin.packVersion, pin.publicationDigest, rulesProfileId) as Array<{ definition_json: string }>) definitions.push(catalogDefinitionSchema.parse(JSON.parse(row.definition_json)));
     return definitions;
   };
@@ -114,18 +120,43 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
   const refKey = (reference: { packId: string; packVersion: string; kind: string; definitionId: string }): string => `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`;
   /** Resolves the selected race, background, class, and its unique level-one definition. */
   const selectedDefinitions = (definitions: CatalogDefinition[], selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>): { race: RaceCatalogDefinition; background: BackgroundCatalogDefinition; klass: ClassCatalogDefinition; level: ClassLevelCatalogDefinition } | null => {
-    if (!selections.race || !selections.background || !selections.class || !selections.starterGrant) return null;
+    if (!selections.race || !selections.background || !selections.class) return null;
     const map = new Map(definitions.map((definition) => [refKey(definition.reference), definition])); const race = raceCatalogDefinitionSchema.safeParse(map.get(refKey(selections.race))); const background = backgroundCatalogDefinitionSchema.safeParse(map.get(refKey(selections.background))); const klass = classCatalogDefinitionSchema.safeParse(map.get(refKey(selections.class)));
     if (!race.success || !background.success || !klass.success) return null;
     const levels = klass.data.mechanics.levelRefs.map((reference) => classLevelCatalogDefinitionSchema.safeParse(map.get(refKey(reference)))).filter((value): value is { success: true; data: ClassLevelCatalogDefinition } => value.success).filter((value) => value.data.mechanics.level === 1 && refKey(value.data.mechanics.classRef) === refKey(klass.data.reference));
-    return levels.length === 1 ? { race: race.data, background: background.data, klass: klass.data, level: levels[0]!.data } : null;
+    if (levels.length !== 1) return null;
+    if (!raceAbilityDefinitions(race.data, definitions)) return null;
+    return { race: race.data, background: background.data, klass: klass.data, level: levels[0]!.data };
+  };
+  /** Resolves every race power through the same exact pinned catalog closure. */
+  const raceAbilityDefinitions = (race: RaceCatalogDefinition, definitions: CatalogDefinition[]): AbilityCatalogDefinition[] | null => {
+    const map = new Map(definitions.map((definition) => [refKey(definition.reference), definition]));
+    const resolved = race.mechanics.abilityRefs.map((reference) => abilityCatalogDefinitionSchema.safeParse(map.get(refKey(reference))));
+    return resolved.every((value): value is { success: true; data: AbilityCatalogDefinition } => value.success)
+      ? resolved.map((value) => value.data) : null;
+  };
+  /** Resolves only the selected class's level-one preparation references for the UI. */
+  const preparedSpellDefinitions = (definitions: CatalogDefinition[], selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>): SpellCatalogDefinition[] => {
+    if (!selections.class) return [];
+    const map = new Map(definitions.map((definition) => [refKey(definition.reference), definition]));
+    const klass = classCatalogDefinitionSchema.safeParse(map.get(refKey(selections.class)));
+    if (!klass.success) return [];
+    const level = klass.data.mechanics.levelRefs
+      .map((reference) => classLevelCatalogDefinitionSchema.safeParse(map.get(refKey(reference))))
+      .filter((value): value is { success: true; data: ClassLevelCatalogDefinition } => value.success)
+      .find((value) => value.data.mechanics.level === 1 && refKey(value.data.mechanics.classRef) === refKey(klass.data.reference));
+    if (!level?.data.mechanics.preparedSpellRefs?.length) return [];
+    return level.data.mechanics.preparedSpellRefs
+      .map((reference) => spellCatalogDefinitionSchema.safeParse(map.get(refKey(reference))))
+      .filter((value): value is { success: true; data: SpellCatalogDefinition } => value.success)
+      .map((value) => value.data);
   };
   /** Builds the starting grants granted by the selected background option. */
   const grantsFor = (background: BackgroundCatalogDefinition, choice: "kit" | "currency"): CharacterStartingGrant[] => choice === "kit" ? background.mechanics.itemRefs.map((reference) => characterStartingGrantSchema.parse({ kind: "item", reference, quantity: 1, source: "background-kit" })) : [characterStartingGrantSchema.parse({ kind: "currency", reference: background.mechanics.startingCurrency.currency, amount: background.mechanics.startingCurrency.amount, source: "background-currency" })];
   /** Compares draft pins to the campaign's current content selection. */
   const samePins = (current: CharacterBuilderCatalogContext, rulesProfileId: string, pins: CharacterDraftPin[]): boolean => current.rulesProfileId === rulesProfileId && canonicalCatalogJson(current.pins) === canonicalCatalogJson(pins);
   /** Supplies row mappers with catalog collaborators without importing command orchestration. */
-  const viewMappers: CharacterBuilderViewMappers = { catalogForPins: (_db, rulesProfileId, pins) => catalogForPins(rulesProfileId, pins), pinsMatchCurrent: (_db, campaignId, rulesProfileId, pins) => samePins(currentCatalog(campaignId), rulesProfileId, pins), selectedDefinitions, grantsFor };
+  const viewMappers: CharacterBuilderViewMappers = { catalogForPins: (_db, rulesProfileId, pins) => catalogForPins(rulesProfileId, pins), pinsMatchCurrent: (_db, campaignId, rulesProfileId, pins) => samePins(currentCatalog(campaignId), rulesProfileId, pins), selectedDefinitions, preparedSpellDefinitions, raceAbilityDefinitions, grantsFor };
   /** Finds a draft and confirms that the actor may view or control it. */
   const getAuthorized = (actorPrincipalId: string, draftId: string): { row: DraftRow; auth: CharacterBuilderAuthority } | null => { const actor = resourceIdSchema.parse(actorPrincipalId); const id = resourceIdSchema.parse(draftId); const row = rowFor(db, id); if (!row) return null; const auth = authority(actor, row.campaign_id); return !auth || !mayControl(actor, auth, row.controller_principal_id) ? null : { row, auth }; };
   /** Reads the actor-authorized current public view for a character draft. */
@@ -138,5 +169,5 @@ export function createCharacterBuilderReadRepository(db: DatabaseDriver.Database
     if (row.draft_id !== found.row.id || row.command_id !== id || row.campaign_id !== found.row.campaign_id || receipt.draftId !== found.row.id || receipt.commandId !== id) throw new Error("character draft receipt path binding is malformed");
     return receipt;
   };
-  return { authority, mayControl, validateController, validatePersona, currentCatalog, catalogForPins, refKey, selectedDefinitions, grantsFor, samePins, viewMappers, getAuthorized, getCharacterDraft, getCharacterDraftReceipt };
+  return { authority, mayControl, validateController, validatePersona, currentCatalog, catalogForPins, refKey, selectedDefinitions, preparedSpellDefinitions, raceAbilityDefinitions, grantsFor, samePins, viewMappers, getAuthorized, getCharacterDraft, getCharacterDraftReceipt };
 }

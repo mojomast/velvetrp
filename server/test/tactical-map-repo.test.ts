@@ -264,6 +264,22 @@ describe("D&D tactical movement economy", () => {
     } finally { db.close(); repo.close(); }
   });
 
+  it("binds opportunity results to the persisted movement transition and replays idempotently", async () => {
+    const { repo, campaignId, sessionId, actorId, combat, request, db } = await dndMapFixture(true);
+    try {
+      const preview = repo.previewTacticalMapMove("reader", campaignId, sessionId, "combat", { ...request, destination: { x: 3, y: 1 } });
+      const move = { ...request, destination: { x: 3, y: 1 }, previewId: preview.previewId, idempotencyKey: "reaction-move" };
+      const result = repo.moveTacticalMapToken("reader", campaignId, sessionId, "combat", move);
+      const transition = db.prepare("SELECT transition_id,movement_key,reaction_results_json FROM combat_movement_transitions_v63 WHERE encounter_id=? AND movement_key=?")
+        .get(combat.combatId, move.idempotencyKey) as { transition_id: string; movement_key: string; reaction_results_json: string };
+      expect(transition.transition_id).toBeTruthy();
+      expect(transition.movement_key).toBe(move.idempotencyKey);
+      expect(JSON.parse(transition.reaction_results_json)).toEqual([]);
+      expect(repo.moveTacticalMapToken("reader", campaignId, sessionId, "combat", move).receipt).toEqual(result.receipt);
+      expect(db.prepare("SELECT count(*) AS count FROM combat_movement_transitions_v63 WHERE encounter_id=?").get(combat.combatId)).toEqual({ count: 1 });
+    } finally { db.close(); repo.close(); }
+  });
+
   it("charges difficult terrain from the authoritative path", async () => {
     const { repo, campaignId, sessionId, actorId, generation, request, db } = await dndMapFixture();
     try {

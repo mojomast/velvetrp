@@ -28,6 +28,7 @@ import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
 import { buildCombatActionPlans, isDndCombat, readCombatTurnEconomy } from "./combatActionPlan.js";
 import { buildUseConsumableLegalActions, mayActForConsumable, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
+import { readReactionAvailability } from "./opportunityAttackRuntime.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
@@ -195,11 +196,12 @@ export function createEncounterReadRepository(
         && (!turnEconomy || turnEconomy.combatantId !== current.combatant_id || turnEconomy.round !== encounter.round_number)) {
       throw new Error("D&D combat turn economy is unavailable or stale");
     }
-    const legalActions = buildCombatActionPlans(db, principal, encounter.campaign_id, combatId,
-      encounter.current_turn_combatant_id).map((plan) => ({
-        legalActionId: plan.legalActionId, kind: plan.kind, targetIds: plan.targetIds, ...(turnEconomy?{cost:plan.cost}:{}),
-      }));
-    const combat = combatStateSchema.parse({
+     const legalActions = buildCombatActionPlans(db, principal, encounter.campaign_id, combatId,
+       encounter.current_turn_combatant_id).map((plan) => ({
+       legalActionId: plan.legalActionId, kind: plan.kind, targetIds: plan.targetIds, ...(turnEconomy?{cost:plan.cost}:{}),
+     }));
+     const dndCombat = isDndCombat(db, encounter.campaign_id);
+     const combat = combatStateSchema.parse({
       combatId,
       round: encounter.round_number,
       currentCombatant: encounter.current_turn_combatant_id,
@@ -207,13 +209,13 @@ export function createEncounterReadRepository(
         ...publicCombatant(row),
         hitPoints: row.hit_points,
         maximumHitPoints: row.maximum_hit_points,
-        temporaryHitPoints: row.temporary_hit_points,
-        conditions: combatConditions(combatId, row.combatant_id, encounter.round_number),
+         ...(dndCombat ? { temporaryHitPoints: row.temporary_hit_points, conditions: combatConditions(combatId, row.combatant_id, encounter.round_number) } : {}),
         status: row.status,
         ...(row.actor_id !== null && row.survival_successes !== null ? { deathSaves: { successes: row.survival_successes, failures: row.survival_failures } } : {}),
       })),
       legalActions,
-      ...(isDndCombat(db,encounter.campaign_id)?{turnEconomy}:{}),
+       ...(isDndCombat(db,encounter.campaign_id)?{turnEconomy}:{}),
+       ...(isDndCombat(db,encounter.campaign_id)?{reactionAvailability:readReactionAvailability(db,combatId,encounter.round_number)}:{}),
       revision: encounter.revision,
     });
     return { campaignId: encounter.campaign_id, encounterId: encounter.encounter_id, ...combat };
@@ -240,11 +242,22 @@ export function createEncounterReadRepository(
     const current = encounter?.current_turn_combatant_id && db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(encounterId, encounter.current_turn_combatant_id) as any;
     if (!current?.actor_id || !controls(principal, campaignId, current.actor_id)) return null;
     const plans=buildCombatActionPlans(db,principal,campaignId,encounterId,current.combatant_id);
-    const actions: any[] = plans.flatMap((plan)=>plan.kind==="attack"
-      ?[{kind:"attack",attackId:"basic_attack",targetCombatantIds:plan.targetIds}]
-      :plan.kind==="flee"?[{kind:"flee"}]:[{kind:"end-turn"}]);
+    const actions: any[] = plans.flatMap((plan) => {
+      // Keep this projection one-to-one with the command kinds accepted by the
+      // public allowlist. Unsupported plan kinds are intentionally omitted.
+      if (plan.kind === "attack") return [{ kind: "attack", attackId: plan.legalActionId, attackType: plan.attackType, targetCombatantIds: plan.targetIds,
+        ...(plan.targetEvidence ? { targetEvidence: plan.targetEvidence } : {}) }];
+      if (plan.kind === "grapple") return [{ kind: "grapple", targetCombatantIds: plan.targetIds }];
+      if (plan.kind === "escape-grapple") return [{ kind: "escape-grapple" }];
+      if (plan.kind === "help") return [{ kind: "help", targetCombatantIds: plan.targetIds }];
+      if (plan.kind === "dash" || plan.kind === "disengage" || plan.kind === "hide" || plan.kind === "flee" || plan.kind === "end-turn")
+        return [{ kind: plan.kind }];
+      return [];
+    });
     const revision = (db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId) as any)?.revision;
-    return legalCombatActionAllowlistSchema.parse({ campaignId, encounterId, combatantId: current.combatant_id, revision: revision ?? 0, issuedAt: utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()), actions });
+    return legalCombatActionAllowlistSchema.parse({ campaignId, encounterId, combatantId: current.combatant_id, revision: revision ?? 0,
+      issuedAt: utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()), actions,
+      coverEvidence: plans.flatMap((plan) => plan.targetEvidence ?? []) });
   };
   /** Projects only schema-valid public entries from the immutable combat audit log. */
   const listCombatLog = (principal: string, campaignId: string, encounterId: string): unknown[] => {

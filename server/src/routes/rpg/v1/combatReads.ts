@@ -39,12 +39,13 @@ export const combatReadsHttpRoutes:FastifyPluginAsync<CombatReadsHttpOptions>=as
     try{
       const combat=options.combatRepositoryAccessor().getCombatState(LOCAL_OWNER,combatId.data);
       if(combat===null)return notFound(request,reply);
-      const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","turnEconomy","revision"]);
+       const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","turnEconomy","reactionAvailability","revision"]);
       if(Object.keys(combat).some((key)=>!allowed.has(key))
         ||combat.combatId!==combatId.data||combat.encounterId!==combatId.data||!resourceIdSchema.safeParse(combat.campaignId).success)
         throw new Error("combat state binding is invalid");
-      return reply.code(200).send(combatReadResponseSchema.parse({round:combat.round,currentCombatant:combat.currentCombatant,
-        combatants:combat.combatants,legalActions:combat.legalActions,turnEconomy:combat.turnEconomy,revision:combat.revision}));
+       return reply.code(200).send(combatReadResponseSchema.parse({round:combat.round,currentCombatant:combat.currentCombatant,
+         combatants:combat.combatants,legalActions:combat.legalActions,turnEconomy:combat.turnEconomy,
+         reactionAvailability:combat.reactionAvailability,revision:combat.revision}));
     }catch(error){
       if(error instanceof EncounterAuthorizationError)return notFound(request,reply);
       request.log.error({operation:"combat-read",method:request.method,route:request.routeOptions.url},"RPG combat read failed");

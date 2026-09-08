@@ -230,6 +230,9 @@ import {
   useConsumableLegalActionSchema,
   canonicalUseConsumableRequestFrame,
   canonicalCombatRewardClaimRequestFrame,
+  directCombatPowerCandidatesResponseSchema,
+  directCombatPowerCommandRequestSchema,
+  directCombatPowerCommandResponseSchema,
 } from "@velvet/contracts";
 import type {
   CombatActionCommandRequest,
@@ -252,6 +255,9 @@ import type {
   UseConsumableCommandRequest,
   UseConsumableCommandResult,
   UseConsumableLegalAction,
+  DirectCombatPowerCandidate,
+  DirectCombatPowerCommandRequest,
+  DirectCombatPowerCommandResponse,
 } from "@velvet/contracts";
 import {
   characterDraftHttpFinalizationResultSchema,
@@ -1806,6 +1812,11 @@ export async function getCombatConsumableActions(combatId:string):Promise<UseCon
   const actions=useConsumableLegalActionSchema.array().parse(success.body);
   return actions;
 }
+
+export async function getDirectCombatPowerActions(combatId:string):Promise<DirectCombatPowerCandidate[]>{const target=combatPath(combatId);const success=await requestResponse<unknown>(`${target.path}/power-actions`,{cache:"no-store"});requireStatus(success,200,"Combat power actions");return directCombatPowerCandidatesResponseSchema.parse(success.body).candidates;}
+export async function commandDirectCombatPower(combatId:string,input:DirectCombatPowerCommandRequest):Promise<DirectCombatPowerCommandResponse>{const target=combatPath(combatId),body=parseApiInput(()=>directCombatPowerCommandRequestSchema.parse(input));const success=await requestResponse<unknown>(`${target.path}/power-actions/commands`,{method:"POST",cache:"no-store",body:JSON.stringify(body)});requireStatus(success,200,"Combat power command");const response=directCombatPowerCommandResponseSchema.parse(success.body);if(JSON.stringify(response.request)!==JSON.stringify(body))throw new Error("Combat power result did not match the exact request");return response;}
+/** Reads an immutable power result and never retries its command. */
+export async function getDirectCombatPowerResult(combatId:string,input:DirectCombatPowerCommandRequest):Promise<DirectCombatPowerCommandResponse>{const target=combatPath(combatId),body=parseApiInput(()=>directCombatPowerCommandRequestSchema.parse(input));const success=await requestResponse<unknown>(`${target.path}/power-actions/results/${encodeURIComponent(body.idempotencyKey)}`,{cache:"no-store"});requireStatus(success,200,"Combat power result");const response=directCombatPowerCommandResponseSchema.parse(success.body);if(JSON.stringify(response.request)!==JSON.stringify(body))throw new Error("Combat power result did not match the exact request");return response;}
 
 export async function commandCombatConsumable(combatId:string,input:UseConsumableCommandRequest):Promise<UseConsumableCommandResult>{
   const target=combatPath(combatId),body=parseApiInput(()=>useConsumableCommandRequestSchema.parse(input));

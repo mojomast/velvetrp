@@ -66,9 +66,16 @@ export const attributeIdSchema = z.enum([
 ]);
 export const actionCostSchema = z.enum(["action", "bonus-action", "reaction", "passive"]);
 export const recoverySchema = z.enum(["none", "short-rest", "long-rest", "encounter"]);
-export const damageTypeSchema = z.enum(["physical", "bludgeoning", "piercing", "slashing", "fire", "frost", "storm", "radiant", "shadow"]);
+export const damageTypeSchema = z.enum(["physical", "bludgeoning", "piercing", "slashing", "fire", "frost", "cold", "force", "storm", "radiant", "shadow"]);
 export const equipmentSlotSchema = z.enum(["hand", "body", "focus", "accessory"]);
 export const targetSchema = z.enum(["self", "ally", "enemy", "single", "area"]);
+const srdSizeSchema = z.enum(["Small", "Medium"]);
+const srdSenseSchema = z.object({ kind: z.enum(["darkvision"]), rangeFeet: z.number().int().min(1).max(120) }).strict();
+const srdSpellSchoolSchema = z.enum(["abjuration", "conjuration", "divination", "enchantment", "evocation", "illusion", "necromancy", "transmutation"]);
+const srdSpellCastingTimeSchema = z.enum(["action", "bonus-action", "reaction", "1-minute", "10-minutes", "1-hour"]);
+const srdSpellDurationSchema = z.enum(["instantaneous", "1-round", "1-minute", "10-minutes", "1-hour", "8-hours", "concentration"]);
+const srdSpellSaveSchema = z.enum(["none", "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]);
+const srdSpellAttackSchema = z.enum(["none", "melee", "ranged"]);
 
 const modifierEffectSchema = z.object({
   type: z.literal("modifier"),
@@ -112,7 +119,13 @@ const typedBase = <Kind extends z.infer<typeof catalogDefinitionKindSchema>>(kin
 
 export const raceCatalogDefinitionSchema = z.object({
   ...typedBase("race"),
-  mechanics: z.object({ speed: z.number().int().min(1).max(100), attributeBonuses: z.partialRecord(attributeIdSchema, z.number().int().min(-5).max(5)), abilityRefs: z.array(abilityCatalogReferenceSchema).max(16) }).strict(),
+  mechanics: z.object({ size: srdSizeSchema.optional(), speed: z.number().int().min(1).max(100), attributeBonuses: z.partialRecord(attributeIdSchema, z.number().int().min(-5).max(5)), abilityRefs: z.array(abilityCatalogReferenceSchema).max(16),
+    languages: z.array(z.string().trim().min(1).max(64)).max(16).optional(), proficiencies: z.array(z.string().trim().min(1).max(128)).max(16).optional(),
+    damageResistances: z.array(z.enum(["acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic", "piercing", "poison", "psychic", "radiant", "slashing", "thunder"])).max(8).optional(),
+    senses: z.array(srdSenseSchema).max(8).optional(),
+    resourceGrants: z.array(z.object({ resourceId: resourceIdSchema, maxIncrease: z.number().int().min(1).max(100), currentIncrease: z.number().int().min(0).max(100) }).strict()
+      .refine((value) => value.currentIncrease <= value.maxIncrease, "current increase cannot exceed max increase")).max(8).optional(),
+  }).strict(),
 }).strict();
 export const backgroundCatalogDefinitionSchema = z.object({
   ...typedBase("background"),
@@ -131,6 +144,8 @@ export const classLevelCatalogDefinitionSchema = z.object({
     hpGain: z.number().int().min(1).max(100),
     abilityRefs: z.array(abilityCatalogReferenceSchema).max(32),
     spellRefs: z.array(spellCatalogReferenceSchema).max(32),
+    /** Prepared spells are intentionally separate from executable known powers. */
+    preparedSpellRefs: z.array(spellCatalogReferenceSchema).max(16).optional(),
     /** Closed advancement choices. These select catalog identities only; they
      * are deliberately not executable rules or a multiclass vocabulary. */
     progressionChoices: z.array(z.object({
@@ -163,7 +178,8 @@ export const abilityCatalogDefinitionSchema = z.object({
   ...typedBase("ability"), mechanics: z.object({ actionCost: actionCostSchema, recovery: recoverySchema, uses: z.number().int().min(0).max(100), target: targetSchema, effects: starterEffectsSchema }).strict(),
 }).strict();
 export const spellCatalogDefinitionSchema = z.object({
-  ...typedBase("spell"), mechanics: z.object({ level: z.number().int().min(0).max(9), actionCost: actionCostSchema, range: z.number().int().min(0).max(10_000), target: targetSchema, concentration: z.boolean(), effects: starterEffectsSchema }).strict(),
+  ...typedBase("spell"), mechanics: z.object({ level: z.number().int().min(0).max(9), school: srdSpellSchoolSchema.optional(), castingTime: srdSpellCastingTimeSchema.optional(), actionCost: actionCostSchema, range: z.number().int().min(0).max(10_000), target: targetSchema, duration: srdSpellDurationSchema.optional(), attackType: srdSpellAttackSchema.optional(), saveType: srdSpellSaveSchema.optional(), concentration: z.boolean(), ritual: z.boolean().optional(),
+    components: z.object({ verbal: z.boolean(), somatic: z.boolean(), material: z.boolean(), materialDescription: z.string().trim().min(1).max(256).optional() }).strict().optional(), ammunition: z.string().trim().min(1).max(128).optional(), effects: starterEffectsSchema }).strict(),
 }).strict();
 
 export const srdDamageTypeSchema = z.enum([
@@ -233,6 +249,17 @@ export const srdWeaponProfileSchema = z.object({
     }
   }
 });
+/** Closed metadata for tools. Tool effects remain unsupported unless another
+ * runtime explicitly implements them. */
+export const srdToolProfileSchema = z.object({
+  kind: z.literal("tool"),
+  proficiency: z.string().trim().min(1).max(128),
+}).strict();
+/** Ammunition is inventory state, not an executable weapon effect. */
+export const srdAmmunitionProfileSchema = z.object({
+  kind: z.literal("ammunition"),
+  weaponCategory: z.enum(["simple", "martial"]),
+}).strict();
 
 const srdArmorBaseShape = {
   kind: z.literal("armor"),
@@ -254,7 +281,7 @@ export const srdArmorProfileSchema = z.discriminatedUnion("category", [
 export const srdItemEngineDetailsSchema = z.object({
   rulesEngine: z.literal(SRD_5_1_RULES_ENGINE),
   weightPounds: z.number().min(0).max(100_000),
-  equipmentProfile: z.union([srdWeaponProfileSchema, srdArmorProfileSchema]).nullable(),
+  equipmentProfile: z.union([srdWeaponProfileSchema, srdArmorProfileSchema, srdToolProfileSchema, srdAmmunitionProfileSchema]).nullable(),
 }).strict();
 export const itemCatalogDefinitionSchema = z.object({
   ...typedBase("item"), mechanics: z.object({

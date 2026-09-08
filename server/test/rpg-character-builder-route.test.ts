@@ -94,6 +94,19 @@ describe("isolated character draft HTTP lane", () => {
     expect(response.statusCode, response.body).toBe(200); expect(repo.updateCharacterDraft).toHaveBeenCalledOnce();
     expect(repo.updateCharacterDraft).toHaveBeenCalledWith("local-owner", "draft-1", expect.objectContaining({ expectedRevision: 0, idempotencyKey: "idem-2" })); await app.close();
   });
+  it("passes the exact prepared-spell multi-select patch to the repository", async () => {
+    const repo = repository(); const app = await appFor(repo);
+    const preparedSpells = [
+      { kind: "spell", packId: "pack-1", packVersion: "1.0.0", definitionId: "bless" },
+      { kind: "spell", packId: "pack-1", packVersion: "1.0.0", definitionId: "cure-wounds" },
+    ];
+    const response = await app.inject({ method: "PATCH", url: "/api/rpg/v1/campaigns/campaign-1/character-drafts/draft-1", payload: {
+      expectedRevision: 0, idempotencyKey: "idem-prepared-spells", selections: { preparedSpells },
+    }, headers: { "content-type": "application/json" } });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(repo.updateCharacterDraft).toHaveBeenCalledWith("local-owner", "draft-1", expect.objectContaining({ selections: { preparedSpells } }));
+    await app.close();
+  });
   it("binds rerolls to the exact campaign, draft revision, and idempotency key", async () => {
     const repo = repository(); const app = await appFor(repo);
     const response = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign-1/character-drafts/draft-1/reroll", payload: {

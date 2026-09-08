@@ -21,6 +21,27 @@ const scores = Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((i
 ])) as CharacterBuilderAttributeScores;
 
 describe("campaign-bound SRD 5.1 starter", () => {
+  it("requires the exact Cleric preparation set and finalizes slot capacity without granting inert powers", () => {
+    const repo = createRepository();
+    const campaign = repo.createCampaign("local-owner", { name: "Cleric preparation" });
+    repo.installSrdStarterCatalog("local-owner");
+    repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "cleric-pins" });
+    const persona = repo.createCharacter({ name: "Cleric", age: 30, archetype: "Cleric", boundaries: "", fictionalConfirmed: true });
+    const created = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: "cleric-draft" });
+    const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+    const cleric = definitions.find((entry) => entry.reference.definitionId === "srd-5.1:class:cleric")!;
+     const spells = definitions.filter((entry) => ["srd-5.1:spell:bless", "srd-5.1:spell:cure-wounds", "srd-5.1:spell:healing-word"].includes(entry.reference.definitionId)).map((entry) => entry.reference);
+    const incomplete = repo.updateCharacterDraft("local-owner", created.draft.id, { expectedRevision: 0, idempotencyKey: "cleric-base", selections: { race: definitions.find((entry) => entry.reference.kind === "race")!.reference, background: definitions.find((entry) => entry.reference.kind === "background")!.reference, class: cleric.reference, starterGrant: "kit" } } as never);
+    expect(incomplete.draft.completion.issues).toContainEqual(expect.objectContaining({ code: "missing-prepared-spells" }));
+    const selected = repo.updateCharacterDraft("local-owner", created.draft.id, { expectedRevision: 1, idempotencyKey: "cleric-spells", selections: { preparedSpells: spells } } as never);
+    expect(selected.draft.completion.complete).toBe(true);
+    const finalized = repo.finalizeCharacterDraft("local-owner", created.draft.id, { expectedRevision: 2, idempotencyKey: "cleric-final" });
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    expect(db.prepare("SELECT name,current,max FROM rpg_actor_resources WHERE actor_id=? AND name='slot-1'").get(finalized.receipt.actorId)).toEqual({ name: "slot-1", current: 2, max: 2 });
+     expect(db.prepare("SELECT COUNT(*) count FROM character_known_powers_v23 WHERE campaign_character_id=? AND kind='spell'").get(finalized.receipt.campaignCharacterId)).toEqual({ count: 3 });
+    db.close(); repo.close();
+  });
+
   it("shares live armor and shield AC between gameplay, sheet and combat without rewriting snapshots", async () => {
     process.env.FEATURE_RPG_CAMPAIGN = "true";
     process.env.FEATURE_RPG_MECHANICS = "true";

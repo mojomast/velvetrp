@@ -106,7 +106,7 @@ export const actorInventoryHttpRoutes: FastifyPluginAsync<ActorInventoryHttpOpti
       if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Actor inventory command request is invalid");
       try {
         const result = options.inventoryRepositoryAccessor().mutateInventoryForActor(LOCAL_OWNER, campaignId.data, actorId.data, body.data);
-        const { expectedRevision: _expectedRevision, ...command } = body.data;
+          const { expectedRevision: _expectedRevision, ...command } = body.data;
         return reply.code(200).send(inventoryHttpCommandResponseSchema.parse({
           inventory: {
             entries: result.inventory.inventory.items,

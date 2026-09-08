@@ -2141,9 +2141,9 @@ CREATE TRIGGER rpg_progression_profiles_v24_canonical_insert BEFORE INSERT ON rp
         OR (NEW.profile_id='velvet:progression:starter-v1:milestone' AND NEW.rules_profile_id='velvet:rules:starter-v1' AND NEW.mode='milestone'
           AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='472a70b91437947fda61ff36a6bf618f92de21d77560bc51218e437d5b8d0a13')
         OR (NEW.profile_id='srd-5.1:progression:fighter-1-2-v1:xp' AND NEW.rules_profile_id='srd-5.1:rules:starter-v1' AND NEW.mode='xp'
-          AND NEW.max_level=2 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300}]' AND NEW.profile_digest='56d140e11f4990b8a6478369c3984e6a7f68388130e8b8617c6e63e8219a047a')
+          AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='21b11e49b055b610a4f78b8203c6c3c0636db8d81ee9ab2bf82ea467daf16f8f')
         OR (NEW.profile_id='srd-5.1:progression:fighter-1-2-v1:milestone' AND NEW.rules_profile_id='srd-5.1:rules:starter-v1' AND NEW.mode='milestone'
-          AND NEW.max_level=2 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300}]' AND NEW.profile_digest='c5260eaeb7d96964297d747a76d1356fa412a84665ddf9c0443f75757f1ce734'))
+          AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='7ce9e28caeab2e6d1404ea9be4a81023fa4e62b69dc010537626aadb155ea10f'))
        BEGIN SELECT RAISE(ABORT,'progression profile requires canonical server provenance'); END;
 CREATE TRIGGER character_progression_v24_require_campaign_provenance BEFORE INSERT ON character_progression_v23
       WHEN NOT EXISTS(SELECT 1 FROM rpg_progression_profiles_v23 profile
@@ -2233,15 +2233,20 @@ CREATE TABLE rpg_inventory_entries_v25 (
       item_kind TEXT NOT NULL CHECK(item_kind='item'), item_definition_id TEXT NOT NULL,
       entry_mode TEXT NOT NULL CHECK(entry_mode IN ('stackable','instanced')),
       quantity INTEGER NOT NULL CHECK(typeof(quantity)='integer' AND quantity BETWEEN 1 AND 9007199254740991),
-      instance_key TEXT, slot_key TEXT CHECK(slot_key IS NULL OR (length(slot_key) BETWEEN 1 AND 128 AND slot_key=trim(slot_key))),
+       instance_key TEXT, slot_key TEXT CHECK(slot_key IS NULL OR (length(slot_key) BETWEEN 1 AND 128 AND slot_key=trim(slot_key))),
+       hand_key TEXT CHECK(hand_key IS NULL OR hand_key IN ('main','off')),
+       grip_key TEXT CHECK(grip_key IS NULL OR grip_key IN ('one-handed','two-handed')),
       equipped INTEGER NOT NULL DEFAULT 0 CHECK(typeof(equipped)='integer' AND equipped IN (0,1)),
        created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
       CHECK((entry_mode='stackable' AND instance_key IS NULL) OR (entry_mode='instanced' AND instance_key IS NOT NULL AND quantity=1)),
-      CHECK(equipped=0 OR slot_key IS NOT NULL), UNIQUE(campaign_id,actor_id,instance_key),
+       CHECK(equipped=0 OR slot_key IS NOT NULL),
+       CHECK(equipped=0 OR slot_key!='hand' OR (grip_key IS NULL OR hand_key IS NOT NULL)),
+       UNIQUE(campaign_id,actor_id,instance_key),
       FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
        FOREIGN KEY(campaign_id,item_pack_id,item_pack_version,item_kind,item_definition_id) REFERENCES rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
     );
-CREATE UNIQUE INDEX uq_rpg_inventory_entries_v25_equipped_slot ON rpg_inventory_entries_v25(campaign_id,actor_id,slot_key) WHERE equipped=1;
+ CREATE UNIQUE INDEX uq_rpg_inventory_entries_v25_equipped_slot ON rpg_inventory_entries_v25(campaign_id,actor_id,slot_key) WHERE equipped=1 AND slot_key!='hand';
+ CREATE UNIQUE INDEX uq_rpg_inventory_entries_v25_equipped_hand ON rpg_inventory_entries_v25(campaign_id,actor_id,hand_key) WHERE equipped=1 AND hand_key IS NOT NULL;
 CREATE INDEX idx_rpg_inventory_entries_v25_actor ON rpg_inventory_entries_v25(campaign_id,actor_id,created_at);
 CREATE TABLE rpg_campaign_catalog_definitions_v25 (
       campaign_id TEXT NOT NULL, pack_id TEXT NOT NULL, pack_version TEXT NOT NULL,
@@ -2669,6 +2674,26 @@ CREATE TRIGGER combat_turn_economy_v60_guard BEFORE UPDATE ON combat_turn_econom
       BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END;
 CREATE TRIGGER combat_turn_economy_v60_retain BEFORE DELETE ON combat_turn_economy_v60
       BEGIN SELECT RAISE(ABORT,'combat turn economies are retained'); END;
+CREATE TABLE combat_reaction_usage_v63 (
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL, round_number INTEGER NOT NULL,
+      used INTEGER NOT NULL DEFAULT 0 CHECK(used IN(0,1)), used_at TEXT,
+      PRIMARY KEY(encounter_id,combatant_id,round_number),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE combat_disengagement_v63 (
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL, round_number INTEGER NOT NULL, command_id TEXT NOT NULL,
+      PRIMARY KEY(encounter_id,combatant_id,round_number),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(encounter_id,command_id) REFERENCES combat_commands_v27(encounter_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE combat_movement_transitions_v63 (
+      transition_id TEXT PRIMARY KEY, encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL,
+      round_number INTEGER NOT NULL, from_x INTEGER NOT NULL, from_y INTEGER NOT NULL,
+      to_x INTEGER NOT NULL, to_y INTEGER NOT NULL, disengaged INTEGER NOT NULL CHECK(disengaged IN(0,1)),
+      movement_key TEXT NOT NULL, reaction_results_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(reaction_results_json) AND json_type(reaction_results_json)='array'), occurred_at TEXT NOT NULL,
+      UNIQUE(encounter_id,movement_key),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+);
 CREATE TABLE combat_log (
       log_id TEXT PRIMARY KEY CHECK(length(log_id) BETWEEN 1 AND 128 AND log_id NOT GLOB '*[^A-Za-z0-9._:-]*'), encounter_id TEXT NOT NULL, combatant_id TEXT,
       event_id TEXT NOT NULL, log_ordinal INTEGER NOT NULL CHECK(typeof(log_ordinal)='integer' AND log_ordinal BETWEEN 0 AND 1000000),

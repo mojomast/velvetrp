@@ -61,6 +61,7 @@ export { CampaignIntegrationConflictError, CampaignIntegrationForbiddenError, Ca
 export { createAdventurePowerRestRepository, type AdventurePowerRestRepository } from "./adventurePowerRestRepo.js";
 export { createAdventureQuestProgressionRepository, type AdventureQuestProgressionRepository } from "./adventureQuestProgressionRepo.js";
 export { PowerUnavailableError, PowerInsufficientResourceError, ActorPowerNotFoundError, ActorPowerConflictError, ActorPowerInsufficientError, type ActorPowerSnapshot, type PowerRepository } from "./powerRepo.js";
+export { createSpellcastingRepository, SpellcastingUnavailableError, SpellcastingComponentError, SpellcastingRangeError, type SpellcastingRepository, type SpellcastingRepositoryOptions } from "./spellcastingRepo.js";
 export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailableError, EffectImmuneError, type ActorEffectSnapshot, type EffectRepository } from "./effectRepo.js";
 export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
 export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMapStaleError, TacticalMapConflictError, type TacticalMapRepository } from "./tacticalMapRepo.js";

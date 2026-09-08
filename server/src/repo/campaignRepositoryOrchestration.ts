@@ -86,6 +86,7 @@ import { createAdventureCommerceRepository } from "./adventureCommerceRepo.js";
 import { createAdventurePowerRestRepository } from "./adventurePowerRestRepo.js";
 import { createAdventureQuestProgressionRepository } from "./adventureQuestProgressionRepo.js";
 import { createPowerRepository, type PowerRepository } from "./powerRepo.js";
+import { createSpellcastingRepository } from "./spellcastingRepo.js";
 import { createEffectRepository, type EffectRepository } from "./effectRepo.js";
 import { createEncounterRepository, type EncounterRepository } from "./encounterRepo.js";
 import { createWorldRepository, type WorldRepository } from "./worldRepo.js";
@@ -737,6 +738,7 @@ function createRepositoryComposition<T>(
   const adventureInventoryRepository=createAdventureInventoryRepository(db,dependencies,inventoryRepository,m15Guard);
   const adventureCommerceRepository=createAdventureCommerceRepository(db,dependencies,economyRepository,m15Guard);
   const powerRepository=createPowerRepository(db,dependencies,m16Guard);
+  const spellcastingRepository=createSpellcastingRepository(db,powerRepository);
   const effectRepository=createEffectRepository(db,dependencies,m16Guard);
   const actorGameplaySheetReadRepository=createActorGameplaySheetReadRepository(db,{
     campaignActors:campaignActorRepository,resources:actorResourceRepository,inventory:inventoryRepository,
@@ -806,6 +808,7 @@ function createRepositoryComposition<T>(
     ...adventurePowerRestRepository,
     ...adventureQuestProgressionRepository,
     ...powerRepository,
+    ...spellcastingRepository,
     ...effectRepository,
     ...actorGameplaySheetReadRepository,
     ...encounterRepository,

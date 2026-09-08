@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { projectTacticalMap } from "../src/map/projection.js";
+import { lineOfEffectBetween } from "../src/map/geometry.js";
+import { pointKey, tileIndex } from "../src/map/types.js";
 import type { TacticalMap } from "../src/map/types.js";
 
 const map: TacticalMap = {
@@ -16,6 +18,27 @@ const map: TacticalMap = {
 };
 
 describe("tactical map projection", () => {
+  it("resolves clear, partial, and full cover on the authoritative grid ray", () => {
+    const clear = tileIndex({ tiles: [map.tiles[0]!, { ...map.tiles[2]!, position: { x: 2, y: 0 } }] });
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 2, y: 0 }, clear)).toMatchObject({ supported: false, lineOfEffect: "blocked" });
+    const partial = new Map([
+      ["0,0", map.tiles[0]!], ["1,0", map.tiles[1]!],
+      ["2,0", { ...map.tiles[2]!, position: { x: 2, y: 0 }, blocksSight: false, blocksMovement: false }],
+      ["3,0", { ...map.tiles[2]!, position: { x: 3, y: 0 }, blocksSight: false, blocksMovement: false }],
+    ]);
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 3, y: 0 }, partial)).toMatchObject({ supported: true, cover: "three-quarters", lineOfEffect: "blocked" });
+    partial.set("2,0", map.tiles[1]!);
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 3, y: 0 }, partial)).toMatchObject({ supported: true, cover: "full", lineOfEffect: "blocked", blockedBy: [{ x: 1, y: 0 }, { x: 2, y: 0 }] });
+  });
+
+  it("changes legality evidence when the attacker repositions and fails closed for unsupported geometry", () => {
+    const tiles = new Map(map.tiles.map((tile) => [pointKey(tile.position), tile]));
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 2, y: 0 }, tiles).cover).toBe("full");
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 0, y: 0 }, tiles).lineOfEffect).toBe("clear");
+    tiles.delete("1,0");
+    expect(lineOfEffectBetween({ x: 0, y: 0 }, { x: 2, y: 0 }, tiles).supported).toBe(false);
+  });
+
   it("does not leak unexplored topology, movement rules, or hidden tokens", () => {
     const projection = projectTacticalMap(map, {
       visible: new Set(["0,0"]), explored: new Set(["0,0", "1,0"]),

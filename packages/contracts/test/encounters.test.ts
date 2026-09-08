@@ -50,13 +50,15 @@ describe("M1.7 encounter contracts", () => {
     ]) expect(createEncounterCommandSchema.safeParse(invalid).success).toBe(false);
   });
 
-  it("accepts only the six strict action variants without caller mechanics", () => {
+  it("accepts strict player actions without caller mechanics", () => {
     const base = { ...mutation, actionId: "action", combatantId: "fighter", submittedAt: time };
     const actions = [
       { ...base, type: "attack", attackId: "sword", targetCombatantId: "goblin" },
       { ...base, type: "power", powerId: "smite", targetCombatantId: "goblin" },
       { ...base, type: "item", inventoryEntryId: "potion", targetCombatantId: null },
       { ...base, type: "defend" }, { ...base, type: "flee" }, { ...base, type: "end-turn" },
+      { ...base, type: "dash" }, { ...base, type: "disengage" }, { ...base, type: "hide" },
+      { ...base, type: "help", targetCombatantId: "ally" },
     ] as const;
     actions.forEach((action) => expect(combatActionCommandSchema.parse(action)).toEqual(action));
     for (const invalid of [
@@ -79,6 +81,6 @@ describe("M1.7 encounter contracts", () => {
   });
 
   it("publishes the closed action union", () => {
-    expectTypeOf<CombatActionCommand["type"]>().toEqualTypeOf<"attack" | "power" | "item" | "defend" | "flee" | "end-turn">();
+    expectTypeOf<CombatActionCommand["type"]>().toEqualTypeOf<"attack" | "power" | "item" | "defend" | "flee" | "end-turn" | "dash" | "disengage" | "help" | "hide">();
   });
 });

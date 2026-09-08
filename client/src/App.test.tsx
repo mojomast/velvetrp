@@ -1397,6 +1397,17 @@ describe("character builder and advancement safety flows", () => {
     expect(screen.queryByText("Race draft-one")).toBeNull();
   });
 
+  it("shows the selected class prepared-spell group and autosaves its multi-select patch", async () => {
+    const bless = ref("spell", "bless"); const cureWounds = ref("spell", "cure-wounds");
+    const cleric = { ...draft(), selections: { race: ref("race", "race"), background: ref("background", "background"), class: ref("class", "cleric"), starterGrant: "kit", preparedSpells: [] },
+      choiceGroups: [...draft().choiceGroups, { id: "prepared-spells", required: true, options: [{ reference: bless, name: "Bless", description: "A blessing." }, { reference: cureWounds, name: "Cure Wounds", description: "Healing." }] }],
+      completion: { complete: false, issues: [{ code: "missing-prepared-spells", path: "selections.preparedSpells", message: "Select each exact prepared spell" }] } };
+    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(cleric), update: vi.fn().mockResolvedValue({ draft: cleric, receipt: {} }), finalize: vi.fn(), getSheet: vi.fn() } as any;
+    render(<CharacterBuilderPage campaignId="campaign" personas={[{ id: "persona", name: "Persona" }]} initialDraftId="draft-one" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} onEditPersona={vi.fn()} onOpenCharacter={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Bless/ }));
+    await waitFor(() => expect(api.update).toHaveBeenCalledWith("campaign", "draft-one", expect.objectContaining({ selections: { preparedSpells: [bless] } })));
+  });
+
   it("restores only the active campaign draft and clears it on explicit new-builder reopen", async () => {
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-character-builder", campaignId: "campaign-one", characterDraftIds: { "campaign-one": "draft-one", "campaign-two": "draft-two" } }));
     installFetch([aria], [], true, true);

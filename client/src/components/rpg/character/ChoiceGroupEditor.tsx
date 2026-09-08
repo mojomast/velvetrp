@@ -8,7 +8,9 @@ export interface ChoiceGroupEditorProps {
 }
 
 function title(id: CharacterDraftHttpView["choiceGroups"][number]["id"]): string {
-  return id === "starter-grant" ? "Starting grant" : id[0]!.toUpperCase() + id.slice(1);
+  if (id === "starter-grant") return "Starting grant";
+  if (id === "prepared-spells") return "Prepared spells";
+  return id[0]!.toUpperCase() + id.slice(1);
 }
 
 function referenceKey(value: object | null): string {
@@ -28,7 +30,17 @@ export function ChoiceGroupEditor({ groups, selections, disabled = false, onSele
         {group.id === "starter-grant" ? group.options.map((option) => <label key={option}>
           <input type="radio" name="builder-starter-grant" checked={selections.starterGrant === option} onChange={() => onSelect({ starterGrant: option })} />
           <span><strong>{option === "kit" ? "Background kit" : "Starting currency"}</strong><small>{option === "kit" ? "Receive the exact item bundle shown in review." : "Receive the exact currency grant shown in review."}</small></span>
-        </label>) : group.options.map((option) => {
+        </label>) : group.id === "prepared-spells" ? group.options.map((option) => {
+          const selected = selections.preparedSpells.some((reference) => referenceKey(reference) === referenceKey(option.reference));
+          return <label key={referenceKey(option.reference)}>
+            <input type="checkbox" name={`builder-${group.id}`} checked={selected} onChange={(event) => onSelect({
+              preparedSpells: event.target.checked
+                ? [...selections.preparedSpells, option.reference]
+                : selections.preparedSpells.filter((reference) => referenceKey(reference) !== referenceKey(option.reference)),
+            })} />
+            <span><strong><bdi dir="auto">{option.name}</bdi></strong><small><bdi dir="auto">{option.description}</bdi></small></span>
+          </label>;
+        }) : group.options.map((option) => {
           const selected = referenceKey(selections[group.id]) === referenceKey(option.reference);
           return <label key={referenceKey(option.reference)}>
             <input type="radio" name={`builder-${group.id}`} checked={selected} onChange={() => onSelect({ [group.id]: option.reference })} />

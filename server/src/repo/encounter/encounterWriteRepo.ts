@@ -14,7 +14,6 @@ import {
   currencyCatalogDefinitionSchema,
   currencyCodeSchema,
   enemyTemplateCatalogDefinitionSchema,
-  abilityCatalogDefinitionSchema,
   resourceIdSchema,
   utcIsoTimestampSchema,
   type EncounterCommand,
@@ -38,14 +37,16 @@ import {
   EncounterUnavailableError,
 } from "./encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot, EncounterReadRepository } from "./encounterReadRepo.js";
-import { beginDndCombatTurn, buildCombatActionPlans, consumeDndTurnCost, endDndCombatTurn, isDndCombat } from "./combatActionPlan.js";
+import { beginDndCombatTurn, buildCombatActionPlans, buildRangedCombatCandidate, buildThrownCombatCandidate, consumeDndTurnCost, coverArmorClassBonus, endDndCombatTurn, isDndCombat } from "./combatActionPlan.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
-import { executeCombatPower, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
+import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, attackDisadvantageConditions, conditionsFor, interruptConcentrationAfterDamage } from "./combatConditionRuntime.js";
+import { absorbDamage, applyCombatCondition, attackDisadvantageConditions, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
+import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
+import { readReactionAvailability } from "./opportunityAttackRuntime.js";
 
 export type EncounterDependencies={clock:Clock;ids:IdGenerator;rng:RandomNumberGenerator};
 export type EncounterReceipt={commandId:string;idempotencyKey:string;revisionBefore:number;revisionAfter:number;occurredAt:string};
@@ -60,7 +61,8 @@ const member=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare(
 const gm=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(c,p));
 const controls=(db:DatabaseDriver.Database,p:string,c:string,a:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(c,a,p));
 const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"||t==="end_combat"?"grant_rewards":"resolve_action";
-const actionTypes=new Set(["attack","power","item","defend","flee","end-turn"]);
+const actionTypes=new Set(["attack","power","item","defend","flee","end-turn","dash","disengage","help","hide"]);
+const dndCommandTypes=new Set(["attack","dash","disengage","help","hide","flee","end-turn"]);
 
 /** Dependencies required by transactional encounter commands. */
 export interface EncounterWriteDependencies extends EncounterDependencies {
@@ -79,6 +81,8 @@ export interface EncounterWriteRepository {
   mutateEncounter(principal:string, command:EncounterCommand):EncounterResult<{encounterId:string;status:string}>;
   useConsumable(principal:string,input:UseConsumableCommandRequest):UseConsumableCommandResult;
   useCombatPower(principal:string,input:CombatPowerRequest):CombatPowerResult;
+  getCombatPowerLegalActions(principal:string,combatId:string):Array<ReturnType<typeof buildCombatPowerLegalActions>[number]&{revisions:{combat:number;sourceM15:number;sourceM16:number;targetM15:number|null;targetM16:number|null}}>;
+  getCombatPowerResultByKey(principal:string,combatId:string,idempotencyKey:string):{request:CombatPowerRequest;result:CombatPowerResult}|null;
   claimCombatReward(principal:string,combatId:string,rewardBundleId:string,input:{rewardClaimId:string;expectedRevision:number;idempotencyKey:string}):EncounterResult<{encounterId:string;status:string}>;
 }
 
@@ -246,9 +250,10 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
         .find((candidate)=>candidate.legalActionId===command.legalActionId
           ||(legacyRequest!==undefined&&dnd&&command.legalActionId==="attack:basic"&&candidate.kind==="attack"));
       if(!plan)throw new EncounterConflictError("combat action is not legal");
-      if(((plan.kind==="attack"||plan.kind==="stabilize")&&(command.targetIds.length!==1||!plan.targetIds.includes(command.targetIds[0]!)))
-          ||(plan.kind!=="attack"&&plan.kind!=="stabilize"&&command.targetIds.length!==0))
-        throw new EncounterConflictError("combat action targets are not legal");
+       if(((plan.kind==="attack"||plan.kind==="stabilize"||plan.kind==="grapple"||plan.kind==="escape-grapple"||plan.kind==="help")
+              &&(command.targetIds.length!==1||!plan.targetIds.includes(command.targetIds[0]!)))
+            ||(plan.kind!=="attack"&&plan.kind!=="stabilize"&&plan.kind!=="grapple"&&plan.kind!=="escape-grapple"&&plan.kind!=="help"&&command.targetIds.length!==0))
+         throw new EncounterConflictError("combat action targets are not legal");
 
       const at=now(deps);
       let outcome:any=null;
@@ -263,13 +268,22 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
           const sheet=db.prepare(`SELECT actor.sheet_id,progression.level,progression.derived_json FROM campaign_actors actor
             JOIN character_progression_v23 progression ON progression.actor_id=actor.id WHERE actor.campaign_id=? AND actor.id=?`)
             .get(encounter.campaign_id,current.actor_id) as {sheet_id:string;level:number;derived_json:string}|undefined;
-          const strength=sheet&&db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id='strength'")
-            .get(encounter.campaign_id,sheet.sheet_id) as {value:number}|undefined;
-          if(!sheet||!strength)throw new EncounterConflictError("SRD attacker sheet is incomplete");
+          if(!sheet)throw new EncounterConflictError("SRD attacker sheet is incomplete");
           let equipment:ReturnType<typeof resolveSrdEquipment>;
           try{equipment=resolveSrdEquipment(db,encounter.campaign_id,current.actor_id);}catch{throw new EncounterConflictError("SRD weapon is unavailable");}
           const weapon=equipment.weapon;
           if(!weapon)throw new EncounterConflictError("SRD equipped weapon is unavailable");
+           const thrown = weapon.properties.some((value) => value.property === "thrown");
+           const ranged = !thrown && weapon.properties.some((value) => value.property === "ammunition");
+           const thrownCandidate = thrown ? buildThrownCombatCandidate(db, encounter.campaign_id, combatId, current.actor_id, [target.combatant_id]) : null;
+           const rangedCandidate = ranged ? buildRangedCombatCandidate(db, encounter.campaign_id, combatId, current.actor_id, [target.combatant_id]) : null;
+           if (thrown && (!thrownCandidate || !thrownCandidate.targetIds.includes(target.combatant_id)))
+             throw new EncounterConflictError("thrown attack is unavailable at this position or item");
+           if (ranged && (!rangedCandidate || !rangedCandidate.targetIds.includes(target.combatant_id)))
+             throw new EncounterConflictError("ranged attack is unavailable at this position");
+          const ability=db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
+            .get(encounter.campaign_id,sheet.sheet_id,weapon.attackAbility) as {value:number}|undefined;
+          if(!ability)throw new EncounterConflictError("SRD attacker sheet is incomplete");
           let armorClass:number;
           if(target.actor_id){try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}
             catch{throw new EncounterConflictError("SRD target equipment is unavailable");}}
@@ -278,34 +292,79 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
               AND definition.kind=provenance.kind AND definition.definition_id=provenance.definition_id WHERE provenance.combatant_id=?`)
             .get(target.combatant_id) as {definition_json:string}|undefined;armorClass=Number(definition&&JSON.parse(definition.definition_json).mechanics.defense);}
           if(!Number.isInteger(armorClass))throw new EncounterConflictError("SRD target armor class is unavailable");
-          const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
-          const attackRoll=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
-            ? Math.min(firstRoll,deps.rng.integer(1,21)) : firstRoll;
-          const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:strength.value,
-            proficiencyBonus:weapon.proficient?binding.module.proficiencyBonus(sheet.level):0,armorClass});
+             const candidate = thrownCandidate ?? rangedCandidate;
+             const rangeFeet=candidate?.rangeFeetByTarget[target.combatant_id];
+             const cover = candidate?.targetEvidence.find((evidence) => evidence.targetCombatantId === target.combatant_id)?.cover;
+             const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
+             const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
+            const disadvantage=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
+              || (rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0));
+           const attackRoll=disadvantage ? Math.min(firstRoll,deps.rng.integer(1,21)) : firstRoll;
+           const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
+             proficiencyBonus:weapon.proficient?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
           const die=weapon.damage.die;
           const damageRolls=attack.hit?Array.from({length:die.count*(attack.critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
           const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
-            modifier:binding.module.abilityModifier(strength.value),critical:attack.critical}).total:0;
-          const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
+            modifier:binding.module.abilityModifier(ability.value),critical:attack.critical}).total:0;
+            let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
+           if (rangedCandidate?.ammunitionResourceId) {
+             const ammo=db.prepare("SELECT current_ammunition FROM rpg_actor_resource_ammunition_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?")
+               .get(encounter.campaign_id,current.actor_id,rangedCandidate.ammunitionResourceId) as { current_ammunition: number } | undefined;
+             if (!ammo || ammo.current_ammunition < 1) throw new EncounterConflictError("ammunition is unavailable");
+             ammunitionBefore=ammo.current_ammunition; ammunitionAfter=ammo.current_ammunition-1;
+             const changed=db.prepare("UPDATE rpg_actor_resource_ammunition_v25 SET current_ammunition=? WHERE campaign_id=? AND actor_id=? AND resource_name=? AND current_ammunition=?")
+               .run(ammunitionAfter,encounter.campaign_id,current.actor_id,rangedCandidate.ammunitionResourceId,ammunitionBefore);
+              if (changed.changes !== 1) throw new EncounterConflictError("ammunition changed before attack");
+            }
+            let thrownItemBefore: number | undefined, thrownItemAfter: number | undefined;
+            if (thrownCandidate) {
+              const item = db.prepare("SELECT quantity,entry_mode,equipped FROM rpg_inventory_entries_v25 WHERE entry_id=? AND campaign_id=? AND actor_id=?")
+                .get(thrownCandidate.throwableItemEntryId, encounter.campaign_id, current.actor_id) as { quantity: number; entry_mode: string; equipped: number } | undefined;
+              if (!item || item.equipped !== 0 || item.quantity < 1) throw new EncounterConflictError("throwable item is unavailable");
+              thrownItemBefore = item.quantity; thrownItemAfter = item.quantity - 1;
+              const changed = thrownItemAfter === 0
+                ? db.prepare("DELETE FROM rpg_inventory_entries_v25 WHERE entry_id=? AND campaign_id=? AND actor_id=? AND equipped=0 AND quantity=1").run(thrownCandidate.throwableItemEntryId, encounter.campaign_id, current.actor_id)
+                : db.prepare("UPDATE rpg_inventory_entries_v25 SET quantity=quantity-1 WHERE entry_id=? AND campaign_id=? AND actor_id=? AND equipped=0 AND quantity=?").run(thrownCandidate.throwableItemEntryId, encounter.campaign_id, current.actor_id, thrownItemBefore);
+              if (changed.changes !== 1) throw new EncounterConflictError("throwable item changed before attack");
+            }
+           const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
           outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:weapon.damage.type,requested:damage,
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
-            rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,
-            critical:attack.critical,damageRolls};
+             rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,
+             critical:attack.critical,damageRolls,...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
+                 rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
+                 ...(candidate.targetEvidence ? { targetEvidence: candidate.targetEvidence } : {}),
+                 disadvantage, ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
+                ...(thrownCandidate ? { thrownItemEntryId: thrownCandidate.throwableItemEntryId, thrownItemBefore, thrownItemAfter, targetEvidence: thrownCandidate.targetEvidence } : {}) } : {})};
           const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,target.combatant_id,
             target.hit_points-hitPointsAfter,outcome.statusAfter,at);if(concentrationCheck)outcome.concentrationCheck=concentrationCheck;
         }else{const hitPointsAfter=Math.max(0,target.hit_points-1);outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:"physical",requested:1,
           applied:target.hit_points-hitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
           statusBefore:"active",statusAfter:hitPointsAfter===0?"defeated":"active"};}
-      }else if(plan.kind==="stabilize"){
+       }else if(plan.kind==="stabilize"){
         const target=db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND team=? AND combatant_kind='actor' AND status='unconscious'")
           .get(combatId,command.targetIds[0]!,current.team) as any;
         if(!target)throw new EncounterConflictError("combatant cannot be stabilized");
         setSurvival(db,combatId,target.combatant_id,0,0,true);
         outcome={kind:"survival",targetId:target.combatant_id,successes:0,failures:0,statusAfter:"stable",hitPointsBefore:target.hit_points,hitPointsAfter:target.hit_points,statusBefore:target.status};
-      }else if(plan.kind==="death-save"){
+       }else if(plan.kind==="grapple"||plan.kind==="escape-grapple"){
+         const targetId=command.targetIds[0]!;
+         const target=plan.kind==="grapple" ? db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'`)
+           .get(combatId,targetId) as any : db.prepare(`SELECT source_combatant_id combatant_id FROM combat_conditions_v62
+             WHERE encounter_id=? AND combatant_id=? AND condition='grappled' LIMIT 1`).get(combatId,current.combatant_id) as any;
+         if(!target)throw new EncounterConflictError("grapple target is unavailable");
+         if(plan.kind==="escape-grapple" && !conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has("grappled"))
+           throw new EncounterConflictError("combatant is not grappled");
+         const attackerScore=contestScore(db,encounter.campaign_id,current),defenderScore=contestScore(db,encounter.campaign_id,target);
+         const attackerRoll=deps.rng.integer(1,21),defenderRoll=deps.rng.integer(1,21);
+         if(!Number.isInteger(attackerRoll)||attackerRoll<1||attackerRoll>20||!Number.isInteger(defenderRoll)||defenderRoll<1||defenderRoll>20)
+           throw new Error("combat RNG returned an out-of-range contest d20");
+         const success=attackerRoll+attackerScore>=defenderRoll+defenderScore;
+         if(plan.kind==="grapple"&&success) outcome={kind:"contest",targetId,contest:"grapple",attackerRoll,defenderRoll,success,condition:"grappled"};
+         else outcome={kind:"contest",targetId:current.combatant_id,contest:"escape-grapple",attackerRoll,defenderRoll,success};
+       }else if(plan.kind==="death-save"){
         const roll=deps.rng.integer(1,21);if(!Number.isInteger(roll)||roll<1||roll>20)throw new Error("combat RNG returned an out-of-range d20");
         const prior=survival(db,combatId,current.combatant_id),failures=Math.min(3,prior.failures+(roll===1?2:roll<10?1:0)),successes=Math.min(3,prior.successes+(roll>=10&&roll!==20?1:0));
         const statusAfter=roll===20?"active":failures===3?"dead":successes===3?"stable":"unconscious",hitPointsAfter=roll===20?1:current.hit_points;
@@ -321,7 +380,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(outcome?.kind==="damage"||outcome?.kind==="survival")stateOverrides.set(outcome.targetId,outcome.statusAfter);
       else if(outcome?.kind==="status")stateOverrides.set(current.combatant_id,"fled");
       const plannedAdvance=planTurnAdvance(db,combatId,encounter,current.combatant_id,stateOverrides);
-      const advancesTurn=plan.kind!=="attack"||!dnd||plannedAdvance.nextId===null;
+       const keepsTurn=["attack","dash","disengage","help","hide"].includes(plan.kind) && dnd;
+       const advancesTurn=!keepsTurn||plannedAdvance.nextId===null;
       const turnPlan=advancesTurn?plannedAdvance:{event:null,nextId:current.combatant_id,round:encounter.round_number};
       const combatantChanges:CombatantStateChange[]=(outcome?.kind==="damage"||outcome?.kind==="survival")?[{combatantId:outcome.targetId,
         hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusBefore:outcome.statusBefore,
@@ -334,12 +394,18 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
         combatantChanges});
       const commandId=id(deps),actionId=id(deps);
       const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
-      beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
-        {kind:"action_resolved",actionId,action:plan.kind},"action",0);
+       beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
+         {kind:"action_resolved",actionId,action:plan.kind},"action",0);
+       if(plan.kind==="grapple"&&outcome?.success)
+         applyCombatCondition(db,combatId,outcome.targetId,"grappled",current.combatant_id,commandId,null,at);
+       if(plan.kind==="escape-grapple"&&outcome?.success)
+         removeCombatCondition(db,combatId,current.combatant_id,"grappled");
       if(outcome?.kind==="damage"||outcome?.kind==="survival")recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
       else if(outcome?.kind==="status")recordStateEvent(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
       executeCombatCompositionPlan(db,compositionPlan);
-      if(dnd&&plan.cost)consumeDndTurnCost(db,combatId,current.combatant_id,plan.cost);
+       if(dnd&&plan.cost)consumeDndTurnCost(db,combatId,current.combatant_id,plan.cost);
+       if(dnd&&plan.kind==="disengage") db.prepare(`INSERT INTO combat_disengagement_v63(encounter_id,combatant_id,round_number,command_id)
+         VALUES(?,?,?,?) ON CONFLICT(encounter_id,combatant_id,round_number) DO NOTHING`).run(combatId,current.combatant_id,encounter.round_number,commandId);
       if(advancesTurn)persistTurnAdvance(db,deps,combatId,turnPlan,at,commandId,after);
       advanceRevision(db,combatId,after,at);
       const combat=deps.reads.getCombatState(p,combatId);
@@ -379,47 +445,25 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(!isDndCombat(db,encounter.campaign_id))throw new EncounterConflictError("enemy turn is only available for D&D combat");
       const current=db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(combatId,encounter.current_turn_combatant_id) as any;
       if(!current||current.combatant_kind!=="enemy")throw new EncounterTurnError("current turn is not an enemy");
-      const provenance=db.prepare(`SELECT p.pack_id,p.pack_version,p.definition_id,d.definition_json FROM encounter_enemy_provenance_v31 p
-        JOIN rpg_catalog_definitions d ON d.pack_id=p.pack_id AND d.pack_version=p.pack_version AND d.kind=p.kind AND d.definition_id=p.definition_id
-        WHERE p.combatant_id=?`).get(current.combatant_id) as any;
-       if(!provenance)throw new EncounterConflictError("enemy provenance is unavailable");
-       const enemy=enemyTemplateCatalogDefinitionSchema.parse(JSON.parse(provenance.definition_json));
-       const profile=enemy.mechanics.combatProfile;
-       const pinned=Boolean(db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25 WHERE campaign_id=?
-         AND pack_id=? AND pack_version=? AND kind='enemy-template' AND definition_id=?`).get(encounter.campaign_id,
-           provenance.pack_id,provenance.pack_version,provenance.definition_id));
-       if(!pinned||enemy.reference.packId!==provenance.pack_id||enemy.reference.packVersion!==provenance.pack_version
-         ||enemy.reference.definitionId!==provenance.definition_id||!profile
-         ||enemy.mechanics.abilityRefs.length!==1||enemy.mechanics.abilityRefs[0]!.packId!==profile.attack.abilityRef.packId
-         ||enemy.mechanics.abilityRefs[0]!.packVersion!==profile.attack.abilityRef.packVersion
-         ||enemy.mechanics.abilityRefs[0]!.definitionId!==profile.attack.abilityRef.definitionId)
-         throw new EncounterConflictError("enemy has no authoritative D&D turn policy");
-       const abilityRef=profile.attack.abilityRef;
-      const abilityRow=db.prepare("SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind='ability' AND definition_id=?")
-        .get(abilityRef.packId,abilityRef.packVersion,abilityRef.definitionId) as any;
-      if(!abilityRow)throw new EncounterConflictError("enemy attack provenance is unavailable");
-      const ability=abilityCatalogDefinitionSchema.parse(JSON.parse(abilityRow.definition_json));
-      const effect=ability.mechanics.effects[0] as any;
-      if(ability.reference.packId!==abilityRef.packId||ability.reference.packVersion!==abilityRef.packVersion||ability.reference.definitionId!==abilityRef.definitionId
-        ||ability.mechanics.actionCost!=="action"||ability.mechanics.target!=="enemy"||ability.mechanics.effects.length!==1||effect?.type!=="damage")
-        throw new EncounterConflictError("enemy basic attack is unavailable");
-       const blocked=["incapacitated","stunned","unconscious"].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition));
-       const target=blocked?null:db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND status IN ('active','unconscious','stable')
-         AND team<>? AND actor_id IS NOT NULL ORDER BY combatant_id LIMIT 1`).get(combatId,current.team) as any;
+       const plan=planMonsterTurn(db,combatId,current,encounter.round_number),ability=plan.ability;
+       const effect=ability.mechanics.effects[0] as any;
+        const target=plan.target;
        const at=now(deps);
        let outcome:any=null,legalActionId="end-turn",targetIds:string[]=[];
       if(target){
         let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}catch{armorClass=NaN;}
         if(Number.isInteger(armorClass)){
-           const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
-           const attackRoll=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
-             ?Math.min(firstRoll,deps.rng.integer(1,21)):firstRoll;
+            const rolls=Array.from({length:plan.attackRollCount},()=>deps.rng.integer(1,21));
+            if(rolls.some((value)=>!Number.isInteger(value)||value<1||value>20))throw new Error("combat RNG returned an out-of-range d20");
+            const attackRoll=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
+              ?Math.min(...rolls):Math.max(...rolls);
+           const profile=plan.enemy.mechanics.combatProfile!;
            const binding=resolveCampaignRuleset(db,encounter.campaign_id),attack=binding.module.mechanics!.resolveAttack({rolls:[attackRoll],abilityScore:10,
-             proficiencyBonus:profile.proficiencyBonus,flatBonus:profile.attack.attackBonus-profile.proficiencyBonus,armorClass});
+              proficiencyBonus:profile.proficiencyBonus,flatBonus:profile.attack.attackBonus-profile.proficiencyBonus,armorClass});
           const die=effect.dice,damageRolls=attack.hit?Array.from({length:die.count*(attack.critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
           const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical:attack.critical}).total:0;
-           const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);legalActionId="attack:basic";targetIds=[target.combatant_id];
+            const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);legalActionId=plan.legalActionId;targetIds=[target.combatant_id];
            outcome={kind:"damage",targetId:target.combatant_id,damageType:effect.damageType,requested:damage,applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
              hitPointsBefore:target.hit_points,hitPointsAfter,statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion,
              attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,critical:attack.critical,damageRolls};
@@ -431,7 +475,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       const turnPlan=planTurnAdvance(db,combatId,encounter,current.combatant_id,overrides),changes:CombatantStateChange[]=outcome?[{combatantId:outcome.targetId,hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusBefore:"active",statusAfter:outcome.statusAfter,stateRevisionBefore:target.state_revision}]:[];
       const compositionPlan=buildCombatCompositionPlan(db,deps.ids,{encounterId:combatId,campaignId:encounter.campaign_id,roundBefore:encounter.round_number,roundAfter:turnPlan.round,occurredAt:at,combatantChanges:changes});
       const commandId=id(deps),actionId=id(deps),internal={type:"enemy_turn",encounterId:combatId,idempotencyKey:command.idempotencyKey};
-      beginProtocol(db,deps,internal,request,commandId,null,before,after,at,"combat_action_resolved",{kind:"action_resolved",actionId,action:outcome?"attack":"end-turn"},"action",0);
+       beginProtocol(db,deps,internal,request,commandId,null,before,after,at,"combat_action_resolved",{kind:"action_resolved",actionId,action:outcome?"attack":"end-turn"},"action",0);
+       if(outcome && isMonsterKnockdown(plan, outcome.hit === true)) applyCombatCondition(db,combatId,outcome.targetId,"prone",current.combatant_id,commandId,encounter.round_number+1,at);
       if(outcome)recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
       executeCombatCompositionPlan(db,compositionPlan);if(outcome)consumeDndTurnCost(db,combatId,current.combatant_id,"action");persistTurnAdvance(db,deps,combatId,turnPlan,at,commandId,after);advanceRevision(db,combatId,after,at);
       const combat=deps.reads.getCombatState(p,combatId);if(!combat)throw new Error("enemy turn projection is unavailable");
@@ -536,14 +581,15 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
 
   const execute=(p:string,input:EncounterCommand):EncounterResult<{encounterId:string;status:string}>=>{
     deps.assertFactoryMutation(); const command=encounterCommandSchema.parse(input), request=canonical(command);
-    if(isDndCombat(db,command.campaignId)&&["attack","flee","end-turn"].includes(command.type)){
-      const c=command as Extract<EncounterCommand,{type:"attack"|"flee"|"end-turn"}>;
+    if(isDndCombat(db,command.campaignId)&&dndCommandTypes.has(command.type)){
+      const c:any=command;
       const encounter=db.prepare("SELECT * FROM encounter WHERE encounter_id=? AND campaign_id=?").get(c.encounterId,c.campaignId) as any;
       if(!encounter)throw new EncounterUnavailableError("encounter unavailable");
       const prior=db.prepare("SELECT 1 FROM combat_commands_v27 WHERE encounter_id=? AND idempotency_key=?").get(c.encounterId,c.idempotencyKey);
       if(!prior&&c.combatantId!==encounter.current_turn_combatant_id)throw new EncounterTurnError("only the current combatant may act");
       if(c.type==="attack"&&c.attackId!=="basic_attack")throw new EncounterUnavailableError("D&D attack is unsupported");
-      const result=resolveCombatAction(p,c.encounterId,{legalActionId:c.type==="attack"?"attack:basic":c.type,targetIds:c.type==="attack"?[c.targetCombatantId]:[],choices:[],expectedRevision:c.expectedRevision,idempotencyKey:c.idempotencyKey},request);
+      const result=resolveCombatAction(p,c.encounterId,{legalActionId:c.type==="attack"?"attack:basic":c.type==="help"?`help:${c.targetCombatantId}`:c.type,
+        targetIds:c.type==="attack"||c.type==="help"?[c.targetCombatantId]:[],choices:[],expectedRevision:c.expectedRevision,idempotencyKey:c.idempotencyKey},request);
       return {encounterId:c.encounterId,status:"active",receipt:result.receipt};
     }
     return db.transaction(()=>{
@@ -568,11 +614,12 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(command.type==="advance_turn"||command.type==="advance_round") return advance(db,deps,p,command,request,encounter,before,after,at,commandId);
       if(isDndCombat(db,command.campaignId)){
         const current=currentCombatant(db,encounter);
-        if(!current||command.combatantId!==current.combatant_id)throw new EncounterTurnError("only the current combatant may act");
-        if(command.type!=="attack"&&command.type!=="flee"&&command.type!=="end-turn")throw new EncounterUnavailableError("D&D action is unsupported");
-        if(command.type==="attack"&&command.attackId!=="basic_attack")throw new EncounterUnavailableError("D&D attack is unsupported");
-        const result=resolveCombatAction(p,command.encounterId,{legalActionId:command.type==="attack"?"attack:basic":command.type,
-          targetIds:command.type==="attack"?[command.targetCombatantId]:[],choices:[],expectedRevision:before,idempotencyKey:command.idempotencyKey});
+       if(!current||command.combatantId!==current.combatant_id)throw new EncounterTurnError("only the current combatant may act");
+         const action:any=command;
+          if(!dndCommandTypes.has(command.type))throw new EncounterUnavailableError("D&D action is unsupported");
+         if(action.type==="attack"&&action.attackId!=="basic_attack")throw new EncounterUnavailableError("D&D attack is unsupported");
+          const result=resolveCombatAction(p,action.encounterId,{legalActionId:action.type==="attack"?"attack:basic":action.type==="help"?`help:${action.targetCombatantId}`:action.type,
+            targetIds:action.type==="attack"||action.type==="help"?[action.targetCombatantId]:[],choices:[],expectedRevision:before,idempotencyKey:action.idempotencyKey});
         return {encounterId:command.encounterId,status:encounter.status,receipt:result.receipt};
       }
       if(encounter.status!=="active") throw new EncounterUnavailableError("encounter is not active");
@@ -626,7 +673,9 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
     },
     executeEncounterCommand:execute,mutateEncounter:execute,
     useConsumable(principal,input){deps.assertFactoryMutation();return executeUseConsumable(db,deps,principal,input);},
-    useCombatPower(principal,input){deps.assertFactoryMutation();return executeCombatPower(db,deps,principal,input);}};
+    useCombatPower(principal,input){deps.assertFactoryMutation();return executeCombatPower(db,deps,principal,input);},
+    getCombatPowerLegalActions(principal,combatId){const actions=buildCombatPowerLegalActions(db,principal,combatId);const combat=(db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(combatId)as any)?.revision;if(combat===undefined)return[];const rev=(family:"m15"|"m16",campaignId:string,actorId:string)=>(db.prepare(`SELECT revision FROM rpg_${family}_mutation_revisions_v${family==="m15"?"25":"26"} WHERE campaign_id=? AND actor_id=?`).get(campaignId,actorId)as any)?.revision??0;return actions.map(action=>({...action,revisions:{combat,sourceM15:rev("m15",action.campaignId,action.sourceActorId),sourceM16:rev("m16",action.campaignId,action.sourceActorId),targetM15:action.targetActorId?rev("m15",action.campaignId,action.targetActorId):null,targetM16:action.targetActorId?rev("m16",action.campaignId,action.targetActorId):null}}));},
+    getCombatPowerResultByKey(principal,combatId,idempotencyKey){return getCombatPowerResultByKey(db,principal,combatId,idempotencyKey);}};
 }
 
 function replayAuthority(db:DatabaseDriver.Database,p:string,c:any,row:any){
@@ -740,6 +789,22 @@ function dndDamageStatus(db:DatabaseDriver.Database,target:any,hitPointsAfter:nu
   if(target.hit_points>0&&hitPointsAfter===0){setSurvival(db,target.encounter_id,target.combatant_id,0,0,false);return "unconscious";}
   if(target.hit_points===0&&damage>0){const prior=survival(db,target.encounter_id,target.combatant_id),failures=Math.min(3,prior.failures+1);setSurvival(db,target.encounter_id,target.combatant_id,prior.successes,failures,prior.stable===1);return failures===3?"dead":target.status;}
   return target.status;
+}
+
+/** Bounded contest scores use the actor's raw ability modifier; enemy templates have no ability-score schema. */
+function contestScore(db:DatabaseDriver.Database,campaignId:string,combatant:any):number{
+  if(!combatant.actor_id)return 0;
+  const rows=db.prepare(`SELECT attributes.attribute_id,attributes.value FROM campaign_actors actor
+    JOIN rpg_character_attributes attributes ON attributes.campaign_id=actor.campaign_id
+      AND attributes.sheet_id=actor.sheet_id AND attributes.attribute_id='strength'
+    WHERE actor.campaign_id=? AND actor.id=?`).all(campaignId,combatant.actor_id) as Array<{attribute_id:string;value:number}>;
+  const dexterity=(db.prepare(`SELECT attributes.value FROM campaign_actors actor
+    JOIN rpg_character_attributes attributes ON attributes.campaign_id=actor.campaign_id
+      AND attributes.sheet_id=actor.sheet_id AND attributes.attribute_id='dexterity'
+    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId,combatant.actor_id) as {value:number}|undefined)?.value;
+  const strength=rows[0]?.value;
+  return [strength,dexterity].filter((value): value is number => Number.isInteger(value))
+    .map(value=>Math.floor((value-10)/2)).sort((a,b)=>b-a)[0]??0;
 }
 
 type TurnAdvancePlan={event:any;nextId:string|null;round:number};

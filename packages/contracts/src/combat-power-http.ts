@@ -1,0 +1,12 @@
+import { z } from "zod";
+import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
+import { idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
+import { powerReferenceSchema } from "./powers.js";
+const text=z.string().trim().min(1).max(200),revisions=z.object({combat:revisionSchema,sourceM15:revisionSchema,sourceM16:revisionSchema,targetM15:revisionSchema.nullable(),targetM16:revisionSchema.nullable()}).strict();
+export const directCombatPowerCandidateSchema=z.object({legalActionId:resourceIdSchema,powerName:text,targetCombatantId:resourceIdSchema,target:text,powerRef:powerReferenceSchema,cost:text.nullable(),revisions}).strict();
+export const directCombatPowerCandidatesResponseSchema=z.object({candidates:z.array(directCombatPowerCandidateSchema).max(128)}).strict();
+export const directCombatPowerCommandRequestSchema=z.object({legalActionId:resourceIdSchema,expectedCombatRevision:revisionSchema,expectedSourceM15Revision:revisionSchema,expectedSourceM16Revision:revisionSchema,expectedTargetM15Revision:revisionSchema.nullable(),expectedTargetM16Revision:revisionSchema.nullable(),idempotencyKey:idempotencyKeySchema}).strict();
+const outcome=z.object({kind:z.enum(["damage","healing","effect"])}).passthrough();
+export const directCombatPowerResultSchema=z.object({commandId:resourceIdSchema,powerName:text,targetCombatantId:resourceIdSchema,cost:z.object({label:text,before:z.number().int().min(0),after:z.number().int().min(0)}).nullable(),outcomes:z.array(outcome).min(1).max(16),concentration:z.boolean(),roundBefore:revisionSchema,roundAfter:revisionSchema,revisionBefore:revisionSchema,revisionAfter:revisionSchema,occurredAt:utcIsoTimestampSchema}).strict().refine(value=>value.revisionAfter===value.revisionBefore+1);
+export const directCombatPowerCommandResponseSchema=z.object({request:directCombatPowerCommandRequestSchema,result:directCombatPowerResultSchema}).strict();
+export type DirectCombatPowerCandidate=z.infer<typeof directCombatPowerCandidateSchema>;export type DirectCombatPowerCommandRequest=z.infer<typeof directCombatPowerCommandRequestSchema>;export type DirectCombatPowerResult=z.infer<typeof directCombatPowerResultSchema>;export type DirectCombatPowerCommandResponse=z.infer<typeof directCombatPowerCommandResponseSchema>;

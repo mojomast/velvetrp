@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { abilityCatalogReferenceSchema, attributeIdSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
+import { abilityCatalogReferenceSchema, attributeIdSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, raceCatalogDefinitionSchema, raceCatalogReferenceSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { rulesProfileIdSchema } from "./rpg-content.js";
@@ -57,7 +57,7 @@ export const progressionPreviewSchema = z.object({
  * catalog steps, never caller-authored totals, levels, HP, DCs, or modifiers. */
 export const progressionCalculatorInputSchema = z.object({
   campaignCharacterId: resourceIdSchema, revision: revisionSchema, profile: progressionProfileSchema,
-  selectedClassRef: classCatalogReferenceSchema,
+  selectedClassRef: classCatalogReferenceSchema, raceRef: raceCatalogReferenceSchema,
   currentLevel: z.number().int().min(1).max(20), totalXp: z.number().int().min(0).max(9_007_199_254_740_991),
   milestoneCount: z.number().int().min(0).max(19), currentHp: z.number().int().min(0).max(1_000_000),
   currentDerived: characterDerivedStatsSchema,
@@ -74,7 +74,7 @@ export const progressionCalculatorInputSchema = z.object({
 
 export const progressionStateSchema = z.object({
   campaignCharacterId: resourceIdSchema, campaignId: resourceIdSchema, sheetId: resourceIdSchema, actorId: resourceIdSchema,
-  profile: progressionProfileSchema, classRef: classCatalogReferenceSchema, level: z.number().int().min(1).max(20),
+  profile: progressionProfileSchema, classRef: classCatalogReferenceSchema, raceRef: raceCatalogReferenceSchema, race: raceCatalogDefinitionSchema, level: z.number().int().min(1).max(20),
   totalXp: z.number().int().min(0).max(9_007_199_254_740_991), milestoneCount: z.number().int().min(0).max(19), revision: revisionSchema,
   pendingChoices: z.array(progressionPendingChoiceSchema).max(32), knownAbilities: z.array(abilityCatalogReferenceSchema).max(128),
   knownSpells: z.array(spellCatalogReferenceSchema).max(128), derived: characterDerivedStatsSchema, updatedAt: utcIsoTimestampSchema,

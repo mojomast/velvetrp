@@ -55,17 +55,33 @@ export function supercoverLine(from: MapPoint, to: MapPoint): MapPoint[] {
 
 export function hasLineOfSight(from: MapPoint, to: MapPoint, tiles: ReadonlyMap<string, MapTile>): boolean {
   const line = supercoverLine(from, to);
-  return line.slice(1, -1).every((point) => !tiles.get(pointKey(point))?.blocksSight);
+  return line.every((point) => tiles.has(pointKey(point)))
+    && line.slice(1, -1).every((point) => !tiles.get(pointKey(point))?.blocksSight);
 }
 
 export type Cover = "none" | "half" | "three-quarters" | "full";
 
+export type LineOfEffectEvidence = {
+  supported: boolean;
+  lineOfEffect: "clear" | "blocked";
+  cover: Cover;
+  blockedBy: MapPoint[];
+};
+
+/** Resolves the bounded 2D tactical ray. Missing cells are unsupported, never clear. */
+export function lineOfEffectBetween(from: MapPoint, to: MapPoint, tiles: ReadonlyMap<string, MapTile>): LineOfEffectEvidence {
+  const line = supercoverLine(from, to);
+  if (!line.every((point) => tiles.has(pointKey(point)))) {
+    return { supported: false, lineOfEffect: "blocked", cover: "full", blockedBy: [] };
+  }
+  const intervening = line.slice(1, -1);
+  const blockedBy = intervening.filter((point) => tiles.get(pointKey(point))!.blocksSight).map((point) => ({ ...point }));
+  if (blockedBy.length === 0) return { supported: true, lineOfEffect: "clear", cover: "none", blockedBy };
+  const cover = blockedBy.length === intervening.length ? "full" : blockedBy.length * 2 >= intervening.length ? "three-quarters" : "half";
+  return { supported: true, lineOfEffect: "blocked", cover, blockedBy };
+}
+
 /** Cover is based on opaque cells touched by the supercover ray, excluding endpoints. */
 export function coverBetween(from: MapPoint, to: MapPoint, tiles: ReadonlyMap<string, MapTile>): Cover {
-  const intervening = supercoverLine(from, to).slice(1, -1);
-  if (intervening.length === 0) return "none";
-  const blocked = intervening.filter((point) => tiles.get(pointKey(point))?.blocksSight).length;
-  if (blocked === 0) return "none";
-  if (blocked === intervening.length) return "full";
-  return blocked * 2 >= intervening.length ? "three-quarters" : "half";
+  return lineOfEffectBetween(from, to, tiles).cover;
 }

@@ -8,6 +8,7 @@ import {
   combatLogQuerySchema,
   combatLogResponseSchema,
   combatActionCommandRequestSchema,
+  combatActionResolutionSchema,
   combatEnemyTurnCommandRequestSchema,
   combatActionCommandResponseSchema,
   combatEndCommandRequestSchema,
@@ -111,6 +112,26 @@ describe("encounter HTTP contracts",()=>{
       outcomes: srd.resolution.outcomes.map(outcome => ({ ...outcome, damageType: "invented" })),
     } }).success).toBe(false);
     expect(combatActionCommandResponseSchema.safeParse({...response,combat:{...combat,revision:4}}).success).toBe(false);
+  });
+
+  it("accepts only server-shaped grapple and escape contest resolutions",()=>{
+    const base={actionId:"action",actingCombatantId:"combatant",roundBefore:1,roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:"enemy"};
+    const grapple={...base,legalActionId:"grapple:enemy",kind:"grapple" as const,targetIds:["enemy"],outcomes:[{
+      kind:"contest" as const,targetId:"enemy",contest:"grapple" as const,attackerRoll:15,defenderRoll:10,success:true,condition:"grappled" as const,
+    }]};
+    expect(combatActionCommandResponseSchema.safeParse({resolution:grapple,combat:{combatId:"encounter",round:1,currentCombatant:"enemy",combatants:[],legalActions:[],revision:2},receipt:{idempotencyKey:"grapple",revisionBefore:1,revisionAfter:2,occurredAt:at}}).success).toBe(false);
+    expect(combatActionResolutionSchema.parse(grapple)).toEqual(grapple);
+    expect(combatActionResolutionSchema.safeParse({...grapple,outcomes:[{...grapple.outcomes[0],targetId:"other"}]}).success).toBe(false);
+  });
+
+  it("keeps utility actions server-derived and outcome-free",()=>{
+    const base={actionId:"action",actingCombatantId:"combatant",roundBefore:1,roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:"combatant",outcomes:[]};
+    for(const kind of ["dash","disengage","hide"] as const) {
+      expect(combatActionResolutionSchema.parse({...base,legalActionId:kind,kind,targetIds:[]})).toMatchObject({kind,targetIds:[],outcomes:[]});
+    }
+    const help={...base,legalActionId:"help:ally",kind:"help" as const,targetIds:["ally"]};
+    expect(combatActionResolutionSchema.parse(help)).toEqual(help);
+    expect(combatActionResolutionSchema.safeParse({...help,outcomes:[{kind:"status",targetId:"ally",statusBefore:"active",statusAfter:"fled"}]}).success).toBe(false);
   });
 
   it("keeps D&D enemy turn execution caller-blind",()=>{

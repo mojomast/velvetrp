@@ -34,6 +34,7 @@ import {
   campaignCreateResponseSchema,
   campaignDetailResponseSchema,
   campaignDetailSchema,
+  castSpellCommandRequestSchema,
   detachCampaignSessionInputSchema,
   requestIdSchema,
   ORIGINAL_STARTER_ID,
@@ -48,6 +49,18 @@ import {
   rpgFeatureFlagsSchema,
   utcIsoTimestampSchema,
 } from "../src/index.js";
+
+describe("spellcasting contracts", () => {
+  it("requires a spell reference and explicit component declarations", () => {
+    const value = castSpellCommandRequestSchema.parse({
+      powerRef: { kind: "spell", packId: "srd-5.1", packVersion: "1.0.0", definitionId: "bless" },
+      targetIds: ["actor:one"], choices: [], expectedRevision: 0, idempotencyKey: "spell-cast-1",
+      components: { verbal: true, somatic: true, material: true },
+    });
+    expect(value.components.material).toBe(true);
+    expect(() => castSpellCommandRequestSchema.parse({ ...value, powerRef: { ...value.powerRef, kind: "ability" } })).toThrow();
+  });
+});
 
 describe("feature flag contracts", () => {
   it("validates legacy roleplay flags without retaining additive fields", () => {

@@ -7,6 +7,7 @@ import {
   currencyCatalogReferenceSchema,
   itemCatalogReferenceSchema,
   raceCatalogReferenceSchema,
+  spellCatalogReferenceSchema,
 } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
@@ -125,12 +126,15 @@ export const characterBuilderSelectionsSchema = z.object({
   background: backgroundCatalogReferenceSchema.nullable(),
   class: classCatalogReferenceSchema.nullable(),
   starterGrant: characterBuilderStarterGrantChoiceSchema.nullable(),
+  /** Exact level-one preparation choices; these are not executable power grants. */
+  preparedSpells: z.array(spellCatalogReferenceSchema).max(16).default([]),
 }).strict();
 export const characterBuilderSelectionPatchSchema = z.object({
   race: raceCatalogReferenceSchema.optional(),
   background: backgroundCatalogReferenceSchema.optional(),
   class: classCatalogReferenceSchema.optional(),
   starterGrant: characterBuilderStarterGrantChoiceSchema.optional(),
+  preparedSpells: z.array(spellCatalogReferenceSchema).max(16).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, "at least one selection is required");
 
 export const characterDraftPinSchema = z.object({
@@ -139,7 +143,7 @@ export const characterDraftPinSchema = z.object({
   publicationDigest: contentDigestSchema,
 }).strict();
 export const characterBuilderIssueSchema = z.object({
-  code: z.enum(["missing-race", "missing-background", "missing-class", "missing-starter-grant", "expired", "pins-changed", "persona-unavailable", "controller-unavailable", "definition-unavailable"]),
+  code: z.enum(["missing-race", "missing-background", "missing-class", "missing-starter-grant", "missing-prepared-spells", "expired", "pins-changed", "persona-unavailable", "controller-unavailable", "definition-unavailable"]),
   path: z.string().min(1).max(200),
   message: z.string().min(1).max(500),
 }).strict();
@@ -155,11 +159,17 @@ export const characterBuilderOptionSchema = z.object({
   name: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(4_000),
 }).strict();
+export const characterBuilderPreparedSpellOptionSchema = z.object({
+  reference: spellCatalogReferenceSchema,
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(4_000),
+}).strict();
 export const characterBuilderChoiceGroupSchema = z.discriminatedUnion("id", [
   z.object({ id: z.literal("race"), required: z.literal(true), options: z.array(characterBuilderOptionSchema).min(1).max(256) }).strict(),
   z.object({ id: z.literal("background"), required: z.literal(true), options: z.array(characterBuilderOptionSchema).min(1).max(256) }).strict(),
   z.object({ id: z.literal("class"), required: z.literal(true), options: z.array(characterBuilderOptionSchema).min(1).max(256) }).strict(),
   z.object({ id: z.literal("starter-grant"), required: z.literal(true), options: z.tuple([z.literal("kit"), z.literal("currency")]) }).strict(),
+  z.object({ id: z.literal("prepared-spells"), required: z.literal(true), options: z.array(characterBuilderPreparedSpellOptionSchema).min(1).max(16) }).strict(),
 ]);
 
 export const characterDerivedStatisticSchema = z.enum([
@@ -219,7 +229,7 @@ export const characterDraftViewSchema = z.object({
   pins: z.array(characterDraftPinSchema).min(1).max(32),
   allocation: characterBuilderAllocationSchema,
   selections: characterBuilderSelectionsSchema,
-  choiceGroups: z.array(characterBuilderChoiceGroupSchema).length(4),
+  choiceGroups: z.array(characterBuilderChoiceGroupSchema).min(4).max(5),
   completion: characterBuilderCompletionSchema,
   derivedPreview: characterDerivedStatsSchema.nullable(),
   startingGrants: z.array(characterStartingGrantSchema).max(64),

@@ -4,7 +4,7 @@ import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
   applyCampaignImport, claimCombatReward, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
-  getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
+   getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession, getDirectCombatPowerActions, commandDirectCombatPower, getDirectCombatPowerResult,
   endCombat, generateTacticalMap, getTacticalMap, listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, moveTacticalMapToken, previewTacticalMapMove, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, startEncounter, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { getCombatRewardClaimResult } from "./api";
@@ -73,7 +73,8 @@ const combatTrackerApi: CombatTrackerApi = {
   listEncounters: listCampaignEncounters, getCombat: getCombatState, getCombatLog, resolveAction: resolveCombatAction,
   getCommandResult: getCombatCommandResult, getPowers: getActorPowers, getEffects: getActorEffects,
   getResources: getActorResources, usePower: commandActorPower,
-  getConsumableActions:getCombatConsumableActions,useConsumable:commandCombatConsumable,getConsumableResult:getCombatConsumableResult,
+   getConsumableActions:getCombatConsumableActions,useConsumable:commandCombatConsumable,getConsumableResult:getCombatConsumableResult,
+   getCombatPowerActions:getDirectCombatPowerActions,useCombatPower:commandDirectCombatPower,getCombatPowerResult:getDirectCombatPowerResult,
   listRewards:listCombatRewards,claimReward:claimCombatReward,getRewardClaimResult:getCombatRewardClaimResult,getWallet:getActorWallet,startEncounter,endCombat,
 };
 const worldExplorerApi:WorldExplorerApi={getWorld:getCampaignWorld,travel:travelActor};

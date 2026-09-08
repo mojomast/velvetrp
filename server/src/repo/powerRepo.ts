@@ -83,7 +83,8 @@ export function createPowerRepository(db:DatabaseDriver.Database,deps:M16Depende
 
     const slots=(db.prepare("SELECT name,current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=?")
       .all(actor.campaign_id,parsedActor) as Array<{name:string;current:number;max:number}>)
-      .flatMap((row)=>{const match=/^slot-([1-9]|1[0-9]|20)$/.exec(row.name);return match?[{slotId:row.name,level:Number(match[1]),current:row.current,max:row.max}]:[];})
+      .flatMap((row)=>{const match=/^(?:spell-)?slot-([1-9]|1[0-9]|20)$/.exec(row.name);return match?[{slotId:`slot-${match[1]}`,level:Number(match[1]),current:row.current,max:row.max}]:[];})
+      .filter((slot,index,all)=>all.findIndex((candidate)=>candidate.slotId===slot.slotId)<index ? false : true)
       .sort((left,right)=>left.level-right.level);
 
     const uses=definitions.filter((definition)=>definition.reference.kind==="ability"&&definition.uses>0).map((definition)=>{

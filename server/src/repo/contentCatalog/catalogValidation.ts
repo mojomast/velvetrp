@@ -50,7 +50,7 @@ export function dependencies(definition: CatalogDefinition): CatalogDefinitionRe
     case "race": return [...asKind(definition, "race").mechanics.abilityRefs];
     case "background": { const value = asKind(definition, "background"); return [...value.mechanics.skillRefs, ...value.mechanics.itemRefs, value.mechanics.startingCurrency.currency]; }
     case "class": return [...asKind(definition, "class").mechanics.levelRefs];
-    case "class-level": { const value = asKind(definition, "class-level"); return [value.mechanics.classRef, ...value.mechanics.abilityRefs, ...value.mechanics.spellRefs,
+    case "class-level": { const value = asKind(definition, "class-level"); return [value.mechanics.classRef, ...value.mechanics.abilityRefs, ...value.mechanics.spellRefs, ...(value.mechanics.preparedSpellRefs ?? []),
       ...(value.mechanics.progressionChoices ?? []).flatMap((choice) => choice.options)]; }
     case "item": return [asKind(definition, "item").mechanics.price.currency];
     case "enemy-template": { const value = asKind(definition, "enemy-template"); return [...value.mechanics.abilityRefs, ...value.private.hiddenAbilityRefs, ...(value.private.hiddenRefs ?? [])]; }

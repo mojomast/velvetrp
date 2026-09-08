@@ -28,6 +28,7 @@ import { projectTacticalMap } from "../map/projection.js";
 import { pointKey, tileIndex } from "../map/types.js";
 import { resolveCampaignRuleset } from "../rulesets/campaignBinding.js";
 import { readCombatTurnEconomy } from "./encounter/combatActionPlan.js";
+import { resolveOpportunityAttacks } from "./encounter/opportunityAttackRuntime.js";
 
 export class TacticalMapAuthorizationError extends Error {}
 export class TacticalMapUnavailableError extends Error {}
@@ -228,7 +229,18 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
           const revised = db.prepare("UPDATE combat_mutation_revisions_v27 SET revision=revision+1,updated_at=? WHERE encounter_id=? AND revision=?").run(now, row.encounter_id, preview.authority_revision);
           if (revised.changes !== 1) throw new TacticalMapConflictError("combat movement authority changed");
         }
-        db.prepare("UPDATE tactical_map_tokens_v58 SET x=?,y=?,state_revision=state_revision+1 WHERE map_id=? AND token_id=?").run(input.destination.x, input.destination.y, row.map_id, token.token_id);
+         const from = { x: token.x, y: token.y };
+         db.prepare("UPDATE tactical_map_tokens_v58 SET x=?,y=?,state_revision=state_revision+1 WHERE map_id=? AND token_id=?").run(input.destination.x, input.destination.y, row.map_id, token.token_id);
+         if (row.mode === "combat" && row.encounter_id && encounterForReaction(db, row.encounter_id)) {
+           const round = (db.prepare("SELECT round_number FROM encounter WHERE encounter_id=?").get(row.encounter_id) as { round_number: number }).round_number;
+           const disengaged = Boolean(db.prepare("SELECT 1 FROM combat_disengagement_v63 WHERE encounter_id=? AND combatant_id=? AND round_number=?").get(row.encounter_id, token.combatant_id, round));
+            const transitionId = dependencies.ids.nextId();
+            db.prepare("INSERT INTO combat_movement_transitions_v63(transition_id,encounter_id,combatant_id,round_number,from_x,from_y,to_x,to_y,disengaged,movement_key,occurred_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)")
+              .run(transitionId, row.encounter_id, token.combatant_id, round, from.x, from.y, input.destination.x, input.destination.y, disengaged ? 1 : 0, input.idempotencyKey, now);
+            const reactions = resolveOpportunityAttacks(db, dependencies, { encounterId: row.encounter_id, campaignId, round, movingCombatantId: token.combatant_id!, from, to: input.destination, transitionId, disengaged, occurredAt: now });
+            const bound = db.prepare("UPDATE combat_movement_transitions_v63 SET reaction_results_json=? WHERE transition_id=?").run(JSON.stringify(reactions), transitionId);
+            if (bound.changes !== 1) throw new TacticalMapConflictError("movement transition binding is unavailable");
+         }
         db.prepare("UPDATE tactical_maps_v58 SET token_revision=token_revision+1 WHERE map_id=?").run(row.map_id);
         if (row.mode === "combat" && !budget.economy) { const round = (db.prepare("SELECT round_number FROM encounter WHERE encounter_id=?").get(row.encounter_id) as { round_number: number }).round_number;
           db.prepare("INSERT INTO tactical_map_combat_movement_v58 VALUES(?,?,?,?,?) ON CONFLICT(map_id,encounter_id,round_number,actor_id) DO UPDATE SET used_feet=used_feet+excluded.used_feet").run(row.map_id, row.encounter_id, round, input.actorId, preview.path_cost_feet); }
@@ -240,4 +252,8 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
       }).immediate();
     },
   };
+}
+
+function encounterForReaction(db: DatabaseDriver.Database, encounterId: string): boolean {
+  return Boolean(db.prepare("SELECT 1 FROM encounter WHERE encounter_id=? AND status='active'").get(encounterId));
 }

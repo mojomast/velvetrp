@@ -49,16 +49,29 @@ export const inventorySchema = z.object({
 export const equippedItemSchema = z.object({
   slot: equipmentSlotSchema,
   entryId: inventoryEntryIdSchema,
+  hand: z.enum(["main", "off"]).optional(),
+  grip: z.enum(["one-handed", "two-handed"]).optional(),
 }).strict();
 export const equipmentSchema = z.array(equippedItemSchema).max(equipmentSlotSchema.options.length).superRefine((equipment, context) => {
   const slots = new Set<string>();
   const entries = new Set<string>();
+  const hands = new Set<string>();
   equipment.forEach((item, index) => {
-    if (slots.has(item.slot)) context.addIssue({ code: "custom", message: "equipment slots must be unique", path: [index, "slot"] });
+    if (item.slot !== "hand" && slots.has(item.slot)) context.addIssue({ code: "custom", message: "equipment slots must be unique", path: [index, "slot"] });
+    if (item.hand && hands.has(item.hand)) context.addIssue({ code: "custom", message: "equipment hands must be unique", path: [index, "hand"] });
     if (entries.has(item.entryId)) context.addIssue({ code: "custom", message: "equipped entries must be unique", path: [index, "entryId"] });
+    if (item.hand) hands.add(item.hand);
     slots.add(item.slot); entries.add(item.entryId);
   });
 });
+
+export const srdEquipmentResolutionSchema = z.object({
+  armorClass: z.number().int().min(1).max(100),
+  carriedWeight: z.number().nonnegative(),
+  carryingLimit: z.number().int().min(0),
+  encumbered: z.boolean(),
+  stealthDisadvantage: z.boolean(),
+}).strict();
 
 export const actorInventorySchema = z.object({
   campaignId: campaignIdSchema,
@@ -99,7 +112,8 @@ export const transferInventoryItemCommandSchema = z.object({
 }).strict().refine((command) => command.actorId !== command.recipientActorId, {
   message: "transfer parties must differ", path: ["recipientActorId"],
 });
-export const equipInventoryItemCommandSchema = z.object({ ...inventoryCommandBase, type: z.literal("equip_inventory_item"), slot: equipmentSlotSchema, entryId: inventoryEntryIdSchema }).strict();
+export const equipInventoryItemCommandSchema = z.object({ ...inventoryCommandBase, type: z.literal("equip_inventory_item"), slot: equipmentSlotSchema, entryId: inventoryEntryIdSchema,
+  hand: z.enum(["main", "off"]).optional(), grip: z.enum(["one-handed", "two-handed"]).optional() }).strict();
 export const unequipInventoryItemCommandSchema = z.object({ ...inventoryCommandBase, type: z.literal("unequip_inventory_item"), slot: equipmentSlotSchema }).strict();
 export const setInventoryCapacityCommandSchema = z.object({ ...inventoryCommandBase, type: z.literal("set_inventory_capacity"), capacity: inventoryCapacitySchema }).strict();
 export const inventoryCommandSchema = z.discriminatedUnion("type", [addInventoryItemCommandSchema, removeInventoryItemCommandSchema, consumeInventoryItemCommandSchema, dropInventoryItemCommandSchema, transferInventoryItemCommandSchema, equipInventoryItemCommandSchema, unequipInventoryItemCommandSchema, setInventoryCapacityCommandSchema]);

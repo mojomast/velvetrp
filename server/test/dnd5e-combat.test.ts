@@ -3,6 +3,7 @@ import {
   planDnd5eConcentrationDamage, planDnd5eDamageAdjustment, resolveDnd5eAttack,
   resolveDnd5eDamageRoll, resolveDnd5eInitiative,
 } from "../src/rulesets/index.js";
+import { coverArmorClassBonus } from "../src/repo/encounter/combatActionPlan.js";
 
 describe("SRD combat mechanics", () => {
   it("resolves AC attacks with natural 1 misses and natural 20 critical hits", () => {
@@ -50,5 +51,12 @@ describe("SRD combat mechanics", () => {
     expect(planDnd5eConcentrationDamage(22, true, { rolls: [7], constitutionScore: 14, proficiencyBonus: 3 })).toMatchObject({ required: true, dc: 11, broken: false, check: { kind: "concentration-check", total: 12 } });
     expect(planDnd5eConcentrationDamage(40, true, { rolls: [5], constitutionScore: 10 })).toMatchObject({ dc: 20, broken: true });
     expect(planDnd5eConcentrationDamage(10, false)).toEqual({ required: false, dc: null, broken: false });
+  });
+
+  it("applies the D&D 5e ranged cover AC bonuses while leaving full cover illegal", () => {
+    expect(coverArmorClassBonus("none")).toBe(0);
+    expect(coverArmorClassBonus("half")).toBe(2);
+    expect(coverArmorClassBonus("three-quarters")).toBe(5);
+    expect(coverArmorClassBonus("full")).toBe(0);
   });
 });

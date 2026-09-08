@@ -22,6 +22,13 @@ export function applyCombatCondition(
     .run(encounterId, combatantId, condition, sourceCombatantId, sourceCommandId, expiresAtRound, at);
 }
 
+export function removeCombatCondition(
+  db: DatabaseDriver.Database, encounterId: string, combatantId: string, condition: string,
+): void {
+  db.prepare("DELETE FROM combat_conditions_v62 WHERE encounter_id=? AND combatant_id=? AND condition=?")
+    .run(encounterId, combatantId, condition);
+}
+
 /** Reads only non-expired closed combat conditions. Source identity remains private. */
 export function conditionsFor(db: DatabaseDriver.Database, encounterId: string, combatantId: string, round: number): Set<string> {
   return new Set((db.prepare(`SELECT DISTINCT condition FROM combat_conditions_v62

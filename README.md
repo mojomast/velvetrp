@@ -1,10 +1,56 @@
 # VelvetRP
 
-VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
+VelvetRP is a local-first AI roleplay and campaign RPG application built around one strong idea:
 
-Development persistence uses one current schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`; startup never upgrades an older schema. The schema changes in the current tree require recreating the development database. The trusted-local RPG API has **126 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include authoritative tactical maps, companion transport, bounded consumables, internal provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, explicit player-safe material publication, and integrated campaign administration for commerce, rulesets, generation recovery, and safety. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); there is no general live exact-candidate generation/selection HTTP or client API, and only the exact state-dependent adventure bridges documented in the [DM harness architecture](docs/dm-harness-architecture.md) exist.
+> The model can propose what happens next. It cannot decide what became true.
 
-## Security And Privacy
+Velvet combines a character-driven roleplay experience with a persistent campaign engine. Players can write declarations to a shared campaign room, while the server owns the campaign timeline, characters, world state, quests, inventory, encounters, rules, and receipts. A React client talks to a loopback Fastify server, and the default deployment stores everything in local SQLite.
+
+This is not a chatbot with RPG flavor text added on top. It is an attempt to make AI-assisted roleplay inspectable and mechanically trustworthy: provider output is untrusted input, game state is authoritative repository state, and narration is produced only after the relevant mutation has committed.
+
+## Why Velvet Is Different
+
+### AI is a bounded participant
+
+The provider receives a role-filtered, size-bounded context basket and only the state-dependent tools selected by the server. It cannot choose its audience, invent a target, supply a destination, alter a revision, execute undeclared tools, or turn a failed command into fictional success. The server parses and revalidates every response before anything changes.
+
+### Mechanics produce receipts, not suggestions
+
+RPG mutations use server-derived candidates, expected revisions, idempotency keys, immediate SQLite transactions, immutable command/event/receipt records, and authoritative read reconciliation. If a request times out after committing, the safe action is to read the receipt, not blindly retry it. This applies to campaign actions, character progression, inventory, combat, rests, travel, rewards, and adventure-tool bridges.
+
+### Campaign generation is reviewed materialization
+
+AI-generated campaign content is staged as bounded candidates. A GM selects a dependency-closed set and explicitly applies it. Generated quests, locations, NPCs, story graphs, handouts, and scene prompts do not silently become canon, executable items, or monster stat blocks.
+
+### Rules and content are swappable and pinned
+
+Rules modules are pure deterministic code. Content is published as immutable, validated packs and campaigns bind to exact `(packId, packVersion)` identities. The current development SRD starter is `srd-5.1:starter@1.2.0+7f94bb928392`; changing content means publishing a new exact version rather than rewriting history.
+
+### Local-first is an operational boundary
+
+The default server binds to loopback and uses a fixed trusted-local principal. A provider is optional: without one, roleplay has a clearly marked deterministic local stub and RPG recovery remains deterministic. Local-first does not mean that configured provider traffic stays on-device, and Velvet is not currently a remote multi-user service.
+
+## What Is Shipped
+
+### Roleplay
+
+- Character profiles with boundaries, memories, lore, summaries, relationships, and rich personality fields.
+- One-to-one and group sessions with attributed messages, streaming, cancellation, branches, and reply swipes.
+- A durable campaign-room DM transcript with role-filtered context, bounded provider tools, confirmations, receipt-grounded narration, and deterministic recovery.
+- Provider settings, usage accounting, prompt/harness controls, and local deterministic fallback behavior.
+
+### Campaign RPG
+
+- Campaign lifecycle, memberships, rooms, timelines, checkpoints, recaps, import/export, and exact content-pack pinning.
+- Character drafts, server-owned rolls, finalization, derived sheets, ancestry data, XP, progression, resources, inventory, equipment, economy, and rests.
+- Server-resolved checks, powers, effects, legal combat actions, encounters, rewards, quests, world state, NPC presence, factions, reputation, and story graphs.
+- Reviewed campaign generation and explicit publication of player-safe handouts and scene prompts.
+- Authoritative tactical maps with role-safe projections, movement previews, line-of-effect, cover, ranged weapons, thrown weapons, and opportunity reactions.
+- A bounded SRD 5.1 development subset with seven starter ancestries, level progression, equipment, selected spells, Magic Missile, Healing Word, Rage resistance, Lay on Hands, and server-authoritative combat state.
+
+The SRD module is deliberately partial. Guiding Bolt, most cantrips, broad spell saves and attack rolls, subclasses, feats, multiclassing, and many ancestry traits remain fail-closed or metadata-only. See the [SRD coverage matrix](docs/srd-5.1-coverage.md) for the exact boundary.
+
+## Trust, Security, And Privacy
 
 Local-first describes storage and deployment, not a guarantee that all processing stays on the device.
 
@@ -15,7 +61,9 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Do not expose this server to a LAN, the internet, a reverse proxy, or multiple untrusted users. `FEATURE_REMOTE_AUTHENTICATION` is discovery-only rollout state, not implemented authentication.
 - Provider keys are persisted locally and are never returned by the public provider API. Authorization headers are sent only to allowlisted hosted providers or loopback hosts.
 
-## Current Capabilities
+## Detailed Scope
+
+The following inventory is intentionally more concrete than the product overview above. It describes shipped surfaces, not promises about the deferred roadmap.
 
 ### Roleplay
 

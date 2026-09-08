@@ -1,7 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
-import { progressionProfileSchema, type ProgressionSelection } from "@velvet/contracts";
+import { progressionProfileSchema, raceCatalogDefinitionSchema, type ProgressionSelection } from "@velvet/contracts";
 import { calculateCharacterProgression } from "../characterProgressionCalculator.js";
-import { progressionReferenceKey, resolveInitialKnownPowers, resolveSelectedClassProgression, type ExactReference } from "../characterProgressionCatalog.js";
+import { isExecutableClassLevel, progressionReferenceKey, resolveInitialKnownPowers, resolveSelectedClassProgression, type ExactReference } from "../characterProgressionCatalog.js";
 import { assertCanonicalProgressionProfile } from "../characterProgressionProfile.js";
 import { resolveCampaignRuleset } from "../rulesets/campaignBinding.js";
 
@@ -31,13 +31,30 @@ export function loadExactProgressionCatalog(db:DatabaseDriver.Database,row:Progr
     return JSON.parse(found.definition_json);
   });
   const profile=loadCanonicalProgressionProfile(db,row.profile_id);
-  const levels=resolveSelectedClassProgression({selectedClass,availableDefinitions:referencedLevels,profileMaximum:profile.maxLevel});
-  const raceRow=db.prepare(`SELECT definition.definition_json FROM rpg_campaign_sheets sheet
+  // A class owns its progression cap. The profile is only the global ceiling;
+  // explicitly gated catalog levels do not make a class executable at that level.
+  const executableLevels = referencedLevels.filter((value: any) => isExecutableClassLevel(value));
+  const maximum = profile.rulesProfileId === "srd-5.1:rules:starter-v1"
+    ? Math.min(profile.maxLevel, Math.max(...executableLevels.map((value: any) => value.mechanics?.level ?? 0)))
+    : profile.maxLevel;
+  const levels=resolveSelectedClassProgression({selectedClass,availableDefinitions:referencedLevels,profileMaximum:maximum});
+  const raceRow=db.prepare(`SELECT definition.definition_json,definition.pack_id,definition.pack_version,definition.kind,definition.definition_id
+    FROM rpg_campaign_sheets sheet
     JOIN rpg_catalog_definitions definition ON definition.pack_id=sheet.race_pack_id AND definition.pack_version=sheet.race_pack_version
-      AND definition.kind='race' AND definition.definition_id=sheet.race_definition_id WHERE sheet.id=?`).get(row.sheet_id) as {definition_json:string}|undefined;
+      AND definition.kind='race' AND definition.definition_id=sheet.race_definition_id
+    JOIN rpg_content_packs pack ON pack.pack_id=definition.pack_id AND pack.pack_version=definition.pack_version
+      AND pack.rules_profile_id=? WHERE sheet.id=?`).get(profile.rulesProfileId,row.sheet_id) as {definition_json:string;pack_id:string;pack_version:string;kind:string;definition_id:string}|undefined;
   if(!raceRow)throw new Error("selected race definition is unavailable");
-  const selectedRace=JSON.parse(raceRow.definition_json);
-  return {selectedClass,selectedRace,levels,profile,initialPowers:resolveInitialKnownPowers({selectedRace,levels})};
+  const selectedRace=raceCatalogDefinitionSchema.parse(JSON.parse(raceRow.definition_json));
+  if (selectedRace.reference.packId !== raceRow.pack_id || selectedRace.reference.packVersion !== raceRow.pack_version
+    || selectedRace.reference.kind !== raceRow.kind || selectedRace.reference.definitionId !== raceRow.definition_id) {
+    throw new Error("selected race definition provenance is inconsistent");
+  }
+  const bootstrap = db.prepare("SELECT initial_powers_json FROM character_progression_bootstrap_v24 WHERE campaign_character_id=?")
+    .get(row.campaign_character_id) as { initial_powers_json: string } | undefined;
+  return {selectedClass,selectedRace,raceRef:selectedRace.reference,levels,profile,initialPowers:bootstrap
+    ? JSON.parse(bootstrap.initial_powers_json)
+    : resolveInitialKnownPowers({selectedRace,levels})};
 }
 
 export function readKnownPowerReferences(db:DatabaseDriver.Database,characterId:string){
@@ -53,9 +70,9 @@ export function calculateAuthoritativeProgressionPreview(db:DatabaseDriver.Datab
   const health=resources.find((resource)=>resource.name==="health");if(!health)throw new Error("health resource is unavailable");
   const known=readKnownPowerReferences(db,row.campaign_character_id);
   return calculateCharacterProgression({campaignCharacterId:row.campaign_character_id,revision:row.revision,profile:catalog.profile,
-    selectedClassRef:(catalog.selectedClass as any).reference,
+     selectedClassRef:(catalog.selectedClass as any).reference,raceRef:catalog.raceRef,
     currentLevel:row.level,totalXp:row.total_xp,milestoneCount:row.milestone_count,currentHp:health.current,
-    currentDerived:JSON.parse(row.derived_json),derivedBase:{scores:attributes as any,raceSpeed:(catalog.selectedRace as any).mechanics.speed,
+       currentDerived:JSON.parse(row.derived_json),derivedBase:{scores:attributes as any,raceSpeed:catalog.selectedRace.mechanics.speed,
       spellcastingAttribute:(catalog.selectedClass as any).mechanics.primaryAttribute},classLevels:catalog.levels,
     knownAbilities:known.filter((ref)=>ref.kind==="ability") as any,knownSpells:known.filter((ref)=>ref.kind==="spell") as any,
     resources:resources.filter((resource)=>resource.name!=="health").map((resource)=>({resourceId:resource.name,current:resource.current,max:resource.max})),selections},{rulesetId:ruleset.rulesetId,rulesetVersion:ruleset.rulesetVersion});

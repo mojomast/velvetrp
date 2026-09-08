@@ -39,7 +39,7 @@ export const adventureCombatConsumableCandidateSchema=z.object({candidateId:reso
 
 const combatPowerConsequenceSchema=z.object({kind:z.enum(["damage","healing","effect"]),label:displayTextSchema}).strict();
 export const adventureCombatPowerCandidateSchema=z.object({candidateId:resourceIdSchema,digest:canonicalSha256DigestSchema,
-  powerName:displayTextSchema,target:displayTextSchema,actionCost:z.literal("action"),costs:z.array(displayTextSchema).max(1),
+  powerName:displayTextSchema,target:displayTextSchema,actionCost:z.enum(["action","bonus-action"]),costs:z.array(displayTextSchema).max(1),
   consequences:z.array(combatPowerConsequenceSchema).min(1).max(16),concentration:z.boolean(),confirmationRequired:z.literal(true)}).strict();
 
 const combatConsumableOutcomeSchema=z.discriminatedUnion("kind",[
@@ -66,7 +66,7 @@ const combatPowerOutcomeSchema=z.discriminatedUnion("kind",[
   z.object({kind:z.literal("effect"),effect:displayTextSchema,replacedConcentration:z.boolean()}).strict(),
 ]);
 export const adventureCombatPowerPublicReceiptSchema=z.object({powerName:displayTextSchema,target:displayTextSchema,
-  actionCost:z.literal("action"),costs:z.array(deltaSchema).max(1),outcomes:z.array(combatPowerOutcomeSchema).min(1).max(16),
+  actionCost:z.enum(["action","bonus-action"]),costs:z.array(deltaSchema).max(1),outcomes:z.array(combatPowerOutcomeSchema).min(1).max(16),
   concentration:z.boolean(),roundBefore:revisionSchema,roundAfter:revisionSchema,revisionBefore:revisionSchema,
   revisionAfter:revisionSchema,occurredAt:utcIsoTimestampSchema}).strict().refine(value=>value.revisionAfter===value.revisionBefore+1,
     "combat power receipt revision must advance once");

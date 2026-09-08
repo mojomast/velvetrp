@@ -27,6 +27,7 @@ type RaceCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "ra
 type BackgroundCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "background" } }>;
 type ClassCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class" } }>;
 type ClassLevelCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "class-level" } }>;
+type SpellCatalogDefinition = Extract<CatalogDefinition, { reference: { kind: "spell" } }>;
 type SelectedDefinitions = {
   race: RaceCatalogDefinition;
   background: BackgroundCatalogDefinition;
@@ -42,6 +43,11 @@ export interface CharacterBuilderViewMappers {
     definitions: CatalogDefinition[],
     selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>,
   ): SelectedDefinitions | null;
+  preparedSpellDefinitions(
+    definitions: CatalogDefinition[],
+    selections: ReturnType<typeof characterBuilderSelectionsSchema.parse>,
+  ): SpellCatalogDefinition[];
+  raceAbilityDefinitions(race: RaceCatalogDefinition, definitions: CatalogDefinition[]): CatalogDefinition[] | null;
   grantsFor(background: BackgroundCatalogDefinition, choice: "kit" | "currency"): CharacterStartingGrant[];
 }
 
@@ -81,11 +87,17 @@ export function buildView(
   let pinChanged = false;
   try { pinChanged = !mappers.pinsMatchCurrent(db, row.campaign_id, row.rules_profile_id, pins); } catch { pinChanged = true; }
   const chosen = mappers.selectedDefinitions(definitions, selections);
-  const issues: Array<{ code: "missing-race" | "missing-background" | "missing-class" | "missing-starter-grant" | "expired" | "pins-changed" | "definition-unavailable" | "persona-unavailable" | "controller-unavailable"; path: string; message: string }> = [];
+  const preparedSpells = mappers.preparedSpellDefinitions(definitions, selections);
+  const issues: Array<{ code: "missing-race" | "missing-background" | "missing-class" | "missing-starter-grant" | "missing-prepared-spells" | "expired" | "pins-changed" | "definition-unavailable" | "persona-unavailable" | "controller-unavailable"; path: string; message: string }> = [];
   if (!selections.race) issues.push({ code: "missing-race", path: "selections.race", message: "Select one race." });
   if (!selections.background) issues.push({ code: "missing-background", path: "selections.background", message: "Select one background." });
   if (!selections.class) issues.push({ code: "missing-class", path: "selections.class", message: "Select one class." });
   if (!selections.starterGrant) issues.push({ code: "missing-starter-grant", path: "selections.starterGrant", message: "Select a starter kit or currency." });
+  if (preparedSpells.length) {
+    const permitted = new Set(preparedSpells.map(({ reference }) => `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`));
+    const selected = selections.preparedSpells.map((reference) => `${reference.packId}\0${reference.packVersion}\0${reference.kind}\0${reference.definitionId}`);
+    if (selected.length !== preparedSpells.length || new Set(selected).size !== selected.length || selected.some((key) => !permitted.has(key))) issues.push({ code: "missing-prepared-spells", path: "selections.preparedSpells", message: "Select each exact prepared spell for this bounded class." });
+  }
   if (effectiveExpiry) issues.push({ code: "expired", path: "expiresAt", message: "This expiring draft is no longer effective." });
   if (pinChanged) issues.push({ code: "pins-changed", path: "pins", message: "Campaign content pins no longer match this draft." });
   const persona = db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(row.persona_id) as { fictional_confirmed: number; is_real_person: number } | undefined;
@@ -112,12 +124,13 @@ export function buildView(
     id: row.id, campaignId: row.campaign_id, personaId: row.persona_id, controllerPrincipalId: row.controller_principal_id,
     role, status: row.status, durability: row.durability, expiresAt: row.expires_at, effectivelyExpired: effectiveExpiry,
     revision: row.revision, rulesProfileId: row.rules_profile_id, rulesetId, rulesetVersion, pins, allocation, selections,
-    choiceGroups: [
+     choiceGroups: [
       { id: "race", required: true, options: definitions.filter((value) => value.reference.kind === "race").map(option) },
       { id: "background", required: true, options: definitions.filter((value) => value.reference.kind === "background").map(option) },
       { id: "class", required: true, options: definitions.filter((value) => value.reference.kind === "class").map(option) },
-      { id: "starter-grant", required: true, options: ["kit", "currency"] },
-    ],
+       { id: "starter-grant", required: true, options: ["kit", "currency"] },
+       ...(preparedSpells.length ? [{ id: "prepared-spells" as const, required: true as const, options: preparedSpells.map(option) }] : []),
+     ],
     completion: characterBuilderCompletionSchema.parse({ complete: issues.length === 0, issues }),
     derivedPreview: derived, startingGrants: grants, createdAt: row.created_at, updatedAt: row.updated_at,
   });

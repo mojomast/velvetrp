@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCharacterProgressionInputSchema, grantCharacterXpInputSchema, progressionProfileSchema,
-  progressionReasonSchema,
+  progressionReasonSchema, classLevelCatalogDefinitionSchema, SRD_5_1_STARTER_IDENTITY,
 } from "../src/index.js";
 
 describe("character progression contracts",()=>{
@@ -18,5 +18,12 @@ describe("character progression contracts",()=>{
   it("bounds and trims correction reasons",()=>{
     expect(progressionReasonSchema.parse(" A clear reason ")).toBe("A clear reason");
     expect(()=>progressionReasonSchema.parse("x".repeat(501))).toThrow();
+  });
+  it("keeps level rewards closed to catalog resource capacities",()=>{
+    const reference={packId:SRD_5_1_STARTER_IDENTITY.packId,packVersion:SRD_5_1_STARTER_IDENTITY.packVersion,kind:"class-level" as const,definitionId:"srd-5.1:class-level:barbarian-1"};
+    const classRef={packId:reference.packId,packVersion:reference.packVersion,kind:"class" as const,definitionId:"srd-5.1:class:barbarian"};
+    const ability={packId:reference.packId,packVersion:reference.packVersion,kind:"ability" as const,definitionId:"srd-5.1:ability:barbarian-rage"};
+    expect(classLevelCatalogDefinitionSchema.parse({reference,name:"Barbarian Level 1",description:"Bounded",tags:["srd-5.1"],mechanics:{classRef,level:1,proficiencyBonus:2,hpGain:12,abilityRefs:[ability],spellRefs:[],resourceGrants:[{resourceId:"rage",maxIncrease:2,currentIncrease:2}]}}).mechanics.resourceGrants).toEqual([{resourceId:"rage",maxIncrease:2,currentIncrease:2}]);
+    expect(()=>classLevelCatalogDefinitionSchema.parse({reference,name:"Forged",description:"Bounded",tags:["srd-5.1"],mechanics:{classRef,level:1,proficiencyBonus:2,hpGain:12,abilityRefs:[ability],spellRefs:[],resourceGrants:[{resourceId:"rage",maxIncrease:1,currentIncrease:2}]}})).toThrow();
   });
 });

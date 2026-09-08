@@ -94,12 +94,13 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
   const getState = (row: ProgressionRootRow, pendingOverride?: ProgressionPreview["pendingChoices"]): ProgressionState => {
     loadCanonicalProgressionProfile(db, row.profile_id);
     const refs = getValidatedKnownPowers(row);
+    const catalog = loadExactProgressionCatalog(db, row);
     const derived = JSON.parse(row.derived_json);
     if (resolveCampaignRuleset(db, row.campaign_id).rulesetId === "dnd-5e") {
       derived.armorClass = resolveSrdEquipment(db, row.campaign_id, row.actor_id).armorClass;
     }
     return progressionStateSchema.parse({ campaignCharacterId: row.campaign_character_id, campaignId: row.campaign_id, sheetId: row.sheet_id, actorId: row.actor_id,
-      profile: loadCanonicalProgressionProfile(db, row.profile_id), classRef: { kind: "class", packId: row.class_pack_id, packVersion: row.class_pack_version, definitionId: row.class_definition_id },
+       profile: loadCanonicalProgressionProfile(db, row.profile_id), classRef: { kind: "class", packId: row.class_pack_id, packVersion: row.class_pack_version, definitionId: row.class_definition_id }, raceRef: catalog.raceRef, race: catalog.selectedRace,
       level: row.level, totalXp: row.total_xp, milestoneCount: row.milestone_count, revision: row.revision, pendingChoices: pendingOverride ?? pendingFor(row),
       knownAbilities: refs.filter((ref) => ref.kind === "ability"), knownSpells: refs.filter((ref) => ref.kind === "spell"), derived, updatedAt: row.updated_at });
   };

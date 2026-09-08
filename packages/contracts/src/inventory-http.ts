@@ -44,6 +44,8 @@ export const inventoryHttpEquipCommandRequestSchema = z.object({
   kind: z.literal("equip"),
   slot: equipmentSlotSchema,
   entryId: inventoryEntryIdSchema,
+  hand: z.enum(["main", "off"]).optional(),
+  grip: z.enum(["one-handed", "two-handed"]).optional(),
   ...commandBase,
 }).strict();
 export const inventoryHttpUnequipCommandRequestSchema = z.object({
@@ -95,6 +97,8 @@ export const inventoryHttpEquipCommandReceiptSchema = z.object({
   kind: z.literal("equip"),
   slot: equipmentSlotSchema,
   entryId: inventoryEntryIdSchema,
+  hand: z.enum(["main", "off"]).optional(),
+  grip: z.enum(["one-handed", "two-handed"]).optional(),
   ...receiptBase,
 }).strict().refine(receiptRevision, "inventory command advances exactly one revision");
 export const inventoryHttpUnequipCommandReceiptSchema = z.object({

@@ -20,8 +20,10 @@ export function calculateCharacterProgression(
     ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
     : Math.min(value.profile.maxLevel, 1 + value.milestoneCount);
   // Compensation never silently removes an already applied level.
-  const eligibleLevel = Math.max(value.currentLevel, thresholdLevel);
+  const maximumClassLevel = Math.max(...value.classLevels.map((step) => step.mechanics.level));
+  const eligibleLevel = Math.max(value.currentLevel, Math.min(thresholdLevel, maximumClassLevel));
   const classKey=refKey(value.selectedClassRef),seenLevels=new Set<number>();
+  if (value.raceRef.kind !== "race") throw new Error("progression ancestry reference is not a race");
   for(const step of value.classLevels){if(refKey(step.mechanics.classRef)!==classKey)throw new Error("progression class level has a mismatched selected class");
     if(seenLevels.has(step.mechanics.level))throw new Error("progression catalog contains a duplicate class level");seenLevels.add(step.mechanics.level);}
   const byLevel = new Map(value.classLevels.map((step) => [step.mechanics.level, step]));
@@ -46,10 +48,12 @@ export function calculateCharacterProgression(
       }
     }
     const before = derived;
-    const durabilityScore="constitution" in value.derivedBase.scores
-      ? value.derivedBase.scores.constitution : value.derivedBase.scores.resolve;
+    // The repository persists race-adjusted scores; do not apply ancestry bonuses again.
+    const persistedScores = value.derivedBase.scores;
+    const durabilityScore="constitution" in persistedScores
+      ? persistedScores.constitution : persistedScores.resolve;
     if (durabilityScore === undefined) throw new Error("progression requires a durability ability score");
-    const after = calculateCharacterDerivedStats({ ...(rulesetIdentity ?? {}), scores: value.derivedBase.scores, racialBonuses: {},
+    const after = calculateCharacterDerivedStats({ ...(rulesetIdentity ?? {}), scores: persistedScores, racialBonuses: {},
       classHp: before.maxHp + step.mechanics.hpGain - Math.floor((durabilityScore - 10) / 2),
       raceSpeed: value.derivedBase.raceSpeed, proficiencyBonus: step.mechanics.proficiencyBonus,
       spellcastingAttribute: value.derivedBase.spellcastingAttribute });

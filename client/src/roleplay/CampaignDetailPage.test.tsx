@@ -31,7 +31,7 @@ const configured = { ...unconfigured, id: "campaign-two", name: "Second Road", a
 const ownerUnconfigured = { ...unconfigured, actorRole: "owner" as const };
 const starterConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:original-narrative", contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }] } };
 const mechanicsConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:starter-v1", contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] } };
-const srdConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "srd-5.1:rules:starter-v1", contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.1.0+2b1f05336aac" }] } };
+const srdConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "srd-5.1:rules:starter-v1", contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.2.0+7f94bb928392" }] } };
 const starter = {
   rulesProfile: { rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Narrative" as const, description: "Metadata identity for Velvet's original narrative starter concepts." as const },
   pack: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Starter" as const, description: "A small original fantasy collection for future campaign setup." as const },
@@ -1245,7 +1245,7 @@ describe("CampaignDetailPage", () => {
     expect(screen.getByRole("radio", { name: /Original metadata starter/i })).toBeTruthy();
     expect(screen.getByRole("radio", { name: /Velvet mechanics starter/i })).toBeTruthy();
     expect(screen.getByText("srd-5.1:rules:starter-v1")).toBeTruthy();
-    expect(screen.getAllByText("srd-5.1:starter@1.1.0+2b1f05336aac")).toHaveLength(2);
+     expect(screen.getAllByText("srd-5.1:starter@1.2.0+7f94bb928392")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("radio", { name: /Original metadata starter/i }));
     expect((srd as HTMLInputElement).checked).toBe(false);

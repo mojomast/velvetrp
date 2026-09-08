@@ -18,6 +18,7 @@ import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./
 import { actorIdSchema } from "./rpg-characters.js";
 import { diceRollResultSchema } from "./rpg-dice.js";
 import { inventoryEntryIdSchema } from "./inventory.js";
+import { mapPointSchema } from "./tactical-map.js";
 
 export const encounterNameSchema = z.string().trim().min(1).max(200);
 
@@ -165,9 +166,12 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
 
 export const combatLegalActionSchema = z.object({
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
   targetIds: z.array(resourceIdSchema).max(128),
   cost: z.enum(["action", "bonus-action", "reaction"]).nullable().optional(),
+  targetEvidence: z.array(z.object({ targetCombatantId: resourceIdSchema, lineOfEffect: z.enum(["clear", "blocked"]),
+    cover: z.enum(["none", "half", "three-quarters", "full"]), blockedBy: z.array(mapPointSchema).max(10_000),
+    reason: z.enum(["full-cover", "unsupported-geometry"]).optional() }).strict()).max(128).optional(),
 }).strict();
 
 const combatTurnResourceSchema = z.object({
@@ -192,6 +196,14 @@ export const combatTurnEconomySchema = z.object({
   "remaining movement must match the safe unused allowance"),
 }).strict();
 
+/** Server-derived reaction state; reactions are encounter-wide, not turn-local. */
+export const combatReactionAvailabilitySchema = z.object({
+  combatantId: resourceIdSchema,
+  round: z.number().int().min(1).max(1_000_000),
+  available: z.boolean(),
+  used: z.boolean(),
+}).strict().refine((value) => value.available !== value.used, "reaction availability must be the inverse of use");
+
 export const combatStateSchema = z.object({
   combatId: resourceIdSchema,
   round: z.number().int().min(1).max(1_000_000),
@@ -199,6 +211,7 @@ export const combatStateSchema = z.object({
   combatants: z.array(combatantStateSchema).min(1).max(128),
   legalActions: z.array(combatLegalActionSchema).max(128),
   turnEconomy: combatTurnEconomySchema.nullable().optional(),
+  reactionAvailability: z.array(combatReactionAvailabilitySchema).max(128).optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -245,6 +258,7 @@ export const combatReadResponseSchema = z.object({
   combatants: z.array(combatantStateSchema).min(1).max(128),
   legalActions: z.array(combatLegalActionSchema).max(128),
   turnEconomy: combatTurnEconomySchema.nullable().optional(),
+  reactionAvailability: z.array(combatReactionAvailabilitySchema).max(128).optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -327,6 +341,21 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
     hit: z.boolean().optional(),
     critical: z.boolean().optional(),
     damageRolls: z.array(z.number().int().min(1).max(100)).max(40).optional(),
+    attackAbility: z.enum(["strength", "dexterity"]).optional(),
+    attackModifier: z.number().int().optional(),
+    rangeFeet: z.number().int().min(0).max(2_000).optional(),
+    normalRangeFeet: z.number().int().min(0).max(2_000).optional(),
+    longRangeFeet: z.number().int().min(0).max(2_000).optional(),
+    disadvantage: z.boolean().optional(),
+    ammunitionResourceId: resourceIdSchema.optional(),
+    ammunitionBefore: z.number().int().min(0).optional(),
+    ammunitionAfter: z.number().int().min(0).optional(),
+    thrownItemEntryId: resourceIdSchema.optional(),
+    thrownItemBefore: z.number().int().min(1).optional(),
+    thrownItemAfter: z.number().int().min(0).optional(),
+    targetEvidence: z.array(z.object({ targetCombatantId: resourceIdSchema, lineOfEffect: z.enum(["clear", "blocked"]),
+      cover: z.enum(["none", "half", "three-quarters", "full"]), blockedBy: z.array(mapPointSchema).max(10_000),
+      reason: z.enum(["full-cover", "unsupported-geometry"]).optional() }).strict()).max(128).optional(),
     hitPointsBefore: z.number().int().min(0).max(1_000_000),
     hitPointsAfter: z.number().int().min(0).max(1_000_000),
     statusBefore: z.enum(["active", "unconscious", "stable"]),
@@ -346,12 +375,21 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
     failures: z.number().int().min(0).max(3),
     statusAfter: z.enum(["active", "unconscious", "stable", "dead"]),
   }).strict(),
+  z.object({
+    kind: z.literal("contest"),
+    targetId: resourceIdSchema,
+    contest: z.enum(["grapple", "escape-grapple"]),
+    attackerRoll: z.number().int().min(1).max(20),
+    defenderRoll: z.number().int().min(1).max(20),
+    success: z.boolean(),
+    condition: z.literal("grappled").optional(),
+  }).strict(),
 ]);
 
 export const combatActionResolutionSchema = z.object({
   actionId: resourceIdSchema,
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
   outcomes: z.array(combatActionOutcomeSchema).max(1),
@@ -385,6 +423,25 @@ export const combatActionResolutionSchema = z.object({
         || outcome.roll === undefined) {
       context.addIssue({ code: "custom", message: "death save resolution must contain one server roll" });
     }
+  } else if (resolution.kind === "grapple") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || outcome?.kind !== "contest" || outcome.targetId !== resolution.targetIds[0]
+        || outcome.contest !== "grapple") {
+      context.addIssue({ code: "custom", message: "grapple resolution must contain one exact contest outcome" });
+    }
+  } else if (resolution.kind === "escape-grapple") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || outcome?.kind !== "contest" || outcome.targetId !== resolution.actingCombatantId
+        || outcome.contest !== "escape-grapple") {
+      context.addIssue({ code: "custom", message: "grapple escape resolution must contain one exact contest outcome" });
+    }
+  } else if (resolution.kind === "help") {
+    if (resolution.targetIds.length !== 1 || resolution.outcomes.length !== 0) {
+      context.addIssue({ code: "custom", message: "help resolution must contain one ally target and no client-authored outcome" });
+    }
+  } else if (["dash", "disengage", "hide"].includes(resolution.kind)
+      && (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0)) {
+    context.addIssue({ code: "custom", message: "utility action cannot contain targets or outcomes" });
   } else if (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0) {
     context.addIssue({ code: "custom", message: "end turn cannot contain targets or outcomes" });
   }

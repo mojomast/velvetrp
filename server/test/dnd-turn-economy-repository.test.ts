@@ -29,9 +29,12 @@ describe("persisted D&D turn economy",()=>{
     const session=await createSession({characterId:persona.id,title:"Combat"});repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
     const template=definitions.find(d=>d.reference.definitionId==="srd-5.1:enemy-template:goblin")!.reference as any;
     const prepared=repo.createEncounter("local-owner",campaign.id,{sessionId:session.id,name:"Fight",combatants:[{kind:"actor",actorId:actor,team:"allies"},{kind:"enemy",template,team:"enemies"}],idempotencyKey:"prepare"});
-    let combat=repo.startEncounter("local-owner",prepared.encounter.encounterId,{expectedRevision:1,idempotencyKey:"start"}).combat;
-    const first=combat.turnEconomy!;expect(first).toMatchObject({action:{available:true,used:false},bonusAction:{available:true},reaction:{available:true},movement:{allowanceFeet:30,usedFeet:0,remainingFeet:30}});
-    const target=combat.combatants.find(c=>c.kind==="enemy")!;
+     let combat=repo.startEncounter("local-owner",prepared.encounter.encounterId,{expectedRevision:1,idempotencyKey:"start"}).combat;
+     const first=combat.turnEconomy!;expect(first).toMatchObject({action:{available:true,used:false},bonusAction:{available:true},reaction:{available:true},movement:{allowanceFeet:30,usedFeet:0,remainingFeet:30}});
+     const legal=repo.getLegalCombatActionAllowlist("local-owner",campaign.id,combat.combatId)!;
+     expect(legal.actions).toEqual(expect.arrayContaining([{kind:"dash"},{kind:"disengage"},{kind:"hide"},{kind:"flee"},{kind:"end-turn"}]));
+     expect(legal.actions.filter(action=>action.kind==="end-turn")).toHaveLength(1);
+     const target=combat.combatants.find(c=>c.kind==="enemy")!;
     const request={legalActionId:combat.legalActions.find(a=>a.kind==="attack")!.legalActionId,targetIds:[target.combatantId],choices:[] as [],expectedRevision:combat.revision,idempotencyKey:"attack"};
     const result=repo.resolveCombatAction("local-owner",combat.combatId,request);combat=result.combat;
     expect(result.resolution.outcomes[0]).toMatchObject({damageType:"slashing",critical:true,damageRolls:[1,1],requested:5,attackTotal:25});
@@ -89,6 +92,34 @@ describe("persisted D&D turn economy",()=>{
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);db.close();
     await app.close();repo.close();
     delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;delete process.env.FEATURE_RPG_COMBAT;
+  });
+
+  it("executes a projected D&D utility action through the legacy command API", async () => {
+    let sequence = 0;
+    const options = { clock: { now: () => new Date("2036-01-01T00:00:00.000Z") }, ids: { nextId: () => `utility-${++sequence}` }, rng: { integer: () => 20 } };
+    const repo = createRepository(options);
+    const campaign = repo.createCampaign("local-owner", { name: "Utility action" });
+    repo.installSrdStarterCatalog("local-owner");
+    repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });
+    const persona = repo.createCharacter({ name: "Utility Hero", age: 30, archetype: "Fighter", boundaries: "", fictionalConfirmed: true });
+    const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable",
+      allocation: { method: "standard-array", scores: Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((key, i) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[i]])) as any }, idempotencyKey: "draft" });
+    const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+    const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: "select", selections: {
+      race: definitions.find(d => d.reference.kind === "race")!.reference, background: definitions.find(d => d.reference.kind === "background")!.reference,
+      class: definitions.find(d => d.reference.kind === "class")!.reference, starterGrant: "kit" } } as any);
+    const actor = repo.finalizeCharacterDraft("local-owner", draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: "final" }).receipt.actorId;
+    const session = await createSession({ characterId: persona.id, title: "Utility combat" });
+    repo.attachCampaignSession("local-owner", { campaignId: campaign.id, sessionId: session.id } as any);
+    const prepared = repo.createEncounter("local-owner", campaign.id, { sessionId: session.id, name: "Utility fight", combatants: [{ kind: "actor", actorId: actor, team: "allies" }], idempotencyKey: "prepare" });
+    const combat = repo.startEncounter("local-owner", prepared.encounter.encounterId, { expectedRevision: 1, idempotencyKey: "start" }).combat;
+    const combatantId = combat.combatants.find(value => value.kind === "actor")!.combatantId;
+    expect(repo.getLegalCombatActionAllowlist("local-owner", campaign.id, combat.combatId)?.actions).toContainEqual({ kind: "dash" });
+    const result = repo.executeEncounterCommand("local-owner", { type: "dash", campaignId: campaign.id, encounterId: combat.combatId, combatantId,
+      actionId: "dash-action", submittedAt: options.clock.now().toISOString(), expectedRevision: combat.revision, idempotencyKey: "dash" });
+    expect(result.receipt.revisionBefore).toBe(combat.revision);
+    expect(result.status).toBe("active");
+    repo.close();
   });
 
   it("rejects an unavailable exact pin and ends a pinned enemy turn with no actor target",async()=>{

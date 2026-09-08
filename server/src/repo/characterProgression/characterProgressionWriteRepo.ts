@@ -91,6 +91,8 @@ export function initializeCharacterProgressionV24(
     actorId: string;
     classRef: { packId: string; packVersion: string; definitionId: string };
     derived: CharacterDerivedStats;
+    preparedSpells?: Array<{ packId: string; packVersion: string; kind: "spell"; definitionId: string }>;
+    preparedSpellSource?: { packId: string; packVersion: string; kind: "class-level"; definitionId: string };
     now: string;
     mode?: "xp" | "milestone";
   },
@@ -147,8 +149,13 @@ export function initializeCharacterProgressionV24(
         "SELECT race_pack_id,race_pack_version,race_definition_id FROM rpg_campaign_sheets WHERE id=?",
       )
       .get(input.sheetId) as any,
-    levelsJson = canonicalCatalogJson(catalog.levels),
-    powersJson = canonicalCatalogJson(catalog.initialPowers);
+     levelsJson = canonicalCatalogJson(catalog.levels),
+     initialPowers = [...catalog.initialPowers, ...(input.preparedSpells ?? []).map((reference) => ({
+       reference,
+       source: "class-level" as const,
+       sourceReference: input.preparedSpellSource!,
+     }))],
+     powersJson = canonicalCatalogJson(initialPowers);
   db.prepare(
     `INSERT INTO character_progression_bootstrap_v24(campaign_character_id,race_pack_id,race_pack_version,race_kind,race_definition_id,class_progression_json,class_progression_digest,initial_powers_json,initial_powers_digest,created_at) VALUES(?,?,?,'race',?,?,?,?,?,?)`,
   ).run(
@@ -159,7 +166,7 @@ export function initializeCharacterProgressionV24(
     levelsJson,
     progressionCatalogDigest(catalog.levels),
     powersJson,
-    progressionCatalogDigest(catalog.initialPowers),
+    progressionCatalogDigest(initialPowers),
     input.now,
   );
   db.prepare(
@@ -182,7 +189,7 @@ export function initializeCharacterProgressionV24(
     sourceInsert = db.prepare(
       `INSERT INTO character_known_power_sources_v24(campaign_character_id,kind,pack_id,pack_version,definition_id,source_kind,source_reference_json,source_digest) VALUES(?,?,?,?,?,?,?,?)`,
     );
-  for (const source of catalog.initialPowers) {
+  for (const source of initialPowers) {
     const reference = source.reference,
       sourceJson = canonicalCatalogJson(source.sourceReference);
     power.run(

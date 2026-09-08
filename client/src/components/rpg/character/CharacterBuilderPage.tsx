@@ -42,7 +42,7 @@ const createLockKey = (campaignId: string, personaId: string) => `new:${campaign
 function publish(key: string, lock: DraftLock | null) { if (lock) draftLocks.set(key, lock); else draftLocks.delete(key); for (const listener of draftListeners) listener(key, lock); }
 function idempotency(kind: string) { const value = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`; return `ui-${kind}-${value}`; }
 function knownNonCommit(error: unknown) { return error instanceof ApiInputError || (error instanceof ApiError && [400, 404, 415, 422].includes(error.status)); }
-function issueTarget(path: string): string { const part = path.split(".").at(-1); return `builder-choice-${part === "starterGrant" ? "starter-grant" : part}`; }
+function issueTarget(path: string): string { const part = path.split(".").at(-1); return `builder-choice-${part === "starterGrant" ? "starter-grant" : part === "preparedSpells" ? "prepared-spells" : part}`; }
 function markerKey(campaignId: string, personaId: string): string { return `${campaignId.length}:${campaignId}${personaId}`; }
 function readCreateMarkers(): Record<string, AmbiguousCreateMarker> {
   try {

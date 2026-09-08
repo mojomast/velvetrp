@@ -1,4 +1,4 @@
-import type { CombatLegalAction, UseConsumableLegalAction } from "@velvet/contracts";
+import type { CombatLegalAction, DirectCombatPowerCandidate, UseConsumableLegalAction } from "@velvet/contracts";
 import { useEffect, useMemo, useState } from "react";
 
 export interface LegalActionTrayProps {
@@ -9,6 +9,8 @@ export interface LegalActionTrayProps {
   onSubmit: (action: CombatLegalAction, targetIds: string[]) => void;
   consumableActions?:readonly UseConsumableLegalAction[];
   onUseConsumable?:(action:UseConsumableLegalAction)=>void;
+  powerActions?:readonly DirectCombatPowerCandidate[];
+  onUsePower?:(action:DirectCombatPowerCandidate)=>void;
 }
 
 type SupportedKind = "attack" | "flee" | "end-turn" | "stabilize" | "death-save";
@@ -27,7 +29,7 @@ const actionExplanation = (kind: SupportedKind) => ({
  * Builds every control from the current server allowlist. Unsupported protocol
  * kinds are structurally absent until the action resolution contract supports them.
  */
-export function LegalActionTray({ legalActions, consumableActions=[],combatantLabels = new Map(), disabled = false, busy = false, onSubmit,onUseConsumable }: LegalActionTrayProps) {
+export function LegalActionTray({ legalActions, consumableActions=[],powerActions=[],combatantLabels = new Map(), disabled = false, busy = false, onSubmit,onUseConsumable,onUsePower }: LegalActionTrayProps) {
   const actions = useMemo(() => legalActions.filter(supported), [legalActions]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function LegalActionTray({ legalActions, consumableActions=[],combatantLa
         {consumableActions.map((action)=><button key={action.legalActionId} type="button" disabled={disabled||busy||!onUseConsumable}
           onClick={()=>onUseConsumable?.(action)}>Use {action.item.definitionId} on {combatantLabels.get(action.target.combatantId)??action.target.combatantId}</button>)}
       </div><p className="combat-restriction">Quantity 1 · Cost: {consumableActions[0]?.actionCost}. Each option has exactly one server-selected target.</p></section>}
+      {powerActions.length>0&&<section aria-labelledby="power-actions-heading"><h3 id="power-actions-heading">Combat powers</h3><div className="legal-action-buttons">{powerActions.map(action=><button key={action.legalActionId} type="button" disabled={disabled||busy||!onUsePower} onClick={()=>onUsePower?.(action)}>Use {action.powerName}</button>)}</div><p className="combat-restriction">Each power and target is an exact server-issued option.</p></section>}
       {selected && requiresTarget && <fieldset className="legal-targets"><legend>{selected.kind === "stabilize" ? "Unconscious allies the server allows you to stabilize" : "Valid targets returned for this action"}</legend>
         {selected.targetIds.length === 0 ? <p className="combat-restriction">The server returned no valid targets, so this action cannot be submitted.</p> : selected.targetIds.map((id) => <label key={id}><input type="radio" name={`target-${selected.legalActionId}`} checked={targetId === id} disabled={disabled || busy} onChange={() => { setTargetId(id); setReviewing(false); }} /><span><bdi dir="auto">{combatantLabels.get(id) ?? "Combatant"}</bdi></span></label>)}
       </fieldset>}

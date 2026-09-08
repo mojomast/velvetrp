@@ -121,6 +121,8 @@ import type { EconomyRepository } from "../../../repo/economyRepo.js";
 import { actorChecksHttpRoutes } from "./actorChecks.js";
 import type { CheckRepository } from "../../../repo/checkRepo.js";
 import { actorPowersHttpRoutes } from "./actorPowers.js";
+import { spellcastingHttpRoutes } from "./spellcasting.js";
+import type { SpellcastingRepository } from "../../../repo/spellcastingRepo.js";
 import type { PowerRepository } from "../../../repo/powerRepo.js";
 import { actorEffectsHttpRoutes } from "./actorEffects.js";
 import type { EffectRepository } from "../../../repo/effectRepo.js";
@@ -129,6 +131,7 @@ import type { EncounterRepository } from "../../../repo/encounterRepo.js";
 import { combatReadsHttpRoutes } from "./combatReads.js";
 import { combatCommandsHttpRoutes } from "./combatCommands.js";
 import { combatConsumablesHttpRoutes } from "./combatConsumables.js";
+import { combatPowersHttpRoutes } from "./combatPowers.js";
 import { worldHttpRoutes } from "./worldRoutes.js";
 import type { WorldRepository } from "../../../repo/worldRepo.js";
 import {npcHttpRoutes} from "./npcRoutes.js";
@@ -162,11 +165,13 @@ export interface CampaignListRepository extends
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
   Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
+  Partial<Pick<SpellcastingRepository, "castSpell">>,
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
   Partial<Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
   Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
+  Partial<Pick<EncounterRepository, "getCombatPowerLegalActions" | "useCombatPower" | "getCombatPowerResultByKey">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
   Partial<Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">>,
@@ -318,10 +323,12 @@ type RestLaneRepository = Pick<RestRepository, "takeRest">;
 type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
+type SpellcastingLaneRepository = Pick<SpellcastingRepository, "castSpell">;
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
 type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter">;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
 type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
+type CombatPowerLaneRepository=Pick<EncounterRepository,"getCombatPowerLegalActions"|"useCombatPower"|"getCombatPowerResultByKey">;
 type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"establishCamp"|"placeActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
@@ -472,6 +479,9 @@ function assertPowerRepository(repository: CampaignListRepository): asserts repo
   if (typeof repository.getActorPowerSnapshot !== "function"
     || typeof repository.useActorPower !== "function") throw new UnsupportedCampaignRepositoryError();
 }
+function assertSpellcastingRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & SpellcastingLaneRepository {
+  if (typeof repository.castSpell !== "function") throw new UnsupportedCampaignRepositoryError();
+}
 function assertEffectRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EffectLaneRepository {
   if (typeof repository.getActorEffectSnapshot !== "function"
     || typeof repository.mutateActorEffect !== "function") throw new UnsupportedCampaignRepositoryError();
@@ -489,6 +499,7 @@ function assertCombatCommandRepository(repository: CampaignListRepository): asse
   if(typeof repository.resolveCombatAction!=="function"||typeof repository.executeCombatEnemyTurn!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function"||typeof repository.claimCombatReward!=="function"||typeof repository.listCombatRewards!=="function"||typeof repository.getCombatRewardClaimResult!=="function")
     throw new UnsupportedCampaignRepositoryError();
 }
+function assertCombatPowerRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&CombatPowerLaneRepository{if(typeof repository.getCombatPowerLegalActions!=="function"||typeof repository.useCombatPower!=="function"||typeof repository.getCombatPowerResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();}
 type CombatConsumableLaneRepository=Pick<EncounterRepository,"getUseConsumableLegalActions"|"useConsumable"|"getUseConsumableCommandResultByKey">;
 function assertCombatConsumableRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&CombatConsumableLaneRepository{
   if(typeof repository.getUseConsumableLegalActions!=="function"||typeof repository.useConsumable!=="function"
@@ -653,6 +664,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertPowerRepository(repository);
     return repository;
   };
+  const spellcastingRepositoryAccessor = (): SpellcastingLaneRepository => { const repository = getCampaignRepository(); assertSpellcastingRepository(repository); return repository; };
   const effectRepositoryAccessor = (): EffectLaneRepository => {
     const repository = getCampaignRepository();
     assertEffectRepository(repository);
@@ -671,6 +683,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const combatCommandRepositoryAccessor = (): CombatCommandLaneRepository => {
     const repository=getCampaignRepository();assertCombatCommandRepository(repository);return repository;
   };
+  const combatPowerRepositoryAccessor=():CombatPowerLaneRepository=>{const repository=getCampaignRepository();assertCombatPowerRepository(repository);return repository;};
   const consumableRepositoryAccessor=():CombatConsumableLaneRepository=>{
     const repository=getCampaignRepository();assertCombatConsumableRepository(repository);return repository;
   };
@@ -726,11 +739,13 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(actorEconomyHttpRoutes, { economyRepositoryAccessor });
   await app.register(actorChecksHttpRoutes, { checkRepositoryAccessor });
   await app.register(actorPowersHttpRoutes, { powerRepositoryAccessor });
+  await app.register(spellcastingHttpRoutes, { spellcastingRepositoryAccessor });
   await app.register(actorEffectsHttpRoutes, { effectRepositoryAccessor });
   await app.register(encounterLifecycleHttpRoutes, { encounterRepositoryAccessor });
   await app.register(combatReadsHttpRoutes, { combatRepositoryAccessor });
   await app.register(combatCommandsHttpRoutes, { combatCommandRepositoryAccessor });
   await app.register(combatConsumablesHttpRoutes, { consumableRepositoryAccessor });
+  await app.register(combatPowersHttpRoutes,{combatPowerRepositoryAccessor});
   await app.register(worldHttpRoutes,{worldRepositoryAccessor});
   await app.register(npcHttpRoutes,{npcRepositoryAccessor});
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});

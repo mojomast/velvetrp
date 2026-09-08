@@ -50,7 +50,7 @@
       "complete": true,
       "sourceSections": [{ "id": "SRD5.1:Combat:Making an Attack", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=94" }],
       "capabilityEvidence": [{ "id": "attacks", "version": "1.0.0", "descriptorStatus": "supported" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/test/dnd5e-combat.test.ts", "server/test/srd-ruleset-integration.test.ts"],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/src/map/geometry.ts#lineOfEffectBetween", "server/test/dnd5e-combat.test.ts", "server/test/srd-ruleset-integration.test.ts", "server/test/tactical-map-projection.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
     },
     {
@@ -130,8 +130,8 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Spellcasting:Spell Slots", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101" }, { "id": "SRD5.1:Spellcasting:Components", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=102" }],
       "capabilityEvidence": [{ "id": "spell-costs", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eSpellCost", "server/test/dnd5e-plans.test.ts"],
-      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/power-commands"]
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eSpellCost", "server/src/repo/spellcastingRepo.ts", "server/src/repo/actorPowerCommandPlanner.ts#isSupportedRangedSpell", "server/test/spellcasting.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/spell-commands"]
     },
     {
       "id": "derived-values",
@@ -160,18 +160,18 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Races", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=3" }, { "id": "SRD5.1:Classes", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=8" }, { "id": "SRD5.1:Backgrounds", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=60" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/test/character-builder.test.ts", "server/test/srd-ruleset-integration.test.ts"],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/characterBuilder/characterBuilderReadRepo.ts", "server/src/repo/characterProgressionPersistence.ts", "server/test/character-builder.test.ts", "server/test/character-progression.test.ts", "server/test/srd-ruleset-integration.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/character-drafts", "POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"]
     },
     {
       "id": "character-advancement",
       "title": "Character advancement beyond level one and multiclassing",
-      "status": "unsupported",
+      "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Beyond 1st Level", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56" }, { "id": "SRD5.1:Multiclassing", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=57" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas", "server/test/srd-ruleset-integration.test.ts"],
-      "apiEvidence": []
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/characterBuilder/characterBuilderWriteRepo.ts", "server/test/character-progression.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"]
     },
     {
       "id": "equipment-catalog",
@@ -190,18 +190,18 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Combat", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=88" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/repo/encounter/combatActionPlan.ts", "server/test/dnd-turn-economy-repository.test.ts", "server/test/rpg-generated-campaign-journey.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "runtimeEvidence": ["server/src/repo/encounter/combatActionPlan.ts", "server/src/repo/encounter/combatPowerRuntime.ts", "server/src/map/geometry.ts", "server/test/dnd-turn-economy-repository.test.ts", "server/test/rpg-generated-campaign-journey.test.ts", "server/test/tactical-map-repo.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
     },
     {
       "id": "spellcasting-and-spells",
       "title": "Complete spellcasting rules and spell catalog",
-      "status": "unsupported",
+      "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Spellcasting", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101" }, { "id": "SRD5.1:Spells", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=104" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas"],
-      "apiEvidence": []
+      "runtimeEvidence": ["server/src/repo/spellcastingRepo.ts", "server/src/repo/actorPowerCommandPlanner.ts", "server/src/repo/actorPowerUseRepo.ts", "server/test/spellcasting.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/spell-commands"]
     },
     {
       "id": "monsters",
@@ -210,7 +210,7 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Monsters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/encounter/encounterWriteRepo.ts", "server/test/dnd-turn-economy-repository.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/encounter/monsterTurnPlanner.ts", "server/src/repo/encounter/encounterWriteRepo.ts", "server/test/monster-turn-planner.test.ts", "server/test/dnd-turn-economy-repository.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/enemy-turn-commands"]
     },
     {

@@ -54,7 +54,7 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     const sourceRoot=db.prepare("SELECT revision FROM rpg_m16_mutation_revisions_v26 WHERE campaign_id=? AND actor_id=?").get(campaignId,actorId) as {revision:number}|undefined;
     const before=sourceRoot?.revision??0;if(before!==intent.expectedRevision)throw new M16StaleError("actor power revision stale");
 
-    const plan=planActorPowerCommands(db,campaignId,actorId).find((candidate)=>refKey(candidate.powerRef)===refKey(intent.powerRef));
+    const plan=planActorPowerCommands(db,campaignId,actorId,true).find((candidate)=>refKey(candidate.powerRef)===refKey(intent.powerRef));
     if(!plan)throw new ActorPowerConflictError("power is not currently legal");
     const targetIds=plannedPowerSelection(plan,actorId,intent);
     if(!targetIds)throw new ActorPowerConflictError("illegal power target selection");
@@ -70,7 +70,10 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),powerUseId=resourceIdSchema.parse(deps.ids.nextId());
     const outcomes:any[]=[],deltas:any[]=[],newEffects=new Map<string,NewEffect>(),replacements=new Map<string,string>();
     const change=(id:string,name:string,amount:number)=>{const row=load(id).find(item=>item.resourceId===name)!;const prior=row.current;row.current=Math.max(0,Math.min(row.capacity,prior+amount));if(prior!==row.current)deltas.push({kind:"resource",actorId:id,resourceId:name,before:prior,after:row.current});return row.current-prior;};
-    for(const cost of costs)if(cost.kind==="slot")change(actorId,cost.slotId,-1);
+    for(const cost of costs)if(cost.kind==="slot"){
+      const resourceId = load(actorId).some((resource) => resource.resourceId === cost.slotId) ? cost.slotId : `spell-${cost.slotId}`;
+      change(actorId,resourceId,-1);
+    }
     for(const id of targetIds)for(const effect of definition.mechanics.effects){
       if(effect.type==="damage"||effect.type==="healing"){const modifier=effect.dice.modifier,roll=evaluateDiceExpression(`${effect.dice.count}d${effect.dice.sides}${modifier===0?"":modifier>0?`+${modifier}`:modifier}`,deps.rng),amount=Math.max(0,roll.total);if(effect.type==="damage"){const modifiers=publicEffects(db,campaignId,id,intent.powerRef,newEffects.get(id),replacements.get(id),now).flatMap(active=>active.modifiers).filter(active=>active.appliesToId===effect.damageType||active.appliesToId==="all"),immune=modifiers.some(active=>active.kind==="immunity"),resistant=modifiers.some(active=>active.kind==="resistance"),vulnerable=modifiers.some(active=>active.kind==="vulnerability"),adjustment=immune?"immunity":resistant&&!vulnerable?"resistance":vulnerable&&!resistant?"vulnerability":"none",adjusted=immune?0:resistant&&!vulnerable?Math.floor(amount/2):vulnerable&&!resistant?amount*2:amount,applied=Math.abs(change(id,"health",-adjusted));outcomes.push({kind:"damage",targetId:id,damageType:effect.damageType,roll,adjustment,applied});}else{const applied=Math.abs(change(id,"health",amount));outcomes.push({kind:"healing",targetId:id,roll,applied});}}
       else if(effect.type==="resource"){const name=effect.resource==="spell-slot"?`slot-${definition.mechanics.level}`:effect.resource,applied=change(id,name,effect.amount);outcomes.push({kind:"resource",targetId:id,resourceId:name,requested:effect.amount,applied});}

@@ -3,7 +3,7 @@ import type {
   ActorEffectsResponse, ActorPowerCommandRequest, ActorPowerCommandResponse, ActorPowersResponse, ActorResourcesHttpGetResponse,
   CombatActionCommandRequest, CombatActionCommandResponse, CombatCommandResultResponse, CombatEnemyTurnCommandRequest, CombatRewardClaimRequest, CombatRewardClaimResponse, CombatRewardClaimResultResponse, CombatRewardGrantPublic, EconomyHttpWalletGetResponse,
   CombatEndCommandResponse, CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterPublic,
-  UseConsumableCommandRequest,UseConsumableCommandResult,UseConsumableLegalAction,
+  UseConsumableCommandRequest,UseConsumableCommandResult,UseConsumableLegalAction,DirectCombatPowerCandidate,DirectCombatPowerCommandRequest,DirectCombatPowerCommandResponse,
 } from "@velvet/contracts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {ApiError, resolveCombatEnemyTurn} from "../../../api";
@@ -29,6 +29,9 @@ export interface CombatTrackerApi {
   getConsumableActions:(combatId:string)=>Promise<UseConsumableLegalAction[]>;
   useConsumable:(combatId:string,command:UseConsumableCommandRequest)=>Promise<UseConsumableCommandResult>;
   getConsumableResult:(combatId:string,expectedRequest:UseConsumableCommandRequest)=>Promise<UseConsumableCommandResult>;
+  getCombatPowerActions:(combatId:string)=>Promise<DirectCombatPowerCandidate[]>;
+  useCombatPower:(combatId:string,command:DirectCombatPowerCommandRequest)=>Promise<DirectCombatPowerCommandResponse>;
+  getCombatPowerResult:(combatId:string,command:DirectCombatPowerCommandRequest)=>Promise<DirectCombatPowerCommandResponse>;
   listRewards:(combatId:string)=>Promise<CombatRewardGrantPublic[]>;
   claimReward:(combatId:string,rewardBundleId:string,recipientActorId:string,command:CombatRewardClaimRequest)=>Promise<CombatRewardClaimResponse>;
   getRewardClaimResult:(campaignId:string,combatId:string,rewardBundleId:string,recipientActorId:string,command:CombatRewardClaimRequest)=>Promise<CombatRewardClaimResultResponse>;
@@ -99,7 +102,7 @@ function OutcomeReceipt({ result }: { result: CombatActionCommandResponse }) {
   return <section className="combat-receipt" aria-labelledby="combat-receipt-heading">
     <div className="combat-panel-heading"><h2 id="combat-receipt-heading">Confirmed action receipt</h2><span>{resolution.kind}</span></div>
     <dl><div><dt>Action</dt><dd>{resolution.kind}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Round</dt><dd>{resolution.roundBefore} → {resolution.roundAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div><div><dt>Targets</dt><dd>{resolution.targetIds.length ? resolution.targetIds.join(", ") : "None"}</dd></div></dl>
-    {resolution.outcomes.length > 0 && <ul>{resolution.outcomes.map((outcome, index) => <li key={`${outcome.kind}-${outcome.targetId}-${index}`}>{outcome.kind === "damage" ? <><strong>Damage:</strong> {outcome.applied} {outcome.damageType} · HP {outcome.hitPointsBefore} → {outcome.hitPointsAfter} · {outcome.statusBefore} → {outcome.statusAfter}{outcome.rulesetId && <> · {outcome.rulesetId} @ {outcome.rulesetVersion} · attack {outcome.attackRoll} + modifiers = {outcome.attackTotal} vs AC {outcome.armorClass}{outcome.critical ? " · critical" : outcome.hit ? " · hit" : " · miss"}</>}</> : outcome.kind === "survival" ? <><strong>Survival:</strong> {outcome.roll ? `d20 ${outcome.roll} · ` : ""}{outcome.successes} successes, {outcome.failures} failures · {outcome.statusAfter}</> : <><strong>Status:</strong> {outcome.statusBefore} → {outcome.statusAfter}</>}</li>)}</ul>}
+     {resolution.outcomes.length > 0 && <ul>{resolution.outcomes.map((outcome, index) => <li key={`${outcome.kind}-${outcome.targetId}-${index}`}>{outcome.kind === "damage" ? <><strong>Damage:</strong> {outcome.applied} {outcome.damageType} · HP {outcome.hitPointsBefore} → {outcome.hitPointsAfter} · {outcome.statusBefore} → {outcome.statusAfter}{outcome.rulesetId && <> · {outcome.rulesetId} @ {outcome.rulesetVersion} · attack {outcome.attackRoll} + modifiers = {outcome.attackTotal} vs AC {outcome.armorClass}{outcome.critical ? " · critical" : outcome.hit ? " · hit" : " · miss"}</>}</> : outcome.kind === "survival" ? <><strong>Survival:</strong> {outcome.roll ? `d20 ${outcome.roll} · ` : ""}{outcome.successes} successes, {outcome.failures} failures · {outcome.statusAfter}</> : outcome.kind === "status" ? <><strong>Status:</strong> {outcome.statusBefore} → {outcome.statusAfter}</> : <><strong>Contest:</strong> {outcome.contest} · {outcome.success ? "success" : "failure"} · {outcome.attackerRoll} vs {outcome.defenderRoll}</>}</li>)}</ul>}
     <details><summary>Complete strict server response</summary><pre>{JSON.stringify(result, null, 2)}</pre></details>
   </section>;
 }
@@ -114,6 +117,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
   const [actorDraft, setActorDraft] = useState(actorId);
   const [combat, setCombat] = useState<CombatReadResponse | null>(null);
   const [consumableActions,setConsumableActions]=useState<UseConsumableLegalAction[]>([]);
+  const [combatPowerActions,setCombatPowerActions]=useState<DirectCombatPowerCandidate[]>([]);
   const [entries, setEntries] = useState<CombatLogEntryPublic[]>([]);
   const [rewards,setRewards]=useState<CombatRewardGrantPublic[]>([]);
   const [nextSequence, setNextSequence] = useState<number | null>(null);
@@ -162,7 +166,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     if (!resourceIdSchema.safeParse(id).success) return false;
     const generation = ++generationRef.current;
     setPhase("loading"); setStateError(""); setLogError(""); setRewardError(""); setLogLoading(true);
-    const [stateRead, logRead,consumableRead,rewardRead] = await Promise.allSettled([api.getCombat(id), api.getCombatLog(id, { afterSequence: 0, limit: 50 }),api.getConsumableActions(id),api.listRewards(id)] as const);
+    const [stateRead, logRead,consumableRead,powerRead,rewardRead] = await Promise.allSettled([api.getCombat(id), api.getCombatLog(id, { afterSequence: 0, limit: 50 }),api.getConsumableActions(id),api.getCombatPowerActions(id),api.listRewards(id)] as const);
     if (!current(generation, id)) return false;
     if (stateRead.status === "fulfilled") { setCombat(stateRead.value); setPhase("ready"); }
     else { setStateError("Combat state could not be refreshed."); setPhase(combat ? "ready" : "failed"); if (focusFailure) queueMicrotask(() => retryRef.current?.focus()); }
@@ -170,6 +174,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     else setLogError("Combat log could not be refreshed. Existing events are preserved.");
     if(consumableRead.status==="fulfilled")setConsumableActions(consumableRead.value);
     else {setConsumableActions([]);setStateError("Combat state loaded, but consumable actions could not be refreshed.");}
+    if(powerRead.status==="fulfilled")setCombatPowerActions(powerRead.value);else setCombatPowerActions([]);
     if(rewardRead.status==="fulfilled"){
       const authoritativeCombat=stateRead.status==="fulfilled"?stateRead.value:combat;
       const actorIds=new Set(authoritativeCombat?.combatants.flatMap((entry)=>entry.kind==="actor"?[entry.actorId]:[])??[]);
@@ -185,7 +190,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
       }
     }else setRewardError("Combat rewards could not be refreshed. Existing claimed state is preserved.");
     setLogLoading(false);
-    return stateRead.status === "fulfilled" && logRead.status === "fulfilled"&&consumableRead.status==="fulfilled"&&rewardRead.status==="fulfilled";
+    return stateRead.status === "fulfilled" && logRead.status === "fulfilled"&&consumableRead.status==="fulfilled"&&powerRead.status==="fulfilled"&&rewardRead.status==="fulfilled";
   }, [api, clearRewardMarker, combat, current]);
 
   const loadActor = useCallback(async (id: string):Promise<boolean> => {
@@ -334,6 +339,12 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
         }else setConsumableStatus("Consumable outcome is ambiguous. It will not be replayed; read the exact result to reconcile.");}
     }catch{if(mountedRef.current)setConsumableStatus("Actor revisions could not be loaded. No consumable command was submitted.");}
   }
+  async function submitCombatPower(action:DirectCombatPowerCandidate){
+    if(!combat||marker||consumableMarker||rewardMarker)return;
+    const command:DirectCombatPowerCommandRequest={legalActionId:action.legalActionId,expectedCombatRevision:action.revisions.combat,expectedSourceM15Revision:action.revisions.sourceM15,expectedSourceM16Revision:action.revisions.sourceM16,expectedTargetM15Revision:action.revisions.targetM15,expectedTargetM16Revision:action.revisions.targetM16,idempotencyKey:commandId()};
+    setCommandStatus("Combat power submitted once. Automatic retry is disabled.");
+    try{await api.useCombatPower(combatId,command);if(!mountedRef.current)return;setCommandStatus("Combat power confirmed. Refreshing authoritative combat state and actions.");await loadCombat(combatId);}catch{if(mountedRef.current)setCommandStatus("Combat power outcome is uncertain or stale. It was not retried; refresh authoritative combat before another action.");}
+  }
   async function reconcileConsumable(){
     if(!consumableMarker)return;setConsumableStatus("Reading the exact immutable consumable result; no POST will be replayed.");
     try{const result=await api.getConsumableResult(combatId,consumableMarker.command);if(!mountedRef.current)return;
@@ -454,7 +465,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
         <div className="combat-actor-lanes"><PowerLibraryPanel powers={powers} loading={actorLoading} error={powerError} disabled={Boolean(powerMarker)} commandStatus={powerStatus} result={powerResult} onUse={(plan,targets)=>void submitPower(plan,targets)} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /><EffectList effects={effects} loading={actorLoading} error={effectError} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /></div>
       </section>
       <aside className="combat-enemy-turn"><h2>Enemy turn</h2>{currentEnemy?<><p>The server selects the enemy action, targets, rolls, and damage.</p><button type="button" className="primary" disabled={Boolean(marker||consumableMarker||rewardMarker||enemyTurnMarker)} onClick={()=>void submitEnemyTurn()}>Resolve enemy turn</button></>:<p>Enemy turn controls appear only while an enemy is the current combatant.</p>}</aside>
-      <LegalActionTray legalActions={combat.legalActions} consumableActions={consumableActions} combatantLabels={labels} disabled={Boolean(marker||consumableMarker||rewardMarker||enemyTurnMarker||currentEnemy)} busy={(marker?.phase === "ambiguous" && commandStatus.startsWith("Submitting"))||(enemyTurnMarker?.phase==="ambiguous")} onSubmit={(action, targets) => void submitAction(action, targets)} onUseConsumable={(action)=>void submitConsumable(action)} />
+       <LegalActionTray legalActions={combat.legalActions} consumableActions={consumableActions} powerActions={combatPowerActions} combatantLabels={labels} disabled={Boolean(marker||consumableMarker||rewardMarker||enemyTurnMarker||currentEnemy)} busy={(marker?.phase === "ambiguous" && commandStatus.startsWith("Submitting"))||(enemyTurnMarker?.phase==="ambiguous")} onSubmit={(action, targets) => void submitAction(action, targets)} onUseConsumable={(action)=>void submitConsumable(action)} onUsePower={(action)=>void submitCombatPower(action)} />
     </div>}
   </div></main>;
 }

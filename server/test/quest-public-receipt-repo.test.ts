@@ -1,6 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { createRepository } from "../src/repo/index.js";
@@ -13,6 +14,8 @@ describe("adventure quest public receipt repository", () => {
   it("returns only durable public evidence to campaign members", async () => {
     let repository = createRepository({ clock: { now: () => new Date(at) } });
     const campaign = repository.createCampaign("local-owner", { name: "Quest receipts" });
+    repository.installSrdStarterCatalog("local-owner");
+    repository.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "srd-pins" });
     repository.createCampaignStorylineGraph("local-owner", campaign.id, { storyline: { storylineId: "story", title: "Story",
       summary: null, nodes: [], edges: [], plotPoints: [], clues: [] }, expectedRevision: 0, idempotencyKey: "story-create" });
     repository.createCampaignQuest("local-owner", campaign.id, { quest: { questId: "quest", storylineId: "story",
@@ -24,14 +27,8 @@ describe("adventure quest public receipt repository", () => {
 
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     db.prepare("INSERT INTO characters VALUES ('persona','Hero',30,'hero','',1,0,?)").run(at);
-    db.prepare("INSERT INTO rpg_rules_profiles VALUES ('profile','Profile','Rules','[]')").run();
-    db.prepare("INSERT INTO rpg_content_packs VALUES ('pack','1','profile','Pack','Pack','[]',0)").run();
-    db.prepare("INSERT INTO rpg_definitions VALUES ('pack','1','race','human','Human','Race','[]'),('pack','1','background','hero','Hero','Background','[]')").run();
-    db.prepare("UPDATE rpg_content_packs SET sealed=1 WHERE pack_id='pack'").run();
-    db.prepare("INSERT INTO campaign_rules_profiles VALUES (?,'profile')").run(campaign.id);
-    db.prepare("INSERT INTO campaign_content_packs VALUES (?,'pack','1','profile')").run(campaign.id);
     db.prepare("INSERT INTO campaign_characters VALUES ('cc',?,'persona',?,?)").run(campaign.id, at, at);
-    db.prepare("INSERT INTO rpg_campaign_sheets VALUES ('sheet',?,'cc','pack','1','race','human','pack','1','background','hero',?,?)").run(campaign.id, at, at);
+    db.prepare("INSERT INTO rpg_campaign_sheets VALUES ('sheet',?,'cc',?,?, 'race','srd-5.1:race:human',?,?, 'background','srd-5.1:background:acolyte',?,?)").run(campaign.id, SRD_5_1_STARTER_IDENTITY.packId, SRD_5_1_STARTER_IDENTITY.packVersion, SRD_5_1_STARTER_IDENTITY.packId, SRD_5_1_STARTER_IDENTITY.packVersion, at, at);
     db.prepare("INSERT INTO campaign_actors VALUES ('actor',?,'cc','sheet','player-character','principal',?,?)").run(campaign.id, at, at);
     db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor',?,'local-owner',NULL)").run(campaign.id);
     db.prepare("INSERT INTO sessions(id,character_id,title,state,preset_id,created_at) VALUES('session','persona','Room','active','default',?)").run(at);
@@ -41,7 +38,7 @@ describe("adventure quest public receipt repository", () => {
 
     repository = createRepository({ clock: { now: () => new Date(at) } });
     const turn = repository.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,
-      sessionId: "session", actorId: "actor", declaration: "I break the final seal", expectedCampaignRevision: 0,
+      sessionId: "session", actorId: "actor", declaration: "I break the final seal", expectedCampaignRevision: 1,
       idempotencyKey: "quest-turn" });
     let calls = 0;
     const dependencies: AdventureAgentDependencies = { complete: async (input) => {
