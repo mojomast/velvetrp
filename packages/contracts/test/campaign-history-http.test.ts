@@ -62,15 +62,35 @@ describe("campaign history HTTP contracts", () => {
       revisionBefore: 0, revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z" };
     const travel = { kind: "travel", destination: "Glass Harbor", revisionBefore: 3, revisionAfter: 4,
       occurredAt: "2030-01-01T00:00:00.000Z" };
+    const quest = { kind: "quest", title: "The Sealed Gate", objectiveDescription: "Break the final seal",
+      progressBefore: 2, progressAfter: 3, target: 3, objectiveCompleted: true, questCompleted: true,
+      revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z" };
+    const check = { kind: "check", checkKind: "skill", ability: "Wisdom", skill: "Perception", mode: "advantage",
+      difficulty: "Hard", rolls: [{ value: 7, kept: false }, { value: 18, kept: true }], abilityModifier: 2,
+      proficiencyBonus: 3, modifier: 5, total: 23, dc: 20, outcome: "success", revisionBefore: 0,
+      revisionAfter: 1, occurredAt: "2030-01-01T00:00:00.000Z" };
+    const power={kind:"power",powerName:"Sheltering Glow",targets:["Briar"],costs:[{label:"Level 1 spell slot",before:1,after:0}],stateDeltas:[{actor:"Briar",change:"Effect applied",before:null,after:null}],concentration:true,revisionBefore:1,revisionAfter:2,occurredAt:"2030-01-01T00:00:00.000Z"};
+    const rest={kind:"rest",restKind:"long",restName:"Long rest",recovery:[{label:"Health",before:4,after:10}],revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"};
     expect(campaignHistoryHttpPublicReceiptSchema.parse(mechanic)).toEqual(mechanic);
     expect(campaignHistoryHttpPublicReceiptSchema.parse(administration)).toEqual(administration);
     expect(campaignHistoryHttpPublicReceiptSchema.parse(travel)).toEqual(travel);
+    expect(campaignHistoryHttpPublicReceiptSchema.parse(quest)).toEqual(quest);
+    expect(campaignHistoryHttpPublicReceiptSchema.parse(check)).toEqual(check);
+    expect(campaignHistoryHttpPublicReceiptSchema.parse(power)).toEqual(power);
+    expect(campaignHistoryHttpPublicReceiptSchema.parse(rest)).toEqual(rest);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...mechanic, commandId: "command" }).success).toBe(false);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...administration, data: { private: true } }).success).toBe(false);
     expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...mechanic, event: { ...mechanic.event, actorId: "actor" } }).success).toBe(false);
     for (const privateKey of ["commandId", "candidateId", "providerCallId", "locationId", "connectionId", "actorId", "principalId", "digest"]) {
       expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...travel, [privateKey]: "private" }).success).toBe(false);
+      expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...quest, [privateKey]: "private" }).success).toBe(false);
+      expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...check, [privateKey]: "private" }).success).toBe(false);
+      expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...power, [privateKey]: "private" }).success).toBe(false);
+      expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...rest, [privateKey]: "private" }).success).toBe(false);
     }
+    expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...quest, progressAfter: 4 }).success).toBe(false);
+    expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...quest, objectiveCompleted: false }).success).toBe(false);
+    expect(campaignHistoryHttpPublicReceiptSchema.safeParse({ ...quest, revisionAfter: 6 }).success).toBe(false);
   });
 
   it("uses strict checkpoint, fork, and recap create envelopes", () => {

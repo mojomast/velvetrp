@@ -49,6 +49,8 @@ import {
   MECHANICS_STARTER_CATALOG,
   MECHANICS_STARTER_RULES_PROFILE_ID,
 } from "../content/mechanicsStarterCatalog.js";
+import { SRD_5_1_STARTER_CATALOG } from "../content/srdStarterCatalog.js";
+import { SRD_5_1_STARTER_RULES_PROFILE_ID } from "@velvet/contracts";
 import { systemRuntime } from "../runtime.js";
 import { LOCAL_OWNER_PRINCIPAL_ID } from "./shared.js";
 import { createCharacterSync } from "./characterRepo.js";
@@ -78,6 +80,11 @@ import { createInventoryRepository, type InventoryRepository } from "./inventory
 import { createEconomyRepository, type EconomyRepository } from "./economyRepo.js";
 import { createRestRepository, type RestRepository } from "./restRepo.js";
 import { createCheckRepository, type CheckRepository } from "./checkRepo.js";
+import { createAdventureCheckRepository } from "./adventureCheckRepo.js";
+import { createAdventureInventoryRepository } from "./adventureInventoryRepo.js";
+import { createAdventureCommerceRepository } from "./adventureCommerceRepo.js";
+import { createAdventurePowerRestRepository } from "./adventurePowerRestRepo.js";
+import { createAdventureQuestProgressionRepository } from "./adventureQuestProgressionRepo.js";
 import { createPowerRepository, type PowerRepository } from "./powerRepo.js";
 import { createEffectRepository, type EffectRepository } from "./effectRepo.js";
 import { createEncounterRepository, type EncounterRepository } from "./encounterRepo.js";
@@ -89,6 +96,8 @@ import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
+import { createTacticalMapRepository } from "./tacticalMapRepo.js";
+import { createCampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
 import {
   CampaignDiceCharacterConflict,
   createDiceRepository,
@@ -164,6 +173,7 @@ import {
 } from "./campaign/campaignTimelineReadRepo.js";
 import { createCampaignCharacterWorkspaceRepository } from "./campaign/campaignCharacterWorkspaceRepo.js";
 import { createCampaignCharacterSheetSnapshotRepository } from "./campaign/campaignCharacterSheetSnapshotRepo.js";
+import { createActorGameplaySheetReadRepository } from "./campaign/actorGameplaySheetReadRepo.js";
 import {
   createCampaignContentConfigurationReadRepository,
   getCampaignContentConfigurationReadSync,
@@ -723,9 +733,18 @@ function createRepositoryComposition<T>(
   const restRepository=createRestRepository(db,dependencies,m15Guard);
   const m16Guard=()=>{assertOpen();if(transactionDepth>0)throw new Error("M1.6 mutation cannot run inside a repository transaction");};
   const checkRepository=createCheckRepository(db,dependencies,m16Guard);
+  const adventureCheckRepository=createAdventureCheckRepository(db,dependencies,m16Guard);
+  const adventureInventoryRepository=createAdventureInventoryRepository(db,dependencies,inventoryRepository,m15Guard);
+  const adventureCommerceRepository=createAdventureCommerceRepository(db,dependencies,economyRepository,m15Guard);
   const powerRepository=createPowerRepository(db,dependencies,m16Guard);
   const effectRepository=createEffectRepository(db,dependencies,m16Guard);
+  const actorGameplaySheetReadRepository=createActorGameplaySheetReadRepository(db,{
+    campaignActors:campaignActorRepository,resources:actorResourceRepository,inventory:inventoryRepository,
+    powers:powerRepository,effects:effectRepository,
+  });
   const encounterRepository=createEncounterRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0&&atomicGenerationApplyDepth===0)throw new Error("M1.7 mutation cannot run inside a repository transaction");});
+  const tacticalMapRepository=createTacticalMapRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("tactical map operation cannot run inside a repository transaction");});
+  const adventurePowerRestRepository=createAdventurePowerRestRepository(db,dependencies,powerRepository,restRepository,encounterRepository,()=>assertOpen());
   const worldRepository=createWorldRepository(db,dependencies,()=>{assertOpen();if(transactionDepth>0)throw new Error("world operation cannot run inside a repository transaction");});
   const rawQuestRepository = createQuestRepository(db, LOCAL_OWNER_PRINCIPAL_ID, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 quest operation cannot run inside a repository transaction");
@@ -737,6 +756,8 @@ function createRepositoryComposition<T>(
       return (...args: unknown[]) => { assertOpen(); return value(...args); };
     },
   }) as QuestRepository;
+  const adventureQuestProgressionRepository=createAdventureQuestProgressionRepository(db,dependencies,questRepository,
+    characterProgressionRepository,()=>assertOpen());
   const storyRepository = createStoryRepository(db, { ...dependencies, guard: () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("M2.10 story operation cannot run inside a repository transaction");
   } });
@@ -752,6 +773,10 @@ function createRepositoryComposition<T>(
     executeSetActorAttribute:(principal,input)=>campaignCommandWriteOperations.executeSetActorAttribute(principal,input),
     executeRollActorDice:(principal,input)=>diceRepository.executeRollActorDice(principal,input),
     resolveCombatAction:(principal,encounterId,input)=>encounterRepository.resolveCombatAction(principal,encounterId,input),
+    executeInventoryAction:(principal,turnId,proposalId)=>adventureInventoryRepository.executeAdventureInventoryProposal(principal,turnId,proposalId),
+    executeCommerceAction:(principal,turnId,proposalId)=>adventureCommerceRepository.executeAdventureCommerceProposal(principal,turnId,proposalId),
+    executePowerRestAction:(principal,turnId,proposalId)=>adventurePowerRestRepository.executeAdventurePowerRestProposal(principal,turnId,proposalId),
+    executeQuestProgressionAction:(principal,turnId,proposalId)=>adventureQuestProgressionRepository.executeAdventureQuestProgressionProposal(principal,turnId,proposalId),
   });
   const exactCandidateRepository=createExactCandidateRepository(db,dependencies,()=>{
     assertOpen();if(transactionDepth>0)throw new Error("exact candidate operation cannot run inside a repository transaction");
@@ -761,6 +786,9 @@ function createRepositoryComposition<T>(
   },exactCandidateRepository);
   const campaignGenerationRepository=createCampaignGenerationRepository(db,dependencies,adventureTurnRepository,()=>{
     assertOpen();if(transactionDepth>0)throw new Error("campaign generation operation cannot run inside a repository transaction");
+  });
+  const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
+    assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
   const repository: Repository = {
     ...administrationRepository,
@@ -772,9 +800,16 @@ function createRepositoryComposition<T>(
     ...economyRepository,
     ...restRepository,
     ...checkRepository,
+    ...adventureCheckRepository,
+    ...adventureInventoryRepository,
+    ...adventureCommerceRepository,
+    ...adventurePowerRestRepository,
+    ...adventureQuestProgressionRepository,
     ...powerRepository,
     ...effectRepository,
+    ...actorGameplaySheetReadRepository,
     ...encounterRepository,
+    ...tacticalMapRepository,
     ...worldRepository,
     ...companionRepository,
     ...questRepository,
@@ -783,6 +818,7 @@ function createRepositoryComposition<T>(
     ...exactCandidateRepository,
     ...exactCandidateProviderBridge,
     ...campaignGenerationRepository,
+    ...campaignAdministrationIntegrationRepository,
     applyEncounterGenerationDraftAtomically: (principalId: string, input: DraftMutationInput) => {
       assertOpen();
       const key = (scope: string) => `${scope}:${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 48)}`;
@@ -831,6 +867,16 @@ function createRepositoryComposition<T>(
           packId: MECHANICS_STARTER_CATALOG.manifest.packId,
           packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
         }],
+        expectedRevision: input.expectedRevision,
+        idempotencyKey: input.idempotencyKey,
+      }),
+    installSrdStarterCatalog: (actorPrincipalId) =>
+      contentCatalogRepository.publishContentCatalog(actorPrincipalId, SRD_5_1_STARTER_CATALOG),
+    configureSrdStarterCatalog: (actorPrincipalId, campaignId, input) =>
+      contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
+        rulesProfileId: SRD_5_1_STARTER_RULES_PROFILE_ID,
+        contentPacks: [{ packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
+          packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion }],
         expectedRevision: input.expectedRevision,
         idempotencyKey: input.idempotencyKey,
       }),

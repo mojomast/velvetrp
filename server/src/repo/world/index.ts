@@ -18,7 +18,7 @@ export {
   type WorldReceipt,
   type WorldWriteContext,
   type WorldWriteRepository,
-  type ActorTravelResult,
+  type ActorTravelResult, type ActorCampResult,
   type CreateNpcResult,
   type NpcRelationshipResult,
   type CreateFactionResult,

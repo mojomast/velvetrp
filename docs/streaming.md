@@ -82,9 +82,9 @@ Room SSE has no heartbeat, token deltas, `generationId`, generation-cancel contr
 
 A client disconnect does not cancel the round. Server-side work continues through the already selected bounded replies and one synthesis attempt; each reply is committed separately. Session stop/delete and `/generation/cancel` do not provide an active room-stream abort controller. Reconcile a missing `room_done` by reading the session/messages. Never infer that the whole round rolled back.
 
-## Durable M2.11 adventure streams
+## Durable adventure streams
 
-This family requires `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`. Its complete HTTP schemas and problem semantics are normative in [Adventure turns and generation drafts (M2.11)](api.md#adventure-turns-and-generation-drafts-m211).
+This family requires `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`. Its complete HTTP schemas and problem semantics are normative in [Adventure turns and generation drafts (M2.11)](api.md#adventure-turns-and-generation-drafts-m211). Campaign play presents one authoritative DM conversation from the durable room transcript; legacy room messages may be shown separately as read-only pre-campaign history.
 
 ### Requests and identity
 
@@ -101,15 +101,19 @@ Every data event has an envelope whose event name equals `type` and whose exact 
 | Event | Exact payload | Semantics |
 | --- | --- | --- |
 | `turn_started` | `{ turn }` | Initial and narration-derivative connections only; never replayed by resume. |
-| `agent_status` | `{ status }`, with `planning`, `awaiting-confirmation`, `pending-mechanics`, or `narrating` | Emits transitions reached on this connection and may repeat. |
+| `agent_status` | `{ status }`, with `planning`, `awaiting-confirmation`, `pending-mechanics`, `narrating`, `decision-rejected`, or `expired` | Emits transitions reached on this connection and may repeat. |
 | `tool_proposed` | `{ proposal }` | Once per durable proposal on an initial stream; not replayed by resume. |
 | `confirmation_required` | `{ proposalIds, expiresAt }` | Durable human decision is required; followed by terminal `aborted` for this connection. |
 | `mechanics_committed` | `{ receipts }` | One or more durable proposal-linked receipts exist. |
-| `narration_delta` | `{ text }` | Nonempty persisted or deterministic fallback narration. It is not legacy provider-token sequencing. |
+| `narration_delta` | `{ text }` | Nonempty persisted receipt-grounded narration. A provider may select only a closed presentation style; the server composes every displayed claim from verified receipts, or emits a deterministic pending/blocked fallback. It is not legacy provider-token sequencing. |
 | `choice` | `{ choiceId, label }` | Reserved validated, non-executable choice vocabulary; the current fallback lane emits none. |
 | `terminal` | `{ outcome, turn, narrationStatus, receipts }`, where outcome is `done`, `aborted`, or `error` | At most one terminal is emitted while the response is writable. A disconnect or stream-construction failure can yield none. |
 
-Conditional events are not guaranteed. A no-tool fallback normally emits `turn_started`, planning/narrating statuses, `narration_delta`, and terminal `done`. Pending confirmation emits `confirmation_required` and terminal `aborted`. On resume, any tool call lacking a linked mechanics receipt applies the `pending-mechanics` path, including a rejected call, and normally ends that connection with terminal `aborted`; M2.11 does not execute the bounded tool bridge. Resume does not replay `turn_started` or `tool_proposed` and may first reconcile a crash-visible recoverable receipt link without rerunning its command.
+Conditional events are not guaranteed. A no-tool fallback normally emits `turn_started`, planning/narrating statuses, unresolved narration that asserts no state change, and terminal `done`. A raw dice receipt states only its total and never infers success or failure. Exact travel completion is narrated only from a verified committed travel receipt naming the destination. Pending player confirmation emits `confirmation_required` and terminal `aborted` for that connection. The current bounded tool loop can commit only its advertised, locally validated mutation subset; a missing receipt remains `pending-mechanics` and is never converted to fictional success. Resume does not replay `turn_started` or `tool_proposed` and may first reconcile a crash-visible recoverable receipt link without rerunning its command.
+
+`GET /api/rpg/v1/adventure-turns/transcript?campaignId=...&sessionId=...` is the non-stream reconciliation read for the conversation. It returns at most 32 completed original declarations, oldest first, paired with the latest completed narration derivative. It does not expose partial stream delivery, proposal arguments, provider records, or legacy room messages.
+
+Outside combat, a controlled player declaration may select one server-issued public quest-objective candidate. Candidates include only currently active, visible, incomplete objectives whose dependencies are complete. The provider receives an opaque candidate identity plus role-safe objective text; quest IDs, objective IDs, revisions, progress commands, and increment values remain server-owned. A committed selection advances exactly one point through the existing quest command repository and becomes a durable adventure receipt. Duplicate initial requests, narration derivatives, resume, and restart reuse that receipt without advancing again.
 
 The server sends `: heartbeat` every `VELVET_SSE_HEARTBEAT_MS`, default 15,000 ms. This path explicitly falls back to 15,000 ms when the configured value is non-finite or non-positive.
 
@@ -122,6 +126,7 @@ Disconnect affects delivery only. It neither rolls back nor cancels deterministi
 3. A non-null locator result is the full authoritative turn response. `{ result: null }` is race-ambiguous with an in-flight request and does not authorize an automatic POST retry.
 4. Confirmation POST and turn GET can expose the same opaque `resumeToken` for a resumable decided batch. Send it only in the resume JSON body. Never put it in a URL or log it.
 5. A disconnect, malformed/missing terminal, unexpected 500, or lost write response is commit-ambiguous. Reconcile first and never automatically repeat the write.
+6. After terminal reconciliation, refresh the transcript to update the single authoritative DM conversation.
 
 The turn GET is `Cache-Control: no-store`; the initial-key locator is `private, no-store`. The stream is `private, no-store, no-transform`.
 

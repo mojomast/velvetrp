@@ -21,6 +21,7 @@ import {
   ORIGINAL_STARTER_RULES_PROFILE,
 } from "./original-starter.js";
 import { MECHANICS_STARTER_ID } from "./mechanics-starter.js";
+import { SRD_5_1_STARTER_ID } from "./srd-starter.js";
 
 export {
   ORIGINAL_STARTER_BACKGROUND,
@@ -203,7 +204,7 @@ export const campaignStarterSetupResponseSchema = campaignDetailResponseSchema;
 
 /** A distinct fixed operation: callers can select no catalog or command data. */
 export const campaignMechanicsStarterSetupRequestSchema = z.object({
-  starterId: z.literal(MECHANICS_STARTER_ID),
+  starterId: z.union([z.literal(MECHANICS_STARTER_ID), z.literal(SRD_5_1_STARTER_ID)]),
 }).strict();
 export const campaignMechanicsStarterSetupResponseSchema = campaignDetailResponseSchema;
 

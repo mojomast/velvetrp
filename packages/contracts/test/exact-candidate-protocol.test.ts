@@ -230,11 +230,14 @@ describe("exact candidate v1 closed protocol", () => {
   });
 
   it("projects only exact provider-safe keys during the explicit current instant", () => {
-    const projection = projectExactCandidateForProvider(candidate(), context().now);
+    const value=candidate();value.label={...value.label,origin:"Old Gate",destination:"Silver Harbor"};
+    const projection = projectExactCandidateForProvider(value, context().now);
     expect(Object.keys(projection)).toEqual([
-      "candidateId", "kind", "version", "label", "summary", "confirmation", "quote", "expiresAt", "choices",
+      "candidateId", "kind", "version", "label", "semanticLabel", "summary", "confirmation", "quote", "expiresAt", "choices",
     ]);
-    expect(Object.keys(projection.label)).toEqual(["format", "key", "routeOption"]);
+    expect(Object.keys(projection.label)).toEqual(["format", "key", "routeOption", "destination", "origin"]);
+    expect(projection.semanticLabel).toEqual({action:"Travel",source:"Old Gate",target:"Silver Harbor",cost:null,
+      consequence:"Move from Old Gate to Silver Harbor."});
     expect(Object.keys(projection.summary)).toEqual(["format", "key"]);
     expect(Object.keys(projection.confirmation)).toEqual(["required"]);
     expect(Object.keys(projection.quote)).toEqual(["kind"]);

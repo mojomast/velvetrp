@@ -1,5 +1,7 @@
 import {
   CHARACTER_BUILDER_STANDARD_ARRAY,
+  SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS,
+  SRD_5_1_STARTER_IDENTITY,
   adventureTurnStreamEventSchema,
 } from "@velvet/contracts";
 import { afterEach, describe, expect, it } from "vitest";
@@ -7,14 +9,15 @@ import { buildApp } from "../src/app.js";
 import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import type { ProviderCompletionResult } from "../src/provider/index.js";
-import { createRepository, MECHANICS_STARTER_CATALOG } from "../src/repo/index.js";
+import { createRepository, SRD_5_1_STARTER_CATALOG } from "../src/repo/index.js";
 import { createSession, transitionSession } from "../src/repo/sessionRepo.js";
 import { useTmpDataDir } from "./helpers.js";
+import { grantSrdEquipment } from "./fixtures/srdEquipment.js";
 
 useTmpDataDir();
 
 const JSON_HEADERS = { "content-type": "application/json" };
-const NARRATION = "You follow the rain-bright road until Silver Harbor opens ahead.";
+const NARRATION = "You follow the rain-bright road and arrive at Silver Harbor.";
 
 afterEach(() => {
   delete process.env.FEATURE_RPG_CAMPAIGN;
@@ -53,12 +56,12 @@ describe("generated campaign deterministic journey", () => {
     const now = new Date("2035-01-01T00:00:00.000Z");
     const repository = createRepository({
       clock: { now: () => now },
-      // Maximal deterministic rolls let the player finish the tiny starter enemy quickly.
-      rng: { integer: (_minimum, maximum) => maximum - 1 },
+      // Hit reliably but roll minimum damage so combat exercises explicit end-turn.
+      rng: { integer: (minimum, maximum) => maximum === 21 ? 19 : minimum },
     });
     const campaign = repository.createCampaign("local-owner", { name: "The Rain Road" });
-    repository.installMechanicsStarterCatalog("local-owner");
-    repository.configureMechanicsStarterCatalog("local-owner", campaign.id, {
+    repository.installSrdStarterCatalog("local-owner");
+    repository.configureSrdStarterCatalog("local-owner", campaign.id, {
       expectedRevision: 0,
       idempotencyKey: "journey-catalog",
     });
@@ -87,7 +90,10 @@ describe("generated campaign deterministic journey", () => {
       connections: [{ key: "harbor-road", fromLocationKey: "rain-gate", toLocationKey: "silver-harbor",
         description: "A rain-bright road descends to the harbor.", visibility: "public" as const }],
       quests: [{ key: "find-lantern", title: "The Missing Lantern", description: "Follow the road and recover the harbor lantern.",
-        visibility: "public" as const, locationKeys: ["silver-harbor"] }],
+        visibility: "public" as const, locationKeys: ["silver-harbor"], objectives: [
+          { key: "reach-harbor", description: "Reach Silver Harbor.", targetProgress: 1, dependencyObjectiveKeys: [], visibility: "public" as const },
+          { key: "recover-lantern", description: "Recover the missing harbor lantern.", targetProgress: 1, dependencyObjectiveKeys: ["reach-harbor"], visibility: "public" as const },
+        ], rewards: [{ key: "harbor-favor", label: "Harbor keeper favor", kind: "custom" as const, amount: null, visibility: "public" as const }] }],
     };
     let generationCalls = 0;
     let adventureCalls = 0;
@@ -100,7 +106,10 @@ describe("generated campaign deterministic journey", () => {
           return providerResult(null, [{ id: "journey-travel-choice", name: travelTool.name,
             arguments: JSON.stringify({ version: "v1", kind: "actor.travel", candidateId, choices: [] }) }]);
         }
-        return providerResult(NARRATION);
+        const narrationTool=input.tools?.find((tool)=>tool.name==="submit_adventure_narration");
+        return narrationTool
+          ? providerResult(null,[{id:"journey-narration",name:narrationTool.name,arguments:JSON.stringify({narration:NARRATION})}])
+          : providerResult(NARRATION);
       },
       getProvider: async () => ({ ...defaultProviderSettings(), model: "journey-test" }),
       getHarness: async () => defaultHarnessSettings(),
@@ -157,6 +166,8 @@ describe("generated campaign deterministic journey", () => {
     expect(quests.json().quests).toEqual(expect.arrayContaining([
       expect.objectContaining({ title: "The Missing Lantern", description: "Follow the road and recover the harbor lantern." }),
     ]));
+    expect(quests.json().objectives.map((objective: any) => objective.description)).toEqual(["Reach Silver Harbor.", "Recover the missing harbor lantern."]);
+    expect(quests.json().objectives[1].dependencyObjectiveIds).toEqual([quests.json().objectives[0].objectiveId]);
 
     const session = await createSession({ characterId: persona.id, title: "Rain Road session" });
     const activeSession = await transitionSession(session.id, "active", "journey-test");
@@ -175,7 +186,7 @@ describe("generated campaign deterministic journey", () => {
     });
 
     const scores = Object.fromEntries(
-      ["might", "agility", "resolve", "insight", "presence", "craft"]
+      SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS
         .map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]),
     );
     const draft = await app.inject({
@@ -186,7 +197,17 @@ describe("generated campaign deterministic journey", () => {
         idempotencyKey: "journey-character" },
     });
     expect(draft.statusCode, draft.body).toBe(201);
-    const definitions = MECHANICS_STARTER_CATALOG.definitions;
+    expect(draft.json().draft).toMatchObject({
+      rulesetId: "dnd-5e",
+      rulesetVersion: "1.0.0",
+      allocation: { method: "standard-array", scores: {
+        strength: 15, dexterity: 14, constitution: 13, intelligence: 12, wisdom: 10, charisma: 8,
+      } },
+    });
+    const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+    const human = definitions.find(({ reference }) => reference.definitionId === "srd-5.1:race:human")!;
+    const acolyte = definitions.find(({ reference }) => reference.definitionId === "srd-5.1:background:acolyte")!;
+    const fighter = definitions.find(({ reference }) => reference.definitionId === "srd-5.1:class:fighter")!;
     const selected = await app.inject({
       method: "PATCH",
       url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.json().draft.id}`,
@@ -195,14 +216,29 @@ describe("generated campaign deterministic journey", () => {
         expectedRevision: 0,
         idempotencyKey: "journey-character-selections",
         selections: {
-          race: definitions.find((definition) => definition.reference.kind === "race")!.reference,
-          background: definitions.find((definition) => definition.reference.kind === "background")!.reference,
-          class: definitions.find((definition) => definition.reference.kind === "class")!.reference,
+          race: human.reference,
+          background: acolyte.reference,
+          class: fighter.reference,
           starterGrant: "currency",
         },
       },
     });
     expect(selected.statusCode, selected.body).toBe(200);
+    expect(selected.json().draft).toMatchObject({
+      rulesetId: "dnd-5e",
+      rulesetVersion: "1.0.0",
+      selections: { race: human.reference, background: acolyte.reference, class: fighter.reference, starterGrant: "currency" },
+      derivedPreview: {
+        rulesetId: "dnd-5e", rulesetVersion: "1.0.0", maxHp: 12, armorClass: 12,
+        proficiencyBonus: 2, initiative: 2, speed: 30, carryingLimit: 240,
+        abilityModifiers: { strength: 3, dexterity: 2, constitution: 2, intelligence: 1, wisdom: 0, charisma: -1 },
+      },
+      startingGrants: [{ kind: "currency", reference: expect.objectContaining({
+        packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion,
+        definitionId: "srd-5.1:currency:gp",
+      }), amount: 15, source: "background-currency" }],
+    });
     const finalized = await app.inject({
       method: "POST",
       url: `/api/rpg/v1/campaigns/${campaign.id}/character-drafts/${draft.json().draft.id}/finalize`,
@@ -210,19 +246,56 @@ describe("generated campaign deterministic journey", () => {
       payload: { expectedRevision: 1, idempotencyKey: "journey-finalize" },
     });
     expect(finalized.statusCode, finalized.body).toBe(201);
+    expect(finalized.json()).toMatchObject({
+      sheet: {
+        race: human.reference,
+        background: acolyte.reference,
+        classes: [{ class: fighter.reference, level: 1 }],
+        attributes: [
+          { attributeId: "strength", value: 16 }, { attributeId: "dexterity", value: 15 },
+          { attributeId: "constitution", value: 14 }, { attributeId: "intelligence", value: 13 },
+          { attributeId: "wisdom", value: 11 }, { attributeId: "charisma", value: 9 },
+        ],
+      },
+      resources: [{ name: "health", current: 12, max: 12 }],
+      receipt: { derived: {
+        rulesetId: "dnd-5e", rulesetVersion: "1.0.0", maxHp: 12, armorClass: 12,
+        proficiencyBonus: 2, initiative: 2,
+      } },
+    });
     expect(finalized.json().receipt.startingGrants).toEqual([
-      expect.objectContaining({ kind: "currency", amount: 12 }),
+      expect.objectContaining({ kind: "currency", reference: expect.objectContaining({
+        packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion,
+        definitionId: "srd-5.1:currency:gp",
+      }), amount: 15 }),
     ]);
     const aggregate = repository.getCampaignCharacter("local-owner", campaign.id, finalized.json().character.id);
     if (!aggregate) throw new Error("finalized campaign character is unavailable");
     const actorId = aggregate.projection.actor.id;
+    repository.mutateInventoryForActor("local-owner", campaign.id, actorId, { kind: "equip",
+      entryId: grantSrdEquipment(campaign.id, actorId), slot: "hand", expectedRevision: 0, idempotencyKey: "journey-equip" });
+
+    const sheet = await app.inject({
+      method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/characters/${finalized.json().character.id}/sheet`,
+    });
+    expect(sheet.statusCode, sheet.body).toBe(200);
+    expect(sheet.json()).toMatchObject({
+      rulesetId: "dnd-5e",
+      rulesetVersion: "1.0.0",
+      derived: { rulesetId: "dnd-5e", rulesetVersion: "1.0.0", maxHp: 12, armorClass: 12, proficiencyBonus: 2 },
+    });
 
     const walletBeforeReward = await app.inject({
       method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/actors/${actorId}/wallet`,
     });
     expect(walletBeforeReward.statusCode, walletBeforeReward.body).toBe(200);
     expect(walletBeforeReward.json().wallet.balances).toEqual([
-      expect.objectContaining({ minorUnits: 12 }),
+      expect.objectContaining({ currency: expect.objectContaining({
+        packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion,
+        definitionId: "srd-5.1:currency:gp",
+      }), minorUnits: 15 }),
     ]);
     const placedWorld = await app.inject({ method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/world` });
     expect(placedWorld.statusCode, placedWorld.body).toBe(200);
@@ -268,15 +341,15 @@ describe("generated campaign deterministic journey", () => {
 
     const enemyTemplate = {
       kind: "enemy-template",
-      packId: MECHANICS_STARTER_CATALOG.manifest.packId,
-      packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
-      definitionId: "velvet:mechanics:enemy-template:gloam-mite",
+      packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
+      packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
+      definitionId: "velvet:test-fixture:enemy-template:training-dummy",
     };
     const encounter = await app.inject({
       method: "POST",
       url: `/api/rpg/v1/campaigns/${campaign.id}/encounters`,
       headers: JSON_HEADERS,
-      payload: { sessionId: session.id, name: "Harbor Mite", combatants: [
+      payload: { sessionId: session.id, name: "Training Dummy", combatants: [
         { kind: "actor", actorId, team: "allies" },
         { kind: "enemy", template: enemyTemplate, team: "enemies" },
       ], idempotencyKey: "journey-encounter" },
@@ -290,31 +363,61 @@ describe("generated campaign deterministic journey", () => {
       payload: { expectedRevision: encounter.json().encounter.revision, idempotencyKey: "journey-combat-start" },
     });
     expect(started.statusCode, started.body).toBe(200);
+    expect(started.json().receipt).toMatchObject({
+      idempotencyKey: "journey-combat-start",
+      revisionBefore: encounter.json().encounter.revision,
+      revisionAfter: encounter.json().encounter.revision + 1,
+    });
     let combat = started.json().combat;
     let playerAttackObserved = false;
+    let playerEndTurnObserved = false;
     for (let turn = 0; turn < 20 && combat.currentCombatant !== null; turn += 1) {
       const acting = combat.combatants.find((combatant: any) => combatant.combatantId === combat.currentCombatant);
       const enemy = combat.combatants.find((combatant: any) => combatant.kind === "enemy");
       if (enemy.status === "defeated") break;
       const legalAction = acting.kind === "actor"
         ? combat.legalActions.find((action: any) => action.kind === "attack" && action.targetIds.includes(enemy.combatantId))
-        : combat.legalActions.find((action: any) => action.kind === "end-turn");
+          ?? combat.legalActions.find((action: any) => action.kind === "end-turn")
+        : { kind: "enemy-turn" };
       if (!legalAction) throw new Error("expected deterministic combat action is unavailable");
       const action = await app.inject({
         method: "POST",
-        url: `/api/rpg/v1/combats/${combatId}/action-commands`,
+        url: acting.kind === "enemy"
+          ? `/api/rpg/v1/combats/${combatId}/enemy-turn-commands`
+          : `/api/rpg/v1/combats/${combatId}/action-commands`,
         headers: JSON_HEADERS,
-        payload: { legalActionId: legalAction.legalActionId, targetIds: legalAction.targetIds, choices: [],
-          expectedRevision: combat.revision, idempotencyKey: `journey-action-${turn}` },
+        payload: acting.kind === "enemy"
+          ? { expectedRevision: combat.revision, idempotencyKey: `journey-action-${turn}` }
+          : { legalActionId: legalAction.legalActionId, targetIds: legalAction.targetIds, choices: [],
+            expectedRevision: combat.revision, idempotencyKey: `journey-action-${turn}` },
       });
       expect(action.statusCode, action.body).toBe(200);
-      if (acting.kind === "actor") {
+      expect(action.json().receipt).toMatchObject({
+        idempotencyKey: `journey-action-${turn}`,
+        revisionBefore: combat.revision,
+        revisionAfter: combat.revision + 1,
+      });
+      if (acting.kind === "actor" && legalAction.kind === "attack") {
         playerAttackObserved = true;
-        expect(action.json().resolution).toMatchObject({ kind: "attack", actingCombatantId: acting.combatantId });
+        expect(action.json().resolution).toMatchObject({
+          kind: "attack",
+          actingCombatantId: acting.combatantId,
+          outcomes: [expect.objectContaining({
+            rulesetId: "dnd-5e", rulesetVersion: "1.0.0", damageType: "slashing", armorClass: 10, hit: true,
+          })],
+        });
+        if (action.json().combat.currentCombatant !== null) {
+          expect(action.json().combat.currentCombatant).toBe(acting.combatantId);
+          expect(action.json().combat.legalActions.some((entry: any) => entry.kind === "attack")).toBe(false);
+        }
+      } else if (acting.kind === "actor") {
+        playerEndTurnObserved = true;
+        expect(action.json().combat.currentCombatant).not.toBe(acting.combatantId);
       }
       combat = action.json().combat;
     }
     expect(playerAttackObserved).toBe(true);
+    expect(playerEndTurnObserved).toBe(true);
     expect(combat.combatants.find((combatant: any) => combatant.kind === "enemy").status).toBe("defeated");
     expect(combat.currentCombatant).toBeNull();
 
@@ -332,8 +435,11 @@ describe("generated campaign deterministic journey", () => {
     });
     expect(ended.statusCode, ended.body).toBe(200);
     expect(ended.json()).toMatchObject({ encounter: { status: "completed" }, rewards: [
-      { recipientActorId: actorId, rewards: [{ kind: "currency", amount: 1 }], claim: { state: "unclaimed" } },
-    ] });
+      { recipientActorId: actorId, rewards: [{ kind: "currency", currency: {
+        kind: "currency", packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion, definitionId: "srd-5.1:currency:gp",
+      }, amount: 1 }], claim: { state: "unclaimed" } },
+    ], receipt: { idempotencyKey: "journey-combat-end", revisionBefore: combat.revision, revisionAfter: combat.revision + 1 } });
     const reward = ended.json().rewards[0];
     const claimed = await app.inject({
       method: "POST",
@@ -344,12 +450,21 @@ describe("generated campaign deterministic journey", () => {
     });
     expect(claimed.statusCode, claimed.body).toBe(200);
     expect(claimed.json().reward.claim).toMatchObject({ state: "claimed" });
+    expect(claimed.json().receipt).toMatchObject({
+      idempotencyKey: "journey-reward-claim",
+      revisionBefore: ended.json().receipt.revisionAfter,
+      revisionAfter: ended.json().receipt.revisionAfter + 1,
+    });
     const walletAfterReward = await app.inject({
       method: "GET", url: `/api/rpg/v1/campaigns/${campaign.id}/actors/${actorId}/wallet`,
     });
     expect(walletAfterReward.statusCode, walletAfterReward.body).toBe(200);
     expect(walletAfterReward.json().wallet.balances).toEqual([
-      expect.objectContaining({ minorUnits: 13 }),
+      expect.objectContaining({ currency: expect.objectContaining({
+        packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion,
+        definitionId: "srd-5.1:currency:gp",
+      }), minorUnits: 16 }),
     ]);
 
     await app.close();
@@ -366,7 +481,11 @@ describe("generated campaign deterministic journey", () => {
       narrationStatus: { status: "completed", text: expect.stringContaining(NARRATION), source: "provider-assisted" } });
     expect(reconciledWorld.json().currentLocations).toContainEqual(expect.objectContaining({ actorId, locationId: destination.locationId }));
     expect(reconciledRewards.json().rewards[0].claim).toMatchObject({ state: "claimed" });
-    expect(reconciledWallet.json().wallet.balances).toEqual([expect.objectContaining({ minorUnits: 13 })]);
+    expect(reconciledWallet.json().wallet.balances).toEqual([expect.objectContaining({
+      currency: expect.objectContaining({ packId: SRD_5_1_STARTER_IDENTITY.packId,
+        packVersion: SRD_5_1_STARTER_IDENTITY.packVersion, definitionId: "srd-5.1:currency:gp" }),
+      minorUnits: 16,
+    })]);
     expect(reconciledEnd.statusCode, reconciledEnd.body).toBe(200);
     expect(reconciledEnd.json()).toMatchObject({ operation: "end", result: { encounter: { status: "completed" } } });
     expect(adventureCalls).toBe(2);

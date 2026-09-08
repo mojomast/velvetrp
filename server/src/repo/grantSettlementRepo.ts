@@ -14,6 +14,17 @@ function ensurePinnedDefinition(db: DatabaseDriver.Database, campaignId: string,
       campaignId, reference.packId, reference.packVersion);
 }
 
+function itemIsStackable(db: DatabaseDriver.Database, campaignId: string, reference: StarterGrant["reference"]): boolean {
+  const row = db.prepare(`SELECT definition.definition_json FROM campaign_catalog_current_pins pin JOIN rpg_catalog_definitions definition
+    ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version AND definition.kind='item'
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.definition_id=?`)
+    .get(campaignId, reference.packId, reference.packVersion, reference.definitionId) as { definition_json: string } | undefined;
+  if (!row) throw new Error("starter item definition is not pinned");
+  const definition = JSON.parse(row.definition_json) as { mechanics?: { stackable?: unknown } };
+  if (typeof definition.mechanics?.stackable !== "boolean") throw new Error("starter item stackability is invalid");
+  return definition.mechanics.stackable;
+}
+
 function currencyCode(db: DatabaseDriver.Database, campaignId: string, reference: StarterGrant["reference"]): string {
   ensurePinnedDefinition(db, campaignId, reference, "currency");
   const existing = db.prepare(`SELECT currency_code FROM rpg_currency_references_v25 WHERE campaign_id=?
@@ -33,14 +44,23 @@ export function materializeStarterGrantsV51(db: DatabaseDriver.Database, ids: Id
   input.grants.forEach((grant, position) => {
     if (grant.kind === "item") {
       ensurePinnedDefinition(db, input.campaignId, grant.reference, "item");
-      const entryId = ids.nextId();
-      db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,
-        item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
-        VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`)
-        .run(entryId, input.campaignId, input.actorId, grant.reference.packId, grant.reference.packVersion,
-          grant.reference.definitionId, grant.quantity, input.occurredAt);
+      const stackable = itemIsStackable(db, input.campaignId, grant.reference);
+      const entryIds = Array.from({ length: stackable ? 1 : grant.quantity }, () => ids.nextId());
+      if (stackable) {
+        db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,
+          item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+          VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)`)
+          .run(entryIds[0], input.campaignId, input.actorId, grant.reference.packId, grant.reference.packVersion,
+            grant.reference.definitionId, grant.quantity, input.occurredAt);
+      } else {
+        const insert = db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,
+          item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+          VALUES(?,?,?,?,?,'item',?,'instanced',1,?,NULL,0,?)`);
+        entryIds.forEach((entryId) => insert.run(entryId, input.campaignId, input.actorId, grant.reference.packId,
+          grant.reference.packVersion, grant.reference.definitionId, entryId, input.occurredAt));
+      }
       db.prepare("INSERT INTO character_starter_materializations_v51 VALUES(?,?,?,?,?,?,?)")
-        .run(input.draftId, position, input.campaignId, input.actorId, "inventory", entryId, input.occurredAt);
+        .run(input.draftId, position, input.campaignId, input.actorId, "inventory", entryIds[0], input.occurredAt);
       return;
     }
     const code = currencyCode(db, input.campaignId, grant.reference);

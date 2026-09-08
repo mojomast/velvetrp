@@ -51,6 +51,11 @@ import type {
 } from "../../types.js";
 import type { ActorResourceRepository } from "../actorResourceRepo.js";
 import type { AdventureTurnRepository } from "../adventureTurnRepo.js";
+import type { AdventureCheckRepository } from "../adventureCheckRepo.js";
+import type { AdventureInventoryRepository } from "../adventureInventoryRepo.js";
+import type { AdventureCommerceRepository } from "../adventureCommerceRepo.js";
+import type { AdventurePowerRestRepository } from "../adventurePowerRestRepo.js";
+import type { AdventureQuestProgressionRepository } from "../adventureQuestProgressionRepo.js";
 import type { ExactCandidateRepository } from "../candidateRepo/index.js";
 import type { ExactCandidateProviderBridgeRepository } from "../candidateRepo/index.js";
 import type { CampaignAdministrationRepository } from "../campaignAdministrationRepo.js";
@@ -70,6 +75,8 @@ import type { StoryRepository } from "../storyRepo.js";
 import type { RestRepository } from "../restRepo.js";
 import type { WorldRepository } from "../worldRepo.js";
 import type { CampaignGenerationRepository } from "../campaignGenerationRepo.js";
+import type { TacticalMapRepository } from "../tacticalMapRepo.js";
+import type { CampaignAdministrationIntegrationRepository } from "../campaignAdministrationIntegrationRepo.js";
 
 export interface RepositoryDependencies {
   clock: Clock;
@@ -184,10 +191,12 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, CampaignAdministrationIntegrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, AdventureCheckRepository, AdventureInventoryRepository, AdventureCommerceRepository, AdventurePowerRestRepository, AdventureQuestProgressionRepository, PowerRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository, TacticalMapRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
+  installSrdStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
+  configureSrdStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
   /** Specialized trusted-local snapshot; it accepts no caller-supplied content identities. */
   inspectOriginalStarterSetup(actorPrincipalId: string, campaignId: string): OriginalStarterSetupInspection;
   /** Specialized setup write; manifest identity and content are fixed by the repository. */

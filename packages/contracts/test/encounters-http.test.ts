@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   encounterCreateRequestSchema,
   encounterCreateResponseSchema,
+  encounterSetupCandidatesResponseSchema,
   encounterStartCommandResponseSchema,
   combatLogQuerySchema,
   combatLogResponseSchema,
   combatActionCommandRequestSchema,
+  combatEnemyTurnCommandRequestSchema,
   combatActionCommandResponseSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
@@ -55,6 +57,25 @@ describe("encounter HTTP contracts",()=>{
     expect(encounterStartCommandResponseSchema.safeParse({...response,combat:{...combat,currentCombatant:"other"}}).success).toBe(false);
   });
 
+  it("projects only the closed authoritative D&D condition and temporary-HP state",()=>{
+    const state={...combatant,hitPoints:10,maximumHitPoints:10,status:"active" as const,temporaryHitPoints:4,
+      conditions:[{condition:"restrained" as const,expiresAtRound:3}]};
+    expect(encounterStartCommandResponseSchema.safeParse({combat:{combatId:"encounter",round:1,currentCombatant:"combatant",
+      combatants:[state],legalActions:[],revision:2},receipt:{idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}}).success).toBe(true);
+    expect(encounterStartCommandResponseSchema.safeParse({combat:{combatId:"encounter",round:1,currentCombatant:"combatant",
+      combatants:[{...state,conditions:[{condition:"invented",expiresAtRound:null}]}],legalActions:[],revision:2},receipt:{idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}}).success).toBe(false);
+  });
+
+  it("exposes only labeled, ordered setup identities and fixed teams",()=>{
+    const response={sessions:[{sessionId:"session"}],actors:[{actorId:"actor",label:"Hero"}],enemies:[{
+      template:{kind:"enemy-template" as const,packId:"pack",packVersion:"1.0.0",definitionId:"mite"},label:"Mite",
+    }],teams:{actor:"allies" as const,enemy:"enemies" as const}};
+    expect(encounterSetupCandidatesResponseSchema.parse(response)).toEqual(response);
+    expect(encounterSetupCandidatesResponseSchema.safeParse({...response,actors:[{actorId:"actor",label:"Hero"},{actorId:"actor",label:"Other"}]}).success).toBe(false);
+    expect(encounterSetupCandidatesResponseSchema.safeParse({...response,enemies:[...response.enemies].map((enemy)=>({...enemy,private:{tactics:"secret"}}))}).success).toBe(false);
+    expect(encounterSetupCandidatesResponseSchema.safeParse({...response,teams:{actor:"enemies",enemy:"allies"}}).success).toBe(false);
+  });
+
   it("validates bounded append-only combat log pages",()=>{
     expect(combatLogQuerySchema.parse({afterSequence:"0",limit:"50"})).toEqual({afterSequence:0,limit:50});
     expect(combatLogQuerySchema.safeParse({afterSequence:0,limit:101}).success).toBe(false);
@@ -81,7 +102,30 @@ describe("encounter HTTP contracts",()=>{
       roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:"enemy"};
     const response={resolution,combat,receipt:{idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}};
     expect(combatActionCommandResponseSchema.parse(response)).toEqual(response);
+    const srd = { ...response, resolution: { ...resolution, outcomes: resolution.outcomes.map(outcome => ({
+      ...outcome, damageType: "slashing", rulesetId: "dnd-5e", rulesetVersion: "1.0.0",
+      attackRoll: 15, attackTotal: 20, armorClass: 10, hit: true, critical: false, damageRolls: [1],
+    })) } };
+    expect(combatActionCommandResponseSchema.parse(srd)).toEqual(srd);
+    expect(combatActionCommandResponseSchema.safeParse({ ...srd, resolution: { ...srd.resolution,
+      outcomes: srd.resolution.outcomes.map(outcome => ({ ...outcome, damageType: "invented" })),
+    } }).success).toBe(false);
     expect(combatActionCommandResponseSchema.safeParse({...response,combat:{...combat,revision:4}}).success).toBe(false);
+  });
+
+  it("keeps D&D enemy turn execution caller-blind",()=>{
+    const request={expectedRevision:2,idempotencyKey:"enemy-turn"};
+    expect(combatEnemyTurnCommandRequestSchema.parse(request)).toEqual(request);
+    for(const authored of ["targetIds","damage","legalActionId","tactics"])
+      expect(combatEnemyTurnCommandRequestSchema.safeParse({...request,[authored]:authored==="targetIds"?[]:1}).success).toBe(false);
+  });
+
+  it("bounds D&D survival commands and projections",()=>{
+    const survivor={...combatant,hitPoints:0,maximumHitPoints:10,status:"unconscious" as const,deathSaves:{successes:1,failures:2}};
+    expect(encounterStartCommandResponseSchema.safeParse({combat:{combatId:"encounter",round:1,currentCombatant:"combatant",combatants:[survivor],legalActions:[{legalActionId:"death-save",kind:"death-save",targetIds:[]}],revision:2},receipt:{idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}}).success).toBe(true);
+    const deathSave={actionId:"save",legalActionId:"death-save",kind:"death-save" as const,actingCombatantId:"combatant",targetIds:[],outcomes:[{kind:"survival" as const,targetId:"combatant",roll:1,successes:1,failures:3,statusAfter:"dead" as const}],roundBefore:1,roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:null};
+    expect(combatActionCommandResponseSchema.safeParse({resolution:deathSave,combat:{combatId:"encounter",round:1,currentCombatant:null,combatants:[{...survivor,status:"dead" as const}],legalActions:[],revision:3},receipt:{idempotencyKey:"save",revisionBefore:2,revisionAfter:3,occurredAt:at}}).success).toBe(true);
+    expect(combatActionCommandResponseSchema.safeParse({resolution:{...deathSave,outcomes:[{...deathSave.outcomes[0],roll:21}]},combat:{combatId:"encounter",round:1,currentCombatant:null,combatants:[{...survivor,status:"dead" as const}],legalActions:[],revision:3},receipt:{idempotencyKey:"save",revisionBefore:2,revisionAfter:3,occurredAt:at}}).success).toBe(false);
   });
 
   it("keeps rewards server-owned and requires completed end projections",()=>{

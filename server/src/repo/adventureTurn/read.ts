@@ -1,10 +1,13 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
-  privateAdventureTurnSchema, privateGenerationDraftSchema, roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema,
+  MAX_ADVENTURE_TRANSCRIPT_TURNS, adventureTurnTranscriptEntrySchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
+  roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema,
+  type AdventureTurnTranscriptEntry,
   type PrivateAdventureTurn, type PrivateGenerationDraft, type RoleSafeAdventureTurn, type RoleSafeGenerationDraft,
 } from "@velvet/contracts";
 import { AdventureTurnUnavailableError } from "./errors.js";
+import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
 
 type Database = DatabaseDriver.Database;
 /** Principal-sensitive adventure-turn projection. */
@@ -23,6 +26,8 @@ export interface AdventureTurnReadRepository {
   getGenerationDraft(principalId: string, draftId: string): GenerationDraftProjection | null;
   /** Reads persisted fallback narration from the exact terminal coordination command. */
   getAdventureTurnNarration(principalId: string, turnId: string): string | null;
+  /** Reads completed room exchanges, collapsing narration-only descendants onto their original turn. */
+  getAdventureTurnTranscript(principalId: string, campaignId: string, sessionId: string, limit?: number): AdventureTurnTranscriptEntry[];
   /** Finds an idempotent draft create without exposing cross-campaign data. */
   getGenerationDraftByIdempotencyKey(principalId: string, campaignId: string, idempotencyKey: string): GenerationDraftProjection | null;
 }
@@ -39,7 +44,6 @@ const rootTurnId = (db: Database, campaignId: string, turnId: string): string =>
     current = row.prior_turn_id;
   }
 };
-
 const receipts = (db: Database, campaignId: string, turnId: string) => {
   const root = rootTurnId(db, campaignId, turnId);
   const linked = (db.prepare(`SELECT link_id,command_id,proposal_id,source_turn_id,linked_at FROM turn_mechanics_links_v36
@@ -55,6 +59,23 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     WHERE campaign_id=? AND turn_id=? ORDER BY linked_at,binding_id`).all(campaignId, root) as any[]).map((row) => ({
       linkId:row.link_id,campaignId,commandId:row.command_id,proposalId:null,sourceTurnId:root,linkedAt:row.linked_at,
     }));
+  const questProgress = boundAdventureQuestReceipts(db,campaignId,root).map((row)=>({
+      linkId:`quest-${createHash("sha256").update(`${campaignId}\0${root}\0${row.commandId}`).digest("hex").slice(0,40)}`,
+      campaignId,commandId:row.commandId,proposalId:null,sourceTurnId:root,linkedAt:row.linkedAt,
+    }));
+  const checks = (db.prepare(`SELECT command_id,occurred_at FROM adventure_check_executions_v54 WHERE campaign_id=? AND turn_id=?
+    ORDER BY occurred_at,command_id`).all(campaignId,root) as Array<{command_id:string;occurred_at:string}>).map((row)=>({
+      linkId:`check-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,
+      campaignId,commandId:row.command_id,proposalId:null,sourceTurnId:root,linkedAt:row.occurred_at,
+    }));
+  const inventory = (db.prepare(`SELECT execution.inventory_command_id command_id,execution.proposal_id,execution.occurred_at
+    FROM adventure_inventory_executions_v55 execution WHERE execution.campaign_id=? AND execution.turn_id=? ORDER BY execution.occurred_at,execution.execution_id`)
+    .all(campaignId,root) as any[]).map((row)=>({linkId:`inventory-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,
+      campaignId,commandId:row.command_id,proposalId:row.proposal_id,sourceTurnId:root,linkedAt:row.occurred_at}));
+  const exactActions=(db.prepare(`SELECT command_id,proposal_id,occurred_at FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=? ORDER BY occurred_at,execution_id`)
+    .all(campaignId,root)as any[]).map(row=>({linkId:`action-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,
+      campaignId,commandId:row.command_id,proposalId:row.proposal_id,sourceTurnId:root,linkedAt:row.occurred_at}));
+  const commerce=(db.prepare("SELECT command_id,proposal_id,occurred_at FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=? ORDER BY occurred_at,execution_id").all(campaignId,root)as any[]).map(row=>({linkId:`commerce-${createHash("sha256").update(`${campaignId}\0${root}\0${row.command_id}`).digest("hex").slice(0,40)}`,campaignId,commandId:row.command_id,proposalId:row.proposal_id,sourceTurnId:root,linkedAt:row.occurred_at}));
   const rootRow = db.prepare("SELECT timeline_id,actor_id FROM adventure_turns WHERE campaign_id=? AND id=?")
     .get(campaignId, root) as { timeline_id: string; actor_id: string } | undefined;
   if (!rootRow) throw new Error("adventure turn receipt root is unavailable");
@@ -93,8 +114,8 @@ const receipts = (db: Database, campaignId: string, turnId: string) => {
     return { linkId: `recoverable-${createHash("sha256").update(`${campaignId}\0${root}\0${proposal.proposal_id}\0${entry.command_id}`).digest("hex").slice(0, 40)}`,
       campaignId, commandId: entry.command_id, proposalId: proposal.proposal_id, sourceTurnId: root, linkedAt: entry.occurred_at };
   });
-  return { links: [...linked, ...recoverable, ...generalized,...exactTravel].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
-    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length+exactTravel.length };
+  return { links: [...linked, ...recoverable, ...generalized,...exactTravel,...questProgress,...checks,...inventory,...exactActions,...commerce].sort((left, right) => left.linkedAt.localeCompare(right.linkedAt) || left.linkId.localeCompare(right.linkId)),
+    recoverableCount: recoverable.length, approvedCount: proposals.length, generalizedCount: generalized.length+exactTravel.length+questProgress.length+checks.length+inventory.length+exactActions.length+commerce.length };
 };
 
 /** Creates principal-sensitive, non-mutating turn and draft projections. */
@@ -105,23 +126,27 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
   const canSeePrivateTurn = (principalId: string, row: any, role: string) => role === "owner" || role === "gm" || row.principal_id === principalId || Boolean(db.prepare(
     "SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?",
   ).get(row.campaign_id, row.actor_id, principalId));
-  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,COALESCE(binding.execution_idempotency_key,combat.execution_idempotency_key) execution_idempotency_key,
-    COALESCE(binding.command_type,'combat_action') command_type,
+  const proposalRows = (turnId: string) => db.prepare(`SELECT proposal.*,COALESCE(binding.execution_idempotency_key,combat.execution_idempotency_key,inventory.execution_idempotency_key,commerce.execution_idempotency_key,action.execution_idempotency_key) execution_idempotency_key,
+    CASE WHEN binding.command_type IS NOT NULL THEN binding.command_type WHEN combat.proposal_id IS NOT NULL THEN 'combat_action' WHEN inventory.proposal_id IS NOT NULL THEN 'inventory_action' WHEN commerce.proposal_id IS NOT NULL THEN 'commerce_action' WHEN action.action_kind='power' THEN 'power_action' WHEN action.action_kind='combat-consumable' THEN 'combat_consumable_action' WHEN action.action_kind='combat-power' THEN 'combat_power_action' WHEN action.action_kind LIKE 'quest-%' THEN 'quest_lifecycle_action' WHEN action.action_kind='progression' THEN 'progression_action' ELSE 'rest_action' END command_type,
     COALESCE(binding.source_turn_id,proposal.turn_id) binding_source_turn_id,COALESCE(binding.timeline_id,turn.timeline_id) binding_timeline_id,
     COALESCE(binding.actor_id,turn.actor_id) binding_actor_id,combat.encounter_id,combat.legal_action_id,combat.legal_action_digest,combat.expected_combat_revision,
      combat.command_legal_action_id,policy.policy_version,policy.category policy_category,policy.requires_confirmation policy_requires_confirmation,
+    COALESCE(inventory.candidate_id,commerce.candidate_id,action.candidate_id) inventory_candidate_id,COALESCE(inventory.candidate_digest,commerce.candidate_digest,action.candidate_digest) inventory_candidate_digest,
     policy.required_authorizer,policy.safe_summary_json,policy.proposed_command_digest,policy.observed_domain_revisions_json,policy.attested_at,
     decision.decision_id,decision.principal_id decision_principal_id,replan.reason replan_reason,
     decision.decision,decision.expected_turn_revision,decision.idempotency_key decision_key,decision.expires_at,decision.decided_at
     FROM tool_proposals proposal JOIN adventure_turns turn ON turn.id=proposal.turn_id LEFT JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=proposal.campaign_id
       AND binding.turn_id=proposal.turn_id AND binding.proposal_id=proposal.proposal_id
       LEFT JOIN agent_combat_proposal_bindings_v39 combat ON combat.campaign_id=proposal.campaign_id AND combat.turn_id=proposal.turn_id AND combat.proposal_id=proposal.proposal_id
+      LEFT JOIN adventure_inventory_proposal_bindings_v55 inventory ON inventory.campaign_id=proposal.campaign_id AND inventory.turn_id=proposal.turn_id AND inventory.proposal_id=proposal.proposal_id
+      LEFT JOIN adventure_commerce_bindings_v57 commerce ON commerce.campaign_id=proposal.campaign_id AND commerce.turn_id=proposal.turn_id AND commerce.proposal_id=proposal.proposal_id
+      LEFT JOIN adventure_exact_action_proposal_bindings_v56 action ON action.campaign_id=proposal.campaign_id AND action.turn_id=proposal.turn_id AND action.proposal_id=proposal.proposal_id
       JOIN confirmation_policy_attestations_v40 policy ON policy.campaign_id=proposal.campaign_id AND policy.turn_id=proposal.turn_id AND policy.proposal_id=proposal.proposal_id
       LEFT JOIN confirmation_decisions decision ON decision.campaign_id=proposal.campaign_id
       AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
       LEFT JOIN agent_replan_requirements_v40 replan ON replan.campaign_id=proposal.campaign_id AND replan.turn_id=proposal.turn_id
         AND replan.proposal_id=proposal.proposal_id WHERE proposal.turn_id=?
-      AND (binding.proposal_id IS NOT NULL OR combat.proposal_id IS NOT NULL) ORDER BY proposal.position`).all(turnId) as any[];
+      AND (binding.proposal_id IS NOT NULL OR combat.proposal_id IS NOT NULL OR inventory.proposal_id IS NOT NULL OR commerce.proposal_id IS NOT NULL OR action.proposal_id IS NOT NULL) ORDER BY proposal.position`).all(turnId) as any[];
   const confirmation = (row: any) => row.decision_id ? { state: "decided" as const, decision: { decisionId: row.decision_id,
     proposalId: row.proposal_id, principalId: row.decision_principal_id, decision: row.decision, expectedTurnRevision: row.expected_turn_revision,
     idempotencyKey: row.decision_key, expiresAt: row.expires_at, decidedAt: row.decided_at } }
@@ -173,8 +198,9 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
              policy:policy(proposal),
             executionBinding: { idempotencyKey: proposal.execution_idempotency_key, commandType: proposal.command_type,
               campaignId: proposal.campaign_id, timelineId: proposal.binding_timeline_id, actorId: proposal.binding_actor_id,
-              sourceTurnId: proposal.binding_source_turn_id,...(proposal.command_type==="combat_action"?{encounterId:proposal.encounter_id,
-                 legalActionId:proposal.command_legal_action_id,legalActionDigest:proposal.legal_action_digest,expectedCombatRevision:proposal.expected_combat_revision}:{}) },
+               sourceTurnId: proposal.binding_source_turn_id,...(proposal.command_type==="combat_action"?{encounterId:proposal.encounter_id,
+                  legalActionId:proposal.command_legal_action_id,legalActionDigest:proposal.legal_action_digest,expectedCombatRevision:proposal.expected_combat_revision}
+                       :["inventory_action","commerce_action","power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"].includes(proposal.command_type)?{candidateId:proposal.inventory_candidate_id,candidateDigest:proposal.inventory_candidate_digest}:{}) },
               confirmation: confirmation(proposal) }, status: proposalLinks.length > 0 ? "committed"
                : proposal.replan_reason ? "cancelled" : proposal.decision ?? (row.v36_state === "cancelled" ? "cancelled"
                 : proposal.requires_confirmation ? "waiting-confirmation" : "approved"), receiptLinks: proposalLinks }); }),
@@ -235,6 +261,51 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
       if (!row) return null;
       const text = (JSON.parse(row.request_json) as { fallbackNarration?: unknown }).fallbackNarration;
       return typeof text === "string" ? text : null;
+    },
+    getAdventureTurnTranscript(principalId, campaignId, sessionId, limit = MAX_ADVENTURE_TRANSCRIPT_TURNS) {
+      const member = membership(principalId, campaignId);
+      if (!member) throw new AdventureTurnUnavailableError("adventure transcript is unavailable");
+      if (!db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId, sessionId)) {
+        throw new AdventureTurnUnavailableError("adventure transcript is unavailable");
+      }
+      const boundedLimit = Math.max(1, Math.min(MAX_ADVENTURE_TRANSCRIPT_TURNS, Math.trunc(limit)));
+      const rows = db.prepare(`WITH RECURSIVE
+        roots AS (
+          SELECT turn.id,turn.campaign_id,turn.actor_id,turn.principal_id,turn.declaration,turn.created_at,turn.rowid root_order
+          FROM adventure_turns turn
+          WHERE turn.campaign_id=? AND turn.session_id=? AND turn.mode='original'
+        ), ancestry(root_id,id,depth) AS (
+          SELECT id,id,0 FROM roots
+          UNION ALL
+          SELECT ancestry.root_id,child.id,ancestry.depth+1 FROM ancestry JOIN adventure_turns child ON child.prior_turn_id=ancestry.id
+            AND child.campaign_id=? AND child.session_id=?
+        ), completed AS (
+          SELECT ancestry.root_id,turn.id,turn.updated_at,
+            json_extract(command.request_json,'$.fallbackNarration') narration,
+            row_number() OVER (PARTITION BY ancestry.root_id ORDER BY ancestry.depth DESC,turn.updated_at DESC,turn.rowid DESC) rank
+          FROM ancestry JOIN adventure_turns turn ON turn.id=ancestry.id
+          JOIN adventure_coordination_events_v36 event ON event.aggregate_kind='turn' AND event.campaign_id=turn.campaign_id
+            AND event.aggregate_id=turn.id AND event.resulting_revision=(SELECT max(latest.resulting_revision)
+              FROM adventure_coordination_events_v36 latest WHERE latest.aggregate_kind='turn'
+                AND latest.campaign_id=turn.campaign_id AND latest.aggregate_id=turn.id)
+          JOIN adventure_coordination_commands_v36 command ON command.aggregate_kind='turn' AND command.campaign_id=turn.campaign_id
+            AND command.aggregate_id=turn.id AND command.mutation_type='narration-update'
+            AND command.resulting_revision=(SELECT max(narrated.resulting_revision) FROM adventure_coordination_commands_v36 narrated
+              WHERE narrated.aggregate_kind='turn' AND narrated.campaign_id=turn.campaign_id
+                AND narrated.aggregate_id=turn.id AND narrated.mutation_type='narration-update'
+                AND json_type(narrated.request_json,'$.fallbackNarration')='text')
+          WHERE event.resulting_state='completed' AND json_type(command.request_json,'$.fallbackNarration')='text'
+        )
+        SELECT roots.id turn_id,roots.campaign_id,roots.actor_id,roots.principal_id,roots.declaration,
+          completed.narration,completed.updated_at completed_at
+        FROM roots JOIN completed ON completed.root_id=roots.id AND completed.rank=1
+        ORDER BY roots.created_at,roots.root_order`).all(campaignId, sessionId, campaignId, sessionId) as Array<{
+          turn_id: string; campaign_id: string; actor_id: string; principal_id: string;
+          declaration: string; narration: string; completed_at: string;
+        }>;
+      return rows.filter((row) => canSeePrivateTurn(principalId, row, member.role)).slice(-boundedLimit)
+        .map((row) => adventureTurnTranscriptEntrySchema.parse({ turnId: row.turn_id, actorId: row.actor_id,
+        declaration: row.declaration, narration: row.narration, completedAt: row.completed_at }));
     },
     getGenerationDraftByIdempotencyKey(principalId, campaignId, idempotencyKey) {
       const row = db.prepare("SELECT id FROM generation_drafts WHERE campaign_id=? AND idempotency_key=?")

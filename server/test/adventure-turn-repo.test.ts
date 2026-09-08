@@ -17,9 +17,11 @@ function seed(): { campaignId: string; timelineId: string } {
   const campaign = initial.createCampaign("local-owner", { name: "Adventure turns" });
   initial.close();
   const db = new DatabaseDriver(dbPath()); db.pragma("foreign_keys=ON");
-  db.prepare("INSERT INTO principals VALUES ('player','Player',0),('observer','Observer',0),('outsider','Outsider',0)").run();
-  db.prepare("INSERT INTO campaign_memberships VALUES (?,'player','player',?),(?,'observer','observer',?)")
-    .run(campaign.id, AT, campaign.id, AT);
+  db.prepare(`INSERT INTO principals VALUES ('player','Player',0),('controller','Controller',0),('unrelated','Unrelated',0),
+    ('gm','GM',0),('observer','Observer',0),('outsider','Outsider',0)`).run();
+  db.prepare(`INSERT INTO campaign_memberships VALUES (?,'player','player',?),(?,'controller','player',?),
+    (?,'unrelated','player',?),(?,'gm','gm',?),(?,'observer','observer',?)`)
+    .run(campaign.id, AT, campaign.id, AT, campaign.id, AT, campaign.id, AT, campaign.id, AT);
   db.prepare("INSERT INTO characters VALUES ('persona','Hero',30,'hero','',1,0,?)").run(AT);
   db.prepare("INSERT INTO rpg_rules_profiles VALUES ('turn-profile','Turn profile','Rules','[]')").run();
   db.prepare("INSERT INTO rpg_content_packs VALUES ('turn-pack','1','turn-profile','Turn pack','Pack','[]',0)").run();
@@ -172,6 +174,14 @@ describe("M1.10 adventure turn repository", () => {
     expiredRepo.close();
   });
 
+  it("rejects a raw proposed-to-narrating transition without durable receipt evidence",()=>{
+    const identity=seed();const repo=factory();const turn=repo.createAdventureTurn("player",createInput(identity,"no-receipt-narration"));
+    repo.appendToolProposal("player",{turnId:turn.turnId,expectedTurnRevision:0,expectedCampaignRevision:0,idempotencyKey:"no-receipt-proposal",
+      toolName:"roll",arguments:{},requiresConfirmation:false});
+    const db=new DatabaseDriver(dbPath());expect(()=>db.prepare(`UPDATE adventure_turns SET state='narrating',narration_status='in-progress',
+      revision=revision+1,updated_at=? WHERE id=?`).run(AT,turn.turnId)).toThrow("invalid adventure turn transition");db.close();repo.close();
+  });
+
   it("rechecks role, actor control, timeline identity, and revisions inside each immediate transaction", () => {
     const identity = seed(); const repo = factory();
     const turn = repo.createAdventureTurn("player", createInput(identity));
@@ -195,6 +205,39 @@ describe("M1.10 adventure turn repository", () => {
     expect(repo.getAdventureTurn("player", turn.turnId)).toMatchObject({ turnId: turn.turnId });
     expect(() => repo.appendToolProposal("player", { turnId: turn.turnId, expectedTurnRevision: 0, expectedCampaignRevision: 0,
       idempotencyKey: "detached", toolName: "roll", arguments: {}, requiresConfirmation: false })).toThrow(AdventureTurnStaleError);
+    repo.close();
+  });
+
+  it("matches private-turn visibility in transcripts and collapses completed narration derivatives", () => {
+    const identity = seed(); const repo = factory();
+    let original = repo.createAdventureTurn("player", createInput(identity, "transcript-original"));
+    original = repo.updateAdventureTurnNarration("player", { turnId: original.turnId, expectedTurnRevision: original.revision,
+      expectedCampaignRevision: 0, idempotencyKey: "transcript-original-cancelled", narrationStatus: "pending", terminalState: "cancelled" });
+    let retry = repo.createAdventureTurn("player", { ...createInput(identity, "transcript-retry"), mode: "narration-retry",
+      priorTurnId: original.turnId });
+    retry = repo.updateAdventureTurnNarration("player", { turnId: retry.turnId, expectedTurnRevision: retry.revision,
+      expectedCampaignRevision: 0, idempotencyKey: "transcript-retry-progress", narrationStatus: "in-progress" });
+    repo.updateAdventureTurnNarration("player", { turnId: retry.turnId, expectedTurnRevision: retry.revision,
+      expectedCampaignRevision: 0, idempotencyKey: "transcript-retry-done", narrationStatus: "completed", terminalState: "completed",
+      fallbackNarration: "The revised account." });
+    const db = new DatabaseDriver(dbPath());
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='controller' WHERE campaign_id=? AND actor_id='actor'")
+      .run(identity.campaignId);
+    db.close();
+    const expected = [{
+      turnId: original.turnId, actorId: "actor", declaration: "I inspect the sealed door", narration: "The revised account.", completedAt: AT,
+    }];
+    for (const principal of ["local-owner", "gm", "player", "controller"]) {
+      expect(repo.getAdventureTurn(principal, original.turnId)).toHaveProperty("declaration", "I inspect the sealed door");
+      expect(repo.getAdventureTurnTranscript(principal, identity.campaignId, "session"), principal).toEqual(expected);
+    }
+    for (const principal of ["observer", "unrelated"]) {
+      expect(repo.getAdventureTurn(principal, original.turnId)).not.toHaveProperty("declaration");
+      expect(repo.getAdventureTurnTranscript(principal, identity.campaignId, "session"), principal).toEqual([]);
+    }
+    expect(() => repo.getAdventureTurnTranscript("outsider", identity.campaignId, "session")).toThrow(AdventureTurnUnavailableError);
+    expect(JSON.stringify(repo.getAdventureTurnTranscript("player", identity.campaignId, "session")))
+      .not.toMatch(/provider|proposal|receipt|arguments|principal/);
     repo.close();
   });
 

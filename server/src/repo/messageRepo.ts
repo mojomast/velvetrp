@@ -226,7 +226,26 @@ interface UsageEventRow {
 
 export async function getUsageSummary(pricing: ProviderPricing): Promise<UsageSummary> {
   const db = getRepositoryDatabase();
-  const rows = db.prepare("SELECT session_id, kind, prompt_tokens, completion_tokens, total_tokens, usage_source, usage_model FROM usage_events ORDER BY created_at").all() as UsageEventRow[];
+  // Adventure calls are already immutable and exactly-once in provider metadata.
+  // Project them directly instead of creating a second ledger write that could
+  // double count retries, recovery, or process restarts.
+  const rows = db.prepare(`SELECT session_id,kind,prompt_tokens,completion_tokens,total_tokens,usage_source,usage_model FROM (
+    SELECT session_id,kind,prompt_tokens,completion_tokens,total_tokens,usage_source,usage_model,created_at
+      FROM usage_events
+    UNION ALL
+    SELECT turn.session_id,
+      CASE WHEN EXISTS(SELECT 1 FROM agent_provider_starts_v38 start
+        WHERE start.campaign_id=metadata.campaign_id AND start.turn_id=metadata.turn_id
+          AND start.provider_call_id=metadata.call_id)
+        THEN 'adventure_planning' ELSE 'adventure_narration' END kind,
+      metadata.prompt_tokens,metadata.completion_tokens,
+      metadata.prompt_tokens+metadata.completion_tokens total_tokens,
+      CASE WHEN metadata.outcome_code LIKE '%-estimated' THEN 'estimated' ELSE 'provider' END usage_source,
+      metadata.model usage_model,metadata.recorded_at created_at
+    FROM provider_call_metadata metadata
+    JOIN adventure_turns turn ON turn.campaign_id=metadata.campaign_id AND turn.id=metadata.turn_id
+    WHERE metadata.phase<>'started' AND metadata.prompt_tokens IS NOT NULL AND metadata.completion_tokens IS NOT NULL
+  ) ORDER BY created_at`).all() as UsageEventRow[];
   const titles = new Map((db.prepare("SELECT id, title FROM sessions").all() as Array<{ id: string; title: string }>).map((row) => [row.id, row.title]));
   const cost = (promptTokens: number, completionTokens: number) =>
     pricing.promptPerMillion === null || pricing.completionPerMillion === null

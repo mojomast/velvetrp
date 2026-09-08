@@ -6,6 +6,7 @@ process.env.NODE_ENV = "test";
 const draft = {
   id: "draft-1", campaignId: "campaign-1", personaId: "persona-1", controllerPrincipalId: "local-owner", role: "owner", status: "active", durability: "durable", expiresAt: null,
   effectivelyExpired: false, revision: 0, rulesProfileId: "rules-profile-1",
+  rulesetId: "velvet-starter-v1", rulesetVersion: "1.0.0",
   pins: [{ packId: "pack-1", packVersion: "1.0.0", publicationDigest: "a".repeat(64) }],
   allocation: { method: "manual", scores: { might: 10, agility: 10, resolve: 10, insight: 10, presence: 10, craft: 10 } },
   selections: { race: null, background: null, class: null, starterGrant: null },

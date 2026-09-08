@@ -8,6 +8,7 @@ import {
   ApiError,
   applyCampaignContentDraft,
   createCampaignContentDraft,
+  getCampaignContentDraft,
   getCampaignGeneratedFoundation,
   getCampaignGeneratedPlanning,
   publishCampaignMaterial,
@@ -19,8 +20,18 @@ const sectionOptions = [
   ["outline", "Campaign outline"], ["arcs", "Story arcs"], ["locations", "Locations & routes"],
   ["factions", "Factions"], ["npcs", "NPCs"], ["quests", "Quests"],
   ["encounters", "Encounter concepts"], ["clues", "Clues"], ["story", "Story graph"],
+  ["lore", "Campaign lore"], ["quest-items", "Quest items"], ["monster-concepts", "Monster concepts"],
   ["handouts", "Handouts"], ["scene-prompts", "Scene prompts"],
 ] as const satisfies ReadonlyArray<readonly [CampaignContentGenerationRequest["sections"][number], string]>;
+
+const allSections = sectionOptions.map(([value]) => value);
+const foundationSections: CampaignContentGenerationRequest["sections"] = ["outline", "locations", "factions", "npcs", "quests"];
+const sectionGroups: ReadonlyArray<readonly [string, readonly Section[]]> = [
+  ["Location / world", ["locations"]], ["NPC / faction", ["npcs", "factions"]],
+  ["Quest / clue", ["quests", "clues"]], ["Encounter", ["encounters"]],
+  ["Story / lore", ["outline", "arcs", "story", "lore"]], ["Items / monsters", ["quest-items", "monster-concepts"]],
+  ["Handout", ["handouts"]], ["Scene prompt", ["scene-prompts"]],
+];
 
 const focusOptions = [
   ["adventure spine", "A connected premise, opening, and quest arc"],
@@ -29,12 +40,14 @@ const focusOptions = [
 ] as const;
 
 type Section = CampaignContentGenerationRequest["sections"][number];
+type Preset = "foundation" | "full" | "custom";
 type Preview = CampaignContentDraftView["preview"];
 type ArtifactRow = { key: string; kind: string; label: string; summary: string; dependencies: string[] };
 type Foundation = { opening: string; premise: string };
 
 export interface CampaignGeneratorPanelApi {
   createCampaignContentDraft: typeof createCampaignContentDraft;
+  getCampaignContentDraft: typeof getCampaignContentDraft;
   applyCampaignContentDraft: typeof applyCampaignContentDraft;
   getCampaignGeneratedFoundation: typeof getCampaignGeneratedFoundation;
   getCampaignGeneratedPlanning: typeof getCampaignGeneratedPlanning;
@@ -42,7 +55,7 @@ export interface CampaignGeneratorPanelApi {
 }
 
 const defaultApi: CampaignGeneratorPanelApi = {
-  createCampaignContentDraft, applyCampaignContentDraft, getCampaignGeneratedFoundation,
+  createCampaignContentDraft, getCampaignContentDraft, applyCampaignContentDraft, getCampaignGeneratedFoundation,
   getCampaignGeneratedPlanning, publishCampaignMaterial,
 };
 
@@ -68,11 +81,14 @@ function artifactRows(preview: Preview): Array<{ title: string; rows: ArtifactRo
     { title: "Connections", rows: preview.connections.map((item) => ({ key: item.key, kind: "Connection", label: `${item.fromLocationKey} → ${item.toLocationKey}`, summary: item.description, dependencies: [item.fromLocationKey, item.toLocationKey] })) },
     { title: "Factions", rows: preview.factions.map((item) => ({ key: item.key, kind: "Faction", label: item.name, summary: item.description, dependencies: [] })) },
     { title: "NPCs", rows: preview.npcs.map((item) => ({ key: item.key, kind: "NPC", label: item.name, summary: `${item.archetype} · ${item.description}`, dependencies: [...item.factionKeys, ...(item.locationKey ? [item.locationKey] : [])] })) },
-    { title: "Quests", rows: preview.quests.map((item) => ({ key: item.key, kind: "Quest", label: item.title, summary: item.description, dependencies: [...item.locationKeys, ...(item.arcKey ? [item.arcKey] : [])] })) },
-    { title: "Encounter concepts", rows: preview.encounters.map((item) => ({ key: item.key, kind: "Encounter", label: item.title, summary: item.description, dependencies: [...item.participantNpcKeys, ...(item.locationKey ? [item.locationKey] : [])] })) },
+    { title: "Quests", rows: preview.quests.map((item) => ({ key: item.key, kind: "Quest", label: item.title, summary: `${item.description}${item.objectives.length ? ` · ${item.objectives.length} operational objective${item.objectives.length === 1 ? "" : "s"}` : ""}`, dependencies: [...item.locationKeys, ...(item.arcKey ? [item.arcKey] : [])] })) },
+    { title: "Encounter plans", rows: preview.encounters.map((item) => ({ key: item.key, kind: "Encounter plan", label: item.title, summary: `${item.description}${item.enemyReferences.length ? ` · ${item.enemyReferences.length} exact pinned enemy reference${item.enemyReferences.length === 1 ? "" : "s"}` : ""}`, dependencies: [...item.participantNpcKeys, ...item.monsterConceptKeys, ...(item.locationKey ? [item.locationKey] : [])] })) },
     { title: "Clues", rows: preview.clues.map((item) => ({ key: item.key, kind: "Clue", label: item.title, summary: item.description, dependencies: [...(item.locationKey ? [item.locationKey] : []), ...(item.revealsStoryNodeKey ? [item.revealsStoryNodeKey] : [])] })) },
     { title: "Story nodes", rows: preview.storyNodes.map((item) => ({ key: item.key, kind: "Story node", label: item.title, summary: item.description, dependencies: [] })) },
     { title: "Story relationships", rows: preview.storyRelationships.map((item) => ({ key: item.key, kind: "Story relationship", label: `${item.fromStoryNodeKey} → ${item.toStoryNodeKey}`, summary: item.description, dependencies: [item.fromStoryNodeKey, item.toStoryNodeKey] })) },
+    { title: "Campaign lore", rows: preview.lore.map((item) => ({ key: item.key, kind: "Lore", label: item.title, summary: item.summary, dependencies: [...item.locationKeys, ...item.factionKeys, ...item.storyNodeKeys] })) },
+    { title: "Quest items", rows: preview.questItems.map((item) => ({ key: item.key, kind: item.mechanics.state === "catalog-bound" ? "Catalog-bound quest item" : "Inert quest item concept", label: item.name, summary: `${item.description} · ${item.mechanics.state === "catalog-bound" ? `Exact ${item.mechanics.reference.definitionId}` : `Inert: ${item.mechanics.reason}`}`, dependencies: [...item.questKeys, ...item.locationKeys] })) },
+    { title: "Monster concepts", rows: preview.monsterConcepts.map((item) => ({ key: item.key, kind: item.mechanics.state === "catalog-bound" ? "Catalog-bound monster concept" : "Inert monster concept", label: item.name, summary: `${item.role} · ${item.description} · ${item.mechanics.state === "catalog-bound" ? `Exact ${item.mechanics.reference.definitionId}` : `Inert: ${item.mechanics.reason}`}`, dependencies: [] })) },
     { title: "Handouts", rows: preview.handouts.map((item) => ({ key: item.key, kind: "Handout", label: item.title, summary: item.content, dependencies: [] })) },
     { title: "Scene prompts", rows: preview.scenePrompts.map((item) => ({ key: item.key, kind: "Scene prompt", label: item.title, summary: item.prompt, dependencies: [...item.npcKeys, ...(item.locationKey ? [item.locationKey] : [])] })) },
   ];
@@ -82,14 +98,15 @@ interface GenerationIntent { input: CampaignContentGenerationRequest; failedAtte
 interface ApplyIntent { draftId: string; input: CampaignContentApplyInput }
 interface PublishIntent { campaignId: string; input: CampaignMaterialPublishInput; title: string }
 
-export function CampaignGeneratorPanel({ campaignId, disabled = false, api = defaultApi }: {
-  campaignId: string; disabled?: boolean; api?: CampaignGeneratorPanelApi;
+export function CampaignGeneratorPanel({ campaignId, disabled = false, openDraftId = null, api = defaultApi }: {
+  campaignId: string; disabled?: boolean; openDraftId?: string | null; api?: CampaignGeneratorPanelApi;
 }) {
   const [brief, setBrief] = useState("");
   const [tone, setTone] = useState("adventurous and grounded");
   const [depth, setDepth] = useState("play-ready");
   const [focus, setFocus] = useState<string[]>(focusOptions.map(([value]) => value));
-  const [sections, setSections] = useState<Section[]>(["outline", "locations", "factions", "quests", "npcs"]);
+  const [preset, setPreset] = useState<Preset>("foundation");
+  const [sections, setSections] = useState<Section[]>(foundationSections);
   const [exclusions, setExclusions] = useState("");
   const [revisionFeedback, setRevisionFeedback] = useState("");
   const [expandKeys, setExpandKeys] = useState("");
@@ -118,6 +135,17 @@ export function CampaignGeneratorPanel({ campaignId, disabled = false, api = def
     return () => { current = false; };
   }, [api, campaignId]);
 
+  useEffect(() => {
+    if (!openDraftId) return;
+    let current = true;
+    void api.getCampaignContentDraft(openDraftId).then((value) => {
+      if (!current || value.draft.campaignId !== campaignId) return;
+      setDraft(value); setSelectedKeys(artifactRows(value.preview).flatMap((group) => group.rows).map((row) => row.key));
+      setNotice(`Opened exact durable draft ${openDraftId}.`); setError("");
+    }).catch(() => { if (current) setError("The exact durable draft could not be opened."); });
+    return () => { current = false; };
+  }, [api, campaignId, openDraftId]);
+
   const groups = useMemo(() => draft ? artifactRows(draft.preview) : [], [draft]);
   const rows = useMemo(() => groups.flatMap((group) => group.rows), [groups]);
   const rowByKey = useMemo(() => new Map(rows.map((row) => [row.key, row])), [rows]);
@@ -133,7 +161,14 @@ export function CampaignGeneratorPanel({ campaignId, disabled = false, api = def
   }
 
   function toggleSection(value: Section): void {
+    setPreset("custom");
     setSections((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+  }
+
+  function choosePreset(value: Preset): void {
+    setPreset(value);
+    if (value === "foundation") setSections([...foundationSections]);
+    if (value === "full") setSections([...allSections]);
   }
 
   function toggleArtifact(row: ArtifactRow): void {
@@ -256,7 +291,7 @@ export function CampaignGeneratorPanel({ campaignId, disabled = false, api = def
 
   return <section className="admin-section campaign-generator" aria-labelledby="campaign-generator-heading">
     <div className="admin-section-heading"><div><p className="eyebrow">REVIEWED API GENERATION</p><h2 id="campaign-generator-heading">Flesh out this campaign</h2></div>{draft && <span className="status-pill">{draft.draft.state}</span>}</div>
-    <p className="builder-help">Generate only the sections you need, inspect every candidate, then apply an explicit dependency-safe selection.</p>
+    <p className="builder-help">Generate only the sections you need, inspect every candidate, then apply an explicit dependency-safe selection. Nothing becomes canon automatically.</p>
     {(error || notice) && <div className={`admin-status ${error ? "is-error" : "is-success"}`} role={error ? "alert" : "status"}><p>{error || notice}</p></div>}
 
     {generationIntent && <div className="campaign-generation-recovery" aria-label="Retained generation intent">
@@ -269,14 +304,15 @@ export function CampaignGeneratorPanel({ campaignId, disabled = false, api = def
     {publishIntent && <div className="campaign-generation-recovery" aria-label="Retained publication intent"><strong>Publication intent retained: {publishIntent.title}</strong><p>Reconcile the planning read or retry this exact publication with the same key.</p><button type="button" disabled={busy} onClick={() => void submitPublication(publishIntent)}>Retry exact publication</button><button type="button" disabled={busy} onClick={() => { setPublishIntent(null); setError(""); }}>Abandon retained intent</button></div>}
 
     {foundation && <article className="campaign-generated-foundation"><p className="eyebrow">ACCEPTED CAMPAIGN CANON</p><h3>Opening</h3><p>{foundation.opening}</p><h3>Premise</h3><p>{foundation.premise}</p></article>}
-    {planning && (planning.encounters.length > 0 || planning.deliverables.length > 0) && <section className="campaign-generation-preview"><h3>Campaign plans</h3><p className="builder-help">Encounter concepts remain preparation only. Player materials appear only after an explicit public delivery.</p>{planning.encounters.map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.description}</p><small>Encounter concept · combat not started</small></article>)}{planning.deliverables.map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.content}</p><small>{item.visibility === "gm" ? "GM only · cannot publish" : item.publishedAt ? "Delivered" : "Public candidate · not delivered"}</small>{item.visibility === "public" && !item.publishedAt && <button type="button" disabled={busy || Boolean(publishIntent)} onClick={() => publish(item.artifactKey, item.title)}>Deliver to players</button>}</article>)}</section>}
+    {planning && (planning.encounters.length > 0 || planning.lore.length > 0 || planning.questItems.length > 0 || planning.monsterConcepts.length > 0 || planning.deliverables.length > 0) && <section className="campaign-generation-preview"><h3>Campaign plans</h3><p className="builder-help">Prepared encounters remain plans and never start combat. Item and monster mechanics are usable only when bound to the displayed exact campaign-pinned reference; otherwise they are explicitly inert narrative canon. Player materials appear only after explicit delivery.</p>{planning.encounters.map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.description}</p><small>Prepared encounter plan · {item.enemyReferences.length} exact pinned enemy reference{item.enemyReferences.length === 1 ? "" : "s"} · not started</small></article>)}{planning.lore.map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.summary}</p><small>Campaign-native lore · narrative canon</small></article>)}{[...planning.questItems, ...planning.monsterConcepts].map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.description}</p><small>{item.mechanics.state === "catalog-bound" ? `Exact pinned mechanics · ${item.mechanics.reference.definitionId}` : `Inert narrative concept · ${item.mechanics.reason}`}</small></article>)}{planning.deliverables.map((item) => <article key={item.resourceId}><strong>{item.title}</strong><p>{item.content}</p><small>{item.visibility === "gm" ? "Generated GM-only prose · cannot publish" : item.publishedAt ? "Generated prose · delivered" : "Generated public prose · not delivered"}</small>{item.visibility === "public" && !item.publishedAt && <button type="button" disabled={busy || Boolean(publishIntent)} onClick={() => publish(item.artifactKey, item.title)}>Deliver to players</button>}</article>)}</section>}
 
     <label className="field"><span>Campaign brief</span><textarea rows={5} maxLength={1500} disabled={busy || Boolean(generationIntent)} value={brief} onChange={(event) => setBrief(event.target.value)} placeholder="A flooded frontier city survives by bargaining with the spirits beneath its canals…" /><small>Include the central conflict, player fantasy, and anything that must remain true.</small></label>
     <div className="campaign-generator-controls">
       <label className="field"><span>Tone</span><select disabled={busy || Boolean(generationIntent)} value={tone} onChange={(event) => setTone(event.target.value)}><option>adventurous and grounded</option><option>dark mystery with hopeful choices</option><option>heroic high fantasy</option><option>political and morally complex</option><option>whimsical and strange</option></select></label>
       <label className="field"><span>Detail level</span><select disabled={busy || Boolean(generationIntent)} value={depth} onChange={(event) => setDepth(event.target.value)}><option value="concise">Concise outline</option><option value="play-ready">Play-ready foundation</option><option value="rich">Rich detail and hooks</option></select></label>
     </div>
-    <fieldset disabled={busy || Boolean(generationIntent)}><legend>Sections to generate</legend><div className="campaign-generation-sections">{sectionOptions.map(([value, label]) => <label key={value}><input type="checkbox" checked={sections.includes(value)} onChange={() => toggleSection(value)} /><span>{label}</span></label>)}</div>{sections.length === 0 && <small className="field-error">Select at least one section.</small>}</fieldset>
+    <fieldset disabled={busy || Boolean(generationIntent)}><legend>Generation preset</legend><div className="campaign-generation-focus"><label><input type="radio" name="campaign-generation-preset" checked={preset === "foundation"} onChange={() => choosePreset("foundation")} /><span><strong>Foundation</strong><small>Outline, world, factions, NPCs, and quests</small></span></label><label><input type="radio" name="campaign-generation-preset" checked={preset === "full"} onChange={() => choosePreset("full")} /><span><strong>Full narrative campaign</strong><small>One prompt requests every supported section</small></span></label><label><input type="radio" name="campaign-generation-preset" checked={preset === "custom"} onChange={() => choosePreset("custom")} /><span><strong>Custom / granular</strong><small>Generate any individual section combination</small></span></label></div></fieldset>
+    <fieldset disabled={busy || Boolean(generationIntent)}><legend>Sections to generate</legend>{sectionGroups.map(([group, values]) => <div key={group}><strong>{group}</strong><div className="campaign-generation-sections">{values.map((value) => { const label = sectionOptions.find(([candidate]) => candidate === value)?.[1] ?? value; return <label key={value}><input type="checkbox" checked={sections.includes(value)} onChange={() => toggleSection(value)} /><span>{label}</span></label>; })}</div></div>)}{sections.length === 0 && <small className="field-error">Select at least one section.</small>}</fieldset>
     <fieldset disabled={busy || Boolean(generationIntent)}><legend>What should the API prioritize?</legend><div className="campaign-generation-focus">{focusOptions.map(([value, description]) => <label key={value}><input type="checkbox" checked={focus.includes(value)} onChange={() => toggleFocus(value)} /><span><strong>{value}</strong><small>{description}</small></span></label>)}</div></fieldset>
     <label className="field"><span>Focused revision feedback (optional)</span><textarea rows={3} maxLength={2000} disabled={busy || Boolean(generationIntent)} value={revisionFeedback} onChange={(event) => setRevisionFeedback(event.target.value)} placeholder="Keep the existing premise, but make the faction conflict more immediate…" /><small>Up to 2,000 characters of prose direction for this candidate.</small></label>
     <label className="field"><span>Accepted artifact keys to expand (optional)</span><input maxLength={1039} disabled={busy || Boolean(generationIntent)} value={expandKeys} onChange={(event) => setExpandKeys(event.target.value)} placeholder="old-harbor, lantern-guild" aria-invalid={expansionInvalid} /><small>Up to 16 comma-separated accepted keys; lowercase letters, numbers, and hyphens only.</small>{expansionInvalid && <small className="field-error">Use no more than 16 valid artifact keys of 64 characters each.</small>}</label>
@@ -285,9 +321,11 @@ export function CampaignGeneratorPanel({ campaignId, disabled = false, api = def
 
     {draft && <section className="campaign-generation-preview" aria-labelledby="campaign-generation-preview-heading">
       <div className="admin-section-heading"><div><p className="eyebrow">CANDIDATE · NOT APPLIED</p><h3 id="campaign-generation-preview-heading">Review generated material</h3></div><span>{selectedKeys.length} of {rows.length} selected</span></div>
+      {draft.derivativeContextKeys.length > 0 && <p className="builder-help">Derivative draft based on immutable accepted context: {draft.derivativeContextKeys.join(", ")}. Applying creates additive canon; it does not edit those artifacts.</p>}
       {draft.validationIssues.length > 0 && <ul className="field-error">{draft.validationIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
       {selectionNotice && <p className="builder-help" role="status">{selectionNotice}</p>}
-      <div className="campaign-generation-artifacts">{groups.map((group) => <section key={group.title}><h4>{group.title}</h4>{group.rows.length === 0 ? <p className="builder-help">No candidates in this section.</p> : group.rows.map((row) => <label className={`campaign-generation-artifact ${selectedKeys.includes(row.key) ? "is-selected" : ""}`} key={row.key}><input type="checkbox" disabled={busy || Boolean(applyIntent) || draft.draft.state !== "staged"} checked={selectedKeys.includes(row.key)} onChange={() => toggleArtifact(row)} /><span><strong>{row.label}</strong><small>{row.kind} · {row.key}</small><p>{row.summary}</p>{row.dependencies.length > 0 && <small>Uses: {row.dependencies.join(", ")}</small>}</span></label>)}</section>)}</div>
+      <p className="builder-help">All entries below are generated candidates. Item and monster mechanics are usable only when bound to an exact campaign-pinned catalog reference; concepts labeled inert remain narrative-only. Prepared encounters never start combat automatically.</p>
+      <div className="campaign-generation-artifacts">{groups.map((group) => <section key={group.title}><h4>{group.title}</h4>{group.rows.length === 0 ? <p className="builder-help">No candidates in this section.</p> : group.rows.map((row) => <label className={`campaign-generation-artifact ${selectedKeys.includes(row.key) ? "is-selected" : ""}`} key={row.key}><input type="checkbox" disabled={busy || Boolean(applyIntent) || draft.draft.state !== "staged"} checked={selectedKeys.includes(row.key)} onChange={() => toggleArtifact(row)} /><span><strong>{row.label}</strong><small>Generated {row.kind.toLowerCase()} · {row.key}</small><p>{row.summary}</p>{row.dependencies.length > 0 && <small>Uses: {row.dependencies.join(", ")}</small>}</span></label>)}</section>)}</div>
       {draft.draft.state === "staged" && <><label className="builder-confirm"><input type="checkbox" checked={confirmed} disabled={busy || Boolean(applyIntent) || selectedKeys.length === 0} onChange={(event) => setConfirmed(event.target.checked)} /> I reviewed the {selectedKeys.length} selected candidate artifact{selectedKeys.length === 1 ? "" : "s"} and want to apply them once.</label><button className="primary" type="button" disabled={busy || Boolean(applyIntent) || !confirmed || selectedKeys.length === 0} onClick={apply}>{applying ? "Applying selected content…" : "Apply selected material once"}</button></>}
     </section>}
   </section>;

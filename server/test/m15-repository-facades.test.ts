@@ -41,7 +41,7 @@ function fixture() {
   const seedResource = (actorId: string, name: string, current: number, max: number) => db.prepare("INSERT OR REPLACE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,?,?,?)").run(campaign.id, actorId, name, current, max);
   seedResource(actor, "health", 5, 10); seedResource(actor, "focus", 1, 4); seedResource(actor, "grit", 1, 3); seedResource(recipient, "health", 7, 10);
   for (const principal of ["source-player", "recipient-player", "third-player"]) {
-    db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal, principal);
+    db.prepare("INSERT OR IGNORE INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal, principal);
     db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?, 'player',?)").run(campaign.id, principal, now);
   }
   db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id=? WHERE actor_id=?").run("source-player", actor);
@@ -60,7 +60,7 @@ function fixture() {
       .run(entryId, campaign.id, actorId, item.packId, item.packVersion, item.definitionId, mode, quantity, mode === "instanced" ? entryId : null, now);
     seed.close();
   };
-  return { repo, campaign: campaign.id, actor, recipient, sourcePlayer: "source-player", recipientPlayer: "recipient-player", thirdPlayer: "third-player", seedInventory, advance: () => { time = new Date(time.getTime() + 301_000); } };
+  return { repo, campaign: campaign.id, actor, recipient, sourcePlayer: "source-player", recipientPlayer: "recipient-player", thirdPlayer: "third-player", seedInventory, advance: (milliseconds = 301_000) => { time = new Date(time.getTime() + milliseconds); } };
 }
 
 function databaseState(f: ReturnType<typeof fixture>) {
@@ -75,6 +75,19 @@ function databaseState(f: ReturnType<typeof fixture>) {
   };
   db.close();
   return state;
+}
+
+function setFixtureItemMechanics(category: "gear" | "consumable", slot: "hand" | null) {
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  const row = db.prepare("SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?")
+    .get(item.packId, item.packVersion, item.definitionId) as { definition_json: string };
+  const definition = JSON.parse(row.definition_json);
+  definition.mechanics = { ...definition.mechanics, category, slot };
+  db.exec("DROP TRIGGER rpg_catalog_definitions_immutable_update");
+  db.prepare("UPDATE rpg_catalog_definitions SET definition_json=? WHERE pack_id=? AND pack_version=? AND kind='item' AND definition_id=?")
+    .run(JSON.stringify(definition), item.packId, item.packVersion, item.definitionId);
+  db.exec("CREATE TRIGGER rpg_catalog_definitions_immutable_update BEFORE UPDATE ON rpg_catalog_definitions BEGIN SELECT RAISE(ABORT,'RPG catalog definitions are immutable'); END");
+  db.close();
 }
 
 describe("M1.5 repository facades", () => {
@@ -131,6 +144,30 @@ describe("M1.5 repository facades", () => {
     f.repo.close();
   });
 
+  it("binds equip and consume commands to exact pinned item mechanics", () => {
+    const f = fixture();
+    f.seedInventory(f.actor, "wrong-slot", "instanced");
+    expect(() => f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor,
+      { kind: "equip", entryId: "wrong-slot", slot: "body", expectedRevision: 0, idempotencyKey: "wrong-slot" }))
+      .toThrow(InventorySlotConflictError);
+
+    setFixtureItemMechanics("gear", null);
+    expect(() => f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor,
+      { kind: "equip", entryId: "wrong-slot", slot: "hand", expectedRevision: 0, idempotencyKey: "inert-gear" }))
+      .toThrow(InventoryBindingError);
+    expect(() => f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor,
+      { kind: "consume", entryId: "wrong-slot", item, quantity: 1, expectedRevision: 0, idempotencyKey: "gear-consume" }))
+      .toThrow(ActorResourceConflictError);
+
+    setFixtureItemMechanics("consumable", null);
+    const consumed = f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor,
+      { kind: "consume", entryId: "wrong-slot", item, quantity: 1, expectedRevision: 0, idempotencyKey: "valid-consume" });
+    expect(consumed.inventory.inventory.items.some((entry) => entry.entryId === "wrong-slot")).toBe(false);
+    expect(f.repo.mutateInventoryForActor("local-owner", f.campaign, f.actor,
+      { kind: "consume", entryId: "wrong-slot", item, quantity: 1, expectedRevision: 0, idempotencyKey: "valid-consume" })).toEqual(consumed);
+    f.repo.close();
+  });
+
   it("projects wallet/shop and makes purchases and bilateral trades atomic with guard rollback", () => {
     const f = fixture();
     expect(f.repo.getWallet("local-owner", f.campaign, f.actor)?.balances[0]).toMatchObject({ minorUnits: 30, currency });
@@ -153,6 +190,10 @@ describe("M1.5 repository facades", () => {
     expect(f.repo.getWallet("local-owner", f.campaign, f.actor)?.balances[0]?.minorUnits).toBe(8); expect(f.repo.getWallet("local-owner", f.campaign, f.recipient)?.balances[0]?.minorUnits).toBe(7);
     f.repo.close();
   });
+  it("atomically sells or gives an exact unequipped entry to accepted shop stock",()=>{const f=fixture();f.seedInventory(f.actor,"vendor-sell","stackable",2);f.seedInventory(f.actor,"vendor-give","stackable",2);f.repo.setShopBuyPolicy("local-owner",f.campaign,"shop","stock",4);const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    for(const [disposition,revision] of [["sell",0],["give",1]] as const)db.prepare("INSERT INTO rpg_vendor_sale_quotes_v57 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").run(`quote-${disposition}`,f.campaign,"shop","stock",f.actor,`vendor-${disposition}`,1,disposition,disposition==="sell"?4:0,"GLM",revision,now,"2035-01-01T00:05:00.000Z");db.close();
+    for(const [disposition,revision] of [["sell",0],["give",1]] as const){const command={type:"sell_to_shop" as const,campaignId:f.campaign,sellerActorId:f.actor,quoteId:`quote-${disposition}`,expectedRevision:revision,idempotencyKey:`commit-${disposition}`},result=f.repo.mutateEconomy("local-owner",command);expect(f.repo.mutateEconomy("local-owner",command)).toEqual(result);}const state=databaseState(f);expect(state.wallets).toContainEqual({actor_id:f.actor,currency_code:"GLM",balance_minor:34});expect(state.stock).toContainEqual({stock_id:"stock",available_quantity:5});expect(state.inventory).toEqual(expect.arrayContaining([expect.objectContaining({entry_id:"vendor-sell",quantity:1}),expect.objectContaining({entry_id:"vendor-give",quantity:1})]));f.repo.close();});
+  it("rejects expired, stale-policy, and equipped vendor sale quotes without partial state",()=>{const f=fixture();for(const mode of ["expired","policy","equipped"] as const)f.seedInventory(f.actor,`blocked-${mode}`,"stackable",1);f.repo.setShopBuyPolicy("local-owner",f.campaign,"shop","stock",4);const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));for(const mode of ["expired","policy","equipped"] as const)db.prepare("INSERT INTO rpg_vendor_sale_quotes_v57 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").run(`blocked-quote-${mode}`,f.campaign,"shop","stock",f.actor,`blocked-${mode}`,1,"sell",4,"GLM",0,now,"2035-01-01T00:05:00.000Z");db.prepare("UPDATE rpg_inventory_entries_v25 SET equipped=1,slot_key='hand' WHERE entry_id='blocked-equipped'").run();db.prepare("UPDATE rpg_shop_buy_policies_v57 SET payout_unit_minor=5 WHERE campaign_id=?").run(f.campaign);db.close();for(const mode of ["policy","equipped"] as const){const before=databaseState(f);expect(()=>f.repo.mutateEconomy("local-owner",{type:"sell_to_shop",campaignId:f.campaign,sellerActorId:f.actor,quoteId:`blocked-quote-${mode}`,expectedRevision:0,idempotencyKey:`blocked-${mode}`})).toThrow();expect(databaseState(f)).toEqual(before);}f.advance();const before=databaseState(f);expect(()=>f.repo.mutateEconomy("local-owner",{type:"sell_to_shop",campaignId:f.campaign,sellerActorId:f.actor,quoteId:"blocked-quote-expired",expectedRevision:0,idempotencyKey:"blocked-expired"})).toThrow();expect(databaseState(f)).toEqual(before);f.repo.close();});
 
   it("returns an authorized wallet revision snapshot and binds economy commands to its actor path", () => {
     const f = fixture();
@@ -178,6 +219,23 @@ describe("M1.5 repository facades", () => {
     expect(f.repo.listRestReceipts("local-owner", f.campaign, f.actor)).toHaveLength(2);
     expect(() => f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 5, idempotencyKey: "illegal" })).toThrow(RestIllegalStateError);
     f.repo.close();
+  });
+
+  it("persists a 24-hour long-rest limit across retries, previews, and restart", () => {
+    const f = fixture();
+    f.repo.mutateActorResource("local-owner", { type: "set_actor_resource_binding", campaignId: f.campaign, actorId: f.actor, resourceId: "health", binding: { kind: "ability", recovery: "long-rest" }, expectedRevision: 0, idempotencyKey: "long-rest-binding" });
+    const first = f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 1, idempotencyKey: "first-long-rest" });
+    expect(f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 1, idempotencyKey: "first-long-rest" })).toEqual(first);
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    db.prepare("UPDATE rpg_actor_resources SET current=5 WHERE campaign_id=? AND actor_id=? AND name='health'").run(f.campaign, f.actor);
+    db.close();
+    expect(f.repo.previewRests("local-owner", f.campaign, f.actor).some((rest) => rest.kind === "long")).toBe(false);
+    expect(() => f.repo.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 2, idempotencyKey: "early-long-rest" })).toThrow(/24 hours/);
+    f.repo.close();
+    const reopened = createRepository({ dataDir: process.env.VELVET_DATA_DIR!, clock: { now: () => new Date("2035-01-02T00:00:00.000Z") } });
+    expect(reopened.previewRests("local-owner", f.campaign, f.actor)).toContainEqual(expect.objectContaining({ kind: "long", revision: 2 }));
+    expect(reopened.takeRest("local-owner", { type: "take_long_rest", campaignId: f.campaign, actorId: f.actor, expectedRevision: 2, idempotencyKey: "next-day-long-rest" }).rest.recovery.resources).toEqual([{ resourceId: "health", before: 5, after: 10 }]);
+    reopened.close();
   });
 
   it("lets a source player gift without recipient control and makes the recipient's cross-actor revision observable", () => {

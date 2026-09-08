@@ -31,11 +31,17 @@ describe("CampaignContextDrawer NPC presence", () => {
   it("renders only the authoritative player cast, not the management roster or private fields", async () => {
     const client = api(); render(<CampaignContextDrawer {...props} audience="player" api={client} />);
     await screen.findByText(/Mira - Gate/); expect(screen.queryByText("Roster Mira")).toBeNull(); expect(screen.queryByText("Tala")).toBeNull();
-    expect(client.listCampaignNpcs).not.toHaveBeenCalled(); expect(screen.getByText("Road")).toBeTruthy(); expect(screen.getByText(/Open the gate/)).toBeTruthy();
+    expect(client.listCampaignNpcs).not.toHaveBeenCalled(); expect(screen.getAllByText("Road").length).toBeGreaterThan(0); expect(screen.getByText(/Open the gate/)).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/persona-secret|principal-secret|secret goal|secret note/);
   });
 
   it("renders only server-published player materials",async()=>{const client=api({getCampaignPublishedMaterials:vi.fn().mockResolvedValue({campaignId:"campaign",revision:2,materials:[{artifactKey:"letter",resourceId:"material-letter",kind:"handout",title:"Delivered letter",content:"Meet at dawn.",publishedAt:at}]})});render(<CampaignContextDrawer {...props} audience="player" api={client}/>);await screen.findByText("Delivered letter");expect(screen.getByText("Meet at dawn.")).toBeTruthy();expect(document.body.textContent).not.toMatch(/GM only|unpublished/i);});
+
+  it("wires route-map travel prefill and World navigation without submitting", async () => {
+    const prefill = vi.fn(); const openWorld = vi.fn(); render(<CampaignContextDrawer {...props} audience="player" api={api()} onPrefillDeclaration={prefill} onOpenWorld={openWorld} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Prefill travel to Road/ })); expect(prefill).toHaveBeenCalledWith("Travel to Road.");
+    fireEvent.click(screen.getByRole("button", { name: "Open World" })); expect(openWorld).toHaveBeenCalledTimes(1);
+  });
 
   it("distinguishes running empty presence from stopped cast history", async () => {
     const client = api({ getCampaignPresentCast: vi.fn().mockResolvedValueOnce(running("player", 5, [])).mockResolvedValueOnce({ audience: "player", state: "stopped", sessionRevision: 6, castHistory: [{ ...playerNpc("At Stop"), location: undefined, lastLocation: { label: "Road" }, leftAt: at }] }) });

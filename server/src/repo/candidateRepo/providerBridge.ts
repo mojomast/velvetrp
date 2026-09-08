@@ -118,14 +118,19 @@ export function createExactCandidateProviderBridgeRepository(db:DatabaseDriver.D
     // after mechanics can reconstruct the exact safe list sent before execution.
     const projection=providerSafeExactCandidateListSchema.parse({version:"v1",candidates:batch.candidates.map((candidate)=>({
       candidateId:candidate.candidateId,kind:candidate.kind,version:candidate.version,label:candidate.label,summary:candidate.summary,
+      semanticLabel:{action:"Travel",source:candidate.label.origin,target:candidate.label.destination,cost:null,
+        consequence:`Move from ${candidate.label.origin} to ${candidate.label.destination}.`},
       confirmation:{required:candidate.confirmation.requirement==="required"},quote:candidate.quote,expiresAt:candidate.expiresAt,choices:[],
     }))});
     const projectionJson=canonicalAgentJson(projection as never),selectionJson=canonicalAgentJson(selection as never);
     const request=JSON.parse(response.request_json),requestProjection=providerSafeExactCandidateListSchema.parse(request.exactCandidateProjection);
     const exactTool=request.advertisedToolSchemas?.find((tool:any)=>tool?.name==="exact_actor_travel.select");
-    const exactParameters={type:"object",properties:{candidateId:{type:"string",enum:projection.candidates.map(({candidateId})=>candidateId)},
+    const exactParameters={type:"object",properties:{candidateId:{type:"string",enum:projection.candidates.map(candidate=>candidate.candidateId)},
       kind:{type:"string",enum:["actor.travel"]},version:{type:"string",enum:["v1"]},choices:{type:"array",maxItems:0}},
-      required:["candidateId","kind","version","choices"],additionalProperties:false};
+      required:["candidateId","kind","version","choices"],additionalProperties:false,oneOf:projection.candidates.map((candidate)=>({type:"object",
+      description:"Select this exact server-issued travel binding.",properties:{
+        candidateId:{type:"string",const:candidate.candidateId},kind:{type:"string",const:"actor.travel"},version:{type:"string",const:"v1"},choices:{type:"array",maxItems:0}},
+      required:["candidateId","kind","version","choices"],additionalProperties:false}))};
     if(canonicalAgentJson(requestProjection as never)!==projectionJson||!exactTool
       ||canonicalAgentJson(exactTool.parameters as never)!==canonicalAgentJson(exactParameters as never))
       throw new ExactCandidateIntegrityError("persisted provider candidate projection is invalid");

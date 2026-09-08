@@ -59,4 +59,11 @@ describe("campaign history experience", () => {
     render(<CampaignEventLogPage campaignId="campaign-one" api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     const retry = await screen.findByRole("button", { name: "Retry history" }); await waitFor(() => expect(document.activeElement).toBe(retry));
   });
+
+  it("renders the public quest receipt union without treating it as a mechanic event", async () => {
+    const client = api(); (client.receipt as ReturnType<typeof vi.fn>).mockResolvedValue({ receipt: { kind: "quest", title: "The Sealed Gate", objectiveDescription: "Break the final seal", progressBefore: 1, progressAfter: 2, target: 2, objectiveCompleted: true, questCompleted: true, revisionBefore: 2, revisionAfter: 3, occurredAt: at } });
+    render(<CampaignEventLogPage campaignId="campaign-one" api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByText(/Strength changed/); fireEvent.click(screen.getByRole("button", { name: "Open public receipt" }));
+    expect(await screen.findByText(/The Sealed Gate: Break the final seal advanced from 1 to 2 of 2; quest completed/)).toBeTruthy();
+  });
 });

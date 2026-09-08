@@ -133,7 +133,7 @@ describe("streamReply", () => {
       snapshot: { campaignId: "campaign", timelineId: "timeline", timelineRevision: 0, campaignRevision: 0, sessionId: session.id, audience: { kind: "player", actorId: "actor" },
         authority: { role: "player", control: "controlled" }, speakerPersona: { characterId: character.id, displayName: character.name },
         safetyControl: ["CAMPAIGN_SAFETY"], humanCanon: [],
-        committedMechanics: [], visibleWorld: [], visibleCast: [], visibleQuests: [], legalActions: [],
+        committedMechanics: [], currentActorLocation:null,visibleWorld: [], visibleCast: [], visibleQuests: [], legalActions: [],
         privateTargetFacts: [],attributeCandidates:[], synthesizedSummaryFacts: [], recap: [], encounter: null },
       declaration: "stale declaration",
       approvedMemory: ["CAMPAIGN_ONLY_MEMORY"],

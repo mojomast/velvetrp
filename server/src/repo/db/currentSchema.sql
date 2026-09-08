@@ -11,6 +11,19 @@ CREATE TABLE characters (
       is_real_person INTEGER NOT NULL,
       created_at TEXT NOT NULL
     );
+CREATE TABLE character_profiles (
+      character_id TEXT PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+      goal TEXT NOT NULL CHECK (goal = trim(goal) AND length(goal) <= 500),
+      ideal TEXT NOT NULL CHECK (ideal = trim(ideal) AND length(ideal) <= 500),
+      bond TEXT NOT NULL CHECK (bond = trim(bond) AND length(bond) <= 500),
+      flaw TEXT NOT NULL CHECK (flaw = trim(flaw) AND length(flaw) <= 500),
+      history TEXT NOT NULL CHECK (history = trim(history) AND length(history) <= 2000),
+      personality TEXT NOT NULL CHECK (personality = trim(personality) AND length(personality) <= 2000),
+      fears TEXT NOT NULL CHECK (fears = trim(fears) AND length(fears) <= 2000),
+      relationships TEXT NOT NULL CHECK (relationships = trim(relationships) AND length(relationships) <= 2000),
+      appearance TEXT NOT NULL CHECK (appearance = trim(appearance) AND length(appearance) <= 2000),
+      voice TEXT NOT NULL CHECK (voice = trim(voice) AND length(voice) <= 2000)
+    );
 CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
@@ -227,6 +240,16 @@ CREATE TABLE rpg_content_packs (
       FOREIGN KEY (rules_profile_id) REFERENCES rpg_rules_profiles(rules_profile_id) ON DELETE RESTRICT
     );
 CREATE INDEX idx_rpg_content_packs_profile ON rpg_content_packs(rules_profile_id);
+CREATE TABLE rpg_rules_profile_bindings_v60 (
+      rules_profile_id TEXT PRIMARY KEY REFERENCES rpg_rules_profiles(rules_profile_id) ON DELETE RESTRICT,
+      ruleset_id TEXT NOT NULL CHECK (ruleset_id IN ('velvet-starter-v1','dnd-5e')),
+      ruleset_version TEXT NOT NULL CHECK (ruleset_version='1.0.0'),
+      UNIQUE (rules_profile_id,ruleset_id,ruleset_version)
+    );
+CREATE TRIGGER rpg_rules_profile_bindings_v60_immutable_update BEFORE UPDATE ON rpg_rules_profile_bindings_v60
+      BEGIN SELECT RAISE(ABORT,'rules profile bindings are immutable'); END;
+CREATE TRIGGER rpg_rules_profile_bindings_v60_immutable_delete BEFORE DELETE ON rpg_rules_profile_bindings_v60
+      BEGIN SELECT RAISE(ABORT,'rules profile bindings are immutable'); END;
 CREATE TABLE rpg_definitions (
       pack_id TEXT NOT NULL,
       pack_version TEXT NOT NULL,
@@ -248,6 +271,21 @@ CREATE TABLE campaign_rules_profiles (
       UNIQUE (campaign_id, rules_profile_id)
     );
 CREATE INDEX idx_campaign_rules_profiles_profile ON campaign_rules_profiles(rules_profile_id);
+CREATE TABLE campaign_ruleset_bindings_v60 (
+      campaign_id TEXT PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+      rules_profile_id TEXT NOT NULL,
+      ruleset_id TEXT NOT NULL CHECK (ruleset_id IN ('velvet-starter-v1','dnd-5e')),
+      ruleset_version TEXT NOT NULL CHECK (ruleset_version='1.0.0'),
+      bound_at TEXT NOT NULL,
+      FOREIGN KEY (campaign_id,rules_profile_id)
+        REFERENCES campaign_rules_profiles(campaign_id,rules_profile_id) ON DELETE CASCADE,
+      UNIQUE (campaign_id,rules_profile_id,ruleset_id,ruleset_version)
+    );
+CREATE TRIGGER campaign_ruleset_bindings_v60_immutable_update BEFORE UPDATE ON campaign_ruleset_bindings_v60
+      BEGIN SELECT RAISE(ABORT,'campaign ruleset bindings are immutable'); END;
+CREATE TRIGGER campaign_ruleset_bindings_v60_immutable_delete BEFORE DELETE ON campaign_ruleset_bindings_v60
+      WHEN EXISTS (SELECT 1 FROM campaign_actors WHERE campaign_id=OLD.campaign_id)
+      BEGIN SELECT RAISE(ABORT,'campaign ruleset bindings with mechanics descendants are immutable'); END;
 CREATE TABLE campaign_content_packs (
       campaign_id TEXT NOT NULL,
       pack_id TEXT NOT NULL,
@@ -1184,7 +1222,7 @@ CREATE TRIGGER campaign_checkpoint_resource_snapshots_prevent_replace BEFORE INS
 CREATE TABLE rpg_content_pack_publications (
       pack_id TEXT NOT NULL, pack_version TEXT NOT NULL,
       validation_level TEXT NOT NULL CHECK (validation_level IN ('legacy-v10','validated-v1')),
-      rules_engine TEXT CHECK (rules_engine IS NULL OR rules_engine='velvet-starter-v1'),
+      rules_engine TEXT CHECK (rules_engine IS NULL OR rules_engine IN ('velvet-starter-v1','dnd-5e')),
       manifest_digest TEXT CHECK (manifest_digest IS NULL OR (length(manifest_digest)=64 AND manifest_digest NOT GLOB '*[^0-9a-f]*')),
       manifest_json TEXT CHECK (manifest_json IS NULL OR (json_valid(manifest_json) AND json_type(manifest_json)='object')),
       provenance_json TEXT CHECK (provenance_json IS NULL OR (json_valid(provenance_json) AND json_type(provenance_json)='object')),
@@ -1194,7 +1232,7 @@ CREATE TABLE rpg_content_pack_publications (
       FOREIGN KEY (pack_id,pack_version) REFERENCES rpg_content_packs(pack_id,pack_version) ON DELETE RESTRICT,
       CHECK ((validation_level='legacy-v10' AND rules_engine IS NULL AND manifest_digest IS NULL AND manifest_json IS NULL
           AND provenance_json IS NULL AND validation_report_json IS NULL AND published_by_principal_id IS NULL AND published_at IS NULL)
-        OR (validation_level='validated-v1' AND rules_engine='velvet-starter-v1' AND manifest_digest IS NOT NULL
+        OR (validation_level='validated-v1' AND rules_engine IN ('velvet-starter-v1','dnd-5e') AND manifest_digest IS NOT NULL
           AND manifest_json IS NOT NULL AND provenance_json IS NOT NULL AND validation_report_json IS NOT NULL
           AND published_by_principal_id IS NOT NULL AND published_at IS NOT NULL))
     );
@@ -2101,8 +2139,18 @@ CREATE TRIGGER rpg_progression_profiles_v24_canonical_insert BEFORE INSERT ON rp
       WHEN NOT ((NEW.profile_id='velvet:progression:starter-v1:xp' AND NEW.rules_profile_id='velvet:rules:starter-v1' AND NEW.mode='xp'
           AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='24022841512715b487268aa61f59e4a6ceb63ad32b6db5647600bb2eaac82975')
         OR (NEW.profile_id='velvet:progression:starter-v1:milestone' AND NEW.rules_profile_id='velvet:rules:starter-v1' AND NEW.mode='milestone'
-          AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='472a70b91437947fda61ff36a6bf618f92de21d77560bc51218e437d5b8d0a13'))
-      BEGIN SELECT RAISE(ABORT,'progression profile requires canonical server provenance'); END;
+          AND NEW.max_level=3 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300},{"level":3,"xp":900}]' AND NEW.profile_digest='472a70b91437947fda61ff36a6bf618f92de21d77560bc51218e437d5b8d0a13')
+        OR (NEW.profile_id='srd-5.1:progression:fighter-1-2-v1:xp' AND NEW.rules_profile_id='srd-5.1:rules:starter-v1' AND NEW.mode='xp'
+          AND NEW.max_level=2 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300}]' AND NEW.profile_digest='56d140e11f4990b8a6478369c3984e6a7f68388130e8b8617c6e63e8219a047a')
+        OR (NEW.profile_id='srd-5.1:progression:fighter-1-2-v1:milestone' AND NEW.rules_profile_id='srd-5.1:rules:starter-v1' AND NEW.mode='milestone'
+          AND NEW.max_level=2 AND NEW.thresholds_json='[{"level":1,"xp":0},{"level":2,"xp":300}]' AND NEW.profile_digest='c5260eaeb7d96964297d747a76d1356fa412a84665ddf9c0443f75757f1ce734'))
+       BEGIN SELECT RAISE(ABORT,'progression profile requires canonical server provenance'); END;
+CREATE TRIGGER character_progression_v24_require_campaign_provenance BEFORE INSERT ON character_progression_v23
+      WHEN NOT EXISTS(SELECT 1 FROM rpg_progression_profiles_v23 profile
+        JOIN campaign_rules_profiles campaign_profile ON campaign_profile.campaign_id=NEW.campaign_id AND campaign_profile.rules_profile_id=profile.rules_profile_id
+        JOIN campaign_content_packs class_pin ON class_pin.campaign_id=NEW.campaign_id AND class_pin.pack_id=NEW.class_pack_id AND class_pin.pack_version=NEW.class_pack_version
+        WHERE profile.profile_id=NEW.profile_id)
+      BEGIN SELECT RAISE(ABORT,'progression root requires exact campaign profile and class publication provenance'); END;
 CREATE TRIGGER character_progression_pending_choices_v24_inert_insert BEFORE INSERT ON character_progression_pending_choices_v23 BEGIN SELECT RAISE(ABORT,'legacy pending choices are inert'); END;
 CREATE TRIGGER character_progression_pending_choices_v24_inert_update BEFORE UPDATE ON character_progression_pending_choices_v23 BEGIN SELECT RAISE(ABORT,'legacy pending choices are inert'); END;
 CREATE TRIGGER character_progression_pending_choices_v24_inert_delete BEFORE DELETE ON character_progression_pending_choices_v23 BEGIN SELECT RAISE(ABORT,'legacy pending choices are inert'); END;
@@ -2207,7 +2255,7 @@ CREATE TRIGGER rpg_campaign_catalog_definitions_v25_require_exact_pin BEFORE INS
       BEGIN SELECT RAISE(ABORT,'campaign catalog definition requires an exact current pin'); END;
 CREATE TABLE rpg_wallets_v25 (
       campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL,
-      currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 3 AND 16 AND currency_code NOT GLOB '*[^A-Z0-9._:-]*'),
+      currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 2 AND 16 AND currency_code NOT GLOB '*[^A-Z0-9._:-]*'),
       balance_minor INTEGER NOT NULL CHECK(typeof(balance_minor)='integer' AND balance_minor BETWEEN -9007199254740991 AND 9007199254740991),
        updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
       PRIMARY KEY(campaign_id,actor_id,currency_code),
@@ -2270,7 +2318,7 @@ CREATE TABLE rpg_rest_receipts_v25 (
        FOREIGN KEY(campaign_id,actor_id,command_id,resulting_revision) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
     );
 CREATE TABLE rpg_currency_references_v25 (
-      campaign_id TEXT NOT NULL, currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 1 AND 128 AND currency_code NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      campaign_id TEXT NOT NULL, currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 2 AND 16 AND currency_code NOT GLOB '*[^A-Z0-9._:-]*'),
       pack_id TEXT NOT NULL, pack_version TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind='currency'), definition_id TEXT NOT NULL,
       PRIMARY KEY(campaign_id,currency_code), UNIQUE(campaign_id,pack_id,pack_version,kind,definition_id),
       FOREIGN KEY(campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
@@ -2412,7 +2460,7 @@ CREATE TABLE rpg_m16_events_v26 (
     );
 CREATE TABLE rpg_check_results_v26 (
       check_id TEXT PRIMARY KEY CHECK(length(check_id) BETWEEN 1 AND 128 AND check_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
-      check_kind TEXT NOT NULL CHECK(check_kind IN ('ability','skill','save','attack','opposed')), check_key TEXT NOT NULL CHECK(check_key IN ('might','agility','resolve','insight','presence','craft','melee','ranged','spell','defense')),
+      check_kind TEXT NOT NULL CHECK(check_kind IN ('ability','skill','save','attack','opposed')), check_key TEXT NOT NULL CHECK(check_key IN ('might','agility','resolve','insight','presence','craft','melee','ranged','spell','defense','strength','dexterity','constitution','intelligence','wisdom','charisma','acrobatics','animal-handling','arcana','athletics','deception','history','intimidation','investigation','medicine','nature','perception','performance','persuasion','religion','sleight-of-hand','stealth','survival')),
       target_actor_id TEXT, difficulty INTEGER CHECK(typeof(difficulty)='integer' AND difficulty BETWEEN 0 AND 1000),
       dice_json TEXT NOT NULL CHECK(length(dice_json) BETWEEN 2 AND 4096 AND json_valid(dice_json) AND json_type(dice_json)='array' AND json_array_length(dice_json) BETWEEN 1 AND 32),
       result_json TEXT NOT NULL CHECK(length(result_json) BETWEEN 2 AND 8192 AND json_valid(result_json) AND json_type(result_json)='object'), total INTEGER NOT NULL CHECK(typeof(total)='integer' AND total BETWEEN -9007199254740991 AND 9007199254740991),
@@ -2559,7 +2607,7 @@ CREATE TABLE combatant (
       enemy_tactic TEXT NOT NULL DEFAULT 'basic_attack' CHECK(enemy_tactic IN ('basic_attack')),
       initiative INTEGER NOT NULL CHECK(typeof(initiative)='integer' AND initiative BETWEEN -1000000 AND 1000000), initiative_tiebreaker INTEGER NOT NULL CHECK(typeof(initiative_tiebreaker)='integer' AND initiative_tiebreaker BETWEEN 0 AND 1000000),
       hit_points INTEGER NOT NULL CHECK(typeof(hit_points)='integer' AND hit_points BETWEEN -1000000 AND 1000000), maximum_hit_points INTEGER NOT NULL CHECK(typeof(maximum_hit_points)='integer' AND maximum_hit_points BETWEEN 1 AND 1000000),
-      status TEXT NOT NULL CHECK(status IN ('active','defeated','fled','removed')), state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991),
+      status TEXT NOT NULL CHECK(status IN ('active','unconscious','stable','dead','defeated','fled','removed')), state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991),
       created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
       updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'),
       CHECK(updated_at>=created_at), CHECK((combatant_kind='actor' AND actor_id IS NOT NULL AND enemy_pack_id IS NULL AND enemy_pack_version IS NULL AND enemy_kind IS NULL AND enemy_definition_id IS NULL) OR (combatant_kind='enemy' AND actor_id IS NULL AND ((enemy_pack_id IS NULL AND enemy_pack_version IS NULL AND enemy_kind IS NULL AND enemy_definition_id IS NULL) OR (enemy_pack_id IS NOT NULL AND enemy_pack_version IS NOT NULL AND enemy_kind='enemy' AND enemy_definition_id IS NOT NULL)))),
@@ -2570,6 +2618,57 @@ CREATE TABLE combatant (
     );
 CREATE UNIQUE INDEX uq_combatant_actor_encounter_v27 ON combatant(encounter_id,actor_id) WHERE actor_id IS NOT NULL;
 CREATE INDEX idx_combatant_turn_order_v27 ON combatant(encounter_id,status,initiative DESC,initiative_tiebreaker,combatant_id);
+CREATE TABLE combat_survival_v61 (
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL,
+      successes INTEGER NOT NULL DEFAULT 0 CHECK(successes BETWEEN 0 AND 3),
+      failures INTEGER NOT NULL DEFAULT 0 CHECK(failures BETWEEN 0 AND 3),
+      stable INTEGER NOT NULL DEFAULT 0 CHECK(stable IN (0,1)),
+      PRIMARY KEY(encounter_id,combatant_id),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+CREATE TABLE combat_temporary_hit_points_v62 (
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL,
+      hit_points INTEGER NOT NULL CHECK(typeof(hit_points)='integer' AND hit_points BETWEEN 0 AND 1000000),
+      source_command_id TEXT NOT NULL CHECK(length(source_command_id) BETWEEN 1 AND 128 AND source_command_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at),
+      PRIMARY KEY(encounter_id,combatant_id),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(encounter_id,source_command_id) REFERENCES combat_commands_v27(encounter_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+CREATE TABLE combat_conditions_v62 (
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL, condition TEXT NOT NULL CHECK(condition IN ('blinded','charmed','frightened','grappled','incapacitated','poisoned','prone','restrained','stunned','unconscious')),
+      source_combatant_id TEXT NOT NULL, source_command_id TEXT NOT NULL,
+      expires_at_round INTEGER CHECK(typeof(expires_at_round)='integer' AND expires_at_round BETWEEN 1 AND 1000000),
+      applied_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',applied_at)=applied_at),
+      PRIMARY KEY(encounter_id,combatant_id,condition,source_combatant_id),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(encounter_id,source_combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED,
+      FOREIGN KEY(encounter_id,source_command_id) REFERENCES combat_commands_v27(encounter_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+CREATE TABLE combat_turn_economy_v60 (
+      turn_id TEXT PRIMARY KEY CHECK(length(turn_id) BETWEEN 1 AND 128 AND turn_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL,
+      round_number INTEGER NOT NULL CHECK(typeof(round_number)='integer' AND round_number BETWEEN 1 AND 1000000),
+      action_used INTEGER NOT NULL DEFAULT 0 CHECK(action_used IN(0,1)),
+      bonus_action_used INTEGER NOT NULL DEFAULT 0 CHECK(bonus_action_used IN(0,1)),
+      reaction_used INTEGER NOT NULL DEFAULT 0 CHECK(reaction_used IN(0,1)),
+      movement_allowance_feet INTEGER NOT NULL CHECK(typeof(movement_allowance_feet)='integer' AND movement_allowance_feet BETWEEN 0 AND 1000000),
+      movement_used_feet INTEGER NOT NULL DEFAULT 0 CHECK(typeof(movement_used_feet)='integer' AND movement_used_feet BETWEEN 0 AND movement_allowance_feet),
+      started_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',started_at)=started_at),
+      ended_at TEXT CHECK(ended_at IS NULL OR (strftime('%Y-%m-%dT%H:%M:%fZ',ended_at)=ended_at AND ended_at>=started_at)),
+      UNIQUE(encounter_id,round_number,combatant_id),
+      FOREIGN KEY(encounter_id,combatant_id) REFERENCES combatant(encounter_id,combatant_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+    );
+CREATE UNIQUE INDEX uq_combat_turn_economy_v60_current ON combat_turn_economy_v60(encounter_id) WHERE ended_at IS NULL;
+CREATE TRIGGER combat_turn_economy_v60_guard BEFORE UPDATE ON combat_turn_economy_v60
+      WHEN NEW.turn_id<>OLD.turn_id OR NEW.encounter_id<>OLD.encounter_id OR NEW.combatant_id<>OLD.combatant_id
+        OR NEW.round_number<>OLD.round_number OR NEW.started_at<>OLD.started_at
+        OR NEW.action_used<OLD.action_used OR NEW.bonus_action_used<OLD.bonus_action_used
+        OR NEW.reaction_used<OLD.reaction_used OR NEW.movement_allowance_feet<>OLD.movement_allowance_feet
+        OR NEW.movement_used_feet<OLD.movement_used_feet OR OLD.ended_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END;
+CREATE TRIGGER combat_turn_economy_v60_retain BEFORE DELETE ON combat_turn_economy_v60
+      BEGIN SELECT RAISE(ABORT,'combat turn economies are retained'); END;
 CREATE TABLE combat_log (
       log_id TEXT PRIMARY KEY CHECK(length(log_id) BETWEEN 1 AND 128 AND log_id NOT GLOB '*[^A-Za-z0-9._:-]*'), encounter_id TEXT NOT NULL, combatant_id TEXT,
       event_id TEXT NOT NULL, log_ordinal INTEGER NOT NULL CHECK(typeof(log_ordinal)='integer' AND log_ordinal BETWEEN 0 AND 1000000),
@@ -2595,7 +2694,7 @@ CREATE TABLE reward_entry_v27 (
       reward_entry_id TEXT PRIMARY KEY CHECK(length(reward_entry_id) BETWEEN 1 AND 128 AND reward_entry_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
       campaign_id TEXT NOT NULL, reward_bundle_id TEXT NOT NULL, entry_ordinal INTEGER NOT NULL CHECK(typeof(entry_ordinal)='integer' AND entry_ordinal BETWEEN 0 AND 127),
       reward_kind TEXT NOT NULL CHECK(reward_kind='currency'), amount_minor INTEGER NOT NULL CHECK(typeof(amount_minor)='integer' AND amount_minor BETWEEN 1 AND 1000000),
-      currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 1 AND 128 AND currency_code NOT GLOB '*[^A-Za-z0-9._:-]*'),
+      currency_code TEXT NOT NULL CHECK(length(currency_code) BETWEEN 2 AND 16 AND currency_code NOT GLOB '*[^A-Z0-9._:-]*'),
       currency_pack_id TEXT NOT NULL, currency_pack_version TEXT NOT NULL, currency_kind TEXT NOT NULL CHECK(currency_kind='currency'), currency_definition_id TEXT NOT NULL,
       created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
       UNIQUE(reward_bundle_id,entry_ordinal), UNIQUE(campaign_id,reward_entry_id),
@@ -2719,14 +2818,17 @@ CREATE TABLE world_mutation_revisions_v28 (
       PRIMARY KEY(campaign_id,session_id), FOREIGN KEY(session_id) REFERENCES campaign_sessions(session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
     );
 CREATE TABLE world_commands_v28 (
-      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL CHECK(length(command_id) BETWEEN 1 AND 128 AND command_id NOT GLOB '*[^A-Za-z0-9._:-]*'), actor_id TEXT NOT NULL, command_type TEXT NOT NULL CHECK(command_type IN ('travel','discover_location','set_npc_relationship','change_reputation','set_faction_relation','set_actor_location')), idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'), canonical_request_json TEXT NOT NULL CHECK(length(canonical_request_json) BETWEEN 2 AND 32768 AND json_valid(canonical_request_json) AND json_type(canonical_request_json)='object'), request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest GLOB '[0-9a-f]*'), expected_revision INTEGER NOT NULL CHECK(typeof(expected_revision)='integer' AND expected_revision BETWEEN 0 AND 9007199254740990), resulting_revision INTEGER NOT NULL CHECK(resulting_revision=expected_revision+1), created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
+      campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL CHECK(length(command_id) BETWEEN 1 AND 128 AND command_id NOT GLOB '*[^A-Za-z0-9._:-]*'), actor_id TEXT NOT NULL, command_type TEXT NOT NULL CHECK(command_type IN ('travel','establish_camp','discover_location','set_npc_relationship','change_reputation','set_faction_relation','set_actor_location')), idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) BETWEEN 1 AND 128 AND idempotency_key NOT GLOB '*[^A-Za-z0-9._:-]*'), canonical_request_json TEXT NOT NULL CHECK(length(canonical_request_json) BETWEEN 2 AND 32768 AND json_valid(canonical_request_json) AND json_type(canonical_request_json)='object'), request_digest TEXT NOT NULL CHECK(length(request_digest)=64 AND request_digest GLOB '[0-9a-f]*'), expected_revision INTEGER NOT NULL CHECK(typeof(expected_revision)='integer' AND expected_revision BETWEEN 0 AND 9007199254740990), resulting_revision INTEGER NOT NULL CHECK(resulting_revision=expected_revision+1), created_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',created_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',created_at)=created_at AND substr(created_at,12,2) BETWEEN '00' AND '23'),
       PRIMARY KEY(campaign_id,session_id,command_id), UNIQUE(campaign_id,session_id,idempotency_key), UNIQUE(campaign_id,session_id,resulting_revision), UNIQUE(campaign_id,session_id,command_id,resulting_revision), FOREIGN KEY(campaign_id,session_id) REFERENCES world_mutation_revisions_v28(campaign_id,session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
     );
 CREATE TABLE world_receipts_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL CHECK(typeof(resulting_revision)='integer' AND resulting_revision BETWEEN 1 AND 9007199254740991), canonical_result_json TEXT NOT NULL CHECK(length(canonical_result_json) BETWEEN 2 AND 32768 AND json_valid(canonical_result_json) AND json_type(canonical_result_json)='object'), result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest GLOB '[0-9a-f]*'), occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), PRIMARY KEY(campaign_id,session_id,command_id), UNIQUE(campaign_id,session_id,resulting_revision), UNIQUE(campaign_id,session_id,command_id,resulting_revision), FOREIGN KEY(campaign_id,session_id,command_id,resulting_revision) REFERENCES world_commands_v28(campaign_id,session_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
-CREATE TABLE world_events_v28 (event_id TEXT PRIMARY KEY CHECK(length(event_id) BETWEEN 1 AND 128 AND event_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL, event_type TEXT NOT NULL CHECK(event_type IN ('travelled','location_discovered','actor_location_set','npc_relationship_changed','reputation_changed','faction_relation_changed')), event_json TEXT NOT NULL CHECK(length(event_json) BETWEEN 2 AND 32768 AND json_valid(event_json) AND json_type(event_json)='object'), occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), UNIQUE(campaign_id,session_id,event_id), UNIQUE(campaign_id,session_id,command_id,event_type), FOREIGN KEY(campaign_id,session_id,command_id,resulting_revision) REFERENCES world_receipts_v28(campaign_id,session_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+ CREATE TABLE world_events_v28 (event_id TEXT PRIMARY KEY CHECK(length(event_id) BETWEEN 1 AND 128 AND event_id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL, event_type TEXT NOT NULL CHECK(event_type IN ('travelled','camp_established','location_discovered','actor_location_set','npc_relationship_changed','reputation_changed','faction_relation_changed')), event_json TEXT NOT NULL CHECK(length(event_json) BETWEEN 2 AND 32768 AND json_valid(event_json) AND json_type(event_json)='object'), occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23'), UNIQUE(campaign_id,session_id,event_id), UNIQUE(campaign_id,session_id,command_id,event_type), FOREIGN KEY(campaign_id,session_id,command_id,resulting_revision) REFERENCES world_receipts_v28(campaign_id,session_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
 CREATE TABLE campaign_actor_locations_v28 (campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, location_id TEXT NOT NULL, session_id TEXT NOT NULL, state_revision INTEGER NOT NULL DEFAULT 0 CHECK(typeof(state_revision)='integer' AND state_revision BETWEEN 0 AND 9007199254740991), updated_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',updated_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at AND substr(updated_at,12,2) BETWEEN '00' AND '23'), PRIMARY KEY(campaign_id,actor_id,session_id), FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(session_id) REFERENCES campaign_sessions(session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
 CREATE TABLE world_travel_party_members_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, actor_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id,actor_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
 CREATE TABLE world_travel_destinations_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, connection_id TEXT NOT NULL, destination_location_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,connection_id) REFERENCES campaign_location_connections_v28(campaign_id,connection_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,destination_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+CREATE TABLE world_expeditions_v60 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, elapsed_minutes INTEGER NOT NULL CHECK(typeof(elapsed_minutes)='integer' AND elapsed_minutes BETWEEN 0 AND 1000000000), camp_location_id TEXT, camp_command_id TEXT, PRIMARY KEY(campaign_id,session_id), FOREIGN KEY(campaign_id,session_id) REFERENCES campaign_sessions(campaign_id,session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,camp_location_id) REFERENCES campaign_locations_v28(campaign_id,location_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,session_id,camp_command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+CREATE TABLE world_travel_elapsed_v60 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, elapsed_minutes INTEGER NOT NULL CHECK(elapsed_minutes=60), elapsed_after INTEGER NOT NULL CHECK(typeof(elapsed_after)='integer' AND elapsed_after BETWEEN 60 AND 1000000000), PRIMARY KEY(campaign_id,session_id,command_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
+CREATE TABLE rpg_rest_elapsed_v60 (rest_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, session_id TEXT NOT NULL, elapsed_before INTEGER NOT NULL, elapsed_after INTEGER NOT NULL CHECK(elapsed_after=elapsed_before+480), FOREIGN KEY(rest_id) REFERENCES rpg_rest_receipts_v25(receipt_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,session_id) REFERENCES campaign_sessions(campaign_id,session_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
 CREATE TABLE world_travel_npc_party_members_v28 (campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, command_id TEXT NOT NULL, npc_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,command_id,npc_id), FOREIGN KEY(campaign_id,session_id,command_id) REFERENCES world_commands_v28(campaign_id,session_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED, FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED);
 CREATE TRIGGER world_mutation_revisions_v28_campaign_session_ancestry BEFORE INSERT ON world_mutation_revisions_v28 WHEN NOT EXISTS(SELECT 1 FROM campaign_sessions WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id) BEGIN SELECT RAISE(ABORT,'world session must belong to campaign'); END;
 CREATE TRIGGER world_commands_v28_campaign_session_ancestry BEFORE INSERT ON world_commands_v28 WHEN NOT EXISTS(SELECT 1 FROM campaign_sessions WHERE campaign_id=NEW.campaign_id AND session_id=NEW.session_id) BEGIN SELECT RAISE(ABORT,'world command session must belong to campaign'); END;
@@ -3507,6 +3609,30 @@ CREATE TABLE provider_call_metadata (
       FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
     );
 CREATE INDEX idx_provider_calls_turn_v35 ON provider_call_metadata(campaign_id,turn_id,call_id,recorded_at);
+CREATE TABLE adventure_narration_dispatches_v60(
+      claim_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, call_id TEXT NOT NULL,
+      provider TEXT NOT NULL, model TEXT NOT NULL, claimed_at TEXT NOT NULL, lease_expires_at TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN('claimed','settled')),
+      source TEXT CHECK(source IS NULL OR source IN('provider-assisted','deterministic-fallback')),
+      narration TEXT CHECK(narration IS NULL OR length(trim(narration)) BETWEEN 1 AND 8000),
+      outcome_code TEXT, prompt_tokens INTEGER CHECK(prompt_tokens IS NULL OR (typeof(prompt_tokens)='integer' AND prompt_tokens>=0)),
+      completion_tokens INTEGER CHECK(completion_tokens IS NULL OR (typeof(completion_tokens)='integer' AND completion_tokens>=0)), settled_at TEXT,
+      CHECK(lease_expires_at>claimed_at),
+      CHECK((status='claimed' AND source IS NULL AND narration IS NULL AND outcome_code IS NULL AND prompt_tokens IS NULL AND completion_tokens IS NULL AND settled_at IS NULL)
+        OR (status='settled' AND source IS NOT NULL AND narration IS NOT NULL AND outcome_code IS NOT NULL AND settled_at IS NOT NULL)),
+      UNIQUE(campaign_id,turn_id,call_id),
+      FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT);
+CREATE TRIGGER adventure_narration_dispatches_v60_insert BEFORE INSERT ON adventure_narration_dispatches_v60 WHEN
+      NOT EXISTS(SELECT 1 FROM adventure_turns turn WHERE turn.campaign_id=NEW.campaign_id AND turn.id=NEW.turn_id
+        AND turn.state='narrating' AND turn.narration_status='in-progress')
+      BEGIN SELECT RAISE(ABORT,'narration dispatch requires an in-progress turn'); END;
+CREATE TRIGGER adventure_narration_dispatches_v60_update BEFORE UPDATE ON adventure_narration_dispatches_v60 WHEN
+      NEW.claim_id<>OLD.claim_id OR NEW.campaign_id<>OLD.campaign_id OR NEW.turn_id<>OLD.turn_id OR NEW.call_id<>OLD.call_id
+      OR NEW.provider<>OLD.provider OR NEW.model<>OLD.model OR NEW.claimed_at<>OLD.claimed_at OR NEW.lease_expires_at<>OLD.lease_expires_at
+      OR OLD.status<>'claimed' OR NEW.status<>'settled'
+      BEGIN SELECT RAISE(ABORT,'invalid narration dispatch settlement'); END;
+CREATE TRIGGER adventure_narration_dispatches_v60_delete BEFORE DELETE ON adventure_narration_dispatches_v60
+      BEGIN SELECT RAISE(ABORT,'narration dispatches are durable'); END;
 CREATE TABLE generation_drafts (
       id TEXT PRIMARY KEY CHECK(length(id) BETWEEN 1 AND 128 AND id NOT GLOB '*[^A-Za-z0-9._:-]*'), campaign_id TEXT NOT NULL,
       timeline_id TEXT NOT NULL, session_id TEXT, principal_id TEXT NOT NULL,
@@ -3683,7 +3809,39 @@ CREATE TRIGGER adventure_turns_guard_update_v36 BEFORE UPDATE ON adventure_turns
       NEW.declaration<>OLD.declaration OR NEW.mode<>OLD.mode OR NEW.prior_turn_id IS NOT OLD.prior_turn_id OR NEW.idempotency_key<>OLD.idempotency_key OR
       NEW.created_at<>OLD.created_at OR NEW.campaign_revision<>OLD.campaign_revision OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at OR NOT (
         (OLD.state='declared' AND NEW.state IN ('declared','proposed','narrating','cancelled','failed')) OR
-        (OLD.state='proposed' AND NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
+        (OLD.state='proposed' AND (NEW.state IN ('proposed','awaiting-confirmation','mechanics-committed','cancelled','failed') OR
+          (NEW.state='narrating' AND (EXISTS(SELECT 1 FROM turn_mechanics_links_v36 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.root_turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM agent_generalized_receipts_v39 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM exact_candidate_provider_bindings_v48 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM adventure_check_executions_v54 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM adventure_inventory_executions_v55 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM adventure_exact_action_executions_v56 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM adventure_commerce_executions_v57 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM campaign_commands command JOIN command_receipts receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+              JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=command.campaign_id AND binding.turn_id=command.source_turn_id
+                AND binding.execution_idempotency_key=command.idempotency_key AND binding.timeline_id=command.timeline_id AND binding.actor_id=command.actor_id AND binding.command_type=command.type
+              WHERE command.campaign_id=OLD.campaign_id AND command.source_turn_id=OLD.id)
+            OR EXISTS(SELECT 1 FROM quest_domain_commands_v33 command JOIN quest_domain_receipts_v33 receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+              JOIN agent_provider_responses_v39 response ON response.campaign_id=command.campaign_id AND response.turn_id=OLD.id AND response.status='succeeded'
+                AND json_extract(response.response_json,'$.calls[0].toolName')='exact_quest_objective.select'
+              WHERE command.campaign_id=OLD.campaign_id AND command.command_type='advance-objective'
+                AND command.idempotency_key='adventure-quest:'||substr(response.provider_call_id,-32)||':'||substr(json_extract(response.response_json,'$.calls[0].arguments.candidateId'),-32)))))) OR
+        (OLD.state='confirmed' AND NEW.state='narrating' AND (EXISTS(SELECT 1 FROM turn_mechanics_links_v36 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.root_turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM agent_generalized_receipts_v39 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM exact_candidate_provider_bindings_v48 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM adventure_check_executions_v54 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM adventure_inventory_executions_v55 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM adventure_exact_action_executions_v56 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM adventure_commerce_executions_v57 receipt WHERE receipt.campaign_id=OLD.campaign_id AND receipt.turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM campaign_commands command JOIN command_receipts receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+            JOIN tool_proposal_execution_bindings_v37 binding ON binding.campaign_id=command.campaign_id AND binding.turn_id=command.source_turn_id
+              AND binding.execution_idempotency_key=command.idempotency_key AND binding.timeline_id=command.timeline_id AND binding.actor_id=command.actor_id AND binding.command_type=command.type
+            WHERE command.campaign_id=OLD.campaign_id AND command.source_turn_id=OLD.id)
+          OR EXISTS(SELECT 1 FROM quest_domain_commands_v33 command JOIN quest_domain_receipts_v33 receipt ON receipt.campaign_id=command.campaign_id AND receipt.command_id=command.command_id
+            JOIN agent_provider_responses_v39 response ON response.campaign_id=command.campaign_id AND response.turn_id=OLD.id AND response.status='succeeded'
+              AND json_extract(response.response_json,'$.calls[0].toolName')='exact_quest_objective.select'
+            WHERE command.campaign_id=OLD.campaign_id AND command.command_type='advance-objective'
+              AND command.idempotency_key='adventure-quest:'||substr(response.provider_call_id,-32)||':'||substr(json_extract(response.response_json,'$.calls[0].arguments.candidateId'),-32)))) OR
         (OLD.state='awaiting-confirmation' AND NEW.state IN ('awaiting-confirmation','mechanics-committed','cancelled','failed')) OR
         (OLD.state='mechanics-committed' AND NEW.state IN ('mechanics-committed','narrating','completed','cancelled','failed')) OR
         (OLD.state='narrating' AND NEW.state IN ('narrating','completed','cancelled','failed')))
@@ -3814,7 +3972,7 @@ CREATE INDEX idx_agent_decision_rounds_turn_v38 ON agent_decision_rounds_v38(cam
 CREATE TABLE agent_tool_calls_v38(
       call_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, round_id TEXT NOT NULL, round_number INTEGER NOT NULL,
       position INTEGER NOT NULL CHECK(typeof(position)='integer' AND position BETWEEN 0 AND 11), provider_tool_call_id TEXT NOT NULL,
-      tool_name TEXT NOT NULL CHECK(tool_name IN ('campaign_context.read','actor_resources.read','actor_inventory.read','actor_powers.read',
+      tool_name TEXT NOT NULL CHECK(tool_name IN ('campaign_context.read','actor_sheet.read','actor_resources.read','actor_inventory.read','actor_powers.read',
         'combat_state.read','world_state.read','quest_state.read','actor_attribute.set','actor_resource.initialize','actor_dice.roll')),
       call_kind TEXT NOT NULL CHECK(call_kind IN ('read','mutation')),
       arguments_json TEXT NOT NULL CHECK(json_valid(arguments_json) AND json_type(arguments_json)='object' AND length(arguments_json)<=32768),
@@ -4076,9 +4234,10 @@ CREATE TRIGGER tool_proposals_guard_insert_v35 BEFORE INSERT ON tool_proposals W
 CREATE TABLE confirmation_policy_attestations_v40(
       proposal_id TEXT PRIMARY KEY,campaign_id TEXT NOT NULL,turn_id TEXT NOT NULL,
        policy_version TEXT NOT NULL CHECK(policy_version IN('v1','legacy-v40-backfill-v1')),category TEXT NOT NULL CHECK(category IN(
-        'currency-transfer','purchase','important-item-loss','important-item-consume','important-item-gift',
+        'inventory-equip','inventory-unequip','currency-transfer','purchase','important-item-loss','important-item-consume','important-item-gift',
         'ambiguous-limited-resource-use','rest-timing','companion-change','combat-start','combat-action-consequential',
-        'generated-world-change','generated-quest-change','generated-story-change','gm-override','deterministic-roll','ambiguous-consequential-change')),
+        'generated-world-change','generated-quest-change','generated-story-change','quest-accept','quest-abandon','quest-reward-claim','character-progression',
+        'gm-override','deterministic-roll','ambiguous-consequential-change')),
       requires_confirmation INTEGER NOT NULL CHECK(requires_confirmation IN(0,1)),
       required_authorizer TEXT NOT NULL CHECK(required_authorizer IN('controller','gm')),
       safe_summary_json TEXT NOT NULL CHECK(json_valid(safe_summary_json) AND json_type(safe_summary_json)='object'),
@@ -4854,18 +5013,18 @@ CREATE TRIGGER exact_candidate_provider_binding_validate_v48 BEFORE INSERT ON ex
     AND json_array_length(json_extract(context.request_json,'$.advertisedToolSchemas'))>0
     AND EXISTS(SELECT 1 FROM json_each(context.request_json,'$.advertisedTools') tool WHERE tool.value=NEW.tool_name)
      AND EXISTS(SELECT 1 FROM json_each(context.request_json,'$.advertisedToolSchemas') tool WHERE json_extract(tool.value,'$.name')=NEW.tool_name
-      AND json_extract(tool.value,'$.parameters.additionalProperties')=0
-      AND json_array_length(json_extract(tool.value,'$.parameters.required'))=4
-      AND NOT EXISTS(SELECT 1 FROM json_each(json_extract(tool.value,'$.parameters.required')) required
-        WHERE required.value NOT IN('candidateId','kind','version','choices'))
-      AND json_array_length(json_extract(tool.value,'$.parameters.properties.candidateId.enum'))=
+      AND json_array_length(json_extract(tool.value,'$.parameters.oneOf'))=
         json_array_length(json_extract(context.request_json,'$.exactCandidateProjection.candidates'))
-      AND json_extract(tool.value,'$.parameters.properties.kind.enum[0]')='actor.travel'
-      AND json_array_length(json_extract(tool.value,'$.parameters.properties.kind.enum'))=1
-      AND json_extract(tool.value,'$.parameters.properties.version.enum[0]')='v1'
-      AND json_array_length(json_extract(tool.value,'$.parameters.properties.version.enum'))=1
-      AND json_extract(tool.value,'$.parameters.properties.choices.type')='array'
-      AND json_extract(tool.value,'$.parameters.properties.choices.maxItems')=0))
+      AND NOT EXISTS(SELECT 1 FROM json_each(tool.value,'$.parameters.oneOf') option
+        WHERE json_extract(option.value,'$.type')<>'object'
+          OR json_extract(option.value,'$.additionalProperties')<>0
+          OR json_array_length(json_extract(option.value,'$.required'))<>4
+          OR json_extract(option.value,'$.properties.kind.const')<>'actor.travel'
+          OR json_extract(option.value,'$.properties.version.const')<>'v1'
+          OR json_extract(option.value,'$.properties.choices.type')<>'array'
+          OR json_extract(option.value,'$.properties.choices.maxItems')<>0
+          OR NOT EXISTS(SELECT 1 FROM json_each(context.request_json,'$.exactCandidateProjection.candidates') candidate
+            WHERE json_extract(candidate.value,'$.candidateId')=json_extract(option.value,'$.properties.candidateId.const')))))
  OR NOT EXISTS(SELECT 1 FROM exact_candidate_executions_v47 execution JOIN exact_candidates_v46 candidate ON candidate.candidate_id=execution.candidate_id
    JOIN exact_candidate_batches_v46 batch ON batch.batch_id=candidate.batch_id
    WHERE execution.execution_id=NEW.execution_id AND execution.candidate_id=NEW.candidate_id AND execution.campaign_id=NEW.campaign_id
@@ -5088,6 +5247,249 @@ CREATE TRIGGER campaign_material_delivery_receipts_v53_immutable_update BEFORE U
 CREATE TRIGGER campaign_material_delivery_receipts_v53_immutable_delete BEFORE DELETE ON campaign_material_delivery_receipts_v53 BEGIN SELECT RAISE(ABORT,'v53 campaign material records are immutable'); END;
 CREATE TRIGGER campaign_material_deliveries_v53_immutable_update BEFORE UPDATE ON campaign_material_deliveries_v53 BEGIN SELECT RAISE(ABORT,'v53 campaign material records are immutable'); END;
 CREATE TRIGGER campaign_material_deliveries_v53_immutable_delete BEFORE DELETE ON campaign_material_deliveries_v53 BEGIN SELECT RAISE(ABORT,'v53 campaign material records are immutable'); END;
+CREATE TABLE adventure_check_revisions_v54 (
+  campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+  revision INTEGER NOT NULL CHECK(typeof(revision)='integer' AND revision BETWEEN 0 AND 9007199254740991),
+  updated_at TEXT NOT NULL CHECK(length(updated_at)=24 AND strftime('%Y-%m-%dT%H:%M:%fZ',updated_at)=updated_at),
+  PRIMARY KEY(campaign_id,actor_id),
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_check_candidate_batches_v54 (
+  batch_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  projection_json TEXT NOT NULL CHECK(json_valid(projection_json) AND json_type(projection_json)='object'),
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest)=64 AND projection_digest NOT GLOB '*[^0-9a-f]*'),
+  candidate_count INTEGER NOT NULL CHECK(candidate_count BETWEEN 1 AND 512), issued_at TEXT NOT NULL,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_check_candidates_v54 (
+  candidate_id TEXT PRIMARY KEY, candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64 AND candidate_digest NOT GLOB '*[^0-9a-f]*'),
+  batch_id TEXT NOT NULL, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, session_id TEXT NOT NULL, actor_id TEXT NOT NULL, principal_id TEXT NOT NULL,
+  rules_profile_id TEXT NOT NULL CHECK(rules_profile_id='dnd-5e'), ruleset_version TEXT NOT NULL CHECK(ruleset_version='1.0.0'),
+  campaign_revision INTEGER NOT NULL, timeline_id TEXT NOT NULL, timeline_revision INTEGER NOT NULL, turn_revision INTEGER NOT NULL,
+  actor_revision INTEGER NOT NULL, check_revision INTEGER NOT NULL, sheet_id TEXT NOT NULL, sheet_updated_at TEXT NOT NULL,
+  sheet_digest TEXT NOT NULL CHECK(length(sheet_digest)=64 AND sheet_digest NOT GLOB '*[^0-9a-f]*'),
+  check_kind TEXT NOT NULL CHECK(check_kind IN('ability','skill')), ability_id TEXT NOT NULL CHECK(ability_id IN('strength','dexterity','constitution','intelligence','wisdom','charisma')),
+  skill_id TEXT, difficulty_ref TEXT NOT NULL CHECK(difficulty_ref IN('very-easy','easy','medium','hard','very-hard','nearly-impossible')),
+  dc INTEGER NOT NULL CHECK(dc IN(5,10,15,20,25,30)), roll_mode TEXT NOT NULL CHECK(roll_mode IN('normal','advantage','disadvantage')),
+  ability_score INTEGER NOT NULL CHECK(ability_score BETWEEN 1 AND 30), level INTEGER NOT NULL CHECK(level BETWEEN 1 AND 20),
+  proficient INTEGER NOT NULL CHECK(proficient IN(0,1)), public_label TEXT NOT NULL CHECK(length(public_label) BETWEEN 1 AND 200), issued_at TEXT NOT NULL,
+  UNIQUE(turn_id,check_kind,ability_id,skill_id,difficulty_ref,roll_mode),
+  CHECK((check_kind='ability' AND skill_id IS NULL AND proficient=0) OR (check_kind='skill' AND skill_id IS NOT NULL)),
+  FOREIGN KEY(batch_id) REFERENCES adventure_check_candidate_batches_v54(batch_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE INDEX idx_adventure_check_candidates_v54_turn ON adventure_check_candidates_v54(campaign_id,turn_id,candidate_id);
+CREATE TABLE adventure_check_executions_v54 (
+  command_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, round_number INTEGER NOT NULL CHECK(round_number BETWEEN 1 AND 5),
+  selection_json TEXT NOT NULL CHECK(json_valid(selection_json) AND json_type(selection_json)='object'),
+  selection_digest TEXT NOT NULL CHECK(length(selection_digest)=64 AND selection_digest NOT GLOB '*[^0-9a-f]*'),
+  provider_request_digest TEXT NOT NULL CHECK(length(provider_request_digest)=64), provider_response_digest TEXT NOT NULL CHECK(length(provider_response_digest)=64),
+  revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
+  rolls_json TEXT NOT NULL CHECK(json_valid(rolls_json) AND json_type(rolls_json)='array' AND json_array_length(rolls_json) BETWEEN 1 AND 2),
+  public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'),
+  result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest NOT GLOB '*[^0-9a-f]*'), occurred_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
+  FOREIGN KEY(candidate_id) REFERENCES adventure_check_candidates_v54(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TRIGGER adventure_check_revisions_v54_guard BEFORE UPDATE ON adventure_check_revisions_v54
+  WHEN NEW.campaign_id<>OLD.campaign_id OR NEW.actor_id<>OLD.actor_id OR NEW.revision<>OLD.revision+1 OR NEW.updated_at<OLD.updated_at
+  BEGIN SELECT RAISE(ABORT,'v54 check revision must advance once'); END;
+CREATE TRIGGER adventure_check_candidate_batches_v54_update BEFORE UPDATE ON adventure_check_candidate_batches_v54 BEGIN SELECT RAISE(ABORT,'v54 check candidates are immutable'); END;
+CREATE TRIGGER adventure_check_candidate_batches_v54_delete BEFORE DELETE ON adventure_check_candidate_batches_v54 BEGIN SELECT RAISE(ABORT,'v54 check candidates are immutable'); END;
+CREATE TRIGGER adventure_check_candidates_v54_update BEFORE UPDATE ON adventure_check_candidates_v54 BEGIN SELECT RAISE(ABORT,'v54 check candidates are immutable'); END;
+CREATE TRIGGER adventure_check_candidates_v54_delete BEFORE DELETE ON adventure_check_candidates_v54 BEGIN SELECT RAISE(ABORT,'v54 check candidates are immutable'); END;
+CREATE TRIGGER adventure_check_executions_v54_update BEFORE UPDATE ON adventure_check_executions_v54 BEGIN SELECT RAISE(ABORT,'v54 check executions are immutable'); END;
+CREATE TRIGGER adventure_check_executions_v54_delete BEFORE DELETE ON adventure_check_executions_v54 BEGIN SELECT RAISE(ABORT,'v54 check executions are immutable'); END;
+CREATE TABLE adventure_inventory_candidate_batches_v55 (
+  batch_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  projection_json TEXT NOT NULL CHECK(json_valid(projection_json) AND json_type(projection_json)='object'),
+  projection_digest TEXT NOT NULL CHECK(length(projection_digest)=64 AND projection_digest NOT GLOB '*[^0-9a-f]*'),
+  candidate_count INTEGER NOT NULL CHECK(candidate_count BETWEEN 0 AND 512), issued_at TEXT NOT NULL,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_inventory_candidates_v55 (
+  candidate_id TEXT PRIMARY KEY, candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64 AND candidate_digest NOT GLOB '*[^0-9a-f]*'),
+  batch_id TEXT NOT NULL, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, session_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL, principal_id TEXT NOT NULL, inventory_revision INTEGER NOT NULL,
+  item_label TEXT NOT NULL CHECK(length(item_label) BETWEEN 1 AND 200), action TEXT NOT NULL CHECK(action IN('equip','unequip','drop','gift','consume')),
+  quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 1000000), slot TEXT, recipient_label TEXT,
+  confirmation_required INTEGER NOT NULL CHECK(confirmation_required IN(0,1)), effect_kind TEXT NOT NULL CHECK(effect_kind IN('inventory-only','none')),
+  private_command_json TEXT NOT NULL CHECK(json_valid(private_command_json) AND json_type(private_command_json)='object'), issued_at TEXT NOT NULL,
+  UNIQUE(turn_id,candidate_digest), FOREIGN KEY(batch_id) REFERENCES adventure_inventory_candidate_batches_v55(batch_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_inventory_proposal_bindings_v55 (
+  proposal_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, candidate_id TEXT NOT NULL UNIQUE,
+  candidate_digest TEXT NOT NULL, provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL,
+  execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,proposal_id),
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_inventory_candidates_v55(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_inventory_executions_v55 (
+  execution_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  proposal_id TEXT NOT NULL UNIQUE, provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL,
+  selection_json TEXT NOT NULL CHECK(json_valid(selection_json) AND json_type(selection_json)='object'), selection_digest TEXT NOT NULL CHECK(length(selection_digest)=64),
+  provider_request_digest TEXT NOT NULL CHECK(length(provider_request_digest)=64), provider_response_digest TEXT NOT NULL CHECK(length(provider_response_digest)=64),
+  inventory_command_id TEXT NOT NULL, actor_id TEXT NOT NULL, revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
+  public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'), result_digest TEXT NOT NULL CHECK(length(result_digest)=64), occurred_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
+  FOREIGN KEY(candidate_id) REFERENCES adventure_inventory_candidates_v55(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_inventory_proposal_bindings_v55(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id,inventory_command_id,revision_after) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT
+);
+CREATE TRIGGER adventure_inventory_batches_v55_update BEFORE UPDATE ON adventure_inventory_candidate_batches_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory candidates are immutable'); END;
+CREATE TRIGGER adventure_inventory_batches_v55_delete BEFORE DELETE ON adventure_inventory_candidate_batches_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory candidates are immutable'); END;
+CREATE TRIGGER adventure_inventory_candidates_v55_update BEFORE UPDATE ON adventure_inventory_candidates_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory candidates are immutable'); END;
+CREATE TRIGGER adventure_inventory_candidates_v55_delete BEFORE DELETE ON adventure_inventory_candidates_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory candidates are immutable'); END;
+CREATE TRIGGER adventure_inventory_bindings_v55_update BEFORE UPDATE ON adventure_inventory_proposal_bindings_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory bindings are immutable'); END;
+CREATE TRIGGER adventure_inventory_bindings_v55_delete BEFORE DELETE ON adventure_inventory_proposal_bindings_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory bindings are immutable'); END;
+CREATE TRIGGER adventure_inventory_executions_v55_update BEFORE UPDATE ON adventure_inventory_executions_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory executions are immutable'); END;
+CREATE TRIGGER adventure_inventory_executions_v55_delete BEFORE DELETE ON adventure_inventory_executions_v55 BEGIN SELECT RAISE(ABORT,'v55 inventory executions are immutable'); END;
+CREATE TABLE adventure_exact_action_batches_v56 (
+  batch_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')),
+  projection_json TEXT NOT NULL CHECK(json_valid(projection_json) AND json_type(projection_json)='object'), projection_digest TEXT NOT NULL CHECK(length(projection_digest)=64),
+  candidate_count INTEGER NOT NULL CHECK(candidate_count BETWEEN 0 AND 512), issued_at TEXT NOT NULL, UNIQUE(turn_id,action_kind),
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_exact_action_candidates_v56 (
+  candidate_id TEXT PRIMARY KEY, candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64), batch_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, session_id TEXT NOT NULL, actor_id TEXT NOT NULL, principal_id TEXT NOT NULL,
+  action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')), public_json TEXT NOT NULL CHECK(json_valid(public_json) AND json_type(public_json)='object'),
+  private_json TEXT NOT NULL CHECK(json_valid(private_json) AND json_type(private_json)='object'), issued_at TEXT NOT NULL,
+  UNIQUE(turn_id,candidate_digest), FOREIGN KEY(batch_id) REFERENCES adventure_exact_action_batches_v56(batch_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT, FOREIGN KEY(principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_exact_action_proposal_bindings_v56 (
+  proposal_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, candidate_id TEXT NOT NULL UNIQUE,
+  candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64), action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')),
+  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,proposal_id), FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_exact_action_candidates_v56(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_exact_action_executions_v56 (
+  execution_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  proposal_id TEXT NOT NULL UNIQUE, action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')), provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL,
+  command_id TEXT NOT NULL, actor_id TEXT NOT NULL, revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
+  source_result_digest TEXT NOT NULL CHECK(length(source_result_digest)=64), public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'),
+  result_digest TEXT NOT NULL CHECK(length(result_digest)=64), occurred_at TEXT NOT NULL, linked_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
+  FOREIGN KEY(candidate_id) REFERENCES adventure_exact_action_candidates_v56(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_exact_action_proposal_bindings_v56(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT
+);
+CREATE TRIGGER adventure_exact_action_batches_v56_update BEFORE UPDATE ON adventure_exact_action_batches_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;
+CREATE TRIGGER adventure_exact_action_batches_v56_delete BEFORE DELETE ON adventure_exact_action_batches_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;
+CREATE TRIGGER adventure_exact_action_candidates_v56_update BEFORE UPDATE ON adventure_exact_action_candidates_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;
+CREATE TRIGGER adventure_exact_action_candidates_v56_delete BEFORE DELETE ON adventure_exact_action_candidates_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;
+CREATE TRIGGER adventure_exact_action_bindings_v56_update BEFORE UPDATE ON adventure_exact_action_proposal_bindings_v56 BEGIN SELECT RAISE(ABORT,'v56 action bindings are immutable'); END;
+CREATE TRIGGER adventure_exact_action_bindings_v56_delete BEFORE DELETE ON adventure_exact_action_proposal_bindings_v56 BEGIN SELECT RAISE(ABORT,'v56 action bindings are immutable'); END;
+CREATE TRIGGER adventure_exact_action_executions_v56_update BEFORE UPDATE ON adventure_exact_action_executions_v56 BEGIN SELECT RAISE(ABORT,'v56 action executions are immutable'); END;
+CREATE TRIGGER adventure_exact_action_executions_v56_delete BEFORE DELETE ON adventure_exact_action_executions_v56 BEGIN SELECT RAISE(ABORT,'v56 action executions are immutable'); END;
+CREATE TABLE campaign_npc_shop_bindings_v57 (
+  campaign_id TEXT NOT NULL, npc_id TEXT NOT NULL, shop_id TEXT NOT NULL,
+  bound_at TEXT NOT NULL, bound_by_principal_id TEXT NOT NULL,
+  PRIMARY KEY(campaign_id,npc_id), UNIQUE(campaign_id,shop_id,npc_id),
+  FOREIGN KEY(campaign_id,npc_id) REFERENCES campaign_npcs_v28(campaign_id,npc_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,shop_id) REFERENCES rpg_shop_definitions_v25(campaign_id,shop_id) ON DELETE RESTRICT,
+  FOREIGN KEY(bound_by_principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE TABLE rpg_shop_buy_policies_v57 (
+  campaign_id TEXT NOT NULL, shop_id TEXT NOT NULL, stock_id TEXT NOT NULL,
+  payout_unit_minor INTEGER NOT NULL CHECK(payout_unit_minor BETWEEN 0 AND 9007199254740991),
+  currency_code TEXT NOT NULL, accepted_at TEXT NOT NULL, accepted_by_principal_id TEXT NOT NULL,
+  PRIMARY KEY(campaign_id,shop_id,stock_id),
+  FOREIGN KEY(campaign_id,stock_id,shop_id,currency_code) REFERENCES rpg_shop_stock_v25(campaign_id,stock_id,shop_id,currency_code) ON DELETE RESTRICT,
+  FOREIGN KEY(accepted_by_principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE TABLE campaign_administration_integrations_v59 (
+  campaign_id TEXT PRIMARY KEY REFERENCES campaigns(id) ON DELETE RESTRICT,
+  ruleset_id TEXT, ruleset_version TEXT, ruleset_digest TEXT CHECK(ruleset_digest IS NULL OR length(ruleset_digest)=64),
+  safety_revision INTEGER NOT NULL DEFAULT 0 CHECK(safety_revision BETWEEN 0 AND 9007199254740991),
+  hard_limits_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(hard_limits_json) AND json_type(hard_limits_json)='array'),
+  veils_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(veils_json) AND json_type(veils_json)='array'),
+  pvp_policy TEXT NOT NULL DEFAULT 'explicit-consent' CHECK(pvp_policy IN('disallowed','fade-to-black','explicit-consent','allowed')),
+  romance_policy TEXT NOT NULL DEFAULT 'fade-to-black' CHECK(romance_policy IN('disallowed','fade-to-black','explicit-consent','allowed')),
+  lethality_policy TEXT NOT NULL DEFAULT 'consent-required' CHECK(lethality_policy IN('nonlethal-default','consent-required','rules-as-written')),
+  paused INTEGER NOT NULL DEFAULT 0 CHECK(paused IN(0,1)), updated_at TEXT NOT NULL
+);
+CREATE TABLE campaign_administration_integration_commands_v59 (
+  command_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL REFERENCES campaigns(id) ON DELETE RESTRICT,
+  principal_id TEXT NOT NULL REFERENCES principals(id) ON DELETE RESTRICT,
+  operation TEXT NOT NULL CHECK(operation IN('associate-vendor','set-buy-policy','select-ruleset','update-safety','pause','resume','skip','rewind')),
+  idempotency_key TEXT NOT NULL, expected_revision INTEGER NOT NULL, request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+  receipt_json TEXT NOT NULL CHECK(json_valid(receipt_json)), occurred_at TEXT NOT NULL,
+  UNIQUE(campaign_id,idempotency_key)
+);
+CREATE INDEX campaign_administration_integration_commands_v59_campaign ON campaign_administration_integration_commands_v59(campaign_id,occurred_at,command_id);
+CREATE TABLE rpg_vendor_sale_quotes_v57 (
+  quote_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, shop_id TEXT NOT NULL, stock_id TEXT NOT NULL,
+  actor_id TEXT NOT NULL, entry_id TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity BETWEEN 1 AND 1000000),
+  disposition TEXT NOT NULL CHECK(disposition IN('sell','give')), unit_price_minor INTEGER NOT NULL CHECK(unit_price_minor BETWEEN 0 AND 9007199254740991),
+  currency_code TEXT NOT NULL, inventory_revision INTEGER NOT NULL, quoted_at TEXT NOT NULL, expires_at TEXT NOT NULL CHECK(expires_at>quoted_at),
+  CHECK((disposition='give' AND unit_price_minor=0) OR (disposition='sell' AND unit_price_minor>0)),
+  UNIQUE(campaign_id,quote_id,actor_id,shop_id),
+  FOREIGN KEY(campaign_id,shop_id) REFERENCES rpg_shop_definitions_v25(campaign_id,shop_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,stock_id,shop_id,currency_code) REFERENCES rpg_shop_stock_v25(campaign_id,stock_id,shop_id,currency_code) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE rpg_vendor_sale_receipts_v57 (
+  sale_id TEXT PRIMARY KEY, quote_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, shop_id TEXT NOT NULL,
+  seller_actor_id TEXT NOT NULL, command_id TEXT NOT NULL, resulting_revision INTEGER NOT NULL,
+  disposition TEXT NOT NULL CHECK(disposition IN('sell','give')), quantity INTEGER NOT NULL,
+  total_json TEXT NOT NULL CHECK(json_valid(total_json) AND json_type(total_json)='object'), sold_at TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+  FOREIGN KEY(campaign_id,quote_id,seller_actor_id,shop_id) REFERENCES rpg_vendor_sale_quotes_v57(campaign_id,quote_id,actor_id,shop_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,seller_actor_id,command_id,resulting_revision) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TRIGGER rpg_vendor_sale_quotes_v57_update BEFORE UPDATE ON rpg_vendor_sale_quotes_v57 BEGIN SELECT RAISE(ABORT,'vendor sale quotes are immutable'); END;
+CREATE TRIGGER rpg_vendor_sale_quotes_v57_delete BEFORE DELETE ON rpg_vendor_sale_quotes_v57 BEGIN SELECT RAISE(ABORT,'vendor sale quotes are immutable'); END;
+CREATE TRIGGER rpg_vendor_sale_receipts_v57_update BEFORE UPDATE ON rpg_vendor_sale_receipts_v57 BEGIN SELECT RAISE(ABORT,'vendor sale receipts are immutable'); END;
+CREATE TRIGGER rpg_vendor_sale_receipts_v57_delete BEFORE DELETE ON rpg_vendor_sale_receipts_v57 BEGIN SELECT RAISE(ABORT,'vendor sale receipts are immutable'); END;
+CREATE TABLE adventure_commerce_batches_v57 (
+  batch_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  projection_json TEXT NOT NULL CHECK(json_valid(projection_json) AND json_type(projection_json)='object'), projection_digest TEXT NOT NULL CHECK(length(projection_digest)=64),
+  candidate_count INTEGER NOT NULL CHECK(candidate_count BETWEEN 0 AND 512), issued_at TEXT NOT NULL,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_commerce_candidates_v57 (
+  candidate_id TEXT PRIMARY KEY, candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64), batch_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL, session_id TEXT NOT NULL, actor_id TEXT NOT NULL, principal_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK(action IN('buy','sell','give')), public_json TEXT NOT NULL CHECK(json_valid(public_json) AND json_type(public_json)='object'),
+  private_json TEXT NOT NULL CHECK(json_valid(private_json) AND json_type(private_json)='object'), issued_at TEXT NOT NULL,
+  UNIQUE(turn_id,candidate_digest), FOREIGN KEY(batch_id) REFERENCES adventure_commerce_batches_v57(batch_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id) REFERENCES campaign_actors(campaign_id,id) ON DELETE RESTRICT,
+  FOREIGN KEY(principal_id) REFERENCES principals(id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_commerce_bindings_v57 (
+  proposal_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, candidate_id TEXT NOT NULL UNIQUE,
+  candidate_digest TEXT NOT NULL, provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,proposal_id), FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_commerce_candidates_v57(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT
+);
+CREATE TABLE adventure_commerce_executions_v57 (
+  execution_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, proposal_id TEXT NOT NULL UNIQUE,
+  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, command_id TEXT NOT NULL, actor_id TEXT NOT NULL,
+  revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1), source_result_digest TEXT NOT NULL CHECK(length(source_result_digest)=64),
+  public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'), result_digest TEXT NOT NULL CHECK(length(result_digest)=64), occurred_at TEXT NOT NULL,
+  FOREIGN KEY(candidate_id) REFERENCES adventure_commerce_candidates_v57(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_commerce_bindings_v57(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,actor_id,command_id,revision_after) REFERENCES rpg_m15_receipts_v25(campaign_id,actor_id,command_id,resulting_revision) ON DELETE RESTRICT
+);
+CREATE TRIGGER adventure_commerce_batches_v57_update BEFORE UPDATE ON adventure_commerce_batches_v57 BEGIN SELECT RAISE(ABORT,'v57 commerce candidates are immutable'); END;
+CREATE TRIGGER adventure_commerce_candidates_v57_update BEFORE UPDATE ON adventure_commerce_candidates_v57 BEGIN SELECT RAISE(ABORT,'v57 commerce candidates are immutable'); END;
+CREATE TRIGGER adventure_commerce_bindings_v57_update BEFORE UPDATE ON adventure_commerce_bindings_v57 BEGIN SELECT RAISE(ABORT,'v57 commerce bindings are immutable'); END;
+CREATE TRIGGER adventure_commerce_executions_v57_update BEFORE UPDATE ON adventure_commerce_executions_v57 BEGIN SELECT RAISE(ABORT,'v57 commerce executions are immutable'); END;
 INSERT INTO "principals" ("id", "display_name", "is_local") VALUES ('local-owner', 'Local owner', 1);
 INSERT INTO "application_owner" ("singleton", "principal_id") VALUES (1, 'local-owner');
 INSERT INTO "rpg_effect_modifier_vocabulary_v26" ("modifier_kind") VALUES ('flat');
@@ -5096,3 +5498,65 @@ INSERT INTO "rpg_effect_modifier_vocabulary_v26" ("modifier_kind") VALUES ('adva
 INSERT INTO "rpg_effect_modifier_vocabulary_v26" ("modifier_kind") VALUES ('resistance');
 INSERT INTO "rpg_effect_modifier_vocabulary_v26" ("modifier_kind") VALUES ('vulnerability');
 INSERT INTO "rpg_effect_modifier_vocabulary_v26" ("modifier_kind") VALUES ('immunity');
+CREATE TABLE tactical_maps_v58 (
+  map_id TEXT PRIMARY KEY CHECK(length(map_id) BETWEEN 1 AND 128 AND map_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
+  campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, mode TEXT NOT NULL CHECK(mode IN('exploration','combat')),
+  encounter_id TEXT, active INTEGER NOT NULL CHECK(active IN(0,1)), map_revision INTEGER NOT NULL,
+  token_revision INTEGER NOT NULL DEFAULT 0, width INTEGER NOT NULL CHECK(width BETWEEN 5 AND 500), height INTEGER NOT NULL CHECK(height BETWEEN 5 AND 500),
+  algorithm TEXT NOT NULL CHECK(algorithm IN('dungeon-v1','cave-v1','arena-v1')), seed TEXT NOT NULL CHECK(length(seed) BETWEEN 1 AND 256),
+  provenance_hash TEXT NOT NULL CHECK(length(provenance_hash)=64), tiles_json TEXT NOT NULL CHECK(json_valid(tiles_json) AND json_type(tiles_json)='array'),
+  created_at TEXT NOT NULL,
+  CHECK((mode='combat' AND encounter_id IS NOT NULL) OR (mode='exploration' AND encounter_id IS NULL)),
+  UNIQUE(campaign_id,session_id,mode,map_revision), UNIQUE(campaign_id,session_id,map_id),
+  FOREIGN KEY(session_id) REFERENCES campaign_sessions(session_id) ON DELETE RESTRICT,
+  FOREIGN KEY(encounter_id) REFERENCES encounter(encounter_id) ON DELETE RESTRICT
+);
+CREATE UNIQUE INDEX uq_tactical_maps_v58_active ON tactical_maps_v58(session_id,mode) WHERE active=1;
+CREATE TABLE tactical_map_tokens_v58 (
+  map_id TEXT NOT NULL, token_id TEXT NOT NULL, actor_id TEXT, combatant_id TEXT, label TEXT NOT NULL,
+  x INTEGER NOT NULL, y INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
+  disposition TEXT NOT NULL CHECK(disposition IN('friendly','neutral','hostile')), hidden INTEGER NOT NULL CHECK(hidden IN(0,1)), state_revision INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(map_id,token_id), UNIQUE(map_id,actor_id), UNIQUE(map_id,combatant_id),
+  FOREIGN KEY(map_id) REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT,
+  FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT,
+  FOREIGN KEY(combatant_id) REFERENCES combatant(combatant_id) ON DELETE RESTRICT
+);
+CREATE TABLE tactical_map_exploration_v58 (
+  map_id TEXT NOT NULL, actor_id TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL, explored_at TEXT NOT NULL,
+  PRIMARY KEY(map_id,actor_id,x,y), FOREIGN KEY(map_id) REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT,
+  FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT
+);
+CREATE TABLE tactical_map_previews_v58 (
+  preview_id TEXT PRIMARY KEY, map_id TEXT NOT NULL, actor_id TEXT NOT NULL, token_id TEXT NOT NULL,
+  destination_x INTEGER NOT NULL, destination_y INTEGER NOT NULL, map_revision INTEGER NOT NULL, token_revision INTEGER NOT NULL,
+  authority_revision INTEGER NOT NULL, path_json TEXT NOT NULL CHECK(json_valid(path_json) AND json_type(path_json)='array'), path_cost_feet INTEGER NOT NULL, budget_feet INTEGER NOT NULL, created_at TEXT NOT NULL,
+  turn_id TEXT REFERENCES combat_turn_economy_v60(turn_id) ON DELETE RESTRICT,
+  FOREIGN KEY(map_id,token_id) REFERENCES tactical_map_tokens_v58(map_id,token_id) ON DELETE RESTRICT,
+  FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT
+);
+CREATE TABLE tactical_map_commands_v58 (
+  map_id TEXT NOT NULL, command_id TEXT NOT NULL, principal_id TEXT NOT NULL, actor_id TEXT,
+  command_type TEXT NOT NULL CHECK(command_type IN('generate','move')), idempotency_key TEXT NOT NULL,
+  request_json TEXT NOT NULL CHECK(json_valid(request_json) AND json_type(request_json)='object'), result_json TEXT NOT NULL CHECK(json_valid(result_json) AND json_type(result_json)='object'), occurred_at TEXT NOT NULL,
+  PRIMARY KEY(map_id,command_id), UNIQUE(map_id,idempotency_key), FOREIGN KEY(map_id) REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT,
+  FOREIGN KEY(principal_id) REFERENCES principals(id) ON DELETE RESTRICT, FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT
+);
+CREATE TABLE tactical_map_generation_keys_v58 (
+  campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, mode TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+  request_json TEXT NOT NULL, map_id TEXT NOT NULL, PRIMARY KEY(campaign_id,session_id,mode,idempotency_key),
+  FOREIGN KEY(map_id) REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT
+);
+CREATE TABLE tactical_map_combat_movement_v58 (
+  map_id TEXT NOT NULL, encounter_id TEXT NOT NULL, round_number INTEGER NOT NULL, actor_id TEXT NOT NULL, used_feet INTEGER NOT NULL CHECK(used_feet>=0),
+  PRIMARY KEY(map_id,encounter_id,round_number,actor_id), FOREIGN KEY(map_id) REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT,
+  FOREIGN KEY(encounter_id) REFERENCES encounter(encounter_id) ON DELETE RESTRICT, FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT
+);
+CREATE TRIGGER tactical_map_commands_v58_update BEFORE UPDATE ON tactical_map_commands_v58 BEGIN SELECT RAISE(ABORT,'tactical map commands are immutable'); END;
+CREATE TRIGGER tactical_map_commands_v58_delete BEFORE DELETE ON tactical_map_commands_v58 BEGIN SELECT RAISE(ABORT,'tactical map commands are immutable'); END;
+CREATE TRIGGER tactical_map_dnd_movement_v60_block BEFORE UPDATE OF x,y ON tactical_map_tokens_v58
+  WHEN (NEW.x<>OLD.x OR NEW.y<>OLD.y) AND EXISTS(SELECT 1 FROM tactical_maps_v58 WHERE map_id=OLD.map_id AND mode='exploration') AND EXISTS(
+    SELECT 1 FROM combatant participant JOIN encounter combat USING(encounter_id)
+      JOIN campaign_ruleset_bindings_v60 binding ON binding.campaign_id=combat.campaign_id
+    WHERE combat.status='active' AND binding.ruleset_id='dnd-5e'
+      AND (participant.combatant_id=OLD.combatant_id OR participant.actor_id=OLD.actor_id))
+  BEGIN SELECT RAISE(ABORT,'exploration movement is unavailable during D&D combat'); END;

@@ -25,6 +25,8 @@ export const characterDraftHttpViewSchema = z.object({
   status: characterDraftStatusSchema, durability: characterDraftDurabilitySchema,
   expiresAt: utcIsoTimestampSchema.nullable(), effectivelyExpired: z.boolean(), revision: revisionSchema,
   rulesProfileId: rulesProfileIdSchema,
+  rulesetId: resourceIdSchema,
+  rulesetVersion: z.string().trim().min(1).max(100),
   pins: z.array(z.object({ packId: contentPackIdSchema, packVersion: contentPackVersionSchema, publicationDigest: contentDigestSchema }).strict()).min(1).max(32),
   allocation: characterBuilderAllocationSchema, selections: characterBuilderSelectionsSchema,
   choiceGroups: z.array(characterBuilderChoiceGroupSchema).length(4), completion: characterBuilderCompletionSchema,

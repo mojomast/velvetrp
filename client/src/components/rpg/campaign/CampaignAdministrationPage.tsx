@@ -12,6 +12,8 @@ import type {
   PublicationSummary,
   CampaignLifecycleStatus,
   CampaignMemberRole,
+  CampaignAdministrationIntegrations,
+  AdministrationIntegrationReceipt,
 } from "@velvet/contracts";
 import {
   ApiError,
@@ -32,12 +34,20 @@ import {
   removeCampaignAdministrationMembership,
   updateCampaignAdministration,
   updateCampaignAdministrationMembership,
+  getCampaignAdministrationIntegrations,
+  associateCampaignVendor,
+  configureCampaignBuyPolicy,
+  selectCampaignRuleset,
+  updateCampaignSessionZeroSafety,
+  requestCampaignSafetyAction,
 } from "../../../api";
 import { CampaignSettingsForm } from "./CampaignSettingsForm";
 import { MembershipManager } from "./MembershipManager";
 import { TimelineCheckpointPanel } from "./TimelineCheckpointPanel";
 import { CampaignContentPicker } from "../content/CampaignContentPicker";
 import { CampaignGeneratorPanel } from "./CampaignGeneratorPanel";
+import { GenerationRecoveryPanel, RulesetAdministrationPanel, SessionZeroSafetyPanel,
+  VendorShopAdministrationPanel } from "../administration";
 
 export interface CampaignAdministrationPageProps {
   campaignId: string;
@@ -50,8 +60,8 @@ export interface CampaignAdministrationPageProps {
   onHeadingFocused?: (request: number) => void;
 }
 
-type MutationKind = "settings" | "lifecycle" | "archive" | "membership" | "checkpoint" | "fork" | "content";
-type Receipt = CampaignAdministrationReceipt | CampaignHistoryHttpCommandReceipt | ContentCatalogHttpCampaignContentReceipt;
+type MutationKind = "settings" | "lifecycle" | "archive" | "membership" | "checkpoint" | "fork" | "content" | "integration";
+type Receipt = CampaignAdministrationReceipt | CampaignHistoryHttpCommandReceipt | ContentCatalogHttpCampaignContentReceipt | AdministrationIntegrationReceipt;
 interface CampaignMutationEntry {
   token: symbol;
   kind: MutationKind;
@@ -124,6 +134,8 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
   const [catalogPack, setCatalogPack] = useState<ContentCatalogHttpCampaignPack | null>(null);
   const [catalogError, setCatalogError] = useState("");
   const [catalogInspecting, setCatalogInspecting] = useState(false);
+  const [integrations, setIntegrations] = useState<CampaignAdministrationIntegrations | null>(null);
+  const [openDraftId, setOpenDraftId] = useState<string | null>(null);
   const mountedRef = useRef(true);
   const activeCampaignRef = useRef(campaignId);
   const generationRef = useRef(0);
@@ -157,12 +169,13 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         listCampaignTimelines(requestedCampaignId),
         listCampaignCheckpoints(requestedCampaignId),
       ]);
-      const [membershipResult, detailResult, contentResult, publicationsResult] = await Promise.allSettled([
+      const [membershipResult, detailResult, contentResult, publicationsResult, integrationsResult] = await Promise.allSettled([
         administration.campaign.actorRole === "owner"
           ? listCampaignMemberships(requestedCampaignId) : Promise.resolve({ memberships: [] }),
         getCampaignDetail(requestedCampaignId),
         getCampaignContent(requestedCampaignId),
         listAllContentPackPublications(),
+        getCampaignAdministrationIntegrations(requestedCampaignId),
       ]);
       if (membershipResult.status === "rejected") throw membershipResult.reason;
       if (!mountedRef.current || activeCampaignRef.current !== requestedCampaignId
@@ -176,6 +189,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
       setCheckpoints(checkpointData.checkpoints);
       setCatalogContent(contentResult.status === "fulfilled" ? contentResult.value.content : null);
       setCatalogPublications(publicationsResult.status === "fulfilled" ? publicationsResult.value.publications : []);
+      setIntegrations(integrationsResult.status === "fulfilled" ? integrationsResult.value : null);
       setCatalogError((contentResult.status === "rejected" && !(contentResult.reason instanceof ApiError && contentResult.reason.status === 404))
         || (publicationsResult.status === "rejected" && !(publicationsResult.reason instanceof ApiError && publicationsResult.reason.status === 404))
         ? "Campaign content could not be loaded. Refresh authoritative administration before changing pins." : "");
@@ -225,6 +239,7 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
     setCampaignName(null); setCampaignNameLoading(false);
     setNotice(""); setError("");
     setCatalogContent(null); setCatalogPublications([]); setCatalogPack(null); setCatalogError(""); setCatalogInspecting(false);
+    setIntegrations(null); setOpenDraftId(null);
     const currentEntry = campaignMutationRegistry.get(campaignId) ?? null;
     setMutationEntry(currentEntry);
     if (currentEntry?.phase === "uncertain") setError(currentEntry.message);
@@ -372,7 +387,36 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         onCreateCheckpoint={(label, timelineId, timelineRevision) => void mutate("checkpoint", () => createCampaignCheckpoint(campaignId, { label, timelineId, timelineRevision, expectedRevision, idempotencyKey: idempotencyKey("checkpoint") }))}
         onFork={(checkpoint) => void mutate("fork", () => forkCampaignTimeline(campaignId, { checkpointId: checkpoint.id, expectedRevision, idempotencyKey: idempotencyKey("fork") }, checkpoint))} />
 
-      {owner && <CampaignGeneratorPanel campaignId={campaignId} disabled={mutationLocked || refreshing} />}
+      {integrations && <VendorShopAdministrationPanel actorRole={integrations.actorRole === "observer" ? "player" : integrations.actorRole} campaignRevision={integrations.revision}
+        npcs={integrations.commerce.npcs} shops={integrations.commerce.shops} associations={integrations.commerce.associations} buyPolicies={integrations.commerce.buyPolicies}
+        disabled={mutationLocked || refreshing} api={{
+          associateVendor: (input) => void mutate("integration", () => associateCampaignVendor(campaignId, { ...input, idempotencyKey: idempotencyKey("vendor") })),
+          configureBuyPolicy: (input) => void mutate("integration", () => configureCampaignBuyPolicy(campaignId, { ...input, idempotencyKey: idempotencyKey("buy-policy") })),
+          reconcileAssociation: () => void load(true, true), reconcileBuyPolicy: () => void load(true, true),
+        }} />}
+
+      {integrations && <RulesetAdministrationPanel actorRole={integrations.actorRole === "observer" ? "player" : integrations.actorRole}
+        current={integrations.rulesets.current} available={integrations.rulesets.available} expectedRevision={integrations.revision}
+        selectionAllowed={integrations.rulesets.mechanicallyEmpty} selectionWarning={integrations.rulesets.selectionWarning}
+        disabled={mutationLocked || refreshing} api={{ selectRuleset: (input) => void mutate("integration", () => selectCampaignRuleset(campaignId,
+          { ...input, migrationConfirmed: true, idempotencyKey: idempotencyKey("ruleset") })), reconcileSelection: () => void load(true, true) }} />}
+
+      {integrations && <SessionZeroSafetyPanel actorRole={integrations.actorRole === "observer" ? "player" : integrations.actorRole}
+        settings={integrations.safety} disabled={mutationLocked || refreshing} safetyActionDisabled={mutationLocked || refreshing}
+        api={{ updateSettings: (input) => void mutate("integration", () => updateCampaignSessionZeroSafety(campaignId, { ...input, idempotencyKey: idempotencyKey("safety") })),
+          reconcileSettings: () => void load(true, true),
+          pause: () => void mutate("integration", () => requestCampaignSafetyAction(campaignId, { action: "pause", confirmed: true, expectedRevision: integrations.revision, idempotencyKey: idempotencyKey("pause") })),
+          resume: () => void mutate("integration", () => requestCampaignSafetyAction(campaignId, { action: "resume", confirmed: true, expectedRevision: integrations.revision, idempotencyKey: idempotencyKey("resume") })),
+          skip: () => void mutate("integration", () => requestCampaignSafetyAction(campaignId, { action: "skip", confirmed: true, expectedRevision: integrations.revision, idempotencyKey: idempotencyKey("skip") })),
+          rewind: () => void mutate("integration", () => requestCampaignSafetyAction(campaignId, { action: "rewind", confirmed: true, expectedRevision: integrations.revision, idempotencyKey: idempotencyKey("rewind") })),
+        }} />}
+
+      {integrations && <GenerationRecoveryPanel actorRole={integrations.actorRole === "observer" ? "player" : integrations.actorRole}
+        drafts={integrations.generation.drafts.map((draft) => ({ ...draft, jobId: draft.jobId ?? "unlinked" }))} jobs={integrations.generation.jobs}
+        retrySupported={integrations.generation.retrySupported} disabled={mutationLocked || refreshing}
+        api={{ openDraft: setOpenDraftId, reconcileJob: () => void load(true, true), retryFailedJob: () => undefined }} />}
+
+      {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <CampaignGeneratorPanel campaignId={campaignId} openDraftId={openDraftId} disabled={mutationLocked || refreshing} />}
 
       {(catalogContent || catalogError) && <section className="admin-section campaign-catalog-section">
         {catalogContent && <CampaignContentPicker actorRole={campaign.actorRole} current={catalogContent} publications={catalogPublications} expectedRevision={expectedRevision} busy={busy || catalogInspecting} mutationLocked={mutationLocked}

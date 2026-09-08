@@ -25,6 +25,8 @@ const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RP
 function repository(overrides:Record<string,unknown>={}){
   return {resolveCombatAction:()=>({campaignId:"campaign",encounterId:"combat",resolution,combat,
     receipt:{commandId:"private",idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}),
+  executeCombatEnemyTurn:()=>({campaignId:"campaign",encounterId:"combat",resolution,combat,
+    receipt:{commandId:"private",idempotencyKey:"enemy-turn",revisionBefore:2,revisionAfter:3,occurredAt:at}}),
   endCombat:()=>({campaignId:"campaign",encounterId:"combat",encounter,rewards:[reward],
     receipt:{commandId:"private",idempotencyKey:"end",revisionBefore:3,revisionAfter:4,occurredAt:at}}),
   getCombatCommandResult:()=>({operation:"action",result:{resolution,combat:Object.fromEntries(Object.entries(combat).filter(([key])=>key!=="campaignId"&&key!=="encounterId")),receipt:{idempotencyKey:"attack",revisionBefore:2,revisionAfter:3,occurredAt:at}}}),
@@ -60,6 +62,18 @@ describe("M2.9 combat command routes",()=>{
       rewards:[Object.fromEntries(Object.entries(reward).filter(([key])=>key!=="campaignId"&&key!=="encounterId"))],
       receipt:{idempotencyKey:"end",revisionBefore:3,revisionAfter:4,occurredAt:at}});
     expect(calls).toEqual([["action","local-owner","combat",actionBody],["end","local-owner","combat",endBody]]);await app.close();
+  });
+
+  it("executes an enemy turn from a closed server-owned command",async()=>{
+    enable();const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repository({executeCombatEnemyTurn:(...args:any[])=>{
+      calls.push(args);return {campaignId:"campaign",encounterId:"combat",resolution,combat,
+        receipt:{commandId:"private",idempotencyKey:"enemy-turn",revisionBefore:2,revisionAfter:3,occurredAt:at}};}})});
+    const body={expectedRevision:2,idempotencyKey:"enemy-turn"};
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/combats/combat/enemy-turn-commands",headers:{"content-type":"application/json"},payload:body});
+    expect(response.statusCode).toBe(200);expect(response.headers["cache-control"]).toBe("no-store");expect(calls).toEqual([["local-owner","combat",body]]);
+    expect((await app.inject({method:"POST",url:"/api/rpg/v1/combats/combat/enemy-turn-commands",headers:{"content-type":"application/json"},payload:{...body,targetIds:["actor-combatant"],damage:99}})).statusCode).toBe(400);
+    const stale=buildApp({campaignRepositoryFactory:()=>repository({executeCombatEnemyTurn:()=>{throw new EncounterStaleError();}})});
+    expect((await stale.inject({method:"POST",url:"/api/rpg/v1/combats/combat/enemy-turn-commands",headers:{"content-type":"application/json"},payload:body})).json()).toMatchObject({code:"RPG_COMBAT_STALE"});await stale.close();await app.close();
   });
 
   it("reads only an exact recipient-safe committed reward claim result",async()=>{

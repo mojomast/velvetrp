@@ -11,7 +11,10 @@ const refKey = (value: { packId: string; packVersion: string; kind: string; defi
   `${value.packId}\0${value.packVersion}\0${value.kind}\0${value.definitionId}`;
 
 /** Pure M1.4 preview. No repository, clock, IDs, RNG, network, or writes. */
-export function calculateCharacterProgression(input: ProgressionCalculatorInput): ProgressionPreview {
+export function calculateCharacterProgression(
+  input: ProgressionCalculatorInput,
+  rulesetIdentity?: { rulesetId: string; rulesetVersion: string },
+): ProgressionPreview {
   const value = progressionCalculatorInputSchema.parse(input);
   const thresholdLevel = value.profile.mode === "xp"
     ? value.profile.thresholds.filter((threshold) => threshold.xp <= value.totalXp).at(-1)!.level
@@ -43,8 +46,11 @@ export function calculateCharacterProgression(input: ProgressionCalculatorInput)
       }
     }
     const before = derived;
-    const after = calculateCharacterDerivedStats({ scores: value.derivedBase.scores, racialBonuses: {},
-      classHp: before.maxHp + step.mechanics.hpGain - Math.floor((value.derivedBase.scores.resolve - 10) / 2),
+    const durabilityScore="constitution" in value.derivedBase.scores
+      ? value.derivedBase.scores.constitution : value.derivedBase.scores.resolve;
+    if (durabilityScore === undefined) throw new Error("progression requires a durability ability score");
+    const after = calculateCharacterDerivedStats({ ...(rulesetIdentity ?? {}), scores: value.derivedBase.scores, racialBonuses: {},
+      classHp: before.maxHp + step.mechanics.hpGain - Math.floor((durabilityScore - 10) / 2),
       raceSpeed: value.derivedBase.raceSpeed, proficiencyBonus: step.mechanics.proficiencyBonus,
       spellcastingAttribute: value.derivedBase.spellcastingAttribute });
     const hpBefore = hp;

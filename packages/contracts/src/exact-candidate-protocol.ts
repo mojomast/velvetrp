@@ -48,6 +48,9 @@ export const exactCandidateSafeLabelSchema = z.object({
   format: z.literal("message-key-v1"),
   key: z.literal("candidate.actor.travel.label"),
   routeOption: canonicalIntegerSchema(1, MAX_EXACT_CANDIDATES_PER_RESPONSE),
+  /** Additive v1 metadata. Older persisted candidates intentionally omit it. */
+  destination: z.string().min(1).max(200).refine((value) => value.trim().length > 0, "destination must not be blank").optional(),
+  origin: z.string().min(1).max(200).refine((value) => value.trim().length > 0, "origin must not be blank").optional(),
 }).strict();
 export const exactCandidateSafeSummarySchema = z.object({
   format: z.literal("message-key-v1"),
@@ -375,6 +378,14 @@ export const providerSafeExactCandidateSchema = z.object({
   kind: z.literal("actor.travel"),
   version: exactCandidateVersionSchema,
   label: exactCandidateSafeLabelSchema,
+  /** Additive provider metadata. Historical persisted v48 projections omit it. */
+  semanticLabel: z.object({
+    action: z.literal("Travel"),
+    source: z.string().trim().min(1).max(200),
+    target: z.string().trim().min(1).max(200),
+    cost: z.null(),
+    consequence: z.string().trim().min(1).max(500),
+  }).strict().optional(),
   summary: exactCandidateSafeSummarySchema,
   confirmation: z.object({ required: z.boolean() }).strict(),
   quote: z.object({ kind: z.literal("not-applicable") }).strict(),
@@ -444,7 +455,7 @@ export function canonicalExactCandidateExecutionResultFrame(result:unknown):stri
   const parsed=exactCandidateExecutionResultSchema.parse(result);
   return canonicalAgentJson({domain:EXACT_CANDIDATE_EXECUTION_RESULT_FRAME,version:parsed.version,
     executionId:parsed.executionId,selection:parsed.selection,canonicalSelectionDigest:parsed.canonicalSelectionDigest,
-    linkedCandidate:parsed.linkedCandidate,actorTravelResult:parsed.actorTravelResult});
+    linkedCandidate:parsed.linkedCandidate,actorTravelResult:parsed.actorTravelResult} as never);
 }
 export function computeExactCandidateExecutionResultDigest(result:unknown,crypto:TrustedExactCandidateCrypto):string {
   return canonicalSha256DigestSchema.parse(crypto.sha256(canonicalExactCandidateExecutionResultFrame(result)));
@@ -468,11 +479,14 @@ export function projectExactCandidateForProvider(candidate: unknown, now: string
     || (parsed.confirmation.requirement === "required" && parsed.confirmation.decision.state === "rejected")) {
     throw new Error("candidate is not provider-selectable");
   }
+  if (!parsed.label.origin || !parsed.label.destination) throw new Error("candidate has no provider-safe semantic label");
   return providerSafeExactCandidateSchema.parse({
     candidateId: parsed.candidateId,
     kind: parsed.kind,
     version: parsed.version,
     label: parsed.label,
+    semanticLabel: { action: "Travel", source: parsed.label.origin, target: parsed.label.destination, cost: null,
+      consequence: `Move from ${parsed.label.origin} to ${parsed.label.destination}.` },
     summary: parsed.summary,
     confirmation: { required: parsed.confirmation.requirement === "required" },
     quote: parsed.quote,

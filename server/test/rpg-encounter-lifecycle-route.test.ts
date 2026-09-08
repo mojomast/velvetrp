@@ -15,7 +15,9 @@ afterEach(()=>{
 });
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";process.env.FEATURE_RPG_COMBAT="true";};
 function repository(overrides:Record<string,unknown>={}){
-  return {listEncounters:()=>[encounter],createEncounter:()=>({campaignId:"campaign",encounter,
+  return {listEncounters:()=>[encounter],getEncounterSetupCandidates:()=>({campaignId:"campaign",sessions:[{sessionId:"session"}],
+    actors:[{actorId:"actor",label:"Hero"}],enemies:[{template:{kind:"enemy-template" as const,packId:"pack",packVersion:"1.0.0",definitionId:"mite"},label:"Mite"}],
+    teams:{actor:"allies" as const,enemy:"enemies" as const}}),createEncounter:()=>({campaignId:"campaign",encounter,
     receipt:{commandId:"private",idempotencyKey:"prepare",revisionBefore:0,revisionAfter:1,occurredAt:at}}),
   startEncounter:()=>({campaignId:"campaign",encounterId:"encounter",combat,
     receipt:{commandId:"private",idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}}),
@@ -26,6 +28,9 @@ describe("M2.9 encounter lifecycle routes",()=>{
   it("uses fixed local ownership and returns only reviewed no-store projections",async()=>{
     enable();const calls:any[]=[];
     const app=buildApp({campaignRepositoryFactory:()=>repository({
+      getEncounterSetupCandidates:(...args:any[])=>{calls.push(["candidates",...args]);return {campaignId:"campaign",sessions:[{sessionId:"session"}],
+        actors:[{actorId:"actor",label:"Hero"}],enemies:[{template:{kind:"enemy-template" as const,packId:"pack",packVersion:"1.0.0",definitionId:"mite"},label:"Mite"}],
+        teams:{actor:"allies" as const,enemy:"enemies" as const}};},
       listEncounters:(...args:any[])=>{calls.push(["list",...args]);return [encounter];},
       createEncounter:(...args:any[])=>{calls.push(["create",...args]);return {campaignId:"campaign",encounter,
         receipt:{commandId:"private",idempotencyKey:"prepare",revisionBefore:0,revisionAfter:1,occurredAt:at}};},
@@ -33,6 +38,10 @@ describe("M2.9 encounter lifecycle routes",()=>{
         receipt:{commandId:"private",idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}};},
     })});
     const hostile={authorization:"Bearer attacker","x-principal-id":"attacker"};
+    const candidates=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/encounter-setup-candidates",headers:hostile});
+    expect(candidates.statusCode).toBe(200);expect(candidates.headers["cache-control"]).toBe("no-store");
+    expect(candidates.json()).toEqual({sessions:[{sessionId:"session"}],actors:[{actorId:"actor",label:"Hero"}],enemies:[{
+      template:{kind:"enemy-template",packId:"pack",packVersion:"1.0.0",definitionId:"mite"},label:"Mite"}],teams:{actor:"allies",enemy:"enemies"}});
     const list=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/encounters",headers:hostile});
     expect(list.statusCode).toBe(200);expect(list.headers["cache-control"]).toBe("no-store");
     expect(list.json()).toEqual({encounters:[Object.fromEntries(Object.entries(encounter).filter(([key])=>key!=="campaignId"))]});
@@ -44,7 +53,7 @@ describe("M2.9 encounter lifecycle routes",()=>{
       headers:{...hostile,"content-type":"application/json"},payload:{expectedRevision:1,idempotencyKey:"start"}});
     expect(started.statusCode).toBe(200);expect(started.json()).toEqual({combat:Object.fromEntries(Object.entries(combat)
       .filter(([key])=>key!=="campaignId"&&key!=="encounterId")),receipt:{idempotencyKey:"start",revisionBefore:1,revisionAfter:2,occurredAt:at}});
-    expect(calls).toEqual([["list","local-owner","campaign"],["create","local-owner","campaign",createBody],
+    expect(calls).toEqual([["candidates","local-owner","campaign"],["list","local-owner","campaign"],["create","local-owner","campaign",createBody],
       ["start","local-owner","encounter",{expectedRevision:1,idempotencyKey:"start"}]]);
     await app.close();
   });
@@ -56,6 +65,7 @@ describe("M2.9 encounter lifecycle routes",()=>{
     expect((await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/encounters"})).statusCode).toBe(404);
     expect(accesses).toBe(0);enable();
     expect((await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/encounters?x=1"})).statusCode).toBe(400);
+    expect((await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/encounter-setup-candidates?x=1"})).statusCode).toBe(400);
     expect((await app.inject({method:"POST",url:"/api/rpg/v1/campaigns/campaign/encounters",payload:"{}"})).statusCode).toBe(415);
     expect((await app.inject({method:"POST",url:"/api/rpg/v1/campaigns/campaign/encounters",headers:{"content-type":"application/json"},
       payload:{sessionId:"session",name:"Name",combatants:[{kind:"actor",actorId:"actor",team:"allies",hitPoints:10}],idempotencyKey:"prepare"}})).statusCode).toBe(400);

@@ -13,6 +13,10 @@ interface CampaignQuickPanelProps {
   selectedActorId: string | null;
   actors: readonly CampaignPlayActor[];
   api: CampaignQuickPanelApi;
+  refreshKey?: number;
+  canOpenSheet?: boolean;
+  onOpenSheet?: () => void;
+  openSheetButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
 type QuickState = {
@@ -21,7 +25,7 @@ type QuickState = {
   effects: ActorEffectsResponse | null;
 };
 
-export function CampaignQuickPanel({ campaignId, selectedActorId, actors, api }: CampaignQuickPanelProps) {
+export function CampaignQuickPanel({ campaignId, selectedActorId, actors, api, refreshKey = 0, canOpenSheet = false, onOpenSheet = () => undefined, openSheetButtonRef }: CampaignQuickPanelProps) {
   const [state, setState] = useState<QuickState>({ resources: null, inventory: null, effects: null });
   const [loading, setLoading] = useState(false);
   const [failures, setFailures] = useState(0);
@@ -47,11 +51,12 @@ export function CampaignQuickPanel({ campaignId, selectedActorId, actors, api }:
       setLoading(false);
     });
     return () => { current = false; };
-  }, [actors, api, campaignId, selectedActorId]);
+  }, [actors, api, campaignId, selectedActorId, refreshKey]);
 
   const actor = actors.find((candidate) => candidate.actorId === selectedActorId);
   return <aside id="campaign-quick-tools" className="campaign-quick-panel" aria-label="Character quick tools" tabIndex={-1}>
     <header><div><p className="eyebrow">ACTING CHARACTER</p><h2>{actor?.name ?? "No actor selected"}</h2></div>{loading && <span role="status">Refreshing...</span>}</header>
+    <div className="quick-sheet-action"><button ref={openSheetButtonRef} type="button" className="primary" disabled={!selectedActorId || !canOpenSheet} onClick={onOpenSheet}>Open character sheet</button>{selectedActorId && !canOpenSheet && <small>Available when play is ready and unambiguous.</small>}</div>
     {failures > 0 && <p className="quick-panel-warning" role="alert">{failures} character {failures === 1 ? "lane is" : "lanes are"} unavailable. No state was inferred.</p>}
     <section aria-labelledby="quick-party-heading"><div className="quick-section-heading"><h3 id="quick-party-heading">Party</h3><span>{actors.length}</span></div>{actors.length ? <ul className="quick-party-list">{actors.map((member) => <li className={member.actorId === selectedActorId ? "is-acting" : ""} key={member.actorId}>{member.name}<span>{member.actorId === selectedActorId ? "Acting" : "Available"}</span></li>)}</ul> : <p className="quick-empty">No controlled actors available.</p>}</section>
     <section aria-labelledby="quick-resources-heading"><div className="quick-section-heading"><h3 id="quick-resources-heading">Health & resources</h3><span>{state.resources?.resources.length ?? 0}</span></div>{state.resources?.resources.length ? <ul className="quick-resource-list">{state.resources.resources.map((resource) => <li key={resource.name}><div><strong>{resource.name}</strong><span>{resource.current} / {resource.max}</span></div><progress value={resource.current} max={Math.max(1, resource.max)} aria-label={`${resource.name}: ${resource.current} of ${resource.max}`} /></li>)}</ul> : <p className="quick-empty">{selectedActorId ? "No resource tracks available." : "Select an acting character."}</p>}</section>

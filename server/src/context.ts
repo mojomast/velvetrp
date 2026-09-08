@@ -1,4 +1,5 @@
 import type { LoreEntry, MemoryFact, Message, Session, SessionContextBasket } from "./types.js";
+import type { RulesetDescriptor } from "./rulesets/types.js";
 
 function compact(text: string, max = 180): string {
   const cleaned = text.replace(/\*+/g, "").replace(/\s+/g, " ").trim();
@@ -77,6 +78,8 @@ export interface CampaignAgentSpeakerPersona {
 /** A focused, already role-filtered persistence snapshot used only by server orchestrators. */
 export interface CampaignAgentContextSnapshot {
   campaignId: string;
+  /** Exact compiled ruleset selected by the campaign's authoritative binding. */
+  ruleset?: Readonly<{ id: string; version: string; descriptor: RulesetDescriptor }>;
   /** Active ancestry observed in the same snapshot as authority and legal actions. */
   timelineId: string;
   timelineRevision: number;
@@ -88,13 +91,15 @@ export interface CampaignAgentContextSnapshot {
   safetyControl: string[];
   humanCanon: string[];
   committedMechanics: string[];
+  /** Exact current actor location after audience visibility filtering. */
+  currentActorLocation: string | null;
   visibleWorld: string[];
   visibleCast: string[];
   visibleQuests: string[];
   legalActions: string[];
   privateTargetFacts: string[];
   /** Opaque provider selector cross-bound to one exact authoritative attribute. */
-  attributeCandidates: Array<{ candidateId:string; digest:string; commandAttributeId:string; currentValue:number }>;
+  attributeCandidates: Array<{ candidateId:string; digest:string; commandAttributeId:string; label?:string; currentValue:number }>;
   synthesizedSummaryFacts: string[];
   recap: string[];
   /** Structured encounter authority used to select tools; never rendered to HTTP. */
@@ -106,7 +111,7 @@ export interface CampaignAgentContextSnapshot {
     currentCombatantKind: "actor" | "enemy" | null;
     currentActorId: string | null;
     legalActionCandidates: Array<{ legalActionId:string; commandLegalActionId:string; digest:string;
-      kind:"attack"|"flee"|"end-turn"; targetId:string|null }>;
+      kind:"attack"|"flee"|"end-turn"; targetId:string|null; label?:string; targetLabel?:string|null }>;
   };
 }
 

@@ -11,10 +11,17 @@ export interface LegalActionTrayProps {
   onUseConsumable?:(action:UseConsumableLegalAction)=>void;
 }
 
-type SupportedKind = "attack" | "flee" | "end-turn";
+type SupportedKind = "attack" | "flee" | "end-turn" | "stabilize" | "death-save";
 const supported = (action: CombatLegalAction): action is CombatLegalAction & { kind: SupportedKind } =>
-  action.kind === "attack" || action.kind === "flee" || action.kind === "end-turn";
-const actionLabel = (kind: SupportedKind) => kind === "end-turn" ? "End turn" : kind[0]!.toUpperCase() + kind.slice(1);
+  action.kind === "attack" || action.kind === "flee" || action.kind === "end-turn" || action.kind === "stabilize" || action.kind === "death-save";
+const actionLabel = (kind: SupportedKind) => ({ attack: "Attack", flee: "Flee", "end-turn": "End turn", stabilize: "Stabilize", "death-save": "Make death save" })[kind];
+const actionExplanation = (kind: SupportedKind) => ({
+  attack: "The server resolves the attack and its outcome.",
+  flee: "The server decides whether leaving combat succeeds.",
+  "end-turn": "Ends this turn without a client-side outcome.",
+  stabilize: "Choose one unconscious ally from the server's allowlist. The server determines the stable outcome.",
+  "death-save": "The server rolls and records this death save. No roll is made in the client.",
+})[kind];
 
 /**
  * Builds every control from the current server allowlist. Unsupported protocol
@@ -33,7 +40,7 @@ export function LegalActionTray({ legalActions, consumableActions=[],combatantLa
     }
   }, [actions, selectedId]);
 
-  const requiresTarget = selected?.kind === "attack";
+   const requiresTarget = selected?.kind === "attack" || selected?.kind === "stabilize";
   const validSelection = Boolean(selected) && (!requiresTarget || (targetId !== null && selected.targetIds.includes(targetId)));
   function choose(action: typeof actions[number]) {
     setSelectedId(action.legalActionId); setTargetId(null); setReviewing(false);
@@ -49,14 +56,15 @@ export function LegalActionTray({ legalActions, consumableActions=[],combatantLa
         {consumableActions.map((action)=><button key={action.legalActionId} type="button" disabled={disabled||busy||!onUseConsumable}
           onClick={()=>onUseConsumable?.(action)}>Use {action.item.definitionId} on {combatantLabels.get(action.target.combatantId)??action.target.combatantId}</button>)}
       </div><p className="combat-restriction">Quantity 1 · Cost: {consumableActions[0]?.actionCost}. Each option has exactly one server-selected target.</p></section>}
-      {selected && selected.kind === "attack" && <fieldset className="legal-targets"><legend>Valid targets returned for this action</legend>
-        {selected.targetIds.length === 0 ? <p className="combat-restriction">The server returned no valid targets.</p> : selected.targetIds.map((id) => <label key={id}><input type="radio" name={`target-${selected.legalActionId}`} checked={targetId === id} disabled={disabled || busy} onChange={() => { setTargetId(id); setReviewing(false); }} /><span><bdi dir="auto">{combatantLabels.get(id) ?? id}</bdi></span></label>)}
+      {selected && requiresTarget && <fieldset className="legal-targets"><legend>{selected.kind === "stabilize" ? "Unconscious allies the server allows you to stabilize" : "Valid targets returned for this action"}</legend>
+        {selected.targetIds.length === 0 ? <p className="combat-restriction">The server returned no valid targets, so this action cannot be submitted.</p> : selected.targetIds.map((id) => <label key={id}><input type="radio" name={`target-${selected.legalActionId}`} checked={targetId === id} disabled={disabled || busy} onChange={() => { setTargetId(id); setReviewing(false); }} /><span><bdi dir="auto">{combatantLabels.get(id) ?? "Combatant"}</bdi></span></label>)}
       </fieldset>}
-      {selected && selected.kind !== "attack" && selected.targetIds.length > 0 && <p className="combat-restriction" role="alert">This server action is incompatible with the current resolution contract and cannot be submitted.</p>}
-      {!reviewing && <button type="button" className="primary legal-review-button" disabled={disabled || busy || !validSelection || Boolean(selected && selected.kind !== "attack" && selected.targetIds.length)} onClick={() => setReviewing(true)}>Review action</button>}
+      {selected && <p className="combat-restriction">{actionExplanation(selected.kind)}</p>}
+      {selected && !requiresTarget && selected.targetIds.length > 0 && <p className="combat-restriction" role="alert">This server action has an unsupported target shape and cannot be submitted.</p>}
+      {!reviewing && <button type="button" className="primary legal-review-button" disabled={disabled || busy || !validSelection || Boolean(selected && !requiresTarget && selected.targetIds.length)} onClick={() => setReviewing(true)}>Review action</button>}
       {reviewing && selected && <section className="action-review" aria-labelledby="action-review-heading">
         <h3 id="action-review-heading">Review server-returned action</h3>
-        <dl><div><dt>Action kind</dt><dd>{actionLabel(selected.kind)}</dd></div><div><dt>Target</dt><dd>{targetId ? <bdi dir="auto">{combatantLabels.get(targetId) ?? targetId}</bdi> : "No target returned or selected"}</dd></div><div><dt>Cost</dt><dd>Not supplied by this legal-action response</dd></div><div><dt>Consequences</dt><dd>Not supplied; the server resolves the outcome authoritatively</dd></div></dl>
+        <dl><div><dt>Action kind</dt><dd>{actionLabel(selected.kind)}</dd></div><div><dt>Target</dt><dd>{targetId ? <bdi dir="auto">{combatantLabels.get(targetId) ?? "Combatant"}</bdi> : "No target required"}</dd></div><div><dt>Cost</dt><dd>{selected.cost ?? "Not supplied by this legal-action response"}</dd></div><div><dt>Consequences</dt><dd>{actionExplanation(selected.kind)}</dd></div></dl>
         <div className="button-row"><button type="button" className="primary" disabled={disabled || busy || !validSelection} onClick={() => onSubmit(selected, targetId ? [targetId] : [])}>Submit once</button><button type="button" className="ghost" disabled={busy} onClick={() => setReviewing(false)}>Change selection</button></div>
       </section>}
     </>}

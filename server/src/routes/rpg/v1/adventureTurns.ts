@@ -2,33 +2,35 @@ import { createHash } from "node:crypto";
 import {
   adventureTurnConfirmRequestSchema, adventureTurnConfirmResponseSchema, adventureTurnGetResponseSchema,
   adventureTurnInitialReconcileRequestSchema, adventureTurnInitialReconcileResponseSchema, adventureTurnResumeTokenSchema,
-  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, resourceIdSchema,
+  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, adventureTurnTranscriptRequestSchema,
+  adventureTurnTranscriptResponseSchema, resourceIdSchema,
   combatActionResolutionSchema,
-  type AdventureTurnStreamEvent, type PrivateAdventureTurn, type AdventureTurnHttpProposal,
+  type AdventureTurnStreamEvent, type PrivateAdventureTurn, type AdventureTurnHttpProposal,type AdventureCombatConsumablePublicReceipt,type AdventureCombatPowerPublicReceipt,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import {
   AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnExpiredError, AdventureTurnStaleError,
-  AdventureTurnUnavailableError, type AdventureTurnRepository,
+  AdventureTurnUnavailableError, getHarnessSettings, getProviderSettings, type AdventureTurnRepository,
 } from "../../../repo/index.js";
 import { openSse, type SseWriter } from "../../roleplay/generationService.js";
-import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
+import { adventureProviderPromptEstimate, createAdventureTurnBudgetPolicy, effectiveAdventureTurnMaxTokens, initializeAdventureTurnBudget,
+  orchestrateAdventureTurn, type AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 import type { Repository } from "../../../repo/index.js";
 import { completeWithProvider } from "../../../provider/index.js";
-import { defaultHarnessSettings, defaultProviderSettings } from "../../../defaults.js";
 import { getPromptPreset } from "../../../presets.js";
+import { adventureNarrationMessages } from "../../../agent/adventurePrompt.js";
+import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
+import type { CompletionFunctionTool, ProviderCompletionInput } from "../../../provider/index.js";
 
 const OWNER = "local-owner";
 const JSON_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-const FALLBACK_PREFIX = "No mechanics were planned for this declaration. The scene records the action without changing campaign state: ";
-const MECHANICS_FALLBACK_PREFIX = "The action was resolved by the authoritative game mechanics: ";
-
 type Repo = Pick<AdventureTurnRepository,
-  "createAdventureTurn" | "getAdventureTurn" | "getAdventureTurnNarration" | "waitForToolConfirmation"
+  "createAdventureTurn" | "getAdventureTurn" | "getAdventureTurnNarration" | "getAdventureTurnTranscript" | "waitForToolConfirmation"
   | "getAdventureTurnByInitialIdempotencyKey" | "decideToolProposals" | "expireToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration"
-  | "recordProviderCallStart" | "recordProviderCallOutcome"> & {
+  | "recordProviderCallStart" | "recordProviderCallOutcome" | "claimNarrationProviderDispatch" | "settleNarrationProviderDispatch"
+  | "getNarrationProviderDispatch" | "getAdventureTurnNarrationSource"> & {
   getCampaign(actorPrincipalId: string, campaignId: string): { activeTimelineId: string } | null;
 };
 
@@ -42,15 +44,32 @@ const enabled = () => { const flags = readRpgFeatureFlags(); return flags.campai
 const hasQuery = (request: FastifyRequest) => (request.raw.url ?? request.url).includes("?")
   || Object.keys(request.query as Record<string, unknown>).length > 0;
 const key = (prefix: string, ...parts: string[]) => `${prefix}:${createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 48)}`;
-const fallback = (declaration: string) => `${FALLBACK_PREFIX}${declaration}`.slice(0, 8_000);
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn";
-  outcome:{kind:"damage";damageType:"physical";requested:1;applied:number;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"defeated"}
+type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn"|"stabilize"|"death-save";
+  outcome:{kind:"damage";damageType:"physical"|"bludgeoning"|"piercing"|"slashing";requested:number;applied:number;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"unconscious"|"stable"|"defeated"|"dead"}
     |{kind:"status";statusAfter:"fled"}|{kind:"none"};roundBefore: number; roundAfter: number }
-  | {kind:"travel";destination:string};
+  | {kind:"travel";destination:string}
+  | {kind:"inventory";itemLabel:string;action:"equip"|"unequip"|"drop"|"gift"|"consume";quantity:number;slot:string|null;recipient:string|null}
+  | {kind:"commerce";action:"buy"|"sell"|"give";vendorLabel:string;shopLabel:string;itemLabel:string;quantity:number;currencyLabel:string;priceMinorUnits:number;balanceBefore:number;balanceAfter:number}
+  | {kind:"quest";questTitle:string;objectiveDescription:string;progressBefore:number;progressAfter:number;targetProgress:number;
+    objectiveCompleted:boolean;questCompleted:boolean}
+  | {kind:"quest-lifecycle";action:"accept"|"abandon"|"claim-reward";questTitle:string;statusBefore:string;statusAfter:string;reward:{label:string;kind:string;amount:number|null;recipient:string}|null}
+  | {kind:"progression";className:string;levelBefore:number;levelAfter:number;features:string[];resources:Array<{label:string;before:number;after:number}>}
+  | {kind:"check";checkKind:"ability"|"skill";ability:string;skill:string|null;mode:"normal"|"advantage"|"disadvantage";
+    difficulty:string;rolls:Array<{value:number;kept:boolean}>;abilityModifier:number;proficiencyBonus:number;modifier:number;total:number;dc:number;outcome:"success"|"failure"}
+  | {kind:"power";powerName:string;targets:string[];costs:Array<{label:string;before:number;after:number}>;stateDeltas:Array<{actor:string;change:string;before:number|null;after:number|null}>;concentration:boolean}
+  | ({kind:"combat-consumable"}&AdventureCombatConsumablePublicReceipt)
+  | ({kind:"combat-power"}&AdventureCombatPowerPublicReceipt)
+  | {kind:"rest";restKind:"short"|"long";restName:"Short rest"|"Long rest";recovery:Array<{label:string;before:number;after:number}>};
 type NarrationResult={turn:PrivateAdventureTurn;text:string;source:"provider-assisted"|"deterministic-fallback"};
-const activeNarrationDispatches = new Map<string, Promise<NarrationResult>>();
+const NARRATION_TOOL_NAME = "submit_adventure_narration";
+const NARRATION_TOOL_PARAMETERS: CompletionFunctionTool["parameters"] = {
+  type: "object",
+  properties: { narration: { type: "string", minLength: 1, maxLength: 8_000 } },
+  required: ["narration"],
+  additionalProperties: false,
+};
 function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn): NarrationReceipt[] | null {
   const values: NarrationReceipt[] = [];
   for (const link of turn.receiptLinks) {
@@ -68,6 +87,19 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
     }
     const travel=repo.getExactCandidateTravelNarrationReceipt(OWNER,turn.turnId,link.commandId);
     if(travel){values.push({kind:"travel",destination:travel.destination});continue;}
+    const inventory=repo.getAdventureInventoryNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(inventory){values.push({kind:"inventory",itemLabel:inventory.itemLabel,action:inventory.action,quantity:inventory.quantity,
+      slot:inventory.slot,recipient:inventory.recipient});continue;}
+    const commerce=repo.getAdventureCommerceNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(commerce){values.push({kind:"commerce",action:commerce.action,vendorLabel:commerce.vendorLabel,shopLabel:commerce.shopLabel,itemLabel:commerce.itemLabel,quantity:commerce.quantity,currencyLabel:commerce.currencyLabel,priceMinorUnits:commerce.priceMinorUnits,balanceBefore:commerce.balanceBefore,balanceAfter:commerce.balanceAfter});continue;}
+    const questProgression=repo.getAdventureQuestProgressionNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(questProgression){values.push(questProgression);continue;}
+    const quest=repo.getAdventureQuestNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(quest){values.push({kind:"quest",...quest});continue;}
+    const check=repo.getAdventureCheckNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(check){values.push({kind:"check",...check});continue;}
+    const action=repo.getAdventurePowerRestNarrationReceipt(OWNER,turn.turnId,link.commandId);
+    if(action){values.push(action);continue;}
     const combat = repo.getAgentCombatReceipt(OWNER, turn.campaignId, link.commandId);
     const resolution=combatActionResolutionSchema.safeParse(combat?.resolution);if(!combat||!resolution.success)return null;
     const outcome=resolution.data.outcomes[0];
@@ -78,68 +110,224 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
   return values;
 }
 export function narrationFallback(declaration: string, values: readonly NarrationReceipt[]): string {
-  if (values.length === 0) return fallback(declaration);
-  return `${MECHANICS_FALLBACK_PREFIX}${declaration}\n\nCommitted results: ${values.map((value) => value.kind === "combat"
-    ? value.outcome.kind==="damage"?`${value.action} dealt ${value.outcome.applied} ${value.outcome.damageType} damage; the target has ${value.outcome.hitPointsAfter} HP and is ${value.outcome.statusAfter}${value.roundAfter!==value.roundBefore?`; round ${value.roundBefore} advanced to ${value.roundAfter}`:""}`
-      :value.outcome.kind==="status"?`the combatant fled during round ${value.roundBefore}`:`the combatant ended their turn in round ${value.roundBefore}${value.roundAfter!==value.roundBefore?`; round ${value.roundAfter} began`:""}` : value.kind==="travel"?`the actor travelled to ${value.destination}`
-    : `${value.event.type}: ${JSON.stringify(value.event.data)}`).join("; ")}`.slice(0, 8_000);
+  void declaration;
+  return composeNarration(values);
+}
+
+/** Receipt-only prose retained for every provider and settings failure lane. */
+function composeNarration(values: readonly NarrationReceipt[]): string {
+  if (values.length === 0) return "The scene holds. Your intended action remains pending; no movement or other campaign change is established.";
+  const facts = values.map((value) => {
+    if (value.kind === "travel") return `You arrive at ${value.destination}.`;
+    if(value.kind==="inventory"){
+      if(value.action==="equip")return `You equip ${value.quantity} ${value.itemLabel} in the ${value.slot} slot.`;
+      if(value.action==="unequip")return `You unequip ${value.quantity} ${value.itemLabel} from the ${value.slot} slot.`;
+      if(value.action==="gift")return `You give ${value.quantity} ${value.itemLabel} to ${value.recipient}.`;
+      if(value.action==="consume")return `You consume ${value.quantity} ${value.itemLabel}; only its removal from inventory is established, with no item effect.`;
+      return `You drop ${value.quantity} ${value.itemLabel}.`;
+    }
+    if(value.kind==="commerce")return value.action==="buy"?`You buy ${value.quantity} ${value.itemLabel} from ${value.vendorLabel} at ${value.shopLabel} for ${value.priceMinorUnits} ${value.currencyLabel}. Your balance changes from ${value.balanceBefore} to ${value.balanceAfter}.`:value.action==="sell"?`You sell ${value.quantity} ${value.itemLabel} to ${value.vendorLabel} at ${value.shopLabel} for ${value.priceMinorUnits} ${value.currencyLabel}. Your balance changes from ${value.balanceBefore} to ${value.balanceAfter}.`:`You give ${value.quantity} ${value.itemLabel} to ${value.vendorLabel} at ${value.shopLabel} without payment. It is transferred into shop stock, not dropped.`;
+    if (value.kind === "quest") return `Quest objective advanced for ${value.questTitle}: ${value.objectiveDescription} (${value.progressAfter} of ${value.targetProgress}).${value.objectiveCompleted ? " The objective is complete." : ""}${value.questCompleted ? " The quest is complete." : ""}`;
+    if(value.kind==="quest-lifecycle")return value.action==="accept"?`Quest accepted: ${value.questTitle}.`:value.action==="abandon"?`Quest abandoned: ${value.questTitle}.`:`Quest reward claimed from ${value.questTitle}: ${value.reward?.amount===null?value.reward.label:`${value.reward?.amount} ${value.reward?.kind} (${value.reward?.label})`} for ${value.reward?.recipient}.`;
+    if(value.kind==="progression")return `${value.className} advances from level ${value.levelBefore} to level ${value.levelAfter}.${value.features.length?` Features gained: ${value.features.join(", ")}.`:""}${value.resources.length?` ${value.resources.map(resource=>`${resource.label} capacity changes from ${resource.before} to ${resource.after}.`).join(" ")}`:""}`;
+    if(value.kind==="check")return `${value.skill??value.ability} check: ${value.rolls.map((roll)=>roll.value).join(" and ")} rolled ${value.mode}; ${value.modifier>=0?"+":""}${value.modifier} modifier gives ${value.total} against ${value.difficulty} DC ${value.dc}: ${value.outcome}.`;
+    if(value.kind==="power")return `${value.powerName} affects ${value.targets.join(", ")}.${value.costs.length?` ${value.costs.map(cost=>`${cost.label} changes from ${cost.before} to ${cost.after}`).join(" ")}.`:""}${value.stateDeltas.length?` ${value.stateDeltas.map(delta=>delta.before===null?`${delta.actor}: ${delta.change}.`:`${delta.actor} ${delta.change} changes from ${delta.before} to ${delta.after}.`).join(" ")}`:""}${value.concentration?" Concentration is active.":""}`;
+    if(value.kind==="combat-consumable"){const outcomes=value.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.roll.total} rolled; ${outcome.applied} ${outcome.damageType} damage applied${outcome.adjustment!=="none"?` after ${outcome.adjustment}`:""}; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:outcome.kind==="healing"?`${outcome.roll.total} rolled; ${outcome.applied} healing applied; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:`${value.target} ${outcome.resource} changes by ${outcome.applied}${outcome.before===null?"":` from ${outcome.before} to ${outcome.after}`}.`).join(" ");return `${value.itemName} is consumed using one ${value.actionCost} on ${value.target}. ${outcomes}${value.roundAfter!==value.roundBefore?` Round ${value.roundAfter} begins.`:""}`;}
+    if(value.kind==="combat-power"){const outcomes=value.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.roll.total} rolled; ${outcome.applied} ${outcome.damageType} damage applied${outcome.adjustment!=="none"?` after ${outcome.adjustment}`:""}; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:outcome.kind==="healing"?`${outcome.roll.total} rolled; ${outcome.applied} healing applied; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:`${outcome.effect} applied${outcome.replacedConcentration?", replacing concentration":""}.`).join(" ");return `${value.powerName} uses one action on ${value.target}. ${outcomes}${value.costs.map(cost=>` ${cost.label} changes from ${cost.before} to ${cost.after}.`).join("")}${value.roundAfter!==value.roundBefore?` Round ${value.roundAfter} begins.`:""}`;}
+    if(value.kind==="rest")return `${value.restName} completed. ${value.recovery.map(delta=>`${delta.label} recovers from ${delta.before} to ${delta.after}.`).join(" ")}`;
+    if (value.kind === "combat") {
+      if (value.outcome.kind === "damage") return `The ${value.action} deals ${value.outcome.applied} physical damage. The target has ${value.outcome.hitPointsAfter} HP and is ${value.outcome.statusAfter}.${value.roundAfter !== value.roundBefore ? ` Round ${value.roundAfter} begins.` : ""}`;
+      if (value.outcome.kind === "status") return `The combatant flees during round ${value.roundBefore}.`;
+      if (value.action === "attack") return `The combatant makes the committed attack in round ${value.roundBefore}; no damage is applied.`;
+      if (value.action === "flee") return `The combatant attempts the committed flee action in round ${value.roundBefore}; no fled status is established.`;
+      return `The combatant ends their turn in round ${value.roundBefore}.${value.roundAfter !== value.roundBefore ? ` Round ${value.roundAfter} begins.` : ""}`;
+    }
+    if (value.event.type === "actor_dice_rolled") {
+      const data = value.event.data as { total: number };
+      return `The roll totals ${data.total}. No success or failure is established, and the attempted task remains unresolved.`;
+    }
+    if (value.event.type === "actor_attribute_set") {
+      const data = value.event.data as { valueBefore: number; valueAfter: number };
+      return `The committed attribute changes from ${data.valueBefore} to ${data.valueAfter}.`;
+    }
+    const data = value.event.data as { current: number; max: number };
+    return `The committed resource is ${data.current} of ${data.max}.`;
+  });
+  return `The authoritative result is clear. ${facts.join(" ")}`.slice(0, 8_000);
+}
+
+const normalizedNarration = (value:string) => value.toLocaleLowerCase("en-US").replace(/[^a-z0-9]+/g," ").trim();
+const includesFact = (text:string,value:string|number) => normalizedNarration(text).includes(normalizedNarration(String(value)));
+const includesAny = (text:string,values:readonly string[]) => values.some(value=>normalizedNarration(text).includes(value));
+const includesNumber = (text:string,value:number) => new RegExp(`(^|\\D)${String(value).replace("-","\\-")}(?=\\D|$)`).test(text);
+const regexEscape=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+
+function acknowledgesCurrentLocation(text:string,currentLocation:string|null):boolean{
+  if(!currentLocation)return true;
+  const normalized=normalizedNarration(text),location=regexEscape(normalizedNarration(currentLocation));
+  return new RegExp(`(?:\\b(?:at|in|inside|within)\\s+(?:the\\s+)?${location}\\b|\\b(?:you are|you stand|you remain|you arrive|you reach|you enter)\\b.{0,80}\\b${location}\\b|\\b${location}\\b.{0,80}\\b(?:around you|surrounds you|is your current location)\\b)`).test(normalized);
+}
+
+/** Conservative semantic gate: receipt prose may add atmosphere, but cannot replace or negate committed public facts. */
+export function providerNarrationMatchesReceipts(text:string,values:readonly NarrationReceipt[],currentLocation:string|null=null):boolean {
+  if(!acknowledgesCurrentLocation(text,currentLocation))return false;
+  const normalized=normalizedNarration(text);
+  const hasKind=(...kinds:NarrationReceipt["kind"][])=>values.some(value=>kinds.includes(value.kind));
+  const damageClaims=[...normalized.matchAll(/\b(\d+)\s+(?:[a-z]+\s+){0,2}damage\b/g)].map(match=>Number(match[1]));
+  const healingClaims=[...normalized.matchAll(/\b(?:heal(?:s|ed|ing)?(?:\s+(?:you|them|him|her))?\s+(?:for\s+)?|restore(?:s|d)?\s+)(\d+)\s+(?:hit points?|hp|health)\b/g)].map(match=>Number(match[1]));
+  const allowedDamage=values.flatMap(value=>value.kind==="combat"&&value.outcome.kind==="damage"?[value.outcome.applied]
+    :value.kind==="combat-consumable"||value.kind==="combat-power"?value.outcomes.flatMap(outcome=>outcome.kind==="damage"?[outcome.applied]:[]):[]);
+  const allowedHealing=values.flatMap(value=>value.kind==="combat-consumable"||value.kind==="combat-power"
+    ?value.outcomes.flatMap(outcome=>outcome.kind==="healing"?[outcome.applied]:[]):[]);
+  if(damageClaims.some(amount=>!allowedDamage.includes(amount))||healingClaims.some(amount=>!allowedHealing.includes(amount)))return false;
+  const unsupportedTravel=!hasKind("travel")&&/\b(?:you|the party|the group)\s+(?:arrive|arrives|arrived|reach|reaches|reached|enter|enters|entered|travel|travels|traveled|journey|journeys|journeyed|leave|leaves|left)\b/.test(normalized);
+  const unsupportedInventory=!hasKind("inventory","commerce","quest-lifecycle")&&/\b(?:you|they|the party|the group)\s+(?:gain|gains|gained|receive|receives|received|obtain|obtains|obtained|acquire|acquires|acquired|lose|loses|lost|drop|drops|dropped|consume|consumes|consumed|equip|equips|equipped|unequip|unequips|unequipped|buy|buys|bought|sell|sells|sold)\b.{0,80}\b(?:gold|coins?|currency|credits?|potion|weapon|armor|item|inventory|reward|sword|shield|bow|dagger|ring|amulet|scroll)\b/.test(normalized);
+  const unsupportedCurrency=!hasKind("commerce","quest-lifecycle")&&/(?:\b(?:gain|gains|gained|receive|receives|received|lose|loses|lost|spend|spends|spent|pay|pays|paid|earn|earns|earned)\b.{0,40}\b(?:gold|coins?|currency|credits?)\b|\b\d+\s+(?:gold|coins?|credits?)\b)/.test(normalized);
+  const unsupportedQuest=!hasKind("quest","quest-lifecycle")&&/(?:\bquest\b.{0,50}\b(?:accept|accepted|abandon|abandoned|advance|advanced|progress|complete|completed|reward|claimed)\b|\b(?:accept|accepted|abandon|abandoned|advance|advanced|complete|completed|claim|claimed)\b.{0,50}\bquest\b)/.test(normalized);
+  const unsupportedProgression=!hasKind("progression")&&/\b(?:level(?:s|ed)?\s+up|advance(?:s|d)?\s+to\s+level|gain(?:s|ed)?\s+\d+\s+(?:xp|experience)|learn(?:s|ed)?\s+(?:a\s+)?new\s+(?:feature|ability|power))\b/.test(normalized);
+  if(unsupportedTravel||unsupportedInventory||unsupportedCurrency||unsupportedQuest||unsupportedProgression)return false;
+  if(values.length===0)return true;
+  const contradiction=/(movement|arrival|travel|result|outcome|action|change|damage|healing|purchase|sale|quest|progression|rest|check|attack).{0,48}(pending|unresolved|uncertain|unknown|not established|not committed|did not happen|has not happened|awaiting confirmation)/
+    .test(normalized)||/(pending|unresolved|uncertain|unknown|not established|not committed|did not happen|has not happened|awaiting confirmation).{0,48}(movement|arrival|travel|result|outcome|action|change|damage|healing|purchase|sale|quest|progression|rest|check|attack)/.test(normalized);
+  if(contradiction)return false;
+  return values.every(value=>{
+    if(value.kind==="travel"){
+      const arrivalClaims=[...text.matchAll(/\b(?:arriv(?:e|es|ed|ing)|arrival)\s+(?:at|in)\s+([^.!?;\n]{1,200})/gi)].map(match=>match[1]!);
+      return includesFact(text,value.destination)&&arrivalClaims.every(claim=>includesFact(claim,value.destination))
+        &&includesAny(text,["arrive","arrives","arrived","reach","reaches","reached","travel","travels","traveled","move","moves","moved","enter","enters","entered"]);
+    }
+    if(value.kind==="inventory")return includesFact(text,value.itemLabel)&&includesNumber(text,value.quantity)&&includesAny(text,value.action==="equip"?["equip"]:value.action==="unequip"?["unequip"]:value.action==="drop"?["drop","discard"]:value.action==="gift"?["give","gives","gave","gift"]:["consume","consumes","consumed","remove","removes","removed"]);
+    if(value.kind==="commerce")return includesFact(text,value.itemLabel)&&includesFact(text,value.vendorLabel)&&includesNumber(text,value.quantity)&&includesNumber(text,value.balanceAfter)&&includesAny(text,value.action==="buy"?["buy","buys","bought","purchase"]:value.action==="sell"?["sell","sells","sold","sale"]:["give","gives","gave","transfer"]);
+    if(value.kind==="quest")return includesFact(text,value.questTitle)&&includesNumber(text,value.progressAfter)&&includesAny(text,["advance","advances","advanced","progress","complete","completes","completed"]);
+    if(value.kind==="quest-lifecycle")return includesFact(text,value.questTitle)&&includesAny(text,value.action==="accept"?["accept","accepted"]:value.action==="abandon"?["abandon","abandoned"]:["claim","claimed"]);
+    if(value.kind==="progression")return includesFact(text,value.className)&&includesNumber(text,value.levelAfter)&&includesAny(text,["advance","advances","advanced","level"]);
+    if(value.kind==="check")return includesFact(text,value.skill??value.ability)&&includesNumber(text,value.total)&&includesNumber(text,value.dc)&&includesFact(text,value.outcome);
+    if(value.kind==="power")return includesFact(text,value.powerName)&&value.targets.every(target=>includesFact(text,target))&&value.costs.every(cost=>includesNumber(text,cost.after))&&value.stateDeltas.every(delta=>includesFact(text,delta.actor)&&includesFact(text,delta.change));
+    if(value.kind==="rest")return includesFact(text,value.restName)&&value.recovery.every(delta=>includesFact(text,delta.label)&&includesNumber(text,delta.after));
+    if(value.kind==="combat-consumable"||value.kind==="combat-power")return includesFact(text,value.kind==="combat-consumable"?value.itemName:value.powerName)&&includesFact(text,value.target)&&value.outcomes.every(outcome=>outcome.kind==="effect"?includesFact(text,outcome.effect):includesNumber(text,outcome.applied)&&(outcome.after===null?outcome.kind==="resource"&&includesFact(text,outcome.resource):includesNumber(text,outcome.after)));
+    if(value.kind==="combat")return includesFact(text,value.action)&&(value.outcome.kind==="damage"?includesNumber(text,value.outcome.applied)&&includesNumber(text,value.outcome.hitPointsAfter)&&includesFact(text,value.outcome.statusAfter):value.outcome.kind==="status"?includesFact(text,value.outcome.statusAfter):includesAny(text,["no damage","ends","ended","attack","flee"]));
+    if(value.event.type==="actor_dice_rolled")return includesNumber(text,(value.event.data as {total:number}).total)&&includesAny(text,["roll","rolled","total"]);
+    if(value.event.type==="actor_attribute_set"){const data=value.event.data as {valueBefore:number;valueAfter:number};return includesNumber(text,data.valueBefore)&&includesNumber(text,data.valueAfter)&&includesAny(text,["attribute","change","changes","changed"]);}
+    const data=value.event.data as {current:number;max:number};return includesNumber(text,data.current)&&includesNumber(text,data.max)&&includesAny(text,["resource","current","maximum"]);
+  });
 }
 async function performNarration(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal): Promise<NarrationResult> {
   const safeReceipts = narrationReceipts(repo, turn);
-  const fallbackText = narrationFallback(turn.declaration, safeReceipts ?? []);
+  const fallbackText = composeNarration(safeReceipts ?? []);
   if (!safeReceipts) return { turn, text: fallbackText,source:"deterministic-fallback" };
   const callId = key("narration-provider", turn.turnId);
-  const start = turn.providerCalls.find((call) => call.callId === callId && call.phase === "started");
-  const started = Boolean(start);
-  const settled = turn.providerCalls.some((call) => call.callId === callId && call.phase !== "started");
-  if (started && !settled) {
-    turn = repo.recordProviderCallOutcome(OWNER, { turnId: turn.turnId, callId, provider: start!.provider, model: start!.model, attempt: start!.attempt,
-      outcome: "failed", outcomeCode: "interrupted", expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
-      idempotencyKey: key("narration-provider-interrupted", turn.turnId) });
-  } else if (!settled) {
-    const provider = await (dependencies?.getProvider() ?? Promise.resolve(defaultProviderSettings())).catch(defaultProviderSettings);
-    turn = repo.recordProviderCallStart(OWNER, { turnId: turn.turnId, callId, provider: provider.providerType || "openai-compatible",
-      model: provider.model.trim() || "unconfigured", attempt: 1, expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
-      idempotencyKey: key("narration-provider-start", turn.turnId) });
+  const recovered=repo.getNarrationProviderDispatch(OWNER,turn.turnId,callId);
+  if(recovered?.state==="settled")return finalizeNarrationDispatch(repo,turn.turnId,callId,recovered);
+    let settings;
     try {
-      const harness = await (dependencies?.getHarness() ?? Promise.resolve(defaultHarnessSettings())).catch(defaultHarnessSettings);
-      const result = await (dependencies?.complete ?? completeWithProvider)({ provider, harness, preset: getPromptPreset("default"), toolChoice: "none", signal,
-        messages: [{ role: "system", content: "Write concise second-person RPG scene narration grounded only in the supplied public canon, declaration, and committed receipts. Do not mention IDs, tools, providers, private state, permissions, hidden statistics, or unprovided facts. Never invent damage, movement, rewards, items, conditions, success, or any other mechanic. If there are no receipts, narrate atmosphere, reactions, dialogue, or observation without asserting a state change. Return narration only." },
-          { role: "user", content: JSON.stringify({ declaration: turn.declaration, receipts: safeReceipts,
-            publicContext: publicNarrationContext(repo,turn) }) }] });
-      if (result.message.toolCalls?.length || typeof result.message.content !== "string") throw new Error("invalid narration response");
-      const providerText=result.message.content.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,"").trim();
-      if(!providerText||providerText.length>6_000)throw new Error("invalid narration response");
-      turn = repo.recordProviderCallOutcome(OWNER, { turnId: turn.turnId, callId, provider: provider.providerType || "openai-compatible",
-        model: provider.model.trim() || "unconfigured", attempt: 1, outcome: "succeeded", outcomeCode: "ok", promptTokens: result.usage?.promptTokens ?? null,
-        completionTokens: result.usage?.completionTokens ?? null, expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
-        idempotencyKey: key("narration-provider-outcome", turn.turnId) });
-      const facts=safeReceipts.length?`\n\nCommitted results: ${narrationFallback(turn.declaration,safeReceipts).split("\n\nCommitted results: ")[1]??""}`:"";
-      return { turn, text:`${providerText}${facts}`.slice(0,8_000),source:"provider-assisted" };
-    } catch {
-      const current = requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId));
-      if (!current.providerCalls.some((call) => call.callId === callId && call.phase !== "started")) turn = repo.recordProviderCallOutcome(OWNER, { turnId: current.turnId, callId,
-        provider: provider.providerType || "openai-compatible", model: provider.model.trim() || "unconfigured", attempt: 1, outcome: "failed", outcomeCode: "narration-failed",
-        expectedTurnRevision: current.revision, expectedCampaignRevision: current.campaignRevision, idempotencyKey: key("narration-provider-failed", current.turnId) });
-      else turn = current;
+      settings = await Promise.all([
+        dependencies ? dependencies.getProvider() : getProviderSettings(),
+        dependencies ? dependencies.getHarness() : getHarnessSettings(),
+      ]);
+    } catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
+    const [provider, harness] = settings;
+    let history;
+    try { history = repo.getAdventureTurnTranscript(OWNER, turn.campaignId, turn.sessionId, harness.recentTurns); }
+    catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
+    const publicContext=publicNarrationContext(repo,turn);
+    if(!publicContext)return {turn,text:fallbackText,source:"deterministic-fallback"};
+    const completionLimit = effectiveAdventureTurnMaxTokens(provider);
+    const completionInput: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
+      harness, preset: getPromptPreset("default"), tools: [{ name: NARRATION_TOOL_NAME,
+        description: "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
+        parameters: NARRATION_TOOL_PARAMETERS }], toolChoice: { name: NARRATION_TOOL_NAME }, signal,
+      parallelToolCalls:false,promptVersion: "adventure-narration-v1", schemaVersion: "adventure-narration-v1",
+      messages: adventureNarrationMessages({ declaration: turn.declaration, receipts: safeReceipts,
+        currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,
+        rulesetDescriptor:publicContext.ruleset.descriptor,
+        safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) }) };
+    const providerName=provider.providerType||"openai-compatible",model=provider.model.trim()||"unconfigured";
+    let claim=repo.claimNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,provider:providerName,model,
+      fallbackNarration:fallbackText,leaseMs:90_000});
+    while(claim.state==="in-progress"){
+      if(signal.aborted)throw new Error("narration aborted");
+      await new Promise<void>(resolve=>setTimeout(resolve,10));
+      claim=repo.getNarrationProviderDispatch(OWNER,turn.turnId,callId)
+        ??repo.claimNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,provider:providerName,model,fallbackNarration:fallbackText,leaseMs:90_000});
     }
-  }
-  return { turn, text: fallbackText,source:"deterministic-fallback" };
+    if(claim.state==="settled")return finalizeNarrationDispatch(repo,turn.turnId,callId,claim);
+    const claimId=claim.claimId;
+    try { turn = repo.recordProviderCallStart(OWNER, { turnId: turn.turnId, callId, provider: providerName,
+        model, attempt: 1, expectedTurnRevision: turn.revision, expectedCampaignRevision: turn.campaignRevision,
+        idempotencyKey: key("narration-provider-start", turn.turnId) }); }
+    catch {
+      claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"deterministic-fallback",
+        narration:fallbackText,outcomeCode:"provider-start-failed",promptTokens:null,completionTokens:null});
+      if(claim.state!=="settled")claim=repo.claimNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,provider:providerName,model,fallbackNarration:fallbackText,leaseMs:90_000});
+      if(claim.state==="settled")return finalizeNarrationDispatch(repo,turn.turnId,callId,claim);
+      return{turn:requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId)),text:fallbackText,source:"deterministic-fallback"};
+    }
+    const policy = createAdventureTurnBudgetPolicy(provider);
+    if (policy) initializeAdventureTurnBudget(turn, policy);
+    const budget = policy ? adventureTurnBudgets.reserve(turn.turnId, policy, { id: callId,
+      promptText: adventureProviderPromptEstimate(completionInput), maxCompletionTokens: completionLimit }, Date.now()) : null;
+    if (!budget?.allowed) {
+      const reason = budget ? budget.reason : "pricing-unconfigured";
+       claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"deterministic-fallback",
+         narration:fallbackText,outcomeCode:`budget-${reason}`,promptTokens:null,completionTokens:null});
+       if(claim.state==="settled")return finalizeNarrationDispatch(repo,turn.turnId,callId,claim);
+       return { turn:requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId)), text: fallbackText, source: "deterministic-fallback" };
+    }
+    let measuredUsage: { promptTokens: number; completionTokens: number } | null = null;
+    let budgetSettled = false;
+    let usageEstimated = false;
+    try {
+      const result = await (dependencies?.complete ?? completeWithProvider)(completionInput);
+      const completionText = result.message.toolCalls?.map((call) => call.arguments).join("\n");
+      const charged = adventureTurnBudgets.settle(turn.turnId, callId, { usage: result.usage,
+        promptText: adventureProviderPromptEstimate(completionInput), ...(completionText === undefined ? {} : { completionText }) });
+      budgetSettled = true; measuredUsage = charged; usageEstimated = charged.source === "estimated";
+      const calls = result.message.toolCalls;
+      if (calls?.length !== 1 || calls[0]?.name !== NARRATION_TOOL_NAME || typeof calls[0].id !== "string" || !calls[0].id.trim()
+        || typeof calls[0].arguments !== "string") throw new Error("invalid narration response");
+      const parsed = JSON.parse(calls[0].arguments) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length !== 1
+        || !("narration" in parsed) || typeof parsed.narration !== "string") {
+        throw new Error("invalid narration response");
+      }
+      const providerText = parsed.narration.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
+      if (!providerText || providerText.length > 8_000) throw new Error("invalid narration response");
+      const currentSnapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
+      if(!currentSnapshot?.ruleset||currentSnapshot.ruleset.id!==publicContext.ruleset.id||currentSnapshot.ruleset.version!==publicContext.ruleset.version
+        ||JSON.stringify(currentSnapshot.ruleset.descriptor)!==JSON.stringify(publicContext.ruleset.descriptor))throw new Error("narration ruleset context is stale");
+      if(!providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation))throw new Error("narration contradicts or omits verified current facts");
+       claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"provider-assisted",narration:providerText,
+         outcomeCode:usageEstimated?"ok-estimated":"ok",promptTokens:measuredUsage.promptTokens,completionTokens:measuredUsage.completionTokens});
+    } catch {
+      if (!budgetSettled) { measuredUsage = adventureTurnBudgets.settle(turn.turnId, callId, {}); usageEstimated = true; }
+       claim=repo.settleNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,claimId,source:"deterministic-fallback",narration:fallbackText,
+         outcomeCode:usageEstimated?"narration-failed-estimated":"narration-failed",promptTokens:measuredUsage?.promptTokens??null,
+         completionTokens:measuredUsage?.completionTokens??null});
+    }
+    if(claim.state!=="settled")claim=repo.claimNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,provider:providerName,model,
+      fallbackNarration:fallbackText,leaseMs:90_000});
+    return claim.state==="settled"?finalizeNarrationDispatch(repo,turn.turnId,callId,claim)
+      :{turn:requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId)),text:fallbackText,source:"deterministic-fallback"};
+}
+function finalizeNarrationDispatch(repo:Repo&Repository,turnId:string,callId:string,dispatch:Extract<ReturnType<Repo["getNarrationProviderDispatch"]>,{state:"settled"}>):NarrationResult{
+  let turn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));const started=turn.providerCalls.find(call=>call.callId===callId&&call.phase==="started");
+  if(started&&!turn.providerCalls.some(call=>call.callId===callId&&call.phase!=="started"))try{turn=repo.recordProviderCallOutcome(OWNER,{turnId,callId,
+    provider:dispatch.provider,model:dispatch.model,attempt:1,outcome:dispatch.source==="provider-assisted"?"succeeded":"failed",outcomeCode:dispatch.outcomeCode,
+    promptTokens:dispatch.promptTokens,completionTokens:dispatch.completionTokens,expectedTurnRevision:turn.revision,expectedCampaignRevision:turn.campaignRevision,
+    idempotencyKey:key("narration-provider-settled",turnId)});}catch{turn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));}
+  return{turn,text:dispatch.narration,source:dispatch.source};
 }
 function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
   const snapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
-  if(!snapshot)return{};return{canon:snapshot.humanCanon,world:snapshot.visibleWorld,cast:snapshot.visibleCast,
-    quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts};
+  if(!snapshot?.ruleset)return null;const currentActorName=snapshot.speakerPersona?.displayName??null;
+  const cast=currentActorName?snapshot.visibleCast.filter(entry=>entry!==`${currentActorName}.`&&!entry.startsWith(`${currentActorName} at `)):snapshot.visibleCast;
+  return{ruleset:snapshot.ruleset,currentLocation:snapshot.currentActorLocation,currentActorName,context:{canon:snapshot.humanCanon,
+    world:snapshot.visibleWorld,cast,quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts}};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal): Promise<NarrationResult> {
-  const callId = key("narration-provider", turn.turnId);
-  const active = activeNarrationDispatches.get(callId);
-  if (active) return active;
-  const dispatch = performNarration(repo, turn, dependencies, signal).finally(() => activeNarrationDispatches.delete(callId));
-  activeNarrationDispatches.set(callId, dispatch);
-  return dispatch;
+  return performNarration(repo,turn,dependencies,signal);
 }
 
 function projectTurn(turn: PrivateAdventureTurn) {
@@ -190,20 +378,33 @@ function resumeToken(turn: PrivateAdventureTurn): string | null {
       return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);}
   }
   if (["declared","proposed"].includes(turn.state) && !turn.toolCalls.some(({proposal})=>proposal.confirmation.state==="pending")) {
+    if (turn.receiptLinks.length > 0) {
+      const evidence=turn.receiptLinks.map(link=>[link.linkId,link.commandId,link.proposalId,link.sourceTurnId,link.linkedAt])
+        .sort((left,right)=>String(left[0]).localeCompare(String(right[0])));
+      const digest=createHash("sha256").update(JSON.stringify([turn.turnId,OWNER,"receipt-recovery",evidence])).digest("base64url");
+      return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
+    }
     const digest=createHash("sha256").update(JSON.stringify([turn.turnId,OWNER,turn.createdAt,"automatic-planning"])).digest("base64url");
     return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
   }
   if (!["confirmed", "mechanics-committed", "narrating", "cancelled"].includes(turn.state)) return null;
-  const digest = resumableDecisionDigest(turn); if (!digest) return null;
-  return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
+  const decisionDigest = resumableDecisionDigest(turn);
+  if (decisionDigest) return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${decisionDigest}`);
+  if (turn.receiptLinks.length > 0 && ["confirmed", "mechanics-committed", "narrating"].includes(turn.state)) {
+    const evidence=turn.receiptLinks.map(link=>[link.linkId,link.commandId,link.proposalId,link.sourceTurnId,link.linkedAt])
+      .sort((left,right)=>String(left[0]).localeCompare(String(right[0])));
+    const digest=createHash("sha256").update(JSON.stringify([turn.turnId,OWNER,"receipt-recovery",evidence])).digest("base64url");
+    return adventureTurnResumeTokenSchema.parse(`v1.${Buffer.from(turn.turnId).toString("base64url")}.${digest}`);
+  }
+  return null;
 }
 function reconcile(repo: Repo, turn: PrivateAdventureTurn) {
   const token = resumeToken(turn);
   const narration=repo.getAdventureTurnNarration(OWNER,turn.turnId);const callId=key("narration-provider",turn.turnId);
-  const providerSucceeded=turn.providerCalls.some((call)=>call.callId===callId&&call.phase==="succeeded");
+  const source=repo.getAdventureTurnNarrationSource(OWNER,turn.turnId);
   return adventureTurnGetResponseSchema.parse({ turn: projectTurn(turn), proposals: proposals(turn), confirmation: confirmation(turn),
     receipts: receipts(turn), narrationStatus: { status: turn.narrationStatus, text:narration,
-      source:narration?(providerSucceeded?"provider-assisted":"deterministic-fallback"):null },
+      source:narration?(source??"deterministic-fallback"):null },
     ...(token ? { resumeToken: token } : {}) });
 }
 
@@ -328,25 +529,41 @@ async function stream(request: FastifyRequest, reply: Parameters<typeof sendApiP
       await yieldToEventLoop();
        const narrated = await narrate(repo as Repo & Repository, turn, agentDependencies, abort.signal);
        turn = narrated.turn; narration = narrated.text;
-      turn = repo.updateAdventureTurnNarration(OWNER, { turnId: turn.turnId, expectedTurnRevision: turn.revision,
+      if(turn.state!=="completed")try{turn = repo.updateAdventureTurnNarration(OWNER, { turnId: turn.turnId, expectedTurnRevision: turn.revision,
         expectedCampaignRevision: turn.campaignRevision, idempotencyKey: key("http-narrated", turn.turnId),
-        narrationStatus: "completed", terminalState: "completed", fallbackNarration: narration });
+         narrationStatus: "completed", terminalState: "completed", fallbackNarration: narration,narrationSource:narrated.source });}
+      catch(error){if(!(error instanceof AdventureTurnConflictError||error instanceof AdventureTurnStaleError))throw error;
+        turn=requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId));if(turn.state!=="completed")throw error;
+        narration=repo.getAdventureTurnNarration(OWNER,turn.turnId)??narration;}
       await yieldToEventLoop();
     }
     if (narration) { send({ type: "narration_delta", payload: { text: narration } }); await yieldToEventLoop(); }
-    finish(turn, "done");
+    finish(requirePrivate(repo.getAdventureTurn(OWNER, turn.turnId)), "done");
   } catch (error) {
     if (closed || abort.signal.aborted) return;
-    request.log.error({ operation: "adventure-turn-stream" }, "RPG adventure turn stream failed");
+    request.log.error({ phase: "stream", errorCode: "RPG_ADVENTURE_TURN_STREAM_FAILED" }, "RPG adventure turn stream failed");
     try { finish(requirePrivate(repo.getAdventureTurn(OWNER, initial.turnId)), "error"); } catch { /* connection or durable state is unavailable */ }
   } finally {
     if (heartbeat) clearInterval(heartbeat);
+    if (terminal) adventureTurnBudgets.clear(initial.turnId);
     if (!reply.raw.destroyed && !reply.raw.writableEnded) writer?.end();
   }
 }
 
 /** Registers strict adventure-turn stream, reconciliation, and confirmation routes. */
 export const adventureTurnsHttpRoutes: FastifyPluginAsync<AdventureTurnsHttpOptions> = async (app, options) => {
+  app.get<{ Querystring: Record<string, unknown> }>("/adventure-turns/transcript", { exposeHeadRoute: false,
+    onRequest: async (request, reply) => { reply.header("cache-control", "private, no-store"); if (!enabled()) {
+      await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found"); return; } },
+  }, async (request, reply) => {
+    const query = adventureTurnTranscriptRequestSchema.safeParse(request.query);
+    if (!query.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Adventure transcript locator is invalid");
+    try {
+      const turns = options.adventureTurnRepositoryAccessor().getAdventureTurnTranscript(OWNER, query.data.campaignId, query.data.sessionId);
+      return reply.send(adventureTurnTranscriptResponseSchema.parse({ ...query.data, turns }));
+    } catch (error) { return fail(request, reply, error); }
+  });
+
   app.post<{ Querystring: Record<string, unknown>; Body: unknown }>("/adventure-turns/stream", {
     onRequest: async (request, reply) => {
       reply.header("cache-control", "no-store");

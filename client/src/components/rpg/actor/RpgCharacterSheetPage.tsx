@@ -286,13 +286,13 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId, api, on
     catch { if (mountedRef.current && request === shopRequestRef.current) setCommandMessage("Known shop could not be loaded."); }
   }
 
-  const derivedStats = useMemo(() => sheet ? [
-    ["Maximum HP", sheet.derived.maxHp], ["Guard", sheet.derived.defenses.guard], ["Evasion", sheet.derived.defenses.evasion], ["Will", sheet.derived.defenses.will],
-    ["Initiative", sheet.derived.initiative], ["Speed", sheet.derived.speed], ["Carrying limit", sheet.derived.carryingLimit], ["Spell attack", sheet.derived.spellAttack], ["Save DC", sheet.derived.saveDc],
-  ] as const : [], [sheet]);
+  const derivedStats = useMemo((): Array<readonly [string, number | undefined]> => { if (!sheet) return [];
+    const defenses: Array<readonly [string, number | undefined]> = sheet.rulesetId === "dnd-5e" ? [["Armor Class", sheet.derived.armorClass]] : [["Guard", sheet.derived.defenses.guard], ["Evasion", sheet.derived.defenses.evasion], ["Will", sheet.derived.defenses.will]];
+    return [["Maximum HP", sheet.derived.maxHp], ...defenses, ["Initiative", sheet.derived.initiative], ["Speed", sheet.derived.speed], ["Carrying limit", sheet.derived.carryingLimit], ["Spell attack", sheet.derived.spellAttack], ["Save DC", sheet.derived.saveDc]];
+  }, [sheet]);
 
   return <main className="page library-page campaign-page actor-sheet-page"><section className="actor-sheet-shell" aria-labelledby="actor-sheet-heading">
-    <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Character workspace</button><p className="eyebrow">CHARACTER SHEET // SERVER STATE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="actor-sheet-heading"><bdi dir="auto">{sheet?.sheet.name ?? "Character sheet"}</bdi></h1></div>{phase === "ready" && <div className="button-row">{onOpenCombat && <button ref={combatButtonRef} className="primary" type="button" onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" type="button" onClick={() => void load()} disabled={Boolean(marker)}>Refresh sheet</button></div>}</header>
+    <header className="library-header"><div><button className="back-link" type="button" onClick={onBack}>← Character workspace</button><p className="eyebrow">CHARACTER SHEET // {sheet ? `${sheet.rulesetId} @ ${sheet.rulesetVersion}` : "SERVER STATE"}</p><h1 ref={headingRef} tabIndex={-1} className="title" id="actor-sheet-heading"><bdi dir="auto">{sheet?.sheet.name ?? "Character sheet"}</bdi></h1></div>{phase === "ready" && <div className="button-row">{onOpenCombat && <button ref={combatButtonRef} className="primary" type="button" onClick={onOpenCombat}>Open combat tracker</button>}<button className="ghost" type="button" onClick={() => void load()} disabled={Boolean(marker)}>Refresh sheet</button></div>}</header>
     {phase === "loading" && <section className="library-panel actor-loading" role="status">Loading authoritative character state…</section>}
     {phase === "failed" && <section className="library-panel actor-loading" role="alert"><p>Character sheet could not be loaded.</p><button ref={retryRef} className="ghost" type="button" onClick={() => void load(true)}>Retry</button></section>}
     {phase === "ready" && sheet && <div className="actor-sheet-layout">

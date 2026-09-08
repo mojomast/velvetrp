@@ -4,6 +4,8 @@ import { agentRequestObjectSchema, agentResultObjectSchema, canonicalAgentJson, 
   utcIsoTimestampSchema, type AgentJsonObject } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
 import { AdventureTurnConflictError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./errors.js";
+import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
+import { buildCombatActionPlans } from "../encounter/combatActionPlan.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export interface ProviderContextInput { turnId:string; providerCallId:string; round:number; expectedCampaignRevision:number;
@@ -25,7 +27,17 @@ export interface AdventureTurnAgentResponseRepository {
   getAgentCombatReceipt(principal:string,campaignId:string,commandId:string):{revisionBefore:number;revisionAfter:number;occurredAt:string;resolution:AgentJsonObject}|null;
   validateApprovedAgentProposal(principal:string,turnId:string,proposalId:string):{valid:true}|{valid:false;reason:string};
   requireAgentProposalReplan(principal:string,turnId:string,proposalId:string,reason:"command-stale"):void;
+  claimNarrationProviderDispatch(principal:string,input:{turnId:string;callId:string;provider:string;model:string;
+    fallbackNarration:string;leaseMs:number}):NarrationDispatchState;
+  settleNarrationProviderDispatch(principal:string,input:{turnId:string;callId:string;claimId:string;
+    source:"provider-assisted"|"deterministic-fallback";narration:string;outcomeCode:string;
+    promptTokens:number|null;completionTokens:number|null}):NarrationDispatchState;
+  getNarrationProviderDispatch(principal:string,turnId:string,callId:string):NarrationDispatchState|null;
+  getAdventureTurnNarrationSource(principal:string,turnId:string):"provider-assisted"|"deterministic-fallback"|null;
 }
+export type NarrationDispatchState={state:"claimed";claimId:string;leaseExpiresAt:string}|{state:"in-progress";leaseExpiresAt:string}
+  |{state:"settled";source:"provider-assisted"|"deterministic-fallback";narration:string;outcomeCode:string;
+    promptTokens:number|null;completionTokens:number|null;provider:string;model:string};
 
 export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Database,deps:{clock:Clock;ids:IdGenerator;guard():void}):AdventureTurnAgentResponseRepository {
   const now=()=>utcIsoTimestampSchema.parse(deps.clock.now().toISOString());
@@ -36,7 +48,43 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       AND control.controller_principal_id=member.principal_id
     WHERE member.campaign_id=? AND member.principal_id=? AND (member.role IN('owner','gm') OR (member.role='player' AND control.actor_id IS NOT NULL))`)
     .get(row.actor_id,row.campaign_id,principal))throw new AdventureTurnUnavailableError();};
+  const narrationDispatch=(row:any,callId:string):NarrationDispatchState|null=>{const value=db.prepare(
+    "SELECT * FROM adventure_narration_dispatches_v60 WHERE campaign_id=? AND turn_id=? AND call_id=?")
+    .get(row.campaign_id,row.id,callId) as any;if(!value)return null;if(value.status==="claimed")return now()>=value.lease_expires_at
+      ?null:{state:"in-progress",leaseExpiresAt:value.lease_expires_at};return{state:"settled",source:value.source,narration:value.narration,
+        outcomeCode:value.outcome_code,promptTokens:value.prompt_tokens,completionTokens:value.completion_tokens,provider:value.provider,model:value.model};};
   return {
+    claimNarrationProviderDispatch(principal,input){return immediate(()=>{const row=turn(input.turnId);authority(principal,row);
+      const old=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE campaign_id=? AND turn_id=? AND call_id=?")
+        .get(row.campaign_id,row.id,input.callId) as any;const at=now();
+      if(old){if(old.status==="settled")return{state:"settled" as const,source:old.source,narration:old.narration,outcomeCode:old.outcome_code,
+          promptTokens:old.prompt_tokens,completionTokens:old.completion_tokens,provider:old.provider,model:old.model};
+        if(at<old.lease_expires_at)return{state:"in-progress" as const,leaseExpiresAt:old.lease_expires_at};
+        db.prepare(`UPDATE adventure_narration_dispatches_v60 SET status='settled',source='deterministic-fallback',narration=?,
+          outcome_code='dispatch-lease-expired',settled_at=? WHERE claim_id=? AND status='claimed'`).run(input.fallbackNarration,at,old.claim_id);
+        return{state:"settled" as const,source:"deterministic-fallback" as const,narration:input.fallbackNarration,
+          outcomeCode:"dispatch-lease-expired",promptTokens:null,completionTokens:null,provider:old.provider,model:old.model};}
+      if(row.state!=="narrating"||row.narration_status!=="in-progress")throw new AdventureTurnConflictError("narration is not dispatchable");
+      const leaseExpiresAt=utcIsoTimestampSchema.parse(new Date(deps.clock.now().getTime()+input.leaseMs).toISOString()),claimId=deps.ids.nextId();
+      db.prepare("INSERT INTO adventure_narration_dispatches_v60(claim_id,campaign_id,turn_id,call_id,provider,model,claimed_at,lease_expires_at,status) VALUES(?,?,?,?,?,?,?,?,'claimed')")
+        .run(claimId,row.campaign_id,row.id,input.callId,input.provider,input.model,at,leaseExpiresAt);
+      return{state:"claimed" as const,claimId,leaseExpiresAt};});},
+    settleNarrationProviderDispatch(principal,input){return immediate(()=>{const row=turn(input.turnId);authority(principal,row);const at=now();
+      const value=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE claim_id=? AND campaign_id=? AND turn_id=? AND call_id=?")
+        .get(input.claimId,row.campaign_id,row.id,input.callId) as any;
+      if(!value)throw new AdventureTurnConflictError("narration dispatch claim is unavailable");
+      if(value.status==="claimed"&&at<value.lease_expires_at&&!['completed','cancelled','failed'].includes(row.state))db.prepare(`UPDATE adventure_narration_dispatches_v60
+        SET status='settled',source=?,narration=?,outcome_code=?,prompt_tokens=?,completion_tokens=?,settled_at=? WHERE claim_id=? AND status='claimed'`)
+        .run(input.source,input.narration,input.outcomeCode,input.promptTokens,input.completionTokens,at,input.claimId);
+      const settled=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE claim_id=?").get(input.claimId) as any;
+      if(settled.status!=="settled")return{state:"in-progress" as const,leaseExpiresAt:settled.lease_expires_at};
+      return{state:"settled" as const,source:settled.source,narration:settled.narration,outcomeCode:settled.outcome_code,
+        promptTokens:settled.prompt_tokens,completionTokens:settled.completion_tokens,provider:settled.provider,model:settled.model};});},
+    getNarrationProviderDispatch(principal,turnId,callId){const row=turn(turnId);authority(principal,row);return narrationDispatch(row,callId);},
+    getAdventureTurnNarrationSource(principal,turnId){const row=turn(turnId);authority(principal,row);const value=db.prepare(`SELECT json_extract(request_json,'$.narrationSource') source
+      FROM adventure_coordination_commands_v36 WHERE campaign_id=? AND aggregate_kind='turn' AND aggregate_id=? AND mutation_type='narration-update'
+        AND json_type(request_json,'$.fallbackNarration')='text' ORDER BY resulting_revision DESC LIMIT 1`).get(row.campaign_id,row.id) as {source:string|null}|undefined;
+      return value?.source==="provider-assisted"||value?.source==="deterministic-fallback"?value.source:null;},
     claimAgentProviderRound(principal,raw){return immediate(()=>{
       const start=startAgentProviderCallInputSchema.parse({turnId:raw.turnId,providerCallId:raw.providerCallId,provider:raw.provider,
         model:raw.model,attempt:raw.attempt,expectedCampaignRevision:raw.expectedCampaignRevision,
@@ -132,7 +180,8 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
         // A rejected late/stale settlement is itself durably terminal. This
         // prevents fallback or terminal turn state from stranding a live claim.
         status="failed";outcomeCode=input.status==="succeeded"?"orphaned-rejected-success":input.outcomeCode;
-        promptTokens=null;completionTokens=null;
+        // Reject late mechanics authority, but retain provider-measured usage:
+        // the completed request may still have been billed.
       }
       const settledResponseJson=status==="succeeded"?responseJson:null;
       db.prepare(`INSERT INTO provider_call_metadata(record_id,campaign_id,turn_id,call_id,phase,provider,model,attempt,prompt_tokens,completion_tokens,outcome_code,idempotency_key,recorded_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`)
@@ -152,12 +201,12 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
        LEFT JOIN agent_provider_contexts_v39 context ON context.campaign_id=start.campaign_id AND context.turn_id=start.turn_id AND context.provider_call_id=start.provider_call_id
        LEFT JOIN agent_provider_dispatch_claims_v39 claim ON claim.campaign_id=start.campaign_id AND claim.turn_id=start.turn_id AND claim.provider_call_id=start.provider_call_id
        LEFT JOIN agent_provider_responses_v39 response ON response.campaign_id=start.campaign_id AND response.turn_id=start.turn_id AND response.provider_call_id=start.provider_call_id
-       WHERE start.campaign_id=? AND start.turn_id=? AND NOT EXISTS(SELECT 1 FROM agent_decision_rounds_v38 round
-         WHERE round.campaign_id=start.campaign_id AND round.turn_id=start.turn_id AND round.provider_call_id=start.provider_call_id)
-         AND NOT EXISTS(SELECT 1 FROM agent_mutation_accounting_v40 mutation WHERE mutation.campaign_id=start.campaign_id
-           AND mutation.turn_id=start.turn_id AND mutation.provider_call_id=start.provider_call_id)
-         ORDER BY provider.recorded_at DESC LIMIT 1`).get(row.campaign_id,turnId) as any;
-      if(!start)return null;return {providerCallId:start.provider_call_id,round:start.round_number??1,provider:start.provider,model:start.model,attempt:start.attempt,context:start.context_json?JSON.parse(start.context_json):null,request:start.request_json?JSON.parse(start.request_json):null,
+        WHERE start.campaign_id=? AND start.turn_id=? AND NOT EXISTS(SELECT 1 FROM agent_decision_rounds_v38 round
+          WHERE round.campaign_id=start.campaign_id AND round.turn_id=start.turn_id AND round.provider_call_id=start.provider_call_id)
+          AND NOT EXISTS(SELECT 1 FROM agent_mutation_accounting_v40 mutation WHERE mutation.campaign_id=start.campaign_id
+            AND mutation.turn_id=start.turn_id AND mutation.provider_call_id=start.provider_call_id)
+          ORDER BY provider.recorded_at DESC LIMIT 1`).get(row.campaign_id,turnId) as any;
+      if(!start||boundAdventureQuestReceipts(db,row.campaign_id,turnId).some((item)=>item.providerCallId===start.provider_call_id))return null;return {providerCallId:start.provider_call_id,round:start.round_number??1,provider:start.provider,model:start.model,attempt:start.attempt,context:start.context_json?JSON.parse(start.context_json):null,request:start.request_json?JSON.parse(start.request_json):null,
          claim:start.claimed_at?{claimedAt:start.claimed_at,leaseExpiresAt:start.lease_expires_at,expired:now()>=start.lease_expires_at}:null,response:start.status?{status:start.status,response:start.response_json?JSON.parse(start.response_json):null}:null};},
     getAgentDecisionContext(principal,turnId,providerToolCallId){const row=turn(turnId);authority(principal,row);
       const value=db.prepare(`SELECT round.provider_call_id,context.timeline_revision,context.context_json
@@ -203,9 +252,24 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       const domains=JSON.parse(proposal.observed_domain_revisions_json) as Array<{domain:string;revision:number}>;
       const domain=(name:string)=>domains.find((item)=>item.domain===name)?.revision;
       let reason:string|null=null;
-      const compatible=proposal.tool_name==="combat_action"?["combat-action-consequential","controller"]
-        :proposal.tool_name==="set_actor_attribute"?["gm-override","gm"]
-        :proposal.tool_name==="roll_actor_dice"?["deterministic-roll","controller"]:["ambiguous-consequential-change","controller"];
+       const inventoryCategory=proposal.tool_name==="inventory_item_equip"?"inventory-equip"
+         :proposal.tool_name==="inventory_item_unequip"?"inventory-unequip"
+         :proposal.tool_name==="inventory_item_drop"?"important-item-loss"
+         :proposal.tool_name==="inventory_item_consume"?"important-item-consume"
+         :proposal.tool_name==="inventory_item_gift"?"important-item-gift":null;
+        const compatible=proposal.tool_name==="combat_action"?["combat-action-consequential","controller"]
+          :proposal.tool_name==="set_actor_attribute"?["gm-override","gm"]
+          :proposal.tool_name==="roll_actor_dice"?["deterministic-roll","controller"]
+          :(proposal.tool_name==="power_use"||proposal.tool_name==="combat_consumable_use"||proposal.tool_name==="combat_power_use")?["ambiguous-limited-resource-use","controller"]
+           :(proposal.tool_name==="rest_short"||proposal.tool_name==="rest_long")?["rest-timing","controller"]
+           :proposal.tool_name==="quest_accept"?["quest-accept","controller"]
+           :proposal.tool_name==="quest_abandon"?["quest-abandon","controller"]
+           :proposal.tool_name==="quest_reward_claim"?["quest-reward-claim","controller"]
+           :proposal.tool_name==="character_progression_apply"?["character-progression","controller"]
+          :proposal.tool_name==="vendor_buy"?["purchase","controller"]
+          :proposal.tool_name==="vendor_sell"?["currency-transfer","controller"]
+          :proposal.tool_name==="vendor_give"?["important-item-gift","controller"]
+          :inventoryCategory?[inventoryCategory,"controller"]:["ambiguous-consequential-change","controller"];
       if(proposal.policy_version!=="v1"||proposal.category!==compatible[0]||proposal.required_authorizer!==compatible[1]
         ||Boolean(proposal.requires_confirmation)!==Boolean(proposal.policy_requires_confirmation??proposal.requires_confirmation)
         ||proposal.proposed_command_digest!==commandDigest)reason="policy-stale";
@@ -233,12 +297,10 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
         .get(proposal.encounter_id,row.campaign_id,row.session_id) as any;
         const currentCandidate=db.prepare(`SELECT 1 FROM combatant current WHERE current.encounter_id=? AND current.combatant_id=? AND current.status='active'`)
           .get(proposal.encounter_id,combat?.current_id);
-        const current=db.prepare("SELECT team FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'")
-          .get(proposal.encounter_id,combat?.current_id) as {team:string}|undefined;
-        const target=args.targetId===null?null:typeof args.targetId==='string'?db.prepare(`SELECT team FROM combatant
-          WHERE encounter_id=? AND combatant_id=? AND status='active'`).get(proposal.encounter_id,args.targetId) as {team:string}|undefined:undefined;
-        const exactTarget=proposal.command_legal_action_id==='attack:basic'?Boolean(target&&current&&target.team!==current.team)
-          :args.targetId===null&&['flee','end-turn'].includes(proposal.command_legal_action_id);
+        const action=buildCombatActionPlans(db,principal,row.campaign_id,proposal.encounter_id,combat?.current_id??null)
+          .find(plan=>plan.legalActionId===proposal.command_legal_action_id);
+        const exactTarget=action?.kind==='attack'?typeof args.targetId==='string'&&action.targetIds.includes(args.targetId)
+          :Boolean(action&&args.targetId===null&&['flee','end-turn'].includes(action.kind));
         const opaque=args.legalActionId,digestValue=typeof opaque==='string'&&combat
           ?hash(JSON.stringify([proposal.encounter_id,combat.revision,opaque,combat.current_id,args.targetId])):"";
         if(!combat||!currentCandidate||combat.revision!==domain('combat')||combat.revision!==proposal.expected_combat_revision

@@ -13,6 +13,10 @@ const characterInput = {
   boundaries: "fictional adults only",
     fictionalConfirmed: true,
 };
+const emptyProfile = {
+  goal: "", ideal: "", bond: "", flaw: "", history: "", personality: "",
+  fears: "", relationships: "", appearance: "", voice: "",
+};
 
 describe("character api compatibility", () => {
   it("preserves exact create, list, get, update, export, import, and delete responses", async () => {
@@ -28,6 +32,7 @@ describe("character api compatibility", () => {
     expect(created).toEqual({
       id: expect.any(String),
       ...characterInput,
+      profile: emptyProfile,
       isRealPerson: false,
       createdAt: expect.any(String),
     });
@@ -52,12 +57,13 @@ describe("character api compatibility", () => {
     const exported = await app.inject({ method: "GET", url: `/api/characters/${created.id as string}/export` });
     expect(exported.statusCode).toBe(200);
     expect(exported.json()).toEqual({
-      formatVersion: "velvet-character@1",
+      formatVersion: "velvet-character@2",
       character: {
         name: "Captain Aria",
         age: 30,
         archetype: characterInput.archetype,
         boundaries: characterInput.boundaries,
+        profile: emptyProfile,
         fictionalConfirmed: true,
       },
     });
@@ -76,6 +82,7 @@ describe("character api compatibility", () => {
       archetype: characterInput.archetype,
       boundaries: characterInput.boundaries,
       fictionalConfirmed: true,
+      profile: emptyProfile,
       isRealPerson: false,
       createdAt: expect.any(String),
     });
@@ -91,6 +98,7 @@ describe("character api compatibility", () => {
       id: expect.any(String),
       ...characterInput,
       name: "Direct import",
+      profile: emptyProfile,
       isRealPerson: false,
       createdAt: expect.any(String),
     });
@@ -98,6 +106,34 @@ describe("character api compatibility", () => {
     const deleted = await app.inject({ method: "DELETE", url: `/api/characters/${created.id as string}` });
     expect(deleted.statusCode).toBe(200);
     expect(deleted.json()).toEqual({ ok: true });
+    await app.close();
+  });
+
+  it("normalizes rich profiles and preserves wrapped v1 imports", async () => {
+    const app = buildApp();
+    const profile = {
+      goal: "  Chart the unknown. ", ideal: "Curiosity", bond: "Her crew", flaw: "Reckless",
+      history: "Raised aboard a survey ship.", personality: "Restless and warm.", fears: "Being stranded.",
+      relationships: "Protective of her navigator.", appearance: "Silver flight jacket.", voice: "Quick, precise sentences.",
+    };
+    const createdResponse = await app.inject({ method: "POST", url: "/api/characters", payload: { ...characterInput, profile } });
+    expect(createdResponse.statusCode).toBe(201);
+    const created = createdResponse.json() as { id: string; profile: typeof profile };
+    expect(created.profile).toEqual({ ...profile, goal: "Chart the unknown." });
+    expect((await app.inject({ method: "GET", url: `/api/characters/${created.id}` })).json()).toEqual(created);
+
+    const v1 = await app.inject({
+      method: "POST", url: "/api/characters/import",
+      payload: { formatVersion: "velvet-character@1", character: { ...characterInput, name: "Legacy" } },
+    });
+    expect(v1.statusCode).toBe(201);
+    expect(v1.json()).toMatchObject({ name: "Legacy", profile: emptyProfile });
+
+    for (const invalidProfile of [{ hidden: "secret" }, { goal: 4 }, { goal: "x".repeat(501) }]) {
+      const response = await app.inject({ method: "POST", url: "/api/characters", payload: { ...characterInput, profile: invalidProfile } });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toEqual({ error: "profile is invalid" });
+    }
     await app.close();
   });
 

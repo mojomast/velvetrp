@@ -21,6 +21,7 @@ import type { EncounterDependencies } from "./encounterWriteRepo.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { EncounterAuthorizationError, EncounterConflictError, EncounterStaleError, EncounterTurnError } from "./encounterErrors.js";
+import { isDndCombat, readCombatTurnEconomy, consumeDndTurnCost, endDndCombatTurn } from "./combatActionPlan.js";
 
 const canonical=(value:unknown):string=>JSON.stringify(value,(_key,nested)=>nested&&typeof nested==="object"&&!Array.isArray(nested)
   ?Object.fromEntries(Object.keys(nested).sort().map((key)=>[key,nested[key]])):nested);
@@ -92,6 +93,7 @@ export function buildUseConsumableLegalActions(db:DatabaseDriver.Database,princi
   if(!encounter||encounter.status!=="active"||encounter.current_turn_combatant_id===null||!member(db,principal,encounter.campaign_id))return [];
   const rows=combatants(db,encounterId),acting=rows.find((row)=>row.combatant_id===encounter.current_turn_combatant_id);
   if(!acting?.actor_id||!mayAct(db,principal,encounter.campaign_id,acting.actor_id))return [];
+  if(isDndCombat(db,encounter.campaign_id)&&!readCombatTurnEconomy(db,encounterId)?.action.available)return [];
   // This invariant is rechecked by execution. It prevents an ambiguous actor authority root.
   const activeCount=(db.prepare(`SELECT count(*) count FROM encounter other JOIN combatant participant USING(encounter_id)
     WHERE other.status='active' AND participant.actor_id=?`).get(acting.actor_id) as {count:number}).count;
@@ -230,6 +232,7 @@ function turnPlan(db:DatabaseDriver.Database,encounter:EncounterRow,currentId:st
     ORDER BY initiative DESC,initiative_tiebreaker,combatant_id`).all(encounter.encounter_id) as Array<{combatant_id:string;team:string;status:string}>;
   const status=(row:{combatant_id:string;status:string})=>row.combatant_id===targetId?targetStatus:row.status;
   if(new Set(rows.filter((row)=>status(row)==="active").map((row)=>row.team)).size<2)return {nextId:null,round:encounter.round_number,event:{kind:"combat_terminal"}};
+  if(isDndCombat(db,encounter.campaign_id))return {nextId:currentId,round:encounter.round_number,event:{kind:"turn_continued"}};
   const index=rows.findIndex((row)=>row.combatant_id===currentId);
   for(let step=1;step<=rows.length;step++){
     const candidateIndex=(index+step)%rows.length,candidate=rows[candidateIndex]!;
@@ -408,6 +411,10 @@ export function executeUseConsumable(db:DatabaseDriver.Database,deps:EncounterDe
       if(update.changes!==1)throw new EncounterConflictError("target combatant changed before commit");
     }
     failpoint?.("combatant");
+    if(isDndCombat(db,encounter.campaign_id)){
+      consumeDndTurnCost(db,encounter.encounter_id,acting.combatant_id,"action");
+      if(turn.nextId===null)endDndCombatTurn(db,encounter.encounter_id,at);
+    }
     exactlyOne(db.prepare(`UPDATE encounter SET current_turn_combatant_id=?,round_number=?,state_revision=state_revision+1,updated_at=?
       WHERE encounter_id=? AND state_revision=?`).run(turn.nextId,turn.round,at,encounter.encounter_id,encounter.state_revision),"encounter state was not updated");
     exactlyOne(db.prepare("UPDATE combat_mutation_revisions_v27 SET revision=?,updated_at=? WHERE encounter_id=? AND revision=?")

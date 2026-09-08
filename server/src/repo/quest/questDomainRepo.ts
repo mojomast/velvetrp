@@ -16,6 +16,7 @@ import {
   type QuestJournalEntryHttp,
   type QuestObjectiveHttp,
 } from "@velvet/contracts";
+import { boundAdventureQuestReceipts, makeAdventureQuestCandidate } from "./adventureQuestBinding.js";
 
 type Database = DatabaseDriver.Database;
 type InternalReceipt = QuestCommandReceiptHttp & { commandId: string };
@@ -33,6 +34,17 @@ export interface CampaignQuestSnapshot {
   journal: QuestJournalEntryHttp[];
 }
 export interface QuestMutationResult { campaignId: string; quest: CampaignQuestProjectionHttp; receipt: InternalReceipt }
+export interface AdventureQuestObjectiveCandidate {
+  candidateId: string; digest: string; questTitle: string; objectiveDescription: string;
+  progress: number; targetProgress: number; questId: string; objectiveId: string; questRevision: number;
+}
+export interface AdventureQuestNarrationReceipt {
+  questTitle: string; objectiveDescription: string; progressBefore: number; progressAfter: number; targetProgress: number;
+  objectiveCompleted: boolean; questCompleted: boolean;
+}
+export interface AdventureQuestPublicReceipt extends AdventureQuestNarrationReceipt {
+  revisionBefore: number; revisionAfter: number; occurredAt: string;
+}
 export interface QuestCreateMutationResult extends QuestMutationResult {
   definition: CreateCampaignQuestHttpRequest["quest"];
   projection: Omit<CampaignQuestSnapshot, "campaignId" | "revision">;
@@ -43,6 +55,10 @@ export interface QuestDomainRepository {
   listCampaignQuests(principalId: string, campaignId: string): CampaignQuestSnapshot | null;
   createCampaignQuest(principalId: string, campaignId: string, input: CreateCampaignQuestHttpRequest): QuestCreateMutationResult;
   executeQuestCommand(principalId: string, questId: string, input: QuestCommandHttpRequest): QuestMutationResult;
+  listAdventureQuestObjectiveCandidates(principalId: string, turnId: string): AdventureQuestObjectiveCandidate[];
+  executeAdventureQuestObjectiveCandidate(principalId: string, input: { turnId: string; providerCallId: string; candidateId: string; digest: string }): QuestMutationResult;
+  getAdventureQuestNarrationReceipt(principalId: string, turnId: string, commandId: string): AdventureQuestNarrationReceipt | null;
+  getAdventureQuestPublicReceipt(principalId: string, campaignId: string, commandId: string): AdventureQuestPublicReceipt | null;
 }
 export interface QuestDomainContext { clock: { now(): Date }; ids: { nextId(): string }; guard(): void }
 
@@ -52,6 +68,8 @@ const canonicalValue = (value: unknown): unknown => Array.isArray(value) ? value
     : value;
 const canonical = (value: unknown): string => JSON.stringify(canonicalValue(value));
 const digest = (value: unknown): string => createHash("sha256").update(canonical(value)).digest("hex");
+const adventureQuestKey = (providerCallId: string,candidateId:string): string =>
+  resourceIdSchema.parse(`adventure-quest:${providerCallId.slice(-32)}:${candidateId.slice(-32)}`);
 const status = (value: string): CampaignQuestHttp["status"] => value === "active" ? "active"
   : value === "completed" ? "completed" : value === "failed" ? "abandoned" : "offered";
 const timestamp = (value: string): string => {
@@ -240,7 +258,69 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
     for (const objective of objectives) if (objective.visibility === "public") inspect(objective.objectiveId, objective.objectiveId, new Set());
   }
 
-  return {
+  function adventureCandidates(principalId: string, turnId: string): AdventureQuestObjectiveCandidate[] {
+    const turn = db.prepare(`SELECT turn.campaign_id,turn.actor_id,turn.session_id FROM adventure_turns turn
+      JOIN campaign_memberships member ON member.campaign_id=turn.campaign_id AND member.principal_id=?
+      JOIN campaign_sessions attached ON attached.campaign_id=turn.campaign_id AND attached.session_id=turn.session_id
+      JOIN sessions session ON session.id=attached.session_id
+      LEFT JOIN campaign_actor_private_state control ON control.campaign_id=turn.campaign_id AND control.actor_id=turn.actor_id
+        AND control.controller_principal_id=?
+      JOIN campaigns campaign ON campaign.id=turn.campaign_id AND campaign.active_timeline_id=turn.timeline_id
+        AND campaign.administration_revision=turn.campaign_revision AND campaign.lifecycle_status IN ('draft','published')
+      WHERE turn.id=? AND turn.principal_id=? AND turn.mode='original' AND turn.state='declared'
+        AND session.state='active' AND session.stopped_at IS NULL
+        AND NOT EXISTS(SELECT 1 FROM encounter WHERE encounter.campaign_id=turn.campaign_id
+          AND encounter.session_id=turn.session_id AND encounter.status='active')
+        AND member.role<>'observer' AND (member.role IN ('owner','gm') OR control.actor_id IS NOT NULL)`)
+      .get(principalId, principalId, turnId, principalId) as { campaign_id: string; actor_id: string; session_id: string } | undefined;
+    if (!turn) throw new QuestAuthorizationError("adventure quest authority is unavailable");
+    const questRevision = revision(turn.campaign_id);
+    const rows = db.prepare(`SELECT quest.id quest_id,quest.title,objective.objective_id,objective.description,
+        objective.target_progress,progress.progress
+      FROM quests quest JOIN quest_definitions_v33 quest_definition
+        ON quest_definition.campaign_id=quest.campaign_id AND quest_definition.quest_id=quest.id
+      JOIN quest_objectives_v33 objective ON objective.campaign_id=quest.campaign_id AND objective.quest_id=quest.id
+      JOIN quest_objective_progress_v33 progress USING(campaign_id,quest_id,objective_id)
+      WHERE quest.campaign_id=? AND quest.status='active' AND quest_definition.visibility='public'
+        AND objective.visibility='public' AND progress.progress<objective.target_progress
+        AND NOT EXISTS(SELECT 1 FROM quest_objective_dependencies_v33 dependency
+          JOIN quest_objective_progress_v33 dependency_progress ON dependency_progress.campaign_id=dependency.campaign_id
+            AND dependency_progress.quest_id=dependency.quest_id AND dependency_progress.objective_id=dependency.dependency_objective_id
+          JOIN quest_objectives_v33 dependency_definition ON dependency_definition.campaign_id=dependency_progress.campaign_id
+            AND dependency_definition.quest_id=dependency_progress.quest_id AND dependency_definition.objective_id=dependency_progress.objective_id
+          WHERE dependency.campaign_id=objective.campaign_id AND dependency.quest_id=objective.quest_id
+            AND dependency.objective_id=objective.objective_id AND dependency_progress.progress<dependency_definition.target_progress)
+      ORDER BY quest.sort_order,quest.id COLLATE BINARY,objective.sort_order,objective.objective_id COLLATE BINARY LIMIT 33`)
+      .all(turn.campaign_id) as Array<{ quest_id: string; title: string; objective_id: string; description: string;
+        target_progress: number; progress: number }>;
+    if (rows.length > 32) throw new QuestConflictError("adventure quest candidate limit exceeded");
+    return rows.map((row) => {
+      const evidence = { version: "v1" as const, turnId, campaignId: turn.campaign_id, questRevision, questId: row.quest_id,
+        objectiveId: row.objective_id, progress: row.progress, targetProgress: row.target_progress,
+        questTitle: row.title, objectiveDescription: row.description };
+      const candidate=makeAdventureQuestCandidate(evidence);
+      return { ...candidate, questTitle: row.title, objectiveDescription: row.description, progress: row.progress,
+        targetProgress: row.target_progress, questId: row.quest_id, objectiveId: row.objective_id, questRevision };
+    });
+  }
+
+  function historicalCandidate(turnId:string,command:{campaign_id:string;quest_id:string;expected_revision:number;resulting_revision:number;
+    canonical_request_json:string}):AdventureQuestObjectiveCandidate|null {
+    const request=JSON.parse(command.canonical_request_json) as {objectiveId?:string};if(!request.objectiveId)return null;
+    const row=db.prepare(`SELECT quest.title,objective.description,objective.target_progress FROM quests quest
+      JOIN quest_objectives_v33 objective ON objective.campaign_id=quest.campaign_id AND objective.quest_id=quest.id
+      WHERE quest.campaign_id=? AND quest.id=? AND objective.objective_id=?`).get(command.campaign_id,command.quest_id,request.objectiveId) as
+      {title:string;description:string;target_progress:number}|undefined;if(!row)return null;
+    const progress=(db.prepare(`SELECT count(*) count FROM quest_domain_commands_v33 prior
+      WHERE prior.campaign_id=? AND prior.quest_id=? AND prior.command_type='advance-objective' AND prior.resulting_revision<?
+        AND json_extract(prior.canonical_request_json,'$.objectiveId')=?`).get(command.campaign_id,command.quest_id,command.resulting_revision,request.objectiveId) as {count:number}).count;
+    const evidence={version:"v1" as const,turnId,campaignId:command.campaign_id,questRevision:command.expected_revision,questId:command.quest_id,
+      objectiveId:request.objectiveId,progress,targetProgress:row.target_progress,questTitle:row.title,objectiveDescription:row.description};
+    return{...makeAdventureQuestCandidate(evidence),questTitle:row.title,objectiveDescription:row.description,progress,targetProgress:row.target_progress,
+      questId:command.quest_id,objectiveId:request.objectiveId,questRevision:command.expected_revision};
+  }
+
+  const repository: QuestDomainRepository = {
     listCampaignQuests(principalId, campaignId) { context.guard(); return snapshot(principalId, campaignId); },
     createCampaignQuest(principalId, campaignIdInput, raw) {
       context.guard();
@@ -372,5 +452,83 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
         record(mutation, result, eventType, event); return result;
       }).immediate();
     },
+    listAdventureQuestObjectiveCandidates(principalId, turnIdInput) {
+      context.guard(); return adventureCandidates(resourceIdSchema.parse(principalId), resourceIdSchema.parse(turnIdInput));
+    },
+    executeAdventureQuestObjectiveCandidate(principalId, input) {
+      context.guard(); const turnId = resourceIdSchema.parse(input.turnId), providerCallId=resourceIdSchema.parse(input.providerCallId),
+        candidateId = resourceIdSchema.parse(input.candidateId),key=adventureQuestKey(providerCallId,candidateId);
+      return db.transaction(()=>{
+        const provider=db.prepare(`SELECT response.response_json,provider_request.request_json,provider_request.timeline_id,
+            provider_request.timeline_revision,provider_request.campaign_revision,provider_request.turn_revision
+          FROM agent_provider_responses_v39 response
+          JOIN agent_provider_contexts_v39 provider_request ON provider_request.context_id=response.context_id
+          WHERE response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'`).get(turnId,providerCallId) as
+          {response_json:string;request_json:string;timeline_id:string;timeline_revision:number;campaign_revision:number;turn_revision:number}|undefined;
+        if(!provider)throw new QuestConflictError("settled adventure quest selection is unavailable");
+        const response=JSON.parse(provider.response_json) as any,request=JSON.parse(provider.request_json) as any;
+        const call=Array.isArray(response?.calls)&&response.calls.length===1?response.calls[0]:null;
+        const advertised=Array.isArray(request?.questCandidateProjection?.candidates)?request.questCandidateProjection.candidates:[];
+        if(call?.toolName!=="exact_quest_objective.select"||call?.arguments?.candidateId!==candidateId||call?.arguments?.digest!==input.digest
+          ||!advertised.some((candidate:any)=>candidate?.candidateId===candidateId&&candidate?.digest===input.digest))
+          throw new QuestConflictError("adventure quest selection is not bound to its provider decision");
+        const existing=db.prepare(`SELECT campaign_id,quest_id,expected_revision,resulting_revision,canonical_request_json FROM quest_domain_commands_v33
+          WHERE idempotency_key=?`).get(key) as {campaign_id:string;quest_id:string;expected_revision:number;resulting_revision:number;canonical_request_json:string}|undefined;
+        if(existing){const bound=historicalCandidate(turnId,existing);if(bound?.candidateId!==candidateId||bound.digest!==input.digest)
+            throw new QuestConflictError("committed quest command does not match the selected candidate");
+          const requestValue=JSON.parse(existing.canonical_request_json) as {objectiveId:string;expectedRevision:number};
+          return repository.executeQuestCommand(principalId,existing.quest_id,{kind:"advance-objective",objectiveId:requestValue.objectiveId,
+            expectedRevision:requestValue.expectedRevision,idempotencyKey:key});}
+        const fresh=db.prepare(`SELECT 1 FROM adventure_turns turn JOIN campaigns campaign ON campaign.id=turn.campaign_id
+          JOIN campaign_timelines timeline ON timeline.campaign_id=turn.campaign_id AND timeline.id=turn.timeline_id
+          WHERE turn.id=? AND turn.mode='original' AND turn.state='declared' AND turn.timeline_id=?
+            AND turn.revision=? AND turn.campaign_revision=? AND campaign.administration_revision=?
+            AND campaign.active_timeline_id=turn.timeline_id AND timeline.revision=?`).get(turnId,provider.timeline_id,
+              provider.turn_revision,provider.campaign_revision,provider.campaign_revision,provider.timeline_revision);
+        if(!fresh)throw new QuestConflictError("adventure quest decision context is stale");
+        const selected = adventureCandidates(resourceIdSchema.parse(principalId), turnId)
+          .find((candidate) => candidate.candidateId === candidateId && candidate.digest === input.digest);
+        if (!selected) throw new QuestConflictError("adventure quest candidate is stale or unavailable");
+        return repository.executeQuestCommand(principalId, selected.questId, { kind: "advance-objective", objectiveId: selected.objectiveId,
+          expectedRevision: selected.questRevision, idempotencyKey:key });
+      }).immediate();
+    },
+    getAdventureQuestNarrationReceipt(principalId, turnIdInput, commandIdInput) {
+      context.guard(); const turnId = resourceIdSchema.parse(turnIdInput), commandId = resourceIdSchema.parse(commandIdInput);
+      let rootTurnId=turnId;const visited=new Set<string>();
+      while(true){if(visited.has(rootTurnId))throw new QuestConflictError("adventure turn ancestry contains a cycle");visited.add(rootTurnId);
+        const ancestor=db.prepare("SELECT mode,prior_turn_id FROM adventure_turns WHERE id=?").get(rootTurnId) as {mode:string;prior_turn_id:string|null}|undefined;
+        if(!ancestor)return null;if(ancestor.mode==="original")break;if(!ancestor.prior_turn_id)return null;rootTurnId=ancestor.prior_turn_id;}
+      const campaign=db.prepare("SELECT campaign_id FROM adventure_turns WHERE id=?").get(rootTurnId) as {campaign_id:string}|undefined;
+      if(!campaign||!membership(principalId,campaign.campaign_id))return null;
+      const bound=boundAdventureQuestReceipts(db,campaign.campaign_id,rootTurnId).find((item)=>item.commandId===commandId);if(!bound)return null;
+      const result=JSON.parse(bound.resultJson) as QuestMutationResult;
+      return { questTitle:bound.questTitle,objectiveDescription:bound.objectiveDescription,progressBefore:bound.progressBefore,
+        progressAfter:bound.progressAfter,targetProgress:bound.targetProgress,objectiveCompleted:bound.progressAfter>=bound.targetProgress,
+        questCompleted:result.quest.status==="completed" };
+    },
+    getAdventureQuestPublicReceipt(principalIdInput, campaignIdInput, commandIdInput) {
+      context.guard();const principalId=resourceIdSchema.parse(principalIdInput),campaignId=resourceIdSchema.parse(campaignIdInput),
+        commandId=resourceIdSchema.parse(commandIdInput);
+      if(!membership(principalId,campaignId))return null;
+      const turns=db.prepare(`SELECT response.turn_id FROM quest_domain_commands_v33 command
+        JOIN agent_provider_responses_v39 response ON response.campaign_id=command.campaign_id AND response.status='succeeded'
+          AND command.idempotency_key='adventure-quest:'||substr(response.provider_call_id,-32)||':'
+            ||substr(json_extract(response.response_json,'$.calls[0].arguments.candidateId'),-32)
+        WHERE command.campaign_id=? AND command.command_id=? ORDER BY response.turn_id`).all(campaignId,commandId) as Array<{turn_id:string}>;
+      for(const turn of turns){const bound=boundAdventureQuestReceipts(db,campaignId,turn.turn_id).find((item)=>item.commandId===commandId);
+        if(!bound)continue;
+        const result=JSON.parse(bound.resultJson) as QuestMutationResult;
+        if(result.campaignId!==campaignId||result.receipt.commandId!==commandId
+          ||result.receipt.revisionBefore!==bound.revisionBefore||result.receipt.revisionAfter!==bound.revisionAfter
+          ||result.receipt.occurredAt!==bound.linkedAt)throw new QuestConflictError("adventure quest receipt ancestry is invalid");
+        return{questTitle:bound.questTitle,objectiveDescription:bound.objectiveDescription,progressBefore:bound.progressBefore,
+          progressAfter:bound.progressAfter,targetProgress:bound.targetProgress,objectiveCompleted:bound.progressAfter>=bound.targetProgress,
+          questCompleted:result.quest.status==="completed",revisionBefore:bound.revisionBefore,revisionAfter:bound.revisionAfter,
+          occurredAt:bound.linkedAt};
+      }
+      return null;
+    },
   };
+  return repository;
 }

@@ -25,6 +25,7 @@ describe("M4.2 durable agent execution contracts", () => {
 
   it("strictly validates whole response batches and complete optimistic identity", () => {
     expect(persistAgentDecisionRoundInputSchema.parse(base)).toEqual(base);
+    expect(persistAgentDecisionRoundInputSchema.safeParse({ ...base, calls: [{ ...base.calls[0], toolName: "actor_sheet.read" }] }).success).toBe(true);
     expect(persistAgentDecisionRoundInputSchema.safeParse({ ...base, unknown: true }).success).toBe(false);
     expect(persistAgentDecisionRoundInputSchema.safeParse({ ...base, calls: [{ ...base.calls[0], kind: "mutation" }] }).success).toBe(false);
     expect(persistAgentDecisionRoundInputSchema.safeParse({ ...base, result: "complete" }).success).toBe(false);

@@ -52,6 +52,9 @@ export function executeTravelInTransaction<Result>(db:DatabaseDriver.Database,de
   if(!policy.allowed){if(policy.reason==="identity-or-authority")throw new WorldAuthorizationError("travel authority is required");
     throw new WorldUnavailableError("route is unavailable");}
   const at=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),after=before+1;
+  const expedition=db.prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?")
+    .get(command.campaignId,sessionId) as {elapsed_minutes:number}|undefined;
+  const elapsedAfter=(expedition?.elapsed_minutes??0)+60;
   const discoveries=policy.positions.map((position)=>{const existing=db.prepare(`SELECT discovered_at FROM campaign_location_discoveries_v28
     WHERE campaign_id=? AND actor_id=? AND location_id=?`).get(command.campaignId,position.actorId,policy.route.toLocationId) as {discovered_at:string}|undefined;
     return {actorId:position.actorId,locationId:policy.route.toLocationId,discoveredAt:existing?.discovered_at??at};});
@@ -63,6 +66,11 @@ export function executeTravelInTransaction<Result>(db:DatabaseDriver.Database,de
   requireOne(db.prepare("INSERT INTO world_receipts_v28 VALUES(?,?,?,?,?,?,?)").run(command.campaignId,sessionId,commandId,after,canonical(result),digest(result),at),"world receipt was not created");
   requireOne(db.prepare("INSERT INTO world_events_v28 VALUES(?,?,?,?,?,?,?,?)").run(resourceIdSchema.parse(deps.ids.nextId()),command.campaignId,sessionId,commandId,after,"travelled",canonical({travelId:command.travelId,destinationLocationId:policy.route.toLocationId}),at),"world event was not created");
   requireOne(db.prepare("UPDATE world_mutation_revisions_v28 SET revision=?,updated_at=? WHERE campaign_id=? AND session_id=? AND revision=?").run(after,at,command.campaignId,sessionId,before),"world revision was not advanced");
+  if(expedition)requireOne(db.prepare("UPDATE world_expeditions_v60 SET elapsed_minutes=?,camp_location_id=NULL,camp_command_id=NULL WHERE campaign_id=? AND session_id=?")
+    .run(elapsedAfter,command.campaignId,sessionId),"expedition state was not advanced");
+  else requireOne(db.prepare("INSERT INTO world_expeditions_v60(campaign_id,session_id,elapsed_minutes,camp_location_id,camp_command_id) VALUES(?,?,?,NULL,NULL)")
+    .run(command.campaignId,sessionId,elapsedAfter),"expedition state was not created");
+  requireOne(db.prepare("INSERT INTO world_travel_elapsed_v60 VALUES(?,?,?,?,?)").run(command.campaignId,sessionId,commandId,60,elapsedAfter),"travel elapsed evidence was not recorded");
   for(const position of policy.positions){
     requireOne(db.prepare("INSERT INTO world_travel_party_members_v28 VALUES(?,?,?,?)").run(command.campaignId,sessionId,commandId,position.actorId),"travel party member was not recorded");
     requireOne(db.prepare(`UPDATE campaign_actor_locations_v28 SET location_id=?,state_revision=state_revision+1,updated_at=?

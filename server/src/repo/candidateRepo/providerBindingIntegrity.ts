@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   canonicalAgentJson,
+  agentJsonObjectSchema,
   computeExactCandidateSelectionDigest,
   exactCandidateSelectionResponseSchema,
   projectExactCandidateForProvider,
@@ -52,11 +53,19 @@ function assertBoundRow(db: DatabaseDriver.Database, row: any): void {
     throw new Error("exact-candidate authoritative provider projection is malformed");
   }
   const schema = request.advertisedToolSchemas?.find((tool: any) => tool?.name === row.tool_name);
-  const exactParameters = { type: "object", properties: {
-    candidateId: { type: "string", enum: projection.candidates.map((candidate: { candidateId: string }) => candidate.candidateId) },
-    kind: { type: "string", enum: ["actor.travel"] }, version: { type: "string", enum: ["v1"] },
-    choices: { type: "array", maxItems: 0 },
-  }, required: ["candidateId", "kind", "version", "choices"], additionalProperties: false };
+  const legacy=projection.candidates.every((candidate:any)=>candidate.semanticLabel===undefined);
+  if(legacy)expectedProjection={...expectedProjection,candidates:expectedProjection.candidates.map(({semanticLabel:_label,...candidate}:any)=>candidate)};
+  const exactParameters = agentJsonObjectSchema.parse(legacy ? { type: "object", properties: {
+    candidateId: { type: "string", enum: projection.candidates.map((candidate: any) => candidate.candidateId) },
+    kind: { type: "string", enum: ["actor.travel"] }, version: { type: "string", enum: ["v1"] }, choices: { type: "array", maxItems: 0 },
+  }, required: ["candidateId", "kind", "version", "choices"], additionalProperties: false } : { type:"object",properties:{
+    candidateId:{type:"string",enum:projection.candidates.map((candidate:any)=>candidate.candidateId)},kind:{type:"string",enum:["actor.travel"]},
+    version:{type:"string",enum:["v1"]},choices:{type:"array",maxItems:0}},required:["candidateId","kind","version","choices"],additionalProperties:false,
+    oneOf: projection.candidates.map((candidate: any) => ({ type: "object",
+    description: "Select this exact server-issued travel binding.", properties: {
+      candidateId: { type: "string", const: candidate.candidateId }, kind: { type: "string", const: "actor.travel" },
+      version: { type: "string", const: "v1" }, choices: { type: "array", maxItems: 0 },
+    }, required: ["candidateId", "kind", "version", "choices"], additionalProperties: false })) });
   if (frame !== canonicalAgentJson(expectedProjection) || frame !== row.provider_projection_json
     || createHash("sha256").update(frame).digest("hex") !== row.provider_projection_digest
     || canonicalAgentJson(request.exactCandidateProjection) !== frame || selectionFrame !== row.selection_json

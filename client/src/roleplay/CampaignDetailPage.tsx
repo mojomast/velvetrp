@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
-import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, type CampaignDetail } from "../api";
+import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
+import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, type CampaignDetail } from "../api";
 import type { CampaignAdministrationHttpResponse, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignPlayBootstrap, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
 
 export interface CampaignDetailPageProps {
@@ -50,7 +50,7 @@ function useCampaignStudioRollout(): boolean {
 
 type RenamePhase = "idle" | "writing" | "reconciling";
 type SetupPhase = "idle" | "writing" | "reconciling";
-type SetupChoice = "original" | "mechanics";
+type SetupChoice = "srd" | "original" | "mechanics";
 type RosterPhase = "loading" | "ready" | "failed" | "unsupported";
 type OptionsPhase = "loading" | "ready" | "failed" | "unsupported";
 type CreatePhase = "idle" | "writing" | "reconciling";
@@ -252,6 +252,18 @@ function isMechanicsStarterConfigured(campaign: CampaignDetail): boolean {
     && campaign.content.contentPacks.length === 1
     && campaign.content.contentPacks[0]?.packId === MECHANICS_STARTER_IDENTITY.packId
     && campaign.content.contentPacks[0]?.packVersion === MECHANICS_STARTER_IDENTITY.packVersion;
+}
+
+function isSrd51StarterConfigured(campaign: CampaignDetail): boolean {
+  return campaign.content.status === "configured"
+    && campaign.content.rulesProfileId === SRD_5_1_STARTER_IDENTITY.rulesProfileId
+    && campaign.content.contentPacks.length === 1
+    && campaign.content.contentPacks[0]?.packId === SRD_5_1_STARTER_IDENTITY.packId
+    && campaign.content.contentPacks[0]?.packVersion === SRD_5_1_STARTER_IDENTITY.packVersion;
+}
+
+function setupChoiceName(choice: SetupChoice): string {
+  return choice === "srd" ? "SRD 5.1" : choice === "mechanics" ? "Velvet mechanics" : "Original";
 }
 
 function reconciledPresence(reconciliation: CreateReconciliation): { present: boolean; used: boolean; complete: boolean } {
@@ -576,7 +588,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       setCampaign(response.campaign);
       setDraft(response.campaign.name);
       setSetupChoice(response.campaign.actorRole === "owner" && response.campaign.content.status === "unconfigured"
-        ? "original" : null);
+        ? mechanicsEnabled ? "srd" : "original" : null);
       setLoading(false);
       return generation;
     } catch (error) {
@@ -589,7 +601,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       setLoading(false);
       return null;
     }
-  }, [campaignId, markCampaignUnavailable]);
+  }, [campaignId, markCampaignUnavailable, mechanicsEnabled]);
 
   const loadRoster = useCallback(async (retry = false, reuseInitialInFlight = false) => {
     const requestedCampaignId = campaignId;
@@ -810,9 +822,9 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       const putConflict = reconciliation.put.status === "rejected"
         && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
       if (reconciliation.put.status === "fulfilled") {
-        setSetupError(`${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration; the PUT was not repeated.`);
+        setSetupError(`${setupChoiceName(reconciliation.choice)} starter setup completed, but the latest details could not be refreshed. Refresh the campaign to reconcile current configuration; the PUT was not repeated.`);
       } else setSetupError(putConflict
-        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated.`
+        ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with current state, and the latest campaign details could not be loaded. The PUT was not repeated.`
         : "Setup outcome is uncertain and latest details could not be loaded. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published). Refresh before deciding whether to try again; the PUT was not repeated.");
       return true;
     }
@@ -830,7 +842,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     setSetupChoice(refreshed.content.status === "unconfigured" ? reconciliation.choice : null);
     const exact = reconciliation.choice === "original"
       ? isOriginalStarterConfigured(refreshed)
-      : isMechanicsStarterConfigured(refreshed);
+      : reconciliation.choice === "srd" ? isSrd51StarterConfigured(refreshed) : isMechanicsStarterConfigured(refreshed);
     if (exact) {
       if (reconciliation.choice === "original") requirePostSetupOptionsRefresh(requestedCampaignId);
       else {
@@ -839,8 +851,8 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       }
       setSetupError("");
       setAnnouncement(reconciliation.put.status === "fulfilled"
-        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup is complete. The configured identifiers are now read-only.`
-        : `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter is currently active. The write response was not authoritative, so campaign detail was reconciled; the PUT was not repeated.`);
+        ? `${setupChoiceName(reconciliation.choice)} starter setup is complete. The configured identifiers are now read-only.`
+        : `${setupChoiceName(reconciliation.choice)} starter is currently active. The write response was not authoritative, so campaign detail was reconciled; the PUT was not repeated.`);
     } else if (refreshed.content.status === "configured") {
       setAnnouncement("");
       setSetupError("This campaign has a different content configuration. Latest identifiers are shown read-only; setup was not repeated.");
@@ -849,7 +861,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
         && reconciliation.put.reason instanceof ApiError && reconciliation.put.reason.status === 409;
       setAnnouncement("");
       setSetupError(conflict
-        ? `${reconciliation.choice === "mechanics" ? "Mechanics" : "Original"} starter setup conflicts with reserved starter state or another configuration. The campaign remains unconfigured; setup was not repeated. The PUT was not repeated.`
+        ? `${setupChoiceName(reconciliation.choice)} starter setup conflicts with reserved starter state or another configuration. The campaign remains unconfigured; setup was not repeated. The PUT was not repeated.`
         : "Setup could not be confirmed complete. The campaign remains unconfigured. Setup uses two transactions, so the pack may remain installed (or the catalog may remain published) after failure. The PUT was not repeated.");
     }
     mutationFocusAfterReconciliationRef.current = { kind: "setup", generation: authoritativeGeneration };
@@ -1521,7 +1533,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   async function setupStarter() {
     // React state cannot synchronously serialize clicks, so the ref owns the lock.
     if (!campaign || campaign.actorRole !== "owner" || campaign.content.status !== "unconfigured"
-      || !setupChoice || (setupChoice === "mechanics" && !mechanicsEnabled)
+      || !setupChoice || (setupChoice !== "original" && !mechanicsEnabled)
       || !setupConfirmed || setupLockedRef.current || renameLockedRef.current || createLockedRef.current || diceLockedRef.current
       || inFlightCampaignMutations.has(campaignId)) return;
 
@@ -1541,9 +1553,9 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
 
     let put: PromiseSettledResult<CampaignDetailResponse>;
     try {
-      put = { status: "fulfilled", value: choice === "mechanics"
-        ? await setupMechanicsStarter(operationCampaignId)
-        : await setupOriginalStarter(operationCampaignId) };
+      put = { status: "fulfilled", value: choice === "srd"
+        ? await setupSrd51Starter(operationCampaignId)
+        : choice === "mechanics" ? await setupMechanicsStarter(operationCampaignId) : await setupOriginalStarter(operationCampaignId) };
     } catch (reason) {
       put = { status: "rejected", reason };
     }
@@ -1893,7 +1905,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
       {loading && <p className="empty-state" role="status">Loading campaign…</p>}
       {!loading && failed && <div className="empty-state large" role="alert"><p>Campaign could not be loaded.</p><button className="ghost" onClick={() => void load()}>Retry</button></div>}
       {!loading && campaign && <>
-        <section className="campaign-readiness" aria-labelledby="campaign-readiness-heading"><header><div><p className="eyebrow">PLAY READINESS</p><h2 id="campaign-readiness-heading">{readinessReady ? "Campaign ready" : "Path to a playable turn"}</h2></div><span>{readinessSteps.filter((step) => step.ready).length} / {readinessSteps.length}</span></header><ol>{readinessSteps.map((step) => <li className={step.ready ? "is-ready" : step.unknown ? "is-unknown" : "is-blocked"} key={step.label}><span aria-hidden="true">{step.ready ? "Ready" : step.unknown ? "Verify" : "Needed"}</span><div><strong>{step.label}</strong><p>{step.help}</p></div></li>)}</ol><div className="readiness-actions">{!configuredForPlay && campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <button className="primary" type="button" onClick={() => { setSetupChoice("mechanics"); document.getElementById("starter-setup-heading")?.scrollIntoView({ block: "start" }); }}>Configure mechanics</button>}{configuredForPlay && !rosterReady && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}{configuredForPlay && rosterReady && activeRooms.length === 0 && <button className="primary" type="button" onClick={() => roomsHeadingRef.current?.scrollIntoView({ block: "start" })}>Review rooms</button>}{activeRooms.length > 0 && !published && <button className="primary" type="button" onClick={() => onOpenAdministration(campaign.name)}>Publish in administration</button>}{readinessReady && playableRoom && <button className="primary" type="button" disabled={pageBusy} onClick={() => onOpenRoom(playableRoom.sessionId)}>{roomOpenPending ? "Opening room..." : "Enter command center"}</button>}<button className="ghost" type="button" onClick={() => void Promise.all([load(false), loadRoster(true), loadRooms(true)])}>Refresh readiness</button></div></section>
+        <section className="campaign-readiness" aria-labelledby="campaign-readiness-heading"><header><div><p className="eyebrow">PLAY READINESS</p><h2 id="campaign-readiness-heading">{readinessReady ? "Campaign ready" : "Path to a playable turn"}</h2></div><span>{readinessSteps.filter((step) => step.ready).length} / {readinessSteps.length}</span></header><ol>{readinessSteps.map((step) => <li className={step.ready ? "is-ready" : step.unknown ? "is-unknown" : "is-blocked"} key={step.label}><span aria-hidden="true">{step.ready ? "Ready" : step.unknown ? "Verify" : "Needed"}</span><div><strong>{step.label}</strong><p>{step.help}</p></div></li>)}</ol><div className="readiness-actions">{!configuredForPlay && mechanicsEnabled && campaign.actorRole === "owner" && campaign.content.status === "unconfigured" && <button className="primary" type="button" onClick={() => { setSetupChoice("srd"); setSetupConfirmed(false); setSetupError(""); document.getElementById("starter-setup-heading")?.scrollIntoView?.({ block: "start" }); }}>Configure SRD 5.1 mechanics</button>}{configuredForPlay && !rosterReady && campaign.actorRole !== "observer" && <button className="primary" type="button" disabled={pageBusy} onClick={onOpenCharacterBuilder}>Build playable character</button>}{configuredForPlay && rosterReady && activeRooms.length === 0 && <button className="primary" type="button" onClick={() => roomsHeadingRef.current?.scrollIntoView({ block: "start" })}>Review rooms</button>}{activeRooms.length > 0 && !published && <button className="primary" type="button" onClick={() => onOpenAdministration(campaign.name)}>Publish in administration</button>}{readinessReady && playableRoom && <button className="primary" type="button" disabled={pageBusy} onClick={() => onOpenRoom(playableRoom.sessionId)}>{roomOpenPending ? "Opening room..." : "Enter command center"}</button>}<button className="ghost" type="button" onClick={() => void Promise.all([load(false), loadRoster(true), loadRooms(true)])}>Refresh readiness</button></div></section>
         <details className="campaign-maintenance"><summary>Campaign details & maintenance</summary><div className="campaign-maintenance-content">
         {campaign.actorRole === "owner" && <form className="campaign-rename" onSubmit={(event) => void submitRename(event)} aria-busy={pageBusy}>
           <div><label htmlFor="campaign-rename-name">Campaign name</label><input ref={renameInputRef} id="campaign-rename-name" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={200} required disabled={pageBusy} /></div>
@@ -2034,8 +2046,9 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
           <p className="starter-warning"><strong>Choose once.</strong> Starter setup is available only while this campaign is unconfigured. Neither choice can replace, migrate, reset, or add to configured content.</p>
           <fieldset className="persona-options starter-choice-options" disabled={pageBusy}>
             <legend>Select one mutually exclusive starter</legend>
+            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "srd"} onChange={() => { setSetupChoice("srd"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>SRD 5.1 starter (recommended)</strong><small> Playable level-one D&amp;D 5e character building, checks, rests, and basic actor attacks.</small></span></label>}
             <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "original"} onChange={() => { setSetupChoice("original"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Original metadata starter</strong><small> Narrative identities only; no playable mechanics.</small></span></label>
-            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "mechanics"} onChange={() => { setSetupChoice("mechanics"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Mechanics starter</strong><small> Enables the fixed catalog for future character builder and progression workflows.</small></span></label>}
+            {mechanicsEnabled && <label className="persona-option"><input type="radio" name="campaign-starter-choice" checked={setupChoice === "mechanics"} onChange={() => { setSetupChoice("mechanics"); setSetupConfirmed(false); setSetupError(""); }} /><span><strong>Velvet mechanics starter</strong><small> Enables Velvet's fixed original mechanics catalog.</small></span></label>}
           </fieldset>
           {setupChoice === "original" && <>
             <div className="starter-heading"><div><p className="eyebrow">FIXED ORIGINAL STARTER</p><h3>Original metadata starter</h3></div><code>{ORIGINAL_STARTER_PRESENTATION.starterId}</code></div>
@@ -2049,6 +2062,14 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
               {[{ label: "Race", item: ORIGINAL_STARTER_PRESENTATION.races[0] }, { label: "Background", item: ORIGINAL_STARTER_PRESENTATION.backgrounds[0] }, { label: "Class", item: ORIGINAL_STARTER_PRESENTATION.classes[0] }].map(({ label, item }) => <article key={label}><span>{label}</span><h3>{item.name}</h3><p>{item.description}</p></article>)}
             </div>
           </>}
+          {setupChoice === "srd" && <>
+            <div className="starter-heading"><div><p className="eyebrow">RECOMMENDED PLAYABLE STARTER</p><h3>SRD 5.1 Starter</h3></div><code>{SRD_5_1_STARTER_IDENTITY.starterId}</code></div>
+            <p className="starter-warning"><strong>Playable mechanics foundation.</strong> This activates the fixed, bounded SRD 5.1 profile for level-one character building, checks, rests, encounters, and basic actor attacks.</p>
+            <div className="starter-identities">
+              <article><span>Rules profile</span><h3>SRD 5.1 Rules</h3><p>D&amp;D 5e mechanics using the bundled SRD 5.1 foundation.</p><code>{SRD_5_1_STARTER_IDENTITY.rulesProfileId}</code></article>
+              <article><span>Content catalog</span><h3>SRD 5.1 Starter</h3><p>Reviewed Human, Acolyte, Fighter, longsword, equipment, GP, and bounded integration fixtures.</p><code>{SRD_5_1_STARTER_IDENTITY.packId}@{SRD_5_1_STARTER_IDENTITY.packVersion}</code></article>
+            </div>
+          </>}
           {setupChoice === "mechanics" && <>
             <div className="starter-heading"><div><p className="eyebrow">FIXED MECHANICS STARTER</p><h3>Velvet Mechanics Starter</h3></div><code>{MECHANICS_STARTER_IDENTITY.starterId}</code></div>
             <p className="starter-warning"><strong>Future mechanics foundation.</strong> This activates the reviewed fixed catalog for future builder and progression UI. It does not add builder, finalization, progression, or arbitrary content controls in this slice, and it cannot replace any configured content.</p>
@@ -2058,10 +2079,10 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             </div>
           </>}
           {setupChoice && <>
-            <p className="starter-warning"><strong>Two-transaction setup:</strong> the {setupChoice === "mechanics" ? "catalog is published" : "pack is installed"} first and the campaign is configured second. If setup fails between them, {setupChoice === "mechanics" ? "the catalog may remain published" : "the pack may remain installed"} without changing this campaign.</p>
-            <label className="checkbox starter-confirm"><input ref={setupConfirmationRef} type="checkbox" checked={setupConfirmed} onChange={(event) => setSetupConfirmed(event.target.checked)} disabled={pageBusy} /><span>{setupChoice === "mechanics" ? "I explicitly confirm mechanics starter activation for future builder and progression, knowing it cannot replace configured content" : "I understand this metadata-only setup is final"} and understand the two-transaction outcome.</span></label>
+            <p className="starter-warning"><strong>Two-transaction setup:</strong> the {setupChoice === "original" ? "pack is installed" : "catalog is published"} first and the campaign is configured second. If setup fails between them, {setupChoice === "original" ? "the pack may remain installed" : "the catalog may remain published"} without changing this campaign.</p>
+            <label className="checkbox starter-confirm"><input ref={setupConfirmationRef} type="checkbox" checked={setupConfirmed} onChange={(event) => setSetupConfirmed(event.target.checked)} disabled={pageBusy} /><span>{setupChoice === "srd" ? "I explicitly confirm SRD 5.1 starter activation as this campaign's fixed playable mechanics" : setupChoice === "mechanics" ? "I explicitly confirm Velvet mechanics starter activation, knowing it cannot replace configured content" : "I understand this metadata-only setup is final"} and understand the two-transaction outcome.</span></label>
           </>}
-          <button className="primary starter-submit" type="button" disabled={pageBusy || !setupChoice || !setupConfirmed} onClick={() => void setupStarter()}>{setupPhase === "writing" ? "Setting up once…" : setupPhase === "reconciling" ? "Checking latest details…" : setupChoice === "mechanics" ? "Activate mechanics starter" : setupChoice === "original" ? "Set up original starter" : "Select a starter"}</button>
+          <button className="primary starter-submit" type="button" disabled={pageBusy || !setupChoice || !setupConfirmed} onClick={() => void setupStarter()}>{setupPhase === "writing" ? "Setting up once…" : setupPhase === "reconciling" ? "Checking latest details…" : setupChoice === "srd" ? "Activate SRD 5.1 starter" : setupChoice === "mechanics" ? "Activate Velvet mechanics starter" : setupChoice === "original" ? "Set up original starter" : "Select a starter"}</button>
         </section>}
         {campaign.content.status === "configured" && <div className="configured-readonly" ref={configuredStatusRef} tabIndex={-1}><strong>Content configuration is read-only.</strong> There are no reset, change, or add controls.</div>}
         {setupError && <p className="form-error setup-result" role="alert">{setupError}</p>}

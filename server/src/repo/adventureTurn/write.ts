@@ -18,6 +18,7 @@ import type { Clock, IdGenerator } from "../../runtime.js";
 import { AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnExpiredError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./errors.js";
 import { createAdventureTurnReadRepository, type AdventureTurnReadRepository } from "./read.js";
 import { deriveConfirmationPolicy } from "../../agent/confirmationPolicy.js";
+import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
 
 export type { AppendToolProposalInput, ApplyGenerationDraftInput, CreateAdventureTurnInput, CreateGenerationDraftInput,
   DecideToolProposalInput, DecideToolProposalsInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
@@ -96,6 +97,8 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     if (campaign.lifecycle_status !== "draft" && campaign.lifecycle_status !== "published") throw new AdventureTurnStaleError("campaign lifecycle does not permit coordination");
     if (campaign.active_timeline_id !== row.timeline_id) throw new AdventureTurnStaleError("active timeline changed");
     if (campaign.administration_revision !== expectedCampaignRevision) throw new AdventureTurnStaleError("campaign revision is stale");
+    if (action !== "draft" && db.prepare("SELECT 1 FROM campaign_administration_integrations_v59 WHERE campaign_id=? AND paused=1").get(row.campaign_id))
+      throw new AdventureTurnStaleError("campaign adventure mutations are paused by a safety request");
     const member = db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(row.campaign_id, principalId) as { role: string } | undefined;
     if (!member || member.role === "observer") throw new AdventureTurnAuthorizationError("current action role is required");
     if (action === "draft" && member.role !== "owner" && member.role !== "gm") throw new AdventureTurnAuthorizationError("owner or GM authority is required");
@@ -189,10 +192,18 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     ON decision.campaign_id=proposal.campaign_id AND decision.turn_id=proposal.turn_id AND decision.proposal_id=proposal.proposal_id
     WHERE proposal.campaign_id=? AND proposal.turn_id=? AND (proposal.requires_confirmation=0 OR decision.decision='approved') ORDER BY proposal.position`)
     .all(row.campaign_id, row.id) as any[];
-  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" | "combat_action" => {
+  const commandType = (toolName: string): "set_actor_attribute" | "initialize_actor_resource" | "roll_actor_dice" | "combat_action" | "inventory_action" | "commerce_action" | "power_action" | "rest_action" | "combat_consumable_action" | "combat_power_action" | "quest_lifecycle_action" | "progression_action" => {
     if (["roll", "roll-check", "roll_actor_dice"].includes(toolName)) return "roll_actor_dice";
     if (toolName === "set_actor_attribute" || toolName === "initialize_actor_resource") return toolName;
     if(toolName==="combat_action")return "combat_action";
+    if(toolName.startsWith("inventory_item_"))return "inventory_action";
+    if(toolName.startsWith("vendor_"))return "commerce_action";
+    if(toolName==="power_use")return "power_action";
+    if(toolName==="combat_consumable_use")return "combat_consumable_action";
+    if(toolName==="combat_power_use")return "combat_power_action";
+    if(toolName==="rest_short"||toolName==="rest_long")return "rest_action";
+    if(toolName.startsWith("quest_"))return "quest_lifecycle_action";
+    if(toolName==="character_progression_apply")return "progression_action";
     throw new AdventureTurnConflictError("tool proposal has no supported mechanics command binding");
   };
   const insertMechanicsLink = (row: any, proposalId: string, commandId: string, at: string) => {
@@ -235,6 +246,15 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       .get(row.campaign_id, row.id) as { count: number }).count;
     return approved.length > 0 && linked === approved.length ? "mechanics-committed" : "confirmed";
   };
+  const hasDurableMechanics = (row: any): boolean => Boolean(
+    db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM agent_generalized_receipts_v39 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || boundAdventureQuestReceipts(db, row.campaign_id, row.id).length
+    || db.prepare("SELECT 1 FROM adventure_check_executions_v54 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM adventure_inventory_executions_v55 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
+    || db.prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
 
   return {
     createAdventureTurn(principalId, raw) { const input = createAdventureTurnInputSchema.parse(raw); return immediate(() => {
@@ -289,7 +309,43 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
         policy.version,policy.category,policy.requiresConfirmation?1:0,policy.requiredAuthorizer,canonicalAgentJson(policy.review as never),
         policy.proposedCommandDigest,canonicalAgentJson(policy.observedDomains),policy.attestedAt);
       const executionKey = `mechanics:${createHash("sha256").update(proposalId).digest("hex").slice(0, 48)}`;
-       if(commandType(input.toolName)==="combat_action"){
+        if(commandType(input.toolName)==="inventory_action"){
+          const args=input.arguments as Record<string,unknown>;
+          const candidate=db.prepare("SELECT action,confirmation_required,candidate_digest FROM adventure_inventory_candidates_v55 WHERE candidate_id=? AND turn_id=?")
+            .get(args.candidateId,row.id) as any;
+          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
+            AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
+              WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_inventory_action.select'
+                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
+            .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
+          if(!candidate||!response||candidate.candidate_digest!==args.digest||`inventory_item_${candidate.action}`!==input.toolName
+            ||Boolean(candidate.confirmation_required)!==policy.requiresConfirmation)throw new AdventureTurnConflictError("inventory proposal is not bound to an exact provider candidate");
+          db.prepare(`INSERT INTO adventure_inventory_proposal_bindings_v55(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,provider_call_id,
+            provider_tool_call_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?)`).run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,
+              args.providerCallId,args.providerToolCallId,executionKey,at);
+        }else if(commandType(input.toolName)==="commerce_action"){
+          const args=input.arguments as Record<string,unknown>;
+          const candidate=db.prepare("SELECT action,candidate_digest FROM adventure_commerce_candidates_v57 WHERE candidate_id=? AND turn_id=?").get(args.candidateId,row.id)as any;
+          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=? AND response.provider_call_id=? AND response.status='succeeded'
+            AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')='exact_vendor_commerce.select'
+              AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`).get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.candidateId,args.digest);
+          if(!candidate||!response||candidate.candidate_digest!==args.digest||`vendor_${candidate.action}`!==input.toolName||!policy.requiresConfirmation)throw new AdventureTurnConflictError("commerce proposal is not bound to an exact provider candidate");
+          db.prepare("INSERT INTO adventure_commerce_bindings_v57 VALUES(?,?,?,?,?,?,?,?,?)").run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,args.providerCallId,args.providerToolCallId,executionKey,at);
+        }else if(["power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"].includes(commandType(input.toolName))){
+          const args=input.arguments as Record<string,unknown>,kind=commandType(input.toolName)==="power_action"?"power":commandType(input.toolName)==="rest_action"?"rest":commandType(input.toolName)==="combat_consumable_action"?"combat-consumable":commandType(input.toolName)==="combat_power_action"?"combat-power":commandType(input.toolName)==="progression_action"?"progression":input.toolName==="quest_accept"?"quest-accept":input.toolName==="quest_abandon"?"quest-abandon":"quest-reward";
+          const candidate=db.prepare("SELECT candidate_digest,action_kind FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
+            .get(args.candidateId,row.id)as any;
+          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
+            AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
+              WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')=?
+                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
+            .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,kind==="power"?"exact_power_use.select":kind==="rest"?"exact_rest.select":kind==="combat-consumable"?"exact_combat_consumable.select":kind==="combat-power"?"exact_combat_power.select":kind==="progression"?"exact_progression_apply.select":"exact_quest_lifecycle.select",args.candidateId,args.digest);
+          if(!candidate||!response||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!policy.requiresConfirmation)
+            throw new AdventureTurnConflictError("adventure action proposal is not bound to an exact provider candidate");
+          db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,
+            provider_call_id,provider_tool_call_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+            .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,args.providerCallId,args.providerToolCallId,executionKey,at);
+        }else if(commandType(input.toolName)==="combat_action"){
          const args=input.arguments as Record<string,unknown>;
            db.prepare(`INSERT INTO agent_combat_proposal_bindings_v39(proposal_id,campaign_id,turn_id,provider_call_id,provider_tool_call_id,encounter_id,legal_action_id,command_legal_action_id,legal_action_digest,expected_combat_revision,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
              .run(proposalId,row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,args.encounterId,args.legalActionId,args.commandLegalActionId,args.legalActionDigest,args.expectedCombatRevision,executionKey,at);
@@ -485,9 +541,7 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       const old = replay("turn", row, principalId, "narration-update", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
       const current = stale("turn", row, input.expectedTurnRevision), at = now();
       if (input.terminalState === "cancelled" && row.mode === "original") reconcile(row, at);
-      const rootRow = root(row); const hasMechanics = Boolean(
-        db.prepare("SELECT 1 FROM turn_mechanics_links_v36 WHERE campaign_id=? AND root_turn_id=?").get(rootRow.campaign_id, rootRow.id)
-        || db.prepare("SELECT 1 FROM agent_generalized_receipts_v39 WHERE campaign_id=? AND turn_id=?").get(rootRow.campaign_id, rootRow.id));
+       const rootRow = root(row); const hasMechanics = hasDurableMechanics(rootRow);
       const hasProposals = Boolean(db.prepare("SELECT 1 FROM tool_proposals WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
       const deterministicFallback = row.mode === "original" && !hasProposals;
       const narrationDerivative = row.mode !== "original";

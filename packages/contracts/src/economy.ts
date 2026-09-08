@@ -11,6 +11,7 @@ export const shopIdSchema = resourceIdSchema;
 export const quoteIdSchema = resourceIdSchema;
 export const tradeIdSchema = resourceIdSchema;
 export const ledgerEntryIdSchema = resourceIdSchema;
+export const currencyCodeSchema = z.string().min(2).max(16).regex(/^[A-Z0-9._:-]+$/);
 
 export const currencyAmountSchema = z.object({ currency: currencyCatalogReferenceSchema, minorUnits: currencyMinorUnitSchema }).strict();
 export const walletBalanceSchema = z.object({ currency: currencyCatalogReferenceSchema, minorUnits: currencyMinorUnitSchema }).strict();
@@ -69,6 +70,22 @@ export const purchaseReceiptSchema = z.object({
   revisionAfter: revisionSchema,
   idempotencyKey: idempotencyKeySchema,
 }).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, { message: "purchase revision must advance exactly once", path: ["revisionAfter"] });
+
+export const vendorDispositionSchema = z.enum(["sell", "give"]);
+export const vendorSaleQuoteSchema = z.object({
+  quoteId: quoteIdSchema, campaignId: campaignIdSchema, shopId: shopIdSchema, sellerActorId: actorIdSchema,
+  entryId: inventoryEntryIdSchema, item: itemCatalogReferenceSchema, quantity: inventoryQuantitySchema,
+  disposition: vendorDispositionSchema, total: currencyAmountSchema, expiresAt: utcIsoTimestampSchema,
+}).strict().superRefine((quote, context) => {
+  if (quote.disposition === "give" && quote.total.minorUnits !== 0) context.addIssue({ code: "custom", path: ["total", "minorUnits"], message: "a vendor gift quote must be zero price" });
+  if (quote.disposition === "sell" && quote.total.minorUnits === 0) context.addIssue({ code: "custom", path: ["total", "minorUnits"], message: "a vendor sale quote must pay a positive price" });
+});
+export const vendorSaleReceiptSchema = z.object({
+  saleId: resourceIdSchema, quoteId: quoteIdSchema, campaignId: campaignIdSchema, shopId: shopIdSchema,
+  sellerActorId: actorIdSchema, disposition: vendorDispositionSchema, quantity: inventoryQuantitySchema,
+  total: currencyAmountSchema, soldAt: utcIsoTimestampSchema, revisionBefore: expectedRevisionSchema,
+  revisionAfter: revisionSchema, idempotencyKey: idempotencyKeySchema,
+}).strict().refine((receipt) => receipt.revisionAfter === receipt.revisionBefore + 1, { message: "vendor sale revision must advance exactly once", path: ["revisionAfter"] });
 
 /**
  * An exact stack selection.  `entryId` makes the source stack unambiguous,
@@ -164,16 +181,19 @@ export const bilateralTradeSchema = z.object({
 const economyCommandBase = { campaignId: campaignIdSchema, expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema };
 export const requestPurchaseQuoteCommandSchema = z.object({ ...economyCommandBase, type: z.literal("request_purchase_quote"), shopId: shopIdSchema, buyerActorId: actorIdSchema, item: itemCatalogReferenceSchema, quantity: z.number().int().min(1).max(1_000_000) }).strict();
 export const purchaseFromShopCommandSchema = z.object({ ...economyCommandBase, type: z.literal("purchase_from_shop"), quoteId: quoteIdSchema, buyerActorId: actorIdSchema }).strict();
+export const sellToShopCommandSchema = z.object({ ...economyCommandBase, type: z.literal("sell_to_shop"), quoteId: quoteIdSchema, sellerActorId: actorIdSchema }).strict();
 export const proposeBilateralTradeCommandSchema = z.object({ ...economyCommandBase, type: z.literal("propose_bilateral_trade"), trade: bilateralTradeSchema }).strict();
 export const acceptBilateralTradeCommandSchema = z.object({ ...economyCommandBase, type: z.literal("accept_bilateral_trade"), tradeId: tradeIdSchema, acceptedByActorId: actorIdSchema }).strict();
 export const cancelBilateralTradeCommandSchema = z.object({ ...economyCommandBase, type: z.literal("cancel_bilateral_trade"), tradeId: tradeIdSchema, cancelledByActorId: actorIdSchema }).strict();
-export const economyCommandSchema = z.discriminatedUnion("type", [requestPurchaseQuoteCommandSchema, purchaseFromShopCommandSchema, proposeBilateralTradeCommandSchema, acceptBilateralTradeCommandSchema, cancelBilateralTradeCommandSchema]);
+export const economyCommandSchema = z.discriminatedUnion("type", [requestPurchaseQuoteCommandSchema, purchaseFromShopCommandSchema, sellToShopCommandSchema, proposeBilateralTradeCommandSchema, acceptBilateralTradeCommandSchema, cancelBilateralTradeCommandSchema]);
 
 export type Wallet = z.infer<typeof walletSchema>;
 export type CurrencyLedgerEntry = z.infer<typeof currencyLedgerEntrySchema>;
 export type Shop = z.infer<typeof shopSchema>;
 export type PurchaseQuote = z.infer<typeof purchaseQuoteSchema>;
 export type PurchaseReceipt = z.infer<typeof purchaseReceiptSchema>;
+export type VendorSaleQuote = z.infer<typeof vendorSaleQuoteSchema>;
+export type VendorSaleReceipt = z.infer<typeof vendorSaleReceiptSchema>;
 export type StackableTradeLine = z.infer<typeof stackableTradeLineSchema>;
 export type InstancedTradeLine = z.infer<typeof instancedTradeLineSchema>;
 export type ExactTradeLine = z.infer<typeof exactTradeLineSchema>;

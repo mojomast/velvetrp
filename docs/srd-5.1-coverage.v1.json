@@ -1,0 +1,237 @@
+{
+  "inventoryVersion": "1.0.3",
+  "ruleset": {
+    "id": "dnd-5e",
+    "version": "1.0.0"
+  },
+  "officialSource": {
+    "id": "SRD-5.1-CC",
+    "title": "System Reference Document 5.1",
+    "publisher": "Wizards of the Coast LLC",
+    "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf"
+  },
+  "license": {
+    "id": "CC-BY-4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "attributionFile": "NOTICE.md",
+    "modified": true
+  },
+  "statusDefinitions": {
+    "implemented": "The bounded behavior named by this inventory domain exists and has executable evidence.",
+    "partial": "Some bounded behavior exists, but the SRD domain is not complete.",
+    "unsupported": "No supported implementation is claimed for this SRD domain.",
+    "not-applicable": "The domain is Velvet-specific and is not an SRD coverage claim."
+  },
+  "domains": [
+    {
+      "id": "d20-tests",
+      "title": "D20 tests, ability modifiers, and proficiency",
+      "status": "implemented",
+      "complete": true,
+      "sourceSections": [{ "id": "SRD5.1:Using Ability Scores", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=76" }],
+      "capabilityEvidence": [{ "id": "checks", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eD20Test", "server/test/dnd5e-checks.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/check-commands"]
+    },
+    {
+      "id": "passive-checks",
+      "title": "Passive checks",
+      "status": "implemented",
+      "complete": true,
+      "sourceSections": [{ "id": "SRD5.1:Using Ability Scores:Passive Checks", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=77" }],
+      "capabilityEvidence": [{ "id": "passive-checks", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#dnd5ePassiveCheck", "server/test/dnd5e-checks.test.ts"],
+      "apiEvidence": []
+    },
+    {
+      "id": "attack-resolution",
+      "title": "Bounded attack and critical-hit resolution",
+      "status": "implemented",
+      "complete": true,
+      "sourceSections": [{ "id": "SRD5.1:Combat:Making an Attack", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=94" }],
+      "capabilityEvidence": [{ "id": "attacks", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/test/dnd5e-combat.test.ts", "server/test/srd-ruleset-integration.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
+    },
+    {
+      "id": "damage",
+      "title": "Damage rolls and damage adjustments",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Combat:Damage and Healing", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=96" }],
+      "capabilityEvidence": [{ "id": "damage", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eDamageRoll", "server/src/rulesets/dnd5e.ts#planDnd5eDamageAdjustment", "server/test/dnd5e-combat.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
+    },
+    {
+      "id": "initiative",
+      "title": "Initiative ordering",
+      "status": "implemented",
+      "complete": true,
+      "sourceSections": [{ "id": "SRD5.1:Combat:Initiative", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=90" }],
+      "capabilityEvidence": [{ "id": "initiative", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eInitiative", "server/test/dnd5e-combat.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/encounters/:encounterId/start-commands"]
+    },
+    {
+      "id": "movement",
+      "title": "Speed and movement",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Adventuring:Movement", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=79" }, { "id": "SRD5.1:Combat:Movement and Position", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=91" }],
+      "capabilityEvidence": [{ "id": "movement", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eMovement", "server/src/repo/tacticalMapRepo.ts", "server/test/dnd5e-plans.test.ts", "server/test/tactical-map-repo.test.ts", "server/test/rpg-tactical-map-route.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps/:mode/move-commands"]
+    },
+    {
+      "id": "rests",
+      "title": "Short and long rests",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Adventuring:Resting", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=87" }],
+      "capabilityEvidence": [{ "id": "rests", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eRest", "server/src/repo/restRepo.ts", "server/test/dnd5e-plans.test.ts", "server/test/adventure-power-rest-action.test.ts", "server/test/srd-ruleset-integration.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/actors/:actorId/rest-commands"]
+    },
+    {
+      "id": "concentration",
+      "title": "Concentration checks and replacement",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Spellcasting:Concentration", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=102" }],
+      "capabilityEvidence": [{ "id": "concentration", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eConcentrationDamage", "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationReplacement", "server/test/dnd5e-combat.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/effect-commands"]
+    },
+    {
+      "id": "conditions",
+      "title": "Condition state",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Appendix A:Conditions", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=358" }],
+      "capabilityEvidence": [{ "id": "conditions", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eCondition", "server/test/dnd5e-plans.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/effect-commands"]
+    },
+    {
+      "id": "generic-resource-plans",
+      "title": "Generic atomic resource plans",
+      "status": "not-applicable",
+      "complete": false,
+      "sourceSections": [],
+      "capabilityEvidence": [{ "id": "resources", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eResourceCosts", "server/test/dnd5e-plans.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/actors/:actorId/resource-commands"]
+    },
+    {
+      "id": "spell-costs",
+      "title": "Spell slot and consumed-material cost checks",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Spellcasting:Spell Slots", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101" }, { "id": "SRD5.1:Spellcasting:Components", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=102" }],
+      "capabilityEvidence": [{ "id": "spell-costs", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eSpellCost", "server/test/dnd5e-plans.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/power-commands"]
+    },
+    {
+      "id": "derived-values",
+      "title": "Character derived values",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Using Ability Scores", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=76" }, { "id": "SRD5.1:Equipment:Armor and Shields", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=68" }],
+      "capabilityEvidence": [{ "id": "derived-values", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#deriveDnd5eCharacter", "server/test/dnd5e-plans.test.ts", "server/test/character-builder.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"]
+    },
+    {
+      "id": "legal-action-envelope",
+      "title": "Velvet legal-action plan envelope",
+      "status": "not-applicable",
+      "complete": false,
+      "sourceSections": [],
+      "capabilityEvidence": [{ "id": "legal-action-plans", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eAction", "server/test/dnd5e-plans.test.ts"],
+      "apiEvidence": []
+    },
+    {
+      "id": "character-options",
+      "title": "Character creation options",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Races", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=3" }, { "id": "SRD5.1:Classes", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=8" }, { "id": "SRD5.1:Backgrounds", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=60" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/test/character-builder.test.ts", "server/test/srd-ruleset-integration.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/character-drafts", "POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"]
+    },
+    {
+      "id": "character-advancement",
+      "title": "Character advancement beyond level one and multiclassing",
+      "status": "unsupported",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Beyond 1st Level", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56" }, { "id": "SRD5.1:Multiclassing", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=57" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas", "server/test/srd-ruleset-integration.test.ts"],
+      "apiEvidence": []
+    },
+    {
+      "id": "equipment-catalog",
+      "title": "Equipment, armor, and adventuring gear catalog",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Equipment", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=65" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/srdEquipmentRuntime.ts", "server/test/srd-equipment-runtime.test.ts", "server/test/srd-equipment-catalog.test.ts", "docs/srd-5.1-coverage.md#coverage-matrix"],
+      "apiEvidence": ["GET /api/rpg/v1/content-packs/:packId/versions/:packVersion"]
+    },
+    {
+      "id": "complete-combat-system",
+      "title": "Complete combat action economy and special combat rules",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Combat", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=88" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["server/src/repo/encounter/combatActionPlan.ts", "server/test/dnd-turn-economy-repository.test.ts", "server/test/rpg-generated-campaign-journey.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
+    },
+    {
+      "id": "spellcasting-and-spells",
+      "title": "Complete spellcasting rules and spell catalog",
+      "status": "unsupported",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Spellcasting", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101" }, { "id": "SRD5.1:Spells", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=104" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "apiEvidence": []
+    },
+    {
+      "id": "monsters",
+      "title": "SRD monsters",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Monsters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/encounter/encounterWriteRepo.ts", "server/test/dnd-turn-economy-repository.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/enemy-turn-commands"]
+    },
+    {
+      "id": "adventuring-environment",
+      "title": "Travel, environment, hazards, and downtime",
+      "status": "unsupported",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Adventuring", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=79" }],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "apiEvidence": []
+    },
+    {
+      "id": "training-dummy",
+      "title": "Training Dummy integration fixture",
+      "status": "not-applicable",
+      "complete": false,
+      "sourceSections": [],
+      "capabilityEvidence": [],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "NOTICE.md#srd-51"],
+      "apiEvidence": []
+    }
+  ]
+}

@@ -9,7 +9,7 @@ const at = "2030-01-01T00:00:00.000Z";
 function preview(overrides: Partial<CampaignContentDraftView["preview"]> = {}): CampaignContentDraftView["preview"] {
   return {
     outlines: [], arcs: [], locations: [], connections: [], factions: [], npcs: [], quests: [],
-    encounters: [], clues: [], storyNodes: [], storyRelationships: [], handouts: [], scenePrompts: [],
+    encounters: [], clues: [], storyNodes: [], storyRelationships: [], lore: [], questItems: [], monsterConcepts: [], handouts: [], scenePrompts: [],
     npcStats: { body: 10, mind: 10, presence: 10, source: "generated-deterministic-baseline" },
     ...overrides,
   };
@@ -18,12 +18,12 @@ function preview(overrides: Partial<CampaignContentDraftView["preview"]> = {}): 
 function draft(candidate: CampaignContentDraftView["preview"]): CampaignContentDraftView {
   return {
     draft: { draftId: "draft-one", campaignId: "campaign", kind: "campaign-content", state: "staged", revision: 0, createdAt: at, updatedAt: at },
-    preview: candidate, validationIssues: [],
+    preview: candidate, validationIssues: [], derivativeContextKeys: [],
   };
 }
 
 function planning(overrides: Partial<CampaignGeneratedPlanning> = {}): CampaignGeneratedPlanning {
-  return { campaignId: "campaign", deliveryRevision: 0, encounters: [], deliverables: [], ...overrides };
+  return { campaignId: "campaign", deliveryRevision: 0, encounters: [], lore: [], questItems: [], monsterConcepts: [], deliverables: [], ...overrides };
 }
 
 function client(overrides: Partial<CampaignGeneratorPanelApi> = {}): CampaignGeneratorPanelApi {
@@ -47,6 +47,20 @@ async function generateCandidate(api: CampaignGeneratorPanelApi): Promise<void> 
 afterEach(cleanup);
 
 describe("CampaignGeneratorPanel", () => {
+  it("offers foundation, full narrative, and grouped granular generation", async () => {
+    const create = vi.fn().mockResolvedValue(draft(preview({ handouts: [{ key: "letter", title: "Letter", content: "Meet at dawn", visibility: "public" }] })));
+    const api = client({ createCampaignContentDraft: create });
+    render(<CampaignGeneratorPanel campaignId="campaign" api={api} />);
+    expect((screen.getByLabelText(/Foundation/) as HTMLInputElement).checked).toBe(true);
+    for (const group of ["Location / world", "NPC / faction", "Quest / clue", "Encounter", "Story / lore", "Items / monsters", "Handout", "Scene prompt"]) expect(screen.getByText(group)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/Full narrative campaign/));
+    fireEvent.change(screen.getByLabelText(/^Campaign brief/), { target: { value: "Build the whole drowned-city campaign" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate selected sections" }));
+    await screen.findByText("Letter");
+    expect(create.mock.calls[0]?.[0].sections).toEqual(["outline", "arcs", "locations", "factions", "npcs", "quests", "encounters", "clues", "story", "lore", "quest-items", "monster-concepts", "handouts", "scene-prompts"]);
+    expect(screen.getByText(/mechanics are usable only when bound/i)).toBeTruthy();
+  });
+
   it("sends sparse sections, bounded feedback, and accepted expansion keys", async () => {
     const create = vi.fn().mockResolvedValue(draft(preview({ locations: [{ key: "old-harbor", name: "Old Harbor", description: "Flooded piers", visibility: "public", discoveries: [], hazards: [], hooks: [], factionKeys: [] }] })));
     const api = client({ createCampaignContentDraft: create });
@@ -71,8 +85,8 @@ describe("CampaignGeneratorPanel", () => {
       locations: [{ key: "harbor", name: "Harbor", description: "Old docks", visibility: "public", discoveries: [], hazards: [], hooks: [], factionKeys: ["guild"] }],
       connections: [{ key: "road", fromLocationKey: "harbor", toLocationKey: "harbor", description: "A loop", visibility: "public" }],
       npcs: [{ key: "mira", name: "Mira", archetype: "Guide", description: "Knows the tide", visibility: "public", locationKey: "harbor", factionKeys: ["guild"] }],
-      quests: [{ key: "quest", title: "Light the lamps", description: "Restore the beacons", visibility: "public", arcKey: "arc", locationKeys: ["harbor"] }],
-      encounters: [{ key: "encounter", title: "Pier standoff", description: "A tense blockade", visibility: "gm", locationKey: "harbor", participantNpcKeys: ["mira"] }],
+      quests: [{ key: "quest", title: "Light the lamps", description: "Restore the beacons", visibility: "public", arcKey: "arc", locationKeys: ["harbor"], objectives: [], rewards: [] }],
+      encounters: [{ key: "encounter", title: "Pier standoff", description: "A tense blockade", visibility: "gm", locationKey: "harbor", participantNpcKeys: ["mira"], objectives: [], terrain: [], escalation: [], enemyReferences: [], monsterConceptKeys: [] }],
       storyNodes: [{ key: "secret", title: "The oath", description: "A broken promise", visibility: "gm" }],
       storyRelationships: [{ key: "secret-link", fromStoryNodeKey: "secret", toStoryNodeKey: "secret", description: "Echoes", visibility: "gm" }],
       clues: [{ key: "clue", title: "Wet seal", description: "Marks the oath", visibility: "public", locationKey: "harbor", revealsStoryNodeKey: "secret" }],
@@ -82,9 +96,9 @@ describe("CampaignGeneratorPanel", () => {
     const apply = vi.fn().mockResolvedValue({ draft: { ...draft(candidate).draft, state: "applied", revision: 2 }, application: { scope: "campaign-content", campaignDomainMutated: true, appliedAt: at }, receipts: [{ receiptId: "receipt", scope: "campaign-content", appliedAt: at }] });
     const api = client({ createCampaignContentDraft: vi.fn().mockResolvedValue(draft(candidate)), applyCampaignContentDraft: apply });
     await generateCandidate(api);
-    for (const heading of ["Outlines", "Arcs", "Locations", "Connections", "Factions", "NPCs", "Quests", "Encounter concepts", "Clues", "Story nodes", "Story relationships", "Handouts", "Scene prompts"]) expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
+    for (const heading of ["Outlines", "Arcs", "Locations", "Connections", "Factions", "NPCs", "Quests", "Encounter plans", "Clues", "Story nodes", "Story relationships", "Campaign lore", "Quest items", "Monster concepts", "Handouts", "Scene prompts"]) expect(screen.getByRole("heading", { name: heading })).toBeTruthy();
 
-    fireEvent.click(screen.getByLabelText(/HarborLocation/));
+    fireEvent.click(screen.getByLabelText(/HarborGenerated location/));
     await screen.findByText(/Deselected 7 dependent candidates/);
     const selected = screen.getAllByRole("checkbox").filter((element) => (element as HTMLInputElement).checked && element.closest(".campaign-generation-artifact"));
     expect(selected.length).toBeLessThan(13);
@@ -149,7 +163,7 @@ describe("CampaignGeneratorPanel", () => {
     const retryPublish = await screen.findByRole("button", { name: "Retry exact publication" });
     expect(publish).toHaveBeenCalledTimes(1);
     fireEvent.click(retryPublish);
-    await waitFor(() => expect(screen.getByText("Delivered")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/Generated prose · delivered/)).toBeTruthy());
     expect(publish.mock.calls[1]?.[1].idempotencyKey).toBe(publish.mock.calls[0]?.[1].idempotencyKey);
   });
 });

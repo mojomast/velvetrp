@@ -1,9 +1,12 @@
+import type { PersonaProfile } from "@velvet/contracts";
+
 export interface Character {
   id: string;
   name: string;
   age: number;
   archetype: string;
   boundaries: string;
+  profile?: PersonaProfile;
   fictionalConfirmed: boolean;
   isRealPerson: boolean;
   createdAt: string;
@@ -14,6 +17,7 @@ export interface CreateCharacterInput {
   age: number;
   archetype: string;
   boundaries: string;
+  profile?: PersonaProfile;
   fictionalConfirmed: boolean;
 }
 
@@ -307,6 +311,7 @@ export interface ProviderSettings {
   zdr: boolean;
   requestTimeoutSeconds: number;
   pricing: ProviderPricing;
+  adventureTurnBudget: AdventureTurnBudgetSettings;
   samplers: SamplerSettings;
   updatedAt: string;
 }
@@ -327,6 +332,7 @@ export interface PublicProviderSettings {
   zdr: boolean;
   requestTimeoutSeconds: number;
   pricing: ProviderPricing;
+  adventureTurnBudget: AdventureTurnBudgetSettings;
   samplers: SamplerSettings;
   updatedAt: string;
 }
@@ -346,7 +352,13 @@ export interface UpdateProviderInput {
   zdr?: boolean;
   requestTimeoutSeconds?: number;
   pricing?: Partial<ProviderPricing>;
+  adventureTurnBudget?: Partial<AdventureTurnBudgetSettings>;
   samplers?: Partial<SamplerSettings>;
+}
+
+export interface AdventureTurnBudgetSettings {
+  maxTotalTokens: number;
+  maxEstimatedCostUsd: number | null;
 }
 
 export interface ProviderPricing {

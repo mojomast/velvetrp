@@ -19,6 +19,7 @@ export {
   type WorldReceipt,
   type WorldCampaignHttpSnapshot,
   type ActorTravelResult,
+  type ActorCampResult,
   type CampaignNpcsSnapshot,
   type CreateNpcResult,
   type NpcRelationshipResult,

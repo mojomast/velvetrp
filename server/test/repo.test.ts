@@ -46,6 +46,10 @@ const characterInput = {
   boundaries: "fictional only",
     fictionalConfirmed: true,
 };
+const emptyProfile = {
+  goal: "", ideal: "", bond: "", flaw: "", history: "", personality: "",
+  fears: "", relationships: "", appearance: "", voice: "",
+};
 
 describe("schema", () => {
   it("creates the complete current schema with SQLite safety settings", () => {
@@ -318,6 +322,7 @@ describe("repository transactions", () => {
     expect(character).toEqual({
       id: "character-fixed",
       ...characterInput,
+      profile: emptyProfile,
       isRealPerson: false,
       createdAt: "2030-04-05T06:07:08.009Z",
     });
@@ -335,6 +340,8 @@ describe("repository transactions", () => {
       is_real_person: 0,
       created_at: "2030-04-05T06:07:08.009Z",
     });
+    expect(raw.prepare("SELECT * FROM character_profiles WHERE character_id = ?").get("character-fixed"))
+      .toEqual({ character_id: "character-fixed", ...emptyProfile });
     raw.close();
   });
 
@@ -614,10 +621,21 @@ describe("named character creation", () => {
     expect(character).toEqual({
       id: expect.any(String),
       ...characterInput,
+      profile: emptyProfile,
       isRealPerson: false,
       createdAt: expect.any(String),
     });
     expect(await listCharacters()).toEqual([character]);
+  });
+
+  it("hydrates an empty profile for a character created by a legacy positional insert", async () => {
+    await listCharacters();
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR as string, "velvet.sqlite"));
+    db.prepare("INSERT INTO characters VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("legacy-character", "Legacy", 40, "wanderer", "fictional only", 1, 0, "2020-01-01T00:00:00.000Z");
+    db.close();
+
+    expect(await listCharacters()).toContainEqual(expect.objectContaining({ id: "legacy-character", profile: emptyProfile }));
   });
 });
 

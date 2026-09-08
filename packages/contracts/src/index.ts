@@ -21,12 +21,16 @@ export type { CampaignMemberRole, CampaignRole, ResourceId, UtcIsoTimestamp } fr
 
 export * from "./campaign-administration.js";
 export * from "./character-builder.js";
+export * from "./persona-profile.js";
 export * from "./character-progression.js";
 export * from "./mechanics-starter.js";
+export * from "./srd-starter.js";
 export * from "./character-builder-http.js";
 export * from "./character-progression-http.js";
 export * from "./character-sheet-http.js";
+export * from "./gameplay-sheet-http.js";
 export * from "./campaign-administration-http.js";
+export * from "./campaign-administration-integrations.js";
 export * from "./campaign-history-http.js";
 export * from "./campaign-play-http.js";
 export * from "./campaign-transfer-http.js";
@@ -34,6 +38,11 @@ export * from "./actor-resources.js";
 export * from "./actor-resources-http.js";
 export * from "./inventory.js";
 export * from "./inventory-http.js";
+export * from "./adventure-inventory.js";
+export * from "./adventure-commerce.js";
+export * from "./adventure-power-rest.js";
+export * from "./adventure-quest-progression.js";
+export * from "./provider-candidate-label.js";
 export * from "./economy.js";
 export * from "./economy-http.js";
 export * from "./rest.js";
@@ -64,6 +73,7 @@ export * from "./generation-drafts.js";
 export * from "./adventure-turns-http.js";
 export * from "./generation-drafts-http.js";
 export * from "./campaign-content-generation-http.js";
+export * from "./tactical-map.js";
 
 export {
   addCampaignMembershipInputSchema,

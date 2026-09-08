@@ -99,9 +99,42 @@ export const encounterListResponseSchema = z.object({
 
 export const encounterCreateResponseSchema = z.object({ encounter: encounterPublicSchema }).strict();
 
+/** Safe, authoritative choices for building a new encounter; no mechanics or catalog internals are exposed. */
+export const encounterSetupCandidatesResponseSchema = z.object({
+  sessions: z.array(z.object({ sessionId: resourceIdSchema }).strict()).max(10_000),
+  actors: z.array(z.object({
+    actorId: actorIdSchema,
+    label: z.string().trim().min(1).max(200),
+  }).strict()).max(10_000),
+  enemies: z.array(z.object({
+    template: enemyTemplateCatalogReferenceSchema,
+    label: z.string().trim().min(1).max(200),
+  }).strict()).max(10_000),
+  teams: z.object({ actor: z.literal("allies"), enemy: z.literal("enemies") }).strict(),
+}).strict().superRefine((response, context) => {
+  const unique = (values: string[], path: (string | number)[], message: string) => {
+    if (new Set(values).size !== values.length || values.some((value, index) => index > 0 && value <= values[index - 1]!)) {
+      context.addIssue({ code: "custom", message, path });
+    }
+  };
+  unique(response.sessions.map((session) => session.sessionId), ["sessions"], "sessions must be unique and stably ordered");
+  unique(response.actors.map((actor) => actor.actorId), ["actors"], "actors must be unique and stably ordered");
+  unique(response.enemies.map((enemy) => `${enemy.template.packId}\u0000${enemy.template.packVersion}\u0000${enemy.template.definitionId}`),
+    ["enemies"], "enemy templates must be unique and stably ordered");
+});
+
 export const encounterStartCommandRequestSchema = z.object({
   expectedRevision: expectedRevisionSchema,
   idempotencyKey: idempotencyKeySchema,
+}).strict();
+
+/** The combat ruleset owns this closed vocabulary; arbitrary actor effects never become conditions. */
+export const dndCombatConditionSchema = z.enum([
+  "blinded", "charmed", "frightened", "grappled", "incapacitated", "poisoned", "prone", "restrained", "stunned", "unconscious",
+]);
+export const combatConditionPublicSchema = z.object({
+  condition: dndCombatConditionSchema,
+  expiresAtRound: z.number().int().min(1).max(1_000_000).nullable(),
 }).strict();
 
 export const combatantStateSchema = z.discriminatedUnion("kind", [
@@ -112,7 +145,10 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     actorId: actorIdSchema,
     hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
-    status: z.enum(["active", "defeated", "fled", "removed"]),
+    temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),
+    conditions: z.array(combatConditionPublicSchema).max(10).optional(),
+    status: z.enum(["active", "unconscious", "stable", "dead", "defeated", "fled", "removed"]),
+    deathSaves: z.object({ successes: z.number().int().min(0).max(3), failures: z.number().int().min(0).max(3) }).strict().optional(),
   }).strict(),
   z.object({
     combatantId: resourceIdSchema,
@@ -121,14 +157,39 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     template: enemyTemplateCatalogReferenceSchema.nullable(),
     hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
-    status: z.enum(["active", "defeated", "fled", "removed"]),
+    temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),
+    conditions: z.array(combatConditionPublicSchema).max(10).optional(),
+    status: z.enum(["active", "unconscious", "stable", "dead", "defeated", "fled", "removed"]),
   }).strict(),
 ]);
 
 export const combatLegalActionSchema = z.object({
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "power", "item", "defend", "flee", "end-turn"]),
+  kind: z.enum(["attack", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
   targetIds: z.array(resourceIdSchema).max(128),
+  cost: z.enum(["action", "bonus-action", "reaction"]).nullable().optional(),
+}).strict();
+
+const combatTurnResourceSchema = z.object({
+  available: z.boolean(),
+  used: z.boolean(),
+}).strict().refine((resource) => resource.available !== resource.used,
+  "turn resource availability must be the inverse of use");
+
+export const combatTurnEconomySchema = z.object({
+  turnId: resourceIdSchema,
+  combatantId: resourceIdSchema,
+  round: z.number().int().min(1).max(1_000_000),
+  action: combatTurnResourceSchema,
+  bonusAction: combatTurnResourceSchema,
+  reaction: combatTurnResourceSchema,
+  movement: z.object({
+    allowanceFeet: z.number().int().min(0).max(1_000_000),
+    usedFeet: z.number().int().min(0).max(1_000_000),
+    remainingFeet: z.number().int().min(0).max(1_000_000),
+  }).strict().refine((movement) => movement.usedFeet <= movement.allowanceFeet
+    && movement.remainingFeet === movement.allowanceFeet - movement.usedFeet,
+  "remaining movement must match the safe unused allowance"),
 }).strict();
 
 export const combatStateSchema = z.object({
@@ -137,6 +198,7 @@ export const combatStateSchema = z.object({
   currentCombatant: resourceIdSchema.nullable(),
   combatants: z.array(combatantStateSchema).min(1).max(128),
   legalActions: z.array(combatLegalActionSchema).max(128),
+  turnEconomy: combatTurnEconomySchema.nullable().optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -152,6 +214,14 @@ export const combatStateSchema = z.object({
   }
   if (combat.legalActions.some((action) => action.targetIds.some((targetId) => !combatantIds.includes(targetId)))) {
     context.addIssue({ code: "custom", message: "legal action targets must belong to combat", path: ["legalActions"] });
+  }
+  if (combat.turnEconomy && (combat.currentCombatant !== combat.turnEconomy.combatantId
+      || combat.round !== combat.turnEconomy.round)) {
+    context.addIssue({ code: "custom", message: "turn economy must match the exact current turn", path: ["turnEconomy"] });
+  }
+  if (combat.turnEconomy && combat.legalActions.some((action) => action.cost !== null && action.cost !== undefined
+      && !combat.turnEconomy![action.cost === "bonus-action" ? "bonusAction" : action.cost].available)) {
+    context.addIssue({ code: "custom", message: "legal actions cannot advertise a spent turn cost", path: ["legalActions"] });
   }
 });
 
@@ -174,6 +244,7 @@ export const combatReadResponseSchema = z.object({
   currentCombatant: resourceIdSchema.nullable(),
   combatants: z.array(combatantStateSchema).min(1).max(128),
   legalActions: z.array(combatLegalActionSchema).max(128),
+  turnEconomy: combatTurnEconomySchema.nullable().optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -189,6 +260,10 @@ export const combatReadResponseSchema = z.object({
   }
   if (combat.legalActions.some((action) => action.targetIds.some((targetId) => !combatantIds.includes(targetId)))) {
     context.addIssue({ code: "custom", message: "legal action targets must belong to combat", path: ["legalActions"] });
+  }
+  if (combat.turnEconomy && (combat.currentCombatant !== combat.turnEconomy.combatantId
+      || combat.round !== combat.turnEconomy.round)) {
+    context.addIssue({ code: "custom", message: "turn economy must match the exact current turn", path: ["turnEconomy"] });
   }
 });
 
@@ -228,17 +303,34 @@ export const combatActionCommandRequestSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
 }).strict();
 
+/** Enemy turns are selected and resolved entirely by the authoritative server. */
+export const combatEnemyTurnCommandRequestSchema = z.object({
+  expectedRevision: expectedRevisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+
 export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("damage"),
     targetId: resourceIdSchema,
-    damageType: z.literal("physical"),
-    requested: z.literal(1),
-    applied: z.number().int().min(0).max(1),
+    damageType: z.enum(["physical", "bludgeoning", "piercing", "slashing"]),
+    requested: z.number().int().min(0).max(1_000_000),
+    applied: z.number().int().min(0).max(1_000_000),
+    temporaryHitPointsAbsorbed: z.number().int().min(0).max(1_000_000).optional(),
+    temporaryHitPointsAfter: z.number().int().min(0).max(1_000_000).optional(),
+    concentrationCheck: z.object({ dc: z.number().int().min(10).max(1_000_000), roll: z.number().int().min(1).max(20), total: z.number().int(), maintained: z.boolean() }).strict().optional(),
+    rulesetId: resourceIdSchema.optional(),
+    rulesetVersion: z.string().trim().min(1).max(100).optional(),
+    attackRoll: z.number().int().min(1).max(20).optional(),
+    attackTotal: z.number().int().optional(),
+    armorClass: z.number().int().optional(),
+    hit: z.boolean().optional(),
+    critical: z.boolean().optional(),
+    damageRolls: z.array(z.number().int().min(1).max(100)).max(40).optional(),
     hitPointsBefore: z.number().int().min(0).max(1_000_000),
     hitPointsAfter: z.number().int().min(0).max(1_000_000),
-    statusBefore: z.literal("active"),
-    statusAfter: z.enum(["active", "defeated"]),
+    statusBefore: z.enum(["active", "unconscious", "stable"]),
+    statusAfter: z.enum(["active", "unconscious", "stable", "dead", "defeated"]),
   }).strict(),
   z.object({
     kind: z.literal("status"),
@@ -246,12 +338,20 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
     statusBefore: z.literal("active"),
     statusAfter: z.literal("fled"),
   }).strict(),
+  z.object({
+    kind: z.literal("survival"),
+    targetId: resourceIdSchema,
+    roll: z.number().int().min(1).max(20).optional(),
+    successes: z.number().int().min(0).max(3),
+    failures: z.number().int().min(0).max(3),
+    statusAfter: z.enum(["active", "unconscious", "stable", "dead"]),
+  }).strict(),
 ]);
 
 export const combatActionResolutionSchema = z.object({
   actionId: resourceIdSchema,
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "flee", "end-turn"]),
+  kind: z.enum(["attack", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
   outcomes: z.array(combatActionOutcomeSchema).max(1),
@@ -272,6 +372,18 @@ export const combatActionResolutionSchema = z.object({
     if (resolution.targetIds.length !== 0 || outcome?.kind !== "status"
         || outcome.targetId !== resolution.actingCombatantId) {
       context.addIssue({ code: "custom", message: "flee resolution must contain the acting combatant status outcome" });
+    }
+  } else if (resolution.kind === "stabilize") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || outcome?.kind !== "survival" || outcome.targetId !== resolution.targetIds[0]
+        || outcome.roll !== undefined || outcome.statusAfter !== "stable") {
+      context.addIssue({ code: "custom", message: "stabilize resolution must contain one exact stable survival outcome" });
+    }
+  } else if (resolution.kind === "death-save") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 0 || outcome?.kind !== "survival" || outcome.targetId !== resolution.actingCombatantId
+        || outcome.roll === undefined) {
+      context.addIssue({ code: "custom", message: "death save resolution must contain one server roll" });
     }
   } else if (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0) {
     context.addIssue({ code: "custom", message: "end turn cannot contain targets or outcomes" });
@@ -802,15 +914,18 @@ export const verifyUseConsumableCommandResultBinding = (
 export type EncounterCreateRequest = z.infer<typeof encounterCreateRequestSchema>;
 export type EncounterCombatantPublic = z.infer<typeof encounterCombatantPublicSchema>;
 export type EncounterPublic = z.infer<typeof encounterPublicSchema>;
+export type EncounterSetupCandidatesResponse = z.infer<typeof encounterSetupCandidatesResponseSchema>;
 export type CombatantState = z.infer<typeof combatantStateSchema>;
 export type CombatLegalAction = z.infer<typeof combatLegalActionSchema>;
 export type CombatState = z.infer<typeof combatStateSchema>;
+export type CombatTurnEconomy = z.infer<typeof combatTurnEconomySchema>;
 export type EncounterStartCommandRequest = z.infer<typeof encounterStartCommandRequestSchema>;
 export type CombatReadResponse = z.infer<typeof combatReadResponseSchema>;
 export type CombatLogQuery = z.infer<typeof combatLogQuerySchema>;
 export type CombatLogEntryPublic = z.infer<typeof combatLogEntryPublicSchema>;
 export type CombatLogResponse = z.infer<typeof combatLogResponseSchema>;
 export type CombatActionCommandRequest = z.infer<typeof combatActionCommandRequestSchema>;
+export type CombatEnemyTurnCommandRequest = z.infer<typeof combatEnemyTurnCommandRequestSchema>;
 export type CombatActionResolution = z.infer<typeof combatActionResolutionSchema>;
 export type CombatActionCommandResponse = z.infer<typeof combatActionCommandResponseSchema>;
 export type CombatEndCommandRequest = z.infer<typeof combatEndCommandRequestSchema>;

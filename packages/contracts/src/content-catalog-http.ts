@@ -9,6 +9,7 @@ import {
   playerCatalogProjectionSchema,
   publicationSummarySchema,
   publishContentCatalogInputSchema,
+  validateContentCatalogInputSchema,
 } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
@@ -30,9 +31,7 @@ export const contentCatalogHttpOwnerDetailResponseSchema = z.object({
 }).strict();
 
 /** The route supplies its own idempotency key after validating this payload. */
-export const contentCatalogHttpValidationRequestSchema = publishContentCatalogInputSchema.omit({
-  idempotencyKey: true,
-});
+export const contentCatalogHttpValidationRequestSchema = validateContentCatalogInputSchema;
 export const contentCatalogHttpValidationResponseSchema = z.object({
   report: catalogValidationReportSchema,
 }).strict();

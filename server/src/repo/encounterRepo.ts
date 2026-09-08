@@ -21,6 +21,7 @@ export type {
   EncounterCombatSnapshot,
   CombatLogPage,
   EncounterLifecycleSnapshot,
+  EncounterSetupCandidatesSnapshot,
   EncounterReceipt,
   EncounterResult,
   EncounterRewardGrantSnapshot,

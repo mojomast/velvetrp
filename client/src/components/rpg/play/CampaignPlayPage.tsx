@@ -1,14 +1,16 @@
-import { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { adventureTurnResumeTokenSchema, idempotencyKeySchema, resourceIdSchema } from "@velvet/contracts";
 import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnInitialReconcileRequest,
-  AdventureTurnStreamEvent, CampaignPlayBootstrap } from "@velvet/contracts";
-import type { AdventureTurnClientBinding } from "../../../api";
+  AdventureTurnStreamEvent, AdventureTurnTranscriptEntry, AdventureTurnTranscriptResponse, ActorGameplaySheetResponse, CampaignPlayBootstrap } from "@velvet/contracts";
+import type { AdventureTurnClientBinding, ChatMessage } from "../../../api";
 import { ApiError } from "../../../api";
 import { AdventureActionComposer } from "./AdventureActionComposer";
 import { CampaignContextDrawer, type CampaignContextDrawerApi } from "./CampaignContextDrawer";
 import { ConfirmationBanner } from "./ConfirmationBanner";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
 import { CampaignQuickPanel, type CampaignQuickPanelApi } from "./CampaignQuickPanel";
+import { CampaignConversation } from "./CampaignConversation";
+import { GameplaySheetDrawer } from "./GameplaySheetDrawer";
 import { CAMPAIGN_CONTEXT_WIDGETS, DEFAULT_CAMPAIGN_WORKBENCH_PREFERENCES, useCampaignWorkbenchPreferences,
   type CampaignContextWidget, type CampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
 
@@ -30,17 +32,20 @@ export interface CampaignPlayApi extends CampaignContextDrawerApi, CampaignQuick
   getCampaignPlayBootstrap: (campaignId: string, sessionId: string) => Promise<CampaignPlayBootstrap>;
   streamAdventureTurn: (request: PlayStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void) => AdventureTurnStreamHandle;
   getAdventureTurn: (turnId: string, expected: AdventureTurnClientBinding) => Promise<AdventureTurnGetResponse>;
+  getAdventureTurnTranscript: (campaignId: string, sessionId: string) => Promise<AdventureTurnTranscriptResponse>;
   reconcileInitialAdventureTurn: (input: AdventureTurnInitialReconcileRequest) => Promise<AdventureTurnGetResponse | null>;
   confirmAdventureTurn: (turnId: string, input: AdventureTurnConfirmRequest, expected: AdventureTurnClientBinding) => Promise<{ turn: AdventureTurnGetResponse["turn"]; resumeToken?: string }>;
+  getActorGameplaySheet: (actorId: string) => Promise<ActorGameplaySheetResponse>;
 }
 
-/** Props for the campaign play layout surrounding the existing room Chat child. */
+/** Props for the authoritative campaign play layout. */
 export interface CampaignPlayPageProps {
   campaignId: string;
   sessionId: string;
   authorizationGeneration: number;
   api: CampaignPlayApi;
-  children: ReactNode;
+  legacyMessages?: readonly ChatMessage[];
+  legacyParticipants?: readonly { id: string; name: string }[];
   onBack: () => void;
   onUnavailable: () => void;
   onSelectedActorChange?: (actorId: string | null) => void;
@@ -58,6 +63,8 @@ type StreamPhase = "idle" | "streaming" | "awaiting-confirmation" | "ambiguous" 
 type SafeState = { turnId?: string; selectedActorId?: string; resumeToken?: string; streamPhase: StreamPhase };
 type PendingInitial = { campaignId: string; sessionId: string; actorId: string; idempotencyKey: string };
 type PendingTurnReconciliation = { turnId: string; actorId: string; allowResumeToken: boolean; priorTurnId?: string | null };
+type GameplaySheetState = { kind: "closed" } | { kind: "loading"; actorId: string }
+  | { kind: "ready"; actorId: string; sheet: ActorGameplaySheetResponse } | { kind: "error"; actorId: string; message: string };
 const stateKey = (campaignId: string, sessionId: string) => `velvet.campaign-play.v1:${campaignId}:${sessionId}`;
 const lockKey = (campaignId: string, sessionId: string) => `velvet.campaign-play-submit.v1:${campaignId}:${sessionId}`;
 const confirmationKey = (turnId: string) => `velvet.adventure-confirm.v1:${turnId}`;
@@ -134,7 +141,7 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 }
 
 /** Coordinates bootstrap, exact durable reconciliation, SSE delivery, confirmation, and the accessible play grid. */
-export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, children, onBack, onUnavailable,
+export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, legacyMessages = [], legacyParticipants = [], onBack, onUnavailable,
   onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
   onNavigate, combatAvailable = false, studioAvailable = false }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
@@ -152,6 +159,11 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const [pendingInitial, setPendingInitial] = useState<PendingInitial | null>(() => readPendingInitial(campaignId, sessionId));
   const [pendingTurnReconciliation, setPendingTurnReconciliation] = useState<PendingTurnReconciliation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState<AdventureTurnTranscriptEntry[]>([]);
+  const [transcriptState, setTranscriptState] = useState<"loading" | "ready" | "error">("loading");
+  const [liveEvents, setLiveEvents] = useState<AdventureTurnStreamEvent[]>([]);
+  const [declaration, setDeclaration] = useState("");
+  const [reconciliationRevision, setReconciliationRevision] = useState(0);
   const streamRef = useRef<AdventureTurnStreamHandle | null>(null);
   const deliveryTurnIdRef=useRef<string|null>(null);
   const activeRef = useRef(true);
@@ -160,6 +172,8 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const [preferences, setPreferences] = useCampaignWorkbenchPreferences();
   const preferencesDialogRef = useRef<HTMLDialogElement>(null); const shortcutDialogRef = useRef<HTMLDialogElement>(null);
   const centerRef = useRef<HTMLElement>(null);
+  const [sheetState, setSheetState] = useState<GameplaySheetState>({ kind: "closed" });
+  const sheetRequestRef = useRef(0); const sheetTriggerRef = useRef<HTMLButtonElement>(null); const sheetCloseRef = useRef<HTMLButtonElement>(null);
   const unavailableRef = useRef(onUnavailable); const selectedChangeRef = useRef(onSelectedActorChange); const turnChangeRef = useRef(onTurnIdChange);
   unavailableRef.current = onUnavailable; selectedChangeRef.current = onSelectedActorChange; turnChangeRef.current = onTurnIdChange;
 
@@ -187,6 +201,17 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     return value;
   }, [api, authorizationCanAct, campaignId, clearAdventureState, initialSelectedActorId, sessionId]);
 
+  const refreshTranscript = useCallback(async () => {
+    setTranscriptState("loading");
+    try {
+      const value = await api.getAdventureTurnTranscript(campaignId, sessionId);
+      if (!activeRef.current) return;
+      setTranscript(value.turns); setTranscriptState("ready");
+    } catch {
+      if (activeRef.current) setTranscriptState("error");
+    }
+  }, [api, campaignId, sessionId]);
+
   const applyReconciled = useCallback(async (value: AdventureTurnGetResponse, allowResumeToken: boolean) => {
     if (!activeRef.current) return;
     setTurn(value); setPendingTurnReconciliation(null); turnChangeRef.current?.(value.turn.turnId); clearLock();
@@ -194,8 +219,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     const nextPhase: StreamPhase = value.confirmation.state === "pending" ? "awaiting-confirmation"
       : token ? "ambiguous" : ["completed", "cancelled", "failed"].includes(value.turn.state) ? "terminal" : "ambiguous";
     setPhase(nextPhase); persist({ turnId: value.turn.turnId, selectedActorId: value.turn.actorId, ...(token ? { resumeToken: token } : {}), streamPhase: nextPhase });
-    await refreshBootstrap().catch(() => undefined);
-  }, [clearLock, persist, refreshBootstrap]);
+    await Promise.all([refreshBootstrap().catch(() => undefined), refreshTranscript()]);
+    if (activeRef.current) setReconciliationRevision((revision) => revision + 1);
+  }, [clearLock, persist, refreshBootstrap, refreshTranscript]);
 
   const reconcile = useCallback(async (turnId: string, actorId: string, allowResumeToken = true, priorTurnId?: string | null) => {
     const value = await api.getAdventureTurn(turnId, { campaignId, sessionId, actorId, turnId, ...(priorTurnId !== undefined ? { priorTurnId } : {}) });
@@ -208,11 +234,12 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }, [reconcile]);
 
   useEffect(() => {
-    activeRef.current = true; setBootstrap(null); setTurn(null); setResumeToken(undefined); setError(null);
+    activeRef.current = true; setBootstrap(null); setTurn(null); setResumeToken(undefined); setError(null); setLiveEvents([]); setTranscript([]); setTranscriptState("loading");
     streamRef.current?.cancelDelivery(); streamRef.current = null;
     void refreshBootstrap().catch(() => { if (activeRef.current) { clearAdventureState(); unavailableRef.current(); } });
+    void refreshTranscript();
     return () => { activeRef.current = false; streamRef.current?.cancelDelivery(); streamRef.current = null; };
-  }, [authorizationGeneration, clearAdventureState, refreshBootstrap]);
+  }, [authorizationGeneration, clearAdventureState, refreshBootstrap, refreshTranscript]);
   useEffect(() => { if (focusHeading && bootstrap && !headingFocusedRef.current) { headingFocusedRef.current = true; headingRef.current?.focus(); } }, [bootstrap, focusHeading]);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -225,6 +252,14 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     };
     window.addEventListener("keydown", keydown); return () => window.removeEventListener("keydown", keydown);
   }, [preferences.contextVisible, preferences.quickToolsVisible]);
+  useEffect(() => {
+    if (sheetState.kind === "closed") return;
+    sheetCloseRef.current?.focus();
+    const keydown = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); closeSheet(); } };
+    window.addEventListener("keydown", keydown); return () => window.removeEventListener("keydown", keydown);
+  // Focus only when the drawer opens or changes from loading to loaded/error.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetState.kind]);
 
   const initialReconciledRef = useRef<string | null>(null);
   useEffect(() => {
@@ -240,22 +275,29 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
 
   const receive = useCallback((event: AdventureTurnStreamEvent) => {
     if (!activeRef.current) return;
-    if (event.type === "turn_started") {
-      const id = event.payload.turn.turnId;deliveryTurnIdRef.current=id; clearLock(); setPhase("streaming"); turnChangeRef.current?.(id);
-      persist({ turnId: id, selectedActorId: event.payload.turn.actorId, streamPhase: "streaming" });
-    }
-    if (event.type === "confirmation_required") setPhase("awaiting-confirmation");
-    if (event.type === "terminal") {
-      setResumeToken(undefined);
-      const locator = { turnId: event.payload.turn.turnId, actorId: event.payload.turn.actorId,
-        allowResumeToken: false, priorTurnId: event.payload.turn.priorTurnId };
-      setPendingTurnReconciliation(locator); void reconcileKnownTurn(locator);
+    setLiveEvents((events) => [...events, event]);
+    switch (event.type) {
+      case "turn_started": {
+        const id = event.payload.turn.turnId; deliveryTurnIdRef.current = id; clearLock(); setDeclaration(""); setPhase("streaming"); turnChangeRef.current?.(id);
+        persist({ turnId: id, selectedActorId: event.payload.turn.actorId, streamPhase: "streaming" }); break;
+      }
+      case "agent_status":
+        if (event.payload.status === "awaiting-confirmation") setPhase("awaiting-confirmation");
+        break;
+      case "tool_proposed": case "mechanics_committed": case "narration_delta": case "choice": break;
+      case "confirmation_required": setPhase("awaiting-confirmation"); break;
+      case "terminal": {
+        setResumeToken(undefined);
+        const locator = { turnId: event.payload.turn.turnId, actorId: event.payload.turn.actorId,
+          allowResumeToken: false, priorTurnId: event.payload.turn.priorTurnId };
+        setPendingTurnReconciliation(locator); void reconcileKnownTurn(locator); break;
+      }
     }
   }, [clearLock, persist, reconcileKnownTurn]);
 
   const openStream = useCallback((request: PlayStreamRequest) => {
     deliveryTurnIdRef.current = null;
-    setError(null); setPhase("streaming"); const handle = api.streamAdventureTurn(request, receive); streamRef.current = handle;
+    setError(null); setLiveEvents([]); setPhase("streaming"); const handle = api.streamAdventureTurn(request, receive); streamRef.current = handle;
     let knownTurnId: string | null = request.kind === "resume" ? request.expected.turnId ?? null : null;
     void handle.turnId.then((turnId) => { knownTurnId = turnId; if (!activeRef.current) return; turnChangeRef.current?.(turnId);
       deliveryTurnIdRef.current=turnId;
@@ -331,6 +373,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }
 
   const setActor = (actorId: string) => { if (!bootstrap?.playableActors.some((actor) => actor.actorId === actorId)) return;
+    if (sheetState.kind !== "closed") closeSheet();
     setSelectedActorId(actorId); selectedActorRef.current = actorId; selectedChangeRef.current?.(actorId);
     persist({ ...(turn ? { turnId: turn.turn.turnId } : {}), selectedActorId: actorId, ...(resumeToken ? { resumeToken } : {}), streamPhase: phase }); };
   const pending = turn?.confirmation.state === "pending" ? turn.confirmation : null;
@@ -339,13 +382,39 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   if (!bootstrap) return <main className="campaign-play-page"><p role="status">Opening campaign play…</p></main>;
   const actionable = authorizationCanAct && bootstrap.session.adventureEligible && bootstrap.session.active
     && bootstrap.principal.role !== "observer" && bootstrap.playableActors.length > 0;
+  const referenceReady = actionable && (phase === "idle" || phase === "terminal") && Boolean(selectedActorId);
   const audience = bootstrap.principal.role === "owner" || bootstrap.principal.role === "gm" ? "gm" : "player";
+  const actorNames = new Map(bootstrap.playableActors.map((actor) => [actor.actorId, actor.name]));
   const playBlocker = !authorizationCanAct || bootstrap.principal.role === "observer" ? "Observer access is read-only."
     : !bootstrap.session.active ? "This attached room has stopped and is read-only."
       : !bootstrap.session.adventureEligible ? "Adventure turns are unavailable. Publish the campaign and use an attached active room with a finalized participating character."
         : bootstrap.playableActors.length === 0 ? "No controlled actor is available in this room. Review character finalization, room participants, and campaign control." : null;
   const navigate = (destination: Parameters<NonNullable<CampaignPlayPageProps["onNavigate"]>>[0]) => onNavigate?.(destination);
   const gridStyle = { "--campaign-context-width": `${preferences.contextWidth}px`, "--campaign-quick-width": `${preferences.quickToolsWidth}px` } as CSSProperties;
+
+  function closeSheet() {
+    sheetRequestRef.current += 1; setSheetState({ kind: "closed" });
+    queueMicrotask(() => sheetTriggerRef.current?.focus());
+  }
+  async function openSheet() {
+    if (!referenceReady || !selectedActorId || !bootstrap?.playableActors.some((actor) => actor.actorId === selectedActorId)) return;
+    const actorId = selectedActorId; const request = ++sheetRequestRef.current; setSheetState({ kind: "loading", actorId });
+    try {
+      const sheet = await api.getActorGameplaySheet(actorId);
+      if (!activeRef.current || request !== sheetRequestRef.current || selectedActorRef.current !== actorId) return;
+      setSheetState({ kind: "ready", actorId, sheet });
+    } catch (failure) {
+      if (!activeRef.current || request !== sheetRequestRef.current) return;
+      const denied = failure instanceof ApiError && (failure.status === 403 || failure.status === 404);
+      setSheetState({ kind: "error", actorId, message: denied ? "This character sheet is unavailable with your current access." : "The character sheet could not be loaded. Nothing was changed." });
+    }
+  }
+  function appendSheetReference(fragment: string) {
+    if (!referenceReady || sheetState.kind !== "ready" || sheetState.actorId !== selectedActorId) return;
+    setDeclaration((current) => current.length === 0 ? fragment : `${current}${/\s$/.test(current) ? "" : " "}${fragment}`);
+    queueMicrotask(() => composerRef.current?.focus());
+  }
+
   return <main className="campaign-play-page"><header className="campaign-play-header"><div><button className="back-link" onClick={onBack}>← Back to campaign</button><p className="eyebrow">CAMPAIGN COMMAND CENTER</p><h1 ref={headingRef} tabIndex={-1}>Adventure room</h1></div>
     <div className="campaign-play-status"><span>{bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name ?? "No acting character"}</span><p className="play-phase" role="status">{phase.replace("-", " ")}</p><small>Campaign revision {bootstrap.expectedRevision}</small></div></header>
     <nav className="campaign-play-nav" aria-label="Campaign command navigation"><button className="ghost" onClick={() => navigate("campaign")}>Campaign</button>{combatAvailable && <button className="ghost" onClick={() => navigate("combat")}>Combat</button>}{studioAvailable && <><button className="ghost" onClick={() => navigate("world")}>World</button><button className="ghost" onClick={() => navigate("cast")}>Cast</button><button className="ghost" onClick={() => navigate("quests")}>Quests</button><button className="ghost" onClick={() => navigate("story")}>Story</button></>}<button className="ghost" onClick={() => navigate("history")}>History</button>{audience === "gm" && <button className="ghost" onClick={() => navigate("administration")}>GM tools</button>}<span className="campaign-nav-spacer" /><button className="ghost" aria-label="Campaign workbench preferences" onClick={() => preferencesDialogRef.current?.showModal()}>Display</button><button className="ghost" aria-label="Campaign keyboard shortcuts" onClick={() => shortcutDialogRef.current?.showModal()}>Shortcuts</button></nav>
@@ -354,20 +423,23 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {pendingInitial && phase === "ambiguous" && actionable && <div className="play-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button className="primary" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
     {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="play-reconcile"><p>A known turn needs authoritative reconciliation.</p><button className="primary" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
     <div className={`campaign-play-grid ${preferences.contextVisible ? "has-context" : ""} ${preferences.quickToolsVisible ? "has-quick-tools" : ""}`} style={gridStyle}>
-      {preferences.contextVisible && <><CampaignContextDrawer key={`${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} api={api} widgets={preferences.widgets} /><PanelSeparator side="left" value={preferences.contextWidth} controls="campaign-context-panel" label="Resize campaign context" onChange={(contextWidth) => setPreferences({ ...preferences, contextWidth })} onCollapse={() => setPreferences({ ...preferences, contextVisible: false })} /></>}
-      <section ref={centerRef} tabIndex={-1} className="campaign-play-center" aria-label="Campaign narration and actions">{actionable && <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={bootstrap.principal.role} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
-          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} onActorChange={setActor} onSubmit={(declaration) => void submit(declaration)} composerRef={composerRef} />}
-        <div className="embedded-room-chat">{children}</div>
-        {turn?.narrationStatus.text && <article className="adventure-narration"><h2>Adventure narration</h2><p>{turn.narrationStatus.text}</p>{turn.receipts.length === 0 && <p className="no-tools-label">No mechanics were needed. {turn.narrationStatus.source === "provider-assisted" ? "The scene was narrated from public campaign context." : "Provider narration failed, so a deterministic fallback is shown."}</p>}</article>}
+      {preferences.contextVisible && <><CampaignContextDrawer key={`${authorizationGeneration}:${audience}`} campaignId={campaignId} sessionId={sessionId} selectedActorId={selectedActorId || null} playableActorIds={bootstrap.playableActors.map((actor) => actor.actorId)} audience={audience} authorizationGeneration={authorizationGeneration} refreshKey={reconciliationRevision} api={api} widgets={preferences.widgets} onPrefillDeclaration={setDeclaration} onOpenWorld={() => navigate("world")} /><PanelSeparator side="left" value={preferences.contextWidth} controls="campaign-context-panel" label="Resize campaign context" onChange={(contextWidth) => setPreferences({ ...preferences, contextWidth })} onCollapse={() => setPreferences({ ...preferences, contextVisible: false })} /></>}
+      <section ref={centerRef} tabIndex={-1} className="campaign-play-center" aria-label="Campaign narration and actions">
+        <CampaignConversation transcript={transcript} transcriptState={transcriptState} legacyMessages={legacyMessages} legacyParticipants={legacyParticipants} current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={setDeclaration} canPrefill={actionable && phase !== "streaming" && phase !== "awaiting-confirmation" && phase !== "ambiguous"} />
         {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
           onReconciled={(value, token) => { void applyReconciled({ ...value, ...(token ? { resumeToken: token } : {}) }, true); }} />}
         {turn && <MechanicReceiptCard campaignId={campaignId} links={turn.receipts} api={api} />}
         {actionable && turn && ["completed", "cancelled", "failed"].includes(turn.turn.state) && <div className="adventure-variant-controls" aria-label="Adventure narration alternatives">
           <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
           <button className="ghost" disabled={phase === "streaming"} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
+        <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={bootstrap.principal.role} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
+          phase={phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"} declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />
       </section>
-      {preferences.quickToolsVisible && <><PanelSeparator side="right" value={preferences.quickToolsWidth} controls="campaign-quick-tools" label="Resize character quick tools" onChange={(quickToolsWidth) => setPreferences({ ...preferences, quickToolsWidth })} onCollapse={() => setPreferences({ ...preferences, quickToolsVisible: false })} /><CampaignQuickPanel campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} api={api} /></>}
+      {preferences.quickToolsVisible && <><PanelSeparator side="right" value={preferences.quickToolsWidth} controls="campaign-quick-tools" label="Resize character quick tools" onChange={(quickToolsWidth) => setPreferences({ ...preferences, quickToolsWidth })} onCollapse={() => setPreferences({ ...preferences, quickToolsVisible: false })} /><CampaignQuickPanel campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} api={api} refreshKey={reconciliationRevision} canOpenSheet={referenceReady} onOpenSheet={() => void openSheet()} openSheetButtonRef={sheetTriggerRef} /></>}
     </div>
+    {sheetState.kind === "loading" && <aside className="gameplay-sheet-drawer gameplay-sheet-message" role="dialog" aria-modal="false" aria-labelledby="gameplay-sheet-loading"><header><h2 id="gameplay-sheet-loading">Opening character sheet</h2><button ref={sheetCloseRef} type="button" aria-label="Close character sheet" onClick={closeSheet}>Close</button></header><p role="status">Loading authoritative character details...</p></aside>}
+    {sheetState.kind === "error" && <aside className="gameplay-sheet-drawer gameplay-sheet-message" role="dialog" aria-modal="false" aria-labelledby="gameplay-sheet-error"><header><h2 id="gameplay-sheet-error">Character sheet unavailable</h2><button ref={sheetCloseRef} type="button" aria-label="Close character sheet" onClick={closeSheet}>Close</button></header><p role="alert">{sheetState.message}</p><button type="button" className="primary" disabled={!referenceReady} onClick={() => void openSheet()}>Try again</button></aside>}
+    {sheetState.kind === "ready" && <GameplaySheetDrawer sheet={sheetState.sheet} canReference={referenceReady && sheetState.actorId === selectedActorId} closeButtonRef={sheetCloseRef} onClose={closeSheet} onReference={appendSheetReference} />}
     {actionable && streamRef.current && <button className="ghost cancel-delivery" onClick={cancelLiveDelivery}>Stop receiving live updates</button>}
     <WorkbenchPreferencesDialog dialogRef={preferencesDialogRef} preferences={preferences} onChange={setPreferences} /><ShortcutDialog dialogRef={shortcutDialogRef} />
   </main>;

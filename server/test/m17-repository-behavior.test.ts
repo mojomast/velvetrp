@@ -38,9 +38,12 @@ describe("M1.7 encounter repository",()=>{
       attributes:[],proficiencies:[],choices:[]}).projection.actor.id;
     repo.executeInitializeActorResource("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,
       actorId:actor,commandId:"lifecycle-health",idempotencyKey:"lifecycle-health",expectedRevision:0,sourceTurnId:null,
-      command:{type:"initialize_actor_resource",payload:{name:"health",current:10,max:10}}});
+       command:{type:"initialize_actor_resource",payload:{name:"health",current:10,max:10}}});
     const session=await createSession({characterId:persona.id,title:"Lifecycle combat"});
     repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
+    expect(repo.getEncounterSetupCandidates("local-owner",campaign.id)).toMatchObject({campaignId:campaign.id,
+      sessions:[{sessionId:session.id}],actors:[{actorId:actor,label:"Lifecycle hero"}],teams:{actor:"allies",enemy:"enemies"}});
+    expect(repo.getEncounterSetupCandidates("not-a-member",campaign.id)).toBeNull();
     const request={sessionId:session.id,name:"Bridge ambush",combatants:[{kind:"actor" as const,actorId:actor,
       team:"allies" as const}],idempotencyKey:"prepare-encounter"};
     const created=repo.createEncounter("local-owner",campaign.id,request);
@@ -82,8 +85,12 @@ describe("M1.7 encounter repository",()=>{
     repo.attachCampaignSession("local-owner",{campaignId:campaign.id,sessionId:session.id} as any);
     const enemy={kind:"enemy-template" as const,packId:MECHANICS_STARTER_IDENTITY.packId,
       packVersion:MECHANICS_STARTER_IDENTITY.packVersion,definitionId:"velvet:mechanics:enemy-template:gloam-mite"};
+    expect(repo.getEncounterSetupCandidates("local-owner",campaign.id)).toMatchObject({
+      sessions:[{sessionId:session.id}],teams:{actor:"allies",enemy:"enemies"},
+    });
     const created=repo.createEncounter("local-owner",campaign.id,{sessionId:session.id,name:"Mite patrol",
       combatants:[{kind:"enemy",template:enemy,team:"enemies"}],idempotencyKey:"prepare-enemy"});
+    expect(repo.getEncounterSetupCandidates("local-owner",campaign.id)?.sessions).toEqual([]);
     expect(created.encounter.combatants).toEqual([{combatantId:created.encounter.combatants[0]!.combatantId,
       kind:"enemy",team:"enemies",template:enemy}]);
     const started=repo.startEncounter("local-owner",created.encounter.encounterId,

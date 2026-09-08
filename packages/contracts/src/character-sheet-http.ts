@@ -15,6 +15,8 @@ export const characterSheetHttpProgressionSchema = z.object({
 
 /** Display-only character sheet read model for the route-bound character. */
 export const characterSheetHttpResponseSchema = z.object({
+  rulesetId: z.string().trim().min(1).optional(),
+  rulesetVersion: z.string().trim().min(1).optional(),
   sheet: campaignCharacterWorkspaceSchema,
   derived: characterDerivedStatsSchema,
   progression: characterSheetHttpProgressionSchema,

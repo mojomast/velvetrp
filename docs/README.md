@@ -17,6 +17,11 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - [API reference](api.md) - Current HTTP routes, request/response contracts, feature gates, error handling, and reconciliation rules.
 - [Streaming](streaming.md) - Current SSE contracts for legacy token/swipe, room, and durable M2.11 adventure streams.
+- [DM harness architecture](dm-harness-architecture.md) - Authoritative DM conversation and transcript, trust boundaries, subordinate harness preferences, actor sheet references, exact adventure tools/limits, ruleset attribution, provider requirements, and engineering checklist.
+- [Exact combat sheet actions](combat-sheet-actions.md) - Exact combat consumable candidates, confirmation, authoritative settlement, replay, and excluded combat-power mechanics.
+- [Vendor commerce](vendor-commerce.md) - Exact visible-vendor candidates, confirmation, authoritative prices and transfers, receipts, and replay.
+- [Tactical maps](tactical-map.md) - Authoritative local maps, fog, movement previews, persistence, and accessible rendering.
+- [SRD 5.1 coverage](srd-5.1-coverage.md) - Licensed rules coverage and explicit gaps.
 - [Customizable harness](customizable-harness.md) - Current prompt/harness fields, limits, template behavior, and context assembly.
 - [Repository architecture](repo-architecture.md) - Normative implementation ownership, persistence boundaries, current-schema ownership, and source-code map. It is not an HTTP contract.
 
@@ -24,6 +29,9 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - [Operations](operations.md) - Node 22 setup, environment, local deployment, disposable storage, testing, and troubleshooting.
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
+- [Provider hardening](provider-hardening.md) - Provider failure classification, privacy, and retry boundaries.
+- [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
+- [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
 - [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.
 - [Planning board](planning-board.md) - Internal contributor workflow for the repository-specific planning board.

@@ -11,9 +11,11 @@ export const confirmationPolicyVersionSchema = z.enum([CONFIRMATION_POLICY_VERSI
 
 /** Closed consequential-change taxonomy. Unknown/ambiguous mutations fail into `ambiguous-consequential-change`. */
 export const confirmationPolicyCategorySchema = z.enum([
+  "inventory-equip", "inventory-unequip",
   "currency-transfer", "purchase", "important-item-loss", "important-item-consume", "important-item-gift",
   "ambiguous-limited-resource-use", "rest-timing", "companion-change", "combat-start",
   "combat-action-consequential", "generated-world-change", "generated-quest-change", "generated-story-change",
+  "quest-accept", "quest-abandon", "quest-reward-claim", "character-progression",
   "gm-override", "deterministic-roll", "ambiguous-consequential-change",
 ]);
 export const confirmationAuthorizerSchema = z.enum(["controller", "gm"]);

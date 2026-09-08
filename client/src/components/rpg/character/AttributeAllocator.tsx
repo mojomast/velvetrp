@@ -19,13 +19,14 @@ const labels: Record<(typeof CHARACTER_BUILDER_ATTRIBUTE_IDS)[number], string> =
 };
 
 const defaultScores = Object.fromEntries(CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => [id, CHARACTER_BUILDER_STANDARD_ARRAY[index]])) as CharacterBuilderAttributeScores;
+type LegacyAttributeId = (typeof CHARACTER_BUILDER_ATTRIBUTE_IDS)[number];
 
 /** Selects only allocation methods accepted by the server contract. It never rolls dice or derives statistics. */
 export function AttributeAllocator({ disabled = false, onContinue }: AttributeAllocatorProps) {
   const [method, setMethod] = useState<CharacterBuilderAllocationRequest["method"]>("standard-array");
   const [scores, setScores] = useState<CharacterBuilderAttributeScores>(defaultScores);
 
-  function updateScore(id: keyof CharacterBuilderAttributeScores, value: number) {
+  function updateScore(id: LegacyAttributeId, value: number) {
     setScores((current) => ({ ...current, [id]: value }));
   }
 
@@ -51,9 +52,9 @@ export function AttributeAllocator({ disabled = false, onContinue }: AttributeAl
       <legend>Attribute scores</legend>
       {CHARACTER_BUILDER_ATTRIBUTE_IDS.map((id, index) => <label className="field" key={id}>
         <span>{labels[id]}</span>
-        {method === "standard-array" ? <select aria-label={`${labels[id]} score`} value={scores[id]} onChange={(event) => updateScore(id, Number(event.target.value))}>
+        {method === "standard-array" ? <select aria-label={`${labels[id]} score`} value={(scores as Record<string, number>)[id]} onChange={(event) => updateScore(id, Number(event.target.value))}>
           {CHARACTER_BUILDER_STANDARD_ARRAY.map((score) => <option key={`${id}-${score}`} value={score}>{score}</option>)}
-        </select> : <input aria-label={`${labels[id]} score`} type="number" min={method === "point-buy" ? 8 : 3} max={method === "point-buy" ? 15 : 20} value={scores[id]} onChange={(event) => updateScore(id, Number(event.target.value))} />}
+        </select> : <input aria-label={`${labels[id]} score`} type="number" min={method === "point-buy" ? 8 : 3} max={method === "point-buy" ? 15 : 20} value={(scores as Record<string, number>)[id]} onChange={(event) => updateScore(id, Number(event.target.value))} />}
         {method === "standard-array" && <small>Use each array value once. Position {index + 1}.</small>}
       </label>)}
     </fieldset> : <p className="builder-callout">The server will make and persist one auditable 4d6 roll for each attribute when the draft is created.</p>}

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { abilityCatalogReferenceSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
+import { abilityCatalogReferenceSchema, attributeIdSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { rulesProfileIdSchema } from "./rpg-content.js";
-import { characterDerivedStatsSchema } from "./character-builder.js";
+import { characterBuilderAttributeScoresSchema, characterDerivedStatsSchema } from "./character-builder.js";
 
 export const PROGRESSION_CALCULATOR_VERSION = "velvet-character-progression-v1" as const;
 export const STARTER_PROGRESSION_PROFILE_ID = "velvet:progression:starter-v1" as const;
@@ -62,8 +62,8 @@ export const progressionCalculatorInputSchema = z.object({
   milestoneCount: z.number().int().min(0).max(19), currentHp: z.number().int().min(0).max(1_000_000),
   currentDerived: characterDerivedStatsSchema,
   derivedBase: z.object({
-    scores: z.object({ might: z.number().int(), agility: z.number().int(), resolve: z.number().int(), insight: z.number().int(), presence: z.number().int(), craft: z.number().int() }).strict(),
-    raceSpeed: z.number().int().min(1).max(1_000), spellcastingAttribute: z.enum(["might", "agility", "resolve", "insight", "presence", "craft"]),
+    scores: characterBuilderAttributeScoresSchema,
+    raceSpeed: z.number().int().min(1).max(1_000), spellcastingAttribute: attributeIdSchema,
   }).strict(),
   classLevels: z.array(classLevelCatalogDefinitionSchema).min(1).max(20),
   knownAbilities: z.array(abilityCatalogReferenceSchema).max(128),

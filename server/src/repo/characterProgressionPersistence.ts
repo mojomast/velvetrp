@@ -3,6 +3,7 @@ import { progressionProfileSchema, type ProgressionSelection } from "@velvet/con
 import { calculateCharacterProgression } from "../characterProgressionCalculator.js";
 import { progressionReferenceKey, resolveInitialKnownPowers, resolveSelectedClassProgression, type ExactReference } from "../characterProgressionCatalog.js";
 import { assertCanonicalProgressionProfile } from "../characterProgressionProfile.js";
+import { resolveCampaignRuleset } from "../rulesets/campaignBinding.js";
 
 export interface ProgressionRootRow {
   campaign_character_id:string; campaign_id:string; sheet_id:string; actor_id:string; profile_id:string;
@@ -45,7 +46,8 @@ export function readKnownPowerReferences(db:DatabaseDriver.Database,characterId:
 }
 
 export function calculateAuthoritativeProgressionPreview(db:DatabaseDriver.Database,row:ProgressionRootRow,selections:ProgressionSelection[]=[]){
-  const catalog=loadExactProgressionCatalog(db,row);
+  const catalog=loadExactProgressionCatalog(db,row),ruleset=resolveCampaignRuleset(db,row.campaign_id);
+  if(ruleset.rulesProfileId!==catalog.profile.rulesProfileId)throw new Error("progression profile is not bound to the campaign ruleset");
   const attributes=Object.fromEntries((db.prepare("SELECT attribute_id,value FROM rpg_character_attributes WHERE sheet_id=?").all(row.sheet_id) as Array<{attribute_id:string;value:number}>).map((value)=>[value.attribute_id,value.value]));
   const resources=db.prepare("SELECT name,current,max FROM rpg_actor_resources WHERE actor_id=? ORDER BY name").all(row.actor_id) as Array<{name:string;current:number;max:number}>;
   const health=resources.find((resource)=>resource.name==="health");if(!health)throw new Error("health resource is unavailable");
@@ -56,7 +58,7 @@ export function calculateAuthoritativeProgressionPreview(db:DatabaseDriver.Datab
     currentDerived:JSON.parse(row.derived_json),derivedBase:{scores:attributes as any,raceSpeed:(catalog.selectedRace as any).mechanics.speed,
       spellcastingAttribute:(catalog.selectedClass as any).mechanics.primaryAttribute},classLevels:catalog.levels,
     knownAbilities:known.filter((ref)=>ref.kind==="ability") as any,knownSpells:known.filter((ref)=>ref.kind==="spell") as any,
-    resources:resources.filter((resource)=>resource.name!=="health").map((resource)=>({resourceId:resource.name,current:resource.current,max:resource.max})),selections});
+    resources:resources.filter((resource)=>resource.name!=="health").map((resource)=>({resourceId:resource.name,current:resource.current,max:resource.max})),selections},{rulesetId:ruleset.rulesetId,rulesetVersion:ruleset.rulesetVersion});
 }
 
 export function assertPowerDefinitionExists(db:DatabaseDriver.Database,reference:Extract<ExactReference,{kind:"ability"|"spell"}>):void{

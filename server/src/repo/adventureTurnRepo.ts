@@ -20,6 +20,10 @@ type AgentCommandExecutors={
   executeSetActorAttribute(principalId:string,input:CommandEnvelope):{commandId:string};
   executeRollActorDice(principalId:string,input:CommandEnvelope):{commandId:string};
   resolveCombatAction(principalId:string,encounterId:string,input:any):unknown;
+  executeInventoryAction(principalId:string,turnId:string,proposalId:string):{commandId:string};
+  executeCommerceAction(principalId:string,turnId:string,proposalId:string):{commandId:string};
+  executePowerRestAction(principalId:string,turnId:string,proposalId:string):{commandId:string};
+  executeQuestProgressionAction(principalId:string,turnId:string,proposalId:string):{commandId:string};
 };
 
 /** Creates the composed M1.10 repository facade. */
@@ -45,7 +49,15 @@ export function createAdventureTurnRepository(db: DatabaseDriver.Database, depen
       if(!call)throw new Error("approved proposal is unavailable");
       const binding=call.proposal.executionBinding,args=JSON.parse(call.proposal.argumentsJson) as any;
       try{
-        db.transaction(()=>{if(binding.commandType==="combat_action"){
+        db.transaction(()=>{if(binding.commandType==="inventory_action"){
+          executors.executeInventoryAction(principalId,turnId,proposalId);
+        }else if(binding.commandType==="commerce_action"){
+          executors.executeCommerceAction(principalId,turnId,proposalId);
+         }else if(binding.commandType==="power_action"||binding.commandType==="rest_action"||binding.commandType==="combat_consumable_action"||binding.commandType==="combat_power_action"){
+           executors.executePowerRestAction(principalId,turnId,proposalId);
+         }else if(binding.commandType==="quest_lifecycle_action"||binding.commandType==="progression_action"){
+           executors.executeQuestProgressionAction(principalId,turnId,proposalId);
+        }else if(binding.commandType==="combat_action"){
           executors.resolveCombatAction(principalId,binding.encounterId,{legalActionId:binding.legalActionId,
             targetIds:args.targetId?[args.targetId]:[],choices:[],expectedRevision:binding.expectedCombatRevision,idempotencyKey:binding.idempotencyKey});
           responses.linkAgentCombatReceipt(principalId,{turnId,encounterId:binding.encounterId,

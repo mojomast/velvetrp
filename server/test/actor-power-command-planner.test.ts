@@ -3,14 +3,14 @@ import { describe,expect,it } from "vitest";
 import { planActorPowerCommands,plannedPowerSelection } from "../src/repo/actorPowerCommandPlanner.js";
 
 const reference={kind:"ability" as const,packId:"pack",packVersion:"1.0.0",definitionId:"area"};
-const definition=(target:"area"|"ally"|"enemy"|"single")=>({reference,name:"Wave",description:"A bounded wave.",tags:[],mechanics:{actionCost:"action",recovery:"none",uses:0,target,effects:[{type:"damage",damageType:"physical",dice:{count:1,sides:4,modifier:0}}]}});
+const definition=(target:"area"|"ally"|"enemy"|"single"|"self")=>({reference,name:"Wave",description:"A bounded wave.",tags:[],mechanics:{actionCost:"action",recovery:"none",uses:0,target,effects:[{type:"damage",damageType:"physical",dice:{count:1,sides:4,modifier:0}}]}});
 
-function fakeDatabase(target:"area"|"ally"|"enemy"|"single"){
+function fakeDatabase(target:"area"|"ally"|"enemy"|"single"|"self"){
   const actorIds=["source",...Array.from({length:40},(_,index)=>`target-${String(index).padStart(2,"0")}`)].sort();
   return {prepare(sql:string){return {
     all(){
       if(sql.includes("character_known_powers_v23"))return [{kind:"ability",pack_id:"pack",pack_version:"1.0.0",definition_id:"area",public_definition_json:JSON.stringify(definition(target))}];
-      if(sql.includes("persona.name label"))return actorIds.map((actor_id)=>({actor_id,label:actor_id}));
+      if(sql.includes("persona.name label"))return actorIds.map((actor_id)=>({actor_id,actor_kind:"player-character",label:actor_id}));
       if(sql.startsWith("SELECT name FROM rpg_actor_resources"))return [{name:"health"}];
       throw new Error(`unexpected planner all: ${sql}`);
     },get(){throw new Error(`unexpected planner get: ${sql}`);},
@@ -18,9 +18,9 @@ function fakeDatabase(target:"area"|"ally"|"enemy"|"single"){
 }
 
 describe("actor power command planner fail-closed targeting",()=>{
-  it.each(["ally","enemy"] as const)("omits %s powers without authoritative team semantics",(target)=>{
-    expect(planActorPowerCommands(fakeDatabase(target),"campaign","source")).toEqual([]);
-  });
+  it("supports campaign player-character allies but omits enemy powers from this lane",()=>{expect(planActorPowerCommands(fakeDatabase("ally"),"campaign","source")[0]).toMatchObject({targeting:"single",maxTargets:1});expect(planActorPowerCommands(fakeDatabase("enemy"),"campaign","source")).toEqual([]);});
+
+  it("represents self targeting with no caller-selected target",()=>{const plan=planActorPowerCommands(fakeDatabase("self"),"campaign","source")[0]!;expect(plan).toMatchObject({targeting:"self",maxTargets:0,validTargets:[{actorId:"source"}]});const intent={powerRef:reference,targetIds:[],choices:[] as [],expectedRevision:0,idempotencyKey:"self"};expect(plannedPowerSelection(plan,"source",intent)).toEqual(["source"]);expect(plannedPowerSelection(plan,"source",{...intent,targetIds:["source"]})).toBeNull();});
 
   it("caps area candidates and selected subsets at the request contract's exact bound",()=>{
     const [plan]=planActorPowerCommands(fakeDatabase("area"),"campaign","source");expect(plan).toBeDefined();

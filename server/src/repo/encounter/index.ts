@@ -12,6 +12,7 @@ export {
   type EncounterCombatSnapshot,
   type CombatLogPage,
   type EncounterLifecycleSnapshot,
+  type EncounterSetupCandidatesSnapshot,
   type EncounterReadRepository,
 } from "./encounterReadRepo.js";
 export {
@@ -24,3 +25,4 @@ export {
   type EncounterWriteRepository,
 } from "./encounterWriteRepo.js";
 export { buildUseConsumableLegalActions, executeUseConsumable, type UseConsumableBoundary } from "./useConsumableRuntime.js";
+export { buildCombatPowerLegalActions, executeCombatPower, type CombatPowerBoundary, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";

@@ -25,9 +25,19 @@ function eventSummary(event: CampaignHistoryHttpEvent): { text: string; technica
   return { text: `Rolled ${event.data.expression}; total ${event.data.total}.` };
 }
 function receiptDetail(receipt: CampaignHistoryHttpPublicReceipt): string {
+  if(receipt.kind==="combat-consumable")return `${receipt.itemName} used on ${receipt.target}; ${receipt.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.applied} ${outcome.damageType} damage`:outcome.kind==="healing"?`${outcome.applied} healing`:`${outcome.resource} ${outcome.applied>=0?"+":""}${outcome.applied}`).join(", ")}.`;
+  if(receipt.kind==="combat-power")return `${receipt.powerName} used on ${receipt.target}; ${receipt.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.applied} ${outcome.damageType} damage`:outcome.kind==="healing"?`${outcome.applied} healing`:outcome.effect).join(", ")}.`;
   if (receipt.kind === "administration") return `${receipt.type.replaceAll("_", " ")} committed revision ${receipt.revisionAfter}.`;
   if(receipt.kind==="combat")return `Combat advanced from round ${receipt.roundBefore} to ${receipt.roundAfter}.`;
   if(receipt.kind==="travel")return `Travel completed to ${receipt.destination}.`;
+  if(receipt.kind==="quest")return `${receipt.title}: ${receipt.objectiveDescription} advanced from ${receipt.progressBefore} to ${receipt.progressAfter} of ${receipt.target}${receipt.questCompleted ? "; quest completed" : receipt.objectiveCompleted ? "; objective completed" : ""}.`;
+  if(receipt.kind==="check")return `${receipt.skill??receipt.ability} check totaled ${receipt.total} against DC ${receipt.dc}: ${receipt.outcome}.`;
+  if(receipt.kind==="inventory")return `${receipt.action} ${receipt.quantity} ${receipt.itemLabel}${receipt.recipient?` to ${receipt.recipient}`:""}${receipt.slot?` in ${receipt.slot}`:""}.`;
+  if(receipt.kind==="commerce")return `${receipt.action} ${receipt.quantity} ${receipt.itemLabel} with ${receipt.vendorLabel} for ${receipt.priceMinorUnits} ${receipt.currencyLabel}; balance ${receipt.balanceBefore} to ${receipt.balanceAfter}.`;
+  if(receipt.kind==="power")return `${receipt.powerName} affected ${receipt.targets.join(", ")}.`;
+  if(receipt.kind==="rest")return `${receipt.restName} recovered ${receipt.recovery.map(delta=>`${delta.label} to ${delta.after}`).join(", ")}.`;
+  if(receipt.kind==="quest-lifecycle")return `${receipt.action} ${receipt.questTitle}${receipt.reward?`; ${receipt.reward.amount===null?receipt.reward.label:`${receipt.reward.amount} ${receipt.reward.kind}`} for ${receipt.reward.recipient}`:""}.`;
+  if(receipt.kind==="progression")return `${receipt.className} advanced from level ${receipt.levelBefore} to ${receipt.levelAfter}${receipt.features.length?`; gained ${receipt.features.join(", ")}`:""}.`;
   const event = receipt.event;
   if (event.type === "actor_attribute_set") return `Attribute changed: ${event.data.valueBefore} → ${event.data.valueAfter}.`;
   if (event.type === "actor_resource_initialized") return `Resource initialized: ${event.data.current} of ${event.data.max}.`;

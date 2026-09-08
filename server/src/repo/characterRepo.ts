@@ -1,4 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
+import { emptyPersonaProfile, personaProfileSchema, type PersonaProfile } from "@velvet/contracts";
 import { systemRuntime } from "../runtime.js";
 import type { Clock, IdGenerator } from "../runtime.js";
 import type { Character, CreateCharacterInput } from "../types.js";
@@ -16,6 +17,26 @@ interface CharacterRow {
   created_at: string;
 }
 
+interface CharacterProfileRow extends PersonaProfile {}
+
+function profileFor(db: DatabaseDriver.Database, characterId: string): PersonaProfile {
+  const row = db.prepare(`SELECT goal, ideal, bond, flaw, history, personality, fears, relationships, appearance, voice
+    FROM character_profiles WHERE character_id = ?`).get(characterId) as CharacterProfileRow | undefined;
+  return row ? personaProfileSchema.parse(row) : emptyPersonaProfile();
+}
+
+function writeProfile(db: DatabaseDriver.Database, characterId: string, profile: PersonaProfile): void {
+  db.prepare(`INSERT INTO character_profiles
+    (character_id, goal, ideal, bond, flaw, history, personality, fears, relationships, appearance, voice)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(character_id) DO UPDATE SET goal=excluded.goal, ideal=excluded.ideal, bond=excluded.bond,
+      flaw=excluded.flaw, history=excluded.history, personality=excluded.personality, fears=excluded.fears,
+      relationships=excluded.relationships, appearance=excluded.appearance, voice=excluded.voice`).run(
+    characterId, profile.goal, profile.ideal, profile.bond, profile.flaw, profile.history,
+    profile.personality, profile.fears, profile.relationships, profile.appearance, profile.voice,
+  );
+}
+
 export function characterFromRow(row: CharacterRow): Character {
   return {
     id: row.id,
@@ -23,6 +44,7 @@ export function characterFromRow(row: CharacterRow): Character {
     age: row.age,
     archetype: row.archetype,
     boundaries: row.boundaries,
+    profile: profileFor(getRepositoryDatabase(), row.id),
     fictionalConfirmed: row.fictional_confirmed === 1,
     isRealPerson: row.is_real_person === 1,
     createdAt: row.created_at,
@@ -35,12 +57,14 @@ export function createCharacterSync(
   dependencies: { clock: Clock; ids: IdGenerator },
   input: CreateCharacterInput,
 ): Character {
+  const profile = personaProfileSchema.parse(input.profile ?? {});
   const character: Character = {
     id: dependencies.ids.nextId(),
     name: input.name,
     age: input.age,
     archetype: input.archetype,
     boundaries: input.boundaries,
+    profile,
     fictionalConfirmed: input.fictionalConfirmed,
     isRealPerson: false,
     createdAt: dependencies.clock.now().toISOString(),
@@ -58,6 +82,7 @@ export function createCharacterSync(
     character.isRealPerson ? 1 : 0,
     character.createdAt,
   );
+  writeProfile(db, character.id, profile);
   return character;
 }
 
@@ -81,12 +106,14 @@ export async function createCharacter(input: CreateCharacterInput): Promise<Char
 
 export async function updateCharacter(id: string, input: CreateCharacterInput): Promise<Character | null> {
   const db = getRepositoryDatabase();
+  const profile = personaProfileSchema.parse(input.profile ?? {});
   const exists = db.prepare("SELECT id FROM characters WHERE id = ?").get(id);
   if (!exists) return null;
   db.prepare(`UPDATE characters SET name = ?, age = ?, archetype = ?, boundaries = ?,
     fictional_confirmed = ?, is_real_person = 0 WHERE id = ?`).run(
     input.name, input.age, input.archetype, input.boundaries, input.fictionalConfirmed ? 1 : 0, id,
   );
+  writeProfile(db, id, profile);
   return getCharacter(id);
 }
 

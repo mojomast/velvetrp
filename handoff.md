@@ -3,7 +3,7 @@
 ## Current Baseline
 
 - Persistence: one current disposable development schema; schema changes require deleting/recreating `velvet.sqlite`, and startup never upgrades older databases.
-- HTTP: 111 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
+- HTTP: 126 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
 - Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
 

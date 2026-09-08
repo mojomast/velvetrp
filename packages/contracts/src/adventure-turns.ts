@@ -13,6 +13,8 @@ export const MAX_TOOL_ARGUMENT_JSON_LENGTH = 32_768;
 export const adventureTurnStateSchema = z.enum(["declared", "proposed", "awaiting-confirmation", "confirmed", "mechanics-committed", "narrating", "completed", "cancelled", "failed"]);
 /** Narration progress tracked independently from committed mechanics. */
 export const narrationStatusSchema = z.enum(["none", "pending", "in-progress", "completed", "failed"]);
+/** Durable origin of completed narration text. */
+export const narrationSourceSchema = z.enum(["provider-assisted", "deterministic-fallback"]);
 /** Identifies an original declaration or narration-only derivative. */
 export const adventureTurnModeSchema = z.enum(["original", "narration-retry", "narration-swipe", "narration-fallback"]);
 /** Closed confirmation decision vocabulary. */
@@ -66,7 +68,16 @@ const legacyToolProposalExecutionBindingSchema = z.object({
 const combatToolProposalExecutionBindingSchema=z.object({idempotencyKey:idempotencyKeySchema,commandType:z.literal("combat_action"),
   campaignId:campaignIdSchema,timelineId:resourceIdSchema,actorId:actorIdSchema,sourceTurnId:resourceIdSchema,
   encounterId:resourceIdSchema,legalActionId:resourceIdSchema,legalActionDigest:z.string().length(64).regex(/^[0-9a-f]+$/),expectedCombatRevision:revisionSchema}).strict();
-export const toolProposalExecutionBindingSchema=z.union([legacyToolProposalExecutionBindingSchema,combatToolProposalExecutionBindingSchema]);
+const inventoryToolProposalExecutionBindingSchema=z.object({idempotencyKey:idempotencyKeySchema,commandType:z.literal("inventory_action"),
+  campaignId:campaignIdSchema,timelineId:resourceIdSchema,actorId:actorIdSchema,sourceTurnId:resourceIdSchema,
+  candidateId:resourceIdSchema,candidateDigest:z.string().length(64).regex(/^[0-9a-f]+$/)}).strict();
+const exactAdventureActionExecutionBindingSchema=z.object({idempotencyKey:idempotencyKeySchema,
+  commandType:z.enum(["power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"]),campaignId:campaignIdSchema,timelineId:resourceIdSchema,
+  actorId:actorIdSchema,sourceTurnId:resourceIdSchema,candidateId:resourceIdSchema,
+  candidateDigest:z.string().length(64).regex(/^[0-9a-f]+$/)}).strict();
+const commerceToolProposalExecutionBindingSchema=inventoryToolProposalExecutionBindingSchema.extend({commandType:z.literal("commerce_action")}).strict();
+export const toolProposalExecutionBindingSchema=z.union([legacyToolProposalExecutionBindingSchema,combatToolProposalExecutionBindingSchema,
+  inventoryToolProposalExecutionBindingSchema,commerceToolProposalExecutionBindingSchema,exactAdventureActionExecutionBindingSchema]);
 
 /** Full private proposal including provider-bound tool arguments and server-owned mechanics identity. */
 export const toolProposalSchema = z.object({
@@ -226,9 +237,10 @@ export const linkTurnReceiptInputSchema = turnMutationInputSchema.extend({ propo
 /** Strict input for narration progress and terminal cancellation/failure. */
 export const updateTurnNarrationInputSchema = turnMutationInputSchema.extend({ narrationStatus: narrationStatusSchema,
   terminalState: z.enum(["completed", "cancelled", "failed"]).optional(),
-  fallbackNarration: z.string().trim().min(1).max(8_000).optional() }).strict().superRefine((value, context) => {
+  fallbackNarration: z.string().trim().min(1).max(8_000).optional(), narrationSource: narrationSourceSchema.optional() }).strict().superRefine((value, context) => {
     if (value.terminalState === "completed" && value.narrationStatus !== "completed") context.addIssue({ code: "custom", path: ["narrationStatus"], message: "completed turns require completed narration" });
     if (value.fallbackNarration !== undefined && value.terminalState !== "completed") context.addIssue({ code: "custom", path: ["fallbackNarration"], message: "fallback narration belongs only to terminal completion" });
+    if (value.narrationSource !== undefined && value.terminalState !== "completed") context.addIssue({ code: "custom", path: ["narrationSource"], message: "narration source belongs only to terminal completion" });
   });
 
 /** Durable adventure-turn lifecycle state. */

@@ -3,6 +3,7 @@ import { characterSheetHttpResponseSchema, type CatalogDefinition, type PublishC
 import { calculateCatalogDigest, MECHANICS_STARTER_CATALOG } from "../../server/src/repo/index.js";
 
 const runId = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+const deterministicAdventureNarration = "A concise deterministic reply from the selected character.";
 
 function consumableCatalog(): PublishContentCatalogInput {
   const catalog = structuredClone(MECHANICS_STARTER_CATALOG) as PublishContentCatalogInput;
@@ -353,21 +354,13 @@ test("M2.7 finalized actor inventories a Waylamp, equips, replays, and unequips 
   const initial = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { kind: string; definitionId: string }; quantity?: number }>; equipment: unknown[]; capacity: number; revision: number }>(request, "GET", inventoryPath);
   expect(initial).toMatchObject({ equipment: [], capacity: 1000, revision: 0 });
   expect(initial.entries).toEqual([expect.objectContaining({
-    kind: "stackable", quantity: 1, item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" },
+    kind: "instanced", item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" },
   })]);
 
-  const entryId = `${runId}-waylamp`;
-  const materialized = await request.post("/api/__e2e/materialize-waylamp", {
-    data: { campaignId: campaign.campaign.id, actorId, entryId, expectedRevision: initial.revision },
-  });
-  expect(materialized.status()).toBe(204);
+  const entryId = initial.entries[0]!.entryId;
   const stocked = await json<{ entries: Array<{ kind: string; entryId: string; item: typeof pin & { definitionId: string } }>; equipment: unknown[]; revision: number }>(request, "GET", inventoryPath);
   expect(stocked).toMatchObject({ equipment: [], revision: initial.revision });
-  expect(stocked.entries).toHaveLength(2);
-  expect(stocked.entries).toEqual(expect.arrayContaining([
-    expect.objectContaining({ kind: "stackable", item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" } }),
-    { kind: "instanced", entryId, item: { kind: "item", ...pin, definitionId: "velvet:mechanics:item:waylamp" } },
-  ]));
+  expect(stocked.entries).toEqual(initial.entries);
 
   const equip = { kind: "equip" as const, slot: "hand" as const, entryId, expectedRevision: stocked.revision, idempotencyKey: `${runId}-m2.7-equip` };
   const equipped = await json<{ inventory: { equipment: Array<{ slot: string; entryId: string }>; revision: number }; receipt: { kind: string; revisionBefore: number; revisionAfter: number; idempotencyKey: string } }>(request, "POST", commandPath, equip, 200);
@@ -837,6 +830,8 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.getByRole("button", { name: "Prompt & settings" }).click();
     await expect(page.getByRole("separator", { name: "Resize settings pane" })).toBeVisible();
     await expect(page.getByLabel("Underlying prompt layer")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Test provider capabilities" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Test strict capabilities" })).toHaveCount(0);
     const targeted = await json<{ reply: { speakerCharacterId: string } }>(request, "POST", `/sessions/${group.id}/messages`, {
       content: "Answer with one short sentence.", speakerCharacterId: second.id,
     }, 200);
@@ -977,6 +972,33 @@ test("campaign administration lifecycle and settings API smoke", async ({ reques
     request, "GET", `/rpg/v1/campaigns/${confirmationCampaign.campaign.id}/administration`,
   );
   expect(remainsUnarchived.campaign.status).not.toBe("archived");
+});
+
+test("campaign administration integrations persist safety and recover by GET", async ({ request }) => {
+  const created = await json<{ campaign: { id: string } }>(request, "POST", "/rpg/v1/campaigns", {
+    name: `${runId}-Administration-Integrations`,
+  });
+  const campaignId = created.campaign.id;
+  const initial = await json<{ revision: number; safety: { paused: boolean; hardLimits: string[] }; generation: { retrySupported: boolean } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration-integrations`,
+  );
+  expect(initial).toMatchObject({ revision: 0, safety: { paused: false, hardLimits: [] }, generation: { retrySupported: false } });
+  const safety = await json<{ receipt: { revisionAfter: number }; administration: typeof initial }>(request, "POST",
+    `/rpg/v1/campaigns/${campaignId}/session-zero-safety-commands`, {
+      hardLimits: ["Harm to children"], veils: ["Body horror"], pvpPolicy: "disallowed",
+      romancePolicy: "fade-to-black", lethalityPolicy: "nonlethal-default", expectedRevision: 0,
+      idempotencyKey: `${runId}-safety-policy`,
+    }, 200);
+  expect(safety.administration.safety.hardLimits).toEqual(["Harm to children"]);
+  const paused = await json<{ receipt: { operation: string; revisionAfter: number }; administration: typeof initial }>(request, "POST",
+    `/rpg/v1/campaigns/${campaignId}/safety-action-commands`, {
+      action: "pause", confirmed: true, expectedRevision: safety.receipt.revisionAfter,
+      idempotencyKey: `${runId}-safety-pause`,
+    }, 200);
+  expect(paused).toMatchObject({ receipt: { operation: "pause" }, administration: { safety: { paused: true } } });
+  const reconciled = await json<typeof initial>(request, "GET", `/rpg/v1/campaigns/${campaignId}/administration-integrations`);
+  expect(reconciled).toMatchObject({ revision: paused.receipt.revisionAfter, safety: { paused: true, hardLimits: ["Harm to children"] } });
+  expect(JSON.stringify(reconciled)).not.toMatch(/providerToken|apiKey|privatePrompt/);
 });
 
 test("campaign import dry-run API smoke does not write", async ({ request }) => {
@@ -1452,11 +1474,26 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
     privateState: { goals: privateSentinel, gmNotes: privateSentinel, merchantState: null },
   }));
 
+  await json(request, "POST", `/sessions/${room.id}/messages`, { content: "Open the deterministic tactical scene." }, 200);
+  const play = await json<{ playableActors: Array<{ actorId: string }> }>(request, "GET", `/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/play-bootstrap`);
+  const actorId = play.playableActors[0]!.actorId;
+  await json(request, "POST", `/rpg/v1/campaigns/${campaignId}/rooms/${encodeURIComponent(room.id)}/tactical-maps`, {
+    mode: "exploration", encounterId: null, kind: "arena", seed: `${runId}-tactical-map`, width: 12, height: 10,
+    tokens: [{ tokenId: actorId, actorId, combatantId: null, label: playerName, position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false }],
+    idempotencyKey: `${runId}-tactical-generate`,
+  }, 200);
+
   await page.goto("/");
   await page.getByRole("button", { name: "Campaigns" }).click();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
   await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tactical map" })).toBeVisible();
+  await page.getByRole("button", { name: "3, 2" }).click();
+  await expect(page.getByText(/Preview: 5 feet/)).toBeVisible();
+  await page.getByRole("button", { name: "Confirm move" }).click();
+  await expect(page.getByText("Token moved and exploration refreshed from the server.")).toBeVisible();
+  await expect(page.getByText(/token revision 1/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "NPCs present now" })).toBeVisible();
   await expect(page.getByText("No NPCs marked present.")).toBeVisible();
 
@@ -1574,7 +1611,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await page.reload();
   await expect(page.getByRole("heading", { name: "Present at stop/history" })).toBeVisible();
   await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
-  await expect(page.getByText(/no longer writable/)).toBeVisible();
+  await expect(page.getByText(/stopped and is read-only/)).toBeVisible();
   await expect(page.getByRole("button", { name: /^(?:Place|Move|Remove|Confirm remove)/ })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await assertNoPrivateClientState();
@@ -1630,7 +1667,142 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
   const evidence=await json<{executions:number;bindings:number;commands:number;events:number;revisionBefore:number;revisionAfter:number;actorRevision:number;locationId:string}>(request,"GET",
     `/__e2e/campaigns/${campaignId}/turns/${turn.result.turn.turnId}/actors/${actorId}/travel-evidence`);
   expect(evidence).toEqual({executions:1,bindings:1,commands:1,events:1,revisionBefore:0,revisionAfter:1,actorRevision:1,locationId:prerequisite.destinationLocationId});
-  expect(await (await request.get("http://127.0.0.1:18788/stats")).json()).toEqual({exactTravelSelections:1});
+  expect(await (await request.get("http://127.0.0.1:18788/stats")).json()).toMatchObject({exactTravelSelections:1});
+});
+
+test("CampaignPlay sheet references remain draft-only until one explicit declaration", async ({ page, request }) => {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const pin = { packId: fixture.manifest.packId, packVersion: fixture.manifest.packVersion };
+  const campaignName = `${runId}-Sheet-References`;
+  const playerName = `${runId}-Sheet-Reader`;
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: playerName, age: 30, archetype: "Careful investigator",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  await json(request, "POST", "/rpg/v1/content-packs", fixture);
+  const campaign = await json<{ campaign: { id: string } }>(
+    request, "POST", "/rpg/v1/campaigns", { name: campaignName },
+  );
+  const campaignId = campaign.campaign.id;
+  const administration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/content`, {
+    rulesProfileId: fixture.manifest.compatibility.rulesProfileId,
+    contentPacks: [pin],
+    expectedRevision: administration.campaign.revision,
+    idempotencyKey: `${runId}-sheet-content`,
+  });
+  const configured = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/administration`, {
+    expectedRevision: configured.campaign.revision,
+    idempotencyKey: `${runId}-sheet-publish`,
+    status: "published",
+  });
+
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+      personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores },
+      idempotencyKey: `${runId}-sheet-draft`,
+    },
+  );
+  const reference = (kind: "race" | "background" | "class") =>
+    fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(
+    request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+      expectedRevision: draft.draft.revision,
+      idempotencyKey: `${runId}-sheet-select`,
+      selections: {
+        race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit",
+      },
+    },
+  );
+  const finalized = await json<{ character: { id: string } }>(
+    request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+      expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-sheet-finalize`,
+    }, 201,
+  );
+  const actorId = await actorForCampaignCharacter(request, campaignId, finalized.character.id);
+  const steadyStrike = fixture.definitions.find((definition) =>
+    definition.reference.kind === "ability" && definition.name === "Steady Strike")!.reference;
+  expect((await request.post("/api/__e2e/materialize-pinned-power-execution", {
+    data: { campaignId, power: steadyStrike },
+  })).status()).toBe(204);
+  const room = await json<{ id: string }>(request, "POST", "/sessions", {
+    characterId: persona.id, title: `${runId}-Sheet-Room`,
+  });
+  await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId: room.id });
+  const privateIds = {
+    actorId,
+    campaignCharacterId: finalized.character.id,
+    originLocationId: `${runId}-sheet-origin`,
+    destinationLocationId: `${runId}-sheet-destination`,
+    connectionId: `${runId}-sheet-road`,
+  };
+  const privateSheet = await json<{
+    inventory: { items: Array<{ entryId: string }> };
+  }>(request, "GET", `/rpg/v1/actors/${actorId}/gameplay-sheet`);
+  const privateSheetIds = privateSheet.inventory.items.map((item) => item.entryId);
+  const originName = `${runId}-Lantern-Gate`;
+  const destinationName = `${runId}-Quiet-Harbor`;
+  expect((await request.post("/api/__e2e/materialize-travel-prerequisite", { data: {
+    campaignId, sessionId: room.id, actorId,
+    originLocationId: privateIds.originLocationId,
+    destinationLocationId: privateIds.destinationLocationId,
+    connectionId: privateIds.connectionId,
+    originName, destinationName,
+  } })).status()).toBe(204);
+
+  const beforeStats = await (await request.get("http://127.0.0.1:18788/stats")).json() as {
+    exactTravelSelections: number; actorSheetReads: number; narrationResponses: number;
+  };
+  const adventureRequests: string[] = [];
+  page.on("request", (browserRequest) => {
+    if (new URL(browserRequest.url()).pathname === "/api/rpg/v1/adventure-turns/stream") {
+      adventureRequests.push(browserRequest.postData() ?? "");
+    }
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Campaigns" }).click();
+  await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
+  await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
+  await expect(page.getByLabel("What do you do?")).toHaveCount(1);
+  await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Prefill travel to ${destinationName}` })).toBeVisible();
+
+  const composer = page.getByLabel("What do you do?");
+  await composer.fill("Consult my character sheet before I investigate: ");
+  await page.getByRole("button", { name: "Open character sheet" }).click();
+  const sheet = page.getByRole("dialog", { name: `${playerName}'s character sheet` });
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole("button", { name: "Waylamp", exact: true }).click();
+  await sheet.getByRole("button", { name: "Steady Strike", exact: true }).click();
+  await sheet.getByRole("button", { name: "Might", exact: true }).click();
+  await expect(composer).toHaveValue(/Consult my character sheet.*I use Waylamp.*I use Steady Strike.*I rely on my Might/s);
+  expect(adventureRequests).toHaveLength(0);
+  await sheet.getByRole("button", { name: "Close character sheet" }).click();
+
+  const declaration = await composer.inputValue();
+  await page.getByRole("button", { name: "Declare action" }).click();
+  await expect.poll(() => adventureRequests.length).toBe(1);
+  await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole("region", { name: "Committed mechanics" })).toHaveCount(0);
+  const afterStats = await (await request.get("http://127.0.0.1:18788/stats")).json() as typeof beforeStats;
+  expect(afterStats.exactTravelSelections).toBe(beforeStats.exactTravelSelections);
+  expect(afterStats.actorSheetReads).toBe(beforeStats.actorSheetReads + 1);
+  expect(afterStats.narrationResponses).toBeGreaterThan(beforeStats.narrationResponses);
+
+  await page.reload();
+  await expect(page.getByText(declaration, { exact: true })).toBeVisible();
+  await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
+  const visibleText = await page.locator("body").innerText();
+  for (const privateId of [...Object.values(privateIds), ...privateSheetIds]) expect(visibleText).not.toContain(privateId);
 });
 
 test("M5.2 companion administration creates, grants, revokes, and replays safely", async ({ request }) => {

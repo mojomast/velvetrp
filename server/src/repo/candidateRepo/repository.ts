@@ -264,9 +264,14 @@ export function createExactCandidateRepository(db:Db,deps:{clock:Clock;ids:IdGen
         const candidateIds=routes.map(()=>id());
         if(new Set(candidateIds).size!==candidateIds.length)throw new ExactCandidateConflictError("generated candidate IDs must be unique");
         const candidates=routes.map((route,index)=>{
+          const names=db.prepare(`SELECT origin.public_name origin,destination.public_name destination
+            FROM campaign_locations_v28 origin JOIN campaign_locations_v28 destination ON destination.campaign_id=origin.campaign_id
+            WHERE origin.campaign_id=? AND origin.location_id=? AND destination.location_id=?`)
+            .get(row.campaign_id,route.fromLocationId,route.toLocationId) as {origin:string;destination:string}|undefined;
+          if(!names)throw new ExactCandidateIntegrityError("candidate route labels are unavailable");
           const unsigned:any={candidateId:candidateIds[index]!,kind:"actor.travel",version:"v1",purpose:"execute-once",
             scope:{campaignId:row.campaign_id,sessionId:row.session_id,actorId:row.actor_id,principalId,connectionId:connection(row.id),authorizationEffect:"none"},
-            label:{format:"message-key-v1",key:"candidate.actor.travel.label",routeOption:index+1},summary:{format:"message-key-v1",key:"candidate.actor.travel.summary"},
+            label:{format:"message-key-v1",key:"candidate.actor.travel.label",routeOption:index+1,origin:names.origin,destination:names.destination},summary:{format:"message-key-v1",key:"candidate.actor.travel.summary"},
             canonicalActionDigest:"0".repeat(64),canonicalEnvelopeDigest:"0".repeat(64),privateParameters:{kind:"actor.travel",connectionId:route.connectionId,partyActorIds:[row.actor_id]},
             expectedRevisions:[{domain:"world",revision}],policy:{kind:"actor.travel",result:"allowed",reason:"legal-visible-connection"},
             confirmation:{requirement:"not-required",decision:{state:"not-applicable"}},quote:{kind:"not-applicable"},issuedAt,expiresAt,

@@ -32,7 +32,24 @@ const JSON_MEDIA_TYPE = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.
 type CampaignHistoryRepository = Pick<CampaignAdministrationRepository,
   "listCampaignTimelineHistory" | "createCampaignCheckpoint" | "listCampaignCheckpoints"
   | "forkCampaignTimeline" | "createCampaignRecap" | "listCampaignRecaps"
-  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt" | "getAgentCombatReceipt" | "getExactCandidateTravelPublicReceipt">;
+  | "getCampaignAdministrationReceipt"> & Pick<Repository, "listPublicCampaignEvents" | "getCommandReceipt" | "getAgentCombatReceipt" | "getExactCandidateTravelPublicReceipt" | "getAdventureCheckPublicReceipt" | "getAdventureInventoryPublicReceipt" | "getAdventureCommercePublicReceipt" | "getAdventurePowerPublicReceipt" | "getAdventureRestPublicReceipt"> & {
+    getAdventureQuestLifecyclePublicReceipt?:Repository["getAdventureQuestLifecyclePublicReceipt"];
+    getAdventureProgressionPublicReceipt?:Repository["getAdventureProgressionPublicReceipt"];
+    getAdventureCombatConsumablePublicReceipt?:Repository["getAdventureCombatConsumablePublicReceipt"];
+    getAdventureCombatPowerPublicReceipt?:Repository["getAdventureCombatPowerPublicReceipt"];
+    getAdventureQuestPublicReceipt?: (principalId: string, campaignId: string, commandId: string) => {
+      questTitle: string;
+      objectiveDescription: string;
+      progressBefore: number;
+      progressAfter: number;
+      targetProgress: number;
+      objectiveCompleted: boolean;
+      questCompleted: boolean;
+      revisionBefore: number;
+      revisionAfter: number;
+      occurredAt: string;
+    } | null;
+  };
 
 export interface CampaignHistoryHttpOptions {
   campaignHistoryRepositoryAccessor: () => CampaignHistoryRepository;
@@ -136,8 +153,46 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
     if ((request.raw.url ?? request.url).includes("?")) return invalid(request, reply, "Campaign history does not accept query parameters");
     try {
       const repository = options.campaignHistoryRepositoryAccessor();
+      const progression=repository.getAdventureProgressionPublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(progression)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"progression",className:progression.className,
+        levelBefore:progression.levelBefore,levelAfter:progression.levelAfter,features:progression.features,resources:progression.resources,
+        revisionBefore:progression.revisionBefore,revisionAfter:progression.revisionAfter,occurredAt:progression.occurredAt}}));
+      const questLifecycle=repository.getAdventureQuestLifecyclePublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(questLifecycle)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"quest-lifecycle",action:questLifecycle.action,
+        questTitle:questLifecycle.questTitle,statusBefore:questLifecycle.statusBefore,statusAfter:questLifecycle.statusAfter,reward:questLifecycle.reward,
+        revisionBefore:questLifecycle.revisionBefore,revisionAfter:questLifecycle.revisionAfter,occurredAt:questLifecycle.occurredAt}}));
+      const combatPower=repository.getAdventureCombatPowerPublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(combatPower)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat-power",...combatPower}}));
+      const combatConsumable=repository.getAdventureCombatConsumablePublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(combatConsumable)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat-consumable",
+        itemName:combatConsumable.itemName,target:combatConsumable.target,quantity:combatConsumable.quantity,
+        actionCost:combatConsumable.actionCost,outcomes:combatConsumable.outcomes,roundBefore:combatConsumable.roundBefore,
+        roundAfter:combatConsumable.roundAfter,revisionBefore:combatConsumable.revisionBefore,
+        revisionAfter:combatConsumable.revisionAfter,occurredAt:combatConsumable.occurredAt}}));
+      const commerce=repository.getAdventureCommercePublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(commerce)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"commerce",action:commerce.action,vendorLabel:commerce.vendorLabel,
+        shopLabel:commerce.shopLabel,itemLabel:commerce.itemLabel,quantity:commerce.quantity,currencyLabel:commerce.currencyLabel,
+        priceMinorUnits:commerce.priceMinorUnits,debitMinorUnits:commerce.debitMinorUnits,creditMinorUnits:commerce.creditMinorUnits,
+        balanceBefore:commerce.balanceBefore,balanceAfter:commerce.balanceAfter,revisionBefore:commerce.revisionBefore,
+        revisionAfter:commerce.revisionAfter,occurredAt:commerce.occurredAt}}));
+      const power=repository.getAdventurePowerPublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(power)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"power",powerName:power.powerName,
+        targets:power.targets,costs:power.costs,stateDeltas:power.stateDeltas,concentration:power.concentration,
+        revisionBefore:power.revisionBefore,revisionAfter:power.revisionAfter,occurredAt:power.occurredAt}}));
+      const rest=repository.getAdventureRestPublicReceipt?.(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(rest)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"rest",restKind:rest.restKind,
+        restName:rest.restName,recovery:rest.recovery,revisionBefore:rest.revisionBefore,revisionAfter:rest.revisionAfter,occurredAt:rest.occurredAt}}));
       // The command repository performs campaign membership and owner binding
       // before returning its role-safe actor mechanic receipt.
+      const inventory=repository.getAdventureInventoryPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(inventory)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"inventory",itemLabel:inventory.itemLabel,
+        action:inventory.action,quantity:inventory.quantity,slot:inventory.slot,recipient:inventory.recipient,
+        revisionBefore:inventory.revisionBefore,revisionAfter:inventory.revisionAfter,occurredAt:inventory.occurredAt}}));
+      const check=repository.getAdventureCheckPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
+      if(check)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"check",checkKind:check.checkKind,
+        ability:check.ability,skill:check.skill,mode:check.mode,difficulty:check.difficulty,rolls:check.rolls,
+        abilityModifier:check.abilityModifier,proficiencyBonus:check.proficiencyBonus,modifier:check.modifier,total:check.total,
+        dc:check.dc,outcome:check.outcome,revisionBefore:check.revisionBefore,revisionAfter:check.revisionAfter,occurredAt:check.occurredAt}}));
       const mechanic = repository.getCommandReceipt(LOCAL_OWNER, campaignId, request.params.commandId);
       if (mechanic !== null) {
         const [event] = mechanic.events;
@@ -153,6 +208,22 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
             : event.type === "actor_resource_initialized"
               ? { type: event.type, data: { current: event.data.current, max: event.data.max } }
               : { type: event.type, data: event.data },
+        } }));
+      }
+      const quest = repository.getAdventureQuestPublicReceipt?.(LOCAL_OWNER, campaignId, request.params.commandId) ?? null;
+      if (quest !== null) {
+        return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({ receipt: {
+          kind: "quest",
+          title: quest.questTitle,
+          objectiveDescription: quest.objectiveDescription,
+          progressBefore: quest.progressBefore,
+          progressAfter: quest.progressAfter,
+          target: quest.targetProgress,
+          objectiveCompleted: quest.objectiveCompleted,
+          questCompleted: quest.questCompleted,
+          revisionBefore: quest.revisionBefore,
+          revisionAfter: quest.revisionAfter,
+          occurredAt: quest.occurredAt,
         } }));
       }
       const combat=typeof repository.getAgentCombatReceipt==="function"?repository.getAgentCombatReceipt(LOCAL_OWNER,campaignId,request.params.commandId):null;

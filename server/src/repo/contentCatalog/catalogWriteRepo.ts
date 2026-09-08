@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
-  VELVET_STARTER_RULES_ENGINE,
   campaignCatalogConfigurationResultSchema,
   campaignCatalogReceiptSchema,
   campaignCatalogResolutionReportSchema,
@@ -15,6 +14,7 @@ import {
   type PublishContentCatalogInput,
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
+import { resolveProfileRulesetIdentity } from "../../rulesets/campaignBinding.js";
 import { createCatalogReadRepository, type PersistedCatalogVisibilityRow } from "./catalogReadRepo.js";
 
 /** Raised when a submitted catalog fails deterministic validation. */
@@ -98,7 +98,17 @@ export function createCatalogWriteRepository(db: DatabaseDriver.Database, deps: 
       }
       db.prepare("UPDATE rpg_content_packs SET sealed=1 WHERE pack_id=? AND pack_version=? AND sealed=0").run(input.manifest.packId, input.manifest.packVersion);
       const publishedAt = deps.clock.now().toISOString();
-      db.prepare("INSERT INTO rpg_content_pack_publications (pack_id,pack_version,validation_level,rules_engine,manifest_digest,manifest_json,provenance_json,validation_report_json,published_by_principal_id,published_at) VALUES (?,?, 'validated-v1',?,?,?,?,?,?,?)").run(input.manifest.packId, input.manifest.packVersion, VELVET_STARTER_RULES_ENGINE, input.manifest.digest, deps.canonicalCatalogJson(input.manifest), deps.canonicalCatalogJson(input.manifest.provenance), deps.canonicalCatalogJson(report), actor, publishedAt);
+      const profileEngine = input.manifest.compatibility.rulesEngine;
+      const profileEngineVersion = input.manifest.compatibility.rulesEngineVersion ?? "1.0.0";
+      const manifestEngineVersion = input.manifest.compatibility.rulesEngineVersion ?? "1.0.0";
+      const profileBinding = db.prepare("SELECT ruleset_id,ruleset_version FROM rpg_rules_profile_bindings_v60 WHERE rules_profile_id=?")
+        .get(input.manifest.compatibility.rulesProfileId) as { ruleset_id: string; ruleset_version: string } | undefined;
+      if (profileBinding && (profileBinding.ruleset_id !== profileEngine || profileBinding.ruleset_version !== manifestEngineVersion)) {
+        throw new ContentCatalogConflictError("rules profile is already bound to a different engine identity");
+      }
+      if (!profileBinding) db.prepare("INSERT INTO rpg_rules_profile_bindings_v60 VALUES(?,?,?)")
+        .run(input.manifest.compatibility.rulesProfileId, profileEngine, profileEngineVersion);
+      db.prepare("INSERT INTO rpg_content_pack_publications (pack_id,pack_version,validation_level,rules_engine,manifest_digest,manifest_json,provenance_json,validation_report_json,published_by_principal_id,published_at) VALUES (?,?, 'validated-v1',?,?,?,?,?,?,?)").run(input.manifest.packId, input.manifest.packVersion, profileEngine, input.manifest.digest, deps.canonicalCatalogJson(input.manifest), deps.canonicalCatalogJson(input.manifest.provenance), deps.canonicalCatalogJson(report), actor, publishedAt);
       db.prepare("INSERT INTO rpg_catalog_publication_attestations VALUES (?,?,?,?,?,?,?)").run(input.manifest.packId, input.manifest.packVersion, input.definitions.length, deps.canonicalCatalogJson(report.normalizedSummary.counts), input.manifest.digest, visibility.aggregateDigest, input.definitions.length);
       db.prepare("INSERT INTO rpg_catalog_publication_submissions VALUES (?,?,?,?,?,?,?)").run(actor, input.idempotencyKey, requestDigest, input.manifest.packId, input.manifest.packVersion, deps.canonicalCatalogJson({ packId: input.manifest.packId, packVersion: input.manifest.packVersion }), publishedAt);
       return reads.ownerProjection(reads.publicationRow(input.manifest.packId, input.manifest.packVersion)!);
@@ -127,10 +137,15 @@ export function createCatalogWriteRepository(db: DatabaseDriver.Database, deps: 
       const existingSelection = db.prepare("SELECT 1 FROM campaign_catalog_current_selections WHERE campaign_id=?").get(campaignId);
       if (!existingSelection && db.prepare("SELECT 1 FROM campaign_rules_profiles WHERE campaign_id=?").get(campaignId)) throw new ContentCatalogConflictError("campaign already has legacy content configuration");
       const resolvedPacks: Array<{ packId: string; packVersion: string; digest: string }> = [];
+      const [rulesetId, rulesetVersion] = resolveProfileRulesetIdentity(db, input.rulesProfileId);
       for (const pin of ordered) {
         const row = reads.publicationRow(pin.packId, pin.packVersion);
         if (!row || row.rules_profile_id !== input.rulesProfileId) throw new ContentCatalogConflictError(`incompatible or unavailable exact publication ${pin.packId}@${pin.packVersion}`);
         reads.validateStoredPublication(row);
+        const publicationEngineVersion = JSON.parse(row.manifest_json).compatibility.rulesEngineVersion ?? "1.0.0";
+        if (row.rules_engine !== rulesetId || publicationEngineVersion !== rulesetVersion) {
+          throw new ContentCatalogConflictError(`mixed rules engine publication ${pin.packId}@${pin.packVersion}`);
+        }
         resolvedPacks.push({ packId: pin.packId, packVersion: pin.packVersion, digest: row.manifest_digest });
       }
       const selectionDigest = createHash("sha256").update(deps.canonicalCatalogJson({ rulesProfileId: input.rulesProfileId, contentPacks: ordered }), "utf8").digest("hex");
@@ -143,6 +158,12 @@ export function createCatalogWriteRepository(db: DatabaseDriver.Database, deps: 
       if (db.prepare("UPDATE campaigns SET administration_revision=?,updated_at=? WHERE id=? AND administration_revision=?").run(input.expectedRevision + 1, at, campaignId, input.expectedRevision).changes !== 1) throw new ContentCatalogStaleError();
       if (existingSelection) { db.prepare("DELETE FROM campaign_catalog_current_selections WHERE campaign_id=?").run(campaignId); db.prepare("DELETE FROM campaign_content_packs WHERE campaign_id=?").run(campaignId); db.prepare("DELETE FROM campaign_rules_profiles WHERE campaign_id=?").run(campaignId); }
       db.prepare("INSERT INTO campaign_rules_profiles (campaign_id,rules_profile_id) VALUES (?,?)").run(campaignId, input.rulesProfileId);
+      const reserved = db.prepare("SELECT ruleset_id,ruleset_version FROM campaign_administration_integrations_v59 WHERE campaign_id=?").get(campaignId) as { ruleset_id: string | null; ruleset_version: string | null } | undefined;
+      if (reserved?.ruleset_id && (reserved.ruleset_id !== rulesetId || reserved.ruleset_version !== rulesetVersion)) {
+        throw new ContentCatalogConflictError("campaign reserved a different ruleset identity");
+      }
+      db.prepare("INSERT INTO campaign_ruleset_bindings_v60(campaign_id,rules_profile_id,ruleset_id,ruleset_version,bound_at) VALUES(?,?,?,?,?)")
+        .run(campaignId, input.rulesProfileId, rulesetId, rulesetVersion, at);
       const insertLegacyPin = db.prepare("INSERT INTO campaign_content_packs (campaign_id,pack_id,pack_version,rules_profile_id) VALUES (?,?,?,?)"); for (const pin of ordered) insertLegacyPin.run(campaignId, pin.packId, pin.packVersion, input.rulesProfileId);
       db.prepare("INSERT INTO campaign_catalog_current_selections (campaign_id,rules_profile_id,selection_digest,configured_by_principal_id,configured_at,open_command_id) VALUES (?,?,?,?,?,?)").run(campaignId, input.rulesProfileId, selectionDigest, actor, at, input.idempotencyKey);
       const insertPin = db.prepare("INSERT INTO campaign_catalog_current_pins (campaign_id,pack_id,pack_version,position,open_command_id) VALUES (?,?,?,?,?)"); ordered.forEach((pin, position) => insertPin.run(campaignId, pin.packId, pin.packVersion, position, input.idempotencyKey));

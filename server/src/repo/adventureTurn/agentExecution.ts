@@ -10,6 +10,7 @@ import {
 import type { Clock, IdGenerator } from "../../runtime.js";
 import { AdventureTurnAuthorizationError, AdventureTurnConflictError, AdventureTurnStaleError,
   AdventureTurnUnavailableError } from "./errors.js";
+import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
 
 type Database = DatabaseDriver.Database;
 type TurnRow = { id: string; campaign_id: string; timeline_id: string; session_id: string; actor_id: string; principal_id: string; mode: string };
@@ -152,11 +153,13 @@ export function createAdventureTurnAgentExecutionRepository(
           toolName: call.tool_name, kind: call.call_kind, arguments: JSON.parse(call.arguments_json), argumentDigest: call.argument_digest,
           status, readOutcome };
       });
-    const decisionRounds = (db.prepare(`SELECT max(rounds) count FROM (
+    const persistedDecisionRounds = (db.prepare(`SELECT max(rounds) count FROM (
       SELECT count(*) rounds FROM agent_decision_rounds_v38 WHERE campaign_id=? AND turn_id=?
       UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM agent_mutation_accounting_v40 WHERE campaign_id=? AND turn_id=?
       UNION ALL SELECT COALESCE(max(round_number),0) rounds FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?)`)
       .get(row.campaign_id,row.id,row.campaign_id,row.id,row.campaign_id,row.id) as { count: number }).count;
+    const questBindings=boundAdventureQuestReceipts(db,row.campaign_id,row.id);
+    const decisionRounds=Math.max(persistedDecisionRounds,...questBindings.map((binding)=>binding.round));
     const postV38Mutations=(db.prepare(`SELECT count(*) count FROM agent_mutation_accounting_v40 item WHERE campaign_id=? AND turn_id=?
       AND NOT EXISTS(SELECT 1 FROM agent_replan_requirements_v40 replan WHERE replan.proposal_id=item.proposal_id)`)
       .get(row.campaign_id,row.id) as {count:number}).count;
@@ -164,12 +167,13 @@ export function createAdventureTurnAgentExecutionRepository(
       .get(row.campaign_id, row.id) as { count: number }).count;
     const exactTravel=(db.prepare("SELECT count(*) count FROM exact_candidate_provider_bindings_v48 WHERE campaign_id=? AND turn_id=?")
       .get(row.campaign_id,row.id) as {count:number}).count;
+    const exactQuest=questBindings.length;
     return durableAgentPlanningStateSchema.parse({ turnId: row.id, toolRegistryVersion: run.tool_registry_version,
       executionRevision: executionRevision(db, row),
       limits: { decisionRounds: run.max_decision_rounds, toolCalls: run.max_tool_calls, mutationCalls: run.max_mutation_calls,
         providerCalls: run.max_provider_calls, durationMs: run.max_duration_ms }, startedAt: run.started_at, deadlineAt: run.deadline_at,
-       decisionRounds, toolCalls: calls, totalToolCalls:calls.length+postV38Mutations+exactTravel,
-       mutationCalls: calls.filter((call) => call.kind === "mutation").length+postV38Mutations+exactTravel,
+       decisionRounds, toolCalls: calls, totalToolCalls:calls.length+postV38Mutations+exactTravel+exactQuest,
+        mutationCalls: calls.filter((call) => call.kind === "mutation").length+postV38Mutations+exactTravel+exactQuest,
       providerStarts, deadlineExceeded: now() >= run.deadline_at });
   };
 

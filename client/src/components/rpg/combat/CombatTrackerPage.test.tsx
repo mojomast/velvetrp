@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { CombatActionCommandResponse, CombatReadResponse, CombatRewardGrantPublic } from "@velvet/contracts";
+import type { CombatActionCommandResponse, CombatLegalAction, CombatReadResponse, CombatRewardGrantPublic } from "@velvet/contracts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CombatTrackerPage, type CombatTrackerApi } from "./CombatTrackerPage";
 import { InitiativeRail } from "./InitiativeRail";
@@ -12,8 +12,8 @@ const at = "2030-01-01T00:00:00.000Z";
 const combat: CombatReadResponse = {
   round: 2, currentCombatant: "combatant-one", revision: 4,
   combatants: [
-    { combatantId: "combatant-one", kind: "actor", actorId: "actor-one", team: "allies", hitPoints: 8, maximumHitPoints: 10, status: "active" },
-    { combatantId: "combatant-two", kind: "enemy", template: null, team: "enemies", hitPoints: 3, maximumHitPoints: 5, status: "active" },
+    { combatantId: "combatant-one", kind: "actor", actorId: "actor-one", team: "allies", hitPoints: 8, maximumHitPoints: 10, temporaryHitPoints: 0, conditions: [], status: "active" },
+    { combatantId: "combatant-two", kind: "enemy", template: null, team: "enemies", hitPoints: 3, maximumHitPoints: 5, temporaryHitPoints: 0, conditions: [], status: "active" },
   ],
   legalActions: [
     { legalActionId: "legal-attack", kind: "attack", targetIds: ["combatant-two"] },
@@ -22,6 +22,10 @@ const combat: CombatReadResponse = {
     { legalActionId: "legal-end", kind: "end-turn", targetIds: [] },
   ],
 };
+const survivalActions: CombatLegalAction[] = [
+  { legalActionId: "legal-save", kind: "death-save" as const, targetIds: [] },
+  { legalActionId: "legal-stabilize", kind: "stabilize" as const, targetIds: ["combatant-one"], cost: "action" as const },
+];
 const response: CombatActionCommandResponse = {
   resolution: { actionId: "action-one", legalActionId: "legal-attack", kind: "attack", actingCombatantId: "combatant-one", targetIds: ["combatant-two"], outcomes: [{ kind: "damage", targetId: "combatant-two", damageType: "physical", requested: 1, applied: 1, hitPointsBefore: 3, hitPointsAfter: 2, statusBefore: "active", statusAfter: "active" }], roundBefore: 2, roundAfter: 2, currentCombatantBefore: "combatant-one", currentCombatantAfter: "combatant-two" },
   combat: { combatId: "combat-one", ...combat, currentCombatant: "combatant-two", revision: 5, combatants: [combat.combatants[0]!, { ...combat.combatants[1]!, hitPoints: 2 }], legalActions: [] },
@@ -39,6 +43,7 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
     getCombat: vi.fn().mockResolvedValue(combat),
     getCombatLog: vi.fn().mockResolvedValue({ entries: [], nextAfterSequence: null }),
     resolveAction: vi.fn().mockResolvedValue(response),
+    resolveEnemyTurn:vi.fn().mockResolvedValue(response),
     getCommandResult:vi.fn().mockResolvedValue({operation:"action",result:response}),
     getPowers: vi.fn().mockResolvedValue(emptyPowers),
     getEffects: vi.fn().mockResolvedValue(emptyEffects),
@@ -51,9 +56,12 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
     claimReward:vi.fn().mockImplementation((_combatId,_bundleId,_actorId,command)=>Promise.resolve({reward:{...claimedReward,claim:{state:"claimed",rewardClaimId:command.rewardClaimId,claimedAt:at}},receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:command.expectedRevision,revisionAfter:command.expectedRevision+1,occurredAt:at}})),
     getRewardClaimResult:vi.fn().mockRejectedValue(new ApiError(404,"absent")),
     getWallet:vi.fn().mockResolvedValue({wallet:{balances:[]},revision:0}),
+    startEncounter:vi.fn(),
+    endCombat:vi.fn(),
     ...overrides,
   };
 }
+const combatReady = () => screen.findByRole("button", { name: /Inspect Ally 1/ });
 
 describe("M3.5 server-authoritative combat controls", () => {
   beforeEach(() => localStorage.clear());
@@ -78,6 +86,13 @@ describe("M3.5 server-authoritative combat controls", () => {
   it("renders each supported consumable as one exact server-targeted quantity-one action",()=>{
     const use=vi.fn();render(<LegalActionTray legalActions={[]} consumableActions={[consumable]} combatantLabels={new Map([["combatant-one","actor-one"]])} onSubmit={()=>undefined} onUseConsumable={use}/>);
     const button=screen.getByRole("button",{name:/Use tonic on actor-one/});expect(screen.getByText(/Quantity 1 · Cost: action/)).toBeTruthy();fireEvent.click(button);expect(use).toHaveBeenCalledWith(consumable);
+  });
+
+  it("offers accessible server-authorized survival controls without client rolls or raw identifiers",()=>{
+    const submit=vi.fn();render(<LegalActionTray legalActions={survivalActions} combatantLabels={new Map([["combatant-one","Ally 1"]])} onSubmit={submit}/>);
+    const deathSave=screen.getByRole("button",{name:"Make death save"});deathSave.focus();expect(document.activeElement).toBe(deathSave);fireEvent.click(deathSave);
+    expect(screen.getByText(/No roll is made in the client/)).toBeTruthy();fireEvent.click(screen.getByRole("button",{name:"Review action"}));fireEvent.click(screen.getByRole("button",{name:"Submit once"}));expect(submit).toHaveBeenCalledWith(survivalActions[0],[]);
+    fireEvent.click(screen.getByRole("button",{name:"Stabilize"}));expect(screen.getByRole("radio",{name:"Ally 1"})).toBeTruthy();expect(screen.getByRole("button",{name:"Review action"}).hasAttribute("disabled")).toBe(true);
   });
 
   it("uses a native ordered list and keyboard-focusable buttons for the visual rail", () => {
@@ -119,13 +134,13 @@ describe("M3.5 server-authoritative combat controls", () => {
   it("loads state and paginated log on reconnect without posting an action", async () => {
     const service = api();
     const { unmount } = render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
-    await screen.findAllByText("actor-one");
+    await combatReady();
     expect(service.getCombat).toHaveBeenCalledWith("combat-one");
     expect(service.getCombatLog).toHaveBeenCalledWith("combat-one", { afterSequence: 0, limit: 50 });
     expect(service.resolveAction).not.toHaveBeenCalled();
     unmount();
     render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
-    await screen.findAllByText("actor-one");
+    await combatReady();
     expect(service.resolveAction).not.toHaveBeenCalled();
     expect(document.querySelector(".legal-action-tray")).toBeTruthy();
   });
@@ -133,7 +148,7 @@ describe("M3.5 server-authoritative combat controls", () => {
   it("keeps an ambiguous stale action locked and never automatically replays it", async () => {
     const service = api({ resolveAction: vi.fn().mockRejectedValue(new Error("stale")) });
     render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
-    await screen.findAllByText("actor-one");
+    await combatReady();
     fireEvent.click(screen.getByRole("button", { name: "Attack" }));
     fireEvent.click(screen.getByRole("radio"));
     fireEvent.click(screen.getByRole("button", { name: "Review action" }));
@@ -148,10 +163,17 @@ describe("M3.5 server-authoritative combat controls", () => {
 
   it("does not clear ambiguity when the exact immutable command result is unavailable",async()=>{
     const service=api({resolveAction:vi.fn().mockRejectedValue(new Error("offline")),getCommandResult:vi.fn().mockRejectedValue(new Error("missing"))});
-    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");
+    render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();
     fireEvent.click(screen.getByRole("button",{name:"Attack"}));fireEvent.click(screen.getByRole("radio"));fireEvent.click(screen.getByRole("button",{name:"Review action"}));fireEvent.click(screen.getByRole("button",{name:"Submit once"}));await screen.findByText(/outcome is uncertain or stale/i);
     fireEvent.click(screen.getByRole("button",{name:"Refresh authoritative state & log"}));await screen.findByText(/No exact authorized command result/i);
     expect(screen.getByText(/Action outcome unresolved/)).toBeTruthy();expect(service.resolveAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps an ambiguous death save locked and reconciles through the exact generic action result",async()=>{
+    const unconscious:CombatReadResponse={...combat,combatants:[{combatantId:"combatant-one",kind:"actor",actorId:"actor-one",team:"allies",hitPoints:0,maximumHitPoints:10,temporaryHitPoints:0,conditions:[{condition:"unconscious",expiresAtRound:null}],status:"unconscious",deathSaves:{successes:1,failures:2}},combat.combatants[1]!],legalActions:[survivalActions[0]!]};
+    const resolve=vi.fn().mockRejectedValue(new Error("offline"));const service=api({getCombat:vi.fn().mockResolvedValue(unconscious),resolveAction:resolve});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByText("Make death save");fireEvent.click(screen.getByRole("button",{name:"Make death save"}));fireEvent.click(screen.getByRole("button",{name:"Review action"}));fireEvent.click(screen.getByRole("button",{name:"Submit once"}));await screen.findByText(/outcome is uncertain or stale/i);
+    expect(resolve).toHaveBeenCalledTimes(1);expect(resolve.mock.calls[0]?.[1]).toEqual(expect.objectContaining({legalActionId:"legal-save",targetIds:[],choices:[]}));fireEvent.click(screen.getByRole("button",{name:"Refresh authoritative state & log"}));await waitFor(()=>expect(screen.queryByText(/Action outcome unresolved/)).toBeNull());expect(resolve).toHaveBeenCalledTimes(1);
   });
 
   it("never hydrates a combat ID absent from the campaign encounter list",async()=>{
@@ -164,7 +186,7 @@ describe("M3.5 server-authoritative combat controls", () => {
     const getLog = vi.fn().mockResolvedValueOnce({ entries: [], nextAfterSequence: null }).mockRejectedValueOnce(new Error("offline"));
     const service = api({ getCombatLog: getLog });
     render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
-    await screen.findAllByText("actor-one");
+    await combatReady();
     fireEvent.click(screen.getByRole("button", { name: "Attack" })); fireEvent.click(screen.getByRole("radio"));
     fireEvent.click(screen.getByRole("button", { name: "Review action" })); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     expect(await screen.findByRole("heading", { name: "Confirmed action receipt" })).toBeTruthy();
@@ -178,37 +200,59 @@ describe("M3.5 server-authoritative combat controls", () => {
     const pending = new Promise<CombatActionCommandResponse>((done) => { resolve = done; });
     const service = api({ resolveAction: vi.fn(() => pending) });
     const { unmount } = render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={() => undefined} />);
-    await screen.findAllByText("actor-one");
+    await combatReady();
     fireEvent.click(screen.getByRole("button", { name: "Attack" })); fireEvent.click(screen.getByRole("radio"));
     fireEvent.click(screen.getByRole("button", { name: "Review action" })); fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
     unmount(); resolve(response); await pending; await Promise.resolve();
     expect(service.resolveAction).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves an enemy turn once with only expected revision and idempotency",async()=>{
+    const enemyCombat={...combat,currentCombatant:"combatant-two",legalActions:[]};const enemyResponse={...response,resolution:{...response.resolution,actingCombatantId:"combatant-two",targetIds:["combatant-one"]},combat:{...response.combat,currentCombatant:"combatant-one",legalActions:[]}};
+    const enemy=vi.fn().mockResolvedValue(enemyResponse);const service=api({getCombat:vi.fn().mockResolvedValue(enemyCombat),resolveEnemyTurn:enemy});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByRole("button",{name:"Resolve enemy turn"});fireEvent.click(screen.getByRole("button",{name:"Resolve enemy turn"}));await screen.findByText(/Enemy turn confirmed; authoritative combat state and log refreshed/i);
+    expect(enemy).toHaveBeenCalledTimes(1);expect(enemy.mock.calls[0]?.[1]).toEqual(expect.objectContaining({expectedRevision:4,idempotencyKey:expect.any(String)}));expect(Object.keys(enemy.mock.calls[0]?.[1]??[])).toEqual(["expectedRevision","idempotencyKey"]);
+  });
+
+  it("keeps an ambiguous enemy turn locked after refresh and never replays it",async()=>{
+    const enemyCombat={...combat,currentCombatant:"combatant-two",legalActions:[]};const enemy=vi.fn().mockRejectedValue(new Error("offline"));const service=api({getCombat:vi.fn().mockResolvedValue(enemyCombat),resolveEnemyTurn:enemy});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByRole("button",{name:"Resolve enemy turn"});fireEvent.click(screen.getByRole("button",{name:"Resolve enemy turn"}));await screen.findByText(/delivery is ambiguous/i);fireEvent.click(screen.getByRole("button",{name:"Refresh authoritative combat state & log"}));await screen.findByText(/cannot be proven exact/i);
+    expect(enemy).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-enemy-turn.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');
+  });
+
+  it("does not show the enemy turn control during a player turn",async()=>{
+    render(<CombatTrackerPage api={api()} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();expect(screen.queryByRole("button",{name:"Resolve enemy turn"})).toBeNull();
+  });
+
+  it("keeps survival controls disabled while the server owns an enemy turn",async()=>{
+    const enemyCombat={...combat,currentCombatant:"combatant-two",legalActions:survivalActions};render(<CombatTrackerPage api={api({getCombat:vi.fn().mockResolvedValue(enemyCombat)})} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    expect(await screen.findByRole("button",{name:"Resolve enemy turn"})).toBeTruthy();expect(screen.getByRole("button",{name:"Make death save"}).hasAttribute("disabled")).toBe(true);expect(screen.getByRole("button",{name:"Stabilize"}).hasAttribute("disabled")).toBe(true);
+  });
+
   it("locks an unknown consumable delivery, never replays POST, and reconciles only through exact result GET",async()=>{
     const commandResult={resolution:{actionId:"resolved",legalActionId:consumable.legalActionId,kind:"use-consumable" as const,actingCombatantId:"combatant-one",target:consumable.target,targetPolicy:consumable.targetPolicy,actionCost:"action" as const,consumed:{inventoryEntryId:"entry",item:consumable.item,quantity:1 as const},effectPlan:consumable.effectPlan,outcome:{targetCombatantId:"combatant-one",settlements:[{kind:"combat-hp-resource" as const,effectOrdinal:0,resource:"health" as const,requested:2,applied:2,before:8,after:10}]},combatRevisionBefore:4,combatRevisionAfter:5,actingM15Revision:{before:0,after:1},targetM15Revision:null},requestBinding:{requestEvidence:{} as any,canonicalRequestDigest:"a".repeat(64),idempotencyKey:"pending"},receipt:{idempotencyKey:"pending",revisionBefore:4,revisionAfter:5,occurredAt:at}};
     const use=vi.fn().mockRejectedValue(new Error("unknown")),read=vi.fn().mockImplementation((_combat,expected)=>Promise.resolve({...commandResult,requestBinding:{...commandResult.requestBinding,requestEvidence:expected,idempotencyKey:expected.idempotencyKey},receipt:{...commandResult.receipt,idempotencyKey:expected.idempotencyKey}}));
-    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:use,getConsumableResult:read});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");
-    fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/outcome is ambiguous/i);expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:use,getConsumableResult:read});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();
+    fireEvent.click(screen.getByRole("button",{name:/Use tonic on Ally 1/}));await screen.findByText(/outcome is ambiguous/i);expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');
     fireEvent.click(screen.getByRole("button",{name:"Read exact result & refresh"}));await waitFor(()=>expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull());expect(read).toHaveBeenCalledTimes(1);expect(use).toHaveBeenCalledTimes(1);
   });
 
   it("preserves the consumable lock when exact result reconciliation is unavailable",async()=>{
-    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn().mockRejectedValue(new Error("unknown")),getConsumableResult:vi.fn().mockRejectedValue(new Error("missing"))});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/outcome is ambiguous/i);fireEvent.click(screen.getByRole("button",{name:"Read exact result & refresh"}));await screen.findByText(/persistent lock remains/i);expect(screen.getByText(/Consumable outcome unresolved/)).toBeTruthy();expect(service.useConsumable).toHaveBeenCalledTimes(1);
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn().mockRejectedValue(new Error("unknown")),getConsumableResult:vi.fn().mockRejectedValue(new Error("missing"))});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:/Use tonic on Ally 1/}));await screen.findByText(/outcome is ambiguous/i);fireEvent.click(screen.getByRole("button",{name:"Read exact result & refresh"}));await screen.findByText(/persistent lock remains/i);expect(screen.getByText(/Consumable outcome unresolved/)).toBeTruthy();expect(service.useConsumable).toHaveBeenCalledTimes(1);
   });
 
   it("aborts before POST when the durable consumable marker cannot be written and read back",async()=>{
     const storage=vi.spyOn(Storage.prototype,"setItem").mockImplementation((key)=>{if(key.includes("combat-consumable"))throw new DOMException("quota");});
-    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn()});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/durable safety lock could not be stored/i);expect(service.useConsumable).not.toHaveBeenCalled();expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();storage.mockRestore();
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable]),useConsumable:vi.fn()});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:/Use tonic on Ally 1/}));await screen.findByText(/durable safety lock could not be stored/i);expect(service.useConsumable).not.toHaveBeenCalled();expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();storage.mockRestore();
   });
 
   it("clears stale consumable actions when their authoritative refresh fails",async()=>{
     const actions=vi.fn().mockResolvedValueOnce([consumable]).mockRejectedValueOnce(new Error("offline"));const use=vi.fn().mockImplementation((_combat,command)=>Promise.resolve({resolution:{actionId:"resolved",legalActionId:consumable.legalActionId,kind:"use-consumable",actingCombatantId:"combatant-one",target:consumable.target,targetPolicy:consumable.targetPolicy,actionCost:"action",consumed:{inventoryEntryId:"entry",item:consumable.item,quantity:1},effectPlan:consumable.effectPlan,outcome:{targetCombatantId:"combatant-one",settlements:[{kind:"combat-hp-resource",effectOrdinal:0,resource:"health",requested:2,applied:2,before:8,after:10}]},combatRevisionBefore:4,combatRevisionAfter:5,actingM15Revision:{before:0,after:1},targetM15Revision:null},requestBinding:{requestEvidence:command,canonicalRequestDigest:"a".repeat(64),idempotencyKey:command.idempotencyKey},receipt:{idempotencyKey:command.idempotencyKey,revisionBefore:4,revisionAfter:5,occurredAt:at}}));
-    const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/refresh is partial/i);expect(screen.queryByRole("button",{name:/Use tonic on actor-one/})).toBeNull();
+    const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:/Use tonic on Ally 1/}));await screen.findByText(/refresh is partial/i);expect(screen.queryByRole("button",{name:/Use tonic on Ally 1/})).toBeNull();
   });
 
   it("clears the marker and refreshes after a definitive 409 without retrying POST",async()=>{
-    const actions=vi.fn().mockResolvedValue([consumable]),use=vi.fn().mockRejectedValue(new ApiError(409,"stale"));const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findAllByText("actor-one");fireEvent.click(screen.getByRole("button",{name:/Use tonic on actor-one/}));await screen.findByText(/rejected before commitment/i);await waitFor(()=>expect(actions.mock.calls.length).toBeGreaterThan(1));expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull();expect(use).toHaveBeenCalledTimes(1);
+    const actions=vi.fn().mockResolvedValue([consumable]),use=vi.fn().mockRejectedValue(new ApiError(409,"stale"));const service=api({getConsumableActions:actions,useConsumable:use});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:/Use tonic on Ally 1/}));await screen.findByText(/rejected before commitment/i);await waitFor(()=>expect(actions.mock.calls.length).toBeGreaterThan(1));expect(localStorage.getItem("velvet.combat-consumable.v1:campaign:combat-one")).toBeNull();expect(screen.queryByText(/Consumable outcome unresolved/)).toBeNull();expect(use).toHaveBeenCalledTimes(1);
   });
 
   it("claims once, confirms settlement from reward reads, and refreshes the bound actor wallet",async()=>{

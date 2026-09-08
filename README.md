@@ -2,7 +2,7 @@
 
 VelvetRP is a local-first AI roleplay and campaign RPG application. A React client talks to a loopback Fastify server, and application state is stored in local SQLite. It supports character and group roleplay, persistent context, and a receipt-backed RPG system with campaign administration, character mechanics, combat, world and story tools, and a campaign play shell.
 
-Development persistence uses one current schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`; startup never upgrades an older schema. The trusted-local RPG API has **111 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include companion transport, bounded consumables, provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, and explicit player-safe material publication. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); live exact-candidate generation/selection HTTP and client APIs remain absent.
+Development persistence uses one current schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`; startup never upgrades an older schema. The schema changes in the current tree require recreating the development database. The trusted-local RPG API has **126 counted explicit operations**, excluding the separately classified `GET /api/rpg/v1/features` discovery operation and implicit `HEAD` aliases. Roadmap milestones M1-M4.6 and M5.1 are complete. Later delivered slices include authoritative tactical maps, companion transport, bounded consumables, internal provider-selected exact travel, character-draft rerolls, reviewed campaign generation/expansion, exact starter materialization and actor placement, recipient-safe combat reward settlement/reconciliation, generated story materialization, explicit player-safe material publication, and integrated campaign administration for commerce, rulesets, generation recovery, and safety. M5.2, M5.3, and M5.5 retain the exclusions recorded in the [roadmap](docs/ROADMAP.md); there is no general live exact-candidate generation/selection HTTP or client API, and only the exact state-dependent adventure bridges documented in the [DM harness architecture](docs/dm-harness-architecture.md) exist.
 
 ## Security And Privacy
 
@@ -19,7 +19,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 
 ### Roleplay
 
-- Character create, edit, import, export, archetypes, and boundaries
+- Character create, edit, import, export, archetypes, boundaries, and rich goal/ideal/bond/flaw/history/personality/fears/relationships/appearance/voice profiles
 - One-to-one and up-to-12-character sessions with attributed messages
 - Model-routed room turns with bounded sequential speakers and auto-follow-up rounds
 - Streaming, cancellation, branches, reply swipes, and durable solo conversations
@@ -43,6 +43,11 @@ Local-first describes storage and deployment, not a guarantee that all processin
 - Reviewed sparse campaign generation/expansion with standard quest/story/world materialization, inert encounter planning, and explicit public handout/scene-prompt delivery
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
 - A role-selected, bounded provider tool loop with deterministic command bridging, durable resume, and receipt-aware narration and recovery
+- One authoritative durable DM conversation per campaign room, with a bounded transcript that collapses narration derivatives; legacy room messages remain read-only pre-campaign history
+- A full read-only gameplay-sheet drawer and `actor_sheet.read`; reference controls and the topological, not-to-scale route map only prefill declarations and never execute actions
+- Foundation, Full narrative campaign, and Custom / granular reviewed generation over 11 supported narrative sections, with explicit artifact selection/apply and separate player-material publication
+
+The registered `dnd-5e@1.0.0` rules module is a tested development subset adapted from the 2014 SRD 5.1, not full D&D support or full SRD conformance. It provides pure deterministic helpers for the mechanics listed in the [coverage matrix](docs/srd-5.1-coverage.md); many rules and feature interactions remain partial or unsupported. This work includes material from Wizards of the Coast LLC's [official SRD source page](https://www.dndbeyond.com/srd) and the exact [System Reference Document 5.1 CC PDF](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). VelvetRP adapts and modifies that material into deterministic software mechanics; Wizards of the Coast LLC has not endorsed these modifications.
 
 The full operation contract is in the [API reference](docs/api.md). The implementation intentionally does not duplicate the route and schema tree here.
 
@@ -173,6 +178,8 @@ A missing or empty database is initialized atomically from `server/src/repo/db/c
 ## Limitations
 
 - Campaign context excludes full catalogs, full inventories, story graph dumps, unrelated private state, hidden routes, and controller identities. NPC/enemy target-private planning is non-disclosable. Legacy character prompting accepts only exact session- and persona-bound player/NPC baskets; DM/enemy legacy prompts fail closed, while the composed adventure orchestrator selects role-authorized player or enemy context.
+- Adventure tools do not provide general inventory use, purchases/vendors, general power use, combat spells/area targeting, resource initialization, encounter start, or arbitrary effects. Sheet/map references never auto-execute. Direct HTTP mechanics remain separate and only their documented closed commands are supported.
+- Campaign generation supports outline, arcs, locations/connections, factions, NPCs, quests, encounter concepts, clues, story nodes/relationships, handouts, and scene prompts. It does not mechanically generate items, executable monsters/stat blocks, or campaign-native lore.
 - The campaign-visible NPC roster is the set of available campaign NPCs; persisted room presence is separate explicit M5.1 state. The context drawer uses the roster for GM placement choices and the authoritative present-cast read for running presence or stopped history. Existing exclusions remain: unrelated roster entries are not treated as present, and hidden locations, controller identities, and role-private NPC state are not added to player projections.
 - Published content-pack versions are immutable. Create a new exact version to change one.
 - Append-only multiclass progression remains outside the current runtime.
@@ -196,6 +203,7 @@ The current policy layer is limited, not a comprehensive content-moderation syst
 | [API reference](docs/api.md) | HTTP behavior, contracts, flags, and RPG operation inventory |
 | [Operations](docs/operations.md) | Setup, environment, disposable development storage, and release gates |
 | [Campaign generation](docs/campaign-generation.md) | Reviewed generation, selective application, planning, and material delivery |
+| [DM harness architecture](docs/dm-harness-architecture.md) | Authoritative conversation, trust boundaries, sheet references, tools, limitations, ruleset scope, and agent best practices |
 | [Gameplay agent instructions](docs/interactive-gameplay-agent-instructions.md) | Trusted-local API workflow and reconciliation guidance |
 | [RPG integration plan](docs/rpg-integration-plan.md) | Product and mechanics integration design |
 | [Roleplay architecture](docs/roleplay-architecture-2026.md) | Roleplay context and generation architecture, including historical notes |

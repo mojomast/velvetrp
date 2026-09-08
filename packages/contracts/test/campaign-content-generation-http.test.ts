@@ -25,7 +25,18 @@ describe("campaign content generation contracts", () => {
   });
 
   it("keeps planning strict and the player delivery shape free of private fields",()=>{
-    const planning=campaignGeneratedPlanningSchema.parse({campaignId:"campaign-1",deliveryRevision:0,encounters:[],deliverables:[{artifactKey:"letter",resourceId:"resource-letter",title:"Letter",visibility:"gm",sourceDraftId:"draft-1",kind:"handout",content:"Secret",locationId:null,npcIds:[],publishedAt:null}]});expect(planning.deliverables[0]?.visibility).toBe("gm");
+    const planning=campaignGeneratedPlanningSchema.parse({campaignId:"campaign-1",deliveryRevision:0,encounters:[],lore:[],questItems:[],monsterConcepts:[],deliverables:[{artifactKey:"letter",resourceId:"resource-letter",title:"Letter",visibility:"gm",sourceDraftId:"draft-1",kind:"handout",content:"Secret",locationId:null,npcIds:[],publishedAt:null}]});expect(planning.deliverables[0]?.visibility).toBe("gm");
     expect(campaignPublishedMaterialsSchema.safeParse({campaignId:"campaign-1",revision:1,materials:[{artifactKey:"letter",resourceId:"resource-letter",kind:"handout",title:"Letter",content:"Public",publishedAt:"2026-08-14T00:00:00.000Z",visibility:"public"}]}).success).toBe(false);
+  });
+
+  it("types operational quests, campaign lore, and explicitly bound or inert concepts",()=>{
+    const parsed=generatedCampaignContentProviderSchema.parse({
+      quests:[{key:"bell-quest",title:"Recover the Bell",description:"Follow its trail.",visibility:"public",objectives:[{key:"find-mark",description:"Find the maker's mark.",visibility:"public"},{key:"open-tower",description:"Open the tower.",visibility:"public",dependencyObjectiveKeys:["find-mark"]}],rewards:[{key:"bell-favor",label:"Bellkeeper favor",kind:"custom",visibility:"public"}]}],
+      lore:[{key:"bell-custom",title:"The Bell Custom",summary:"Bells name each district.",visibility:"public",details:["A silent bell marks exile."]}],
+      questItems:[{key:"silent-clapper",name:"Silent Clapper",description:"A ceremonial clapper.",visibility:"public",questKeys:["bell-quest"],mechanics:{state:"inert",reason:"No compatible pinned item exists."}}],
+      monsterConcepts:[{key:"bell-wraith",name:"Bell Wraith",description:"A resonance in the tower.",role:"guardian",visibility:"gm",mechanics:{state:"inert",reason:"No compatible pinned enemy template exists."}}],
+    });
+    expect(parsed.quests[0]?.objectives[1]?.dependencyObjectiveKeys).toEqual(["find-mark"]);
+    expect(parsed.questItems[0]?.mechanics.state).toBe("inert");
   });
 });

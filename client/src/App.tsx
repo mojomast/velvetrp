@@ -4,10 +4,11 @@ import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
   applyCampaignImport, claimCombatReward, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
-  getSessionContext, getSiblings, getUsage, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
-  listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
+  getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession,
+  endCombat, generateTacticalMap, getTacticalMap, listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, moveTacticalMapToken, previewTacticalMapMove, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, startEncounter, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
 import { getCombatRewardClaimResult } from "./api";
+import { getActorGameplaySheet } from "./api";
 import { CharacterForm } from "./components/CharacterForm";
 import { LoreManager } from "./components/LoreManager";
 import { MemoryManager } from "./components/MemoryManager";
@@ -73,7 +74,7 @@ const combatTrackerApi: CombatTrackerApi = {
   getCommandResult: getCombatCommandResult, getPowers: getActorPowers, getEffects: getActorEffects,
   getResources: getActorResources, usePower: commandActorPower,
   getConsumableActions:getCombatConsumableActions,useConsumable:commandCombatConsumable,getConsumableResult:getCombatConsumableResult,
-  listRewards:listCombatRewards,claimReward:claimCombatReward,getRewardClaimResult:getCombatRewardClaimResult,getWallet:getActorWallet,
+  listRewards:listCombatRewards,claimReward:claimCombatReward,getRewardClaimResult:getCombatRewardClaimResult,getWallet:getActorWallet,startEncounter,endCombat,
 };
 const worldExplorerApi:WorldExplorerApi={getWorld:getCampaignWorld,travel:travelActor};
 const castStudioApi:CastStudioApi={listNpcs:listCampaignNpcs,listFactions:listCampaignFactions,createNpc:createCampaignNpc,relationship:commandNpcRelationship,createFaction:createCampaignFaction,reputation:commandFactionReputation,previewNpcs:projectNpcsForPlayers,previewFactions:projectFactionsForPlayers};
@@ -82,9 +83,9 @@ const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignS
 const campaignHistoryApi: CampaignHistoryApi = { administration: getCampaignAdministration, timelines: listCampaignTimelines, checkpoints: listCampaignCheckpoints, events: listCampaignEvents, recaps: listCampaignRecaps, receipt: getCampaignCommandReceipt, createRecap: createCampaignRecap };
 const campaignImportApi: CampaignImportApi = { dryRun: dryRunCampaignImport, apply: applyCampaignImport };
 const campaignExportApi: CampaignExportApi = { export: getCampaignExport };
-const campaignPlayApi: CampaignPlayApi = { getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, reconcileInitialAdventureTurn, confirmAdventureTurn,
-  getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources,
-  getActorInventory, getActorEffects, listCampaignEncounters, getCombatState };
+const campaignPlayApi: CampaignPlayApi = { getCampaignPlayBootstrap, streamAdventureTurn, getAdventureTurn, getAdventureTurnTranscript, reconcileInitialAdventureTurn, confirmAdventureTurn,
+  getCampaignCommandReceipt, getCampaignWorld, listCampaignNpcs, listCampaignQuests, getActorResources, getActorGameplaySheet,
+  getActorInventory, getActorEffects, listCampaignEncounters, getCombatState, getTacticalMap, generateTacticalMap, previewTacticalMapMove, moveTacticalMapToken };
 
 function CampaignAuthorizationGate({campaignId,onUnavailable,children}:{campaignId:string;onUnavailable:()=>void;children:(authorization:StudioAuthorization)=>ReactNode}){
   const [authorization,setAuthorization]=useState<StudioAuthorization|null>(null),[failed,setFailed]=useState(false);
@@ -294,7 +295,9 @@ export default function App() {
         const validSelected = selectedIds.filter((id) => valid.has(id));
         setSelectedIds(validSelected); setPrimaryId(validSelected.includes(primaryId) ? primaryId : validSelected[0] ?? "");
         if (activeCharacterId && !valid.has(activeCharacterId)) { setActiveCharacterId(""); if (["edit", "memory"].includes(view)) setView("home"); }
-        if (stored.sessionId && library.sessions.some((item) => item.id === stored.sessionId) && (stored.view === "chat" || stored.view === "campaign-play")
+        const sessionIsRestorable = Boolean(stored.sessionId && (library.sessions.some((item) => item.id === stored.sessionId)
+          || stored.chatReturnCampaignId || stored.view === "campaign-play"));
+        if (stored.sessionId && sessionIsRestorable && (stored.view === "chat" || stored.view === "campaign-play")
           && !(stored.view === "campaign-play" && mechanicsAvailabilityRef.current === false)) {
           const restorationEpoch = navigationEpochRef.current;
           try {
@@ -547,13 +550,10 @@ export default function App() {
     return <CharacterBuilderPage campaignId={activeCampaignId} personas={characters.map((character) => ({ id: character.id, name: character.name }))} initialDraftId={characterDraftIds[activeCampaignId]} api={characterBuilderApi} focusHeadingRequest={characterBuilderEntryRef.current || undefined} onDraftIdentity={setDraftIdentity} onBack={returnToCampaign} onReviewCampaignRoster={returnToCampaign} onUnavailable={returnToCampaign} onEditPersona={(personaId) => { cancelRoomOpenForNavigation(); setActiveCharacterId(personaId); setError(null); setView("edit"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); setActiveCampaignCharacterId(campaignCharacterId); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character"); }} />;
   }
   if (view === "campaign-play" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && session) {
-    const entryToken = chatEntryRef.current;
     const returnToCampaign = () => { clearCampaignPlayPersistence(activeCampaignId, session.id, playTurnId); cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
       setRoomsRefreshRequest({ campaignId: activeCampaignId, request }); setPlayTurnId(""); setPlaySelectedActorId("");
       currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" };
       setSession(null); setMessages([]); setView("campaign-detail"); };
-    const replaceCurrentSession = (next: Session) => { if (currentNavigationRef.current.view !== "campaign-play" || chatEntryRef.current !== entryToken
-      || currentSessionRef.current?.id !== session.id || next.id !== session.id) return; currentSessionRef.current = next; setSession(next); };
     return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
       <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
         authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
@@ -566,11 +566,7 @@ export default function App() {
           if (["world", "cast", "quests", "story"].includes(destination)) studioEntryRef.current = ++transitionRequestRef.current;
           if (destination === "administration") campaignAdministrationEntryRef.current = ++transitionRequestRef.current;
           currentNavigationRef.current = { view: target[destination], campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView(target[destination]);
-        }}>
-        <Chat embedded key={`${session.id}:${entryToken}`} session={session} initialMessages={messages} provider={provider} harness={harness} features={features}
-          externalError={error} navigationBusy={busy} onSessionChange={replaceCurrentSession} onProviderChange={setProvider} onHarnessChange={setHarness}
-          onOpenPrivate={openPrivateSession} backLabel="← Back to campaign" onBack={returnToCampaign} />
-      </CampaignPlayPage>}
+        }} legacyMessages={messages} legacyParticipants={session.participants} />}
     </CampaignAuthorizationGate>;
   }
   if (view === "chat" && session) {

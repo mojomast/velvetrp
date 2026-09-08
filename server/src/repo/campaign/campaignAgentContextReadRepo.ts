@@ -10,8 +10,11 @@ import { createNpcPresenceReadRepository } from "../world/npcPresenceReadRepo.js
 import { createCampaignRoomSessionLifecycleRepository } from "./campaignRoomSessionLifecycleRepo.js";
 import { createHash } from "node:crypto";
 import { createCampaignPlayReadRepository } from "./campaignPlayReadRepo.js";
+import { resolveCampaignRuleset } from "../../rulesets/index.js";
 
 const MAX_CAMPAIGN_CONTEXT_COMBATANTS = 32;
+const semanticLabel = (value: string) => value.split(/[._:-]+/u).filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").slice(0, 200);
 
 interface EncounterRow {
   encounter_id: string;
@@ -127,7 +130,7 @@ export function createCampaignAgentContextReadRepository(
             AND combatant.combatant_id=? AND combatant.combatant_kind='enemy' AND combatant.status='active'`)
           .get(campaign, sessionId, targetEnemyId) as { combatant_id: string } | undefined;
         if (!target) return null;
-        targetName = `Enemy ${targetEnemyId}`;
+        targetName = "Enemy combatant";
       }
 
       npcPresence.assertScopedIntegrity(campaign, sessionId);
@@ -137,6 +140,12 @@ export function createCampaignAgentContextReadRepository(
           AND timeline.id=campaign.active_timeline_id WHERE campaign.id=?`)
         .get(campaign) as { active_timeline_id: string; administration_revision: number; timeline_revision: number } | undefined;
       if (!campaignState) return null;
+      let ruleset;
+      try {
+        ruleset = resolveCampaignRuleset(db, campaign);
+      } catch {
+        return null;
+      }
 
       const principalVisibleLocationIds = audience.kind === "player" ? new Set((db.prepare(`SELECT DISTINCT discovery.location_id
         FROM campaign_location_discoveries_v28 discovery JOIN campaign_actor_private_state actor
@@ -168,11 +177,12 @@ export function createCampaignAgentContextReadRepository(
         WHERE combatant.encounter_id=? ORDER BY combatant.combatant_id COLLATE BINARY LIMIT ?`)
         .all(encounter.encounter_id, MAX_CAMPAIGN_CONTEXT_COMBATANTS + 1) as CombatantRow[] : [];
       if (combatants.length > MAX_CAMPAIGN_CONTEXT_COMBATANTS) return null;
+      const combatantLabels=new Map(combatants.map((row,index)=>[row.combatant_id,row.name?.trim()||`Enemy combatant ${index+1}`]));
 
       const committedMechanics: string[] = encounter ? [
-        `Active encounter ${encounter.name}; revision ${encounter.revision}; round ${encounter.round_number}.`,
-        `Current combatant: ${encounter.current_turn_combatant_id ?? "none"}.`,
-        ...combatants.map((row) => `${row.name ?? `Enemy ${row.combatant_id}`}: HP ${row.hit_points}/${row.maximum_hit_points}; status ${row.status}; team ${row.team}.`),
+        `Active encounter ${encounter.name}; round ${encounter.round_number}.`,
+        `Current combatant: ${encounter.current_turn_combatant_id ? combatantLabels.get(encounter.current_turn_combatant_id) ?? "unknown" : "none"}.`,
+        ...combatants.map((row) => `${combatantLabels.get(row.combatant_id)}: HP ${row.hit_points}/${row.maximum_hit_points}; status ${row.status}; team ${row.team}.`),
       ] : ["No active encounter is committed for this session."];
 
       const castRows = db.prepare(`SELECT character.name,actor.id actor_id,location.public_name location_name,
@@ -231,6 +241,9 @@ export function createCampaignAgentContextReadRepository(
           : [];
       const visibleWorld = (locationRows as Array<{ public_name: string; public_description: string }>).map((row) =>
         `${row.public_name}${row.public_description.trim() ? ` — ${row.public_description}` : ""}`);
+      const currentActorLocation = audience.kind === "player"
+        ? (locationRows as Array<{ public_name: string }>)[0]?.public_name ?? null
+        : null;
 
       const questRows = db.prepare(`SELECT quest.title,quest.description,quest.status FROM quests quest
         LEFT JOIN quest_definitions_v33 definition ON definition.campaign_id=quest.campaign_id AND definition.quest_id=quest.id
@@ -256,11 +269,15 @@ export function createCampaignAgentContextReadRepository(
           || (audience.kind === "enemy" && current?.combatant_id === targetEnemyId);
         if (audienceOwnsCurrent) {
           const plans=buildCombatActionPlans(db, principal, campaign, encounter.encounter_id,encounter.current_turn_combatant_id);
-          legalActionCandidates=plans.flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).map((targetId)=>{
+          legalActionCandidates=plans.filter((plan):plan is typeof plan&{kind:"attack"|"flee"|"end-turn"}=>["attack","flee","end-turn"].includes(plan.kind)).flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).flatMap((targetId)=>{
+            const targetRow=targetId===null?null:combatants.find((combatant)=>combatant.combatant_id===targetId);
+            const targetLabel=targetRow ? combatantLabels.get(targetRow.combatant_id) ?? null : null;
+            if(targetId!==null&&!targetLabel)return[];
             const legalActionId=targetId===null?plan.legalActionId:`${plan.legalActionId}:target:${createHash("sha256").update(targetId).digest("hex").slice(0,12)}`;
-            return{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,
-              digest:createHash("sha256").update(JSON.stringify([encounter.encounter_id,encounter.revision,legalActionId,plan.actingCombatantId,targetId])).digest("hex")};}));
-          legalActions = legalActionCandidates.map((candidate) => `${candidate.legalActionId}; digest ${candidate.digest}; exactly one target ${candidate.targetId ?? "none"}.`);
+            const actionLabel=plan.kind==="end-turn"?"End turn":plan.kind==="flee"?"Flee encounter":`Basic attack against ${targetLabel}`;
+            return[{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,label:actionLabel,targetLabel,
+              digest:createHash("sha256").update(JSON.stringify([encounter.encounter_id,encounter.revision,legalActionId,plan.actingCombatantId,targetId])).digest("hex")}];}));
+          legalActions = legalActionCandidates.map((candidate) => `${candidate.label}; consequence: ${candidate.kind==="attack"?"resolve one basic attack and advance the turn":candidate.kind==="flee"?"leave the encounter if the action succeeds":"finish the current turn"}.`);
         }
       }
 
@@ -275,9 +292,9 @@ export function createCampaignAgentContextReadRepository(
         if (actor.private_notes?.trim()) privateTargetFacts.push(`Target notes: ${actor.private_notes}`);
         const attributes = db.prepare(`SELECT attribute_id,value FROM rpg_character_attributes
           WHERE campaign_id=? AND sheet_id=? ORDER BY position LIMIT 64`).all(campaign, actor.sheet_id) as Array<{ attribute_id: string; value: number }>;
-        privateTargetFacts.push(...attributes.map((row) => `Target attribute ${row.attribute_id}: ${row.value}.`));
+        privateTargetFacts.push(...attributes.map((row) => `Target attribute ${semanticLabel(row.attribute_id)}: ${row.value}.`));
         attributeCandidates=attributes.map((row)=>{const candidateId=`attribute:${createHash("sha256").update(row.attribute_id).digest("hex").slice(0,24)}`;
-          return{candidateId,commandAttributeId:row.attribute_id,currentValue:row.value,
+          return{candidateId,commandAttributeId:row.attribute_id,label:semanticLabel(row.attribute_id),currentValue:row.value,
             digest:createHash("sha256").update(JSON.stringify([campaign,campaignState.active_timeline_id,campaignState.timeline_revision,targetActorId,row.attribute_id,row.value])).digest("hex")};});
       } else if (targetNpcId) {
         const npc = db.prepare(`SELECT private.private_goals
@@ -291,11 +308,11 @@ export function createCampaignAgentContextReadRepository(
         const enemy = combatants.find((row) => row.combatant_id === targetEnemyId);
         if (!enemy) return null;
         privateTargetFacts.push(`Target enemy: ${targetName}.`, `Target tactic: ${enemy.enemy_tactic}.`);
-        if (enemy.definition_id) privateTargetFacts.push(`Target template reference: ${enemy.definition_id}.`);
       }
 
       return {
         campaignId: campaign,
+        ruleset: { id: ruleset.rulesetId, version: ruleset.rulesetVersion, descriptor: ruleset.module.descriptor },
         timelineId: campaignState.active_timeline_id,
         timelineRevision: campaignState.timeline_revision,
         campaignRevision: campaignState.administration_revision,
@@ -310,6 +327,7 @@ export function createCampaignAgentContextReadRepository(
         ],
         humanCanon,
         committedMechanics,
+        currentActorLocation,
         visibleWorld,
         visibleCast,
         visibleQuests,

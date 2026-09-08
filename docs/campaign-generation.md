@@ -2,6 +2,8 @@
 
 Campaign generation is a reviewed, additive API. It never edits accepted generated artifacts in place and it never applies a provider response automatically.
 
+The client offers three directions: **Foundation** requests an outline, locations/connections, factions, NPCs, and quests; **Full narrative campaign** requests all 14 supported sections in one prompt; and **Custom / granular** retains independent section selection. A full request is still only one dependency-linked draft and is never auto-applied.
+
 ## Section candidates
 
 `POST /api/rpg/v1/campaign-content-drafts` accepts any nonempty combination of:
@@ -15,12 +17,17 @@ Campaign generation is a reviewed, additive API. It never edits accepted generat
 - encounter concepts;
 - clues/discoveries;
 - story nodes and relationships;
+- typed campaign-native lore;
+- quest-item concepts;
+- monster concepts;
 - handouts; and
 - scene prompts.
 
-The provider response is sparse: unrequested sections must be empty. A faction, NPC, quest, clue, handout, or scene prompt does not need an opening or a location graph. Stable lowercase-hyphen keys can reference another candidate or an accepted artifact named in `expandArtifactKeys`. Candidate keys must be new. Strict local Zod parsing, requested-section checks, reference checks, and the provider adapter's strict JSON Schema response format run before staging.
+The provider response is sparse: unrequested sections must be empty. A faction, NPC, quest, clue, lore entry, concept, handout, or scene prompt does not need an opening or a location graph. Stable lowercase-hyphen keys can reference another candidate or an accepted artifact named in `expandArtifactKeys`. Candidate, objective, and reward keys must be globally unambiguous. Strict local Zod parsing, requested-section checks, duplicate-key checks, missing-reference checks, graph-cycle checks, self-connection checks, transitive public-to-GM dependency checks, objective-DAG checks, and the provider adapter's strict JSON Schema response format run before staging. Critical graph, visibility, objective, and catalog-pin checks run again inside apply.
 
-Expansion keys are resolved server-side to accepted canon, its immutable digest, source draft, and any materialized server resource ID. Only public accepted content is sent back to the provider; a GM-only dependency remains an opaque key. The draft captures both the campaign-content revision before the provider call and exact dependency digests. Apply fails closed if either is stale.
+Expansion keys are resolved server-side to accepted canon, its immutable digest, source draft, and any materialized server resource ID. Only public accepted content is sent back to the provider; a GM-only dependency remains an opaque key. The draft captures both the campaign-content revision before the provider call and exact dependency digests. `derivativeContextKeys` exposes that immutable base in the review view. Regeneration with `expandArtifactKeys` plus `revisionFeedback` creates an additive derivative draft; it never edits the accepted source artifact. Apply fails closed if either the content revision or a dependency digest is stale.
+
+Campaign text, accepted canon, tone, exclusions, and revision feedback are framed as untrusted quoted data in the provider request. Instructions embedded in any of those values are explicitly non-authoritative. Provider tool use remains disabled with `toolChoice: "none"`. Logical request identity uses recursively key-sorted canonical JSON before SHA-256 hashing, so object property order does not alter identity.
 
 Candidate GET/POST responses omit faction GM notes and NPC private goals. They do not expose provider prompts, credentials, principals, hidden goals, or provider-call records.
 
@@ -32,13 +39,15 @@ Candidate GET/POST responses omit faction GM notes and NPC private goals. They d
 - a distinct idempotency key; and
 - a nonempty `selectedArtifactKeys` list.
 
-References must close over the selected set or accepted canon. The transaction records immutable accepted-key provenance and materializes selected locations, connections, factions, NPCs, arcs, quests, story nodes, story relationships, and clues into their standard domains. Generated story material is created as a complete immutable v34 storyline graph in the same outer apply transaction, with normal story command/event/receipt/revision provenance and stable server IDs. Relationships must select both endpoint nodes in that graph. A clue may name a selected source node; a standalone clue receives a bounded hidden source node because v34 requires every clue to have one source. Generated quests and story therefore appear immediately in standard reads. Outline start locations are designated only when the selected outline references an accepted or selected location.
+References must close over the selected set or accepted canon. The transaction records immutable accepted-key provenance and materializes selected locations, connections, factions, NPCs, arcs, quests, story nodes, story relationships, and clues into their standard domains. Generated quests now write their bounded objectives, objective dependencies, visibility, rewards, and journal text to v33, so normal quest reads and adventure objective candidates consume the applied content. Generated story material is created as a complete immutable v34 storyline graph in the same outer apply transaction, with normal story command/event/receipt/revision provenance and stable server IDs. Relationships must select both endpoint nodes in that graph. A clue may name a selected source node; a standalone clue receives a bounded hidden source node because v34 requires every clue to have one source. Outline start locations are designated only when the selected outline references an accepted or selected location.
 
 An exact apply replay returns the original durable result only when both its idempotency key and ordered selection match. A different key or selection fails closed. `GET /api/rpg/v1/campaigns/:campaignId/generated-foundation` reads the latest accepted public outline immediately after apply.
 
 ## Planning and player delivery
 
-`GET /api/rpg/v1/campaigns/:campaignId/generated-planning` is the GM planning projection for inert encounter concepts and generated handouts/scene prompts. Encounter references are resolved to same-campaign location and NPC server IDs, but no encounter/combat rows or combatants are created.
+`GET /api/rpg/v1/campaigns/:campaignId/generated-planning` is the GM planning projection for prepared encounter plans, lore, quest items, monster concepts, and generated handouts/scene prompts. Prepared plans include objectives, terrain, escalation, resolution, exact enemy-template references, and resolved same-campaign location/NPC/concept IDs, but no encounter/combat rows or combatants are created.
+
+Quest items and monster concepts use a closed mechanics union. `catalog-bound` requires an exact `{ kind, packId, packVersion, definitionId }` supplied from the campaign's current pinned public catalog. The server verifies it before staging and rechecks the current pin inside apply. If no compatible exact reference exists, the provider must return `inert` with a reason. Inert concepts are narrative planning canon only. No generated stat block, approximate match, provider ID, or newly invented definition crosses into mechanics.
 
 No generated material is delivered on apply. A GM explicitly publishes a `public` handout or scene prompt with `POST /api/rpg/v1/campaigns/:campaignId/material-publications`, an expected v53 delivery revision, and an idempotency key. The append-only command/receipt/projection is exact-replay safe. GM-only artifacts cannot be published. `GET /api/rpg/v1/campaigns/:campaignId/published-materials` selects only explicitly published public columns and is the player-safe read used by campaign play.
 
@@ -65,7 +74,8 @@ Selected NPC `locationKey` values resolve only within the same campaign. Applica
 ## Deliberate limits
 
 - Generation remains trusted-local owner/GM administration; there is no remote tenant authorization model.
-- Accepted encounter concepts are planning canon, not prepared combat aggregates and never automatically started combat.
+- Accepted encounter plans are planning canon, not combat aggregates, and are never automatically started.
+- Campaign-native lore and item/monster concepts have typed accepted projections. Lore is narrative canon. Catalog-bound concepts retain exact pin identity but do not themselves grant inventory, spawn enemies, or create encounters. Inert concepts have no mechanical behavior.
 - v34 graphs are immutable after creation, so a later generation apply creates a new generated storyline rather than appending nodes to an accepted storyline.
 - Concurrent wait is bounded; a long-running or abandoned owner returns a conflict rather than starting another paid call. An operator/caller must explicitly acknowledge a terminal failure before retrying.
 - Standalone generated clues receive a bounded hidden source node because v34 requires every clue to have a source.

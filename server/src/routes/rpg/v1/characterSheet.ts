@@ -3,6 +3,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
 import { sendApiProblem } from "../../../http/problem.js";
 import type { CampaignCharacterSheetSnapshot } from "../../../repo/index.js";
+import { rulesetIdentityForProfile } from "../../../rulesets/campaignBinding.js";
 
 const LOCAL_OWNER = "local-owner";
 
@@ -51,7 +52,9 @@ export const characterSheetHttpRoutes: FastifyPluginAsync<CharacterSheetHttpOpti
           || snapshot.progression.campaignCharacterId !== campaignCharacterId.data) {
           throw new Error("campaign character sheet snapshot does not match the request");
         }
+        const [rulesetId, rulesetVersion] = rulesetIdentityForProfile(snapshot.progression.profile.rulesProfileId);
         return reply.code(200).send(characterSheetHttpResponseSchema.parse({
+          rulesetId, rulesetVersion,
           sheet: snapshot.sheet,
           derived: snapshot.progression.derived,
           progression: {

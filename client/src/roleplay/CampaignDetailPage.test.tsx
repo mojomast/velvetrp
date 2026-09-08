@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
 import type { CampaignAdministrationReceipt } from "@velvet/contracts";
-import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, updateCampaignAdministration } from "../api";
+import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, updateCampaignAdministration } from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
 import { CampaignAdministrationPage, resetCampaignAdministrationPageModuleStateForTests } from "../components/rpg/campaign/CampaignAdministrationPage";
 
@@ -17,6 +17,7 @@ vi.mock("../api", async (importOriginal) => ({
   renameCampaign: vi.fn(),
   setupOriginalStarter: vi.fn(),
   setupMechanicsStarter: vi.fn(),
+  setupSrd51Starter: vi.fn(),
   getCampaignAdministration: vi.fn(),
   getCampaignPlayBootstrap: vi.fn(),
   listCampaignMemberships: vi.fn(),
@@ -30,6 +31,7 @@ const configured = { ...unconfigured, id: "campaign-two", name: "Second Road", a
 const ownerUnconfigured = { ...unconfigured, actorRole: "owner" as const };
 const starterConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:original-narrative", contentPacks: [{ packId: "velvet:original-starter", packVersion: "1.0.0+d15042935818" }] } };
 const mechanicsConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "velvet:rules:starter-v1", contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] } };
+const srdConfigured = { ...ownerUnconfigured, updatedAt: "2030-04-06T00:00:00.000Z", content: { status: "configured" as const, rulesProfileId: "srd-5.1:rules:starter-v1", contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.1.0+2b1f05336aac" }] } };
 const starter = {
   rulesProfile: { rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Narrative" as const, description: "Metadata identity for Velvet's original narrative starter concepts." as const },
   pack: { packId: "velvet:original-starter" as const, packVersion: "1.0.0+d15042935818" as const, rulesProfileId: "velvet:rules:original-narrative" as const, name: "Velvet Original Starter" as const, description: "A small original fantasy collection for future campaign setup." as const },
@@ -69,7 +71,7 @@ describe("CampaignDetailPage", () => {
     vi.mocked(listCampaignRooms).mockResolvedValue({ attached: [{ sessionId: "room", title: "Raincross", participantNames: ["Aria"], createdAt: unconfigured.createdAt, attachedAt: unconfigured.updatedAt, stopped: false }], eligible: [] });
     vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: mechanicsConfigured.id, actorRole: "owner", status: "published", activeTimelineId: "timeline", revision: 4, updatedAt: mechanicsConfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
     render(<CampaignDetailPage campaignId={mechanicsConfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} onOpenRoom={open} />);
-    await screen.findByRole("heading", { name: "Campaign ready" });
+    await screen.findByRole("heading", { name: "Campaign ready" }, { timeout: 5_000 });
     expect(screen.getByText("Ready to play")).toBeTruthy();
     expect(screen.getByText("1 authorized actor is available in an attached room.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Enter command center" }));
@@ -1205,27 +1207,61 @@ describe("CampaignDetailPage", () => {
     vi.mocked(setupMechanicsStarter).mockResolvedValueOnce({ campaign: mechanicsConfigured });
     render(<CampaignDetailPage campaignId={ownerUnconfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
 
-    const original = await screen.findByRole("radio", { name: /Original metadata starter/i });
-    const mechanics = screen.getByRole("radio", { name: /Mechanics starter/i });
-    expect((original as HTMLInputElement).checked).toBe(true);
+    const srd = await screen.findByRole("radio", { name: /SRD 5.1 starter.*recommended/i });
+    const original = screen.getByRole("radio", { name: /Original metadata starter/i });
+    const mechanics = screen.getByRole("radio", { name: /Velvet mechanics starter/i });
+    expect((srd as HTMLInputElement).checked).toBe(true);
+    expect((original as HTMLInputElement).checked).toBe(false);
     expect((mechanics as HTMLInputElement).checked).toBe(false);
     fireEvent.click(mechanics);
+    expect((srd as HTMLInputElement).checked).toBe(false);
     expect((original as HTMLInputElement).checked).toBe(false);
     expect(screen.getByText(/future builder and progression UI/i)).toBeTruthy();
     expect(screen.getByText(/cannot replace any configured content/i)).toBeTruthy();
-    const confirmation = screen.getByRole("checkbox", { name: /explicitly confirm mechanics starter activation/i });
+    const confirmation = screen.getByRole("checkbox", { name: /explicitly confirm Velvet mechanics starter activation/i });
     fireEvent.click(confirmation);
-    const activate = screen.getByRole("button", { name: "Activate mechanics starter" });
+    const activate = screen.getByRole("button", { name: "Activate Velvet mechanics starter" });
     fireEvent.click(activate);
     fireEvent.click(activate);
 
-    await screen.findByText(/Mechanics starter setup is complete/i);
+    await screen.findByText(/Velvet mechanics starter setup is complete/i);
     expect(setupMechanicsStarter).toHaveBeenCalledOnce();
     expect(setupMechanicsStarter).toHaveBeenCalledWith(ownerUnconfigured.id);
     expect(setupOriginalStarter).not.toHaveBeenCalled();
     expect(getCampaignDetail).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/Content configuration is read-only/i)).toBeTruthy();
     expect(screen.queryByRole("radio", { name: /starter/i })).toBeNull();
+  });
+
+  it("defaults and readiness-shortcuts to the separate recommended SRD 5.1 setup, then reconciles its exact identity", async () => {
+    vi.mocked(getCampaignDetail)
+      .mockResolvedValueOnce({ campaign: ownerUnconfigured })
+      .mockResolvedValueOnce({ campaign: srdConfigured });
+    vi.mocked(setupSrd51Starter).mockResolvedValueOnce({ campaign: srdConfigured });
+    render(<CampaignDetailPage campaignId={ownerUnconfigured.id} mechanicsEnabled onBack={vi.fn()} onUnavailable={vi.fn()} />);
+
+    const srd = await screen.findByRole("radio", { name: /SRD 5.1 starter.*recommended/i });
+    expect((srd as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("radio", { name: /Original metadata starter/i })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /Velvet mechanics starter/i })).toBeTruthy();
+    expect(screen.getByText("srd-5.1:rules:starter-v1")).toBeTruthy();
+    expect(screen.getAllByText("srd-5.1:starter@1.1.0+2b1f05336aac")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("radio", { name: /Original metadata starter/i }));
+    expect((srd as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Configure SRD 5.1 mechanics" }));
+    expect((srd as HTMLInputElement).checked).toBe(true);
+    const confirmation = screen.getByRole("checkbox", { name: /confirm SRD 5.1 starter activation/i });
+    fireEvent.click(confirmation);
+    fireEvent.click(screen.getByRole("button", { name: "Activate SRD 5.1 starter" }));
+
+    await screen.findByText(/SRD 5.1 starter setup is complete/i);
+    expect(setupSrd51Starter).toHaveBeenCalledOnce();
+    expect(setupSrd51Starter).toHaveBeenCalledWith(ownerUnconfigured.id);
+    expect(setupMechanicsStarter).not.toHaveBeenCalled();
+    expect(setupOriginalStarter).not.toHaveBeenCalled();
+    expect(getCampaignDetail).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("srd-5.1:starter")).toBeTruthy();
   });
 
   it("prevents a late pre-activation detail read from overwriting mechanics reconciliation after reopen", async () => {
@@ -1238,17 +1274,17 @@ describe("CampaignDetailPage", () => {
     vi.mocked(setupMechanicsStarter).mockReturnValueOnce(write.promise);
     const props = { campaignId: ownerUnconfigured.id, mechanicsEnabled: true, onBack: vi.fn(), onUnavailable: vi.fn() };
     const first = render(<CampaignDetailPage {...props} />);
-    await screen.findByRole("radio", { name: /Mechanics starter/i });
-    fireEvent.click(screen.getByRole("radio", { name: /Mechanics starter/i }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /explicitly confirm mechanics starter activation/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Activate mechanics starter" }));
+    await screen.findByRole("radio", { name: /Velvet mechanics starter/i });
+    fireEvent.click(screen.getByRole("radio", { name: /Velvet mechanics starter/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /explicitly confirm Velvet mechanics starter activation/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Activate Velvet mechanics starter" }));
     expect(setupMechanicsStarter).toHaveBeenCalledOnce();
     first.unmount();
 
     render(<CampaignDetailPage {...props} />);
     await waitFor(() => expect(getCampaignDetail).toHaveBeenCalledTimes(2));
     write.resolve({ campaign: mechanicsConfigured });
-    await screen.findByText(/Mechanics starter setup is complete/i);
+    await screen.findByText(/Velvet mechanics starter setup is complete/i);
     expect(getCampaignDetail).toHaveBeenCalledTimes(3);
     stalePreActivation.resolve({ campaign: ownerUnconfigured });
     await stalePreActivation.promise;
@@ -1256,8 +1292,8 @@ describe("CampaignDetailPage", () => {
 
     expect(screen.getByText("velvet:rules:starter-v1")).toBeTruthy();
     expect(screen.getByText(/Content configuration is read-only/i)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Activate mechanics starter" })).toBeNull();
-    expect(screen.queryByRole("radio", { name: /Mechanics starter/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Activate Velvet mechanics starter" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Velvet mechanics starter/i })).toBeNull();
     expect(setupMechanicsStarter).toHaveBeenCalledOnce();
   });
 

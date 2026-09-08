@@ -43,10 +43,10 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
       AND execution.pack_id=known.pack_id AND execution.pack_version=known.pack_version AND execution.kind=known.kind AND execution.definition_id=known.definition_id
     WHERE actor.campaign_id=? AND actor.id=? ORDER BY known.kind,known.pack_id,known.pack_version,known.definition_id`)
     .all(campaignId, actorId) as Array<{ kind: "ability" | "spell"; pack_id: string; pack_version: string; definition_id: string; public_definition_json: string }>;
-  const targetRows = db.prepare(`SELECT actor.id actor_id,persona.name label FROM campaign_actors actor
+  const targetRows = db.prepare(`SELECT actor.id actor_id,actor.kind actor_kind,persona.name label FROM campaign_actors actor
     LEFT JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
     LEFT JOIN characters persona ON persona.id=character.character_id
-    WHERE actor.campaign_id=? ORDER BY actor.id`).all(campaignId) as Array<{ actor_id: string; label: string | null }>;
+    WHERE actor.campaign_id=? ORDER BY actor.id`).all(campaignId) as Array<{ actor_id: string; actor_kind:string; label: string | null }>;
   const publicTarget = (row: typeof targetRows[number]) => ({ actorId: row.actor_id,
     ...(typeof row.label === "string" && row.label.trim().length > 0 && row.label.trim().length <= 200 ? { label: row.label.trim() } : {}) });
   const plans: ActorPowerCommandPlan[] = [];
@@ -74,16 +74,18 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
       costs.push({ kind: "slot", slotId, amount: 1 });
     }
     const targeting = definition.mechanics.target;
-    // This actor lane has no authoritative teams and cannot address encounter enemies.
-    // Ally/enemy powers therefore remain unavailable rather than becoming generic single-target powers.
-    if (targeting === "ally" || targeting === "enemy") continue;
+    // Outside combat, campaign player characters are the only authoritative ally set.
+    // Enemy powers remain unavailable until the combat command path supports powers.
+    if (targeting === "enemy") continue;
     const validRows = (targeting === "self" ? targetRows.filter((target) => target.actor_id === actorId)
-      : targetRows.filter((target) => target.actor_id !== actorId && hasRequiredResources(db, campaignId, target.actor_id, definition))).slice(0,32);
+      : targetRows.filter((target) => target.actor_id !== actorId && (targeting!=="ally"||target.actor_kind==="player-character")
+        && hasRequiredResources(db, campaignId, target.actor_id, definition))).slice(0,32);
     if (targeting === "self" && !hasRequiredResources(db, campaignId, actorId, definition)) continue;
     if (validRows.length === 0) continue;
     const effectKinds = [...new Set(definition.mechanics.effects.map((effect: any) => effect.type))];
-    const maxTargets=targeting==="self"?0:targeting==="single"?1:validRows.length;
-    const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting, validTargets: validRows.map(publicTarget), maxTargets,costs,
+    const publicTargeting=targeting==="ally"?"single":targeting;
+    const maxTargets=publicTargeting==="self"?0:publicTargeting==="single"?1:validRows.length;
+    const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting:publicTargeting, validTargets: validRows.map(publicTarget), maxTargets,costs,
       concentration: definition.reference.kind === "spell" ? definition.mechanics.concentration : false, effectKinds });
     plans.push({ ...command, definition });
   }

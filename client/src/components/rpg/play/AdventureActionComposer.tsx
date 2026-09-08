@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent } from "react";
 
 /** A server-authorized actor offered by the campaign play bootstrap. */
 export interface AdventureComposerActor {
@@ -14,6 +14,8 @@ export interface AdventureActionComposerProps {
   eligible: boolean;
   inactive: boolean;
   phase: "ready" | "inflight" | "ambiguous";
+  declaration: string;
+  onDeclarationChange: (declaration: string) => void;
   onActorChange: (actorId: string) => void;
   onSubmit: (declaration: string) => void;
   composerRef?: React.RefObject<HTMLTextAreaElement>;
@@ -21,8 +23,7 @@ export interface AdventureActionComposerProps {
 
 /** Renders exact actor selection and declaration submission without client-side mechanics. */
 export function AdventureActionComposer({ actors, selectedActorId, role, eligible, inactive, phase,
-  onActorChange, onSubmit, composerRef }: AdventureActionComposerProps) {
-  const [declaration, setDeclaration] = useState("");
+  declaration, onDeclarationChange, onActorChange, onSubmit, composerRef }: AdventureActionComposerProps) {
   const observer = role === "observer";
   const actorAvailable = actors.some((actor) => actor.actorId === selectedActorId);
   const disabled = observer || inactive || !eligible || !actorAvailable || phase !== "ready";
@@ -49,7 +50,7 @@ export function AdventureActionComposer({ actors, selectedActorId, role, eligibl
       {actors.map((actor) => <option key={actor.actorId} value={actor.actorId}>{actor.name}</option>)}
     </select></label>
     <label className="adventure-declaration"><span>What do you do?</span><textarea ref={composerRef} rows={2} maxLength={8000}
-      value={declaration} disabled={disabled} onChange={(event) => setDeclaration(event.target.value)}
+      value={declaration} disabled={disabled} onChange={(event) => onDeclarationChange(event.target.value)}
       placeholder="Describe an action in the fiction…" /></label>
     <button className="primary" type="submit" disabled={disabled || declaration.trim().length === 0}>Declare action</button>
     <p id="adventure-composer-status" className="adventure-composer-status" role="status">{status}</p>

@@ -375,12 +375,13 @@ describe("campaign agent context repository", () => {
     const transaction = vi.spyOn(DatabaseDriver.prototype, "transaction");
     const enemy = repo.getCampaignAgentContextSnapshot("local-owner", campaign.id, session.id,
       { kind: "enemy", combatantId: enemyId })!;
-    const attack = enemy.legalActions.find((line) => line.startsWith("attack:basic"))!;
+    const attack = enemy.legalActions.find((line) => line.startsWith("Basic attack against"))!;
     const actorCombatants = combat.combatants.filter((item) => item.kind === "actor").map((item) => item.combatantId)
       .sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-    expect(attack).toContain(`exactly one target ${actorCombatants[0]}`);
-    expect(attack).not.toContain(actorCombatants[1]!);
-    expect(enemy.legalActions.map((line) => line.split(";")[0])).toEqual([expect.stringMatching(/^attack:basic:target:[0-9a-f]{12}$/), "flee", "end-turn"]);
+    expect(enemy.encounter?.legalActionCandidates.find((candidate) => candidate.kind === "attack")?.targetId).toBe(actorCombatants[0]);
+    expect(enemy.encounter?.legalActionCandidates.some((candidate) => candidate.targetId === actorCombatants[1])).toBe(false);
+    expect(attack).not.toContain(actorCombatants[0]!); expect(attack).not.toContain(actorCombatants[1]!);
+    expect(enemy.legalActions.map((line) => line.split(";")[0])).toEqual([expect.stringMatching(/^Basic attack against /), "Flee encounter", "End turn"]);
     expect(enemy.visibleWorld).toEqual([]);
     expect(enemy.visibleCast.every((line) => !line.includes(" at "))).toBe(true);
     expect(enemy.committedMechanics).toHaveLength(34);

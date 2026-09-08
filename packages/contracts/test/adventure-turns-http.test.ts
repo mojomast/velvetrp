@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   adventureTurnConfirmRequestSchema, adventureTurnGetResponseSchema, adventureTurnInitialReconcileRequestSchema,
-  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema,
+  adventureTurnStreamEventSchema, adventureTurnStreamRequestSchema, adventureTurnTranscriptRequestSchema,
+  adventureTurnTranscriptResponseSchema,
 } from "../src/adventure-turns-http.js";
 import { decideToolProposalsInputSchema } from "../src/adventure-turns.js";
 
@@ -27,6 +28,17 @@ describe("M2.11 adventure turn HTTP contracts", () => {
     expect(adventureTurnInitialReconcileRequestSchema.safeParse({ ...locator, declaration: "secret" }).success).toBe(false);
     expect(adventureTurnGetResponseSchema.parse({ turn, proposals: [], confirmation: { state: "none" }, receipts: [],
       narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" }, resumeToken: "v1.dHVybg.ZGlnZXN0" })).toBeTruthy();
+  });
+
+  it("bounds a structurally role-safe room transcript", () => {
+    const locator = { campaignId: "campaign", sessionId: "session" };
+    expect(adventureTurnTranscriptRequestSchema.parse(locator)).toEqual(locator);
+    expect(adventureTurnTranscriptRequestSchema.safeParse({ ...locator, limit: 100 }).success).toBe(false);
+    const entry = { turnId: "turn", actorId: "actor", declaration: "I listen", narration: "The ferryman answers.", completedAt: at };
+    expect(adventureTurnTranscriptResponseSchema.parse({ ...locator, turns: [entry] }).turns).toEqual([entry]);
+    expect(adventureTurnTranscriptResponseSchema.safeParse({ ...locator, turns: [{ ...entry, providerCalls: [] }] }).success).toBe(false);
+    expect(adventureTurnTranscriptResponseSchema.safeParse({ ...locator,
+      turns: Array.from({ length: 33 }, (_, index) => ({ ...entry, turnId: `turn-${index}` })) }).success).toBe(false);
   });
 
   it("closes and bounds the public SSE vocabulary", () => {

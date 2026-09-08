@@ -73,7 +73,10 @@ describe("character builder repository", () => {
     expect(db.prepare("SELECT COUNT(*) count FROM character_starting_grants_v19 WHERE draft_id=?").get(updated.draft.id)).toEqual({ count: 1 });
     expect(db.prepare("SELECT materialization_kind FROM character_starter_materializations_v51 WHERE draft_id=?").get(updated.draft.id))
       .toEqual({materialization_kind:grant==="kit"?"inventory":"wallet"});
-    if(grant==="kit")expect((db.prepare("SELECT sum(quantity) quantity FROM rpg_inventory_entries_v25 WHERE actor_id=?").get(finalized.receipt.actorId) as {quantity:number}).quantity).toBeGreaterThan(0);
+    if(grant==="kit"){
+      const entries=db.prepare("SELECT entry_id,entry_mode,quantity,instance_key FROM rpg_inventory_entries_v25 WHERE actor_id=? ORDER BY entry_id").all(finalized.receipt.actorId) as Array<{entry_id:string;entry_mode:string;quantity:number;instance_key:string|null}>;
+      expect(entries.length).toBeGreaterThan(0);expect(entries.every(entry=>entry.entry_mode==="instanced"&&entry.quantity===1&&entry.instance_key===entry.entry_id)).toBe(true);
+    }
     else expect((db.prepare("SELECT sum(balance_minor) balance FROM rpg_wallets_v25 WHERE actor_id=?").get(finalized.receipt.actorId) as {balance:number}).balance).toBeGreaterThanOrEqual(0);
     db.close(); repo.close();
   });

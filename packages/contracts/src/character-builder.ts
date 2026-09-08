@@ -16,13 +16,16 @@ import { contentPackIdSchema, contentPackVersionSchema, rulesProfileIdSchema } f
 export const CHARACTER_BUILDER_ATTRIBUTE_IDS = [
   "might", "agility", "resolve", "insight", "presence", "craft",
 ] as const;
+export const SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS = [
+  "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
+] as const;
 export const CHARACTER_BUILDER_STANDARD_ARRAY = [15, 14, 13, 12, 10, 8] as const;
 export const CHARACTER_BUILDER_POINT_BUY_BUDGET = 27 as const;
 export const CHARACTER_DRAFT_EXPIRY_SECONDS = 7 * 24 * 60 * 60;
 export const CHARACTER_BUILDER_ROLL_DICE = 4 as const;
 export const CHARACTER_BUILDER_ROLL_SIDES = 6 as const;
 
-export const characterBuilderAttributeScoresSchema = z.object({
+const velvetCharacterBuilderAttributeScoresSchema = z.object({
   might: z.number().int().min(3).max(20),
   agility: z.number().int().min(3).max(20),
   resolve: z.number().int().min(3).max(20),
@@ -30,6 +33,19 @@ export const characterBuilderAttributeScoresSchema = z.object({
   presence: z.number().int().min(3).max(20),
   craft: z.number().int().min(3).max(20),
 }).strict();
+const srdCharacterBuilderAttributeScoresSchema = z.object({
+  strength: z.number().int().min(3).max(20),
+  dexterity: z.number().int().min(3).max(20),
+  constitution: z.number().int().min(3).max(20),
+  intelligence: z.number().int().min(3).max(20),
+  wisdom: z.number().int().min(3).max(20),
+  charisma: z.number().int().min(3).max(20),
+}).strict();
+type CharacterBuilderScores = (z.infer<typeof velvetCharacterBuilderAttributeScoresSchema> & Partial<z.infer<typeof srdCharacterBuilderAttributeScoresSchema>>)
+  | (z.infer<typeof srdCharacterBuilderAttributeScoresSchema> & Partial<z.infer<typeof velvetCharacterBuilderAttributeScoresSchema>>);
+export const characterBuilderAttributeScoresSchema = z.union([
+  velvetCharacterBuilderAttributeScoresSchema, srdCharacterBuilderAttributeScoresSchema,
+]).transform((value): CharacterBuilderScores => value);
 
 const standardArrayAllocationSchema = z.object({
   method: z.literal("standard-array"),
@@ -45,6 +61,7 @@ const pointBuyCosts = new Map([[8, 0], [9, 1], [10, 2], [11, 3], [12, 4], [13, 5
 export function characterBuilderPointBuyCost(scores: z.infer<typeof characterBuilderAttributeScoresSchema>): number | null {
   let total = 0;
   for (const score of Object.values(scores)) {
+    if (score === undefined) continue;
     const cost = pointBuyCosts.get(score);
     if (cost === undefined) return null;
     total += cost;
@@ -88,13 +105,14 @@ export const characterBuilderAllocationSchema = z.discriminatedUnion("method", [
   standardArrayAllocationSchema, pointBuyAllocationSchema, manualAllocationSchema,
   z.object({
     method: z.literal("server-roll"),
-    algorithm: z.literal("velvet-4d6-drop-first-lowest-v1"),
+    algorithm: z.enum(["velvet-4d6-drop-first-lowest-v1", "srd-5.1-4d6-drop-lowest-v1"]),
     scores: characterBuilderAttributeScoresSchema,
     terms: z.array(characterBuilderRollTermSchema).length(CHARACTER_BUILDER_ATTRIBUTE_IDS.length),
   }).strict().superRefine((value, context) => {
     value.terms.forEach((term, index) => {
-      if (term.attributeId !== CHARACTER_BUILDER_ATTRIBUTE_IDS[index]) context.addIssue({ code: "custom", path: ["terms", index, "attributeId"], message: "roll terms must use canonical attribute order" });
-      if (value.scores[term.attributeId] !== term.score) context.addIssue({ code: "custom", path: ["scores", term.attributeId], message: "score must match persisted roll term" });
+      const order = "strength" in value.scores ? SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS : CHARACTER_BUILDER_ATTRIBUTE_IDS;
+      if (term.attributeId !== order[index]) context.addIssue({ code: "custom", path: ["terms", index, "attributeId"], message: "roll terms must use canonical attribute order" });
+      if ((value.scores as Record<string, number>)[term.attributeId] !== term.score) context.addIssue({ code: "custom", path: ["scores", term.attributeId], message: "score must match persisted roll term" });
     });
   }),
 ]);
@@ -154,6 +172,8 @@ export const characterDerivedExplanationSchema = z.object({
   result: z.number().int(),
 }).strict();
 export const characterDerivedStatsSchema = z.object({
+  rulesetId: resourceIdSchema.optional(),
+  rulesetVersion: z.string().trim().min(1).max(100).optional(),
   maxHp: z.number().int().min(1).max(1_000_000),
   defenses: z.object({ guard: z.number().int(), evasion: z.number().int(), will: z.number().int() }).strict(),
   initiative: z.number().int(),
@@ -161,9 +181,14 @@ export const characterDerivedStatsSchema = z.object({
   carryingLimit: z.number().int().min(0).max(1_000_000),
   spellAttack: z.number().int(),
   saveDc: z.number().int(),
+  armorClass: z.number().int().optional(),
+  proficiencyBonus: z.number().int().optional(),
+  abilityModifiers: z.record(resourceIdSchema, z.number().int()).optional(),
   explanations: z.array(characterDerivedExplanationSchema).length(9),
 }).strict();
 export const characterDerivedCalculatorInputSchema = z.object({
+  rulesetId: resourceIdSchema.optional(),
+  rulesetVersion: z.string().trim().min(1).max(100).optional(),
   scores: characterBuilderAttributeScoresSchema,
   racialBonuses: z.partialRecord(attributeIdSchema, z.number().int().min(-5).max(5)),
   classHp: z.number().int().min(1).max(100),
@@ -189,6 +214,8 @@ export const characterDraftViewSchema = z.object({
   effectivelyExpired: z.boolean(),
   revision: revisionSchema,
   rulesProfileId: rulesProfileIdSchema,
+  rulesetId: resourceIdSchema.optional(),
+  rulesetVersion: z.string().trim().min(1).max(100).optional(),
   pins: z.array(characterDraftPinSchema).min(1).max(32),
   allocation: characterBuilderAllocationSchema,
   selections: characterBuilderSelectionsSchema,

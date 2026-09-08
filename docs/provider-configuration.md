@@ -33,10 +33,11 @@ Do not source an untrusted environment file. Keep `.env` out of version control.
 
 - `GET /api/provider` returns public settings and `hasApiKey`; it never returns `apiKey`.
 - `PUT /api/provider` updates supplied fields. Omit `apiKey` to retain it; send `apiKey: ""` to clear it.
+- `POST /api/provider/preflight` is the only capability probe. It accepts `{}`, performs one schema-bound function-tool request and one strict-JSON-Schema request, and is initiated only by the settings button or another explicit caller. It reports DM-play compatibility (usable function tool calls) separately from campaign-generation compatibility (strict JSON Schema response format). It is `no-store` and may incur provider charges.
 - Send `baseUrl: ""` to deliberately disable outbound generation and use the local deterministic stub.
 - A nonblank malformed or disallowed `baseUrl` receives HTTP 400. HTTPS is accepted; HTTP is accepted only for `localhost`, `*.localhost`, `127.x`, `::1`, or the expanded IPv6 loopback form.
 
-The profile includes `baseUrl`, `model`, `streaming`, `requestTimeoutSeconds` (15-300), OpenRouter routing/privacy controls, token pricing, and samplers. Supported finite numeric timeout and sampler values are clamped to their bounds when saved. Sampler bounds are:
+The profile includes `baseUrl`, `model`, `streaming`, `requestTimeoutSeconds` (15-300), OpenRouter routing/privacy controls, token pricing, adventure-turn budgets, and samplers. `adventureTurnBudget.maxTotalTokens` is 1-1,000,000,000 and defaults to 65,536. `adventureTurnBudget.maxEstimatedCostUsd` is nullable (disabled) or 0-1,000,000; enabling it requires both pricing fields or adventure provider dispatch fails closed. Supported finite numeric timeout and sampler values are clamped to their bounds when saved. Sampler bounds are:
 
 | Field | Range |
 | --- | --- |
@@ -54,6 +55,14 @@ Null samplers are omitted from requests. `startReplyWith` becomes a server-gener
 
 The exact hosted names `api.openai.com`, `openrouter.ai`, `requesty.ai`, and `router.requesty.ai` require a nonblank key to become usable. Loopback and other allowed HTTPS OpenAI-compatible endpoints can be keyless; configured credentials are withheld from arbitrary HTTPS hosts. Missing/blank URL, invalid runtime URL, or a required missing key selects the deterministic local stub whose marker begins `[local stub`. A remote provider HTTP failure instead produces the generation lane's safe fallback and records `providerError` where that API exposes it.
 
+## Strict capability requirements
+
+Provider type labels do not imply capability support. Adventure planning sends closed OpenAI-compatible function schemas without the provider-side `strict` field and uses `tool_choice: "auto"` when tools are available. Adventure narration advertises only the closed `submit_adventure_narration` output tool and requires that named call; this tool is output transport, not an adventure action or mutation. Omitting provider-side strict tool mode allows RouteTok/OpenRouter-style model fallback routing, but does not relax local parsing, Zod and semantic validation, authorization, candidate binding, receipts, or fail-closed execution. Reviewed campaign generation still sends `response_format.type: "json_schema"` with `json_schema.strict: true` and `tool_choice: "none"`; it is never silently downgraded to free-form JSON.
+
+For DM play, the provider must preserve assistant `tool_calls`, stable unique call IDs, JSON-string arguments, ordered tool-result messages, and named tool choice when requested. Campaign generation additionally requires strict JSON Schema response format. Velvet rejects malformed, duplicate, reused, undeclared, disabled, or out-of-order calls and responses that omit a required call. Narration accepts exactly one complete matching output call with only one bounded `narration` string. Tool arguments and structured content are parsed and validated locally after transport; provider-side strictness is not treated as authorization or correctness. Capability/protocol failure follows the owning lane's deterministic fallback or terminal failure behavior and is observable without persisting prompts, keys, private arguments, or hidden state.
+
+Adventure planning and narration reserve the configured per-call `samplers.maxTokens` (4,096 when null, also sent as the request cap), a conservative three-UTF-8-byte prompt estimate, and configured pricing before dispatch. Reservations share one turn coordinator so overlapping calls cannot overcommit. Valid provider usage settles the reservation; missing usage persists conservative estimated token counts. Planning budget exhaustion records a safe `budget-*` outcome, marks the turn failed, and executes no provider-selected or fallback mechanics. Automatic transient retries remain disabled because the current durable attempt model cannot safely represent multiple dispatch attempts for one decision without a schema change.
+
 ## Credentials and backups
 
 The API key is stored as plain JSON inside the `provider` table in `<resolved data directory>/velvet.sqlite`. It is not encrypted at rest. See [Data directory and current schema](operations.md#data-directory-and-current-schema) for resolution rules. Database files, SQLite online backups, copied data directories, filesystem snapshots, and live-E2E source databases therefore contain the key and must be protected as secrets.
@@ -64,7 +73,7 @@ Velvet sends `Authorization: Bearer <key>` only when the destination's exact hos
 
 ## Outbound context and privacy
 
-Using a remote provider sends more than the newest user line. Depending on the operation, outbound request bodies can include character persona and boundaries, participant cards, active-branch history, approved memories, summaries, triggered lore, editable harness/template text, manual canon, synthesized scene state, recent events, and the current generation instruction. Room routing sends participant identities/descriptions and recent room context. Scene synthesis sends manual canon, prior synthesized state, and recent messages.
+Using a remote provider sends more than the newest user line. Depending on the operation, outbound request bodies can include character persona, rich profile fields, and boundaries; participant cards; active-branch or durable adventure history; approved memories; summaries; triggered lore; editable harness/template text; manual canon; role-filtered campaign context; verified receipt facts; recent events; and the current generation instruction. Room routing sends participant identities/descriptions and recent room context. Scene synthesis sends manual canon, prior synthesized state, and recent messages. In adventure prompts, campaign, history, profile, and harness strings are explicitly labeled untrusted data; that framing reduces authority confusion but cannot make disclosure to a remote recipient safe.
 
 Treat all configured remote provider endpoints and any provider-selected upstream model as recipients of that context. Velvet's local loopback listener does not make outbound provider traffic local. Review the provider's retention, training, logging, routing, and jurisdiction policies before use; do not place secrets in roleplay context.
 

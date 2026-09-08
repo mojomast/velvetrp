@@ -11,7 +11,7 @@ const aria = { id: "char-1", name: "Aria", age: 29, archetype: "Confidant", boun
 const rowan = { ...aria, id: "char-2", name: "Rowan", archetype: "Mysterious stranger" };
 const baseSession = { id: "sess-1", characterId: aria.id, primaryCharacterId: aria.id, participants: [aria, rowan], title: "Night watch", state: "active" as "setup" | "active" | "paused" | "cooldown" | "closed", presetId: "default", consentLog: [], activeLeafId: null, createdAt: "2026-01-01T00:00:00.000Z", stoppedAt: null as string | null, stopReason: null as string | null };
 const harness = { id: "harness", systemPrompt: "", personaPreamble: "", styleGuide: "", postHistoryInstructions: "", recentTurns: 12, memoryChars: 1200, summaryChars: 800, loreChars: 800, temperature: null, promptOverrides: {}, updatedAt: "" };
-const provider = { id: "provider", providerType: "openai-compatible", baseUrl: "", model: "test-model", hasApiKey: false, streaming: false, httpReferer: "", appTitle: "Velvet", requireParameters: false, allowFallbacks: true, routingSort: "default", dataCollection: "default", zdr: false, requestTimeoutSeconds: 90, samplers: { maxTokens: null, topP: null, topK: null, minP: null, repetitionPenalty: null, frequencyPenalty: null, presencePenalty: null, seed: null, reasoningEffort: null, stopStrings: [], startReplyWith: "" }, updatedAt: "" };
+const provider = { id: "provider", providerType: "openai-compatible", baseUrl: "", model: "test-model", hasApiKey: false, streaming: false, httpReferer: "", appTitle: "Velvet", requireParameters: false, allowFallbacks: true, routingSort: "default", dataCollection: "default", zdr: false, requestTimeoutSeconds: 90, pricing: { promptPerMillion: null, completionPerMillion: null }, adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null }, samplers: { maxTokens: null, topP: null, topK: null, minP: null, repetitionPenalty: null, frequencyPenalty: null, presencePenalty: null, seed: null, reasoningEffort: null, stopStrings: [], startReplyWith: "" }, updatedAt: "" };
 const campaignAccess = { id: "campaign-one", name: "The Long Road", activeTimelineId: "timeline-secret", ownerPrincipalId: "principal-secret", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-02T00:00:00.000Z" };
 const campaignDetail = { campaign: { id: campaignAccess.id, name: campaignAccess.name, actorRole: "owner", createdAt: campaignAccess.createdAt, updatedAt: campaignAccess.updatedAt, content: { status: "unconfigured" } } };
 const configuredCampaignDetail = { campaign: { ...campaignDetail.campaign, content: { status: "configured", rulesProfileId: ORIGINAL_STARTER_RULES_PROFILE.rulesProfileId, contentPacks: [{ packId: ORIGINAL_STARTER_PACK.packId, packVersion: ORIGINAL_STARTER_PACK.packVersion }] } } };
@@ -400,7 +400,7 @@ describe("persistence and multi-character frontend", () => {
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").chatReturnCampaignId).toBeUndefined());
   });
 
-  it("opens a mechanics-enabled campaign room in the primary play shell around existing Chat", async () => {
+  it("opens a mechanics-enabled campaign room in authoritative play with read-only legacy history", async () => {
     const attached = { sessionId: baseSession.id, title: "Night watch", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
     const playBootstrap = { campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: attached.attachedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
     installFetch([aria], [baseSession], true, true);
@@ -410,6 +410,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [attached], eligible: [] }) },
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [message("campaign-message", "character", "Campaign room history", aria.id)] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
+      { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
@@ -418,7 +419,8 @@ describe("persistence and multi-character frontend", () => {
     );
     await openLibrary(); fireEvent.click(screen.getByRole("button", { name: "Campaigns" })); fireEvent.click(await screen.findByRole("button", { name: `Open campaign ${campaignAccess.name}` }));
     fireEvent.click(await screen.findByRole("button", { name: "Open attached room 1 of 1" }));
-    await screen.findByRole("heading", { name: "Adventure room" }); expect(screen.getByText("Campaign room history")).toBeTruthy();
+    await screen.findByRole("heading", { name: "Adventure room" }); expect(screen.getByRole("heading", { name: "Read-only pre-campaign history" })).toBeTruthy(); expect(screen.getByText("Campaign room history")).toBeTruthy();
+    expect(screen.queryByLabelText(/Message for/)).toBeNull(); expect(screen.getByLabelText("What do you do?")).toBeTruthy();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
     const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
   });
@@ -1351,7 +1353,7 @@ describe("character builder and advancement safety flows", () => {
   const ref = (kind: string, id: string) => ({ kind, packId: "pack", packVersion: "1", definitionId: id });
   const derived = { maxHp: 10, defenses: { guard: 11, evasion: 12, will: 13 }, initiative: 2, speed: 30, carryingLimit: 150, spellAttack: 3, saveDc: 11,
     explanations: ["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"].map((statistic) => ({ statistic, formula: "server formula", inputs: {}, result: 10 })) };
-  function draft(id = "draft-one", complete = false) { return { id, campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false, revision: 1, rulesProfileId: "rules",
+  function draft(id = "draft-one", complete = false) { return { id, campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false, revision: 1, rulesProfileId: "rules", rulesetId: "velvet-starter-v1", rulesetVersion: "1.0.0",
     pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }], allocation: { method: "standard-array", scores },
     selections: complete ? { race: ref("race", "race"), background: ref("background", "background"), class: ref("class", "class"), starterGrant: "kit" } : { race: null, background: null, class: null, starterGrant: null },
     choiceGroups: [{ id: "race", required: true, options: [{ reference: ref("race", "race"), name: `Race ${id}`, description: "Server race." }] }, { id: "background", required: true, options: [{ reference: ref("background", "background"), name: "Guide", description: "Server background." }] }, { id: "class", required: true, options: [{ reference: ref("class", "class"), name: "Warden", description: "Server class." }] }, { id: "starter-grant", required: true, options: ["kit", "currency"] }],

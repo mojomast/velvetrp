@@ -1,6 +1,7 @@
 import {
   combatActionCommandRequestSchema,
   combatActionCommandResponseSchema,
+  combatEnemyTurnCommandRequestSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatCommandResultResponseSchema,
@@ -26,7 +27,7 @@ import {
 
 const LOCAL_OWNER="local-owner";
 const APPLICATION_JSON=/^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"endCombat"|"getCombatCommandResult"|"claimCombatReward"|"listCombatRewards"|"getCombatRewardClaimResult">;
+type CombatCommandRepository=Pick<EncounterRepository,"resolveCombatAction"|"executeCombatEnemyTurn"|"endCombat"|"getCombatCommandResult"|"claimCombatReward"|"listCombatRewards"|"getCombatRewardClaimResult">;
 export interface CombatCommandsHttpOptions{combatCommandRepositoryAccessor:()=>CombatCommandRepository;}
 
 function enabled():boolean{const flags=readRpgFeatureFlags();return flags.campaign&&flags.mechanics&&flags.combat;}
@@ -34,10 +35,10 @@ function notFound(request:FastifyRequest,reply:Parameters<typeof sendApiProblem>
   return sendApiProblem(request,reply,404,"RPG_COMBAT_NOT_FOUND","Combat not found");
 }
 function publicCombat(value:ReturnType<CombatCommandRepository["resolveCombatAction"]>["combat"]):CombatState{
-  const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","revision"]);
-  if(Object.keys(value).length!==allowed.size||Object.keys(value).some((key)=>!allowed.has(key)))throw new Error("combat result shape is invalid");
+  const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","turnEconomy","revision"]);
+  if(Object.keys(value).some((key)=>!allowed.has(key)))throw new Error("combat result shape is invalid");
   return {combatId:value.combatId,round:value.round,currentCombatant:value.currentCombatant,combatants:value.combatants,
-    legalActions:value.legalActions,revision:value.revision};
+    legalActions:value.legalActions,turnEconomy:value.turnEconomy,revision:value.revision};
 }
 function publicEncounter(value:ReturnType<CombatCommandRepository["endCombat"]>["encounter"]):EncounterPublic{
   const allowed=new Set(["campaignId","encounterId","sessionId","name","status","combatId","combatants","revision","createdAt","updatedAt"]);
@@ -139,6 +140,34 @@ export const combatCommandsHttpRoutes:FastifyPluginAsync<CombatCommandsHttpOptio
       request.log.error({operation:"combat-action",method:request.method,route:request.routeOptions.url},"RPG combat action failed");
       return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR",
         "Combat action outcome could not be confirmed; reconcile combat state before retrying and do not automatically retry");
+    }
+  });
+
+  app.post<{Params:{combatId:string};Querystring:Record<string,unknown>;Body:unknown}>("/combats/:combatId/enemy-turn-commands",{
+    onRequest:async(request,reply)=>{
+      reply.header("cache-control","no-store");
+      if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0){await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Enemy turn does not accept query parameters");return;}
+      if(!resourceIdSchema.safeParse(request.params.combatId).success){await notFound(request,reply);return;}
+      const contentType=request.headers["content-type"];if(typeof contentType!=="string"||!APPLICATION_JSON.test(contentType))await sendApiProblem(request,reply,415,"RPG_UNSUPPORTED_MEDIA_TYPE","Enemy turn requires application/json");
+    },errorHandler:(_error,request,reply)=>sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Enemy turn request is invalid"),
+  },async(request,reply)=>{
+    const combatId=resourceIdSchema.safeParse(request.params.combatId),body=combatEnemyTurnCommandRequestSchema.safeParse(request.body);
+    if(!combatId.success)return notFound(request,reply);if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Enemy turn request is invalid");
+    try{
+      const result=options.combatCommandRepositoryAccessor().executeCombatEnemyTurn(LOCAL_OWNER,combatId.data,body.data);
+      if(result.encounterId!==combatId.data||result.combat.encounterId!==combatId.data||result.combat.combatId!==combatId.data
+        ||result.campaignId!==result.combat.campaignId||result.receipt.idempotencyKey!==body.data.idempotencyKey
+        ||result.receipt.revisionBefore!==body.data.expectedRevision||result.receipt.revisionAfter!==body.data.expectedRevision+1
+        ||result.combat.revision!==result.receipt.revisionAfter)throw new Error("enemy turn result binding is invalid");
+      return reply.code(200).send(combatActionCommandResponseSchema.parse({resolution:result.resolution,combat:publicCombat(result.combat),
+        receipt:{idempotencyKey:result.receipt.idempotencyKey,revisionBefore:result.receipt.revisionBefore,revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
+    }catch(error){
+      if(error instanceof EncounterAuthorizationError||error instanceof EncounterUnavailableError)return notFound(request,reply);
+      if(error instanceof EncounterStaleError)return sendApiProblem(request,reply,409,"RPG_COMBAT_STALE","Combat state is stale; refresh before trying again");
+      if(error instanceof EncounterConflictError||error instanceof EncounterTurnError)return sendApiProblem(request,reply,409,"RPG_ENEMY_TURN_CONFLICT","Enemy turn conflicts with current state");
+      request.log.error({operation:"combat-enemy-turn",method:request.method,route:request.routeOptions.url},"RPG enemy turn failed");
+      return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Enemy turn outcome could not be confirmed; reconcile combat state before retrying and do not automatically retry");
     }
   });
 

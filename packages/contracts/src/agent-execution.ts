@@ -25,7 +25,7 @@ export const MAX_AGENT_RESULT_JSON_LENGTH = 262_144;
 /** Version of the closed server-selected tool registry represented by these contracts. */
 export const AGENT_TOOL_REGISTRY_VERSION = "v1" as const;
 /** Additive registry for consequential tools that cannot alter sealed v38 DDL. */
-export const POST_V38_AGENT_TOOL_REGISTRY_VERSION = "v2" as const;
+export const POST_V38_AGENT_TOOL_REGISTRY_VERSION = "v4" as const;
 
 /** A finite recursive JSON value accepted by durable agent contracts. */
 export type AgentJsonValue = null | boolean | number | string | AgentJsonValue[] | { [key: string]: AgentJsonValue };
@@ -106,7 +106,7 @@ export const agentToolRegistryVersionSchema = z.literal(AGENT_TOOL_REGISTRY_VERS
 export const agentToolCallKindSchema = z.enum(["read", "mutation"]);
 /** Closed first-version tool registry; availability is selected by the server for each round. */
 export const agentToolNameSchema = z.enum([
-  "campaign_context.read", "actor_resources.read", "actor_inventory.read", "actor_powers.read",
+  "campaign_context.read", "actor_sheet.read", "actor_resources.read", "actor_inventory.read", "actor_powers.read",
    "combat_state.read", "world_state.read", "quest_state.read",
     "actor_attribute.set", "actor_resource.initialize", "actor_dice.roll",
 ]);

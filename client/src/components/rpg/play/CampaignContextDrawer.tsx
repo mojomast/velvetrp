@@ -3,16 +3,18 @@ import type { ActorResourcesHttpGetResponse, CampaignPublishedMaterials, Campaig
 import { ApiError, ApiInputError, commandNpcPresence as defaultCommandNpcPresence, getCampaignPresentCast as defaultGetCampaignPresentCast, getCampaignPublishedMaterials as defaultGetCampaignPublishedMaterials } from "../../../api";
 import { beginNpcPresenceMutation, clearNpcPresenceMutation, markNpcPresenceAmbiguous, markNpcPresenceReconciliation, reconcileNpcPresenceMutation, releaseNpcPresenceMutation, useNpcPresenceMutation } from "../narrativeMutationRegistry";
 import type { CampaignContextWidget } from "./campaignWorkbenchPreferences";
+import { CampaignRouteMap } from "./CampaignRouteMap";
+import { TacticalMapPanel, type TacticalMapPanelApi } from "../map/TacticalMapPanel";
 
 type Audience = "gm" | "player";
 type Load<T> = { state: "loading"; stale?: T } | { state: "ready"; value: T } | { state: "error"; stale?: T };
 type NamedNpc = { id: string; name: string };
 type Objective = { id: string; description: string; progress: number; target: number };
-type EncounterView = { encounters: EncounterPublic[]; activeCombat: { round: number; currentCombatant: string | null } | null };
+type EncounterView = { encounters: EncounterPublic[]; activeCombat: { encounterId: string; round: number; currentCombatant: string | null } | null };
 type CastView = { audience: Audience; state: "running" | "stopped"; sessionRevision: number; members: Array<{ id: string; name: string; locationLabel: string | null; locationId: string | null }> };
 
 /** Narrow, role-filtered read/write API consumed by the campaign context drawer. */
-export interface CampaignContextDrawerApi {
+export interface CampaignContextDrawerApi extends Partial<TacticalMapPanelApi> {
   getCampaignWorld: (campaignId: string) => Promise<{ data: CampaignWorldHttpResponse; revision: number }>;
   listCampaignNpcs: (campaignId: string, audience: Audience) => Promise<{ data: { npcs: Array<{ npcId: string; publicState: { name: string } }> }; revision: number }>;
   listCampaignQuests: (campaignId: string, audience: Audience) => Promise<{ data: { quests: Array<{ questId: string; status: string }>; objectives: Array<{ objectiveId: string; questId: string; description: string; progress: number; targetProgress: number; completedAt: string | null }> }; revision: number }>;
@@ -33,6 +35,9 @@ export interface CampaignContextDrawerProps {
   authorizationGeneration: number;
   api: CampaignContextDrawerApi;
   widgets?: readonly CampaignContextWidget[];
+  refreshKey?: number;
+  onPrefillDeclaration?: (declaration: string) => void;
+  onOpenWorld?: () => void;
 }
 
 function status<T>(load: Load<T>, empty: boolean, label: string) {
@@ -60,7 +65,7 @@ const presenceKey = () => `presence-ui-${typeof crypto !== "undefined" && "rando
 
 /** Loads and renders only server projections; it performs no authoritative calculations. */
 export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, playableActorIds, audience, authorizationGeneration, api,
-  widgets = ["location", "cast", "objectives", "resources", "encounter"] }: CampaignContextDrawerProps) {
+  widgets = ["location", "cast", "objectives", "resources", "encounter"], refreshKey = 0, onPrefillDeclaration = () => undefined, onOpenWorld = () => undefined }: CampaignContextDrawerProps) {
   const [world, setWorld] = useState<Load<CampaignWorldHttpResponse>>({ state: "loading" });
   const [roster, setRoster] = useState<Load<NamedNpc[]>>({ state: "loading" });
   const [cast, setCast] = useState<Load<CastView>>({ state: "loading" });
@@ -72,6 +77,7 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
   const [placeNpcId, setPlaceNpcId] = useState(""); const [placeLocationId, setPlaceLocationId] = useState("");
   const [moveLocations, setMoveLocations] = useState<Record<string, string>>({}); const [removeNpcId, setRemoveNpcId] = useState<string | null>(null);
   const actorEligible = selectedActorId !== null && playableActorIds.includes(selectedActorId);
+  const tacticalActorId = actorEligible ? selectedActorId : playableActorIds[0] ?? null;
   const lock = useNpcPresenceMutation(campaignId, sessionId);
   const statusRef = useRef<HTMLDivElement>(null); const confirmRemoveRef = useRef<HTMLButtonElement>(null);
   const removeOriginRef = useRef<HTMLButtonElement | null>(null); const restoreRemoveFocusRef = useRef(false);
@@ -119,10 +125,10 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
     else setRoster({ state: "ready", value: [] });
     void api.listCampaignQuests(campaignId, audience).then((value) => { if (!current) return; const active = new Set(value.data.quests.filter((quest) => quest.status === "active").map((quest) => quest.questId)); setObjectives({ state: "ready", value: value.data.objectives.filter((objective) => active.has(objective.questId) && objective.completedAt === null).map((objective) => ({ id: objective.objectiveId, description: objective.description, progress: objective.progress, target: objective.targetProgress })) }); }).catch(() => { if (current) setObjectives({ state: "error" }); });
     if (actorEligible && selectedActorId) void api.getActorResources(campaignId, selectedActorId).then((value) => { if (current) setResources({ state: "ready", value }); }).catch(() => { if (current) setResources({ state: "error" }); }); else setResources({ state: "ready", value: null });
-    void api.listCampaignEncounters(campaignId).then(async ({ encounters: rows }) => { const roomRows = rows.filter((entry) => entry.sessionId === sessionId); const active = roomRows.find((entry) => entry.status === "active" && entry.combatId !== null); let activeCombat: EncounterView["activeCombat"] = null; if (active?.combatId) try { const combat = await api.getCombatState(active.combatId); activeCombat = { round: combat.round, currentCombatant: combat.currentCombatant }; } catch { /* encounter status remains useful */ } if (current) setEncounters({ state: "ready", value: { encounters: roomRows, activeCombat } }); }).catch(() => { if (current) setEncounters({ state: "error" }); });
+    void api.listCampaignEncounters(campaignId).then(async ({ encounters: rows }) => { const roomRows = rows.filter((entry) => entry.sessionId === sessionId); const active = roomRows.find((entry) => entry.status === "active" && entry.combatId !== null); let activeCombat: EncounterView["activeCombat"] = null; if (active?.combatId) try { const combat = await api.getCombatState(active.combatId); activeCombat = { encounterId: active.encounterId, round: combat.round, currentCombatant: combat.currentCombatant }; } catch { /* encounter status remains useful */ } if (current) setEncounters({ state: "ready", value: { encounters: roomRows, activeCombat } }); }).catch(() => { if (current) setEncounters({ state: "error" }); });
     void getPublishedMaterials(campaignId).then((value)=>{if(current)setMaterials({state:"ready",value});}).catch(()=>{if(current)setMaterials({state:"error"});});
     return () => { current = false; operationGeneration.current += 1; };
-  }, [api, campaignId, sessionId, selectedActorId, actorEligible, audience, authorizationGeneration, refreshCast,getPublishedMaterials]);
+  }, [api, campaignId, sessionId, selectedActorId, actorEligible, audience, authorizationGeneration, refreshCast,getPublishedMaterials,refreshKey]);
 
   useEffect(() => { if (notice) statusRef.current?.focus(); }, [notice]);
   useEffect(() => {
@@ -143,6 +149,9 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
   const materialValue=materials.state==="ready"?materials.value:materials.stale;
   const availableNpcs = rosterValue?.filter((npc) => !castValue?.members.some((member) => member.id === npc.id)) ?? [];
   const canManage = audience === "gm" && castValue?.state === "running";
+  const tacticalApi = useMemo(() => api.getTacticalMap && api.generateTacticalMap && api.previewTacticalMapMove && api.moveTacticalMapToken
+    ? { getTacticalMap: api.getTacticalMap, generateTacticalMap: api.generateTacticalMap, previewTacticalMapMove: api.previewTacticalMapMove, moveTacticalMapToken: api.moveTacticalMapToken } : null,
+  [api.generateTacticalMap, api.getTacticalMap, api.moveTacticalMapToken, api.previewTacticalMapMove]);
 
   function presenceControlLabel(action: "Move" | "Remove", npc: CastView["members"][number], suffix = "") {
     const duplicates = castValue?.members.filter((member) => member.name === npc.name) ?? [];
@@ -193,6 +202,10 @@ export function CampaignContextDrawer({ campaignId, sessionId, selectedActorId, 
   return <aside id="campaign-context-panel" className="campaign-context-drawer" aria-label="Campaign context" tabIndex={-1}><details open><summary>Campaign context</summary>
     {audience === "gm" && (notice || lock) && <div ref={statusRef} tabIndex={-1} role="alert"><p>{notice ?? "An NPC presence command still requires authoritative reconciliation. No command will be repeated."}</p>{lock && <button type="button" className="ghost" onClick={() => void refreshCast(true)}>Refresh present cast</button>}</div>}
     {widgets.map((widget) => <Fragment key={widget}>{widgetContent[widget]}</Fragment>)}
+    {worldValue && <CampaignRouteMap world={worldValue} selectedActorId={actorEligible ? selectedActorId : null} onPrefillDeclaration={onPrefillDeclaration} onOpenWorld={onOpenWorld} />}
+    {tacticalApi && tacticalActorId && <TacticalMapPanel campaignId={campaignId} sessionId={sessionId} actorId={tacticalActorId} audience={audience}
+      mode={encounterValue?.activeCombat ? "combat" : "exploration"} encounterId={encounterValue?.activeCombat?.encounterId ?? null}
+      combatantId={encounterValue?.activeCombat?.currentCombatant ?? null} api={tacticalApi} />}
     <section><h2>Delivered materials</h2>{status(materials,!materialValue?.materials.length,"delivered materials")}{materialValue?.materials.length?<ul>{materialValue.materials.map((item)=><li key={item.resourceId}><strong>{item.title}</strong><p>{item.content}</p></li>)}</ul>:null}</section>
   </details></aside>;
 }

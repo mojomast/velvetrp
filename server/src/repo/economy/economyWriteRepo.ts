@@ -1,5 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, type BilateralTrade, type EconomyCommand } from "@velvet/contracts";
+import { economyCommandSchema, purchaseReceiptSchema, purchaseQuoteSchema, vendorSaleReceiptSchema, type BilateralTrade, type EconomyCommand } from "@velvet/contracts";
 import { ActorResourceNegativeError, runM15Mutation, type M15Dependencies, type M15Result } from "../actorResourceRepo.js";
 import type { EconomyReadHelpers } from "./economyReadRepo.js";
 
@@ -18,14 +18,15 @@ export class TradeStaleError extends Error { readonly code="TRADE_STALE"; }
 export type ActorScopedEconomyCommand=
   |{kind:"request_purchase_quote";shopId:string;item:{kind:"item";packId:string;packVersion:string;definitionId:string};quantity:number;expectedRevision:number;idempotencyKey:string}
   |{kind:"purchase_from_shop";quoteId:string;expectedRevision:number;idempotencyKey:string}
+  |{kind:"sell_to_shop";quoteId:string;expectedRevision:number;idempotencyKey:string}
   |{kind:"propose_bilateral_trade";trade:Omit<BilateralTrade,"campaignId"|"offeredByActorId">;expectedRevision:number;idempotencyKey:string}
   |{kind:"accept_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string}
   |{kind:"cancel_bilateral_trade";tradeId:string;expectedRevision:number;idempotencyKey:string};
 
 /** State-changing economy commands backed by the shared M1.5 mutation stream. */
 export interface EconomyWriteRepository {
-  mutateEconomy(principal:string,command:EconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
-  mutateEconomyForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedEconomyCommand):M15Result<{quote?:object;purchase?:object;trade?:object}>;
+  mutateEconomy(principal:string,command:EconomyCommand):M15Result<{quote?:object;purchase?:object;sale?:object;trade?:object}>;
+  mutateEconomyForActor(principal:string,campaignId:string,actorId:string,input:ActorScopedEconomyCommand):M15Result<{quote?:object;purchase?:object;sale?:object;trade?:object}>;
 }
 
 const MAX_MINOR=Number.MAX_SAFE_INTEGER;
@@ -43,12 +44,16 @@ export function createEconomyWriteRepository(db:DatabaseDriver.Database,deps:M15
     db.prepare("UPDATE rpg_wallets_v25 SET balance_minor=balance_minor-?,updated_at=? WHERE campaign_id=? AND actor_id=? AND currency_code=?").run(amount,now,campaign,actor,code);
     db.prepare("INSERT INTO rpg_currency_ledger_v25(entry_id,campaign_id,actor_id,currency_code,delta_minor,reason,reference_type,reference_id,occurred_at) VALUES(?,?,?,?,? ,?,?,?,?)").run(id,campaign,actor,code,-amount,reason,reason,id,now);
   };
-  const mutateEconomy=(principal:string,input:EconomyCommand)=>{const command=economyCommandSchema.parse(input);const actor='buyerActorId'in command?command.buyerActorId:'trade'in command?command.trade.offeredByActorId:'acceptedByActorId'in command?command.acceptedByActorId:command.cancelledByActorId;
+  const credit=(campaign:string,actor:string,code:string,amount:number,now:string,id:string)=>{const row=walletRow(campaign,actor,code);if(!row||row.balance_minor>MAX_MINOR-amount)throw new EconomyConflictError("wallet credit exceeds supported range");
+    db.prepare("UPDATE rpg_wallets_v25 SET balance_minor=balance_minor+?,updated_at=? WHERE campaign_id=? AND actor_id=? AND currency_code=?").run(amount,now,campaign,actor,code);
+    if(amount>0)db.prepare("INSERT INTO rpg_currency_ledger_v25(entry_id,campaign_id,actor_id,currency_code,delta_minor,reason,reference_type,reference_id,occurred_at) VALUES(?,?,?,?,?,'vendor-sale','vendor-sale',?,?)").run(id,campaign,actor,code,amount,id,now);
+  };
+  const mutateEconomy=(principal:string,input:EconomyCommand)=>{const command=economyCommandSchema.parse(input);const actor='buyerActorId'in command?command.buyerActorId:'sellerActorId'in command?command.sellerActorId:'trade'in command?command.trade.offeredByActorId:'acceptedByActorId'in command?command.acceptedByActorId:command.cancelledByActorId;
     const existingTrade=(command.type==='accept_bilateral_trade'||command.type==='cancel_bilateral_trade')
       ?db.prepare("SELECT proposer_actor_id,recipient_actor_id FROM rpg_trade_proposals_v25 WHERE campaign_id=? AND trade_id=?").get(command.campaignId,command.tradeId)as any:undefined;
     const counterpart=command.type==='propose_bilateral_trade'?command.trade.acceptedByActorId:existingTrade
       ?(actor===existingTrade.proposer_actor_id?existingTrade.recipient_actor_id:existingTrade.proposer_actor_id):undefined;
-    return runM15Mutation(db,deps,assertMutation,{principal,campaignId:command.campaignId,actorId:actor,family:command.type==='purchase_from_shop'?'purchase':command.type.includes('trade')?'trade':'economy',type:command.type,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,changedKeys:[`economy:${actor}`],additionalActorIds:counterpart?[counterpart]:[],apply:(_after,now,commandId)=>{
+    return runM15Mutation(db,deps,assertMutation,{principal,campaignId:command.campaignId,actorId:actor,family:command.type==='purchase_from_shop'||command.type==='sell_to_shop'?'purchase':command.type.includes('trade')?'trade':'economy',type:command.type,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey,request:command,changedKeys:[`economy:${actor}`],additionalActorIds:counterpart?[counterpart]:[],apply:(_after,now,commandId)=>{
       if(command.type==='request_purchase_quote'){
         const stock=db.prepare("SELECT * FROM rpg_shop_stock_v25 WHERE campaign_id=? AND shop_id=? AND item_pack_id=? AND item_pack_version=? AND item_definition_id=?").get(command.campaignId,command.shopId,command.item.packId,command.item.packVersion,command.item.definitionId)as any;
         if(!stock||stock.available_quantity<command.quantity)throw new ShopStockExhaustedError('shop stock exhausted');if(!ref(command.campaignId,stock.currency_code))throw new EconomyConflictError('currency has no pinned reference');const total=totalFor(command.quantity,stock.unit_price_minor);
@@ -64,6 +69,27 @@ export function createEconomyWriteRepository(db:DatabaseDriver.Database,deps:M15
         if(existing)db.prepare("UPDATE rpg_inventory_entries_v25 SET quantity=quantity+? WHERE entry_id=?").run(quote.quantity,existing.entry_id);else db.prepare("INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at) VALUES(?,?,?,?,?,'item',?,'stackable',?,NULL,NULL,0,?)").run(deps.ids.nextId(),command.campaignId,actor,quote.item_pack_id,quote.item_pack_version,quote.item_definition_id,quote.quantity,now);
         db.prepare("INSERT INTO rpg_purchase_receipts_v25 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(commandId,command.quoteId,command.campaignId,quote.shop_id,actor,commandId,_after,quote.quantity,JSON.stringify({currency:ref(command.campaignId,quote.currency_code),minorUnits:total}),now,command.idempotencyKey);
         return {purchase:purchaseReceiptSchema.parse({purchaseId:commandId,quoteId:command.quoteId,campaignId:command.campaignId,shopId:quote.shop_id,buyerActorId:actor,quantity:quote.quantity,total:{currency:ref(command.campaignId,quote.currency_code),minorUnits:total},purchasedAt:now,revisionBefore:command.expectedRevision,revisionAfter:_after,idempotencyKey:command.idempotencyKey})};
+      }
+      if(command.type==='sell_to_shop'){
+        const quote=db.prepare(`SELECT quote.*,stock.available_quantity,stock.item_pack_id,stock.item_pack_version,stock.item_definition_id,
+          policy.payout_unit_minor FROM rpg_vendor_sale_quotes_v57 quote JOIN rpg_shop_stock_v25 stock ON stock.campaign_id=quote.campaign_id AND stock.stock_id=quote.stock_id
+          LEFT JOIN rpg_shop_buy_policies_v57 policy ON policy.campaign_id=quote.campaign_id AND policy.shop_id=quote.shop_id AND policy.stock_id=quote.stock_id
+          WHERE quote.quote_id=? AND quote.campaign_id=? AND quote.actor_id=?`).get(command.quoteId,command.campaignId,actor)as any;
+        if(!quote)throw new EconomyConflictError('vendor quote unavailable');if(quote.expires_at<=now)throw new QuoteExpiredError('quote expired');
+        if(quote.inventory_revision!==command.expectedRevision)throw new EconomyConflictError('vendor quote inventory revision changed');
+        if(quote.disposition==='sell'&&quote.payout_unit_minor!==quote.unit_price_minor)throw new EconomyConflictError('vendor buy policy changed');
+        const source=db.prepare(`SELECT * FROM rpg_inventory_entries_v25 WHERE entry_id=? AND campaign_id=? AND actor_id=? AND item_pack_id=? AND item_pack_version=? AND item_definition_id=?`)
+          .get(quote.entry_id,command.campaignId,actor,quote.item_pack_id,quote.item_pack_version,quote.item_definition_id)as any;
+        if(!source||source.equipped||source.quantity<quote.quantity)throw new EconomyConflictError('sale inventory is unavailable or equipped');
+        const total=totalFor(quote.quantity,quote.unit_price_minor),currency=ref(command.campaignId,quote.currency_code);if(!currency)throw new EconomyConflictError('currency has no pinned reference');
+        if(source.quantity===quote.quantity)db.prepare("DELETE FROM rpg_inventory_entries_v25 WHERE entry_id=?").run(source.entry_id);
+        else db.prepare("UPDATE rpg_inventory_entries_v25 SET quantity=quantity-? WHERE entry_id=?").run(quote.quantity,source.entry_id);
+        db.prepare("UPDATE rpg_shop_stock_v25 SET available_quantity=available_quantity+? WHERE stock_id=?").run(quote.quantity,quote.stock_id);
+        credit(command.campaignId,actor,quote.currency_code,total,now,commandId);
+        const totalValue={currency,minorUnits:total};db.prepare("INSERT INTO rpg_vendor_sale_receipts_v57 VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+          .run(commandId,command.quoteId,command.campaignId,quote.shop_id,actor,commandId,_after,quote.disposition,quote.quantity,JSON.stringify(totalValue),now,command.idempotencyKey);
+        return {sale:vendorSaleReceiptSchema.parse({saleId:commandId,quoteId:command.quoteId,campaignId:command.campaignId,shopId:quote.shop_id,sellerActorId:actor,
+          disposition:quote.disposition,quantity:quote.quantity,total:totalValue,soldAt:now,revisionBefore:command.expectedRevision,revisionAfter:_after,idempotencyKey:command.idempotencyKey})};
       }
       if(command.type==='propose_bilateral_trade'){db.prepare("INSERT INTO rpg_trade_proposals_v25 VALUES(?,?,? ,?,'open',?,?,?,?)").run(command.trade.tradeId,command.campaignId,command.trade.offeredByActorId,command.trade.acceptedByActorId,JSON.stringify(command.trade),JSON.stringify(command.trade),now,new Date(new Date(now).getTime()+300000).toISOString());return {trade:{tradeId:command.trade.tradeId,status:'open'}};}
       const trade=db.prepare("SELECT * FROM rpg_trade_proposals_v25 WHERE trade_id=? AND campaign_id=?").get(command.tradeId,command.campaignId)as any;if(!trade||trade.status!=='open')throw new TradeStaleError('trade is not open');if(trade.expires_at<=now){db.prepare("UPDATE rpg_trade_proposals_v25 SET status='cancelled' WHERE trade_id=?").run(command.tradeId);return {trade:{tradeId:command.tradeId,status:'cancelled',expired:true}};}
@@ -92,6 +118,8 @@ export function createEconomyWriteRepository(db:DatabaseDriver.Database,deps:M15
       ?{type:"request_purchase_quote",campaignId,buyerActorId:actorId,shopId:input.shopId,item:input.item,quantity:input.quantity,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
       :input.kind==="purchase_from_shop"
         ?{type:"purchase_from_shop",campaignId,buyerActorId:actorId,quoteId:input.quoteId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
+        :input.kind==="sell_to_shop"
+          ?{type:"sell_to_shop",campaignId,sellerActorId:actorId,quoteId:input.quoteId,expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
         :input.kind==="propose_bilateral_trade"
           ?{type:"propose_bilateral_trade",campaignId,trade:{...input.trade,campaignId,offeredByActorId:actorId},expectedRevision:input.expectedRevision,idempotencyKey:input.idempotencyKey}
           :input.kind==="accept_bilateral_trade"

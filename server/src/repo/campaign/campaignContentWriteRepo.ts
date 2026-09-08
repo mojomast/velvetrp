@@ -14,6 +14,7 @@ import type {
   InstallContentPackInput,
   RpgDefinition,
 } from "../../types.js";
+import { rulesetIdentityForProfile } from "../../rulesets/campaignBinding.js";
 import {
   CampaignContentConfigurationAuthorizationError,
   CampaignContentConfigurationConflictError,
@@ -175,7 +176,7 @@ function configureCampaignContentSync(
   });
   return db.transaction(() => {
     if (requireOriginalStarterAuthority) requireOriginalStarterInspectionForWrite(originalStarterSetupInspectionRepository!, actorId, id, "configure");
-    const campaign = db.prepare("SELECT owner_principal_id FROM campaigns WHERE id = ?").get(id) as { owner_principal_id: string } | undefined;
+    const campaign = db.prepare("SELECT owner_principal_id,updated_at FROM campaigns WHERE id = ?").get(id) as { owner_principal_id: string; updated_at: string } | undefined;
     if (!campaign) throw new CampaignContentConfigurationAuthorizationError("campaign not found");
     if (campaign.owner_principal_id !== actorId) throw new CampaignContentConfigurationAuthorizationError("campaign content configuration requires the campaign owner");
     if (!db.prepare(`SELECT 1 FROM campaign_memberships WHERE campaign_id = ? AND principal_id = ? AND role = 'owner'`).get(id, actorId)) {
@@ -222,6 +223,18 @@ function configureCampaignContentSync(
     // remaining window through both profile and pin inserts.
     if (requireOriginalStarterAuthority) requireOriginalStarterInspectionForWrite(originalStarterSetupInspectionRepository!, actorId, id, "configure");
     db.prepare(`INSERT INTO campaign_rules_profiles (campaign_id, rules_profile_id) VALUES (?, ?)`).run(id, normalized.rulesProfileId);
+    let rulesetId: string, rulesetVersion: string;
+    try { [rulesetId, rulesetVersion] = rulesetIdentityForProfile(normalized.rulesProfileId); }
+    catch { rulesetId = "velvet-starter-v1"; rulesetVersion = "1.0.0"; }
+    db.prepare("INSERT OR IGNORE INTO rpg_rules_profile_bindings_v60 VALUES(?,?,?)")
+      .run(normalized.rulesProfileId, rulesetId, rulesetVersion);
+    const reserved = db.prepare("SELECT ruleset_id,ruleset_version FROM campaign_administration_integrations_v59 WHERE campaign_id=?")
+      .get(id) as { ruleset_id: string | null; ruleset_version: string | null } | undefined;
+    if (reserved?.ruleset_id && (reserved.ruleset_id !== rulesetId || reserved.ruleset_version !== rulesetVersion)) {
+      throw new CampaignContentConfigurationConflictError("campaign reserved a different ruleset identity");
+    }
+    db.prepare("INSERT INTO campaign_ruleset_bindings_v60(campaign_id,rules_profile_id,ruleset_id,ruleset_version,bound_at) VALUES(?,?,?,?,?)")
+      .run(id, normalized.rulesProfileId, rulesetId, rulesetVersion, campaign.updated_at);
     const insertPin = db.prepare(`INSERT INTO campaign_content_packs
       (campaign_id, pack_id, pack_version, rules_profile_id) VALUES (?, ?, ?, ?)`);
     for (const pack of normalized.contentPacks) insertPin.run(id, pack.packId, pack.packVersion, normalized.rulesProfileId);

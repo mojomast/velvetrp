@@ -109,9 +109,12 @@ async function fakeToolProvider(select: ProviderSelector) {
     request.on("data", (chunk) => { body += String(chunk); });
     request.on("end", () => {
       const parsed = JSON.parse(body); requests.push(parsed);
-      if (!parsed.tools) {
+      const narrationTool = parsed.tools?.find((tool: any) => tool.function.name === "submit_adventure_narration");
+      if (narrationTool) {
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ model: "acceptance-fake", choices: [{ message: { role: "assistant", content: "The committed result changes the scene." } }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
+        response.end(JSON.stringify({ model: "acceptance-fake", choices: [{ message: { role: "assistant", content: null,
+          tool_calls: [{ id: `narration-${requests.length}`, type: "function", function: { name: "submit_adventure_narration",
+            arguments: JSON.stringify({ narration: "The authoritative result is recorded." }) } }] } }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }));
         return;
       }
       const call = select(parsed);
@@ -180,11 +183,15 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(streamEvents(resumed.body).at(-1)).toMatchObject({ type: "terminal", payload: { outcome: "done",
       turn: { turnId: fixture.turnId, state: "completed" }, receipts: [{ proposalId: fixture.proposal.proposalId }] } });
     expect(fixture.provider.requests).toHaveLength(2);
-    expect(fixture.provider.requests[1]).toMatchObject({ tool_choice: "none" });
-    expect(fixture.provider.requests[1].tools).toBeUndefined();
-    expect(JSON.parse(fixture.provider.requests[1].messages[1].content)).toEqual({ declaration: "Set my might precisely",
-      publicContext: { summary: [], recap: [], cast: ["Aster."], world: [], quests: [], canon: [] },
-      receipts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }] });
+    expect(fixture.provider.requests[1]).toMatchObject({ tool_choice: { type: "function", function: { name: "submit_adventure_narration" } } });
+    expect(fixture.provider.requests[1].tools).toHaveLength(1);
+    const narrationData=JSON.parse(fixture.provider.requests[1].messages[1].content.split("\n\n").at(-1));
+    expect(narrationData).toEqual({
+      mandatorySessionZeroSafetyPolicy: { hardLimits: [], veils: [], pvpPolicy: "explicit-consent",
+        romancePolicy: "fade-to-black", lethalityPolicy: "consent-required", paused: false, revision: 1 },
+      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [] },
+      verifiedReceiptFacts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }],
+    });
     await restarted.close();
 
     const db = new DatabaseDriver(dbFile(), { readonly: true });

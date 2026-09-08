@@ -49,6 +49,13 @@ export const actorTravelCommandResponseSchema=z.object({
   if(response.locations.some((location,index)=>location.locationId!==response.discoveries[index]?.locationId))
     context.addIssue({code:"custom",message:"travel discoveries must match resultant locations"});
 });
+export const actorCampCommandRequestSchema=z.object({
+  campaignId:resourceIdSchema,expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema,
+}).strict();
+export const actorCampCommandResponseSchema=z.object({
+  locationId:locationIdSchema,elapsedMinutes:z.number().int().min(0).max(1_000_000_000),
+  receipt:worldCommandReceiptHttpSchema,
+}).strict();
 
 /** Safe GM-only bootstrap placement used when campaign content has no designated start. */
 export const actorPlacementCommandRequestSchema=z.object({
@@ -64,6 +71,7 @@ export type ActorTravelCommandResponse=z.infer<typeof actorTravelCommandResponse
 export type ActorPlacementCommandRequest=z.infer<typeof actorPlacementCommandRequestSchema>;
 export type WorldCurrentLocationHttp=z.infer<typeof worldCurrentLocationHttpSchema>;
 export type ActorTravelDiscoveryHttp=z.infer<typeof actorTravelDiscoveryHttpSchema>;
+export type ActorCampCommandRequest=z.infer<typeof actorCampCommandRequestSchema>;
 
 export const npcPublicStateHttpSchema=z.object({name:z.string().trim().min(1).max(200),
   description:z.string().trim().min(1).max(4_000).optional(),archetype:z.string().trim().min(1).max(200).optional()}).strict();

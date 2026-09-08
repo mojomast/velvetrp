@@ -1,15 +1,61 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
-import { claimCombatReward,commandActorPower,commandCombatConsumable,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatRewardClaimResult,getCombatState,listCombatRewards,resolveCombatAction } from "./api";
+import { ApiError, ApiInputError, activateMessage, addCampaignAdministrationMembership, applyCharacterProgression, archiveCampaignAdministration, attachCampaignRoom, branchMessage, cancelGeneration, commandActorCheck, commandActorEconomy, commandActorInventory, commandActorRest, configureCampaignContent, continueRoom, continueSession, createCampaign, createCampaignCheckpoint, createCharacterDraft, createOriginalStarterCampaignCharacter, createSseParser, deleteSession, detachCampaignRoom, encodeOpaquePathSegment, errorFromResponse, finalizeCharacterDraft, forkCampaignTimeline, getActorEffects, getActorInventory, getActorResources, getActorWallet, getCampaignCharacterCreationOptions, getCampaignCharacterWorkspace, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignDiceHistory, getCampaignShop, getCharacterDraft, getCharacterProgression, getCharacterSheet, getContentPackPublication, getFeatures, getMessages, getRpgFeatures, getSession, getSessionContext, getSiblings, grantCharacterXp, listAllContentPackPublications, listCampaignCharacters, listCampaignCheckpoints, listCampaignRooms, listCampaigns, listContentPackPublications, previewCharacterProgression, publishContentPack, renameCampaign, rollCampaignDice, sendMessage, sendRoomMessage, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, stopSession, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, updateCampaignAdministration, updateCampaignAdministrationMembership, updateCharacterDraft, updateSessionContext, validateContentPackDraft } from "./api";
+import { claimCombatReward,commandActorPower,commandCombatConsumable,endCombat,getActorPowers,getCombatCommandResult,getCombatConsumableActions,getCombatConsumableResult,getCombatLog,getCombatRewardClaimResult,getCombatState,getEncounterSetupCandidates,listCombatRewards,resolveCombatAction,resolveCombatEnemyTurn,startEncounter } from "./api";
 import { commandQuest, commandStoryline, createCampaignQuest, createCampaignStoryline, getCampaignStory, getCampaignWorld, listCampaignFactions, listCampaignNpcs, listCampaignQuests, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, travelActor } from "./api";
 import { getCampaignCommandReceipt } from "./api";
-import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
+import { getActorGameplaySheet } from "./api";
+import { preflightProviderCapabilities } from "./api";
+import { confirmAdventureTurn, createAdventureTurnSseParser, getAdventureTurn, getAdventureTurnTranscript, getCampaignPlayBootstrap, reconcileInitialAdventureTurn, streamAdventureTurn } from "./api";
 import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./api";
 import { commandNpcPresence, getCampaignPresentCast } from "./api";
 import {canonicalCombatRewardClaimRequestFrame,canonicalUseConsumableRequestFrame} from "@velvet/contracts";
+import { generateTacticalMap, getTacticalMap, moveTacticalMapToken, previewTacticalMapMove } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("tactical map API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const projection = { mapId: "map", width: 5, height: 5, grid: { kind: "square", feetPerCell: 5 }, tiles: [{ position: { x: 1, y: 1 }, terrain: "floor", visibility: "visible" }], tokens: [{ tokenId: "actor", label: "Hero", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly" }], authoritativePath: null, reachable: [{ x: 1, y: 1 }] };
+  const snapshot = { campaignId: "campaign:one", sessionId: "room / one", encounterId: null, mode: "exploration", mapRevision: 0, tokenRevision: 0, controlledTokenId: "actor", movement: { policy: "exploration-60-feet", budgetFeet: 60 }, projection };
+  it("encodes bindings and strictly validates GET, preview, move, and generation", async () => {
+    const preview = { ...snapshot, previewId: "preview", pathCostFeet: 5, projection: { ...projection, authoritativePath: [{ x: 1, y: 1 }, { x: 2, y: 1 }] } };
+    const moveInput = { actorId: "actor", destination: { x: 2, y: 1 }, previewId: "preview", expectedMapRevision: 0, expectedTokenRevision: 0, idempotencyKey: "move" };
+    const moved = { receipt: { mapId: "map", tokenId: "actor", previewId: "preview", idempotencyKey: "move", mapRevision: 0, tokenRevisionBefore: 0, tokenRevisionAfter: 1, destination: { x: 2, y: 1 }, occurredAt: at }, snapshot: { ...snapshot, tokenRevision: 1 } };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(snapshot), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(preview), { status: 200 })).mockResolvedValueOnce(new Response(JSON.stringify(moved), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(snapshot), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(getTacticalMap("campaign:one", "room / one", "exploration", "actor")).resolves.toEqual(snapshot);
+    const previewInput = { actorId: "actor", destination: { x: 2, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 };
+    await expect(previewTacticalMapMove("campaign:one", "room / one", "exploration", previewInput)).resolves.toEqual(preview);
+    await expect(moveTacticalMapToken("campaign:one", "room / one", "exploration", moveInput)).resolves.toEqual(moved);
+    const generation = { mode: "exploration" as const, encounterId: null, kind: "arena" as const, seed: "seed", width: 5, height: 5, tokens: [{ tokenId: "actor", actorId: "actor", combatantId: null, label: "Hero", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly" as const, hidden: false }], idempotencyKey: "generate" };
+    await expect(generateTacticalMap("campaign:one", "room / one", generation)).resolves.toEqual(snapshot);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rpg/v1/campaigns/campaign%3Aone/rooms/room%20%2F%20one/tactical-maps/exploration/actors/actor");
+    expect(fetchMock.mock.calls.slice(1).every((call) => (call[1] as RequestInit).method === "POST")).toBe(true);
+  });
+});
+
+describe("provider capability API binding", () => {
+  it("uses one explicit no-store empty POST", async () => {
+    const result = { model: "model", ok: true, dmPlayCompatible: true, campaignGenerationCompatible: true, capabilities: [
+       { capability: "function-tools", status: "supported" },
+      { capability: "strict-json-schema", status: "supported" },
+    ] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(preflightProviderCapabilities()).resolves.toEqual(result);
+    expect(fetchMock).toHaveBeenCalledWith("/api/provider/preflight", expect.objectContaining({ method: "POST", cache: "no-store", body: "{}" }));
+  });
+
+  it("preserves the legacy strict-function-tools response discriminator", async () => {
+    const result = { model: "old", ok: true, dmPlayCompatible: true, campaignGenerationCompatible: false, capabilities: [
+      { capability: "strict-function-tools" as const, status: "supported" as const },
+    ] };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 200 })));
+    await expect(preflightProviderCapabilities()).resolves.toEqual(result);
+  });
 });
 
 describe("M5.1 NPC presence API binding", () => {
@@ -48,6 +94,27 @@ describe("M4.5 encounter generation API binding", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/generation-drafts", expect.objectContaining({ method: "POST", cache: "no-store" }));
     expect(JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string)).toEqual(request);
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/generation-drafts/draft-id", expect.objectContaining({ cache: "no-store" }));
+  });
+});
+
+describe("encounter lifecycle API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const combat = { combatId: "encounter", round: 1, currentCombatant: null, combatants: [{ combatantId: "actor", kind: "actor", actorId: "actor", team: "allies", hitPoints: 1, maximumHitPoints: 1, temporaryHitPoints: 0, conditions: [], status: "active" }], legalActions: [], revision: 5 };
+  it("posts exact revisions to existing start and terminal command routes", async () => {
+    const start = { combat, receipt: { idempotencyKey: "start-key", revisionBefore: 4, revisionAfter: 5, occurredAt: at } };
+    const encounter = { encounterId: "encounter", sessionId: "session", name: "Ambush", status: "completed", combatId: "encounter", combatants: [], revision: 6, createdAt: at, updatedAt: at };
+    const end = { encounter, rewards: [], receipt: { idempotencyKey: "end-key", revisionBefore: 5, revisionAfter: 6, occurredAt: at } };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(start), { status: 200 })).mockResolvedValueOnce(new Response(JSON.stringify(end), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(startEncounter("encounter", { expectedRevision: 4, idempotencyKey: "start-key" })).resolves.toEqual(start);
+    await expect(endCombat("encounter", { expectedRevision: 5, idempotencyKey: "end-key" })).resolves.toEqual(end);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/encounters/encounter/start-commands", expect.objectContaining({ method: "POST", cache: "no-store" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/combats/encounter/end-commands", expect.objectContaining({ method: "POST", cache: "no-store" }));
+  });
+  it("reads the strict safe setup candidate projection", async () => {
+    const candidates = { sessions: [{ sessionId: "session" }], actors: [{ actorId: "actor", label: "Aria" }], enemies: [{ template: { kind: "enemy-template" as const, packId: "pack", packVersion: "1", definitionId: "wolf" }, label: "Wolf" }], teams: { actor: "allies" as const, enemy: "enemies" as const } };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(candidates), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(getEncounterSetupCandidates("campaign:one")).resolves.toEqual(candidates);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign%3Aone/encounter-setup-candidates", expect.objectContaining({ cache: "no-store" }));
   });
 });
 
@@ -94,6 +161,16 @@ describe("M3.7 adventure play API binding", () => {
     const stream = streamAdventureTurn({ kind: "initial", campaignId: "campaign", sessionId: "session", actorId: "actor", declaration: "I listen", expectedRevision: 0, idempotencyKey: "initial" }, vi.fn());
     await expect(stream.turnId).resolves.toBe("turn"); await expect(stream.done).resolves.toBeUndefined();
     expect(fetchMock.mock.calls[3]?.[1]).toEqual(expect.objectContaining({ cache: "no-store", method: "POST" }));
+  });
+
+  it("strictly binds the bounded transcript to its requested campaign room", async () => {
+    const transcript = { campaignId: "campaign", sessionId: "session", turns: [{ turnId: "turn", actorId: "actor", declaration: "I listen", narration: "You hear bells.", completedAt: at }] };
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(transcript), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...transcript, sessionId: "other" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getAdventureTurnTranscript("campaign", "session")).resolves.toEqual(transcript);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/adventure-turns/transcript?campaignId=campaign&sessionId=session", expect.objectContaining({ cache: "no-store" }));
+    await expect(getAdventureTurnTranscript("campaign", "session")).rejects.toThrow(/requested room/);
   });
 
   it("rejects malformed stream payloads instead of discarding them", async () => {
@@ -304,10 +381,32 @@ describe("M2.7 actor API bindings", () => {
   });
 });
 
+describe("actor gameplay-sheet API binding", () => {
+  const at = "2030-01-01T00:00:00.000Z";
+  const response = { identity: { actorId: "actor:one", name: "Aria" }, race: { reference: { kind: "race", packId: "pack", packVersion: "1", definitionId: "human" }, label: "Human" }, background: { reference: { kind: "background", packId: "pack", packVersion: "1", definitionId: "guide" }, label: "Guide" }, classes: [{ reference: { kind: "class", packId: "pack", packVersion: "1", definitionId: "ranger" }, label: "Ranger", level: 1 }], attributes: [], proficiencies: [], choices: [], derived: { maxHp: 10, defenses: { guard: 10, evasion: 11, will: 12 }, initiative: 1, speed: 30, carryingLimit: 100, spellAttack: 2, saveDc: 10, explanations: (["max-hp", "defense-guard", "defense-evasion", "defense-will", "initiative", "speed", "carrying-limit", "spell-attack", "save-dc"] as const).map((statistic) => ({ statistic, formula: "base", inputs: {}, result: 1 })) }, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, pendingChoiceCount: 0, updatedAt: at }, resources: [], inventory: { capacity: 10, items: [] }, knownPowers: [], activeEffects: [] };
+
+  it("uses the exact encoded no-store route and returns a strictly parsed actor-bound response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(getActorGameplaySheet("actor:one")).resolves.toEqual(response);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/actors/actor%3Aone/gameplay-sheet", expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("rejects malformed input, extra response fields, identity mismatch, and undocumented success status", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ ...response, privateNotes: "secret" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...response, identity: { ...response.identity, actorId: "other" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 201 })); vi.stubGlobal("fetch", fetchMock);
+    await expect(getActorGameplaySheet("bad/id")).rejects.toBeInstanceOf(ApiInputError);
+    await expect(getActorGameplaySheet("actor:one")).rejects.toThrow();
+    await expect(getActorGameplaySheet("actor:one")).rejects.toThrow(/requested actor/);
+    await expect(getActorGameplaySheet("actor:one")).rejects.toThrow(/documented status/);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe("M2.8 and M2.9 combat workspace API bindings", () => {
   const combat = { round: 1, currentCombatant: "one", combatants: [
-    { combatantId: "one", kind: "actor", team: "allies", actorId: "actor", hitPoints: 3, maximumHitPoints: 3, status: "active" },
-    { combatantId: "two", kind: "enemy", team: "enemies", template: null, hitPoints: 2, maximumHitPoints: 2, status: "active" },
+    { combatantId: "one", kind: "actor", team: "allies", actorId: "actor", hitPoints: 3, maximumHitPoints: 3, temporaryHitPoints: 0, conditions: [], status: "active" },
+    { combatantId: "two", kind: "enemy", team: "enemies", template: null, hitPoints: 2, maximumHitPoints: 2, temporaryHitPoints: 0, conditions: [], status: "active" },
   ], legalActions: [{ legalActionId: "attack", kind: "attack", targetIds: ["two"] }], revision: 2 };
 
   it("uses strict no-store paths and binds the exact log query cursor", async () => {
@@ -336,6 +435,19 @@ describe("M2.8 and M2.9 combat workspace API bindings", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(resolveCombatAction("combat", { legalActionId: "attack", targetIds: ["two"], choices: [], expectedRevision: 2, idempotencyKey: "key" })).resolves.toEqual(body);
     expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/combats/combat/action-commands", expect.objectContaining({ method: "POST", cache: "no-store" }));
+  });
+
+  it("posts a caller-blind enemy turn with only revision and idempotency",async()=>{
+    const body={resolution:{actionId:"resolved",legalActionId:"server-action",kind:"attack",actingCombatantId:"two",targetIds:["one"],outcomes:[{kind:"damage",targetId:"one",damageType:"physical",requested:1,applied:1,hitPointsBefore:3,hitPointsAfter:2,statusBefore:"active",statusAfter:"active"}],roundBefore:1,roundAfter:1,currentCombatantBefore:"two",currentCombatantAfter:"one"},combat:{combatId:"combat",...combat,revision:3},receipt:{idempotencyKey:"enemy-key",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z"}};
+    const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify(body),{status:200}));vi.stubGlobal("fetch",fetchMock);
+    await expect(resolveCombatEnemyTurn("combat",{expectedRevision:2,idempotencyKey:"enemy-key"})).resolves.toEqual(body);
+    expect(fetchMock).toHaveBeenCalledWith("/api/rpg/v1/combats/combat/enemy-turn-commands",expect.objectContaining({method:"POST",body:JSON.stringify({expectedRevision:2,idempotencyKey:"enemy-key"})}));
+  });
+
+  it("rejects enemy turn inputs with caller-authored combat details before POST",async()=>{
+    const fetchMock=vi.fn();vi.stubGlobal("fetch",fetchMock);
+    await expect(resolveCombatEnemyTurn("combat",{expectedRevision:2,idempotencyKey:"enemy-key",targetIds:["one"]} as any)).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects malformed success statuses before accepting a body", async () => {
@@ -428,7 +540,8 @@ describe("M2.6 character API bindings", () => {
     { id: "starter-grant", required: true, options: ["kit", "currency"] },
   ];
   const draft = { id: "draft", campaignId: "campaign", personaId: "persona", status: "active", durability: "durable", expiresAt: null, effectivelyExpired: false,
-    revision: 0, rulesProfileId: "rules", pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }],
+    revision: 0, rulesProfileId: "rules", rulesetId: "velvet-starter-v1", rulesetVersion: "1.0.0",
+    pins: [{ packId: "pack", packVersion: "1", publicationDigest: "a".repeat(64) }],
     allocation: { method: "standard-array", scores }, selections: { race: null, background: null, class: null, starterGrant: null }, choiceGroups: groups,
     completion: { complete: false, issues: [{ code: "missing-race", path: "selections.race", message: "Choose race" }] }, derivedPreview: null, startingGrants: [], createdAt: at, updatedAt: at };
   const receipt = { draftId: "draft", idempotencyKey: "create-key", type: "create", revisionBefore: 0, revisionAfter: 0, occurredAt: at };
@@ -1039,6 +1152,26 @@ describe("HTTP runtime contracts", () => {
     await expect(setupMechanicsStarter("campaign-one")).rejects.toThrow(/committed status/);
     expect(jsonSpy).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("sends the exact SRD 5.1 starter request and rejects a different mechanics setup", async () => {
+    const campaign = { id: "campaign:one", name: "Road", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z",
+      updatedAt: "2030-01-02T00:00:00.000Z", content: { status: "configured", rulesProfileId: "srd-5.1:rules:starter-v1",
+        contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.1.0+2b1f05336aac" }] } };
+    const velvetCampaign = { ...campaign, content: { status: "configured", rulesProfileId: "velvet:rules:starter-v1",
+      contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] } };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ campaign }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ campaign: velvetCampaign }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(setupSrd51Starter("campaign:one")).resolves.toEqual({ campaign });
+    expect(fetchMock).toHaveBeenNthCalledWith(1,
+      "/api/rpg/v1/campaigns/campaign%3Aone/mechanics-starter-setup",
+      expect.objectContaining({ method: "PUT", cache: "no-store", body: JSON.stringify({ starterId: "srd-5.1:starter@1.1.0+2b1f05336aac" }) }),
+    );
+    await expect(setupSrd51Starter("campaign:one")).rejects.toThrow(/did not match the request/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("directly binds administration update and destructive archive wrappers", async () => {

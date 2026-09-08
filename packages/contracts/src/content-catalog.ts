@@ -15,6 +15,9 @@ import {
 
 /** M1.2's deliberately closed execution boundary. It is not an extensible DSL. */
 export const VELVET_STARTER_RULES_ENGINE = "velvet-starter-v1" as const;
+export const VELVET_STARTER_RULES_ENGINE_VERSION = "1.0.0" as const;
+export const SRD_5_1_RULES_ENGINE = "dnd-5e" as const;
+export const SRD_5_1_RULES_ENGINE_VERSION = "1.0.0" as const;
 export const CONTENT_VALIDATION_LEVEL = "validated-v1" as const;
 export const LEGACY_CONTENT_VALIDATION_LEVEL = "legacy-v10" as const;
 
@@ -57,10 +60,13 @@ export const catalogDefinitionReferenceSchema = z.discriminatedUnion("kind", [
   enemyTemplateCatalogReferenceSchema,
 ]);
 
-export const attributeIdSchema = z.enum(["might", "agility", "resolve", "insight", "presence", "craft"]);
+export const attributeIdSchema = z.enum([
+  "might", "agility", "resolve", "insight", "presence", "craft",
+  "strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma",
+]);
 export const actionCostSchema = z.enum(["action", "bonus-action", "reaction", "passive"]);
 export const recoverySchema = z.enum(["none", "short-rest", "long-rest", "encounter"]);
-export const damageTypeSchema = z.enum(["physical", "fire", "frost", "storm", "radiant", "shadow"]);
+export const damageTypeSchema = z.enum(["physical", "bludgeoning", "piercing", "slashing", "fire", "frost", "storm", "radiant", "shadow"]);
 export const equipmentSlotSchema = z.enum(["hand", "body", "focus", "accessory"]);
 export const targetSchema = z.enum(["self", "ally", "enemy", "single", "area"]);
 
@@ -159,15 +165,131 @@ export const abilityCatalogDefinitionSchema = z.object({
 export const spellCatalogDefinitionSchema = z.object({
   ...typedBase("spell"), mechanics: z.object({ level: z.number().int().min(0).max(9), actionCost: actionCostSchema, range: z.number().int().min(0).max(10_000), target: targetSchema, concentration: z.boolean(), effects: starterEffectsSchema }).strict(),
 }).strict();
-export const itemCatalogDefinitionSchema = z.object({
-  ...typedBase("item"), mechanics: z.object({ category: z.enum(["weapon", "armor", "consumable", "tool", "gear"]), stackable: z.boolean(), slot: equipmentSlotSchema.nullable(), price: z.object({ currency: currencyCatalogReferenceSchema, amount: nonNegativeMechanicIntegerSchema }).strict(), effects: starterEffectsSchema }).strict(),
+
+export const srdDamageTypeSchema = z.enum([
+  "acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic", "piercing", "poison", "psychic",
+  "radiant", "slashing", "thunder",
+]);
+export const srdWeaponDamageDieSchema = z.object({
+  count: z.number().int().min(1).max(2),
+  sides: z.union([z.literal(4), z.literal(6), z.literal(8), z.literal(10), z.literal(12)]),
 }).strict();
+const srdWeaponRangeSchema = z.object({
+  normalFeet: z.number().int().min(5).max(1_000),
+  longFeet: z.number().int().min(5).max(2_000),
+}).strict().refine((range) => range.longFeet >= range.normalFeet, {
+  message: "long range must be at least normal range",
+  path: ["longFeet"],
+});
+export const srdWeaponPropertySchema = z.discriminatedUnion("property", [
+  z.object({ property: z.literal("finesse") }).strict(),
+  z.object({ property: z.literal("light") }).strict(),
+  z.object({ property: z.literal("heavy") }).strict(),
+  z.object({ property: z.literal("reach"), reachFeet: z.literal(10) }).strict(),
+  z.object({ property: z.literal("thrown"), range: srdWeaponRangeSchema }).strict(),
+  z.object({ property: z.literal("two-handed") }).strict(),
+  z.object({ property: z.literal("versatile"), damageDie: srdWeaponDamageDieSchema }).strict(),
+  z.object({ property: z.literal("ammunition"), range: srdWeaponRangeSchema }).strict(),
+  z.object({ property: z.literal("loading") }).strict(),
+  z.object({ property: z.literal("special") }).strict(),
+]);
+export const srdWeaponProfileSchema = z.object({
+  kind: z.literal("weapon"),
+  proficiency: z.enum(["simple", "martial"]),
+  attackType: z.enum(["melee", "ranged"]),
+  damage: z.object({ type: srdDamageTypeSchema, die: srdWeaponDamageDieSchema }).strict(),
+  properties: z.array(srdWeaponPropertySchema).max(10),
+}).strict().superRefine((profile, context) => {
+  const properties = new Map(profile.properties.map((property, index) => [property.property, { property, index }]));
+  if (properties.size !== profile.properties.length) {
+    context.addIssue({ code: "custom", message: "weapon properties must be unique", path: ["properties"] });
+  }
+  const reject = (property: z.infer<typeof srdWeaponPropertySchema>["property"], message: string) => {
+    const entry = properties.get(property);
+    if (entry) context.addIssue({ code: "custom", message, path: ["properties", entry.index] });
+  };
+  if (profile.attackType === "melee") {
+    reject("ammunition", "melee weapons cannot have the ammunition property");
+    reject("loading", "melee weapons cannot have the loading property");
+  } else {
+    reject("reach", "ranged weapons cannot have the reach property");
+    reject("versatile", "ranged weapons cannot have the versatile property");
+  }
+  if (properties.has("light")) {
+    reject("heavy", "a weapon cannot be both light and heavy");
+    reject("two-handed", "a light weapon cannot be two-handed");
+    reject("versatile", "a light weapon cannot be versatile");
+  }
+  if (properties.has("heavy")) reject("finesse", "a heavy weapon cannot have the finesse property");
+  if (properties.has("two-handed")) reject("versatile", "a two-handed weapon cannot be versatile");
+  if (properties.has("loading") && !properties.has("ammunition")) {
+    reject("loading", "the loading property requires ammunition");
+  }
+  const versatile = properties.get("versatile")?.property;
+  if (versatile?.property === "versatile") {
+    const base = profile.damage.die;
+    if (versatile.damageDie.count !== base.count || versatile.damageDie.sides <= base.sides) {
+      context.addIssue({ code: "custom", message: "versatile damage die must be a larger die with the same count", path: ["properties", properties.get("versatile")!.index, "damageDie"] });
+    }
+  }
+});
+
+const srdArmorBaseShape = {
+  kind: z.literal("armor"),
+  baseArmorClass: z.number().int().min(1).max(30),
+  strengthRequirement: z.number().int().min(1).max(30).nullable(),
+  stealthDisadvantage: z.boolean(),
+  shieldBonus: z.literal(0),
+};
+export const srdArmorProfileSchema = z.discriminatedUnion("category", [
+  z.object({ ...srdArmorBaseShape, category: z.literal("light"), dexterity: z.object({ policy: z.literal("full") }).strict(), strengthRequirement: z.null() }).strict(),
+  z.object({ ...srdArmorBaseShape, category: z.literal("medium"), dexterity: z.object({ policy: z.literal("capped"), maxBonus: z.literal(2) }).strict(), strengthRequirement: z.null() }).strict(),
+  z.object({ ...srdArmorBaseShape, category: z.literal("heavy"), dexterity: z.object({ policy: z.literal("none") }).strict() }).strict(),
+  z.object({
+    kind: z.literal("armor"), category: z.literal("shield"), baseArmorClass: z.null(),
+    dexterity: z.object({ policy: z.literal("none") }).strict(), strengthRequirement: z.null(),
+    stealthDisadvantage: z.literal(false), shieldBonus: z.number().int().min(1).max(10),
+  }).strict(),
+]);
+export const srdItemEngineDetailsSchema = z.object({
+  rulesEngine: z.literal(SRD_5_1_RULES_ENGINE),
+  weightPounds: z.number().min(0).max(100_000),
+  equipmentProfile: z.union([srdWeaponProfileSchema, srdArmorProfileSchema]).nullable(),
+}).strict();
+export const itemCatalogDefinitionSchema = z.object({
+  ...typedBase("item"), mechanics: z.object({
+    category: z.enum(["weapon", "armor", "consumable", "tool", "gear"]),
+    stackable: z.boolean(),
+    slot: equipmentSlotSchema.nullable(),
+    price: z.object({ currency: currencyCatalogReferenceSchema, amount: nonNegativeMechanicIntegerSchema }).strict(),
+    effects: starterEffectsSchema,
+    engineDetails: srdItemEngineDetailsSchema.nullable().optional(),
+  }).strict(),
+}).strict().superRefine((item, context) => {
+  const profile = item.mechanics.engineDetails?.equipmentProfile;
+  if (!profile) return;
+  if (profile.kind === "weapon" && item.mechanics.category !== "weapon") {
+    context.addIssue({ code: "custom", message: "weapon profiles require the weapon item category", path: ["mechanics", "category"] });
+  }
+  if (profile.kind === "armor" && item.mechanics.category !== "armor") {
+    context.addIssue({ code: "custom", message: "armor profiles require the armor item category", path: ["mechanics", "category"] });
+  }
+  if (profile.kind === "armor" && profile.category === "shield" && item.mechanics.slot !== "hand") {
+    context.addIssue({ code: "custom", message: "shields require the hand equipment slot", path: ["mechanics", "slot"] });
+  }
+  if (profile.kind === "armor" && profile.category !== "shield" && item.mechanics.slot !== "body") {
+    context.addIssue({ code: "custom", message: "body armor requires the body equipment slot", path: ["mechanics", "slot"] });
+  }
+});
 export const currencyCatalogDefinitionSchema = z.object({
   ...typedBase("currency"), mechanics: z.object({ symbol: z.string().trim().min(1).max(8), minorPerMajor: positiveMechanicIntegerSchema }).strict(),
 }).strict();
 export const enemyTemplateCatalogDefinitionSchema = z.object({
   ...typedBase("enemy-template"),
-  mechanics: z.object({ tier: z.number().int().min(1).max(20), maxHp: positiveMechanicIntegerSchema, defense: z.number().int().min(0).max(100), speed: z.number().int().min(1).max(100), abilityRefs: z.array(abilityCatalogReferenceSchema).min(1).max(32), resistances: z.array(damageTypeSchema).max(6), vulnerabilities: z.array(damageTypeSchema).max(6), immunities: z.array(damageTypeSchema).max(6) }).strict(),
+  mechanics: z.object({ tier: z.number().int().min(1).max(20), maxHp: positiveMechanicIntegerSchema, defense: z.number().int().min(0).max(100), speed: z.number().int().min(1).max(100), abilityRefs: z.array(abilityCatalogReferenceSchema).min(1).max(32), resistances: z.array(damageTypeSchema).max(6), vulnerabilities: z.array(damageTypeSchema).max(6), immunities: z.array(damageTypeSchema).max(6),
+    /** A closed executable binding, not a general monster-statblock vocabulary. */
+    combatProfile: z.object({ kind: z.literal("dnd-5e-pinned-basic-attack-v1"), proficiencyBonus: z.number().int().min(0).max(10),
+      attack: z.object({ abilityRef: abilityCatalogReferenceSchema, attackBonus: z.number().int().min(-20).max(30) }).strict() }).strict().optional() }).strict(),
   private: z.object({ tactics: z.string().trim().min(1).max(2_000), gmNotes: z.string().trim().max(2_000),
     hiddenAbilityRefs: z.array(abilityCatalogReferenceSchema).max(16),
     hiddenRefs: z.array(catalogDefinitionReferenceSchema).max(32).optional() }).strict(),
@@ -184,19 +306,22 @@ export const catalogDefinitionSchema = z.union([
 export const contentCatalogDefinitionSchema = catalogDefinitionSchema;
 
 export const contentCompatibilitySchema = z.object({
-  rulesEngine: z.literal(VELVET_STARTER_RULES_ENGINE),
+  rulesEngine: z.enum([VELVET_STARTER_RULES_ENGINE, SRD_5_1_RULES_ENGINE]),
+  rulesEngineVersion: z.enum([VELVET_STARTER_RULES_ENGINE_VERSION, SRD_5_1_RULES_ENGINE_VERSION]).optional(),
   rulesProfileId: rulesProfileIdSchema,
   catalogFormat: z.literal(CONTENT_VALIDATION_LEVEL),
 }).strict();
-export const publicationProvenanceSchema = z.object({
-  authorship: z.literal("original"),
+const publicationProvenanceBase = {
   author: z.string().trim().min(1).max(200),
   authoredAt: utcIsoTimestampSchema,
   reviewedBy: z.string().trim().min(1).max(200),
   reviewedAt: utcIsoTimestampSchema,
   declaration: z.string().trim().min(1).max(2_000),
-  thirdPartyData: z.literal(false),
-}).strict();
+};
+export const publicationProvenanceSchema = z.discriminatedUnion("authorship", [
+  z.object({ authorship: z.literal("original"), ...publicationProvenanceBase, thirdPartyData: z.literal(false) }).strict(),
+  z.object({ authorship: z.literal("licensed"), ...publicationProvenanceBase, thirdPartyData: z.literal(true) }).strict(),
+]);
 export const contentPublicationManifestSchema = z.object({
   packId: contentPackIdSchema,
   packVersion: contentPackVersionSchema,
@@ -208,11 +333,22 @@ export const contentPublicationManifestSchema = z.object({
   digest: contentDigestSchema,
   provenance: publicationProvenanceSchema,
 }).strict();
-export const publishContentCatalogInputSchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
+export const validateContentCatalogInputSchema = z.object({
   manifest: contentPublicationManifestSchema,
   definitions: z.array(catalogDefinitionSchema).min(1).max(MAX_DEFINITIONS_PER_PACK),
-}).strict();
+}).strict().superRefine((catalog, context) => {
+  catalog.definitions.forEach((definition, index) => {
+    if (!("engineDetails" in definition.mechanics)) return;
+    const details = definition.mechanics.engineDetails;
+    if (details && details.rulesEngine !== catalog.manifest.compatibility.rulesEngine) {
+      context.addIssue({ code: "custom", message: "item engine details must match the publication rules engine",
+        path: ["definitions", index, "mechanics", "engineDetails", "rulesEngine"] });
+    }
+  });
+});
+export const publishContentCatalogInputSchema = validateContentCatalogInputSchema.safeExtend({
+  idempotencyKey: idempotencyKeySchema,
+});
 
 export const catalogValidationIssueCodeSchema = z.enum([
   "invalid-input", "identity-mismatch", "duplicate-definition", "missing-reference", "wrong-reference-kind",
@@ -298,6 +434,10 @@ export const campaignCatalogConfigurationResultSchema = z.object({
 export type CatalogDefinitionKind = z.infer<typeof catalogDefinitionKindSchema>;
 export type CatalogDefinitionReference = z.infer<typeof catalogDefinitionReferenceSchema>;
 export type CatalogDefinition = z.infer<typeof catalogDefinitionSchema>;
+export type SrdWeaponProperty = z.infer<typeof srdWeaponPropertySchema>;
+export type SrdWeaponProfile = z.infer<typeof srdWeaponProfileSchema>;
+export type SrdArmorProfile = z.infer<typeof srdArmorProfileSchema>;
+export type SrdItemEngineDetails = z.infer<typeof srdItemEngineDetailsSchema>;
 export type MemberCatalogDefinition = z.infer<typeof memberCatalogDefinitionSchema>;
 export type ObserverCatalogDefinition = z.infer<typeof observerCatalogDefinitionSchema>;
 export type ContentCompatibility = z.infer<typeof contentCompatibilitySchema>;

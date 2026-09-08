@@ -1,6 +1,6 @@
 # Development Plan
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with no startup upgrades, and the checked trusted-local RPG inventory has 111 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with no startup upgrades, and the checked trusted-local RPG inventory has 126 counted operations plus feature discovery.
 
 ## Delivered
 

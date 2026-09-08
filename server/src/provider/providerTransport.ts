@@ -62,9 +62,11 @@ export function buildProviderHeaders(baseUrl: string, provider: ProviderSettings
   if (provider.apiKey.trim() && (SUPPORTED_HOSTED_PROVIDER_HOSTS.has(hostname) || isLoopbackHost(hostname))) {
     headers.Authorization = `Bearer ${provider.apiKey.trim()}`;
   }
-  if (hostname === "openrouter.ai") {
+  if (hostname === "openrouter.ai" || isLoopbackHost(hostname)) {
     if (provider.httpReferer.trim()) headers["HTTP-Referer"] = provider.httpReferer.trim();
     if (provider.appTitle.trim()) headers["X-Title"] = provider.appTitle.trim();
+    const userAgent = process.env.OPENROUTER_USER_AGENT?.trim() ?? "";
+    if (/^[\x20-\x7E]{1,200}$/.test(userAgent)) headers["User-Agent"] = userAgent;
   }
   return headers;
 }

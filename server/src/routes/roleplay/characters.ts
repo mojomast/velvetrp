@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { personaProfileSchema } from "@velvet/contracts";
 import { checkCharacter } from "../../policy.js";
 import {
   createCharacter,
@@ -27,6 +28,10 @@ function parseCharacterInput(body: Partial<CreateCharacterInput> | null): Parsed
   if (body.fictionalConfirmed !== true) {
     return { ok: false, error: "fictionalConfirmed must be true" };
   }
+  const profile = personaProfileSchema.safeParse(body.profile ?? {});
+  if (!profile.success) {
+    return { ok: false, error: "profile is invalid" };
+  }
   return {
     ok: true,
     value: {
@@ -34,6 +39,7 @@ function parseCharacterInput(body: Partial<CreateCharacterInput> | null): Parsed
       age: body.age,
       archetype: body.archetype,
       boundaries: body.boundaries,
+      profile: profile.data,
       fictionalConfirmed: body.fictionalConfirmed,
     },
   };
@@ -46,6 +52,7 @@ function candidateFromInput(value: CreateCharacterInput): Character {
     age: value.age,
     archetype: value.archetype,
     boundaries: value.boundaries,
+    profile: value.profile ?? personaProfileSchema.parse({}),
     fictionalConfirmed: value.fictionalConfirmed,
     isRealPerson: false,
     createdAt: "",
@@ -85,6 +92,7 @@ export const roleplayCharacterRoutes: FastifyPluginAsync = async (app) => {
       age: body.age ?? existing.age,
       archetype: body.archetype ?? existing.archetype,
       boundaries: body.boundaries ?? existing.boundaries,
+      profile: body.profile ?? existing.profile ?? personaProfileSchema.parse({}),
       fictionalConfirmed: body.fictionalConfirmed ?? existing.fictionalConfirmed,
     });
     if (!parsed.ok) return reply.code(400).send({ error: parsed.error });
@@ -106,12 +114,13 @@ export const roleplayCharacterRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: "character not found" });
     }
     return {
-      formatVersion: "velvet-character@1",
+      formatVersion: "velvet-character@2",
       character: {
         name: character.name,
         age: character.age,
         archetype: character.archetype,
         boundaries: character.boundaries,
+        profile: character.profile ?? personaProfileSchema.parse({}),
         fictionalConfirmed: character.fictionalConfirmed,
       },
     };

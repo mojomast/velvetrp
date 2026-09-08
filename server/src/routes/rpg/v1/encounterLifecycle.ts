@@ -2,11 +2,13 @@ import {
   encounterCreateRequestSchema,
   encounterCreateResponseSchema,
   encounterListResponseSchema,
+  encounterSetupCandidatesResponseSchema,
   encounterStartCommandRequestSchema,
   encounterStartCommandResponseSchema,
   resourceIdSchema,
   type CombatState,
   type EncounterPublic,
+  type EncounterSetupCandidatesResponse,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -24,7 +26,7 @@ const LOCAL_OWNER = "local-owner";
 const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
 
 type EncounterLifecycleRepository = Pick<EncounterRepository,
-  "listEncounters" | "createEncounter" | "startEncounter">;
+  "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter">;
 
 export interface EncounterLifecycleHttpOptions {
   encounterRepositoryAccessor: () => EncounterLifecycleRepository;
@@ -66,9 +68,9 @@ function projectEncounter(value: NonNullable<ReturnType<EncounterLifecycleReposi
 
 function projectCombat(value: ReturnType<EncounterLifecycleRepository["startEncounter"]>["combat"]): CombatState {
   const allowed = new Set([
-    "campaignId", "encounterId", "combatId", "round", "currentCombatant", "combatants", "legalActions", "revision",
+    "campaignId", "encounterId", "combatId", "round", "currentCombatant", "combatants", "legalActions", "turnEconomy", "revision",
   ]);
-  if (typeof value !== "object" || value === null || Object.keys(value).length !== allowed.size
+  if (typeof value !== "object" || value === null
       || Object.keys(value).some((key) => !allowed.has(key))) {
     throw new Error("combat projection shape is invalid");
   }
@@ -78,11 +80,54 @@ function projectCombat(value: ReturnType<EncounterLifecycleRepository["startEnco
     currentCombatant: value.currentCombatant,
     combatants: value.combatants,
     legalActions: value.legalActions,
+    turnEconomy: value.turnEconomy,
     revision: value.revision,
   };
 }
 
+function projectSetupCandidates(value: NonNullable<ReturnType<EncounterLifecycleRepository["getEncounterSetupCandidates"]>>): EncounterSetupCandidatesResponse {
+  const allowed = new Set(["campaignId", "sessions", "actors", "enemies", "teams"]);
+  if (typeof value !== "object" || value === null || Object.keys(value).length !== allowed.size
+      || Object.keys(value).some((key) => !allowed.has(key))) {
+    throw new Error("encounter setup candidates projection shape is invalid");
+  }
+  return {
+    sessions: value.sessions,
+    actors: value.actors,
+    enemies: value.enemies,
+    teams: value.teams,
+  };
+}
+
 export const encounterLifecycleHttpRoutes: FastifyPluginAsync<EncounterLifecycleHttpOptions> = async (app, options) => {
+  app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>(
+    "/campaigns/:campaignId/encounter-setup-candidates",
+    { exposeHeadRoute: false, onRequest: async (request, reply) => {
+      reply.header("cache-control", "no-store");
+      if (!enabled()) {
+        await sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
+        return;
+      }
+      if ((request.raw.url ?? request.url).includes("?") || Object.keys(request.query).length > 0) {
+        await sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Encounter setup candidates do not accept query parameters");
+      }
+    } },
+    async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      if (!campaignId.success) return campaignNotFound(request, reply);
+      try {
+        const candidates = options.encounterRepositoryAccessor().getEncounterSetupCandidates(LOCAL_OWNER, campaignId.data);
+        if (candidates === null) return campaignNotFound(request, reply);
+        if (candidates.campaignId !== campaignId.data) throw new Error("encounter setup candidates are not bound to the requested campaign");
+        return reply.code(200).send(encounterSetupCandidatesResponseSchema.parse(projectSetupCandidates(candidates)));
+      } catch (error) {
+        if (error instanceof EncounterAuthorizationError) return campaignNotFound(request, reply);
+        request.log.error({ operation: "encounter-setup-candidates", method: request.method, route: request.routeOptions.url }, "RPG encounter setup candidates failed");
+        return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Encounter setup candidates could not be loaded");
+      }
+    },
+  );
+
   app.get<{ Params: { campaignId: string }; Querystring: Record<string, unknown> }>(
     "/campaigns/:campaignId/encounters",
     { exposeHeadRoute: false, onRequest: async (request, reply) => {

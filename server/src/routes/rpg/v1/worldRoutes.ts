@@ -1,4 +1,4 @@
-import { actorPlacementCommandRequestSchema,actorPlacementCommandResponseSchema,actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignWorldHttpResponseSchema,resourceIdSchema } from "@velvet/contracts";
+import { actorCampCommandRequestSchema,actorCampCommandResponseSchema,actorPlacementCommandRequestSchema,actorPlacementCommandResponseSchema,actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignWorldHttpResponseSchema,resourceIdSchema } from "@velvet/contracts";
 import type {FastifyPluginAsync,FastifyRequest} from "fastify";
 import {readRpgFeatureFlags} from "../../../features.js";
 import {sendApiProblem} from "../../../http/problem.js";
@@ -6,7 +6,7 @@ import {WorldAuthorizationError,WorldConflictError,WorldStaleError,WorldUnavaila
 
 const LOCAL_OWNER="local-owner";
 const APPLICATION_JSON=/^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+.^_`|~0-9A-Za-z-]+|"[^"]+"))?\s*$/i;
-type WorldHttpRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"placeActor">;
+type WorldHttpRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"establishCamp"|"placeActor">;
 export interface WorldHttpOptions{worldRepositoryAccessor:()=>WorldHttpRepository;}
 function enabled(){const flags=readRpgFeatureFlags();return flags.campaign&&flags.mechanics;}
 function campaignNotFound(request:FastifyRequest,reply:Parameters<typeof sendApiProblem>[1]){
@@ -93,4 +93,19 @@ export const worldHttpRoutes:FastifyPluginAsync<WorldHttpOptions>=async(app,opti
         "Travel outcome could not be confirmed; reconcile world state before retrying and do not automatically retry");
     }
   });
+  app.post<{Params:{actorId:string};Querystring:Record<string,unknown>;Body:unknown}>("/actors/:actorId/camp-commands",{
+    onRequest:async(request,reply)=>{reply.header("cache-control","no-store");if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
+      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0){await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor camp does not accept query parameters");return;}
+      const contentType=request.headers["content-type"];if(typeof contentType!=="string"||!APPLICATION_JSON.test(contentType))await sendApiProblem(request,reply,415,"RPG_UNSUPPORTED_MEDIA_TYPE","Actor camp requires application/json");},
+    errorHandler:(_error,request,reply)=>sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor camp request is invalid")},async(request,reply)=>{
+      const actorId=resourceIdSchema.safeParse(request.params.actorId),body=actorCampCommandRequestSchema.safeParse(request.body);if(!actorId.success)return actorNotFound(request,reply);
+      if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor camp request is invalid");
+      try{const result=options.worldRepositoryAccessor().establishCamp(LOCAL_OWNER,actorId.data,body.data);
+        if(result.campaignId!==body.data.campaignId||result.receipt.idempotencyKey!==body.data.idempotencyKey||result.receipt.revisionBefore!==body.data.expectedRevision||result.receipt.revisionAfter!==body.data.expectedRevision+1)throw new Error("actor camp result binding is invalid");
+        return reply.code(200).send(actorCampCommandResponseSchema.parse({locationId:result.locationId,elapsedMinutes:result.elapsedMinutes,receipt:result.receipt}));
+      }catch(error){if(error instanceof WorldAuthorizationError||error instanceof WorldUnavailableError)return actorNotFound(request,reply);
+        if(error instanceof WorldStaleError)return sendApiProblem(request,reply,409,"RPG_WORLD_STALE","World state is stale; refresh before trying again");
+        if(error instanceof WorldConflictError)return sendApiProblem(request,reply,409,"RPG_CAMP_CONFLICT","Camp conflicts with current world state");
+        request.log.error({operation:"actor-camp"},"RPG actor camp failed");return sendApiProblem(request,reply,500,"RPG_INTERNAL_ERROR","Camp outcome could not be confirmed; reconcile world state and do not automatically retry");}
+    });
 };

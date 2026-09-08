@@ -10,12 +10,15 @@ import {
   forkCampaignTimelineInputSchema,
 } from "./campaign-administration.js";
 import { resourceIdSchema } from "./domain-primitives.js";
+import { adventureCombatPowerPublicReceiptSchema } from "./adventure-power-rest.js";
+import { adventureProgressionPublicReceiptSchema, adventureQuestLifecyclePublicReceiptSchema } from "./adventure-quest-progression.js";
 import {
   actorAttributeSetEventSchema,
   actorDiceRolledEventSchema,
   actorResourceInitializedEventSchema,
   revisionSchema,
 } from "./rpg-commands.js";
+import { diceRollResultSchema } from "./rpg-dice.js";
 
 const MAX_CAMPAIGN_HISTORY_EVENTS_PAGE_SIZE = 100;
 
@@ -76,6 +79,65 @@ export const campaignHistoryHttpPublicMechanicEventSchema = z.discriminatedUnion
   actorDiceRolledEventSchema.pick({ type: true, data: true }),
 ]);
 export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind", [
+  adventureQuestLifecyclePublicReceiptSchema.extend({kind:z.literal("quest-lifecycle")}).strict(),
+  adventureProgressionPublicReceiptSchema.extend({kind:z.literal("progression")}).strict(),
+  adventureCombatPowerPublicReceiptSchema.extend({kind:z.literal("combat-power")}).strict(),
+  z.object({kind:z.literal("combat-consumable"),itemName:z.string().trim().min(1).max(200),target:z.string().trim().min(1).max(200),
+    quantity:z.literal(1),actionCost:z.literal("action"),outcomes:z.array(z.discriminatedUnion("kind",[
+      z.object({kind:z.literal("damage"),damageType:z.string().trim().min(1).max(64),roll:diceRollResultSchema,requested:z.number().int().min(0),adjustment:z.enum(["none","resistance","vulnerability","immunity"]),applied:z.number().int().min(0),before:z.number().int().min(0),after:z.number().int().min(0)}).strict(),
+      z.object({kind:z.literal("healing"),roll:diceRollResultSchema,requested:z.number().int().min(0),applied:z.number().int().min(0),before:z.number().int().min(0),after:z.number().int().min(0)}).strict(),
+      z.object({kind:z.literal("resource"),resource:z.enum(["Health","Guard","Focus"]),requested:z.number().int(),applied:z.number().int(),before:z.number().int().min(0).nullable(),after:z.number().int().min(0).nullable()}).strict(),
+    ])).min(1).max(16),roundBefore:revisionSchema,roundAfter:revisionSchema,revisionBefore:revisionSchema,revisionAfter:revisionSchema,
+    occurredAt:z.string().datetime({offset:false,precision:3})}).strict().refine(value=>value.revisionAfter===value.revisionBefore+1,"combat consumable receipt must advance once"),
+  z.object({kind:z.literal("commerce"),action:z.enum(["buy","sell","give"]),vendorLabel:z.string().trim().min(1).max(200),shopLabel:z.string().trim().min(1).max(200),itemLabel:z.string().trim().min(1).max(200),quantity:z.number().int().min(1).max(1_000_000),currencyLabel:z.string().trim().min(1).max(200),priceMinorUnits:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),debitMinorUnits:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),creditMinorUnits:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),balanceBefore:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),balanceAfter:z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),revisionBefore:revisionSchema,revisionAfter:revisionSchema,occurredAt:z.string().datetime({offset:false,precision:3})}).strict().refine(value=>value.revisionAfter===value.revisionBefore+1,"commerce receipt revision must advance once"),
+  z.object({kind:z.literal("power"),powerName:z.string().trim().min(1).max(200),targets:z.array(z.string().trim().min(1).max(200)).min(1).max(32),
+    costs:z.array(z.object({label:z.string().trim().min(1).max(200),before:z.number().int().min(0),after:z.number().int().min(0)}).strict()).max(1),
+    stateDeltas:z.array(z.object({actor:z.string().trim().min(1).max(200),change:z.string().trim().min(1).max(200),before:z.number().int().min(0).nullable(),after:z.number().int().min(0).nullable()}).strict()).max(512),
+    concentration:z.boolean(),revisionBefore:revisionSchema,revisionAfter:revisionSchema,occurredAt:z.string().datetime({offset:false,precision:3})}).strict()
+    .refine(value=>value.revisionAfter===value.revisionBefore+1,"power receipt revision must advance once"),
+  z.object({kind:z.literal("rest"),restKind:z.enum(["short","long"]),restName:z.enum(["Short rest","Long rest"]),
+    recovery:z.array(z.object({label:z.string().trim().min(1).max(200),before:z.number().int().min(0),after:z.number().int().min(0)}).strict()).min(1).max(128),
+    revisionBefore:revisionSchema,revisionAfter:revisionSchema,occurredAt:z.string().datetime({offset:false,precision:3})}).strict()
+    .refine(value=>value.restName===(value.restKind==="short"?"Short rest":"Long rest")&&value.revisionAfter===value.revisionBefore+1,"rest receipt must be exact"),
+  z.object({
+    kind: z.literal("inventory"),
+    itemLabel: z.string().trim().min(1).max(200),
+    action: z.enum(["equip", "unequip", "drop", "gift", "consume"]),
+    quantity: z.number().int().min(1).max(1_000_000),
+    slot: z.enum(["hand", "body", "focus", "accessory"]).nullable(),
+    recipient: z.string().trim().min(1).max(200).nullable(),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+  }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
+    "inventory receipt revision must advance once"),
+  z.object({
+    kind: z.literal("check"),
+    checkKind: z.enum(["ability", "skill"]),
+    ability: z.enum(["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]),
+    skill: z.string().trim().min(1).max(64).nullable(),
+    mode: z.enum(["normal", "advantage", "disadvantage"]),
+    difficulty: z.enum(["Very Easy", "Easy", "Medium", "Hard", "Very Hard", "Nearly Impossible"]),
+    rolls: z.array(z.object({ value: z.number().int().min(1).max(20), kept: z.boolean() }).strict()).min(1).max(2),
+    abilityModifier: z.number().int().min(-10).max(10),
+    proficiencyBonus: z.number().int().min(0).max(6),
+    modifier: z.number().int().min(-10).max(16),
+    total: z.number().int().min(-9).max(36),
+    dc: z.number().int().min(5).max(30),
+    outcome: z.enum(["success", "failure"]),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+  }).strict().superRefine((value, context) => {
+    if ((value.checkKind === "ability") !== (value.skill === null)) context.addIssue({ code: "custom", path: ["skill"], message: "skill must match check kind" });
+    if (value.rolls.filter((roll) => roll.kept).length !== 1) context.addIssue({ code: "custom", path: ["rolls"], message: "exactly one roll must be kept" });
+    if ((value.mode === "normal" ? 1 : 2) !== value.rolls.length) context.addIssue({ code: "custom", path: ["rolls"], message: "roll count must match mode" });
+    if (value.modifier !== value.abilityModifier + value.proficiencyBonus) context.addIssue({ code: "custom", path: ["modifier"], message: "modifier must match its sources" });
+    const kept = value.rolls.find((roll) => roll.kept)?.value;
+    if (kept === undefined || value.total !== kept + value.modifier) context.addIssue({ code: "custom", path: ["total"], message: "total must match kept roll and modifier" });
+    if ((value.outcome === "success") !== (value.total >= value.dc)) context.addIssue({ code: "custom", path: ["outcome"], message: "outcome must match total and DC" });
+    if (value.revisionAfter !== value.revisionBefore + 1) context.addIssue({ code: "custom", path: ["revisionAfter"], message: "receipt revision must advance once" });
+  }),
   z.object({
     kind: z.literal("mechanic"),
     revisionBefore: revisionSchema,
@@ -95,7 +157,7 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
   z.object({kind:z.literal("combat"),revisionBefore:revisionSchema,revisionAfter:revisionSchema,
     occurredAt:z.string().datetime({offset:false,precision:3}),action:z.enum(["attack","flee","end-turn"]),
     outcome:z.discriminatedUnion("kind",[
-      z.object({kind:z.literal("damage"),damageType:z.literal("physical"),requested:z.literal(1),applied:z.number().int().min(0).max(1),
+      z.object({kind:z.literal("damage"),damageType:z.enum(["physical","bludgeoning","piercing","slashing"]),requested:z.number().int().min(0).max(1_000_000),applied:z.number().int().min(0).max(1_000_000),
         hitPointsBefore:z.number().int().min(0).max(1_000_000),hitPointsAfter:z.number().int().min(0).max(1_000_000),statusAfter:z.enum(["active","defeated"])}).strict(),
       z.object({kind:z.literal("status"),statusAfter:z.literal("fled")}).strict(),
       z.object({kind:z.literal("none")}).strict(),
@@ -109,6 +171,35 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
     occurredAt: z.string().datetime({ offset: false, precision: 3 }),
   }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
     "receipt revision must advance once"),
+  z.object({
+    kind: z.literal("quest"),
+    title: z.string().trim().min(1).max(200),
+    objectiveDescription: z.string().trim().min(1).max(2_000),
+    progressBefore: z.number().int().min(0).max(1_000_000),
+    progressAfter: z.number().int().min(0).max(1_000_000),
+    target: z.number().int().min(1).max(1_000_000),
+    objectiveCompleted: z.boolean(),
+    questCompleted: z.boolean(),
+    revisionBefore: revisionSchema,
+    revisionAfter: revisionSchema,
+    occurredAt: z.string().datetime({ offset: false, precision: 3 }),
+  }).strict().superRefine((value, context) => {
+    if (value.progressAfter !== value.progressBefore + 1) {
+      context.addIssue({ code: "custom", message: "quest progress must advance once", path: ["progressAfter"] });
+    }
+    if (value.progressAfter > value.target) {
+      context.addIssue({ code: "custom", message: "quest progress cannot exceed target", path: ["progressAfter"] });
+    }
+    if (value.objectiveCompleted !== (value.progressAfter === value.target)) {
+      context.addIssue({ code: "custom", message: "objective completion must match progress", path: ["objectiveCompleted"] });
+    }
+    if (value.questCompleted && !value.objectiveCompleted) {
+      context.addIssue({ code: "custom", message: "a completed quest requires a completed objective", path: ["questCompleted"] });
+    }
+    if (value.revisionAfter !== value.revisionBefore + 1) {
+      context.addIssue({ code: "custom", message: "receipt revision must advance once", path: ["revisionAfter"] });
+    }
+  }),
 ]);
 export const campaignHistoryHttpPublicReceiptResponseSchema = z.object({
   receipt: campaignHistoryHttpPublicReceiptSchema,

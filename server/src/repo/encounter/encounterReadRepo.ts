@@ -11,10 +11,12 @@ import {
   useConsumableCommandResultSchema,
   combatRewardClaimResultResponseSchema,
   encounterCommandSchema,
+  encounterSetupCandidatesResponseSchema,
   utcIsoTimestampSchema,
   type CombatState,
   type CombatLogEntry,
   type EncounterPublic,
+  type EncounterSetupCandidatesResponse,
   type LegalCombatActionAllowlist,
   type CombatCommandResultResponse,
   type UseConsumableLegalAction,
@@ -24,13 +26,14 @@ import {
 } from "@velvet/contracts";
 import type { Clock } from "../../runtime.js";
 import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js";
-import { buildCombatActionPlans } from "./combatActionPlan.js";
+import { buildCombatActionPlans, isDndCombat, readCombatTurnEconomy } from "./combatActionPlan.js";
 import { buildUseConsumableLegalActions, mayActForConsumable, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
 
 export type EncounterLifecycleSnapshot = EncounterPublic & { campaignId: string };
+export type EncounterSetupCandidatesSnapshot = EncounterSetupCandidatesResponse & { campaignId: string };
 export type EncounterCombatSnapshot = CombatState & { campaignId: string; encounterId: string };
 export type CombatLogPage = {
   campaignId: string;
@@ -43,6 +46,8 @@ export type CombatLogPage = {
 export interface EncounterReadRepository {
   /** Returns lifecycle summaries for one visible campaign, or null when the campaign is concealed. */
   listEncounters(principal: string, campaignId: string): EncounterLifecycleSnapshot[] | null;
+  /** Returns only campaign-pinned, public setup choices available to a GM. */
+  getEncounterSetupCandidates(principal: string, campaignId: string): EncounterSetupCandidatesSnapshot | null;
   /** Returns authoritative public combat state by its globally unique encounter-backed identity. */
   getCombatState(principal: string, combatId: string): EncounterCombatSnapshot | null;
   /** Returns a stable append-only page, or null when the combat is absent or concealed. */
@@ -82,10 +87,13 @@ export function createEncounterReadRepository(
   const canonical=(value:unknown)=>JSON.stringify(value,(_key,item)=>item&&typeof item==="object"&&!Array.isArray(item)
     ?Object.fromEntries(Object.keys(item).sort().map((key)=>[key,item[key]])):item);
   const sha256=(value:string)=>createHash("sha256").update(value).digest("hex");
-  const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,
+  const combatantRows = (encounterId: string): any[] => db.prepare(`SELECT c.*,survival.successes survival_successes,survival.failures survival_failures,
+    COALESCE(temporary.hit_points,0) temporary_hit_points,
     provenance.pack_id provenance_pack_id,provenance.pack_version provenance_pack_version,
     provenance.definition_id provenance_definition_id
-    FROM combatant c LEFT JOIN encounter_enemy_provenance_v31 provenance
+    FROM combatant c LEFT JOIN combat_survival_v61 survival ON survival.encounter_id=c.encounter_id AND survival.combatant_id=c.combatant_id
+      LEFT JOIN combat_temporary_hit_points_v62 temporary ON temporary.encounter_id=c.encounter_id AND temporary.combatant_id=c.combatant_id
+      LEFT JOIN encounter_enemy_provenance_v31 provenance
       ON provenance.encounter_id=c.encounter_id AND provenance.combatant_id=c.combatant_id
     WHERE c.encounter_id=? ORDER BY c.combatant_id`).all(encounterId) as any[];
 
@@ -104,6 +112,11 @@ export function createEncounterReadRepository(
               definitionId: row.provenance_definition_id,
             },
       };
+  const combatConditions = (encounterId: string, combatantId: string, round: number) => db.prepare(`SELECT condition,expires_at_round
+    FROM combat_conditions_v62 WHERE encounter_id=? AND combatant_id=? AND (expires_at_round IS NULL OR expires_at_round>=?)
+    ORDER BY condition,source_combatant_id`).all(encounterId, combatantId, round).map((row: any) => ({
+      condition: row.condition, expiresAtRound: row.expires_at_round,
+    }));
 
   const listEncounters = (principal: string, campaignId: string): EncounterLifecycleSnapshot[] | null => {
     if (!member(principal, campaignId)) return null;
@@ -127,17 +140,64 @@ export function createEncounterReadRepository(
     }));
   };
 
+  const getEncounterSetupCandidates = (principal: string, campaignId: string): EncounterSetupCandidatesSnapshot | null => {
+    if (!gm(principal, campaignId)) return null;
+    const sessions = db.prepare(`SELECT attached.session_id
+      FROM campaign_sessions attached
+      WHERE attached.campaign_id=? AND NOT EXISTS(
+        SELECT 1 FROM encounter open WHERE open.session_id=attached.session_id AND open.status IN ('preparing','active')
+      ) ORDER BY attached.session_id`).all(campaignId) as Array<{ session_id: string }>;
+    const actors = db.prepare(`SELECT actor.id actor_id,persona.name label
+      FROM campaign_actors actor
+      JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
+      JOIN characters persona ON persona.id=character.character_id
+      JOIN rpg_actor_resources health ON health.campaign_id=actor.campaign_id AND health.actor_id=actor.id
+        AND health.name='health' AND health.current>0
+      WHERE actor.campaign_id=? AND NOT EXISTS(
+        SELECT 1 FROM combatant joined JOIN encounter open ON open.encounter_id=joined.encounter_id
+        WHERE joined.campaign_id=actor.campaign_id AND joined.actor_id=actor.id AND open.status IN ('preparing','active')
+      ) ORDER BY actor.id`).all(campaignId) as Array<{ actor_id: string; label: string | null }>;
+    const enemies = db.prepare(`SELECT definition.pack_id,definition.pack_version,definition.definition_id,visibility.public_definition_json
+      FROM rpg_campaign_catalog_definitions_v25 definition
+      JOIN campaign_catalog_current_pins pin ON pin.campaign_id=definition.campaign_id
+        AND pin.pack_id=definition.pack_id AND pin.pack_version=definition.pack_version
+      JOIN rpg_catalog_definition_visibility visibility ON visibility.pack_id=definition.pack_id AND visibility.pack_version=definition.pack_version
+        AND visibility.kind=definition.kind AND visibility.definition_id=definition.definition_id AND visibility.publicly_reachable=1
+      WHERE definition.campaign_id=? AND definition.kind='enemy-template'
+      ORDER BY definition.pack_id,definition.pack_version,definition.definition_id`).all(campaignId) as Array<{
+        pack_id: string; pack_version: string; definition_id: string; public_definition_json: string;
+      }>;
+    const result = encounterSetupCandidatesResponseSchema.parse({
+      sessions: sessions.map((session) => ({ sessionId: session.session_id })),
+      actors: actors.map((actor) => ({ actorId: actor.actor_id, label: actor.label })),
+      enemies: enemies.map((enemy) => {
+        const publicDefinition = JSON.parse(enemy.public_definition_json) as { name?: unknown };
+        return {
+          template: { kind: "enemy-template" as const, packId: enemy.pack_id, packVersion: enemy.pack_version, definitionId: enemy.definition_id },
+          label: publicDefinition.name,
+        };
+      }),
+      teams: { actor: "allies" as const, enemy: "enemies" as const },
+    });
+    return { campaignId, ...result };
+  };
+
   const getCombatState = (principal: string, combatId: string): EncounterCombatSnapshot | null => {
     const encounter = db.prepare(`SELECT e.*,root.revision FROM encounter e
       JOIN combat_mutation_revisions_v27 root ON root.encounter_id=e.encounter_id
       WHERE e.encounter_id=? AND e.status<>'preparing'`).get(combatId) as any;
     if (!encounter || !member(principal, encounter.campaign_id)) return null;
     const rows = combatantRows(combatId);
-    const active = rows.filter((row) => row.status === "active");
+    const active = rows.filter((row) => row.status === "active" || row.status === "unconscious");
     const current = active.find((row) => row.combatant_id === encounter.current_turn_combatant_id) ?? null;
+    const turnEconomy = readCombatTurnEconomy(db, combatId);
+    if (encounter.status === "active" && current && isDndCombat(db, encounter.campaign_id)
+        && (!turnEconomy || turnEconomy.combatantId !== current.combatant_id || turnEconomy.round !== encounter.round_number)) {
+      throw new Error("D&D combat turn economy is unavailable or stale");
+    }
     const legalActions = buildCombatActionPlans(db, principal, encounter.campaign_id, combatId,
       encounter.current_turn_combatant_id).map((plan) => ({
-        legalActionId: plan.legalActionId, kind: plan.kind, targetIds: plan.targetIds,
+        legalActionId: plan.legalActionId, kind: plan.kind, targetIds: plan.targetIds, ...(turnEconomy?{cost:plan.cost}:{}),
       }));
     const combat = combatStateSchema.parse({
       combatId,
@@ -147,9 +207,13 @@ export function createEncounterReadRepository(
         ...publicCombatant(row),
         hitPoints: row.hit_points,
         maximumHitPoints: row.maximum_hit_points,
+        temporaryHitPoints: row.temporary_hit_points,
+        conditions: combatConditions(combatId, row.combatant_id, encounter.round_number),
         status: row.status,
+        ...(row.actor_id !== null && row.survival_successes !== null ? { deathSaves: { successes: row.survival_successes, failures: row.survival_failures } } : {}),
       })),
       legalActions,
+      ...(isDndCombat(db,encounter.campaign_id)?{turnEconomy}:{}),
       revision: encounter.revision,
     });
     return { campaignId: encounter.campaign_id, encounterId: encounter.encounter_id, ...combat };
@@ -175,9 +239,10 @@ export function createEncounterReadRepository(
     const encounter = db.prepare("SELECT * FROM encounter WHERE encounter_id=? AND campaign_id=? AND status='active'").get(encounterId, campaignId) as any;
     const current = encounter?.current_turn_combatant_id && db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(encounterId, encounter.current_turn_combatant_id) as any;
     if (!current?.actor_id || !controls(principal, campaignId, current.actor_id)) return null;
-    const targets = (db.prepare("SELECT combatant_id FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id").all(encounterId, current.team) as any[]).map((row) => row.combatant_id);
-    const actions: any[] = [{ kind: "flee" }, { kind: "end-turn" }];
-    if (targets.length) actions.unshift({ kind: "attack", attackId: "basic_attack", targetCombatantIds: targets });
+    const plans=buildCombatActionPlans(db,principal,campaignId,encounterId,current.combatant_id);
+    const actions: any[] = plans.flatMap((plan)=>plan.kind==="attack"
+      ?[{kind:"attack",attackId:"basic_attack",targetCombatantIds:plan.targetIds}]
+      :plan.kind==="flee"?[{kind:"flee"}]:[{kind:"end-turn"}]);
     const revision = (db.prepare("SELECT revision FROM combat_mutation_revisions_v27 WHERE encounter_id=?").get(encounterId) as any)?.revision;
     return legalCombatActionAllowlistSchema.parse({ campaignId, encounterId, combatantId: current.combatant_id, revision: revision ?? 0, issuedAt: utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()), actions });
   };
@@ -204,7 +269,7 @@ export function createEncounterReadRepository(
     if (row.command_type === "resolve_action") {
       const combat = internal.combat;
       const result = combatActionCommandResponseSchema.parse({ resolution: internal.resolution,
-        combat: { combatId, round: combat.round, currentCombatant: combat.currentCombatant, combatants: combat.combatants, legalActions: combat.legalActions, revision: combat.revision },
+        combat: { combatId, round: combat.round, currentCombatant: combat.currentCombatant, combatants: combat.combatants, legalActions: combat.legalActions, turnEconomy:combat.turnEconomy, revision: combat.revision },
         receipt: { idempotencyKey: internal.receipt.idempotencyKey, revisionBefore: internal.receipt.revisionBefore, revisionAfter: internal.receipt.revisionAfter, occurredAt: internal.receipt.occurredAt } });
       return combatCommandResultResponseSchema.parse({ operation: "action", result });
     }
@@ -281,7 +346,7 @@ export function createEncounterReadRepository(
         expectedRevision:request.expectedRevision,idempotencyKey:request.idempotencyKey},canonicalRequestDigest:row.request_digest},
       receipt:{idempotencyKey:row.idempotency_key,revisionBefore:row.expected_revision,revisionAfter:row.resulting_revision,occurredAt:row.occurred_at}});
   };
-  return { listEncounters, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
+  return { listEncounters, getEncounterSetupCandidates, getCombatState, listCombatLogPage, getLegalCombatActionAllowlist, listCombatLog, getCombatCommandResult,
     listCombatRewards,getCombatRewardClaimResult,
     getUseConsumableLegalActions:(principal,combatId)=>db.transaction(()=>buildUseConsumableLegalActions(db,principal,combatId)).deferred(),
     getUseConsumableCommandResult:(principal,commandId)=>db.transaction(()=>readUseConsumableCommandResult(db,principal,commandId)).deferred(),

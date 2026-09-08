@@ -48,10 +48,7 @@ export interface CompletionToolResultMessage {
 /** A message accepted by the non-stream completion adapter. */
 export type CompletionMessage = CompletionSystemMessage | CompletionUserMessage | CompletionAssistantMessage | CompletionToolResultMessage;
 
-/**
- * A function tool whose wire declaration requests the provider's strict mode.
- * The adapter does not weaken or remove strict mode for incompatible providers.
- */
+/** A schema-bound function tool. Callers still validate every returned argument locally. */
 export interface CompletionFunctionTool {
   name: string;
   description?: string;
@@ -80,11 +77,15 @@ export interface ProviderCompletionInput {
   harness: HarnessSettings;
   preset: PromptPreset;
   messages: readonly CompletionMessage[];
-  /** Strict function capabilities to advertise; an empty list is omitted. */
+  /** Schema-bound function capabilities to advertise; an empty list is omitted. */
   tools?: readonly CompletionFunctionTool[];
   toolChoice?: CompletionToolChoice;
+  /** Whether the provider may emit multiple tool calls in one response. */
+  parallelToolCalls?: boolean;
   /** Strict provider response-format request; never silently downgraded. */
   jsonSchema?: CompletionJsonSchemaFormat;
+  promptVersion?: string;
+  schemaVersion?: string;
   signal?: AbortSignal;
 }
 
@@ -106,6 +107,14 @@ export interface ProviderCompletionResult {
   message: CompletionAssistantMessage;
   usage: ProviderCompletionUsage | null;
   model: ProviderCompletionModelMetadata;
+  provenance?: {
+    requestId: string | null;
+    systemFingerprint: string | null;
+    finishReason: "stop" | "length" | "tool_calls" | "content_filter" | "error" | "unknown";
+    latencyMs: number;
+    promptVersion: string;
+    schemaVersion: string;
+  };
 }
 
 /** Base class for classified completion adapter failures. */
@@ -133,11 +142,13 @@ export class ProviderProtocolError extends ProviderCompletionError {}
 export class ProviderHttpError extends ProviderCompletionError {
   /** HTTP status returned by the provider. */
   readonly status: number;
+  readonly retryAfter: string | null;
 
-  constructor(status: number, detail: string, apiKey = "") {
+  constructor(status: number, detail: string, apiKey = "", retryAfter: string | null = null) {
     const safeDetail = redactSensitiveExcerpt(detail, apiKey);
     super(`Provider completion HTTP ${status}${safeDetail ? `: ${safeDetail}` : ""}`);
     this.status = status;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -225,7 +236,6 @@ function applyTools(body: Record<string, unknown>, input: ProviderCompletionInpu
           name: tool.name,
           ...(tool.description !== undefined ? { description: tool.description } : {}),
           parameters: tool.parameters,
-          strict: true,
         },
       };
     });
@@ -361,6 +371,10 @@ function parseResponse(
   requestedModel: string,
   policy: ResponseToolPolicy,
   apiKey: string,
+  response: Response,
+  latencyMs: number,
+  promptVersion: string,
+  schemaVersion: string,
 ): ProviderCompletionResult {
   if (!isObject(payload)) throw new ProviderProtocolError("Provider completion response must be an object");
   if (Object.prototype.hasOwnProperty.call(payload, "error") && payload.error !== null) {
@@ -370,6 +384,17 @@ function parseResponse(
     throw new ProviderProtocolError("Provider completion response has no choice");
   }
   const choice = payload.choices[0];
+  if (Object.prototype.hasOwnProperty.call(choice, "error") && choice.error !== null) {
+    throw new ProviderResponseError(providerErrorMessage(choice.error), apiKey);
+  }
+  const finishReason = ["stop", "length", "tool_calls", "content_filter", "error"].includes(String(choice.finish_reason))
+    ? choice.finish_reason as "stop" | "length" | "tool_calls" | "content_filter" | "error" : "unknown";
+  const requiresToolCall = policy.toolChoice === "required" || typeof policy.toolChoice === "object";
+  const hasResponseToolCalls = isObject(choice.message) && Object.prototype.hasOwnProperty.call(choice.message, "tool_calls");
+  if ((requiresToolCall || hasResponseToolCalls)
+    && (finishReason === "error" || finishReason === "length" || finishReason === "content_filter")) {
+    throw new ProviderProtocolError(`Provider did not complete the tool call (finish_reason: ${finishReason})`);
+  }
   if (!isObject(choice.message) || (choice.message.role !== undefined && choice.message.role !== "assistant")) {
     throw new ProviderProtocolError("Provider completion choice has no assistant message");
   }
@@ -383,7 +408,7 @@ function parseResponse(
   if ((!hasContent || message.content === null) && !toolCalls) {
     throw new ProviderProtocolError("Provider assistant message has neither content nor tool calls");
   }
-  if ((policy.toolChoice === "required" || typeof policy.toolChoice === "object") && !toolCalls) {
+  if (requiresToolCall && !toolCalls) {
     throw new ProviderProtocolError("Provider did not return a required tool call");
   }
   return {
@@ -392,6 +417,14 @@ function parseResponse(
     model: {
       requestedModel,
       responseModel: typeof payload.model === "string" && payload.model.trim() ? payload.model : null,
+    },
+    provenance: {
+      requestId: response.headers.get("x-request-id") ?? (typeof payload.id === "string" && payload.id.trim() ? payload.id : null),
+      systemFingerprint: typeof payload.system_fingerprint === "string" && payload.system_fingerprint.trim() ? payload.system_fingerprint : null,
+      finishReason,
+      latencyMs,
+      promptVersion,
+      schemaVersion,
     },
   };
 }
@@ -408,10 +441,10 @@ function isRedirectFailure(error: unknown): boolean {
 /**
  * Executes one real, non-stream OpenAI-compatible completion request.
  *
- * Strict function tools and JSON Schema constraints are sent exactly as
- * requested. Provider incompatibility is surfaced as an HTTP, provider, or
- * protocol error and is never silently downgraded. The owning orchestrator
- * must still parse and locally validate tool arguments and schema content.
+ * Function tools and strict JSON Schema constraints are sent exactly as
+ * requested. Function declarations omit provider-specific strict mode so
+ * compatible routers may select fallback models. The owning orchestrator must
+ * still parse and locally validate tool arguments and schema content.
  * Redirects are refused so scoped credentials cannot be forwarded.
  *
  * @throws {ProviderConfigurationError} For invalid settings, capabilities, or transcripts.
@@ -437,11 +470,13 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
   const transcript = wireMessages(input.messages);
   body.messages = transcript.messages;
   body.stream = false;
+  if (input.parallelToolCalls !== undefined) body.parallel_tool_calls = input.parallelToolCalls;
   const advertisedNames = applyTools(body, input);
   applyJsonSchema(body, input.jsonSchema);
   const requestedModel = String(body.model);
 
   const timeout = new AbortController();
+  const startedAt = performance.now();
   const timer = setTimeout(() => timeout.abort(), timeoutMs);
   const signals = input.signal ? [input.signal, timeout.signal] : [timeout.signal];
   try {
@@ -454,14 +489,15 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
     });
     if (response.status >= 300 && response.status < 400) throw new ProviderRedirectError("Provider completion redirect refused");
     if (!response.ok) {
-      throw new ProviderHttpError(response.status, await readBoundedErrorDetail(response), input.provider.apiKey);
+      throw new ProviderHttpError(response.status, await readBoundedErrorDetail(response), input.provider.apiKey, response.headers.get("retry-after"));
     }
     const payload=await readBoundedSuccessPayload(response);
     return parseResponse(payload, requestedModel, {
       advertisedNames,
       toolChoice: input.toolChoice,
       priorCallIds: transcript.priorCallIds,
-    }, input.provider.apiKey);
+    }, input.provider.apiKey, response, Math.max(0, Math.round(performance.now() - startedAt)),
+      input.promptVersion ?? "unversioned", input.schemaVersion ?? "unversioned");
   } catch (error) {
     if (error instanceof ProviderCompletionError) throw error;
     if (input.signal?.aborted) throw new ProviderCallerAbortError("Provider completion aborted by caller", { cause: error });

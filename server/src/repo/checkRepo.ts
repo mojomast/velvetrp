@@ -11,6 +11,7 @@ import {
 } from "@velvet/contracts";
 import { evaluateDiceExpression } from "../dice.js";
 import { runM16Mutation, type M16Dependencies, type M16Result } from "./effectRepo.js";
+import { DND_5E_SKILL_ABILITIES, resolveCampaignRuleset, type AbilityId, type SkillId } from "../rulesets/index.js";
 
 export class CheckUnavailableError extends Error { readonly code = "CHECK_UNAVAILABLE"; }
 export class ActorCheckNotFoundError extends Error { readonly code = "ACTOR_CHECK_NOT_FOUND"; }
@@ -63,7 +64,17 @@ export function createCheckRepository(
             : command.kind === "attack"
               ? command.attackId
               : command.skillId ?? "insight";
-        if (!SUPPORTED_KEYS.has(key)) throw new CheckUnavailableError("check selection is unavailable");
+        let binding: ReturnType<typeof resolveCampaignRuleset>;
+        try { binding = resolveCampaignRuleset(db, command.campaignId); }
+        catch { throw new CheckUnavailableError("campaign ruleset binding is unavailable"); }
+        const srd = binding.rulesetId === "dnd-5e";
+        const normalizedKey = key.toLowerCase().split(/[.:_-]+/u).filter(Boolean).at(-1)!;
+        const srdAbility = command.kind === "skill" || command.kind === "opposed"
+          ? DND_5E_SKILL_ABILITIES[normalizedKey as SkillId]
+          : command.kind === "attack" ? "strength" : normalizedKey as AbilityId;
+        if ((!srd && !SUPPORTED_KEYS.has(key)) || (srd && !binding.module.descriptor.abilities.some(({ id }) => id === srdAbility))) {
+          throw new CheckUnavailableError("check selection is unavailable");
+        }
 
         const targetActorId = command.kind === "opposed"
           ? command.opponentActorId
@@ -78,8 +89,10 @@ export function createCheckRepository(
         const sheet = db.prepare("SELECT sheet_id FROM campaign_actors WHERE campaign_id=? AND id=?")
           .get(command.campaignId, command.actorId) as { sheet_id: string } | undefined;
         if (!sheet) throw new ActorCheckNotFoundError("actor check state is unavailable");
+        const attributeKey = srd ? srdAbility : key;
         const attribute = db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
-          .get(command.campaignId, sheet.sheet_id, key) as { value: number } | undefined;
+          .get(command.campaignId, sheet.sheet_id, attributeKey) as { value: number } | undefined;
+        if (!attribute) throw new CheckUnavailableError("check ability is unavailable");
         const proficiencyCategory = command.kind === "save" ? "saving-throw"
           : command.kind === "skill" || (command.kind === "opposed" && command.skillId !== undefined) ? "skill"
             : command.kind === "attack" ? "weapon" : "none";
@@ -101,10 +114,12 @@ export function createCheckRepository(
           }));
         const advantage = effects.some((effect) => effect.modifierKind === "advantage");
         const roll = evaluateDiceExpression(advantage ? "1d20adv" : "1d20", deps.rng);
-        const flat = (attribute?.value ?? 0)
+        const flat = (srd ? binding.module.abilityModifier(attribute.value) : attribute.value)
           + effects.filter((effect) => effect.modifierKind === "flat").reduce((sum, effect) => sum + effect.amount, 0);
+        const level = srd ? (db.prepare("SELECT COALESCE(sum(level),0) level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=?")
+          .get(command.campaignId, sheet.sheet_id) as { level: number }).level : 1;
         const proficiency = proficient
-          ? 2 + effects.filter((effect) => effect.modifierKind === "proficiency").reduce((sum, effect) => sum + effect.amount, 0)
+          ? binding.module.proficiencyBonus(level) + effects.filter((effect) => effect.modifierKind === "proficiency").reduce((sum, effect) => sum + effect.amount, 0)
           : 0;
         const terms: Array<Record<string, unknown>> = [
           { kind: "roll", roll },
@@ -114,10 +129,11 @@ export function createCheckRepository(
         const total = terms.reduce((sum, term) => sum + (term.kind === "roll" ? roll.total : term.value as number), 0);
         const target = command.kind === "opposed"
           ? { kind: "opposed_total" as const, actorId: command.opponentActorId, value: 14 }
-          : { kind: "difficulty_class" as const, value: difficultyRef === undefined ? 10 : DIFFICULTY_CLASSES[difficultyRef] };
+          : { kind: "difficulty_class" as const, value: difficultyRef === undefined ? (srd ? 15 : 10)
+            : srd ? { easy: 10, standard: 15, hard: 20, "very-hard": 25 }[difficultyRef] : DIFFICULTY_CLASSES[difficultyRef] };
         if (target.value === undefined) throw new CheckUnavailableError("check difficulty is unavailable");
-        const outcome = roll.terms.some((term) => term.kept && term.value === 20) ? "critical_success"
-          : roll.terms.some((term) => term.kept && term.value === 1) ? "critical_failure"
+        const outcome = !srd && roll.terms.some((term) => term.kept && term.value === 20) ? "critical_success"
+          : !srd && roll.terms.some((term) => term.kept && term.value === 1) ? "critical_failure"
             : total >= target.value ? "success" : "failure";
         const resolution = checkResolutionSchema.parse({ terms, total, target, outcome });
         return {

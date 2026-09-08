@@ -82,6 +82,7 @@ function readProvider(db: DatabaseDriver.Database): ProviderSettings {
       ...parsed,
       id: "provider",
       pricing: { ...defaultProviderSettings().pricing, ...(parsed.pricing ?? {}) },
+      adventureTurnBudget: { ...defaultProviderSettings().adventureTurnBudget, ...(parsed.adventureTurnBudget ?? {}) },
       samplers: { ...DEFAULT_SAMPLERS, ...(parsed.samplers ?? {}) },
     };
   } catch {
@@ -103,6 +104,7 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
   const next: ProviderSettings = {
     ...current,
     pricing: { ...current.pricing, ...(patch.pricing ?? {}) },
+    adventureTurnBudget: { ...current.adventureTurnBudget, ...(patch.adventureTurnBudget ?? {}) },
     samplers: { ...current.samplers, ...(patch.samplers ?? {}) } as SamplerSettings,
   };
   if (patch.providerType !== undefined) next.providerType = patch.providerType;
@@ -123,6 +125,15 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
     if (typeof patch.pricing.promptPerMillion === "number" && Number.isFinite(patch.pricing.promptPerMillion)) next.pricing.promptPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.promptPerMillion));
     if (patch.pricing.completionPerMillion === null) next.pricing.completionPerMillion = null;
     if (typeof patch.pricing.completionPerMillion === "number" && Number.isFinite(patch.pricing.completionPerMillion)) next.pricing.completionPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.completionPerMillion));
+  }
+  if (patch.adventureTurnBudget) {
+    if (typeof patch.adventureTurnBudget.maxTotalTokens === "number" && Number.isFinite(patch.adventureTurnBudget.maxTotalTokens)) {
+      next.adventureTurnBudget.maxTotalTokens = clampInt(patch.adventureTurnBudget.maxTotalTokens, 1, 1_000_000_000);
+    }
+    if (patch.adventureTurnBudget.maxEstimatedCostUsd === null) next.adventureTurnBudget.maxEstimatedCostUsd = null;
+    if (typeof patch.adventureTurnBudget.maxEstimatedCostUsd === "number" && Number.isFinite(patch.adventureTurnBudget.maxEstimatedCostUsd)) {
+      next.adventureTurnBudget.maxEstimatedCostUsd = Math.max(0, Math.min(1_000_000, patch.adventureTurnBudget.maxEstimatedCostUsd));
+    }
   }
   if (patch.samplers) {
     if (patch.samplers.maxTokens !== undefined) next.samplers.maxTokens = clampNullableInt(patch.samplers.maxTokens, 1, 32768);

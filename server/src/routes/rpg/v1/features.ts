@@ -20,7 +20,7 @@ import {
   campaignRoomLinkingResponseSchema,
   campaignStarterSetupRequestSchema,
   campaignStarterSetupResponseSchema,
-  resourceIdSchema,
+  resourceIdSchema, SRD_5_1_STARTER_ID, SRD_5_1_STARTER_IDENTITY,
 } from "@velvet/contracts";
 import type {
   Campaign,
@@ -44,6 +44,8 @@ import {
   CampaignSessionAttachmentConflictError,
   CampaignSessionAttachmentSessionMissingError,
   CampaignSessionAttachmentUnavailableError,
+  ContentCatalogConflictError,
+  ContentCatalogStaleError,
 } from "../../../repo/index.js";
 import type { OriginalStarterSetupRepository } from "../../../content/originalStarterSetup.js";
 import type {
@@ -51,6 +53,7 @@ import type {
   MechanicsStarterSetupSnapshotRepository,
 } from "../../../content/mechanicsStarterSetup.js";
 import type { CampaignCharacterRosterSnapshot } from "../../../repo/index.js";
+import type { ActorGameplaySheetReadRepository } from "../../../repo/index.js";
 import type { CampaignCharacterWorkspaceSnapshot } from "../../../repo/index.js";
 import type { CampaignRoomLinkingSnapshot } from "../../../repo/index.js";
 import {
@@ -85,6 +88,7 @@ import { MECHANICS_STARTER_IDENTITY } from "@velvet/contracts";
 import { characterBuilderHttpRoutes } from "./characterBuilder.js";
 import { characterProgressionRoutes } from "./characterProgression.js";
 import { characterSheetHttpRoutes } from "./characterSheet.js";
+import { actorGameplaySheetHttpRoutes } from "./actorGameplaySheet.js";
 import { campaignAdministrationHttpRoutes } from "./campaignAdministration.js";
 import { campaignMembershipHttpRoutes } from "./campaignMemberships.js";
 import { campaignHistoryHttpRoutes } from "./campaignHistory.js";
@@ -133,6 +137,10 @@ import { npcPresenceHttpRoutes } from "./npcPresenceRoutes.js";
 import { companionAdministrationHttpRoutes } from "./companionAdministration.js";
 import type { CompanionRepository } from "../../../repo/companionRepo.js";
 import type { AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
+import { tacticalMapHttpRoutes } from "./tacticalMaps.js";
+import type { TacticalMapRepository } from "../../../repo/tacticalMapRepo.js";
+import type { CampaignAdministrationIntegrationRepository } from "../../../repo/campaignAdministrationIntegrationRepo.js";
+import { campaignAdministrationIntegrationsHttpRoutes } from "./campaignAdministrationIntegrations.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
 export interface CampaignListRepository extends
@@ -157,7 +165,7 @@ export interface CampaignListRepository extends
   Partial<Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">>,
   Partial<Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">>,
   Partial<Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">>,
-  Partial<Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
+  Partial<Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "getCombatRewardClaimResult">>,
   Partial<Pick<EncounterRepository, "getUseConsumableLegalActions" | "useConsumable" | "getUseConsumableCommandResultByKey">>,
   Partial<Pick<WorldRepository, "getCampaignWorld" | "travelActor" | "placeActor">>,
   Partial<Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">>,
@@ -165,6 +173,8 @@ export interface CampaignListRepository extends
   Partial<Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">>,
   Partial<Pick<CompanionRepository,
     "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">>,
+  Partial<TacticalMapRepository>,
+  Partial<CampaignAdministrationIntegrationRepository>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
   getAdventureTurnByInitialIdempotencyKey?: AdventureTurnRepository["getAdventureTurnByInitialIdempotencyKey"];
@@ -187,6 +197,14 @@ export interface CampaignListRepository extends
   getCommandReceipt?: Repository["getCommandReceipt"];
   getAgentCombatReceipt?:Repository["getAgentCombatReceipt"];
   getExactCandidateTravelPublicReceipt?:Repository["getExactCandidateTravelPublicReceipt"];
+  getAdventureCheckPublicReceipt?:Repository["getAdventureCheckPublicReceipt"];
+  getAdventureInventoryPublicReceipt?:Repository["getAdventureInventoryPublicReceipt"];
+  getAdventureCommercePublicReceipt?:Repository["getAdventureCommercePublicReceipt"];
+  getAdventurePowerPublicReceipt?:Repository["getAdventurePowerPublicReceipt"];
+  getAdventureRestPublicReceipt?:Repository["getAdventureRestPublicReceipt"];
+  getAdventureQuestLifecyclePublicReceipt?:Repository["getAdventureQuestLifecyclePublicReceipt"];
+  getAdventureProgressionPublicReceipt?:Repository["getAdventureProgressionPublicReceipt"];
+  getAdventureCombatConsumablePublicReceipt?:Repository["getAdventureCombatConsumablePublicReceipt"];
   getCampaignDetail(actorPrincipalId: string, campaignId: string): CampaignDetail | null;
   createCampaign(actorPrincipalId: string, input: CreateCampaignInput): Campaign;
   getCampaignCharacterCreationOptions(
@@ -207,12 +225,15 @@ export interface CampaignListRepository extends
     campaignId: string,
     campaignCharacterId: string,
   ): import("../../../repo/index.js").CampaignCharacterSheetSnapshot | null;
+  getActorGameplaySheet?: ActorGameplaySheetReadRepository["getActorGameplaySheet"];
   getCampaignCharacter?(actorPrincipalId: string, campaignId: string, campaignCharacterId: string): CampaignCharacterRead | null;
   listActorResources?(actorPrincipalId: string, campaignId: string, actorId: string): ActorResource[];
   createOriginalStarterCampaignCharacter: OriginalStarterCharacterCreationRepository["createOriginalStarterCampaignCharacter"];
   resolveCampaignCatalog?: MechanicsStarterSetupSnapshotRepository["resolveCampaignCatalog"];
   installMechanicsStarterCatalog?: MechanicsStarterSetupRepository["installMechanicsStarterCatalog"];
   configureMechanicsStarterCatalog?: MechanicsStarterSetupRepository["configureMechanicsStarterCatalog"];
+  installSrdStarterCatalog?: Repository["installSrdStarterCatalog"];
+  configureSrdStarterCatalog?: Repository["configureSrdStarterCatalog"];
   renameCampaignIfUnchanged(
     actorPrincipalId: string,
     campaignId: string,
@@ -259,6 +280,7 @@ type CharacterBuilderLaneRepository = Pick<CharacterBuilderRepository,
 type CharacterProgressionLaneRepository = Pick<CharacterProgressionRepository,
   "getCharacterProgression" | "previewCharacterProgression" | "grantCharacterXp" | "applyCharacterProgression">;
 type CharacterSheetLaneRepository = Required<Pick<CampaignListRepository, "getCampaignCharacterSheetSnapshot">>;
+type ActorGameplaySheetLaneRepository = Required<Pick<CampaignListRepository, "getActorGameplaySheet">>;
 type CampaignAdministrationLaneRepository = Pick<CampaignAdministrationRepository,
   "getCampaignAdministration" | "updateCampaignAdministration" | "archiveCampaignWithConfirmation">;
 type CampaignTransferLaneRepository = Pick<CampaignAdministrationRepository,
@@ -275,6 +297,11 @@ type CampaignHistoryLaneRepository = Pick<CampaignAdministrationRepository,
   getCommandReceipt: Repository["getCommandReceipt"];
   getAgentCombatReceipt:Repository["getAgentCombatReceipt"];
   getExactCandidateTravelPublicReceipt:Repository["getExactCandidateTravelPublicReceipt"];
+  getAdventureCheckPublicReceipt:Repository["getAdventureCheckPublicReceipt"];
+  getAdventureInventoryPublicReceipt:Repository["getAdventureInventoryPublicReceipt"];
+  getAdventureCommercePublicReceipt:Repository["getAdventureCommercePublicReceipt"];
+  getAdventurePowerPublicReceipt:Repository["getAdventurePowerPublicReceipt"];
+  getAdventureRestPublicReceipt:Repository["getAdventureRestPublicReceipt"];
 };
 type QuestLaneRepository = Pick<QuestRepository,
   "listCampaignQuests" | "createCampaignQuest" | "executeQuestCommand">;
@@ -292,15 +319,16 @@ type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" |
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 type EffectLaneRepository = Pick<EffectRepository, "getActorEffectSnapshot" | "mutateActorEffect">;
-type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "createEncounter" | "startEncounter">;
+type EncounterLifecycleLaneRepository = Pick<EncounterRepository, "listEncounters" | "getEncounterSetupCandidates" | "createEncounter" | "startEncounter">;
 type CombatReadLaneRepository = Pick<EncounterRepository, "getCombatState" | "listCombatLogPage" | "listCombatRewards">;
-type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
-type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"placeActor">;
+type CombatCommandLaneRepository = Pick<EncounterRepository, "resolveCombatAction" | "executeCombatEnemyTurn" | "endCombat" | "getCombatCommandResult" | "claimCombatReward" | "listCombatRewards" | "getCombatRewardClaimResult">;
+type WorldHttpLaneRepository=Pick<WorldRepository,"getCampaignWorld"|"travelActor"|"establishCamp"|"placeActor">;
 type NpcHttpLaneRepository=Pick<WorldRepository,"listCampaignNpcs"|"createCampaignNpc"|"changeNpcRelationship">;
 type FactionHttpLaneRepository=Pick<WorldRepository,"listCampaignFactions"|"createCampaignFaction"|"changeFactionReputation">;
 type NpcPresenceHttpLaneRepository = Pick<WorldRepository, "getNpcCast" | "mutateNpcPresence">;
 type CompanionAdministrationHttpLaneRepository = Pick<CompanionRepository,
   "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">;
+type TacticalMapLaneRepository = TacticalMapRepository;
 type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnByInitialIdempotencyKey" | "getAdventureTurnNarration" | "createAdventureTurn"
   | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
   & Required<Pick<CampaignListRepository, "getCampaign">>;
@@ -310,7 +338,7 @@ type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGeneratio
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>
   & Pick<Repository, "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
     | "getCampaignGenerationContext" | "recordCampaignGenerationCandidate" | "getCampaignGeneratedFoundation"
-    | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial">;
+    | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial" | "getSessionZeroSafetyPolicy">;
 
 class UnsupportedCampaignRepositoryError extends Error {
   constructor() {
@@ -349,6 +377,12 @@ function assertCharacterSheetRepository(
   if (typeof repository.getCampaignCharacterSheetSnapshot !== "function") {
     throw new UnsupportedCampaignRepositoryError();
   }
+}
+
+function assertActorGameplaySheetRepository(
+  repository: CampaignListRepository,
+): asserts repository is CampaignListRepository & ActorGameplaySheetLaneRepository {
+  if (typeof repository.getActorGameplaySheet !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertCampaignAdministrationRepository(
@@ -392,7 +426,12 @@ function assertCampaignHistoryRepository(
     || typeof repository.listPublicCampaignEvents !== "function"
     || typeof repository.getCommandReceipt !== "function"
     || typeof repository.getAgentCombatReceipt!=="function"
-    || typeof repository.getExactCandidateTravelPublicReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
+    || typeof repository.getExactCandidateTravelPublicReceipt!=="function"
+    || typeof repository.getAdventureCheckPublicReceipt!=="function"
+     || typeof repository.getAdventureInventoryPublicReceipt!=="function"
+     || typeof repository.getAdventureCommercePublicReceipt!=="function"
+     || typeof repository.getAdventurePowerPublicReceipt!=="function"
+     || typeof repository.getAdventureRestPublicReceipt!=="function") throw new UnsupportedCampaignRepositoryError();
 }
 
 function assertQuestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & QuestLaneRepository {
@@ -447,7 +486,7 @@ function assertCombatReadRepository(repository: CampaignListRepository): asserts
   }
 }
 function assertCombatCommandRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CombatCommandLaneRepository {
-  if(typeof repository.resolveCombatAction!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function"||typeof repository.claimCombatReward!=="function"||typeof repository.listCombatRewards!=="function"||typeof repository.getCombatRewardClaimResult!=="function")
+  if(typeof repository.resolveCombatAction!=="function"||typeof repository.executeCombatEnemyTurn!=="function"||typeof repository.endCombat!=="function"||typeof repository.getCombatCommandResult!=="function"||typeof repository.claimCombatReward!=="function"||typeof repository.listCombatRewards!=="function"||typeof repository.getCombatRewardClaimResult!=="function")
     throw new UnsupportedCampaignRepositoryError();
 }
 type CombatConsumableLaneRepository=Pick<EncounterRepository,"getUseConsumableLegalActions"|"useConsumable"|"getUseConsumableCommandResultByKey">;
@@ -456,7 +495,8 @@ function assertCombatConsumableRepository(repository:CampaignListRepository):ass
     ||typeof repository.getUseConsumableCommandResultByKey!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertWorldHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&WorldHttpLaneRepository{
-  if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function"||typeof repository.placeActor!=="function")throw new UnsupportedCampaignRepositoryError();
+  const candidate=repository as unknown as Record<string,unknown>;
+  if(typeof repository.getCampaignWorld!=="function"||typeof repository.travelActor!=="function"||typeof candidate.establishCamp!=="function"||typeof repository.placeActor!=="function")throw new UnsupportedCampaignRepositoryError();
 }
 function assertNpcHttpRepository(repository:CampaignListRepository):asserts repository is CampaignListRepository&NpcHttpLaneRepository{
   if(typeof repository.listCampaignNpcs!=="function"||typeof repository.createCampaignNpc!=="function"||typeof repository.changeNpcRelationship!=="function")throw new UnsupportedCampaignRepositoryError();
@@ -479,6 +519,10 @@ function assertCompanionAdministrationHttpRepository(
   ];
   if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
+function assertTacticalMapRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & TacticalMapLaneRepository {
+  const methods: Array<keyof TacticalMapLaneRepository> = ["generateTacticalMapForSession", "getTacticalMap", "previewTacticalMapMove", "moveTacticalMapToken"];
+  if (methods.some((method) => typeof repository[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
+}
 function assertAdventureTurnRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AdventureTurnLaneRepository {
   const methods: Array<keyof AdventureTurnLaneRepository> = ["getAdventureTurn", "getAdventureTurnByInitialIdempotencyKey", "getAdventureTurnNarration", "createAdventureTurn",
     "waitForToolConfirmation", "decideToolProposals", "reconcileAdventureTurnMechanics", "updateAdventureTurnNarration", "getCampaign"];
@@ -492,7 +536,7 @@ function assertGenerationDraftRepository(repository: CampaignListRepository): as
     "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration",
     "beginCampaignGenerationCall", "getCampaignGenerationCall", "finishCampaignGenerationCall",
     "getCampaignGenerationContext", "recordCampaignGenerationCandidate", "getCampaignGeneratedFoundation",
-    "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial"];
+    "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial", "getSessionZeroSafetyPolicy"];
   if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
 }
 
@@ -541,6 +585,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const characterSheetRepositoryAccessor = (): CharacterSheetLaneRepository => {
     const repository = getCampaignRepository();
     assertCharacterSheetRepository(repository);
+    return repository;
+  };
+  const actorGameplaySheetRepositoryAccessor = (): ActorGameplaySheetLaneRepository => {
+    const repository = getCampaignRepository();
+    assertActorGameplaySheetRepository(repository);
     return repository;
   };
   const campaignAdministrationRepositoryAccessor = (): CampaignAdministrationLaneRepository => {
@@ -638,9 +687,17 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertCompanionAdministrationHttpRepository(repository);
     return repository;
   };
+  const tacticalMapRepositoryAccessor = (): TacticalMapLaneRepository => { const repository = getCampaignRepository(); assertTacticalMapRepository(repository); return repository; };
   const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository as unknown as AdventureTurnLaneRepository & Repository; };
   const campaignPlayRepositoryAccessor = (): CampaignPlayLaneRepository => { const repository = getCampaignRepository(); assertCampaignPlayRepository(repository); return repository; };
   const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
+  const administrationIntegrationsRepositoryAccessor = (): CampaignAdministrationIntegrationRepository => {
+    const repository = getCampaignRepository();
+    if (typeof repository.getCampaignAdministrationIntegrations !== "function" || typeof repository.associateCampaignVendor !== "function"
+      || typeof repository.configureCampaignBuyPolicy !== "function" || typeof repository.selectCampaignRuleset !== "function"
+      || typeof repository.updateSessionZeroSafetyPolicy !== "function" || typeof repository.requestCampaignSafetyAction !== "function") throw new UnsupportedCampaignRepositoryError();
+    return repository as CampaignListRepository & CampaignAdministrationIntegrationRepository;
+  };
   await app.register(characterBuilderHttpRoutes, {
     characterBuilderRepositoryAccessor,
   });
@@ -650,9 +707,13 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(characterSheetHttpRoutes, {
     characterSheetRepositoryAccessor,
   });
+  await app.register(actorGameplaySheetHttpRoutes, {
+    actorGameplaySheetRepositoryAccessor,
+  });
   await app.register(campaignAdministrationHttpRoutes, {
     campaignAdministrationRepositoryAccessor,
   });
+  await app.register(campaignAdministrationIntegrationsHttpRoutes, { repositoryAccessor: administrationIntegrationsRepositoryAccessor });
   await app.register(campaignTransferHttpRoutes, { campaignTransferRepositoryAccessor });
   await app.register(campaignMembershipHttpRoutes, { campaignMembershipRepositoryAccessor });
   await app.register(campaignHistoryHttpRoutes, { campaignHistoryRepositoryAccessor });
@@ -675,6 +736,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(factionHttpRoutes,{factionRepositoryAccessor});
   await app.register(npcPresenceHttpRoutes, { npcPresenceRepositoryAccessor });
   await app.register(companionAdministrationHttpRoutes, { companionRepositoryAccessor });
+  await app.register(tacticalMapHttpRoutes, { tacticalMapRepositoryAccessor });
   await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
@@ -1415,6 +1477,25 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
 
     try {
       const repository = getCampaignRepository();
+      if (body.data.starterId === SRD_5_1_STARTER_ID) {
+        if (typeof repository.installSrdStarterCatalog !== "function"
+          || typeof repository.configureSrdStarterCatalog !== "function"
+          || typeof repository.getCampaignAdministration !== "function") throw new Error("campaign repository does not support SRD starter setup");
+        const before = repository.getCampaignAdministration(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
+        if (!before) throw new MechanicsStarterSetupUnavailableError();
+        repository.installSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL);
+        repository.configureSrdStarterCatalog(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data, { expectedRevision: before.revision,
+          idempotencyKey: "srd-5.1-starter-setup-v1" });
+        const campaign = repository.getCampaignDetail(LOCAL_CAMPAIGN_PRINCIPAL, campaignId.data);
+        if (!campaign || campaign.content.status !== "configured"
+          || campaign.content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId
+          || campaign.content.contentPacks.length !== 1
+          || campaign.content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId
+          || campaign.content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion) {
+          throw new MechanicsStarterSetupConflictError();
+        }
+        return reply.code(200).send(campaignMechanicsStarterSetupResponseSchema.parse({ campaign }));
+      }
       if (typeof repository.transaction !== "function"
         || typeof repository.installMechanicsStarterCatalog !== "function"
         || typeof repository.configureMechanicsStarterCatalog !== "function") {
@@ -1437,7 +1518,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
       if (error instanceof MechanicsStarterSetupUnavailableError) {
         return sendApiProblem(request, reply, 404, "RPG_CAMPAIGN_NOT_FOUND", "Campaign not found");
       }
-      if (error instanceof MechanicsStarterSetupConflictError) {
+      if (error instanceof MechanicsStarterSetupConflictError || error instanceof ContentCatalogConflictError
+        || error instanceof ContentCatalogStaleError) {
         return sendApiProblem(
           request, reply, 409, "RPG_CAMPAIGN_MECHANICS_STARTER_SETUP_CONFLICT",
           "Mechanics starter setup conflicts with current campaign state",

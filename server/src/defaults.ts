@@ -52,6 +52,7 @@ export function defaultProviderSettings(updatedAt = now()): ProviderSettings {
     zdr: false,
     requestTimeoutSeconds: 90,
     pricing: { promptPerMillion: null, completionPerMillion: null },
+    adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null },
     samplers: { ...DEFAULT_SAMPLERS },
     updatedAt,
   };
@@ -92,6 +93,7 @@ export function toPublicProvider(provider: ProviderSettings): PublicProviderSett
     zdr: provider.zdr,
     requestTimeoutSeconds: provider.requestTimeoutSeconds,
     pricing: provider.pricing,
+    adventureTurnBudget: provider.adventureTurnBudget,
     samplers: provider.samplers,
     updatedAt: provider.updatedAt,
   };

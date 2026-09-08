@@ -2,6 +2,7 @@ import { z } from "zod";
 import { campaignIdSchema } from "./rpg-characters.js";
 import { idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
+import { enemyTemplateCatalogReferenceSchema, itemCatalogReferenceSchema } from "./content-catalog.js";
 
 const text = z.string().trim().min(1).max(4_000);
 const name = z.string().trim().min(1).max(200);
@@ -12,7 +13,7 @@ export const generatedArtifactKeySchema = z.string().trim().min(1).max(64).regex
 /** Independently generatable sections. None implicitly requires an opening or a location graph. */
 export const campaignGenerationSectionSchema = z.enum([
   "outline", "arcs", "locations", "factions", "npcs", "quests", "encounters",
-  "clues", "story", "handouts", "scene-prompts",
+  "clues", "story", "lore", "quest-items", "monster-concepts", "handouts", "scene-prompts",
 ]);
 
 const retryFailedAttemptSchema = z.object({ failedAttempt: z.number().int().min(1).max(32) }).strict();
@@ -24,7 +25,7 @@ export const campaignContentGenerationRequestSchema = z.object({
   tone: name,
   exclusions: z.array(name).max(16),
   idempotencyKey: idempotencyKeySchema,
-  sections: z.array(campaignGenerationSectionSchema).min(1).max(11).default([
+  sections: z.array(campaignGenerationSectionSchema).min(1).max(14).default([
     "outline", "locations", "factions", "quests", "npcs",
   ]),
   expandArtifactKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
@@ -52,13 +53,34 @@ const npc = z.object({
   locationKey: generatedArtifactKeySchema.optional(), factionKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
   privateGoals: text.optional(),
 }).strict();
+const questObjective = z.object({
+  key: generatedArtifactKeySchema,
+  description: text,
+  targetProgress: z.number().int().min(1).max(1_000_000).default(1),
+  dependencyObjectiveKeys: z.array(generatedArtifactKeySchema).max(32).default([]),
+  visibility,
+}).strict();
+const questReward = z.object({
+  key: generatedArtifactKeySchema,
+  label: name,
+  kind: z.enum(["xp", "currency", "custom"]),
+  amount: z.number().int().safe().nullable().default(null),
+  visibility,
+}).strict();
 const quest = z.object({
   key: generatedArtifactKeySchema, title: name, description: text, visibility,
   arcKey: generatedArtifactKeySchema.optional(), locationKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+  objectives: z.array(questObjective).max(32).default([]),
+  rewards: z.array(questReward).max(16).default([]),
+  journalText: text.optional(),
 }).strict();
 const encounter = z.object({
   key: generatedArtifactKeySchema, title: name, description: text, visibility,
   locationKey: generatedArtifactKeySchema.optional(), participantNpcKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
+  objectives: detailList, terrain: detailList, escalation: detailList,
+  resolution: text.max(1_000).optional(),
+  enemyReferences: z.array(enemyTemplateCatalogReferenceSchema).max(16).default([]),
+  monsterConceptKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
 }).strict();
 const clue = z.object({
   key: generatedArtifactKeySchema, title: name, description: text, visibility,
@@ -74,6 +96,32 @@ const scenePrompt = z.object({
   key: generatedArtifactKeySchema, title: name, prompt: text, visibility,
   locationKey: generatedArtifactKeySchema.optional(), npcKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
 }).strict();
+const lore = z.object({
+  key: generatedArtifactKeySchema, title: name, summary: text, visibility,
+  details: detailList,
+  locationKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+  factionKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+  storyNodeKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+}).strict();
+const itemMechanics = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("catalog-bound"), reference: itemCatalogReferenceSchema }).strict(),
+  z.object({ state: z.literal("inert"), reason: text.max(500) }).strict(),
+]);
+const questItem = z.object({
+  key: generatedArtifactKeySchema, name, description: text, visibility,
+  questKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+  locationKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
+  mechanics: itemMechanics,
+}).strict();
+const monsterMechanics = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("catalog-bound"), reference: enemyTemplateCatalogReferenceSchema }).strict(),
+  z.object({ state: z.literal("inert"), reason: text.max(500) }).strict(),
+]);
+const monsterConcept = z.object({
+  key: generatedArtifactKeySchema, name, description: text, visibility,
+  role: name, tactics: detailList,
+  mechanics: monsterMechanics,
+}).strict();
 
 /** Strict sparse provider output. Arrays outside the requested sections must be empty. */
 export const generatedCampaignContentProviderSchema = z.object({
@@ -88,6 +136,9 @@ export const generatedCampaignContentProviderSchema = z.object({
   clues: z.array(clue).max(24).default([]),
   storyNodes: z.array(storyNode).max(24).default([]),
   storyRelationships: z.array(storyRelationship).max(32).default([]),
+  lore: z.array(lore).max(24).default([]),
+  questItems: z.array(questItem).max(16).default([]),
+  monsterConcepts: z.array(monsterConcept).max(16).default([]),
   handouts: z.array(handout).max(12).default([]),
   scenePrompts: z.array(scenePrompt).max(16).default([]),
 }).strict();
@@ -115,6 +166,8 @@ export const campaignContentDraftViewSchema = z.object({
   }).strict(),
   preview: campaignContentGenerationPreviewSchema,
   validationIssues: z.array(z.string()),
+  /** Accepted immutable artifacts used as derivative context; this is not mutable canon. */
+  derivativeContextKeys: z.array(generatedArtifactKeySchema).max(16),
 }).strict();
 
 export const campaignContentApplyRequestSchema = z.object({
@@ -149,6 +202,24 @@ export const campaignGeneratedPlanningSchema = z.object({
     description: text,
     locationId: resourceIdSchema.nullable(),
     participantNpcIds: z.array(resourceIdSchema).max(16),
+    objectives: detailList,
+    terrain: detailList,
+    escalation: detailList,
+    resolution: text.max(1_000).nullable(),
+    enemyReferences: z.array(enemyTemplateCatalogReferenceSchema).max(16),
+    monsterConceptIds: z.array(resourceIdSchema).max(16),
+  }).strict()).max(10_000),
+  lore: z.array(generatedMaterialBase.extend({
+    summary: text, details: detailList,
+    locationIds: z.array(resourceIdSchema).max(8), factionIds: z.array(resourceIdSchema).max(8),
+    storyNodeIds: z.array(resourceIdSchema).max(8),
+  }).strict()).max(10_000),
+  questItems: z.array(generatedMaterialBase.extend({
+    description: text, questIds: z.array(resourceIdSchema).max(8), locationIds: z.array(resourceIdSchema).max(8),
+    mechanics: itemMechanics,
+  }).strict()).max(10_000),
+  monsterConcepts: z.array(generatedMaterialBase.extend({
+    description: text, role: name, tactics: detailList, mechanics: monsterMechanics,
   }).strict()).max(10_000),
   deliverables: z.array(generatedMaterialBase.extend({
     kind: z.enum(["handout", "scene-prompt"]),

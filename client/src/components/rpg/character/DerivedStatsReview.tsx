@@ -12,13 +12,13 @@ const statisticLabels: Record<string, string> = {
 
 /** Displays authoritative server preview values; no statistic is calculated in the browser. */
 export function DerivedStatsReview({ derived, startingGrants }: DerivedStatsReviewProps) {
-  const values = [
-    ["Maximum health", derived.maxHp], ["Guard", derived.defenses.guard], ["Evasion", derived.defenses.evasion],
-    ["Will", derived.defenses.will], ["Initiative", derived.initiative], ["Speed", derived.speed],
-    ["Carrying limit", derived.carryingLimit], ["Spell attack", derived.spellAttack], ["Save DC", derived.saveDc],
-  ] as const;
+  const defenses: Array<readonly [string, number | undefined]> = derived.rulesetId === "dnd-5e"
+    ? [["Armor Class", derived.armorClass]] : [["Guard", derived.defenses.guard], ["Evasion", derived.defenses.evasion], ["Will", derived.defenses.will]];
+  const values: Array<readonly [string, number | undefined]> = [["Maximum health", derived.maxHp], ...defenses,
+    ["Initiative", derived.initiative], ["Speed", derived.speed], ["Carrying limit", derived.carryingLimit],
+    ["Spell attack", derived.spellAttack], ["Save DC", derived.saveDc]];
   return <section className="builder-section derived-review" aria-labelledby="derived-heading">
-    <div className="builder-section-heading"><div><p className="eyebrow">SERVER PREVIEW</p><h2 id="derived-heading">Derived statistics and starter grants</h2></div><span className="status-pill">Not finalized</span></div>
+    <div className="builder-section-heading"><div><p className="eyebrow">SERVER PREVIEW{derived.rulesetId ? ` · ${derived.rulesetId} @ ${derived.rulesetVersion}` : ""}</p><h2 id="derived-heading">Derived statistics and starter grants</h2></div><span className="status-pill">Not finalized</span></div>
     <p className="builder-help">These values and explanations were returned by the server. Finalization will validate them again against current pinned content.</p>
     <dl className="derived-stat-grid">{values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <details className="derived-explanations"><summary>Server calculation explanations</summary><ul>{derived.explanations.map((item) => <li key={item.statistic}><strong>{statisticLabels[item.statistic] ?? item.statistic}</strong><span>{item.formula}</span><span>Result: {item.result}</span></li>)}</ul></details>

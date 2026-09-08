@@ -7,6 +7,7 @@ import {
   contentCompatibilitySchema,
   enemyTemplateCatalogDefinitionSchema,
   gmCatalogProjectionSchema,
+  itemCatalogDefinitionSchema,
   playerCatalogProjectionSchema,
   publicationProvenanceSchema,
   publishContentCatalogInputSchema,
@@ -25,9 +26,12 @@ describe("M1.2 content catalog contracts", () => {
     expect(catalogDefinitionReferenceSchema.safeParse({ ...exact, versionRange: "^1" }).success).toBe(false);
   });
 
-  it("accepts only the closed velvet-starter-v1 compatibility and mechanics shapes", () => {
+  it("accepts only the closed Velvet and D&D compatibility engines and mechanics shapes", () => {
     expect(contentCompatibilitySchema.parse({ rulesEngine: "velvet-starter-v1", rulesProfileId: "velvet:rules", catalogFormat: "validated-v1" }))
       .toEqual({ rulesEngine: "velvet-starter-v1", rulesProfileId: "velvet:rules", catalogFormat: "validated-v1" });
+    expect(contentCompatibilitySchema.parse({ rulesEngine: "dnd-5e", rulesEngineVersion:"1.0.0",rulesProfileId: "srd-5.1:rules:starter-v1", catalogFormat: "validated-v1" }))
+      .toEqual({ rulesEngine: "dnd-5e",rulesEngineVersion:"1.0.0", rulesProfileId: "srd-5.1:rules:starter-v1", catalogFormat: "validated-v1" });
+    expect(contentCompatibilitySchema.safeParse({ rulesEngine:"unknown",rulesProfileId:"unknown",catalogFormat:"validated-v1" }).success).toBe(false);
     const skill = { reference: exact, name: "Trailcraft", description: "A bounded skill.", tags: [], mechanics: { attribute: "insight" } };
     expect(skillCatalogDefinitionSchema.parse(skill)).toEqual(skill);
     for (const forbidden of [{ path: "skill.json" }, { file: "skill.json" }, { url: "https://invalid" }, { script: "run()" }, { formula: "x+1" }, { executable: true }]) {
@@ -35,12 +39,75 @@ describe("M1.2 content catalog contracts", () => {
     }
   });
 
-  it("requires honest original provenance without URLs or third-party data", () => {
+  it("accepts backward-compatible items and closed legal SRD equipment profiles", () => {
+    const currency = { ...exact, kind: "currency", definitionId: "velvet:test:gp" } as const;
+    const item = { reference: { ...exact, kind: "item", definitionId: "velvet:test:item" }, name: "Item",
+      description: "A test item.", tags: [], mechanics: { category: "gear", stackable: false, slot: null,
+        price: { currency, amount: 1 }, effects: [] } } as const;
+    expect(itemCatalogDefinitionSchema.parse(item)).toEqual(item);
+    expect(itemCatalogDefinitionSchema.safeParse({ ...item, mechanics: { ...item.mechanics, engineDetails: null } }).success).toBe(true);
+
+    const profiles = [
+      { category: "weapon", slot: "hand", profile: { kind: "weapon", proficiency: "martial", attackType: "melee",
+        damage: { type: "slashing", die: { count: 1, sides: 8 } },
+        properties: [{ property: "versatile", damageDie: { count: 1, sides: 10 } }] } },
+      { category: "armor", slot: "body", profile: { kind: "armor", category: "light", baseArmorClass: 11,
+        dexterity: { policy: "full" }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 0 } },
+      { category: "armor", slot: "body", profile: { kind: "armor", category: "medium", baseArmorClass: 13,
+        dexterity: { policy: "capped", maxBonus: 2 }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 0 } },
+      { category: "armor", slot: "body", profile: { kind: "armor", category: "heavy", baseArmorClass: 16,
+        dexterity: { policy: "none" }, strengthRequirement: 13, stealthDisadvantage: true, shieldBonus: 0 } },
+      { category: "armor", slot: "hand", profile: { kind: "armor", category: "shield", baseArmorClass: null,
+        dexterity: { policy: "none" }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 2 } },
+    ] as const;
+    for (const { category, slot, profile } of profiles) {
+      expect(itemCatalogDefinitionSchema.safeParse({ ...item, mechanics: { ...item.mechanics, category, slot,
+        engineDetails: { rulesEngine: "dnd-5e", weightPounds: 3, equipmentProfile: profile } } }).success).toBe(true);
+    }
+  });
+
+  it.each([
+    ["duplicate properties", "melee", [{ property: "light" }, { property: "light" }]],
+    ["melee ammunition", "melee", [{ property: "ammunition", range: { normalFeet: 80, longFeet: 320 } }]],
+    ["ranged reach", "ranged", [{ property: "reach", reachFeet: 10 }]],
+    ["ranged versatile", "ranged", [{ property: "versatile", damageDie: { count: 1, sides: 10 } }]],
+    ["loading without ammunition", "ranged", [{ property: "loading" }]],
+    ["light and heavy", "melee", [{ property: "light" }, { property: "heavy" }]],
+    ["light and two-handed", "melee", [{ property: "light" }, { property: "two-handed" }]],
+    ["two-handed and versatile", "melee", [{ property: "two-handed" }, { property: "versatile", damageDie: { count: 1, sides: 10 } }]],
+    ["non-increasing versatile die", "melee", [{ property: "versatile", damageDie: { count: 1, sides: 8 } }]],
+    ["reversed range", "ranged", [{ property: "ammunition", range: { normalFeet: 320, longFeet: 80 } }]],
+  ] as const)("rejects invalid SRD weapon combination: %s", (_label, attackType, properties) => {
+    const currency = { ...exact, kind: "currency", definitionId: "velvet:test:gp" } as const;
+    const candidate = { reference: { ...exact, kind: "item", definitionId: "velvet:test:weapon" }, name: "Weapon",
+      description: "A test weapon.", tags: [], mechanics: { category: "weapon", stackable: false, slot: "hand",
+        price: { currency, amount: 1 }, effects: [], engineDetails: { rulesEngine: "dnd-5e", weightPounds: 3,
+          equipmentProfile: { kind: "weapon", proficiency: "martial", attackType,
+            damage: { type: "slashing", die: { count: 1, sides: 8 } }, properties } } } };
+    expect(itemCatalogDefinitionSchema.safeParse(candidate).success).toBe(false);
+  });
+
+  it.each([
+    ["light armor with capped Dexterity", "body", { kind: "armor", category: "light", baseArmorClass: 11, dexterity: { policy: "capped", maxBonus: 2 }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 0 }],
+    ["medium armor without the SRD cap", "body", { kind: "armor", category: "medium", baseArmorClass: 13, dexterity: { policy: "full" }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 0 }],
+    ["shield in the body slot", "body", { kind: "armor", category: "shield", baseArmorClass: null, dexterity: { policy: "none" }, strengthRequirement: null, stealthDisadvantage: false, shieldBonus: 2 }],
+  ] as const)("rejects invalid SRD armor combination: %s", (_label, slot, profile) => {
+    const currency = { ...exact, kind: "currency", definitionId: "velvet:test:gp" } as const;
+    expect(itemCatalogDefinitionSchema.safeParse({ reference: { ...exact, kind: "item", definitionId: "velvet:test:armor" },
+      name: "Armor", description: "Test armor.", tags: [], mechanics: { category: "armor", stackable: false, slot,
+        price: { currency, amount: 1 }, effects: [], engineDetails: { rulesEngine: "dnd-5e", weightPounds: 10,
+          equipmentProfile: profile } } }).success).toBe(false);
+  });
+
+  it("requires provenance to distinguish original and licensed third-party data", () => {
     const provenance = { authorship: "original", author: "Author", authoredAt: "2030-01-01T00:00:00.000Z",
       reviewedBy: "Reviewer", reviewedAt: "2030-01-02T00:00:00.000Z", declaration: "Clean room.", thirdPartyData: false } as const;
     expect(publicationProvenanceSchema.parse(provenance)).toEqual(provenance);
     expect(publicationProvenanceSchema.safeParse({ ...provenance, sourceUrl: "https://invalid" }).success).toBe(false);
     expect(publicationProvenanceSchema.safeParse({ ...provenance, thirdPartyData: true }).success).toBe(false);
+    expect(publicationProvenanceSchema.safeParse({ ...provenance, authorship: "licensed", thirdPartyData: true,
+      declaration: "Licensed source reviewed with attribution." }).success).toBe(true);
+    expect(publicationProvenanceSchema.safeParse({ ...provenance, authorship: "licensed", thirdPartyData: false }).success).toBe(false);
   });
 
   it("makes enemy private fields structurally impossible in the player projection", () => {

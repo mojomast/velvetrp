@@ -179,6 +179,11 @@ export const travelCommandSchema = z.object({
     party.add(actorId);
   });
 });
+/** A GM establishes the session camp at the actor's authoritative current location. */
+export const establishCampCommandSchema = z.object({
+  type: z.literal("establish_camp"), campaignId: campaignIdSchema, actorId: actorIdSchema,
+  expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema,
+}).strict();
 /** GM-only authoritative placement, including the initial session position. */
 export const setActorLocationCommandSchema = z.object({
   type: z.literal("set_actor_location"), campaignId: campaignIdSchema,
@@ -198,7 +203,7 @@ export const changeReputationCommandSchema = z.object({
   reason: worldTextSchema, reputationLedgerEntryId: reputationLedgerEntryIdSchema.optional(),
   expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema,
 }).strict();
-export const worldCommandSchema = z.discriminatedUnion("type", [travelCommandSchema, setActorLocationCommandSchema, discoverLocationCommandSchema, changeReputationCommandSchema]);
+export const worldCommandSchema = z.discriminatedUnion("type", [travelCommandSchema, establishCampCommandSchema, setActorLocationCommandSchema, discoverLocationCommandSchema, changeReputationCommandSchema]);
 
 const playerLocationSchema = z.object({ locationId: locationIdSchema, parentLocationId: locationIdSchema.nullable(), name: worldNameSchema, description: z.string().max(MAX_WORLD_TEXT_LENGTH) }).strict();
 const playerConnectionSchema = z.object({ locationConnectionId: locationConnectionIdSchema, fromLocationId: locationIdSchema, toLocationId: locationIdSchema }).strict();
@@ -261,6 +266,7 @@ export type FactionMembership = z.infer<typeof factionMembershipSchema>;
 export type FactionRelation = z.infer<typeof factionRelationSchema>;
 export type ReputationLedgerEntry = z.infer<typeof reputationLedgerEntrySchema>;
 export type TravelCommand = z.infer<typeof travelCommandSchema>;
+export type EstablishCampCommand = z.infer<typeof establishCampCommandSchema>;
 export type WorldCommand = z.infer<typeof worldCommandSchema>;
 export type PlayerWorldProjection = z.infer<typeof playerWorldProjectionSchema>;
 export type GmWorldProjection = z.infer<typeof gmWorldProjectionSchema>;

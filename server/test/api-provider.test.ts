@@ -11,6 +11,21 @@ const rawJson = (payload: string) => ({
 });
 
 describe("provider api compatibility", () => {
+  it("runs capability probes only on explicit no-store POST and reports missing key safely", async () => {
+    const app = buildApp();
+    const get = await app.inject({ method: "GET", url: "/api/provider/preflight" });
+    expect(get.statusCode).toBe(404);
+    const response = await app.inject({ method: "POST", url: "/api/provider/preflight", headers: { "content-type": "application/json" }, payload: {} });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toMatchObject({ ok: false, dmPlayCompatible: false, campaignGenerationCompatible: false, capabilities: [
+      { capability: "function-tools", status: "unavailable", failure: { permanence: "permanent", code: "configuration" } },
+      { capability: "strict-json-schema", status: "unavailable", failure: { permanence: "permanent", code: "configuration" } },
+    ] });
+    expect(JSON.stringify(response.json())).not.toMatch(/apiKey|authorization|bearer/i);
+    await app.close();
+  });
+
   it("is registered exactly once under the /api prefix", async () => {
     const app = buildApp();
     for (const url of ["/provider", "/api/api/provider"]) {
@@ -36,11 +51,12 @@ describe("provider api compatibility", () => {
     expect(Object.keys(body)).toEqual([
       "id", "providerType", "baseUrl", "model", "hasApiKey", "streaming", "httpReferer", "appTitle",
       "requireParameters", "allowFallbacks", "routingSort", "dataCollection", "zdr", "requestTimeoutSeconds",
-      "pricing", "samplers", "updatedAt",
+      "pricing", "adventureTurnBudget", "samplers", "updatedAt",
     ]);
     expect(body.id).toBe("provider");
     expect(body).not.toHaveProperty("apiKey");
     expect(Object.keys(body.pricing)).toEqual(["promptPerMillion", "completionPerMillion"]);
+    expect(body.adventureTurnBudget).toEqual({ maxTotalTokens: 65536, maxEstimatedCostUsd: null });
     expect(Object.keys(body.samplers)).toEqual([
       "maxTokens", "topP", "topK", "minP", "repetitionPenalty", "frequencyPenalty", "presencePenalty", "seed",
       "reasoningEffort", "stopStrings", "startReplyWith",

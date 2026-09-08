@@ -23,7 +23,7 @@ function snapshot(audience: CampaignAgentAudience): CampaignAgentContextSnapshot
     speakerPersona: audience.kind === "player" ? { characterId: "hero", displayName: "Aster" }
       : audience.kind === "npc" ? { characterId: "npc-persona", displayName: "Marrow" } : null,
     safetyControl: ["SAFETY_SENTINEL"], humanCanon: ["CANON_SENTINEL"],
-    committedMechanics: ["MECHANICS_SENTINEL"], visibleWorld: ["WORLD_SENTINEL"],
+    committedMechanics: ["MECHANICS_SENTINEL"], currentActorLocation:null,visibleWorld: ["WORLD_SENTINEL"],
     visibleCast: ["CAST_SENTINEL"], visibleQuests: ["QUEST_SENTINEL"], legalActions: ["LEGAL_SENTINEL"],
     privateTargetFacts: ["PRIVATE_TARGET_SENTINEL"],attributeCandidates:[], synthesizedSummaryFacts: ["SYNTHESIZED_SENTINEL"], recap: ["RECAP_SENTINEL"], encounter: null,
   };

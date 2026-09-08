@@ -1,13 +1,14 @@
-import { combatRewardClaimRequestSchema, resourceIdSchema } from "@velvet/contracts";
+import { combatEnemyTurnCommandRequestSchema, combatRewardClaimRequestSchema, resourceIdSchema } from "@velvet/contracts";
 import type {
   ActorEffectsResponse, ActorPowerCommandRequest, ActorPowerCommandResponse, ActorPowersResponse, ActorResourcesHttpGetResponse,
-  CombatActionCommandRequest, CombatActionCommandResponse, CombatCommandResultResponse, CombatRewardClaimRequest, CombatRewardClaimResponse, CombatRewardClaimResultResponse, CombatRewardGrantPublic, EconomyHttpWalletGetResponse,
-  CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterPublic,
+  CombatActionCommandRequest, CombatActionCommandResponse, CombatCommandResultResponse, CombatEnemyTurnCommandRequest, CombatRewardClaimRequest, CombatRewardClaimResponse, CombatRewardClaimResultResponse, CombatRewardGrantPublic, EconomyHttpWalletGetResponse,
+  CombatEndCommandResponse, CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterPublic,
   UseConsumableCommandRequest,UseConsumableCommandResult,UseConsumableLegalAction,
 } from "@velvet/contracts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {ApiError} from "../../../api";
+import {ApiError, resolveCombatEnemyTurn} from "../../../api";
 import { CombatLog } from "./CombatLog";
+import { EncounterLifecyclePanel } from "./EncounterLifecyclePanel";
 import { CombatRewards } from "./CombatRewards";
 import { EffectList } from "./EffectList";
 import { InitiativeRail } from "./InitiativeRail";
@@ -19,6 +20,7 @@ export interface CombatTrackerApi {
   getCombat: (combatId: string) => Promise<CombatReadResponse>;
   getCombatLog: (combatId: string, query: { afterSequence: number; limit: number }) => Promise<CombatLogResponse>;
   resolveAction: (combatId: string, command: CombatActionCommandRequest) => Promise<CombatActionCommandResponse>;
+  resolveEnemyTurn?: (combatId: string, command: CombatEnemyTurnCommandRequest) => Promise<CombatActionCommandResponse>;
   getCommandResult: (campaignId: string, combatId: string, idempotencyKey: string) => Promise<CombatCommandResultResponse>;
   getPowers: (actorId: string) => Promise<ActorPowersResponse>;
   getEffects: (actorId: string) => Promise<ActorEffectsResponse>;
@@ -31,6 +33,8 @@ export interface CombatTrackerApi {
   claimReward:(combatId:string,rewardBundleId:string,recipientActorId:string,command:CombatRewardClaimRequest)=>Promise<CombatRewardClaimResponse>;
   getRewardClaimResult:(campaignId:string,combatId:string,rewardBundleId:string,recipientActorId:string,command:CombatRewardClaimRequest)=>Promise<CombatRewardClaimResultResponse>;
   getWallet:(campaignId:string,actorId:string)=>Promise<EconomyHttpWalletGetResponse>;
+  startEncounter:(encounterId:string,input:{expectedRevision:number;idempotencyKey:string})=>Promise<{combat:CombatReadResponse&{combatId:string}}>;
+  endCombat:(combatId:string,input:{expectedRevision:number;idempotencyKey:string})=>Promise<CombatEndCommandResponse>;
 }
 
 export interface CombatTrackerPageProps {
@@ -55,6 +59,7 @@ type ActionMarker = {
 type PowerMarker = { campaignId: string; actorId: string; phase: "ambiguous" | "confirmed"; command: ActorPowerCommandRequest; startedAt: string; result?: ActorPowerCommandResponse };
 type ConsumableMarker={campaignId:string;combatId:string;phase:"ambiguous"|"confirmed";command:UseConsumableCommandRequest;startedAt:string;result?:UseConsumableCommandResult};
 type RewardClaimMarker={campaignId:string;combatId:string;rewardBundleId:string;recipientActorId:string;phase:"ambiguous"|"confirmed";command:CombatRewardClaimRequest;startedAt:string;result?:CombatRewardClaimResponse};
+type EnemyTurnMarker={campaignId:string;combatId:string;phase:"ambiguous"|"confirmed";command:CombatEnemyTurnCommandRequest;startedAt:string;result?:CombatActionCommandResponse};
 
 const combatStorageKey = (campaignId: string) => `velvet.combat-id.v2:${campaignId}`;
 const actorStorageKey = (campaignId: string) => `velvet.combat-actor-id.v2:${campaignId}`;
@@ -62,6 +67,7 @@ const markerKey = (campaignId: string, combatId: string) => `velvet.combat-actio
 const powerMarkerKey = (campaignId: string, actorId: string) => `velvet.power-action.v1:${campaignId}:${actorId}`;
 const consumableMarkerKey=(campaignId:string,combatId:string)=>`velvet.combat-consumable.v1:${campaignId}:${combatId}`;
 const rewardMarkerKey=(campaignId:string,combatId:string)=>`velvet.combat-reward-claim.v1:${campaignId}:${combatId}`;
+const enemyTurnMarkerKey=(campaignId:string,combatId:string)=>`velvet.combat-enemy-turn.v1:${campaignId}:${combatId}`;
 const readStoredId = (key: string) => { try { const id = localStorage.getItem(key) ?? ""; return resourceIdSchema.safeParse(id).success ? id : ""; } catch { return ""; } };
 const writeStoredId = (key: string, id: string) => { try { if (id) localStorage.setItem(key, id); else localStorage.removeItem(key); } catch { /* optional restoration */ } };
 const readMarker = (campaignId: string, combatId: string): ActionMarker | null => {
@@ -71,13 +77,15 @@ const readMarker = (campaignId: string, combatId: string): ActionMarker | null =
     return value?.campaignId === campaignId && value.combatId === combatId && value.operation === "action" && (value.phase === "ambiguous" || value.phase === "confirmed") && typeof value.actionKind === "string" && typeof value.startedAt === "string" && value.command !== undefined ? value as ActionMarker : null;
   } catch { return null; }
 };
-const writeMarker = (campaignId: string, combatId: string, marker: ActionMarker | null) => { try { if (marker) localStorage.setItem(markerKey(campaignId, combatId), JSON.stringify(marker)); else localStorage.removeItem(markerKey(campaignId, combatId)); } catch { /* best-effort durable write lock */ } };
+const writeMarker = (campaignId: string, combatId: string, marker: ActionMarker | null): boolean => { try { const key=markerKey(campaignId,combatId); if(marker){const encoded=JSON.stringify(marker);localStorage.setItem(key,encoded);return localStorage.getItem(key)===encoded;}localStorage.removeItem(key);return localStorage.getItem(key)===null;} catch { return false; } };
 const readPowerMarker = (campaignId: string, actorId: string): PowerMarker | null => { try { const value=JSON.parse(localStorage.getItem(powerMarkerKey(campaignId,actorId))??"null") as Partial<PowerMarker>|null; return value?.campaignId===campaignId&&value.actorId===actorId&&(value.phase==="ambiguous"||value.phase==="confirmed")&&value.command!==undefined?value as PowerMarker:null; } catch{return null;} };
 const writePowerMarker = (campaignId:string,actorId:string,value:PowerMarker|null) => { try { if(value)localStorage.setItem(powerMarkerKey(campaignId,actorId),JSON.stringify(value));else localStorage.removeItem(powerMarkerKey(campaignId,actorId)); } catch{/* durable best effort */} };
 const readConsumableMarker=(campaignId:string,combatId:string):ConsumableMarker|null=>{try{const value=JSON.parse(localStorage.getItem(consumableMarkerKey(campaignId,combatId))??"null") as Partial<ConsumableMarker>|null;return value?.campaignId===campaignId&&value.combatId===combatId&&(value.phase==="ambiguous"||value.phase==="confirmed")&&value.command!==undefined?value as ConsumableMarker:null;}catch{return null;}};
 const writeConsumableMarker=(campaignId:string,combatId:string,value:ConsumableMarker|null):boolean=>{try{const key=consumableMarkerKey(campaignId,combatId);if(value){const encoded=JSON.stringify(value);localStorage.setItem(key,encoded);return localStorage.getItem(key)===encoded;}localStorage.removeItem(key);return localStorage.getItem(key)===null;}catch{return false;}};
 const readRewardMarker=(campaignId:string,combatId:string):RewardClaimMarker|null=>{try{const value=JSON.parse(localStorage.getItem(rewardMarkerKey(campaignId,combatId))??"null") as Partial<RewardClaimMarker>|null;return value?.campaignId===campaignId&&value.combatId===combatId&&resourceIdSchema.safeParse(value.rewardBundleId).success&&resourceIdSchema.safeParse(value.recipientActorId).success&&(value.phase==="ambiguous"||value.phase==="confirmed")&&combatRewardClaimRequestSchema.safeParse(value.command).success&&typeof value.startedAt==="string"?value as RewardClaimMarker:null;}catch{return null;}};
 const writeRewardMarker=(campaignId:string,combatId:string,value:RewardClaimMarker|null):boolean=>{try{const key=rewardMarkerKey(campaignId,combatId);if(value){const encoded=JSON.stringify(value);localStorage.setItem(key,encoded);return localStorage.getItem(key)===encoded;}localStorage.removeItem(key);return localStorage.getItem(key)===null;}catch{return false;}};
+const readEnemyTurnMarker=(campaignId:string,combatId:string):EnemyTurnMarker|null=>{try{const value=JSON.parse(localStorage.getItem(enemyTurnMarkerKey(campaignId,combatId))??"null") as Partial<EnemyTurnMarker>|null;return value?.campaignId===campaignId&&value.combatId===combatId&&(value.phase==="ambiguous"||value.phase==="confirmed")&&combatEnemyTurnCommandRequestSchema.safeParse(value.command).success&&typeof value.startedAt==="string"?value as EnemyTurnMarker:null;}catch{return null;}};
+const writeEnemyTurnMarker=(campaignId:string,combatId:string,value:EnemyTurnMarker|null):boolean=>{try{const key=enemyTurnMarkerKey(campaignId,combatId);if(value){const encoded=JSON.stringify(value);localStorage.setItem(key,encoded);return localStorage.getItem(key)===encoded;}localStorage.removeItem(key);return localStorage.getItem(key)===null;}catch{return false;}};
 const commandId = () => `combat-ui-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 const readCombatId = (campaignId:string,initial?: string) => resourceIdSchema.safeParse(initial).success ? initial! : readStoredId(combatStorageKey(campaignId));
 
@@ -91,7 +99,7 @@ function OutcomeReceipt({ result }: { result: CombatActionCommandResponse }) {
   return <section className="combat-receipt" aria-labelledby="combat-receipt-heading">
     <div className="combat-panel-heading"><h2 id="combat-receipt-heading">Confirmed action receipt</h2><span>{resolution.kind}</span></div>
     <dl><div><dt>Action</dt><dd>{resolution.kind}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Round</dt><dd>{resolution.roundBefore} → {resolution.roundAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div><div><dt>Targets</dt><dd>{resolution.targetIds.length ? resolution.targetIds.join(", ") : "None"}</dd></div></dl>
-    {resolution.outcomes.length > 0 && <ul>{resolution.outcomes.map((outcome, index) => <li key={`${outcome.kind}-${outcome.targetId}-${index}`}>{outcome.kind === "damage" ? <><strong>Damage:</strong> {outcome.applied} {outcome.damageType} · HP {outcome.hitPointsBefore} → {outcome.hitPointsAfter} · {outcome.statusBefore} → {outcome.statusAfter}</> : <><strong>Status:</strong> {outcome.statusBefore} → {outcome.statusAfter}</>}</li>)}</ul>}
+    {resolution.outcomes.length > 0 && <ul>{resolution.outcomes.map((outcome, index) => <li key={`${outcome.kind}-${outcome.targetId}-${index}`}>{outcome.kind === "damage" ? <><strong>Damage:</strong> {outcome.applied} {outcome.damageType} · HP {outcome.hitPointsBefore} → {outcome.hitPointsAfter} · {outcome.statusBefore} → {outcome.statusAfter}{outcome.rulesetId && <> · {outcome.rulesetId} @ {outcome.rulesetVersion} · attack {outcome.attackRoll} + modifiers = {outcome.attackTotal} vs AC {outcome.armorClass}{outcome.critical ? " · critical" : outcome.hit ? " · hit" : " · miss"}</>}</> : outcome.kind === "survival" ? <><strong>Survival:</strong> {outcome.roll ? `d20 ${outcome.roll} · ` : ""}{outcome.successes} successes, {outcome.failures} failures · {outcome.statusAfter}</> : <><strong>Status:</strong> {outcome.statusBefore} → {outcome.statusAfter}</>}</li>)}</ul>}
     <details><summary>Complete strict server response</summary><pre>{JSON.stringify(result, null, 2)}</pre></details>
   </section>;
 }
@@ -129,6 +137,8 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
   const [consumableResult,setConsumableResult]=useState<UseConsumableCommandResult|null>(()=>readConsumableMarker(campaignId,initialId)?.result??null);
   const [consumableStatus,setConsumableStatus]=useState("");
   const [rewardMarker,setRewardMarkerState]=useState<RewardClaimMarker|null>(()=>readRewardMarker(campaignId,initialId));
+  const [enemyTurnMarker,setEnemyTurnMarkerState]=useState<EnemyTurnMarker|null>(()=>readEnemyTurnMarker(campaignId,initialId));
+  const [enemyTurnResult,setEnemyTurnResult]=useState<CombatActionCommandResponse|null>(()=>readEnemyTurnMarker(campaignId,initialId)?.result??null);
   const [rewardStatus,setRewardStatus]=useState("");
   const [commandStatus, setCommandStatus] = useState("");
   const [inspected, setInspected] = useState<string | null>(null);
@@ -145,7 +155,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
   const retryRef = useRef<HTMLButtonElement>(null);
 
   const current = useCallback((generation: number, id: string) => mountedRef.current && generationRef.current === generation && combatIdRef.current === id, []);
-  const setMarker = useCallback((next: ActionMarker | null, id = combatId) => { writeMarker(campaignId,id, next); if (mountedRef.current) setMarkerState(next); }, [campaignId,combatId]);
+  const setMarker = useCallback((next: ActionMarker | null, id = combatId): boolean => { const stored=writeMarker(campaignId,id,next); if (stored && mountedRef.current) setMarkerState(next); return stored; }, [campaignId,combatId]);
   const clearRewardMarker=useCallback((id:string)=>{writeRewardMarker(campaignId,id,null);rewardMarkerRef.current=null;if(mountedRef.current)setRewardMarkerState(null);},[campaignId]);
 
   const loadCombat = useCallback(async (id: string, focusFailure = false) => {
@@ -211,6 +221,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     const restored = readMarker(campaignId,combatDraft); setMarkerState(restored); setConfirmed(restored?.result ?? null); setCommandStatus("");
     const restoredConsumable=readConsumableMarker(campaignId,combatDraft);setConsumableMarkerState(restoredConsumable);setConsumableResult(restoredConsumable?.result??null);setConsumableStatus("");
     const restoredReward=readRewardMarker(campaignId,combatDraft);rewardMarkerRef.current=restoredReward;setRewardMarkerState(restoredReward);setRewardStatus("");
+    const restoredEnemyTurn=readEnemyTurnMarker(campaignId,combatDraft);setEnemyTurnMarkerState(restoredEnemyTurn);setEnemyTurnResult(restoredEnemyTurn?.result??null);
     // State publication is asynchronous, so this direct read is bound to the submitted exact ID.
     queueMicrotask(() => { if (mountedRef.current) void loadCombat(combatDraft); });
   }
@@ -220,6 +231,7 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     const restored=readPowerMarker(campaignId,actorDraft);setPowerMarkerState(restored);setPowerResult(restored?.result??null);setPowerStatus("");
     queueMicrotask(() => { if (mountedRef.current) void loadActor(actorDraft); });
   }
+  function openLifecycleCombat(id: string) { setCombatDraft(id); combatIdRef.current=id; setCombatId(id); writeStoredId(combatStorageKey(campaignId),id); setCombat(null); setEntries([]); setRewards([]); setNextSequence(null); queueMicrotask(() => { if (mountedRef.current) void loadCombat(id); }); }
   async function loadMoreLog() {
     if (!combatId || nextSequence === null || logLoading) return;
     const cursor = nextSequence; setLogLoading(true); setLogError("");
@@ -235,17 +247,19 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     if (!combat || marker || rewardMarker || !action.targetIds.every((id) => combat.combatants.some((entry) => entry.combatantId === id)) || targetIds.some((id) => !action.targetIds.includes(id))) return;
     const command: CombatActionCommandRequest = { legalActionId: action.legalActionId, targetIds, choices: [], expectedRevision: combat.revision, idempotencyKey: commandId() };
     const pending: ActionMarker = { campaignId,combatId,operation:"action", phase: "ambiguous", command, actionKind: action.kind, startedAt: new Date().toISOString() };
-    setMarker(pending); setConfirmed(null); setCommandStatus("Submitting once. Automatic replay is disabled.");
+    if(!setMarker(pending)){setCommandStatus("Action was not submitted because its durable safety lock could not be stored. Enable local storage and try again.");return;}
+    setConfirmed(null); setCommandStatus("Submitting once. Automatic replay is disabled.");
     try {
       const result = await api.resolveAction(combatId, command);
       const complete: ActionMarker = { ...pending, phase: "confirmed", result };
-      writeMarker(campaignId,combatId, complete);
+       if(!setMarker(complete)){if(mountedRef.current)setCommandStatus("Action response arrived, but durable confirmation could not be stored. No POST will be retried; use exact result reconciliation.");return;}
       if (!mountedRef.current) return;
       setMarkerState(complete); setConfirmed(result); setCombat(publicRead(result));
       setCommandStatus("Action confirmed. Refreshing authoritative combat state and log…");
       const refreshed = await loadCombat(combatId);
       if (!mountedRef.current) return;
-      if (refreshed) { setMarker(null); setCommandStatus("Action confirmed; authoritative state and log refreshed."); }
+       if (refreshed && setMarker(null)) { setCommandStatus("Action confirmed; authoritative state and log refreshed."); }
+       else if(refreshed) setCommandStatus("Action confirmed, but the durable lock could not be cleared. Use exact result reconciliation before another action.");
       else setCommandStatus("Action confirmed, but refresh was partial. The receipt and write lock are preserved.");
     } catch {
       if (mountedRef.current) setCommandStatus("Action outcome is uncertain or stale. It will not be replayed. Use authoritative refresh before another action.");
@@ -259,9 +273,34 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
       if(!mountedRef.current||found.operation!=="action")return;
       setConfirmed(found.result);setCombat(publicRead(found.result));
       const refreshed=await loadCombat(combatId,true);if(!mountedRef.current)return;
-      if(refreshed){setMarker(null);setCommandStatus("Exact command result confirmed; authoritative state and log refreshed.");}
+       if(refreshed&&setMarker(null)){setCommandStatus("Exact command result confirmed; authoritative state and log refreshed.");}
+       else if(refreshed)setCommandStatus("Exact result is confirmed, but the durable lock could not be cleared. It remains locked.");
       else setCommandStatus("Exact result is confirmed, but refresh is partial. The response and lock remain preserved.");
     }catch{if(mountedRef.current)setCommandStatus("No exact authorized command result is available. Generic state/log reads cannot clear this lock.");}
+  }
+
+  async function submitEnemyTurn(){
+    if(!combat||enemyTurnMarker||marker||consumableMarker||rewardMarker||combat.combatants.find((entry)=>entry.combatantId===combat.currentCombatant)?.kind!=="enemy")return;
+    const command:CombatEnemyTurnCommandRequest={expectedRevision:combat.revision,idempotencyKey:commandId()};
+    const pending:EnemyTurnMarker={campaignId,combatId,phase:"ambiguous",command,startedAt:new Date().toISOString()};
+    if(!writeEnemyTurnMarker(campaignId,combatId,pending)){setCommandStatus("Enemy turn was not submitted because its durable safety lock could not be stored. Enable local storage and try again.");return;}
+    setEnemyTurnMarkerState(pending);setEnemyTurnResult(null);setCommandStatus("Enemy turn submitted once. Automatic replay is disabled.");
+    try{
+      const result=await (api.resolveEnemyTurn??resolveCombatEnemyTurn)(combatId,command),complete:EnemyTurnMarker={...pending,phase:"confirmed",result};
+      if(!writeEnemyTurnMarker(campaignId,combatId,complete)){if(mountedRef.current)setCommandStatus("Enemy turn response arrived, but durable confirmation could not be stored. No POST will be retried; refresh authoritative state.");return;}
+      if(!mountedRef.current)return;
+      setEnemyTurnMarkerState(complete);setEnemyTurnResult(result);setCombat(publicRead(result));
+      const refreshed=await loadCombat(combatId);if(!mountedRef.current)return;
+      if(refreshed){writeEnemyTurnMarker(campaignId,combatId,null);setEnemyTurnMarkerState(null);setCommandStatus("Enemy turn confirmed; authoritative combat state and log refreshed.");}
+      else setCommandStatus("Enemy turn confirmed, but refresh is partial. The receipt and lock are preserved.");
+    }catch{if(mountedRef.current)setCommandStatus("Enemy turn delivery is ambiguous. It will not be replayed; refresh authoritative state while the lock remains.");}
+  }
+  async function reconcileEnemyTurn(){
+    if(!enemyTurnMarker)return;
+    setCommandStatus("Refreshing authoritative combat state and log; no enemy turn will be replayed.");
+    const refreshed=await loadCombat(combatId,true);if(!mountedRef.current)return;
+    // Command-result reads identify only an action, not this server-owned endpoint or request frame.
+    setCommandStatus(refreshed?"Authoritative combat state refreshed, but this enemy-turn delivery cannot be proven exact. The lock remains and no POST was replayed.":"Authoritative refresh was partial. The enemy-turn lock remains and no POST was replayed.");
   }
 
   async function submitConsumable(action:UseConsumableLegalAction){
@@ -381,15 +420,19 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     catch{if(mountedRef.current)setPowerStatus("Power outcome is ambiguous. Authoritative actor lanes may be refreshed, but this persistent lock cannot be cleared by generic reads.");}
   }
 
-  const labels = useMemo(() => new Map(combat?.combatants.map((entry) => [entry.combatantId, entry.kind === "actor" ? entry.actorId : entry.template?.definitionId ?? "Enemy"]) ?? []), [combat]);
+  const labels = useMemo(() => new Map(combat?.combatants.map((entry,index) => [entry.combatantId, entry.kind === "actor" ? `Ally ${index + 1}` : `Enemy ${index + 1}`]) ?? []), [combat]);
   const inspectedCombatant = combat?.combatants.find((entry) => entry.combatantId === inspected) ?? null;
+  const currentEnemy=combat?.combatants.find((entry)=>entry.combatantId===combat.currentCombatant)?.kind==="enemy";
 
   return <main className="combat-page" aria-labelledby="combat-heading"><div className="combat-shell">
     <header className="combat-header"><div><button type="button" className="back-link" onClick={onBack}>← Back</button><p className="eyebrow">LIVE SERVER COMBAT</p><h1 ref={headingRef} tabIndex={-1} id="combat-heading">Combat tracker</h1></div>{combat && <div className="combat-round"><span>Round</span><strong>{combat.round}</strong><small>Revision {combat.revision}</small></div>}</header>
     <form className="combat-binding" onSubmit={connectCombat}><label>Campaign encounter<select value={combatDraft} onChange={(event) => setCombatDraft(event.target.value)}><option value="">Choose a combat</option>{encounters.map((encounter)=><option key={encounter.encounterId} value={encounter.combatId??""}>{encounter.name} · {encounter.status}</option>)}</select></label><button type="submit" className="ghost" disabled={!encounters.some((encounter)=>encounter.combatId===combatDraft) || Boolean(marker||rewardMarker)}>Load combat</button><p>Combat identity comes only from this campaign's authorized encounter list and is restored only within this campaign.</p></form>
+    {!enemyTurnMarker&&<EncounterLifecyclePanel campaignId={campaignId} api={api} onCombatReady={openLifecycleCombat} onRewards={(result) => { if (result.encounter.combatId) openLifecycleCombat(result.encounter.combatId); setRewards(result.rewards); }} />}
     {marker && <section className={`combat-lock ${marker.phase === "ambiguous" ? "is-warning" : ""}`} role="alert"><p><strong>{marker.phase === "confirmed" ? "Confirmed action awaiting complete refresh" : "Action outcome unresolved"}.</strong> {marker.actionKind} was issued once at {marker.startedAt}. Controls remain locked and no automatic replay is allowed.</p><button type="button" className="ghost" onClick={() => void reconcile()}>Refresh authoritative state & log</button></section>}
     {commandStatus && <p className="combat-command-status" role="status">{commandStatus}</p>}
     {confirmed && <OutcomeReceipt result={confirmed} />}
+    {enemyTurnMarker&&<section className={`combat-lock ${enemyTurnMarker.phase==="ambiguous"?"is-warning":""}`} role="alert"><p><strong>{enemyTurnMarker.phase==="confirmed"?"Confirmed enemy turn awaiting complete refresh":"Enemy turn outcome unresolved"}.</strong> The server-owned turn was issued once at {enemyTurnMarker.startedAt}. Command-result reads cannot prove this endpoint's exact request, so no replay is allowed.</p><button type="button" className="ghost" onClick={()=>void reconcileEnemyTurn()}>Refresh authoritative combat state &amp; log</button></section>}
+    {enemyTurnResult&&<OutcomeReceipt result={enemyTurnResult}/>}
     {consumableMarker&&<section className={`combat-lock ${consumableMarker.phase==="ambiguous"?"is-warning":""}`} role="alert"><p><strong>{consumableMarker.phase==="confirmed"?"Confirmed consumable awaiting complete refresh":"Consumable outcome unresolved"}.</strong> The command was issued once at {consumableMarker.startedAt}. Controls remain locked and no automatic replay is allowed.</p><button type="button" className="ghost" onClick={()=>void reconcileConsumable()}>Read exact result & refresh</button></section>}
     {consumableStatus&&<p className="combat-command-status" role="status">{consumableStatus}</p>}
     {consumableResult&&<ConsumableReceipt result={consumableResult}/>}
@@ -401,16 +444,17 @@ export function CombatTrackerPage({ api, campaignId, initialCombatId, onBack, on
     {combat && <div className="combat-layout">
       <InitiativeRail combatants={combat.combatants} currentCombatant={combat.currentCombatant} selectedCombatant={inspected} onInspect={setInspected} />
       <section className="combat-main-column">
-        <section className="combat-panel current-turn" aria-live="polite"><div><span>Current turn</span><strong><bdi dir="auto">{combat.currentCombatant ? labels.get(combat.currentCombatant) ?? combat.currentCombatant : "Combat complete"}</bdi></strong></div>{stateError && <p role="alert">{stateError}</p>}{inspectedCombatant && <dl><div><dt>Team</dt><dd>{inspectedCombatant.team}</dd></div><div><dt>Status</dt><dd>{inspectedCombatant.status}</dd></div><div><dt>Hit points</dt><dd>{inspectedCombatant.hitPoints} / {inspectedCombatant.maximumHitPoints}</dd></div></dl>}</section>
+        <section className="combat-panel current-turn" aria-live="polite"><div><span>Current turn</span><strong><bdi dir="auto">{combat.currentCombatant ? labels.get(combat.currentCombatant) ?? "Current combatant" : "Combat complete"}</bdi></strong></div>{stateError && <p role="alert">{stateError}</p>}{inspectedCombatant && <dl><div><dt>Team</dt><dd>{inspectedCombatant.team}</dd></div><div><dt>Status</dt><dd>{inspectedCombatant.status}</dd></div><div><dt>Hit points</dt><dd>{inspectedCombatant.hitPoints} / {inspectedCombatant.maximumHitPoints}{(inspectedCombatant.temporaryHitPoints ?? 0) > 0 ? ` · ${inspectedCombatant.temporaryHitPoints} temporary` : ""}</dd></div>{(inspectedCombatant.conditions?.length ?? 0) > 0 && <div><dt>Conditions</dt><dd>{inspectedCombatant.conditions?.map((condition) => condition.condition.replaceAll("_", " ")).join(", ")}</dd></div>}{inspectedCombatant.kind === "actor" && inspectedCombatant.deathSaves && <div><dt>Death saves</dt><dd>{inspectedCombatant.deathSaves.successes} successes / {inspectedCombatant.deathSaves.failures} failures</dd></div>}{inspectedCombatant.status === "unconscious" && <div><dt>Recovery</dt><dd>Await a server-authorized death save or stabilization.</dd></div>}{inspectedCombatant.status === "stable" && <div><dt>Recovery</dt><dd>Stable. This combatant is no longer making death saves.</dd></div>}{inspectedCombatant.status === "dead" && <div><dt>Recovery</dt><dd>Dead. No recovery action is available in this combat.</dd></div>}</dl>}</section>
         {rewardError&&<p className="combat-inline-error" role="alert">{rewardError}</p>}
-        <CombatRewards rewards={rewards} claimableActorId={actorId} claimingBundleId={rewardMarker?.rewardBundleId} locked={Boolean(rewardMarker)} onClaim={(reward)=>void submitRewardClaim(reward)}/>
+        <CombatRewards rewards={rewards} claimableActorId={actorId} claimingBundleId={rewardMarker?.rewardBundleId} locked={Boolean(rewardMarker||enemyTurnMarker)} onClaim={(reward)=>void submitRewardClaim(reward)}/>
         {actorId&&wallet&&<p className="combat-authority-note">Loaded actor wallet revision {wallet.revision}. Wallet balances refresh after this actor's confirmed reward settlement.</p>}
         <CombatLog entries={entries} nextAfterSequence={nextSequence} loading={logLoading} error={logError} onLoadMore={() => void loadMoreLog()} onRetry={() => void loadCombat(combatId)} />
         <form className="combat-binding actor-combat-binding" onSubmit={connectActor}><label>Actor ID for powers & effects<input value={actorDraft} onChange={(event) => setActorDraft(event.target.value)} autoComplete="off" /></label><button type="submit" className="ghost" disabled={!resourceIdSchema.safeParse(actorDraft).success}>Load actor lanes</button><p>Actor identity is entered explicitly because combat state does not expose a safe actor-workspace binding.</p></form>
         {powerMarker&&<section className={`combat-lock ${powerMarker.phase==="ambiguous"?"is-warning":""}`} role="alert"><p><strong>{powerMarker.phase==="confirmed"?"Confirmed power awaiting complete actor refresh":"Power outcome unresolved"}.</strong> No automatic replay is allowed. Generic actor refresh does not prove an ambiguous result.</p><button type="button" className="ghost" onClick={()=>void loadActor(actorId)}>Refresh actor powers, effects & resources</button></section>}
         <div className="combat-actor-lanes"><PowerLibraryPanel powers={powers} loading={actorLoading} error={powerError} disabled={Boolean(powerMarker)} commandStatus={powerStatus} result={powerResult} onUse={(plan,targets)=>void submitPower(plan,targets)} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /><EffectList effects={effects} loading={actorLoading} error={effectError} onRefresh={actorId ? () => void loadActor(actorId) : undefined} /></div>
       </section>
-      <LegalActionTray legalActions={combat.legalActions} consumableActions={consumableActions} combatantLabels={labels} disabled={Boolean(marker||consumableMarker||rewardMarker)} busy={marker?.phase === "ambiguous" && commandStatus.startsWith("Submitting")} onSubmit={(action, targets) => void submitAction(action, targets)} onUseConsumable={(action)=>void submitConsumable(action)} />
+      <aside className="combat-enemy-turn"><h2>Enemy turn</h2>{currentEnemy?<><p>The server selects the enemy action, targets, rolls, and damage.</p><button type="button" className="primary" disabled={Boolean(marker||consumableMarker||rewardMarker||enemyTurnMarker)} onClick={()=>void submitEnemyTurn()}>Resolve enemy turn</button></>:<p>Enemy turn controls appear only while an enemy is the current combatant.</p>}</aside>
+      <LegalActionTray legalActions={combat.legalActions} consumableActions={consumableActions} combatantLabels={labels} disabled={Boolean(marker||consumableMarker||rewardMarker||enemyTurnMarker||currentEnemy)} busy={(marker?.phase === "ambiguous" && commandStatus.startsWith("Submitting"))||(enemyTurnMarker?.phase==="ambiguous")} onSubmit={(action, targets) => void submitAction(action, targets)} onUseConsumable={(action)=>void submitConsumable(action)} />
     </div>}
   </div></main>;
 }

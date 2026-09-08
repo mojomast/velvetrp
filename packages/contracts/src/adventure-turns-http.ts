@@ -100,6 +100,28 @@ export const adventureTurnGetResponseSchema = z.object({
   resumeToken: adventureTurnResumeTokenSchema.optional(),
 }).strict();
 
+/** Maximum completed room exchanges exposed to clients or provider prompts. */
+export const MAX_ADVENTURE_TRANSCRIPT_TURNS = 32;
+/** Exact room locator for a bounded, role-safe adventure transcript. */
+export const adventureTurnTranscriptRequestSchema = z.object({
+  campaignId: campaignIdSchema,
+  sessionId: resourceIdSchema,
+}).strict();
+/** One collapsed original declaration and its latest completed narration derivative. */
+export const adventureTurnTranscriptEntrySchema = z.object({
+  turnId: resourceIdSchema,
+  actorId: actorIdSchema,
+  declaration: z.string().trim().min(1).max(8_000),
+  narration: z.string().trim().min(1).max(8_000),
+  completedAt: utcIsoTimestampSchema,
+}).strict();
+/** Oldest-to-newest bounded room transcript with coordination internals structurally absent. */
+export const adventureTurnTranscriptResponseSchema = z.object({
+  campaignId: campaignIdSchema,
+  sessionId: resourceIdSchema,
+  turns: z.array(adventureTurnTranscriptEntrySchema).max(MAX_ADVENTURE_TRANSCRIPT_TURNS),
+}).strict();
+
 /** Exact safe locator for read-only initial-turn idempotency reconciliation. */
 export const adventureTurnInitialReconcileRequestSchema = z.object({
   campaignId: campaignIdSchema,
@@ -169,6 +191,8 @@ export const adventureTurnStreamEventSchema = z.discriminatedUnion("type", [
 
 export type AdventureTurnStreamRequest = z.infer<typeof adventureTurnStreamRequestSchema>;
 export type AdventureTurnGetResponse = z.infer<typeof adventureTurnGetResponseSchema>;
+export type AdventureTurnTranscriptEntry = z.infer<typeof adventureTurnTranscriptEntrySchema>;
+export type AdventureTurnTranscriptResponse = z.infer<typeof adventureTurnTranscriptResponseSchema>;
 /** Public HTTP proposal without private decision identity. */
 export type AdventureTurnHttpProposal = z.infer<typeof adventureTurnHttpProposalSchema>;
 /** Safe initial-turn idempotency reconciliation locator. */

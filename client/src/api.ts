@@ -1,4 +1,5 @@
-import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema } from "@velvet/contracts";
+import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
+import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
 import {
   campaignAdministrationHttpArchiveRequestSchema,
@@ -64,6 +65,22 @@ import type {
   CampaignTransferHttpDryRunResponse,
   CampaignTransferHttpExportDocument,
 } from "@velvet/contracts";
+import { administrationIntegrationCommandResponseSchema, campaignAdministrationIntegrationsSchema,
+  rulesetSelectionCommandSchema, safetyActionCommandSchema, sessionZeroSafetyUpdateCommandSchema,
+  shopBuyPolicyCommandSchema, vendorAssociationCommandSchema } from "@velvet/contracts";
+import type { CampaignAdministrationIntegrations, RulesetSelectionCommand, SafetyActionCommand,
+  SessionZeroSafetyUpdateCommand, ShopBuyPolicyCommand, VendorAssociationCommand } from "@velvet/contracts";
+import {
+  tacticalMapGenerateRequestSchema,
+  tacticalMapGenerateResponseSchema,
+  tacticalMapModeSchema,
+  tacticalMapMoveRequestSchema,
+  tacticalMapMoveResponseSchema,
+  tacticalMapPreviewRequestSchema,
+  tacticalMapPreviewResponseSchema,
+  tacticalMapSnapshotSchema,
+} from "@velvet/contracts";
+import type { TacticalMapGenerateRequest, TacticalMapMode, TacticalMapMoveRequest, TacticalMapMoveResponse, TacticalMapPreviewRequest, TacticalMapPreviewResponse, TacticalMapSnapshot } from "@velvet/contracts";
 import {
   npcCastHttpSchema,
   npcPresenceMutationHttpRequestSchema,
@@ -107,6 +124,8 @@ import {
   adventureTurnNarrationVariantStreamRequestSchema,
   adventureTurnResumeStreamRequestSchema,
   adventureTurnStreamEventSchema,
+  adventureTurnTranscriptRequestSchema,
+  adventureTurnTranscriptResponseSchema,
   campaignPlayBootstrapSchema,
   campaignPlaySessionIdSchema,
 } from "@velvet/contracts";
@@ -115,6 +134,7 @@ import type {
   AdventureTurnGetResponse,
   AdventureTurnInitialReconcileRequest,
   AdventureTurnStreamEvent,
+  AdventureTurnTranscriptResponse,
   CampaignPlayBootstrap,
 } from "@velvet/contracts";
 import {
@@ -189,6 +209,7 @@ import {
   combatActionCommandRequestSchema,
   combatActionCommandResponseSchema,
   combatCommandResultResponseSchema,
+  combatEnemyTurnCommandRequestSchema,
   combatEndCommandRequestSchema,
   combatEndCommandResponseSchema,
   combatRewardClaimRequestSchema,
@@ -201,6 +222,7 @@ import {
   encounterCreateRequestSchema,
   encounterCreateResponseSchema,
   encounterListResponseSchema,
+  encounterSetupCandidatesResponseSchema,
   encounterStartCommandRequestSchema,
   encounterStartCommandResponseSchema,
   useConsumableCommandRequestSchema,
@@ -213,6 +235,7 @@ import type {
   CombatActionCommandRequest,
   CombatActionCommandResponse,
   CombatCommandResultResponse,
+  CombatEnemyTurnCommandRequest,
   CombatEndCommandRequest,
   CombatEndCommandResponse,
   CombatRewardClaimRequest,
@@ -224,6 +247,7 @@ import type {
   CombatReadResponse,
   EncounterCreateRequest,
   EncounterPublic,
+  EncounterSetupCandidatesResponse,
   EncounterStartCommandRequest,
   UseConsumableCommandRequest,
   UseConsumableCommandResult,
@@ -301,6 +325,7 @@ export interface CharacterSpec {
   age: number;
   archetype: string;
   boundaries: string;
+  profile?: import("@velvet/contracts").PersonaProfile;
   fictionalConfirmed: boolean;
 }
 
@@ -1062,6 +1087,47 @@ export async function getCampaignPlayBootstrap(campaignId: string, sessionId: st
   return response;
 }
 
+function tacticalMapPath(campaignId: string, sessionId: string, mode: TacticalMapMode): string {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const session = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  const parsedMode = parseApiInput(() => tacticalMapModeSchema.parse(mode));
+  return `/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(session)}/tactical-maps/${parsedMode}`;
+}
+
+export async function getTacticalMap(campaignId: string, sessionId: string, mode: TacticalMapMode, actorId: string): Promise<TacticalMapSnapshot> {
+  const actor = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/actors/${encodeURIComponent(actor)}`, { cache: "no-store" });
+  requireStatus(success, 200, "Tactical map"); const value = tacticalMapSnapshotSchema.parse(success.body);
+  if (value.campaignId !== campaignId || value.sessionId !== sessionId || value.mode !== mode || value.controlledTokenId === null) throw new Error("Tactical map did not match the request");
+  return value;
+}
+
+export async function generateTacticalMap(campaignId: string, sessionId: string, input: TacticalMapGenerateRequest): Promise<TacticalMapSnapshot> {
+  const campaign = parseApiInput(() => resourceIdSchema.parse(campaignId)); const room = parseApiInput(() => campaignPlaySessionIdSchema.parse(sessionId));
+  const body = parseApiInput(() => tacticalMapGenerateRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(campaign)}/rooms/${encodeURIComponent(room)}/tactical-maps`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Tactical map generation"); const value = tacticalMapGenerateResponseSchema.parse(success.body);
+  if (value.campaignId !== campaign || value.sessionId !== room || value.mode !== body.mode || value.encounterId !== body.encounterId) throw new Error("Generated tactical map did not match the request");
+  return value;
+}
+
+export async function previewTacticalMapMove(campaignId: string, sessionId: string, mode: TacticalMapMode, input: TacticalMapPreviewRequest): Promise<TacticalMapPreviewResponse> {
+  const body = parseApiInput(() => tacticalMapPreviewRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/previews`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Tactical map preview"); const value = tacticalMapPreviewResponseSchema.parse(success.body);
+  const end = value.projection.authoritativePath?.at(-1);
+  if (value.campaignId !== campaignId || value.sessionId !== sessionId || value.mode !== mode || end?.x !== body.destination.x || end.y !== body.destination.y) throw new Error("Tactical map preview did not match the request");
+  return value;
+}
+
+export async function moveTacticalMapToken(campaignId: string, sessionId: string, mode: TacticalMapMode, input: TacticalMapMoveRequest): Promise<TacticalMapMoveResponse> {
+  const body = parseApiInput(() => tacticalMapMoveRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${tacticalMapPath(campaignId, sessionId, mode)}/move-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Tactical map move"); const value = tacticalMapMoveResponseSchema.parse(success.body);
+  if (value.snapshot.campaignId !== campaignId || value.snapshot.sessionId !== sessionId || value.snapshot.mode !== mode || value.receipt.previewId !== body.previewId || value.receipt.idempotencyKey !== body.idempotencyKey) throw new Error("Tactical map move did not match the request");
+  return value;
+}
+
 /** Opens one initial or token-resume delivery stream; cancellation affects delivery only. */
 export function streamAdventureTurn(requestInput: AdventureTurnClientStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void): AdventureTurnClientStreamHandle {
   const request = requestInput.kind === "initial"
@@ -1123,6 +1189,19 @@ export async function getAdventureTurn(turnId: string, expected: AdventureTurnCl
   const id = parseApiInput(() => resourceIdSchema.parse(turnId));
   const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/${encodeURIComponent(id)}`, { cache: "no-store" }); requireStatus(success, 200, "Adventure turn read");
   const response = adventureTurnGetResponseSchema.parse(success.body); assertAdventureTurnBinding(response.turn, { ...expected, turnId: id }); return response;
+}
+
+/** Reads the bounded role-safe transcript for one exact campaign room. */
+export async function getAdventureTurnTranscript(campaignId: string, sessionId: string): Promise<AdventureTurnTranscriptResponse> {
+  const locator = parseApiInput(() => adventureTurnTranscriptRequestSchema.parse({ campaignId, sessionId }));
+  const query = new URLSearchParams(locator);
+  const success = await requestResponse<unknown>(`/rpg/v1/adventure-turns/transcript?${query.toString()}`, { cache: "no-store" });
+  requireStatus(success, 200, "Adventure turn transcript");
+  const response = adventureTurnTranscriptResponseSchema.parse(success.body);
+  if (response.campaignId !== locator.campaignId || response.sessionId !== locator.sessionId) {
+    throw new Error("Adventure turn transcript did not match the requested room");
+  }
+  return response;
 }
 
 function assertAdventureTurnBinding(turn: AdventureTurnGetResponse["turn"], expected: AdventureTurnClientBinding): void {
@@ -1506,6 +1585,16 @@ export async function getActorEffects(actorId: string): Promise<ActorEffectsResp
   return actorEffectsResponseSchema.parse(success.body);
 }
 
+/** Reads the complete display-safe gameplay sheet and binds it to the requested actor. */
+export async function getActorGameplaySheet(actorId: string): Promise<import("@velvet/contracts").ActorGameplaySheetResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/gameplay-sheet`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor gameplay sheet read");
+  const response = actorGameplaySheetResponseSchema.parse(success.body);
+  if (response.identity.actorId !== validActorId) throw new Error("Actor gameplay sheet did not match the requested actor");
+  return response;
+}
+
 /** Resolves one server-owned check and binds its discriminant, target, and receipt. */
 export async function commandActorCheck(actorId: string, input: ActorCheckCommandRequest): Promise<ActorCheckCommandResponse> {
   const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
@@ -1580,6 +1669,14 @@ export async function listCampaignEncounters(campaignId: string): Promise<{ enco
   const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounters`, { cache: "no-store" });
   requireStatus(success, 200, "Encounter list");
   return encounterListResponseSchema.parse(success.body);
+}
+
+/** Reads the server-authorized identities available for safe encounter preparation. */
+export async function getEncounterSetupCandidates(campaignId: string): Promise<EncounterSetupCandidatesResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${encodeURIComponent(id)}/encounter-setup-candidates`, { cache: "no-store" });
+  requireStatus(success, 200, "Encounter setup candidates");
+  return encounterSetupCandidatesResponseSchema.parse(success.body);
 }
 
 /** Creates one encounter intent and requires its route-bound preparing projection. */
@@ -1776,6 +1873,21 @@ export async function resolveCombatAction(combatId: string, input: CombatActionC
     || response.receipt.idempotencyKey !== body.idempotencyKey || response.receipt.revisionBefore !== body.expectedRevision
     || response.receipt.revisionAfter !== body.expectedRevision + 1 || response.combat.revision !== response.receipt.revisionAfter) {
     throw new Error("Combat action response did not match the request");
+  }
+  return response;
+}
+
+/** Resolves the current enemy turn; target and outcome selection remain server-owned. */
+export async function resolveCombatEnemyTurn(combatId: string, input: CombatEnemyTurnCommandRequest): Promise<CombatActionCommandResponse> {
+  const target = combatPath(combatId);
+  const body = parseApiInput(() => combatEnemyTurnCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/enemy-turn-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Combat enemy turn");
+  const response = combatActionCommandResponseSchema.parse(success.body);
+  if (response.combat.combatId !== target.id || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision || response.receipt.revisionAfter !== body.expectedRevision + 1
+    || response.combat.revision !== response.receipt.revisionAfter) {
+    throw new Error("Combat enemy turn response did not match the request");
   }
   return response;
 }
@@ -2000,6 +2112,30 @@ export async function setupMechanicsStarter(campaignId: string): Promise<Campaig
   return response;
 }
 
+/** Issues exactly one fixed SRD 5.1 setup PUT and verifies that exact profile and pack. */
+export async function setupSrd51Starter(campaignId: string): Promise<CampaignDetailResponse> {
+  const validCampaignId = parseApiInput(() => resourceIdSchema.parse(campaignId));
+  const body = parseApiInput(() => campaignMechanicsStarterSetupRequestSchema.parse({ starterId: SRD_5_1_STARTER_IDENTITY.starterId }));
+  const result = await requestResponse<unknown>(
+    `/rpg/v1/campaigns/${encodeURIComponent(validCampaignId)}/mechanics-starter-setup`,
+    { method: "PUT", cache: "no-store", body: JSON.stringify(body) },
+    { status: 200, message: "Campaign SRD 5.1 starter setup response did not use the committed status" },
+  );
+  requireStatus(result, 200, "Campaign SRD 5.1 starter setup");
+  const response = campaignMechanicsStarterSetupResponseSchema.parse(result.body);
+  const content = response.campaign.content;
+  if (response.campaign.id !== validCampaignId
+    || response.campaign.actorRole !== "owner"
+    || content.status !== "configured"
+    || content.rulesProfileId !== SRD_5_1_STARTER_IDENTITY.rulesProfileId
+    || content.contentPacks.length !== 1
+    || content.contentPacks[0]?.packId !== SRD_5_1_STARTER_IDENTITY.packId
+    || content.contentPacks[0]?.packVersion !== SRD_5_1_STARTER_IDENTITY.packVersion) {
+    throw new Error("Campaign SRD 5.1 starter setup response did not match the request");
+  }
+  return response;
+}
+
 function campaignAdministrationPath(campaignId: string): { id: string; path: string } {
   const id = parseApiInput(() => resourceIdSchema.parse(campaignId));
   return { id, path: `/rpg/v1/campaigns/${encodeURIComponent(id)}/administration` };
@@ -2029,6 +2165,29 @@ export async function getCampaignAdministration(campaignId: string): Promise<Cam
   if (response.campaign.id !== id) throw new Error("Campaign administration response did not match the request");
   return response;
 }
+
+const integrationPath = (campaignId: string, command = "") => `/rpg/v1/campaigns/${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)))}/${command || "administration-integrations"}`;
+export async function getCampaignAdministrationIntegrations(campaignId: string): Promise<CampaignAdministrationIntegrations> {
+  const success = await requestResponse<unknown>(integrationPath(campaignId), { cache: "no-store" });
+  requireStatus(success, 200, "Campaign administration integrations");
+  const response = campaignAdministrationIntegrationsSchema.parse(success.body);
+  if (response.campaignId !== campaignId) throw new Error("Campaign integration response did not match the request");
+  return response;
+}
+async function integrationCommand<T>(campaignId: string, segment: string, schema: { parse(value: unknown): T }, input: T) {
+  const body = parseApiInput(() => schema.parse(input));
+  const success = await requestResponse<unknown>(integrationPath(campaignId, segment), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Campaign administration command");
+  const response = administrationIntegrationCommandResponseSchema.parse(success.body);
+  if (response.receipt.campaignId !== campaignId || response.receipt.idempotencyKey !== (body as any).idempotencyKey
+    || response.receipt.revisionBefore !== (body as any).expectedRevision) throw new Error("Campaign integration receipt did not match the request");
+  return response;
+}
+export const associateCampaignVendor = (campaignId: string, input: VendorAssociationCommand) => integrationCommand(campaignId, "vendor-association-commands", vendorAssociationCommandSchema, input);
+export const configureCampaignBuyPolicy = (campaignId: string, input: ShopBuyPolicyCommand) => integrationCommand(campaignId, "buy-policy-commands", shopBuyPolicyCommandSchema, input);
+export const selectCampaignRuleset = (campaignId: string, input: RulesetSelectionCommand) => integrationCommand(campaignId, "ruleset-selection-commands", rulesetSelectionCommandSchema, input);
+export const updateCampaignSessionZeroSafety = (campaignId: string, input: SessionZeroSafetyUpdateCommand) => integrationCommand(campaignId, "session-zero-safety-commands", sessionZeroSafetyUpdateCommandSchema, input);
+export const requestCampaignSafetyAction = (campaignId: string, input: SafetyActionCommand) => integrationCommand(campaignId, "safety-action-commands", safetyActionCommandSchema, input);
 
 /** Issues one revision-bound PATCH. Callers must never automatically retry it. */
 export async function updateCampaignAdministration(
@@ -2657,12 +2816,34 @@ export interface ProviderSettings {
   zdr: boolean;
   requestTimeoutSeconds: number;
   pricing: { promptPerMillion: number | null; completionPerMillion: number | null };
+  adventureTurnBudget: { maxTotalTokens: number; maxEstimatedCostUsd: number | null };
   samplers: SamplerSettings;
   updatedAt: string;
 }
 
 export function getProvider(): Promise<ProviderSettings> {
   return request<ProviderSettings>("/provider");
+}
+
+export interface ProviderCapabilityPreflightResult {
+  model: string;
+  dmPlayCompatible: boolean;
+  campaignGenerationCompatible: boolean;
+  ok: boolean;
+  capabilities: Array<{
+    /** strict-function-tools is retained for responses from older servers or saved fixtures. */
+    capability: "function-tools" | "strict-function-tools" | "strict-json-schema";
+    status: "supported" | "unsupported" | "unavailable";
+    failure?: { permanence: "permanent" | "transient"; code: string; httpStatus: number | null; retryAfterMs?: number | null };
+  }>;
+}
+
+export function preflightProviderCapabilities(): Promise<ProviderCapabilityPreflightResult> {
+  return request<ProviderCapabilityPreflightResult>("/provider/preflight", {
+    method: "POST",
+    cache: "no-store",
+    body: "{}",
+  });
 }
 
 export interface UsageBreakdown {
@@ -2701,6 +2882,7 @@ export function updateProvider(patch: {
   zdr?: boolean;
   requestTimeoutSeconds?: number;
   pricing?: Partial<ProviderSettings["pricing"]>;
+  adventureTurnBudget?: Partial<ProviderSettings["adventureTurnBudget"]>;
   samplers?: Partial<SamplerSettings>;
 }): Promise<ProviderSettings> {
   return request<ProviderSettings>("/provider", {

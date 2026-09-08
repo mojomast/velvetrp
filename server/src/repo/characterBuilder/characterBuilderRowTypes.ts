@@ -11,6 +11,7 @@ import {
   type CharacterStartingGrant,
 } from "@velvet/contracts";
 import { calculateCharacterDerivedStats } from "../../characterBuilderCalculator.js";
+import { resolveProfileRulesetIdentity } from "../../rulesets/campaignBinding.js";
 
 /** Campaign membership roles that can be represented in a draft view. */
 export type CharacterBuilderRole = "owner" | "gm" | "player" | "observer";
@@ -101,7 +102,8 @@ export function buildView(
   if (selections.race && selections.background && selections.class && selections.starterGrant && !chosen) {
     issues.push({ code: "definition-unavailable", path: "selections", message: "A selected definition is unavailable or not a valid level-one choice." });
   }
-  const derived = chosen ? calculateCharacterDerivedStats({ scores: allocation.scores, racialBonuses: chosen.race.mechanics.attributeBonuses,
+  const [rulesetId, rulesetVersion] = resolveProfileRulesetIdentity(db, row.rules_profile_id);
+  const derived = chosen ? calculateCharacterDerivedStats({ rulesetId, rulesetVersion, scores: allocation.scores, racialBonuses: chosen.race.mechanics.attributeBonuses,
     classHp: chosen.level.mechanics.hpGain, raceSpeed: chosen.race.mechanics.speed,
     proficiencyBonus: chosen.level.mechanics.proficiencyBonus, spellcastingAttribute: chosen.klass.mechanics.primaryAttribute }) : null;
   const grants = chosen && selections.starterGrant ? mappers.grantsFor(chosen.background, selections.starterGrant) : [];
@@ -109,7 +111,7 @@ export function buildView(
   return characterDraftViewSchema.parse({
     id: row.id, campaignId: row.campaign_id, personaId: row.persona_id, controllerPrincipalId: row.controller_principal_id,
     role, status: row.status, durability: row.durability, expiresAt: row.expires_at, effectivelyExpired: effectiveExpiry,
-    revision: row.revision, rulesProfileId: row.rules_profile_id, pins, allocation, selections,
+    revision: row.revision, rulesProfileId: row.rules_profile_id, rulesetId, rulesetVersion, pins, allocation, selections,
     choiceGroups: [
       { id: "race", required: true, options: definitions.filter((value) => value.reference.kind === "race").map(option) },
       { id: "background", required: true, options: definitions.filter((value) => value.reference.kind === "background").map(option) },

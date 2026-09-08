@@ -1,6 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { getPromptPreset } from "../src/presets.js";
 import {
@@ -35,6 +35,7 @@ interface TestResponse {
 let server: Server | null = null;
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   if (!server) return;
   await new Promise<void>((resolve) => server?.close(() => resolve()));
   server = null;
@@ -134,7 +135,7 @@ describe("non-stream provider completion request", () => {
     expect(result.message).toEqual({ role: "assistant", content: "The door opens." });
   });
 
-  it("wires strict tools, named choice, assistant calls, and tool results", async () => {
+  it("wires schema-bound tools without outbound strict mode, plus named choice and tool transcripts", async () => {
     const fake = await startProvider({ body: {
       choices: [{ message: { role: "assistant", content: null, tool_calls: [
         { id: "next-call", type: "function", function: { name: "move_actor", arguments: " {\n  \"room\": \"r2\"\n} " } },
@@ -156,7 +157,8 @@ describe("non-stream provider completion request", () => {
 
     expect(fake.requests[0]?.body).toMatchObject({
       stream: false,
-      tools: [{ type: "function", function: { name: "move_actor", description: "Move an actor", strict: true } }],
+      tools: [{ type: "function", function: { name: "move_actor", description: "Move an actor",
+        parameters: { additionalProperties: false } } }],
       tool_choice: { type: "function", function: { name: "move_actor" } },
       messages: expect.arrayContaining([
         { role: "assistant", content: null, tool_calls: [{ id: "prior-call", type: "function", function: {
@@ -165,7 +167,24 @@ describe("non-stream provider completion request", () => {
         { role: "tool", tool_call_id: "prior-call", content: "{\"ok\":true}" },
       ]),
     });
+    expect((fake.requests[0]?.body.tools as Array<{ function: Record<string, unknown> }>)[0]?.function).not.toHaveProperty("strict");
     expect(result.message.toolCalls?.[0]?.arguments).toBe(" {\n  \"room\": \"r2\"\n} ");
+  });
+
+  it("transports Qwen-like narration as one named schema-bound tool without response_format",async()=>{
+    const fake=await startProvider({body:{model:"qwen/qwen3.7-flash",choices:[{finish_reason:"tool_calls",message:{role:"assistant",content:null,tool_calls:[{
+      id:"qwen-narration",type:"function",function:{name:"submit_adventure_narration",arguments:'{"narration":"Rain beads on the harbor rail."}'},
+    }]}}],usage:{prompt_tokens:11,completion_tokens:7,total_tokens:18}}});
+    const result=await completeWithProvider({...input(provider(fake.baseUrl)),tools:[{name:"submit_adventure_narration",parameters:{type:"object",
+      properties:{narration:{type:"string",minLength:1,maxLength:8000}},required:["narration"],additionalProperties:false}}],
+      toolChoice:{name:"submit_adventure_narration"},promptVersion:"adventure-narration-v1",schemaVersion:"adventure-narration-v1"});
+    expect(fake.requests[0]?.body).toMatchObject({tools:[{function:{name:"submit_adventure_narration",parameters:{additionalProperties:false}}}],
+      tool_choice:{type:"function",function:{name:"submit_adventure_narration"}}});
+    expect((fake.requests[0]?.body.tools as Array<{ function: Record<string, unknown> }>)[0]?.function).not.toHaveProperty("strict");
+    expect(fake.requests[0]?.body).not.toHaveProperty("response_format");
+    expect(result).toMatchObject({message:{content:null,toolCalls:[{id:"qwen-narration",name:"submit_adventure_narration",
+      arguments:'{"narration":"Rain beads on the harbor rail."}'}]},usage:{promptTokens:11,completionTokens:7,totalTokens:18},
+      provenance:{finishReason:"tool_calls",promptVersion:"adventure-narration-v1",schemaVersion:"adventure-narration-v1"}});
   });
 
   it("transports strict json_schema without locally parsing assistant content", async () => {
@@ -186,7 +205,7 @@ describe("non-stream provider completion request", () => {
     });
   });
 
-  it("surfaces strict-capability incompatibility without retrying or downgrading", async () => {
+  it("keeps strict JSON incompatibility fail-closed without adding strict mode to tools", async () => {
     const fake = await startProvider({ status: 400, body: { error: { message: "strict unsupported" } } });
     const pending = completeWithProvider({
       ...input(provider(fake.baseUrl)),
@@ -196,10 +215,24 @@ describe("non-stream provider completion request", () => {
     await expect(pending).rejects.toBeInstanceOf(ProviderHttpError);
     expect(fake.requests).toHaveLength(1);
     expect(fake.requests[0]?.body).toMatchObject({
-      tools: [{ function: { strict: true } }],
       response_format: { json_schema: { strict: true } },
       stream: false,
     });
+    expect((fake.requests[0]?.body.tools as Array<{ function: Record<string, unknown> }>)[0]?.function).not.toHaveProperty("strict");
+  });
+
+  it("allows OpenRouter fallbacks without constraining tools to provider strict mode", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: null,
+      tool_calls: [{ id: "fallback-call", type: "function", function: { name: "act", arguments: "{}" } }] } }] }),
+      { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await completeWithProvider({ ...input({ ...provider("https://openrouter.ai/api/v1"), model: "openrouter/auto",
+      allowFallbacks: true }), tools: [{ name: "act", parameters: { type: "object", additionalProperties: false } }],
+      toolChoice: "required" });
+    const body = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body)) as any;
+    expect(body).toMatchObject({ model: "openrouter/auto", provider: { allow_fallbacks: true },
+      tools: [{ function: { name: "act", parameters: { additionalProperties: false } } }] });
+    expect(body.tools[0].function).not.toHaveProperty("strict");
   });
 
   it("omits empty tools and assistant tool_calls from the wire", async () => {
@@ -213,6 +246,18 @@ describe("non-stream provider completion request", () => {
     expect(fake.requests[0]?.body).not.toHaveProperty("tools");
     expect((fake.requests[0]?.body.messages as Array<Record<string, unknown>>)[2]).not.toHaveProperty("tool_calls");
   });
+
+  it("serializes parallelToolCalls only when provided", async () => {
+    const fake = await startProvider({ body: textResponse() });
+    const settings = provider(fake.baseUrl);
+    await completeWithProvider({ ...input(settings), parallelToolCalls: true });
+    await completeWithProvider({ ...input(settings), parallelToolCalls: false });
+    await completeWithProvider(input(settings));
+
+    expect(fake.requests[0]?.body.parallel_tool_calls).toBe(true);
+    expect(fake.requests[1]?.body.parallel_tool_calls).toBe(false);
+    expect(fake.requests[2]?.body).not.toHaveProperty("parallel_tool_calls");
+  });
 });
 
 describe("provider completion parsing and metadata", () => {
@@ -221,6 +266,8 @@ describe("provider completion parsing and metadata", () => {
     const result = await completeWithProvider(input(provider(fake.baseUrl)));
     expect(result.usage).toEqual({ promptTokens: 10, completionTokens: 4, totalTokens: 14 });
     expect(result.model).toEqual({ requestedModel: "requested-model", responseModel: "response-model" });
+    expect(result.provenance).toMatchObject({ requestId: null, systemFingerprint: null, finishReason: "unknown",
+      promptVersion: "unversioned", schemaVersion: "unversioned", latencyMs: expect.any(Number) });
   });
 
   it.each([
@@ -265,6 +312,37 @@ describe("provider completion parsing and metadata", () => {
       toolCalls: [{ id: "call-1", name: "act", arguments: "{}" }],
     });
   });
+
+  it.each([
+    ["stop", { finish_reason: "stop", message: { role: "assistant", content: "done" } }, undefined],
+    ["tool_calls", { finish_reason: "tool_calls", message: { role: "assistant", content: null, tool_calls: [
+      { id: "call-1", type: "function", function: { name: "act", arguments: "{}" } },
+    ] } }, "required"],
+  ] as const)("accepts normal %s completion behavior", async (_label, choice, toolChoice) => {
+    const fake = await startProvider({ body: { choices: [choice] } });
+    const result = await completeWithProvider({
+      ...input(provider(fake.baseUrl)),
+      ...(toolChoice ? { tools: [{ name: "act", parameters: { type: "object" } }], toolChoice } : {}),
+    });
+    expect(result.provenance?.finishReason).toBe(choice.finish_reason);
+  });
+
+  it.each(["error", "length", "content_filter"] as const)(
+    "rejects required tool completions with finish reason %s before accepting calls",
+    async (finishReason) => {
+      const argumentsText = finishReason === "length" ? '{"value":' : "{}";
+      const fake = await startProvider({ body: { choices: [{ finish_reason: finishReason, message: {
+        role: "assistant",
+        content: null,
+        tool_calls: [{ id: "call-1", type: "function", function: { name: "act", arguments: argumentsText } }],
+      } }] } });
+      await expect(completeWithProvider({
+        ...input(provider(fake.baseUrl)),
+        tools: [{ name: "act", parameters: { type: "object" } }],
+        toolChoice: finishReason === "length" ? "auto" : "required",
+      })).rejects.toThrow(new ProviderProtocolError(`Provider did not complete the tool call (finish_reason: ${finishReason})`));
+    },
+  );
 
   it.each([
     ["without advertised tools", undefined, undefined, "act"],
@@ -321,6 +399,12 @@ describe("provider completion parsing and metadata", () => {
 });
 
 describe("provider completion failures and configuration", () => {
+  it("rejects choice-level provider errors from successful HTTP responses", async () => {
+    const fake = await startProvider({ body: { choices: [{ error: { message: "choice failed" } }] } });
+    await expect(completeWithProvider(input(provider(fake.baseUrl))))
+      .rejects.toEqual(expect.objectContaining<Partial<ProviderResponseError>>({ message: "choice failed" }));
+  });
+
   it("classifies provider-declared and invalid-JSON errors", async () => {
     let call = 0;
     const fake = await startProvider(() => ++call === 1
@@ -446,6 +530,25 @@ describe("provider credential and OpenRouter header scope", () => {
       "HTTP-Referer": "https://velvet.example",
       "X-Title": "Velvet Test",
     });
+  });
+
+  it("forwards explicit OpenRouter application headers to a loopback inference gateway", () => {
+    const prior = process.env.OPENROUTER_USER_AGENT;
+    process.env.OPENROUTER_USER_AGENT = "opencode/1.15.13";
+    try {
+      const settings = provider("http://127.0.0.1:8787/v1");
+      settings.httpReferer = "https://opencode.ai/";
+      settings.appTitle = "opencode";
+      expect(buildProviderHeaders(settings.baseUrl, settings)).toMatchObject({
+        Authorization: "Bearer local-secret",
+        "HTTP-Referer": "https://opencode.ai/",
+        "X-Title": "opencode",
+        "User-Agent": "opencode/1.15.13",
+      });
+    } finally {
+      if (prior === undefined) delete process.env.OPENROUTER_USER_AGENT;
+      else process.env.OPENROUTER_USER_AGENT = prior;
+    }
   });
 
   it("requires keys only for exact hosted names across provider labels", () => {

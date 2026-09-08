@@ -82,7 +82,9 @@ describe("M5.4 actor.travel candidate generation",()=>{
     const r=repo();const batch=r.generateActorTravelCandidates("player",{turnId:ids.turnId,idempotencyKey:"generate"});
     expect(batch.worldRevision).toBe(0);expect(batch.candidates.map((value)=>value.privateParameters.connectionId)).toEqual(["discovery-required","reputation-allowed","route-a","route-b"]);
     expect(batch.candidates.map((value)=>value.label.routeOption)).toEqual([1,2,3,4]);expect(batch.candidates.every((value)=>value.policy.reason==="legal-visible-connection"&&value.privateParameters.partyActorIds[0]==="actor")).toBe(true);
-    expect(JSON.stringify(batch.candidates.map(({label,summary})=>({label,summary})))).not.toContain("route-");r.close();});
+    expect(batch.candidates.map((value)=>value.label.destination)).toEqual(["Destination discovery-required","Destination reputation-allowed","Destination route-a","Destination route-b"]);
+    expect(batch.candidates.every((value)=>value.label.origin==="Origin")).toBe(true);
+    expect(JSON.stringify(batch.candidates.map(({label,summary})=>({label,summary})))).not.toContain('"connectionId"');r.close();});
 
   it("applies GM visibility while retaining discovery and faction requirements",()=>{const ids=seed();seedTravelWorld(ids,[
     {id:"gm-open",visibility:"gm"},{id:"gm-discovery",visibility:"gm",requirement:"discovery"},{id:"gm-reputation",visibility:"gm",requirement:"faction_reputation",minimum:1},

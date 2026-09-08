@@ -1,5 +1,5 @@
 import { expect, request as requestFactory, test, type APIRequestContext } from "@playwright/test";
-import { startLiveServer, type LiveServer } from "../support/live-server";
+import { startLiveServer, type LiveServer } from "../support/live-server.js";
 
 test.skip(process.env.VELVET_E2E_LIVE !== "1", "set VELVET_E2E_LIVE=1 to allow paid provider requests");
 
