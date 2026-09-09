@@ -252,6 +252,15 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
       noStore: true,
     };
   }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/dm\/preparation-readiness$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness",
+      hasQuery,
+      queryDetail: method === "GET" ? "DM preparation readiness does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+    };
+  }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/play-bootstrap$/.test(instance)) {
     return {
       instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/play-bootstrap",

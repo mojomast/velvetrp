@@ -41,6 +41,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 ## Planning and historical records
 
 - [Playability execution protocol](playability-execution.md) - Ordered three-plan program, small-context subagent workflow, API budget, milestone commits, and reusable execution trigger.
+- [Playability progress](playability-progress.md) - Durable execution ledger with committed milestone handoffs, validation results, and remaining live budget.
 - [Plan 1: Campaign readiness](plan-1-campaign-readiness.md) - Private provider-free preparation diagnostics and actionable GM remedies; planned, not an activation replacement.
 - [Campaign readiness contract](campaign-readiness.md) - Versioned strict DTO, issue taxonomy, and bounded inspection coverage for GM preparation diagnostics.
 - [Plan 2: Complete reviewed adventure](plan-2-reviewed-adventure.md) - Supported human/AI branch completion, deterministic recovery, bounded configured-provider evaluation, and source-bound observations.

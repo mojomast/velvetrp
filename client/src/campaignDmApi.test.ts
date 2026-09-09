@@ -1,9 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmControl, getCampaignDmHistory, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun } from "./api";
+import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmControl, getCampaignDmHistory, getCampaignDmPreparationReadiness, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun } from "./api";
 import { commandCampaignDmSceneBinding } from "./api";
 
 const run = { runId: "run", campaignId: "campaign", sessionId: "room", intent: "open", mode: "ai", modeRevision: 2, revision: 0, state: "completed", narration: "The harbor wakes.", receipts: [], blockers: [], createdAt: "2030-01-01T00:00:00.000Z" };
 const control = { campaignId: "campaign", mode: "ai", revision: 2 };
+const readiness = {
+  version: "1.0" as const,
+  identity: { campaignId: "campaign", sessionId: "room", timelineId: "timeline", campaignRevision: 3, timelineRevision: 4 },
+  activationReadiness: { campaignId: "campaign", sessionId: "room", expectedRevision: 3, active: true, ready: true, blockers: [], actorIds: [] },
+  mode: "ai" as const, issues: [],
+  coverage: { state: "complete" as const, families: ["locations", "connections", "actors", "quests", "encounters", "story", "clues", "artifacts", "bindings", "evidence"].map(family => ({ family, state: "complete" as const, inspected: [], omitted: [] })) },
+  manualReviewLimitations: [],
+};
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
 afterEach(() => vi.unstubAllGlobals());
 describe("Campaign DM API", () => {
@@ -21,6 +29,19 @@ describe("Campaign DM API", () => {
     await getCampaignDmControl("campaign"); await getCampaignDmHistory("campaign", "room"); await getCampaignDmRun("campaign", "room", "run"); await getCampaignDmProposal("campaign", "room", "run");
     expect(fetch.mock.calls.map(call => call[0])).toEqual(["/api/rpg/v1/campaigns/campaign/dm", "/api/rpg/v1/campaigns/campaign/rooms/room/dm", "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run", "/api/rpg/v1/campaigns/campaign/rooms/room/dm/runs/run/proposal"]);
     expect(fetch.mock.calls.every(call => call[1].cache === "no-store" && !call[1].body)).toBe(true);
+  });
+  it("fetches strict, path-bound readiness without a body or retry", async () => {
+    const encodedReadiness = { ...readiness, identity: { ...readiness.identity, campaignId: "campaign:id", sessionId: "room:id" }, activationReadiness: { ...readiness.activationReadiness, campaignId: "campaign:id", sessionId: "room:id" } };
+    const fetch = vi.fn().mockResolvedValueOnce(response(encodedReadiness)); vi.stubGlobal("fetch", fetch);
+    await expect(getCampaignDmPreparationReadiness("campaign:id", "room:id")).resolves.toEqual(encodedReadiness);
+    expect(fetch).toHaveBeenCalledWith("/api/rpg/v1/campaigns/campaign%3Aid/rooms/room%3Aid/dm/preparation-readiness", expect.objectContaining({ cache: "no-store" }));
+    expect(fetch.mock.calls[0]![1]).not.toHaveProperty("body");
+
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...readiness, identity: { ...readiness.identity, sessionId: "other" } }));
+    await expect(getCampaignDmPreparationReadiness("campaign", "room")).rejects.toThrow(/match/);
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...readiness, unexpected: true }));
+    await expect(getCampaignDmPreparationReadiness("campaign", "room")).rejects.toThrow();
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
   it("sends exact closed command bodies with JSON media type", async () => {
     const fetch = vi.fn().mockResolvedValueOnce(response(control)).mockImplementation(async () => response({ ...run, revision: 1 })); vi.stubGlobal("fetch", fetch);

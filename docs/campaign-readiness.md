@@ -96,3 +96,8 @@ bindings are not treated as scene evidence. Generated and authored public story
 nodes/clues both participate in disclosure checks. Encounter rosters require
 exact pinned `enemy-template` references, and all resource lists are bounded;
 overflow is explicit partial coverage.
+
+The HTTP transport is `GET /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness`.
+It is a trusted-local owner/GM read, rejects query and body input, binds the
+response identity to the path, uses `private, no-store`, and returns generic
+not-found errors for unavailable or unauthorized resources.

@@ -3,7 +3,7 @@
 ## Current Baseline
 
 - Persistence: one current disposable development schema; schema changes require deleting/recreating `velvet.sqlite` except for narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessors. Director upgrades also recognize exact review-authority/narration predecessors, preserving historical rows and cancelling pending planning/approval runs during the review-authority upgrade. The new third SQL asset adds immutable adventure narration dispatch context; exact older director/map upgrades install it within their validated transaction when absent. Complete startup validation precedes commit and failure rolls back; every other unknown or partially upgraded schema rejects without repair.
-- HTTP: 144 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
+- HTTP: 145 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
 - Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
 
@@ -20,7 +20,7 @@ Commit `11e0107` (`feat(rpg): add Living Atlas and AI campaign director`) is the
 - Targeted server run: 71 passed, with one documentation timeout; the focused rerun passed all 7 tests. The full server suite was not rerun after a prior 15-minute timeout; no current full-server green claim is made.
 - `npm run typecheck`: all workspaces pass.
 - Final focused E2E: all 12 director/control-plane/combat-map/session-recovery tests pass.
-- Documentation inventory: 144 counted explicit operations plus separately classified feature discovery; the strict documentation drift check is known passing.
+- Documentation inventory: 145 counted explicit operations plus separately classified feature discovery; the strict documentation drift check is known passing.
 
 These are the supplied accumulated-work validation results, not fresh full-suite runs from the docs-only audit. Before commit, select intended files explicitly: `.opencode/skills/seed-test-campaign/` and `server/test/two-player-gameplay-api.test.ts` must remain untracked. The audit does not stage or commit files.
 

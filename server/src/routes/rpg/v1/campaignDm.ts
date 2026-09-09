@@ -1,7 +1,9 @@
 import { campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmHistorySchema,
+  campaignDmReadinessResponseSchema,
   campaignDmModeRequestSchema, campaignDmPrivateRunSchema, campaignDmRunSchema, campaignDmResumeRequestSchema, campaignDmSceneBindingRequestSchema, resourceIdSchema } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { CampaignDmConflictError, CampaignDmUnavailableError, type CampaignDmRepository } from "../../../repo/campaignDmRepo.js";
+import { CampaignDmReadinessUnavailableError, type CampaignDmReadinessRepository } from "../../../repo/campaignDmReadinessRepo.js";
 import { orchestrateCampaignDmBeat } from "../../../agent/campaignDmOrchestrator.js";
 import type { AdventureAgentDependencies } from "../../../agent/adventureOrchestrator.js";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -11,7 +13,7 @@ import { sendApiProblem } from "../../../http/problem.js";
 const PRINCIPAL = "local-owner";
 type Params = { campaignId: string; sessionId: string; runId: string };
 export const campaignDmHttpRoutes: FastifyPluginAsync<{
-  repositoryAccessor: () => CampaignDmRepository; agentDependencies?: AdventureAgentDependencies;
+  repositoryAccessor: () => CampaignDmRepository & CampaignDmReadinessRepository; agentDependencies?: AdventureAgentDependencies;
 }> = async (app, options) => {
   const gate = async (request: FastifyRequest, reply: FastifyReply) => {
     reply.header("cache-control", "private, no-store");
@@ -22,7 +24,8 @@ export const campaignDmHttpRoutes: FastifyPluginAsync<{
       return sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "DM commands require application/json");
   };
   const failure = (error: unknown, request: FastifyRequest, reply: FastifyReply) => {
-    if (error instanceof CampaignDmUnavailableError) return sendApiProblem(request, reply, 404, "RPG_DM_NOT_FOUND", "DM resource unavailable");
+    if (error instanceof CampaignDmUnavailableError || error instanceof CampaignDmReadinessUnavailableError)
+      return sendApiProblem(request, reply, 404, "RPG_DM_NOT_FOUND", "DM resource unavailable");
     if (error instanceof CampaignDmConflictError) return sendApiProblem(request, reply, 409, "RPG_DM_CONFLICT", "DM command conflicts with current state; read history before continuing");
     return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "DM outcome unavailable; reconcile the identical request");
   };
@@ -42,8 +45,32 @@ export const campaignDmHttpRoutes: FastifyPluginAsync<{
      handle((repo,p,body) => repo.setDmControl(PRINCIPAL,p.campaignId,campaignDmModeRequestSchema.parse(body))));
    app.post<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/dm/scene-binding-commands", { onRequest: gate },
      handle((repo,p,body) => repo.bindDmSceneEvidence(PRINCIPAL,p.campaignId,campaignDmSceneBindingRequestSchema.parse(body))));
-   app.get<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/rooms/:sessionId/dm", { exposeHeadRoute: false, onRequest: gate },
-     handle((repo,p) => campaignDmHistorySchema.parse(repo.getDmHistory(PRINCIPAL,p.campaignId,p.sessionId))));
+    app.get<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/rooms/:sessionId/dm", { exposeHeadRoute: false, onRequest: gate },
+      handle((repo,p) => campaignDmHistorySchema.parse(repo.getDmHistory(PRINCIPAL,p.campaignId,p.sessionId))));
+    app.get<{ Params: Pick<Params, "campaignId" | "sessionId">; Body: unknown }>(
+      "/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness",
+      { exposeHeadRoute: false, onRequest: gate },
+      async (request, reply) => {
+        if (Object.values(request.params).some(value => !resourceIdSchema.safeParse(value).success))
+          return failure(new CampaignDmReadinessUnavailableError(), request, reply);
+        if (request.body !== undefined || Number(request.headers["content-length"] ?? 0) > 0)
+          return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "GET does not accept a body");
+        try {
+           const report = options.repositoryAccessor().getCampaignDmPreparationReadiness(
+             PRINCIPAL, request.params.campaignId, request.params.sessionId,
+           );
+           const identity = (report as { identity?: { campaignId?: unknown; sessionId?: unknown } }).identity;
+           if (identity && (identity.campaignId !== request.params.campaignId || identity.sessionId !== request.params.sessionId))
+             throw new CampaignDmReadinessUnavailableError();
+           const parsed = campaignDmReadinessResponseSchema.parse(report);
+           if (parsed.identity.campaignId !== request.params.campaignId || parsed.identity.sessionId !== request.params.sessionId)
+             throw new CampaignDmReadinessUnavailableError();
+           return reply.send(parsed);
+        } catch (error) {
+          return failure(error, request, reply);
+        }
+      },
+    );
    app.get<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId", { exposeHeadRoute: false, onRequest: gate },
      handle((repo,p) => campaignDmRunSchema.parse(repo.getDmRun(PRINCIPAL,p.campaignId,p.sessionId,p.runId))));
    app.get<{ Params: Params; Body: unknown }>("/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/proposal", { exposeHeadRoute: false, onRequest: gate },

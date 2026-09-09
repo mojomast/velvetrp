@@ -1,6 +1,6 @@
 import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
 import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest } from "@velvet/contracts";
-import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest } from "@velvet/contracts";
+import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, campaignDmReadinessResponseSchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest, type CampaignDmReadinessResponse } from "@velvet/contracts";
 
 const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
   const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
@@ -33,6 +33,14 @@ export async function getCampaignDmHistory(campaignId: string, sessionId: string
   const value = campaignDmHistorySchema.parse(await dmRequest(dmPath(campaignId, sessionId)));
   if (value.control.campaignId !== campaignId) throw new Error("DM history campaign mismatch");
   value.runs.forEach(run => bindDmRun(run, campaignId, sessionId));
+  return value;
+}
+export async function getCampaignDmPreparationReadiness(campaignId: string, sessionId: string): Promise<CampaignDmReadinessResponse> {
+  const value = campaignDmReadinessResponseSchema.parse(await dmRequest(
+    `${dmPath(campaignId, sessionId)}/preparation-readiness`,
+  ));
+  if (value.identity.campaignId !== campaignId || value.identity.sessionId !== sessionId)
+    throw new Error("DM readiness response did not match this campaign/room");
   return value;
 }
 export async function getCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
