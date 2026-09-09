@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { campaignPublicContext } from "../../../context.js";
 import {
   adventureTurnConfirmRequestSchema, adventureTurnConfirmResponseSchema, adventureTurnGetResponseSchema,
   adventureTurnInitialReconcileRequestSchema, adventureTurnInitialReconcileResponseSchema, adventureTurnResumeTokenSchema,
@@ -228,7 +229,7 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
     } catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
     const [provider, harness] = settings;
     let history;
-    try { history = repo.getAdventureTurnTranscript(OWNER, turn.campaignId, turn.sessionId, harness.recentTurns); }
+    try { history = repo.getAdventureTurnTranscript(OWNER, turn.campaignId, turn.sessionId, harness.recentTurns, turn.actorId); }
     catch { return { turn, text: fallbackText, source: "deterministic-fallback" }; }
     const publicContext=publicNarrationContext(repo,turn);
     if(!publicContext)return {turn,text:fallbackText,source:"deterministic-fallback"};
@@ -244,7 +245,8 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
         safetyPolicy: repo.getSessionZeroSafetyPolicy(OWNER, turn.campaignId) }) };
     const providerName=provider.providerType||"openai-compatible",model=provider.model.trim()||"unconfigured";
     let claim=repo.claimNarrationProviderDispatch(OWNER,{turnId:turn.turnId,callId,provider:providerName,model,
-      fallbackNarration:fallbackText,leaseMs:90_000});
+      fallbackNarration:fallbackText,leaseMs:90_000,context:publicContext,
+      request:{messages:completionInput.messages,tools:completionInput.tools,toolChoice:completionInput.toolChoice}});
     while(claim.state==="in-progress"){
       if(signal.aborted)throw new Error("narration aborted");
       await new Promise<void>(resolve=>setTimeout(resolve,10));
@@ -294,6 +296,7 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       const providerText = parsed.narration.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim();
       if (!providerText || providerText.length > 8_000) throw new Error("invalid narration response");
       const currentSnapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
+      if (JSON.stringify(publicNarrationContext(repo, turn)) !== JSON.stringify(publicContext)) throw new Error("narration public context is stale");
       if(!currentSnapshot?.ruleset||currentSnapshot.ruleset.id!==publicContext.ruleset.id||currentSnapshot.ruleset.version!==publicContext.ruleset.version
         ||JSON.stringify(currentSnapshot.ruleset.descriptor)!==JSON.stringify(publicContext.ruleset.descriptor))throw new Error("narration ruleset context is stale");
       if(!providerNarrationMatchesReceipts(providerText,safeReceipts,publicContext.currentLocation))throw new Error("narration contradicts or omits verified current facts");
@@ -311,6 +314,11 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       :{turn:requirePrivate(repo.getAdventureTurn(OWNER,turn.turnId)),text:fallbackText,source:"deterministic-fallback"};
 }
 function finalizeNarrationDispatch(repo:Repo&Repository,turnId:string,callId:string,dispatch:Extract<ReturnType<Repo["getNarrationProviderDispatch"]>,{state:"settled"}>):NarrationResult{
+   const currentTurn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));
+   const frozen=repo.getNarrationProviderContext(OWNER,turnId,callId);
+   if(frozen && JSON.stringify(frozen)!==JSON.stringify(publicNarrationContext(repo,currentTurn))) {
+     return {turn:currentTurn,text:composeNarration(narrationReceipts(repo,currentTurn)??[]),source:"deterministic-fallback"};
+   }
   let turn=requirePrivate(repo.getAdventureTurn(OWNER,turnId));const started=turn.providerCalls.find(call=>call.callId===callId&&call.phase==="started");
   if(started&&!turn.providerCalls.some(call=>call.callId===callId&&call.phase!=="started"))try{turn=repo.recordProviderCallOutcome(OWNER,{turnId,callId,
     provider:dispatch.provider,model:dispatch.model,attempt:1,outcome:dispatch.source==="provider-assisted"?"succeeded":"failed",outcomeCode:dispatch.outcomeCode,
@@ -321,10 +329,14 @@ function finalizeNarrationDispatch(repo:Repo&Repository,turnId:string,callId:str
 function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
   const snapshot=repo.getCampaignAgentContextSnapshot(OWNER,turn.campaignId,turn.sessionId,{kind:"player",actorId:turn.actorId});
   if(!snapshot?.ruleset)return null;const currentActorName=snapshot.speakerPersona?.displayName??null;
+  const historicalRecall = repo.getCampaignRecall(OWNER, { campaignId: turn.campaignId, sessionId: turn.sessionId,
+    audience: { kind: "player", actorId: turn.actorId }, purpose: "public-narration", query: turn.declaration,
+    excludeRootTurnId: turn.mode === "original" ? turn.turnId : turn.priorTurnId ?? turn.turnId });
+  if (!historicalRecall) return null;
   const cast=currentActorName?snapshot.visibleCast.filter(entry=>entry!==`${currentActorName}.`&&!entry.startsWith(`${currentActorName} at `)):snapshot.visibleCast;
-  return{ruleset:snapshot.ruleset,currentLocation:snapshot.currentActorLocation,currentActorName,context:{canon:snapshot.humanCanon,
-    world:snapshot.visibleWorld,cast,quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts,
-    acceptedPublicPreparation:snapshot.publicPreparation??[]}};
+  return{ruleset:snapshot.ruleset,currentLocation:snapshot.currentActorLocation,currentActorName,
+    context:{...campaignPublicContext({...snapshot,visibleCast:cast}),historicalRecall},
+    safety:repo.getSessionZeroSafetyPolicy(OWNER,turn.campaignId)};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal): Promise<NarrationResult> {

@@ -28,7 +28,8 @@ export interface AdventureTurnAgentResponseRepository {
   validateApprovedAgentProposal(principal:string,turnId:string,proposalId:string):{valid:true}|{valid:false;reason:string};
   requireAgentProposalReplan(principal:string,turnId:string,proposalId:string,reason:"command-stale"):void;
   claimNarrationProviderDispatch(principal:string,input:{turnId:string;callId:string;provider:string;model:string;
-    fallbackNarration:string;leaseMs:number}):NarrationDispatchState;
+    fallbackNarration:string;leaseMs:number; context?:unknown; request?:unknown}):NarrationDispatchState;
+  getNarrationProviderContext(principal:string,turnId:string,callId:string):unknown;
   settleNarrationProviderDispatch(principal:string,input:{turnId:string;callId:string;claimId:string;
     source:"provider-assisted"|"deterministic-fallback";narration:string;outcomeCode:string;
     promptTokens:number|null;completionTokens:number|null}):NarrationDispatchState;
@@ -54,6 +55,13 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       ?null:{state:"in-progress",leaseExpiresAt:value.lease_expires_at};return{state:"settled",source:value.source,narration:value.narration,
         outcomeCode:value.outcome_code,promptTokens:value.prompt_tokens,completionTokens:value.completion_tokens,provider:value.provider,model:value.model};};
   return {
+    getNarrationProviderContext(principal,turnId,callId) {
+      const row=turn(turnId);authority(principal,row);
+      const stored=db.prepare(`SELECT context.context_json FROM adventure_narration_contexts context
+        JOIN adventure_narration_dispatches_v60 dispatch USING(claim_id)
+        WHERE dispatch.campaign_id=? AND dispatch.turn_id=? AND dispatch.call_id=?`).get(row.campaign_id,turnId,callId) as {context_json:string}|undefined;
+      return stored ? JSON.parse(stored.context_json) : null;
+    },
     claimNarrationProviderDispatch(principal,input){return immediate(()=>{const row=turn(input.turnId);authority(principal,row);
       const old=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE campaign_id=? AND turn_id=? AND call_id=?")
         .get(row.campaign_id,row.id,input.callId) as any;const at=now();
@@ -68,6 +76,8 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       const leaseExpiresAt=utcIsoTimestampSchema.parse(new Date(deps.clock.now().getTime()+input.leaseMs).toISOString()),claimId=deps.ids.nextId();
       db.prepare("INSERT INTO adventure_narration_dispatches_v60(claim_id,campaign_id,turn_id,call_id,provider,model,claimed_at,lease_expires_at,status) VALUES(?,?,?,?,?,?,?,?,'claimed')")
         .run(claimId,row.campaign_id,row.id,input.callId,input.provider,input.model,at,leaseExpiresAt);
+      if (input.context !== undefined && input.request !== undefined) db.prepare("INSERT INTO adventure_narration_contexts VALUES(?,?,?)")
+        .run(claimId,JSON.stringify(input.context),JSON.stringify(input.request));
       return{state:"claimed" as const,claimId,leaseExpiresAt};});},
     settleNarrationProviderDispatch(principal,input){return immediate(()=>{const row=turn(input.turnId);authority(principal,row);const at=now();
       const value=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE claim_id=? AND campaign_id=? AND turn_id=? AND call_id=?")

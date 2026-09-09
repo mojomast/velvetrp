@@ -4,7 +4,8 @@ import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8");
+  + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -88,8 +89,20 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       })();
       return;
     }
-    if (!upgradeCampaignDmSchema(db, schemaObjects(db), expectedObjects(), () => assertCurrentDatabase(db, databasePath))
-      && !upgradeTacticalMapSchema(db, schemaObjects(db), expectedObjects(), () => assertCurrentDatabase(db, databasePath))) {
+    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts"));
+    const finishRecallUpgrade = () => {
+      db.exec(readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8"));
+      assertCurrentDatabase(db, databasePath);
+    };
+    if (mismatchReason(schemaObjects(db), prior) === null) {
+      db.transaction(finishRecallUpgrade).immediate();
+      return;
+    }
+    const missingRecall = !schemaObjects(db).some(object => object.name === "adventure_narration_contexts");
+    const expected = missingRecall ? prior : expectedObjects();
+    const validate = missingRecall ? finishRecallUpgrade : () => assertCurrentDatabase(db, databasePath);
+    if (!upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

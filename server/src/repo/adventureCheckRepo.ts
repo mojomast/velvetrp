@@ -33,7 +33,7 @@ export type AdventureCheckPublicReceipt = {
 
 export interface AdventureCheckRepository {
   generateAdventureCheckCandidates(principalId: string, turnId: string): ProviderSafeAdventureCheckCandidate[];
-  executeAdventureCheckCandidate(principalId: string, input: { turnId: string; providerCallId: string; providerToolCallId: string; round: number; selection: unknown }): { commandId: string; receipt: AdventureCheckPublicReceipt };
+  executeAdventureCheckCandidate(principalId: string, input: { turnId: string; providerCallId: string; providerToolCallId: string; round: number; selection: unknown; requireCommittedExecution?: boolean }): { commandId: string; receipt: AdventureCheckPublicReceipt };
   getAdventureCheckPublicReceipt(principalId: string, campaignId: string, commandId: string): AdventureCheckPublicReceipt | null;
   getAdventureCheckNarrationReceipt(principalId: string, turnId: string, commandId: string): AdventureCheckPublicReceipt | null;
 }
@@ -153,6 +153,7 @@ export function createAdventureCheckRepository(db: DatabaseDriver.Database, deps
           if (existing.provider_call_id !== input.providerCallId || existing.provider_tool_call_id !== input.providerToolCallId || existing.round_number !== input.round || existing.selection_json !== selectionJson) throw new Error("adventure check replay changed");
           return verifyExecution(db, existing);
         }
+        if (input.requireCommittedExecution) throw new Error("committed adventure check execution is unavailable");
         const candidate = db.prepare("SELECT candidate.*,batch.projection_json,batch.projection_digest FROM adventure_check_candidates_v54 candidate JOIN adventure_check_candidate_batches_v54 batch ON batch.batch_id=candidate.batch_id WHERE candidate.candidate_id=? AND candidate.turn_id=?")
           .get(selection.candidateId, turnId) as any;
         if (!candidate || candidate.candidate_digest !== selection.digest || sha(candidate.projection_json) !== candidate.projection_digest) throw new Error("adventure check candidate is unavailable");

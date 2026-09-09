@@ -58,6 +58,52 @@ function events(body: string) {
 }
 
 describe("M2.11 adventure turn routes", () => {
+  it("scopes actor history before the limit in planning and public narration without changing room transcript defaults",async()=>{
+    enable();const campaign=seed(),repo=createRepository();
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO characters VALUES ('persona-b','Other Hero',30,'hero','',1,0,?)").run(at);
+    db.prepare("INSERT INTO campaign_characters VALUES ('cc-b',?,'persona-b',?,?)").run(campaign.id,at,at);
+    db.prepare("INSERT INTO rpg_campaign_sheets VALUES ('sheet-b',?,'cc-b','turn-pack','1','race','human','turn-pack','1','background','hero',?,?)").run(campaign.id,at,at);
+    db.prepare("INSERT INTO campaign_actors VALUES ('actor-b',?,'cc-b','sheet-b','player-character','principal',?,?)").run(campaign.id,at,at);
+    db.prepare("INSERT INTO campaign_actor_private_state VALUES ('actor-b',?,'local-owner',NULL)").run(campaign.id);
+    db.prepare("INSERT INTO session_characters VALUES('session','persona-b',1)").run();
+    for(const actorId of ["actor","actor-b"]){
+      for(let i=0;i<(actorId==="actor"?2:6);i++){
+        const text=`${actorId==="actor"?"A_HISTORY":"B_PRIVATE_DECLARATION"}_${i}`;
+        let turn=repo.createAdventureTurn("local-owner",{campaignId:campaign.id,timelineId:campaign.activeTimelineId,sessionId:"session",actorId,
+          declaration:text,expectedCampaignRevision:0,idempotencyKey:text});
+        turn=repo.updateAdventureTurnNarration("local-owner",{turnId:turn.turnId,expectedTurnRevision:turn.revision,expectedCampaignRevision:0,
+          narrationStatus:"in-progress",idempotencyKey:`start-${text}`});
+        repo.updateAdventureTurnNarration("local-owner",{turnId:turn.turnId,expectedTurnRevision:turn.revision,expectedCampaignRevision:0,
+          narrationStatus:"completed",terminalState:"completed",fallbackNarration:`Account of ${text}.`,idempotencyKey:`finish-${text}`});
+      }
+    }
+    expect(repo.getAdventureTurnTranscript("local-owner",campaign.id,"session",2).map(entry=>entry.actorId)).toEqual(["actor-b","actor-b"]);
+    expect(repo.getAdventureTurnTranscript("local-owner",campaign.id,"session",2,"actor").map(entry=>entry.declaration)).toEqual(["A_HISTORY_0","A_HISTORY_1"]);
+    expect(()=>repo.getAdventureTurnTranscript("local-owner",campaign.id,"session",2,"missing-actor")).toThrow("actor is unavailable");
+    db.prepare("INSERT INTO principals VALUES('history-player','Player',0)").run();
+    db.prepare("INSERT INTO campaign_memberships VALUES(?,'history-player','player',?)").run(campaign.id,at);
+    expect(()=>repo.getAdventureTurnTranscript("history-player",campaign.id,"session",2,"actor")).toThrow("actor is unavailable");
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='history-player' WHERE actor_id='actor'").run();
+    expect(repo.getAdventureTurnTranscript("history-player",campaign.id,"session",2,"actor")).toHaveLength(2);
+    expect(()=>repo.getAdventureTurnTranscript("history-player",campaign.id,"session",2,"actor-b")).toThrow("actor is unavailable");
+    db.close();repo.close();
+    let calls=0;
+    const dependencies:AdventureAgentDependencies={complete:async input=>{
+      calls++;
+      const history=input.messages.find(message=>typeof message.content==="string"&&message.content.includes("UNTRUSTED PRIOR ROOM ADVENTURE HISTORY DATA"))!.content;
+      expect(history).toContain("A_HISTORY_0");expect(history).toContain("A_HISTORY_1");
+      expect(JSON.stringify(input.messages)).not.toContain("B_PRIVATE_DECLARATION");
+      return input.tools?.some(tool=>tool.name==="submit_adventure_narration")?narrationResult("The guide answers quietly.")
+        :{message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>({...defaultHarnessSettings(),recentTurns:2}),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:dependencies});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},payload:{
+      campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I listen",expectedRevision:0,idempotencyKey:"scoped-history"}});
+    expect(response.statusCode).toBe(200);expect(calls).toBe(2);
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{narrationStatus:{source:"provider-assisted"}}});
+    await app.close();
+  });
   it("consumes accepted public preparation in planning and narration without GM or unpublished material", async () => {
     enable();process.env.FEATURE_RPG_COMBAT="true";
     const campaign=seed(),repo=createRepository();
@@ -304,9 +350,18 @@ describe("M2.11 adventure turn routes", () => {
       declaration:"I listen",expectedCampaignRevision:0,idempotencyKey:"two-worker-turn"});
     turn=first.updateAdventureTurnNarration("local-owner",{turnId:turn.turnId,expectedTurnRevision:turn.revision,expectedCampaignRevision:0,
       idempotencyKey:"two-worker-narrating",narrationStatus:"in-progress"});
-    const input={turnId:turn.turnId,callId:"narration-call",provider:"test",model:"test",fallbackNarration:narrationFallback(turn.declaration,[]),leaseMs:90_000};
+    const context={historicalRecall:first.getCampaignRecall("local-owner",{campaignId:campaign.id,sessionId:"session",audience:{kind:"player",actorId:"actor"},
+      query:"listen",purpose:"public-narration",excludeRootTurnId:turn.turnId})};
+    const input={turnId:turn.turnId,callId:"narration-call",provider:"test",model:"test",fallbackNarration:narrationFallback(turn.declaration,[]),leaseMs:90_000,
+      context,request:{messages:[{role:"user",content:JSON.stringify(context)}]}};
     expect(first.claimNarrationProviderDispatch("local-owner",input)).toMatchObject({state:"claimed"});
     expect(second.claimNarrationProviderDispatch("local-owner",input)).toMatchObject({state:"in-progress"});
+    expect(second.claimNarrationProviderDispatch("local-owner",{...input,context:{changed:true}})).toMatchObject({state:"in-progress"});
+    expect(second.getNarrationProviderContext("local-owner",turn.turnId,input.callId)).toEqual(context);
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    expect(()=>db.exec("UPDATE adventure_narration_contexts SET context_json='{}'")).toThrow("immutable");
+    expect(()=>db.exec("INSERT OR REPLACE INTO adventure_narration_contexts SELECT * FROM adventure_narration_contexts")).toThrow("immutable");
+    db.close();
     first.close();second.close();
   });
 

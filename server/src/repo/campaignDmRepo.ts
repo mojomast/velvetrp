@@ -18,6 +18,7 @@ import type { AdventureCheckRepository } from "./adventureCheckRepo.js";
 import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
+import type { CampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
 
 export class CampaignDmUnavailableError extends Error {}
 export class CampaignDmConflictError extends Error {}
@@ -58,7 +59,7 @@ export interface CampaignDmRepository {
     promptTokens: number, completionTokens: number): string | null;
   settleDmNarration(principal: string, runId: string, claimId: string | null, scene: string | null, outcome: string): void;
 }
-type Services = CampaignAgentContextReadRepository & Pick<EncounterRepository,
+type Services = CampaignAgentContextReadRepository & CampaignRecallReadRepository & Pick<EncounterRepository,
   "listEncounters" | "getCombatState" | "createEncounter" | "startEncounter" | "endCombat" | "executeCombatEnemyTurn" | "resolveCombatAction" | "getEncounterSetupCandidates">
   & StoryRepository & Pick<CampaignGenerationRepository, "getCampaignGeneratedPlanning">
   & Pick<AdventureTurnRepository, "getAdventureTurn" | "getAdventureTurnNarration" | "getAgentCombatReceipt">
@@ -200,7 +201,10 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const safety = services.getSessionZeroSafetyPolicy(r.gm_principal_id,r.campaign_id);
     const facts = (values: unknown[]) => values.map(value=>Object.fromEntries(Object.entries(value as Record<string,unknown>)
       .map(([key,text])=>[key,typeof text==='string'?text.slice(0,1000):text])));
-    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,
+    const historicalRecall = services.getCampaignRecall(r.gm_principal_id, { campaignId: r.campaign_id, sessionId: r.session_id,
+      audience: { kind: "dm" }, purpose: "dm-narration", query: JSON.stringify({ scenes, locations }).slice(0, 512) });
+    if (!historicalRecall) throw new CampaignDmConflictError("public recall authority unavailable");
+    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,
       receipts:receipt?[JSON.parse(receipt.public_json)]:[],safety };
   }
   const narrationGuard = (r:RunRow, context:unknown) => hash({context,
@@ -341,10 +345,13 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       }
     }
     const bounded = bindings.slice(0, 24);
-    const privateContext = { context, story: graph, preparation: planning, evidence, safety };
+    const historicalRecall = services.getCampaignRecall(g, { campaignId: c, sessionId: s, audience: { kind: "dm" }, purpose: "dm-planning",
+      query: evidence?.intent || graph?.nodes.filter(node => node.status === "revealed").map(node => node.title).join(" ") || context.visibleWorld.join(" ") });
+    if (!historicalRecall) throw new CampaignDmConflictError("director recall authority unavailable");
+    const privateContext = { context, story: graph, preparation: planning, evidence, safety, historicalRecall };
     // A changing domain snapshot invalidates approvals, including actor health and catalog changes.
     const health = db.prepare("SELECT actor_id,name,current,max FROM rpg_actor_resources WHERE campaign_id=? ORDER BY actor_id,name").all(c);
-    const freshness = hash({ context, story, planning, locations, health, combat, candidates: bounded, evidence, safety });
+    const freshness = hash({ context, story, planning, locations, health, combat, candidates: bounded, evidence, safety, historicalRecall });
     if (json(privateContext).length + json(bounded).length > 60000) throw new CampaignDmConflictError("director context exceeds bounded preparation");
     return { context: privateContext, bindings: bounded, blockers: [...new Set(blockers)].slice(0,16), freshness, timelineId: context.timelineId };
   }

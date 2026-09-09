@@ -366,7 +366,7 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     if(stored?.result==="tool-calls"&&call?.toolName==="exact_srd_check.select"){
       const alreadyBound=turn.receiptLinks.length>0;
       try{repository.executeAdventureCheckCandidate(OWNER,{turnId:turn.turnId,providerCallId:earlyRecovery.providerCallId,
-        providerToolCallId:call.providerToolCallId,round:earlyRecovery.round,selection:call.arguments});
+        providerToolCallId:call.providerToolCallId,round:earlyRecovery.round,selection:call.arguments,requireCommittedExecution:true});
         return{turn:privateTurn(repository,turn.turnId),outcome:alreadyBound?"completed":"mechanics-committed",limitations:ADVENTURE_TOOL_LIMITATIONS};}
       catch{/* A fresh execution remains subject to the normal current-state gates below. */}
     }
@@ -376,6 +376,14 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     return{turn,outcome:"completed",limitations:ADVENTURE_TOOL_LIMITATIONS};
   // Confirmation resume executes only immutable approved proposals. Rejected
   // and expired proposals are never passed to a command service.
+  if (turn.toolCalls.some(call => call.status === "approved") && earlyRecovery?.request?.historicalRecall) {
+    const audience = (earlyRecovery.context as any)?.decisionIdentity?.audience as CampaignAgentAudience | undefined;
+    const currentRecall = audience ? repository.getCampaignRecall(OWNER, { campaignId: turn.campaignId, sessionId: turn.sessionId,
+      audience, query: turn.declaration, purpose: "adventure-planning", excludeRootTurnId: turn.turnId }) : null;
+    if (canonicalAgentJson(currentRecall as never) !== canonicalAgentJson(earlyRecovery.request.historicalRecall)) {
+      return { turn, outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
+    }
+  }
   for(const call of turn.toolCalls.filter((candidate)=>candidate.status==="approved")){
     try{
       const execution=repository.executeApprovedAgentProposalAtomically(OWNER,turnId,call.proposal.proposalId);
@@ -406,12 +414,15 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   }
   throwIfAborted(signal);
   let history;
-  try { history = repository.getAdventureTurnTranscript(OWNER, turn.campaignId, turn.sessionId, harness.recentTurns); }
+  try { history = repository.getAdventureTurnTranscript(OWNER, turn.campaignId, turn.sessionId, harness.recentTurns, turn.actorId); }
   catch {
     safeEnemyFallback(repository, snapshot, turn.turnId);
     return { turn: privateTurn(repository, turn.turnId), outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
   }
-  const basket = assembleCampaignAgentContext({ snapshot, declaration: turn.declaration });
+  const historicalRecall = repository.getCampaignRecall(OWNER, { campaignId: turn.campaignId, sessionId: turn.sessionId,
+    audience: snapshot.audience, query: turn.declaration, purpose: "adventure-planning", excludeRootTurnId: turn.turnId });
+  if (!historicalRecall) return { turn, outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
+  const basket = assembleCampaignAgentContext({ snapshot, declaration: turn.declaration, historicalRecall });
   const basketText=campaignContextBasketText(basket);
   let exactTravel=providerSafeExactCandidateListSchema.parse({version:"v1",candidates:[]});
   let questCandidates:ProviderSafeQuestObjectiveCandidate[]=[];
@@ -614,7 +625,7 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
         || planning.providerStarts >= planning.limits.providerCalls || planning.totalToolCalls >= planning.limits.toolCalls) break;
     const round = planning.decisionRounds + 1;
     const providerCallId = id("agent-provider", turn.turnId, String(round));
-      const request=requestRecord(messages,selected,exactTravel,modelQuest,providerChecks,providerInventory,providerCommerce,providerPowers,providerRests,providerConsumables,providerCombatPowers,providerQuestLifecycle,providerProgression,progressionRead);
+      const request=agentRequestObjectSchema.parse({...requestRecord(messages,selected,exactTravel,modelQuest,providerChecks,providerInventory,providerCommerce,providerPowers,providerRests,providerConsumables,providerCombatPowers,providerQuestLifecycle,providerProgression,progressionRead),historicalRecall});
     let claim:{claimed:boolean;leaseExpiresAt:string;expired:boolean};
     try {
       claim=repository.claimAgentProviderRound(OWNER, { turnId: turn.turnId, providerCallId, provider: providerLabel(provider),
@@ -671,6 +682,9 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
         throw new Error("provider batch exceeds remaining execution limits");
       }
       const currentSnapshot = repository.getCampaignAgentContextSnapshot(OWNER, turn.campaignId, turn.sessionId, snapshot.audience);
+      const currentRecall = repository.getCampaignRecall(OWNER, { campaignId: turn.campaignId, sessionId: turn.sessionId,
+        audience: snapshot.audience, query: turn.declaration, purpose: "adventure-planning", excludeRootTurnId: turn.turnId });
+      if (JSON.stringify(currentRecall) !== JSON.stringify(historicalRecall)) throw new Error("historical recall changed before decision");
       if (!currentSnapshot || snapshotDecisionIdentity(currentSnapshot,round,turn.revision) !== snapshotDecisionIdentity(snapshot,round,turn.revision)) {
         throw new Error("campaign decision authority or revision changed");
       }

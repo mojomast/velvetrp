@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
-  MAX_ADVENTURE_TRANSCRIPT_TURNS, adventureTurnTranscriptEntrySchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
+  MAX_ADVENTURE_TRANSCRIPT_TURNS, adventureTurnTranscriptEntrySchema, privateAdventureTurnSchema, privateGenerationDraftSchema, resourceIdSchema,
   roleSafeAdventureTurnSchema, roleSafeGenerationDraftSchema,
   type AdventureTurnTranscriptEntry,
   type PrivateAdventureTurn, type PrivateGenerationDraft, type RoleSafeAdventureTurn, type RoleSafeGenerationDraft,
@@ -26,8 +26,8 @@ export interface AdventureTurnReadRepository {
   getGenerationDraft(principalId: string, draftId: string): GenerationDraftProjection | null;
   /** Reads persisted fallback narration from the exact terminal coordination command. */
   getAdventureTurnNarration(principalId: string, turnId: string): string | null;
-  /** Reads completed room exchanges, collapsing narration-only descendants onto their original turn. */
-  getAdventureTurnTranscript(principalId: string, campaignId: string, sessionId: string, limit?: number): AdventureTurnTranscriptEntry[];
+  /** Optional actor scope requires current control and is applied before the result limit. */
+  getAdventureTurnTranscript(principalId: string, campaignId: string, sessionId: string, limit?: number, actorId?: string): AdventureTurnTranscriptEntry[];
   /** Finds an idempotent draft create without exposing cross-campaign data. */
   getGenerationDraftByIdempotencyKey(principalId: string, campaignId: string, idempotencyKey: string): GenerationDraftProjection | null;
 }
@@ -262,23 +262,34 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
       const text = (JSON.parse(row.request_json) as { fallbackNarration?: unknown }).fallbackNarration;
       return typeof text === "string" ? text : null;
     },
-    getAdventureTurnTranscript(principalId, campaignId, sessionId, limit = MAX_ADVENTURE_TRANSCRIPT_TURNS) {
+    getAdventureTurnTranscript(principalId, campaignId, sessionId, limit = MAX_ADVENTURE_TRANSCRIPT_TURNS, actorId) {
       const member = membership(principalId, campaignId);
       if (!member) throw new AdventureTurnUnavailableError("adventure transcript is unavailable");
       if (!db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId, sessionId)) {
         throw new AdventureTurnUnavailableError("adventure transcript is unavailable");
+      }
+      if (actorId !== undefined && (!resourceIdSchema.safeParse(actorId).success || !db.prepare(`SELECT 1 FROM campaign_actors actor
+        LEFT JOIN campaign_actor_private_state control ON control.campaign_id=actor.campaign_id AND control.actor_id=actor.id
+        WHERE actor.campaign_id=? AND actor.id=? AND (? IN ('owner','gm') OR (?='player' AND control.controller_principal_id=?))`)
+        .get(campaignId, actorId, member.role, member.role, principalId))) {
+        throw new AdventureTurnUnavailableError("adventure transcript actor is unavailable");
       }
       const boundedLimit = Math.max(1, Math.min(MAX_ADVENTURE_TRANSCRIPT_TURNS, Math.trunc(limit)));
       const rows = db.prepare(`WITH RECURSIVE
         roots AS (
           SELECT turn.id,turn.campaign_id,turn.actor_id,turn.principal_id,turn.declaration,turn.created_at,turn.rowid root_order
           FROM adventure_turns turn
-          WHERE turn.campaign_id=? AND turn.session_id=? AND turn.mode='original'
+           WHERE turn.campaign_id=? AND turn.session_id=? AND turn.mode='original'
+             AND (? IS NULL OR turn.actor_id=?)
+             AND turn.timeline_id=(SELECT active_timeline_id FROM campaigns WHERE id=turn.campaign_id)
+             AND (? IN ('owner','gm') OR turn.principal_id=? OR EXISTS(SELECT 1 FROM campaign_actor_private_state control
+               WHERE control.campaign_id=turn.campaign_id AND control.actor_id=turn.actor_id AND control.controller_principal_id=?))
         ), ancestry(root_id,id,depth) AS (
           SELECT id,id,0 FROM roots
           UNION ALL
           SELECT ancestry.root_id,child.id,ancestry.depth+1 FROM ancestry JOIN adventure_turns child ON child.prior_turn_id=ancestry.id
-            AND child.campaign_id=? AND child.session_id=?
+             AND child.campaign_id=? AND child.session_id=? AND child.mode<>'original'
+             AND child.timeline_id=(SELECT active_timeline_id FROM campaigns WHERE id=child.campaign_id) AND ancestry.depth<32
         ), completed AS (
           SELECT ancestry.root_id,turn.id,turn.updated_at,
             json_extract(command.request_json,'$.fallbackNarration') narration,
@@ -299,11 +310,12 @@ export function createAdventureTurnReadRepository(db: Database): AdventureTurnRe
         SELECT roots.id turn_id,roots.campaign_id,roots.actor_id,roots.principal_id,roots.declaration,
           completed.narration,completed.updated_at completed_at
         FROM roots JOIN completed ON completed.root_id=roots.id AND completed.rank=1
-        ORDER BY roots.created_at,roots.root_order`).all(campaignId, sessionId, campaignId, sessionId) as Array<{
+         ORDER BY roots.created_at DESC,roots.root_order DESC LIMIT ?`).all(campaignId, sessionId, actorId ?? null, actorId ?? null, member.role, principalId,
+           principalId, campaignId, sessionId, boundedLimit) as Array<{
           turn_id: string; campaign_id: string; actor_id: string; principal_id: string;
           declaration: string; narration: string; completed_at: string;
         }>;
-      return rows.filter((row) => canSeePrivateTurn(principalId, row, member.role)).slice(-boundedLimit)
+      return rows.reverse()
         .map((row) => adventureTurnTranscriptEntrySchema.parse({ turnId: row.turn_id, actorId: row.actor_id,
         declaration: row.declaration, narration: row.narration, completedAt: row.completed_at }));
     },

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createCampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
 import DatabaseDriver from "better-sqlite3";
 import {
   addCampaignMembershipInputSchema,
@@ -795,10 +796,29 @@ function createRepositoryComposition<T>(
   const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
+  const recallRepository = createCampaignRecallReadRepository(db, {
+    getCampaignAgentContextSnapshot: (...args) => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(...args),
+    getAdventureCheckPublicReceipt: (...args) => adventureCheckRepository.getAdventureCheckPublicReceipt(...args),
+    getAdventureReceipt: (principal, turn, command, kind) => kind === "inventory-receipt"
+      ? adventureInventoryRepository.getAdventureInventoryNarrationReceipt(principal, turn, command)
+      : kind === "commerce-receipt" ? adventureCommerceRepository.getAdventureCommerceNarrationReceipt(principal, turn, command)
+      : kind === "travel-receipt" ? exactCandidateProviderBridge.getExactCandidateTravelNarrationReceipt(principal, turn, command)
+      : kind === "quest-receipt" ? questRepository.getAdventureQuestNarrationReceipt(principal, turn, command)
+      : kind === "combat-receipt" ? adventureTurnRepository.getAgentCombatReceipt(principal,
+        adventureTurnRepository.getAdventureTurn(principal, turn)!.campaignId, command)?.resolution ?? null
+      : adventureQuestProgressionRepository.getAdventureQuestProgressionNarrationReceipt(principal, turn, command)
+        ?? adventurePowerRestRepository.getAdventurePowerRestNarrationReceipt(principal, turn, command),
+    getMechanicReceipt: (principal, campaign, command) => {
+      const receipt = campaignEventReadRepository.getCommandReceipt(principal, campaign, command);
+      return receipt ? receipt.events.map(event => ({ type: event.type, data: event.data })) : null;
+    },
+  });
   const repository: Repository = {
+    ...recallRepository,
     ...createCampaignDmRepository(db, dependencies, {
       ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
       ...campaignAdministrationIntegrationRepository,
+      ...recallRepository,
       getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
         createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(principal, campaign, session, audience),
     }, () => assertOpen()),

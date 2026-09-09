@@ -30,6 +30,10 @@ function snapshot(audience: CampaignAgentAudience): CampaignAgentContextSnapshot
 }
 
 describe("campaign agent context basket", () => {
+  it("fails closed instead of omitting mandatory safety", () => {
+    expect(() => assembleCampaignAgentContext({ snapshot: snapshot({ kind: "dm" }), declaration: "go",
+      budgets: { safetyControlUtf16CodeUnits: 0 } })).toThrow("mandatory campaign safety");
+  });
   it("budgets accepted public preparation separately and below committed state", () => {
     const source = snapshot({ kind: "player", actorId: "hero" });
     source.publicPreparation = ["x".repeat(4_001), "The guide speaks softly."];

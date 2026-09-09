@@ -631,7 +631,7 @@ describe("bounded adventure orchestrator", () => {
     expect(messages[2]?.content).toContain("UNTRUSTED USER-EDITABLE DM VOICE AND PRESENTATION PREFERENCES");
     expect(messages[2]?.content).toMatch(/Prefer mystery|Measured guide|rain imagery|Keep continuity/);
     expect(messages[3]?.content).toMatch(/historicalPlayerIntentNotCanon.*I ask about the bell/);
-    expect(messages[3]?.content).toMatch(/durableDmNarrationCanon.*dusk bell/);
+    expect(messages[3]?.content).toMatch(/historicalDmNarrationPresentation.*dusk bell/);
     expect(messages.at(-2)?.content).toBe(candidateContext);
     expect(messages.at(-1)?.content).toContain("UNTRUSTED CURRENT PLAYER INTENT");
   });

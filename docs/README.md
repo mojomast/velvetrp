@@ -40,6 +40,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 ## Planning and historical records
 
+- [Bounded campaign memory](campaign-memory.md) - Implemented direct SQLite recall, source/authority scope, exact packing limits, scan limitations, immutable narration provenance, and migration behavior.
+- [RPG memory framework evaluation](memory-framework-evaluation.md) - Research comparison of SQLite, LangGraph, Mem0, Graphiti/Zep, and Letta, with proposed evaluation gates rather than implementation claims.
 - [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
 - [Harness Wars campaign report](harness-wars-campaign-report.md) - Recorded campaign hydration outcomes, canon inventory, and provider probes; not a runtime contract.

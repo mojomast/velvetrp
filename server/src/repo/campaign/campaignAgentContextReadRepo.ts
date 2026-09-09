@@ -257,10 +257,11 @@ export function createCampaignAgentContextReadRepository(
       const visibleQuests = questRows.map((row) => `${row.title} (${row.status})${row.description ? ` — ${row.description}` : ""}`);
 
       const recapRows = db.prepare(`SELECT recap.text FROM campaign_recaps recap
-        WHERE recap.campaign_id=? AND (? OR recap.visibility='members')
+        WHERE recap.campaign_id=? AND recap.timeline_id=? AND recap.through_revision<=? AND (? OR recap.visibility='members')
           AND (json_array_length(recap.selected_session_ids)=0 OR EXISTS(
             SELECT 1 FROM json_each(recap.selected_session_ids) selected WHERE selected.value=?))
-        ORDER BY recap.created_at DESC,recap.id COLLATE BINARY DESC LIMIT 3`).all(campaign, audience.kind === "dm" ? 1 : 0, sessionId) as Array<{ text: string }>;
+        ORDER BY recap.created_at DESC,recap.id COLLATE BINARY DESC LIMIT 3`).all(campaign, campaignState.active_timeline_id,
+          campaignState.timeline_revision, audience.kind === "dm" ? 1 : 0, sessionId) as Array<{ text: string }>;
       const recap = recapRows.reverse().flatMap((row) => row.text.split(/\r?\n/));
 
       let legalActions: string[] = [];

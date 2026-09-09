@@ -196,6 +196,7 @@ type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
 export interface Repository extends RepositoryUnitOfWork, CampaignDmRepository, CampaignRoomActivationRepository, CampaignStartingLocationRepository, CampaignAdministrationRepository, CampaignAdministrationIntegrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, AdventureCheckRepository, AdventureInventoryRepository, AdventureCommerceRepository, AdventurePowerRestRepository, AdventureQuestProgressionRepository, PowerRepository, SpellcastingRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository, TacticalMapRepository {
+  getCampaignRecall: import("./campaignRecallReadRepo.js").CampaignRecallReadRepository["getCampaignRecall"];
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;
