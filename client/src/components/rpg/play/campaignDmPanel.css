@@ -9,3 +9,18 @@
 .dm-chronicle article { border-left: 2px solid #b98746; padding-left: 1rem; margin: 1rem 0; }
 .dm-chronicle p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .dm-chronicle small { display: block; }
+.dm-readiness { border: 1px solid #73664a; padding: 1rem; display: grid; gap: .75rem; }
+.dm-readiness-heading { display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap; }
+.dm-readiness-heading h4, .dm-readiness-section h5 { margin: 0; }
+.dm-readiness-report { display: grid; gap: 1rem; }
+.dm-readiness-section { border-top: 1px solid #73664a; padding-top: .75rem; display: grid; gap: .5rem; }
+.dm-readiness-section ul { margin: 0; padding-left: 1.25rem; }
+.dm-readiness-issues { display: grid; gap: .75rem; }
+.dm-readiness-issues p { margin-top: .25rem; }
+.dm-readiness-issues small { display: block; overflow-wrap: anywhere; }
+.dm-readiness-severity { text-transform: uppercase; font-size: .75rem; letter-spacing: .05em; }
+.dm-readiness-blocker { color: #a33; }
+.dm-readiness-warning { color: #8a651e; }
+.dm-readiness-review { color: #536b8a; }
+.dm-readiness-coverage { columns: 2 14rem; }
+@media (max-width: 600px) { .dm-readiness-coverage { columns: 1; } }

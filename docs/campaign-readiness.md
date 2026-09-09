@@ -101,3 +101,10 @@ The HTTP transport is `GET /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm
 It is a trusted-local owner/GM read, rejects query and body input, binds the
 response identity to the path, uses `private, no-store`, and returns generic
 not-found errors for unavailable or unauthorized resources.
+
+The Living Atlas Director drawer exposes this read through an explicit
+`Inspect preparation` action for owner/GM roles only. It keeps activation
+readiness separate from preparation issues, shows bounded coverage and manual
+review limits, and uses the existing scene-binding controls for binding
+remediation. Inspection does not acquire the DM command lock, write browser
+recovery storage, or replace pending command/map/draft recovery.

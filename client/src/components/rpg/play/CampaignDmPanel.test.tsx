@@ -13,6 +13,7 @@ function fixture(mode: "human" | "ai" = "human", runs: CampaignDmRun[] = []) {
     getBindingQuests: vi.fn().mockResolvedValue({ revision: 99, data: { quests: [{ questId: "quest", title: "Save the harbor" }], objectives: [{ questId: "quest", objectiveId: "objective", description: "Restore the gate" }] } }),
     listCampaignEncounters: vi.fn().mockResolvedValue({ encounters: [{ encounterId: "encounter", sessionId: "room", name: "Gate guardians", status: "active" }, { encounterId: "elsewhere", sessionId: "other-room", name: "Private other room fight", status: "active" }] }),
     getCampaignDmHistory: vi.fn().mockImplementation(async () => ({ ...history, runs: [...history.runs] })),
+    getCampaignDmPreparationReadiness: vi.fn(),
     getCampaignDmRun: vi.fn().mockImplementation(async () => history.runs[0]),
     getCampaignDmProposal: vi.fn().mockResolvedValue({ run, proposal: { candidateId: "candidate", digest: "a".repeat(64), action: "reveal-node", label: "Reveal the harbor" } }),
     commandCampaignDmBeat: vi.fn().mockImplementation(async () => { history.runs = [run]; return run; }),

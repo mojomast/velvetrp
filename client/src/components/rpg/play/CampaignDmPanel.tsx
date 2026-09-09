@@ -2,14 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmModeRequestSchema, campaignDmSceneBindingRequestSchema, resourceIdSchema,
   type CampaignDmHistory, type CampaignDmPrivateRun, type CampaignDmRun, type CampaignPlayBootstrap } from "@velvet/contracts";
-import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmHistory, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun, commandCampaignDmSceneBinding, getCampaignStory, listCampaignQuests, listCampaignEncounters } from "../../../api";
+import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmHistory, getCampaignDmPreparationReadiness, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun, commandCampaignDmSceneBinding, getCampaignStory, listCampaignQuests, listCampaignEncounters } from "../../../api";
 import { createClientId } from "../../../utils/clientId";
+import { CampaignDmReadinessPanel } from "./CampaignDmReadinessPanel";
 import "./campaignDmPanel.css";
 
 export const campaignDmApi = { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmHistory, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun,
-  commandCampaignDmSceneBinding, getBindingStory: (campaignId: string) => getCampaignStory(campaignId, "gm"),
+  commandCampaignDmSceneBinding, getCampaignDmPreparationReadiness, getBindingStory: (campaignId: string) => getCampaignStory(campaignId, "gm"),
   getBindingQuests: (campaignId: string) => listCampaignQuests(campaignId, "gm"), listCampaignEncounters };
-export type CampaignDmApi = typeof campaignDmApi;
+export type CampaignDmApi = Omit<typeof campaignDmApi, "getCampaignDmPreparationReadiness"> & {
+  getCampaignDmPreparationReadiness?: typeof campaignDmApi.getCampaignDmPreparationReadiness;
+};
 const operationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("beat"), request: campaignDmBeatRequestSchema }).strict(),
   z.object({ kind: z.literal("decision"), runId: resourceIdSchema, request: campaignDmDecisionRequestSchema }).strict(),
@@ -201,6 +204,7 @@ export function CampaignDmPanel({ bootstrap, api, blocked, canAct, evidenceTurnI
       <button type="button" disabled={modeBusy || !!modeOperation} onClick={() => setReviewMode(null)}>Cancel mode review</button>
     </section>}
     {modeOperation && gm && <button type="button" disabled={modeBusy || invalid} onClick={() => void changeMode(true)}>Recover exact mode request</button>}
+    {gm && api.getCampaignDmPreparationReadiness && <CampaignDmReadinessPanel campaignId={campaignId} sessionId={sessionId} role={bootstrap.principal.role} api={{ getCampaignDmPreparationReadiness: api.getCampaignDmPreparationReadiness }} />}
     {gm && <details><summary>Prepare scene resolution (GM only)</summary>
       <p>Link a named scene to evidence you judge sufficient to finish it. The server still requires qualifying committed evidence and legal story dependencies. This authors a rule; it does not complete an objective, end an encounter, resolve a scene, or reveal secrets.</p>
       <button type="button" disabled={blocked || locked || !allowed} onClick={() => void prepareBinding(false)}>Load scene preparation choices</button>
