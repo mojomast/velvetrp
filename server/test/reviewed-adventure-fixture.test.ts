@@ -3,6 +3,7 @@ import path from "node:path";
 import DatabaseDriver from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanupTmpDataDirs, makeTmpDir } from "./helpers.js";
+import { SRD_5_1_STARTER_CATALOG } from "../src/repo/index.js";
 import { createReviewedAdventure, REVIEWED_ADVENTURE_MANIFEST, REVIEWED_ADVENTURE_MANIFEST_DIGEST, REVIEWED_ADVENTURE_PRIVATE_SENTINEL } from "./fixtures/reviewedAdventure.js";
 
 describe("reviewed Last Harbor Light fixture", () => {
@@ -14,10 +15,25 @@ describe("reviewed Last Harbor Light fixture", () => {
     process.env.FEATURE_RPG_COMBAT = "true";
     const directory = makeTmpDir("reviewed-harbor-");
     process.env.VELVET_DATA_DIR = directory;
-    expect(REVIEWED_ADVENTURE_MANIFEST_DIGEST).toBe("9517022bfcd508893f6b2f83a89c2c26560fd701d6fd46551da7ef107516929d");
+    expect(REVIEWED_ADVENTURE_MANIFEST_DIGEST).toBe("2c97de85881596773fcde7c6e72b840edc07774295df9c6efaa3490815f728ab");
     const fixture = await createReviewedAdventure(directory);
     expect(fixture.providerDispatches).toBe(0);
     expect(fixture.optionalEncounterInstanceId).toBe(fixture.resourceIds["optional-encounter-instance"]);
+    expect(fixture.inventoryReceipt).toMatchObject({
+      idempotencyKey: "harbor-equip-longsword", revisionBefore: 0, revisionAfter: 1,
+    });
+    const inventory = fixture.repo.getActorInventorySnapshot("local-owner", fixture.campaignId, fixture.actorId)!;
+    expect(inventory).toMatchObject({
+      revision: fixture.inventoryReceipt.revisionAfter,
+      equipment: [{ slot: "hand", entryId: fixture.longswordEntryId, hand: "main", grip: "one-handed" }],
+    });
+    expect(inventory.inventory.items.filter(item => item.kind === "instanced" && item.item.definitionId === "srd-5.1:item:longsword")).toEqual([
+      expect.objectContaining({
+        kind: "instanced", entryId: fixture.longswordEntryId,
+        item: { kind: "item", packId: REVIEWED_ADVENTURE_MANIFEST.catalog.packId,
+          packVersion: REVIEWED_ADVENTURE_MANIFEST.catalog.packVersion, definitionId: "srd-5.1:item:longsword" },
+      }),
+    ]);
     expect(Object.keys(fixture.resourceIds)).toEqual(expect.arrayContaining([
       ...REVIEWED_ADVENTURE_MANIFEST.keys.locations, REVIEWED_ADVENTURE_MANIFEST.keys.npc,
       REVIEWED_ADVENTURE_MANIFEST.keys.quest, ...REVIEWED_ADVENTURE_MANIFEST.keys.storyNodes,
@@ -28,6 +44,15 @@ describe("reviewed Last Harbor Light fixture", () => {
       "private-artifact", "awaiting-play-evidence",
     ]);
     expect(REVIEWED_ADVENTURE_MANIFEST.documentedBranchReadinessExpectation).toBe("optional-disconnected-content");
+    expect(REVIEWED_ADVENTURE_MANIFEST.catalog).toMatchObject({
+      rulesProfileId: "srd-5.1:rules:starter-v1",
+      packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
+      packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
+      raceDefinitionId: "srd-5.1:race:human",
+      backgroundDefinitionId: "srd-5.1:background:acolyte",
+      classDefinitionId: "srd-5.1:class:fighter",
+      enemyDefinitionId: "srd-5.1:enemy-template:goblin",
+    });
     expect(REVIEWED_ADVENTURE_MANIFEST.bindings).toEqual([
       { node: "lens-recovered", evidenceKind: "quest-objective", targetObjective: "secure-lens" },
       { node: "harbor-finale", evidenceKind: "quest-objective", targetObjective: "relight-beacon" },
@@ -61,6 +86,18 @@ describe("reviewed Last Harbor Light fixture", () => {
       ]));
       expect(db.prepare("SELECT status FROM story_node_state_v34 WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ status: "hidden" }, { status: "hidden" }, { status: "hidden" }]);
       expect(db.prepare("SELECT count(*) count FROM campaign_actors WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 1 });
+      expect(db.prepare("SELECT rules_profile_id FROM campaign_rules_profiles WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ rules_profile_id: REVIEWED_ADVENTURE_MANIFEST.catalog.rulesProfileId }]);
+      expect(db.prepare("SELECT race_definition_id,background_definition_id FROM rpg_campaign_sheets WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{
+        race_definition_id: REVIEWED_ADVENTURE_MANIFEST.catalog.raceDefinitionId,
+        background_definition_id: REVIEWED_ADVENTURE_MANIFEST.catalog.backgroundDefinitionId,
+      }]);
+      expect(db.prepare("SELECT definition_id FROM rpg_character_classes WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{
+        definition_id: REVIEWED_ADVENTURE_MANIFEST.catalog.classDefinitionId,
+      }]);
+      expect(db.prepare("SELECT attribute_id,value FROM rpg_character_attributes WHERE campaign_id=? ORDER BY position").all(fixture.campaignId)).toEqual([
+        { attribute_id: "strength", value: 16 }, { attribute_id: "dexterity", value: 15 }, { attribute_id: "constitution", value: 14 },
+        { attribute_id: "intelligence", value: 13 }, { attribute_id: "wisdom", value: 11 }, { attribute_id: "charisma", value: 9 },
+      ]);
       expect(db.prepare("SELECT pack_id,pack_version FROM campaign_catalog_current_pins WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ pack_id: REVIEWED_ADVENTURE_MANIFEST.catalog.packId, pack_version: REVIEWED_ADVENTURE_MANIFEST.catalog.packVersion }]);
     } finally { db.close(); fixture.repo.close(); }
   });
@@ -75,6 +112,20 @@ describe("reviewed Last Harbor Light fixture", () => {
     expect(fixture.optionalEncounterInstanceId).toBeNull();
     expect(fixture.resourceIds).not.toHaveProperty("optional-encounter-instance");
     expect(fixture.resourceIds[REVIEWED_ADVENTURE_MANIFEST.keys.encounter]).toBeTruthy();
+    expect(fixture.inventoryReceipt).toMatchObject({
+      idempotencyKey: "harbor-equip-longsword", revisionBefore: 0, revisionAfter: 1,
+    });
+    const inventory = fixture.repo.getActorInventorySnapshot("local-owner", fixture.campaignId, fixture.actorId)!;
+    expect(inventory).toMatchObject({
+      revision: fixture.inventoryReceipt.revisionAfter,
+      equipment: [{ slot: "hand", entryId: fixture.longswordEntryId, hand: "main", grip: "one-handed" }],
+    });
+    expect(inventory.inventory.items.filter(item => item.kind === "instanced" && item.item.definitionId === "srd-5.1:item:longsword")).toEqual([
+      expect.objectContaining({
+        kind: "instanced", entryId: fixture.longswordEntryId,
+        item: expect.objectContaining({ definitionId: "srd-5.1:item:longsword" }),
+      }),
+    ]);
     const planning = fixture.repo.getCampaignGeneratedPlanning("local-owner", fixture.campaignId)!;
     expect(planning.encounters).toEqual([expect.objectContaining({
       artifactKey: REVIEWED_ADVENTURE_MANIFEST.keys.encounter,

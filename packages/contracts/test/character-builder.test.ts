@@ -6,6 +6,7 @@ import {
   characterBuilderPointBuyCost,
   characterDraftViewSchema,
   characterDerivedCalculatorInputSchema,
+  characterStartingGrantSchema,
   createCharacterDraftInputSchema,
 } from "../src/index.js";
 
@@ -47,5 +48,14 @@ describe("character builder contracts", () => {
       { id: "class", required: true, options: [{ reference: { kind: "class", packId: "pack", packVersion: "1", definitionId: "class" }, name: "Cleric", description: "A class." }] },
       { id: "starter-grant", required: true, options: ["kit", "currency"] }, group,
     ])).not.toThrow();
+  });
+
+  it("limits starting item grants to background and class starter-kit sources", () => {
+    const reference = { kind: "item" as const, packId: "dnd-5e", packVersion: "1.0.0", definitionId: "longsword" };
+    expect(characterStartingGrantSchema.parse({ kind: "item", reference, quantity: 1, source: "background-kit" }).source).toBe("background-kit");
+    expect(characterStartingGrantSchema.parse({ kind: "item", reference, quantity: 1, source: "class-starter-kit" }).source).toBe("class-starter-kit");
+    expect(characterStartingGrantSchema.parse({ kind: "currency", reference: { kind: "currency", packId: "dnd-5e", packVersion: "1.0.0", definitionId: "gp" }, amount: 10, source: "background-currency" }).source).toBe("background-currency");
+    expect(characterStartingGrantSchema.safeParse({ kind: "item", reference, quantity: 1, source: "unknown" }).success).toBe(false);
+    expect(characterStartingGrantSchema.safeParse({ kind: "currency", reference: { kind: "currency", packId: "dnd-5e", packVersion: "1.0.0", definitionId: "gp" }, amount: 10, source: "class-starter-kit" }).success).toBe(false);
   });
 });

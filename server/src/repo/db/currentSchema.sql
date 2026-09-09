@@ -1708,7 +1708,7 @@ CREATE TABLE character_starting_grants_v19 (
       kind TEXT NOT NULL CHECK (kind IN ('item','currency')),
       pack_id TEXT NOT NULL, pack_version TEXT NOT NULL, definition_id TEXT NOT NULL,
       amount INTEGER NOT NULL CHECK (typeof(amount)='integer' AND amount BETWEEN 0 AND 1000000),
-      source TEXT NOT NULL CHECK (source IN ('background-kit','background-currency')),
+      source TEXT NOT NULL CHECK (source IN ('background-kit','background-currency','class-starter-kit')),
       grant_json TEXT NOT NULL CHECK (json_valid(grant_json) AND json_type(grant_json)='object'),
       PRIMARY KEY (draft_id,position),
       FOREIGN KEY (pack_id,pack_version) REFERENCES rpg_content_pack_publications(pack_id,pack_version) ON DELETE RESTRICT

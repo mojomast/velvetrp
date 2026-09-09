@@ -2,11 +2,11 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 / P2.F, player-elected optional encounter fixture variant
-- Last accepted milestone and commit: P2.1 reviewed fixture, `b375e35`; P2.F bounded readiness reference fix, `bd3b3a8`
-- Next small assignment: add a journey-only fixture option that leaves the optional encounter unmaterialized until director planning
+- Active plan/milestone: Plan 2 / P2.3 interruption and supported-withdrawal boundaries
+- Last accepted milestone and commit: P2.F.2 optional encounter fixture variant, `609fbf5`
+- Next small assignment: cover deferred planning/narration, takeover, evidence/recovery failures, and pre-activation withdrawal
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
-- Blockers and decision required: none; no provider calls authorized or required yet
+- Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
 
 ## Interface handoffs
@@ -27,13 +27,25 @@
 | P1 | accepted | `2bda645` | P1.1-P1.6 focused gates accepted; zero provider calls | Plan 1 handoff recorded | full shared live envelope unused |
 | P2.1 | accepted | `b375e35` | reviewed fixture 3; readiness/checks/fixture 12; server typecheck; independent review accepted | reviewed fixture guide; docs index; readiness observations | full shared live envelope unused |
 | P2.F | accepted | `bd3b3a8` | readiness/checks/fixture 12; server typecheck; independent review accepted | scope amendment and binding-reference policy in ledger | full shared live envelope unused |
-| P2.2 | blocked | | risky route blocked: optional encounter is pre-created before player election | P2.F evidence recorded in ledger | full shared live envelope unused |
-| P2.F.2 | accepted | pending coordinator commit | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
+| P2.2 | accepted | pending coordinator commit | journey 13; server typecheck; independent final review accepted; zero live provider calls | journey oracle and reviewed fixture docs pending commit | full shared live envelope unused |
+| P2.F.2 | accepted | `609fbf5` | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
+| P2.F combat | accepted | pending coordinator commit | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs pending commit | full shared live envelope unused |
+| P2.F.3 | in-progress | | negotiation-capable fixture profile decision pending | scope amendment in ledger | full shared live envelope unused |
 
 ## Next agent task
 P2.F handoff: readiness projection uses raw colon-free valid binding references only; colon-containing, oversized, invalid, or digest-shaped tuples use `binding:` plus a 48-hex SHA-256 prefix of an unambiguous JSON tuple. Internal evidence matching remains exact JSON tuple semantics. Prepared future evidence is `review` severity, while missing binding stays a blocker. The actual reviewed fixture is activation-ready/active and emits one `private-artifact` warning plus two `awaiting-play-evidence` reviews. `optional-disconnected-content` is documented only as a branch expectation because generated content has no optional flag.
 
 Amendment: P2.2 found `createReviewedAdventure` creates the optional Gloam-Mite encounter during fixture setup, before player risky-route election. The existing director then offers only `encounter-start`; its materialization lane requires no open encounter and accepted planning. Add a journey-only fixture option that preserves the P2.1 default initial-state proof but omits this pre-created encounter, so P2.2 can prove player-authorized travel followed by existing director materialization. No new player encounter-election API, route, authority, schema, or combat-retreat behavior is authorized.
+
+Amendment: P2.2 negotiation probes through real HTTP/SSE in human and AI modes show the pinned `velvet-mechanics` profile advertises no `exact_srd_check.select` candidate. The original player turn persists but cannot produce a check receipt or success/failure outcome. The reviewed fixture must pin an already supported deterministic-check ruleset/catalog, or P2.2 remains incomplete. Do not add new runtime check authority merely for the fixture.
+
+P2.F.3 decision: use existing `dnd-5e@1.0.0` through `SRD_5_1_STARTER_CATALOG`, Human/Acolyte/Fighter, and exact pinned Goblin roster. This is fixture-only; quest/travel/director materialization semantics remain unchanged. Exact Insight check candidates and receipts are already supported. Update manifest digest, fixture assertions, journey selection, and reviewed-fixture documentation; run fixture/journey/SRD-check tests and server typecheck.
+
+Amendment: P2.2 terminal-combat probes reach active SRD Goblin combat in human and AI modes, but the exact player candidate table contains only `flee` and `end-turn`, no legal attack. The probe stops before any terminal combat, reward, claim, finale, or completion state. Investigate the finalized SRD actor's attack source/legal-action construction; any fix must be narrowly scoped, preserve server-authoritative combat, and not treat `flee` as supported active-combat retreat.
+
+Evidence: D&D `legalCombatActions` requires `resolveSrdEquipment(...).weapon` before advertising attack. The reviewed Human/Acolyte/Fighter has no equipped weapon. Existing `server/test/fixtures/srdEquipment.ts` creates stock using direct SQL and then equips through the repository; P2 forbids that direct-stock shortcut for proving the complete production journey. No normal inventory grant command exists in the reviewed setup path. User selected the narrow authoritative normal grant path. It must be catalog-pinned, idempotent, revisioned, receipt-backed, and fixture-scoped rather than a generalized arbitrary grant API.
+
+P2.F combat handoff: `class-starter-kit` is item-only. The exact SRD Fighter kit appends one pinned longsword through shared preview/finalization grant derivation, durable grant materialization, finalization receipt, and exact predecessor schema migration. The reviewed fixture equips that entry only through `mutateInventoryForActor` with current revision and an idempotency key. Terminal combat/reward proof passes in human/AI without fixture SQL stock. P2.2 completes the final objective evidence, one-time bound scenes, custom claim with no economy effect, explicit owner completion, and true reopen/reload with no extra dispatch.
 
 Assignment: P2.F.2 optional encounter fixture variant
 Goal: add a journey-only reviewed fixture option that does not pre-create the optional encounter, while retaining the existing P2.1 default fixture and all unearned-state guarantees.

@@ -54,6 +54,7 @@ import {
 } from "./characterBuilderErrors.js";
 import type { CharacterBuilderReadRepository } from "./characterBuilderReadRepo.js";
 import { resolveProfileRulesetIdentity } from "../../rulesets/campaignBinding.js";
+import { startingGrantsFor } from "./characterBuilderStartingGrants.js";
 
 /** Dependencies required by character-builder commands.  Reads are shared with the facade. */
 export interface CharacterBuilderWriteDependencies {
@@ -591,9 +592,11 @@ export function createCharacterBuilderWriteRepository(
               proficiencyBonus: chosen.level.mechanics.proficiencyBonus,
               spellcastingAttribute: chosen.klass.mechanics.primaryAttribute,
             }),
-            grants = reads.grantsFor(
-              chosen.background,
+            grants = startingGrantsFor(
+              row.rules_profile_id,
+              chosen.klass.reference,
               selections.starterGrant,
+              reads.grantsFor(chosen.background, selections.starterGrant),
             ),
             campaignCharacterId = resourceIdSchema.parse(
               dependencies.ids.nextId(),

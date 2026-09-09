@@ -14,16 +14,27 @@ or reuses storage, and does not use ambient `VELVET_DATA_DIR` to select it. The
 legacy session setup command is scoped to the same supplied target and restores
 the caller's environment immediately.
 
-The fixture pins the mechanics starter catalog and creates one finalized actor,
-three directed public locations, Keeper Maren, three public story nodes, the
-public Saltglass Trail clue, Restore the Harbor Light, an optional Gloam-Mite
-encounter, and a custom Keeper's acknowledgment reward. The private sentinel
-preparation artifact is `HARBOR-SENTINEL-PRIVATE-7`; it must not appear in a
-public projection.
+The fixture pins `dnd-5e@1.0.0` through the SRD 5.1 starter catalog and creates
+one finalized Human/Acolyte/Fighter actor with the six SRD ability scores
+(`strength`, `dexterity`, `constitution`, `intelligence`, `wisdom`, and
+`charisma`). It includes three directed public locations, Keeper Maren, three
+public story nodes, the public Saltglass Trail clue, Restore the Harbor Light,
+an optional pinned SRD Goblin encounter, and a custom Keeper's acknowledgment
+reward. The private sentinel preparation artifact is
+`HARBOR-SENTINEL-PRIVATE-7`; it must not appear in a public projection.
+
+The closed Fighter `class-starter-kit` materializes one pinned SRD longsword
+during normal finalization. The fixture locates and equips that exact inventory
+entry through the revisioned inventory command, retaining its receipt; it never
+uses the direct-SQL test stock helper.
 
 Initial state deliberately has no completed objectives, story evidence, active
 combat, successful checks, reward claims, scene resolution, campaign completion,
 or assertion that the beacon is restored.
+
+The SRD profile and Acolyte Insight proficiency make exact server-owned Insight
+check candidates available for P2.2. This fixture setup does not execute a check
+or claim any check outcome.
 
 ## Readiness
 

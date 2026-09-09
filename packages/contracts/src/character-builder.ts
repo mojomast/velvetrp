@@ -208,7 +208,7 @@ export const characterDerivedCalculatorInputSchema = z.object({
 }).strict();
 
 export const characterStartingGrantSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("item"), reference: itemCatalogReferenceSchema, quantity: z.number().int().min(1).max(100), source: z.literal("background-kit") }).strict(),
+  z.object({ kind: z.literal("item"), reference: itemCatalogReferenceSchema, quantity: z.number().int().min(1).max(100), source: z.enum(["background-kit", "class-starter-kit"]) }).strict(),
   z.object({ kind: z.literal("currency"), reference: currencyCatalogReferenceSchema, amount: z.number().int().min(0).max(1_000_000), source: z.literal("background-currency") }).strict(),
 ]);
 

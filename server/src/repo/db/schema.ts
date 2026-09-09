@@ -80,6 +80,47 @@ function assertCurrentDatabase(db: DatabaseDriver.Database, databasePath: string
   }
 }
 
+/** Upgrades only the complete schema whose grants source CHECK predates class starter kits. */
+export function upgradeStartingGrantsSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const grantsTable = "character_starting_grants_v19";
+  const materializationsTable = "character_starter_materializations_v51";
+  const predecessor = expected.map((object) => object.name === grantsTable && object.type === "table"
+    ? { ...object, sql: object.sql.replace(
+      "source IN ('background-kit','background-currency','class-starter-kit')",
+      "source IN ('background-kit','background-currency')",
+    ) }
+    : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("starting grants upgrade requires an independent transaction");
+
+  const affectedTables = new Set([grantsTable, materializationsTable]);
+  const affected = expected.filter((object) => object.type !== "table" && (
+    affectedTables.has(object.tbl_name) || object.sql.includes(grantsTable)
+  ));
+  const definition = (name: string) => expected.find((object) => object.type === "table" && object.name === name)!;
+  db.transaction(() => {
+    db.exec(`CREATE TEMP TABLE ${grantsTable}_upgrade AS SELECT * FROM ${grantsTable}`);
+    db.exec(`CREATE TEMP TABLE ${materializationsTable}_upgrade AS SELECT * FROM ${materializationsTable}`);
+    for (const object of affected) db.exec(`DROP ${object.type.toUpperCase()} ${object.name}`);
+    db.exec(`DROP TABLE ${materializationsTable}`);
+    db.exec(`DROP TABLE ${grantsTable}`);
+    db.exec(definition(grantsTable).sql);
+    db.exec(definition(materializationsTable).sql);
+    db.exec(`INSERT INTO ${grantsTable} SELECT * FROM ${grantsTable}_upgrade`);
+    db.exec(`INSERT INTO ${materializationsTable} SELECT * FROM ${materializationsTable}_upgrade`);
+    db.exec(`DROP TABLE ${grantsTable}_upgrade`);
+    db.exec(`DROP TABLE ${materializationsTable}_upgrade`);
+    for (const object of affected) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -101,7 +142,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const missingRecall = !schemaObjects(db).some(object => object.name === "adventure_narration_contexts");
     const expected = missingRecall ? prior : expectedObjects();
     const validate = missingRecall ? finishRecallUpgrade : () => assertCurrentDatabase(db, databasePath);
-    if (!upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
+    if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }

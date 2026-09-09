@@ -12,6 +12,7 @@ import {
 } from "@velvet/contracts";
 import { calculateCharacterDerivedStats } from "../../characterBuilderCalculator.js";
 import { resolveProfileRulesetIdentity } from "../../rulesets/campaignBinding.js";
+import { startingGrantsFor } from "./characterBuilderStartingGrants.js";
 
 /** Campaign membership roles that can be represented in a draft view. */
 export type CharacterBuilderRole = "owner" | "gm" | "player" | "observer";
@@ -118,7 +119,9 @@ export function buildView(
   const derived = chosen ? calculateCharacterDerivedStats({ rulesetId, rulesetVersion, scores: allocation.scores, racialBonuses: chosen.race.mechanics.attributeBonuses,
     classHp: chosen.level.mechanics.hpGain, raceSpeed: chosen.race.mechanics.speed,
     proficiencyBonus: chosen.level.mechanics.proficiencyBonus, spellcastingAttribute: chosen.klass.mechanics.primaryAttribute }) : null;
-  const grants = chosen && selections.starterGrant ? mappers.grantsFor(chosen.background, selections.starterGrant) : [];
+  const grants = chosen && selections.starterGrant
+    ? startingGrantsFor(row.rules_profile_id, chosen.klass.reference, selections.starterGrant, mappers.grantsFor(chosen.background, selections.starterGrant))
+    : [];
   const option = (definition: CatalogDefinition) => ({ reference: definition.reference, name: definition.name, description: definition.description });
   return characterDraftViewSchema.parse({
     id: row.id, campaignId: row.campaign_id, personaId: row.persona_id, controllerPrincipalId: row.controller_principal_id,

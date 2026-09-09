@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import DatabaseDriver from "better-sqlite3";
-import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
+import { CHARACTER_BUILDER_STANDARD_ARRAY, SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS } from "@velvet/contracts";
 import { buildApp } from "../../src/app.js";
-import { closeRepo, createRepository, MECHANICS_STARTER_CATALOG } from "../../src/repo/index.js";
+import { closeRepo, createRepository, SRD_5_1_STARTER_CATALOG } from "../../src/repo/index.js";
 import { createSession } from "../../src/repo/sessionRepo.js";
 
 export const REVIEWED_ADVENTURE_MANIFEST_VERSION = "1.0.0";
@@ -27,10 +27,13 @@ export const REVIEWED_ADVENTURE_MANIFEST = {
   version: REVIEWED_ADVENTURE_MANIFEST_VERSION,
   name: REVIEWED_ADVENTURE_NAME,
   catalog: {
-    rulesProfileId: "velvet-mechanics",
-    packId: MECHANICS_STARTER_CATALOG.manifest.packId,
-    packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion,
-    enemyDefinitionId: "velvet:mechanics:enemy-template:gloam-mite",
+    rulesProfileId: "srd-5.1:rules:starter-v1",
+    packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
+    packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion,
+    raceDefinitionId: "srd-5.1:race:human",
+    backgroundDefinitionId: "srd-5.1:background:acolyte",
+    classDefinitionId: "srd-5.1:class:fighter",
+    enemyDefinitionId: "srd-5.1:enemy-template:goblin",
   },
   keys: {
     outline: "harbor-opening",
@@ -40,7 +43,7 @@ export const REVIEWED_ADVENTURE_MANIFEST = {
     quest: "restore-harbor-light",
     objectives: ["hear-keeper", "secure-lens", "relight-beacon"],
     reward: "harbor-acknowledgment",
-    encounter: "gloam-mite-nest",
+    encounter: "goblin-ambush",
     storyNodes: ["keeper-request", "lens-recovered", "harbor-finale"],
     clue: "saltglass-trail",
     privateSentinel: "sentinel-preparation",
@@ -94,7 +97,7 @@ const reviewedContent = {
     { key: "secure-lens", description: "Secure the harbor lens.", targetProgress: 1, dependencyObjectiveKeys: ["hear-keeper"], visibility: "public" as const },
     { key: "relight-beacon", description: "Relight the harbor beacon.", targetProgress: 1, dependencyObjectiveKeys: ["secure-lens"], visibility: "public" as const },
   ], rewards: [{ key: "harbor-acknowledgment", label: "Keeper's acknowledgment", kind: "custom" as const, amount: null, visibility: "public" as const }] }],
-  encounters: [{ key: "gloam-mite-nest", title: "Gloam-Mite Nest", description: "An optional hazard nests among the wet stones.", visibility: "public" as const, locationKey: "breakwater-cave", participantNpcKeys: [], objectives: ["Protect the route."], terrain: ["Wet stone."], escalation: [], resolution: "A completed encounter clears the cave route.", enemyReferences: [{ kind: "enemy-template" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId, packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:enemy-template:gloam-mite" }], monsterConceptKeys: [] }],
+  encounters: [{ key: "goblin-ambush", title: "Goblin Ambush", description: "An optional Goblin ambush waits among the wet stones.", visibility: "public" as const, locationKey: "breakwater-cave", participantNpcKeys: [], objectives: ["Protect the route."], terrain: ["Wet stone."], escalation: [], resolution: "A completed encounter clears the cave route.", enemyReferences: [{ kind: "enemy-template" as const, packId: SRD_5_1_STARTER_CATALOG.manifest.packId, packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion, definitionId: "srd-5.1:enemy-template:goblin" }], monsterConceptKeys: [] }],
   clues: [{ key: "saltglass-trail", title: "Saltglass Trail", description: "Saltglass fragments point toward the lens route.", visibility: "public" as const, locationKey: "lantern-quay", revealsStoryNodeKey: "keeper-request" }],
   storyNodes: [
     { key: "keeper-request", title: "Keeper's Request", description: "Maren asks what help you are willing to offer.", visibility: "public" as const },
@@ -109,13 +112,15 @@ const reviewedContent = {
   scenePrompts: [{ key: "sentinel-preparation", title: "Sentinel preparation", prompt: REVIEWED_ADVENTURE_PRIVATE_SENTINEL, visibility: "gm" as const, locationKey: "breakwater-cave", npcKeys: [] }],
 };
 
-export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR, options: { prepareOptionalEncounter?: boolean } = {}): Promise<{
+export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR, options: { prepareOptionalEncounter?: boolean; rng?: { integer(minimum: number, maximum: number): number }; clock?: { now(): Date } } = {}): Promise<{
   repo: ReturnType<typeof createRepository>;
   campaignId: string;
   sessionId: string;
   actorId: string;
   resourceIds: Record<string, string>;
   optionalEncounterInstanceId: string | null;
+  longswordEntryId: string;
+  inventoryReceipt: { commandId: string; idempotencyKey: string; revisionBefore: number; revisionAfter: number; occurredAt: string; changedKeys: string[] };
   providerDispatches: number;
 }> {
   if (!targetDirectory) throw new Error("reviewed adventure requires an explicit target directory");
@@ -125,15 +130,15 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
   closeRepo();
   try {
   let providerDispatches = 0;
-  const repo = createRepository({ dataDir: targetDirectory, clock: { now: () => new Date("2036-01-01T00:00:00.000Z") } });
+  const repo = createRepository({ dataDir: targetDirectory, clock: options.clock ?? { now: () => new Date("2036-01-01T00:00:00.000Z") }, ...(options.rng ? { rng: options.rng } : {}) });
   const campaign = repo.createCampaign(OWNER, { name: REVIEWED_ADVENTURE_NAME });
-  repo.installMechanicsStarterCatalog(OWNER);
-  repo.configureMechanicsStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "harbor-catalog" });
+   repo.installSrdStarterCatalog(OWNER);
+   repo.configureSrdStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "harbor-catalog" });
   const persona = repo.createCharacter({ name: "Aster Vale", age: 30, archetype: "Lantern Warden", boundaries: "", fictionalConfirmed: true });
-  const scores = Object.fromEntries(["might", "agility", "resolve", "insight", "presence", "craft"].map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]));
+   const scores = Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]));
   const draft = repo.createCharacterDraft(OWNER, campaign.id, { personaId: persona.id, controllerPrincipalId: OWNER, durability: "durable", allocation: { method: "standard-array", scores } as any, idempotencyKey: "harbor-character" });
-  const definitions = MECHANICS_STARTER_CATALOG.definitions;
-  const selected = repo.updateCharacterDraft(OWNER, draft.draft.id, { expectedRevision: 0, idempotencyKey: "harbor-character-select", selections: { race: definitions.find(item => item.reference.kind === "race")!.reference, background: definitions.find(item => item.reference.kind === "background")!.reference, class: definitions.find(item => item.reference.kind === "class")!.reference, starterGrant: "kit" } } as any);
+   const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+   const selected = repo.updateCharacterDraft(OWNER, draft.draft.id, { expectedRevision: 0, idempotencyKey: "harbor-character-select", selections: { race: definitions.find(item => item.reference.definitionId === REVIEWED_ADVENTURE_MANIFEST.catalog.raceDefinitionId)!.reference, background: definitions.find(item => item.reference.definitionId === REVIEWED_ADVENTURE_MANIFEST.catalog.backgroundDefinitionId)!.reference, class: definitions.find(item => item.reference.definitionId === REVIEWED_ADVENTURE_MANIFEST.catalog.classDefinitionId)!.reference, starterGrant: "kit" } } as any);
   const actorId = repo.finalizeCharacterDraft(OWNER, draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: "harbor-character-finalize" }).receipt.actorId;
   const session = await createSession({ characterId: persona.id, title: "Last Harbor Light" });
   repo.attachCampaignSession(OWNER, { campaignId: campaign.id, sessionId: session.id } as any);
@@ -155,9 +160,18 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
   repo.updateCampaignAdministration(OWNER, campaign.id, { status: "published", expectedRevision: administration.revision, idempotencyKey: "harbor-publish" });
   const activationInspection = repo.getCampaignRoomActivationReadiness(OWNER, campaign.id, session.id);
   if (!activationInspection.ready) throw new Error(`reviewed room is not activation-ready: ${activationInspection.blockers.join(",")}`);
-  const activation = repo.activateCampaignRoom(OWNER, campaign.id, session.id, { expectedRevision: activationInspection.expectedRevision, idempotencyKey: "harbor-activate" });
-  if (!activation.readiness.ready) throw new Error("reviewed room did not activate");
-  const db = new DatabaseDriver(path.join(targetDirectory, "velvet.sqlite"), { readonly: true });
+   const activation = repo.activateCampaignRoom(OWNER, campaign.id, session.id, { expectedRevision: activationInspection.expectedRevision, idempotencyKey: "harbor-activate" });
+   if (!activation.readiness.ready) throw new Error("reviewed room did not activate");
+   const inventory = repo.getActorInventorySnapshot(OWNER, campaign.id, actorId);
+   if (!inventory) throw new Error("reviewed actor inventory is unavailable");
+   const longswords = inventory.inventory.items.filter(item => item.kind === "instanced" && item.item.definitionId === "srd-5.1:item:longsword");
+   if (longswords.length !== 1) throw new Error("reviewed Fighter starter longsword is not uniquely materialized");
+   const longswordEntryId = longswords[0]!.entryId;
+   const equipped = repo.mutateInventoryForActor(OWNER, campaign.id, actorId, {
+     kind: "equip", entryId: longswordEntryId, slot: "hand", hand: "main", grip: "one-handed",
+     expectedRevision: inventory.revision, idempotencyKey: "harbor-equip-longsword",
+   });
+   const db = new DatabaseDriver(path.join(targetDirectory, "velvet.sqlite"), { readonly: true });
   try {
     const rows = db.prepare("SELECT artifact_key,server_resource_id FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=? AND server_resource_id IS NOT NULL").all(campaign.id) as Array<{ artifact_key: string; server_resource_id: string }>;
     const resourceIds = Object.fromEntries(rows.map(row => [row.artifact_key, row.server_resource_id]));
@@ -165,7 +179,7 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
     for (const objective of objectiveRows) if (objective.key.includes("Hear Keeper")) resourceIds["hear-keeper"] = objective.objective_id; else if (objective.key.includes("Secure the harbor")) resourceIds["secure-lens"] = objective.objective_id; else if (objective.key.includes("Relight")) resourceIds["relight-beacon"] = objective.objective_id;
     const enemy = definitions.find(item => item.reference.definitionId === REVIEWED_ADVENTURE_MANIFEST.catalog.enemyDefinitionId)!.reference as any;
     const optionalEncounterInstanceId = options.prepareOptionalEncounter !== false
-      ? repo.createEncounter(OWNER, campaign.id, { sessionId: session.id, name: "Gloam-Mite Nest", combatants: [{ kind: "actor", actorId, team: "allies" }, { kind: "enemy", template: enemy, team: "enemies" }], idempotencyKey: "harbor-optional-encounter" }).encounter.encounterId
+       ? repo.createEncounter(OWNER, campaign.id, { sessionId: session.id, name: "Goblin Ambush", combatants: [{ kind: "actor", actorId, team: "allies" }, { kind: "enemy", template: enemy, team: "enemies" }], idempotencyKey: "harbor-optional-encounter" }).encounter.encounterId
       : null;
     if (optionalEncounterInstanceId) resourceIds["optional-encounter-instance"] = optionalEncounterInstanceId;
     let storyRevision = repo.getCampaignStory(OWNER, campaign.id)!.revision;
@@ -174,7 +188,7 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
     repo.bindDmSceneEvidence(OWNER, campaign.id, { nodeId: lensRecovered, evidence: { kind: "quest-objective", targetId: secureLens }, expectedStoryRevision: storyRevision, idempotencyKey: "harbor-bind-lens" });
     storyRevision = repo.getCampaignStory(OWNER, campaign.id)!.revision;
     repo.bindDmSceneEvidence(OWNER, campaign.id, { nodeId: harborFinale, evidence: { kind: "quest-objective", targetId: relightBeacon }, expectedStoryRevision: storyRevision, idempotencyKey: "harbor-bind-finale" });
-    return { repo, campaignId: campaign.id, sessionId: session.id, actorId, resourceIds, optionalEncounterInstanceId, providerDispatches };
+     return { repo, campaignId: campaign.id, sessionId: session.id, actorId, resourceIds, optionalEncounterInstanceId, longswordEntryId, inventoryReceipt: equipped.receipt, providerDispatches };
   } finally { db.close(); }
   } finally {
     closeRepo();
