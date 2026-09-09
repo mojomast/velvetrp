@@ -17,6 +17,7 @@ describe("reviewed Last Harbor Light fixture", () => {
     expect(REVIEWED_ADVENTURE_MANIFEST_DIGEST).toBe("9517022bfcd508893f6b2f83a89c2c26560fd701d6fd46551da7ef107516929d");
     const fixture = await createReviewedAdventure(directory);
     expect(fixture.providerDispatches).toBe(0);
+    expect(fixture.optionalEncounterInstanceId).toBe(fixture.resourceIds["optional-encounter-instance"]);
     expect(Object.keys(fixture.resourceIds)).toEqual(expect.arrayContaining([
       ...REVIEWED_ADVENTURE_MANIFEST.keys.locations, REVIEWED_ADVENTURE_MANIFEST.keys.npc,
       REVIEWED_ADVENTURE_MANIFEST.keys.quest, ...REVIEWED_ADVENTURE_MANIFEST.keys.storyNodes,
@@ -51,6 +52,7 @@ describe("reviewed Last Harbor Light fixture", () => {
       expect(db.prepare("SELECT progress,completed_at FROM quest_objective_progress_v33 WHERE campaign_id=?").all(fixture.campaignId)).toEqual(expect.arrayContaining([expect.objectContaining({ progress: 0, completed_at: null })]));
       expect(db.prepare("SELECT * FROM dm_story_evidence WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
       expect(db.prepare("SELECT status FROM encounter WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ status: "preparing" }]);
+      expect(db.prepare("SELECT * FROM dm_encounter_bindings WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
       expect(db.prepare("SELECT * FROM quest_reward_claims_v33 WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
       expect(db.prepare("SELECT count(*) count FROM dm_review_scene_bindings WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 2 });
       expect(db.prepare("SELECT node_id,evidence_kind,target_id FROM dm_review_scene_bindings WHERE campaign_id=?").all(fixture.campaignId)).toEqual(expect.arrayContaining([
@@ -60,6 +62,46 @@ describe("reviewed Last Harbor Light fixture", () => {
       expect(db.prepare("SELECT status FROM story_node_state_v34 WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ status: "hidden" }, { status: "hidden" }, { status: "hidden" }]);
       expect(db.prepare("SELECT count(*) count FROM campaign_actors WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 1 });
       expect(db.prepare("SELECT pack_id,pack_version FROM campaign_catalog_current_pins WHERE campaign_id=?").all(fixture.campaignId)).toEqual([{ pack_id: REVIEWED_ADVENTURE_MANIFEST.catalog.packId, pack_version: REVIEWED_ADVENTURE_MANIFEST.catalog.packVersion }]);
+    } finally { db.close(); fixture.repo.close(); }
+  });
+
+  it("leaves the optional encounter unmaterialized for the player travel journey", async () => {
+    process.env.FEATURE_RPG_CAMPAIGN = "true";
+    process.env.FEATURE_RPG_MECHANICS = "true";
+    process.env.FEATURE_RPG_COMBAT = "true";
+    const directory = makeTmpDir("reviewed-harbor-journey-");
+    const fixture = await createReviewedAdventure(directory, { prepareOptionalEncounter: false });
+    expect(fixture.providerDispatches).toBe(0);
+    expect(fixture.optionalEncounterInstanceId).toBeNull();
+    expect(fixture.resourceIds).not.toHaveProperty("optional-encounter-instance");
+    expect(fixture.resourceIds[REVIEWED_ADVENTURE_MANIFEST.keys.encounter]).toBeTruthy();
+    const planning = fixture.repo.getCampaignGeneratedPlanning("local-owner", fixture.campaignId)!;
+    expect(planning.encounters).toEqual([expect.objectContaining({
+      artifactKey: REVIEWED_ADVENTURE_MANIFEST.keys.encounter,
+      resourceId: fixture.resourceIds[REVIEWED_ADVENTURE_MANIFEST.keys.encounter],
+      locationId: fixture.resourceIds["breakwater-cave"],
+      enemyReferences: [{
+        kind: "enemy-template",
+        packId: REVIEWED_ADVENTURE_MANIFEST.catalog.packId,
+        packVersion: REVIEWED_ADVENTURE_MANIFEST.catalog.packVersion,
+        definitionId: REVIEWED_ADVENTURE_MANIFEST.catalog.enemyDefinitionId,
+      }],
+    })]);
+    const readiness = fixture.repo.getCampaignDmPreparationReadiness("local-owner", fixture.campaignId, fixture.sessionId);
+    expect(readiness.activationReadiness).toMatchObject({ ready: true, active: true });
+    expect(JSON.stringify(fixture.repo.getCampaignWorld("local-owner", fixture.campaignId))).not.toContain(REVIEWED_ADVENTURE_PRIVATE_SENTINEL);
+    const db = new DatabaseDriver(path.join(directory, "velvet.sqlite"), { readonly: true });
+    try {
+      expect(db.prepare("SELECT * FROM encounter WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
+      expect(db.prepare("SELECT * FROM dm_encounter_bindings WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
+      expect(db.prepare("SELECT progress,completed_at FROM quest_objective_progress_v33 WHERE campaign_id=?").all(fixture.campaignId)).toEqual(expect.arrayContaining([expect.objectContaining({ progress: 0, completed_at: null })]));
+      expect(db.prepare("SELECT * FROM dm_story_evidence WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
+      expect(db.prepare("SELECT * FROM quest_reward_claims_v33 WHERE campaign_id=?").all(fixture.campaignId)).toEqual([]);
+      expect(db.prepare("SELECT node_id,evidence_kind,target_id FROM dm_review_scene_bindings WHERE campaign_id=?").all(fixture.campaignId)).toEqual(expect.arrayContaining([
+        { node_id: fixture.resourceIds["harbor-finale"], evidence_kind: "quest-objective", target_id: fixture.resourceIds["relight-beacon"] },
+        { node_id: fixture.resourceIds["lens-recovered"], evidence_kind: "quest-objective", target_id: fixture.resourceIds["secure-lens"] },
+      ]));
+      expect(db.prepare("SELECT count(*) count FROM campaign_actors WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 1 });
     } finally { db.close(); fixture.repo.close(); }
   });
 

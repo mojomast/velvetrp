@@ -109,12 +109,13 @@ const reviewedContent = {
   scenePrompts: [{ key: "sentinel-preparation", title: "Sentinel preparation", prompt: REVIEWED_ADVENTURE_PRIVATE_SENTINEL, visibility: "gm" as const, locationKey: "breakwater-cave", npcKeys: [] }],
 };
 
-export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR): Promise<{
+export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR, options: { prepareOptionalEncounter?: boolean } = {}): Promise<{
   repo: ReturnType<typeof createRepository>;
   campaignId: string;
   sessionId: string;
   actorId: string;
   resourceIds: Record<string, string>;
+  optionalEncounterInstanceId: string | null;
   providerDispatches: number;
 }> {
   if (!targetDirectory) throw new Error("reviewed adventure requires an explicit target directory");
@@ -163,15 +164,17 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
     const objectiveRows = db.prepare("SELECT objective.objective_id, accepted.artifact_key || ':' || objective.description key FROM quest_objectives_v33 objective JOIN quests quest ON quest.id=objective.quest_id JOIN campaign_generation_accepted_artifacts_v52 accepted ON accepted.campaign_id=quest.campaign_id AND accepted.server_resource_id=quest.id WHERE quest.campaign_id=?").all(campaign.id) as Array<{ objective_id: string; key: string }>;
     for (const objective of objectiveRows) if (objective.key.includes("Hear Keeper")) resourceIds["hear-keeper"] = objective.objective_id; else if (objective.key.includes("Secure the harbor")) resourceIds["secure-lens"] = objective.objective_id; else if (objective.key.includes("Relight")) resourceIds["relight-beacon"] = objective.objective_id;
     const enemy = definitions.find(item => item.reference.definitionId === REVIEWED_ADVENTURE_MANIFEST.catalog.enemyDefinitionId)!.reference as any;
-    const encounter = repo.createEncounter(OWNER, campaign.id, { sessionId: session.id, name: "Gloam-Mite Nest", combatants: [{ kind: "actor", actorId, team: "allies" }, { kind: "enemy", template: enemy, team: "enemies" }], idempotencyKey: "harbor-optional-encounter" }).encounter;
-    resourceIds["optional-encounter-instance"] = encounter.encounterId;
+    const optionalEncounterInstanceId = options.prepareOptionalEncounter !== false
+      ? repo.createEncounter(OWNER, campaign.id, { sessionId: session.id, name: "Gloam-Mite Nest", combatants: [{ kind: "actor", actorId, team: "allies" }, { kind: "enemy", template: enemy, team: "enemies" }], idempotencyKey: "harbor-optional-encounter" }).encounter.encounterId
+      : null;
+    if (optionalEncounterInstanceId) resourceIds["optional-encounter-instance"] = optionalEncounterInstanceId;
     let storyRevision = repo.getCampaignStory(OWNER, campaign.id)!.revision;
     const lensRecovered = resourceIds["lens-recovered"], secureLens = resourceIds["secure-lens"], harborFinale = resourceIds["harbor-finale"], relightBeacon = resourceIds["relight-beacon"];
     if (!lensRecovered || !secureLens || !harborFinale || !relightBeacon) throw new Error("reviewed resource mapping is incomplete");
     repo.bindDmSceneEvidence(OWNER, campaign.id, { nodeId: lensRecovered, evidence: { kind: "quest-objective", targetId: secureLens }, expectedStoryRevision: storyRevision, idempotencyKey: "harbor-bind-lens" });
     storyRevision = repo.getCampaignStory(OWNER, campaign.id)!.revision;
     repo.bindDmSceneEvidence(OWNER, campaign.id, { nodeId: harborFinale, evidence: { kind: "quest-objective", targetId: relightBeacon }, expectedStoryRevision: storyRevision, idempotencyKey: "harbor-bind-finale" });
-    return { repo, campaignId: campaign.id, sessionId: session.id, actorId, resourceIds, providerDispatches };
+    return { repo, campaignId: campaign.id, sessionId: session.id, actorId, resourceIds, optionalEncounterInstanceId, providerDispatches };
   } finally { db.close(); }
   } finally {
     closeRepo();
