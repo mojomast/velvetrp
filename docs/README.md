@@ -31,6 +31,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
 - [Provider hardening](provider-hardening.md) - Provider failure classification, privacy, and retry boundaries.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
+- [Frontend control plane](frontend-control-plane.md) - Living Atlas campaign workspace, preparation, session recovery, and browser acceptance coverage.
+- [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.
 - [Interactive gameplay agent instructions](interactive-gameplay-agent-instructions.md) - Trusted-local operator workflow, discovery, character/campaign setup, play, and no-retry reconciliation.
@@ -38,7 +40,9 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 ## Planning and historical records
 
+- [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
+- [Harness Wars campaign report](harness-wars-campaign-report.md) - Recorded campaign hydration outcomes, canon inventory, and provider probes; not a runtime contract.
 - [Revision 2 integration plan](revision-2-integration-plan.md) - Preserved approved post-M4 execution design at its saved checkpoint; historical rather than current next-work authority.
 - [RPG integration plan](rpg-integration-plan.md) - Original integration design and historical operation ledgers; current implementation can be newer.
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.

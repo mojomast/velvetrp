@@ -94,9 +94,12 @@ import { createCompanionRepository } from "./companionRepo.js";
 import { createQuestRepository, type QuestRepository } from "./questRepo.js";
 import { createStoryRepository } from "./storyRepo.js";
 import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
+import { createCampaignDmRepository } from "./campaignDmRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
+import { createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
+import { createCampaignStartingLocationRepository } from "./campaignStartingLocationRepo.js";
 import { createTacticalMapRepository } from "./tacticalMapRepo.js";
 import { createCampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
 import {
@@ -793,6 +796,18 @@ function createRepositoryComposition<T>(
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
   const repository: Repository = {
+    ...createCampaignDmRepository(db, dependencies, {
+      ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
+      ...campaignAdministrationIntegrationRepository,
+      getCampaignAgentContextSnapshot: (principal, campaign, session, audience) =>
+        createCampaignAgentContextReadRepository(db).getCampaignAgentContextSnapshot(principal, campaign, session, audience),
+    }, () => assertOpen()),
+    ...createCampaignStartingLocationRepository(db, dependencies, () => {
+      assertOpen(); if (transactionDepth > 0) throw new Error("starting-location operation cannot run inside a repository transaction");
+    }),
+    ...createCampaignRoomActivationRepository(db, dependencies, () => {
+      assertOpen(); if (transactionDepth > 0) throw new Error("room activation cannot run inside a repository transaction");
+    }, (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId)),
     ...administrationRepository,
     ...contentCatalogRepository,
     ...characterBuilderRepository,

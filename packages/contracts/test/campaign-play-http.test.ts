@@ -6,6 +6,7 @@ const bootstrap = {
   campaignId: "campaign", sessionId: "session", expectedRevision: 7,
   session: { attached: true as const, attachedAt: at, active: true, adventureEligible: true },
   principal: { role: "player" as const, control: "controlled" as const },
+  capabilities: { campaignDice: { canView: true, canRoll: true } },
   playableActors: [{ actorId: "actor", name: "Aria" }],
 };
 
@@ -13,7 +14,7 @@ describe("campaign play HTTP contract", () => {
   it("accepts the exact minimal role-safe bootstrap", () => {
     expect(campaignPlayBootstrapSchema.parse(bootstrap)).toEqual(bootstrap);
     expect(Object.keys(campaignPlayBootstrapSchema.parse(bootstrap))).toEqual([
-      "campaignId", "sessionId", "expectedRevision", "session", "principal", "playableActors",
+      "campaignId", "sessionId", "expectedRevision", "session", "principal", "capabilities", "playableActors",
     ]);
   });
 
@@ -26,7 +27,21 @@ describe("campaign play HTTP contract", () => {
   it("binds role to control and observer visibility", () => {
     expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, principal: { role: "player", control: "all" } }).success).toBe(false);
     expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, principal: { role: "observer", control: "none" } }).success).toBe(false);
-    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, principal: { role: "observer", control: "none" }, playableActors: [] }).success).toBe(true);
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, principal: { role: "observer", control: "none" },
+      capabilities: { campaignDice: { canView: false, canRoll: false } }, playableActors: [] }).success).toBe(true);
+  });
+
+  it("requires coherent server-derived dice capabilities", () => {
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap,
+      capabilities: { campaignDice: { canView: false, canRoll: true } } }).success).toBe(false);
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap,
+      capabilities: { campaignDice: { canView: true, canRoll: false } } }).success).toBe(true);
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, playableActors: [],
+      capabilities: { campaignDice: { canView: true, canRoll: true } } }).success).toBe(false);
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap,
+      capabilities: { campaignDice: { canView: false, canRoll: false } } }).success).toBe(true);
+    expect(campaignPlayBootstrapSchema.safeParse({ ...bootstrap, principal: { role: "gm", control: "all" },
+      capabilities: { campaignDice: { canView: false, canRoll: false } } }).success).toBe(false);
   });
 
   it("preserves opaque room IDs but permits adventure eligibility only for strict stream IDs", () => {

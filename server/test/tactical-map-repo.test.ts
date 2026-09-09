@@ -34,6 +34,60 @@ async function fixture(dnd = false) {
 }
 
 describe("tactical map repository", () => {
+  it("binds v2 generation to persisted session location, preserves replay, and rejects travel-stale moves", async () => {
+    const { repo, campaignId, sessionId, actorId } = await fixture();
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    const request = { mode: "exploration" as const, encounterId: null, kind: "cave" as const, seed: "private-seed", width: 12, height: 10,
+      grounding: { actorId, expectedLocationId: "map-location", expectedLocationRevision: 0 },
+      tokens: [{ tokenId: actorId, actorId, combatantId: null, label: "Aster", position: { x: 1, y: 1 }, footprint: { width: 2, height: 2 }, disposition: "friendly" as const, hidden: false }], idempotencyKey: "grounded" };
+    try {
+      expect(() => repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, request)).toThrow(/location/);
+      db.prepare("INSERT INTO campaign_locations_v28 VALUES(?,?,NULL,?,'Prose is not mechanics','public',?)").run("map-location", campaignId, "Accepted place", "2030-01-01T00:00:00.000Z");
+      db.prepare("INSERT INTO campaign_locations_v28 VALUES(?,?,NULL,?,'','public',?)").run("other-location", campaignId, "Other place", "2030-01-01T00:00:00.000Z");
+      repo.setActorLocation("local-owner", sessionId, { type: "set_actor_location", campaignId, actorId, locationId: "map-location", expectedRevision: 0, idempotencyKey: "initial-place" });
+      expect(() => repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, { ...request, grounding: { ...request.grounding, expectedLocationRevision: 1 } })).toThrow(TacticalMapStaleError);
+      const generated = repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, request);
+      expect(generated.locationBinding).toEqual({ locationId: "map-location" });
+      expect(db.prepare("SELECT algorithm FROM tactical_maps_v58 WHERE map_id=?").get(generated.projection.mapId)).toEqual({ algorithm: "cave-v2" });
+      expect(() => db.prepare("UPDATE tactical_map_contexts_v2 SET context_json='{}'").run()).toThrow(/immutable/);
+      const before = repo.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)!;
+      expect(before.locationBinding).toEqual(generated.locationBinding);
+      expect(JSON.stringify(before)).not.toMatch(/private-seed|context|provenance|Prose|blocksMovement/);
+      const previewRequest = { actorId, destination: { x: 1, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 };
+      const preview = repo.previewTacticalMapMove("reader", campaignId, sessionId, "exploration", previewRequest);
+      const move = { ...previewRequest, previewId: preview.previewId, idempotencyKey: "grounded-move" };
+      repo.setActorLocation("local-owner", sessionId, { type: "set_actor_location", campaignId, actorId, locationId: "other-location", expectedRevision: 1, idempotencyKey: "leave" });
+      expect(() => repo.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)).toThrow(/current location/);
+      expect(() => repo.previewTacticalMapMove("reader", campaignId, sessionId, "exploration", previewRequest)).toThrow(/current location/);
+      expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", move)).toThrow(/current location/);
+      repo.setActorLocation("local-owner", sessionId, { type: "set_actor_location", campaignId, actorId, locationId: "map-location", expectedRevision: 2, idempotencyKey: "return" });
+      expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", move)).toThrow(TacticalMapStaleError);
+      // Editing canonical prose never changes persisted geometry, nor does idempotent generation re-resolve inputs.
+      db.prepare("UPDATE campaign_locations_v28 SET public_description='Secret lava dragons' WHERE location_id='map-location'").run();
+      expect(repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, request).projection).toEqual(generated.projection);
+      repo.close();
+      const reopened = createRepository();
+      try { expect(reopened.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)?.projection).toEqual(before.projection); }
+      finally { reopened.close(); }
+    } finally { db.close(); repo.close(); }
+  });
+
+  it("rejects illegal v2 footprints without replacing the active map", async () => {
+    const { repo, campaignId, sessionId, actorId } = await fixture();
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    try {
+      db.prepare("INSERT INTO campaign_locations_v28 VALUES('map-location',?,NULL,'Place','','public',?)").run(campaignId, "2030-01-01T00:00:00.000Z");
+      db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,?,'map-location',?,0,?)").run(campaignId, actorId, sessionId, "2030-01-01T00:00:00.000Z");
+      const request = { mode: "exploration" as const, encounterId: null, kind: "dungeon" as const, seed: "seed", width: 12, height: 10,
+        grounding: { actorId, expectedLocationId: "map-location", expectedLocationRevision: 0 },
+        tokens: [{ tokenId: actorId, actorId, combatantId: null, label: "Aster", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly" as const, hidden: false }], idempotencyKey: "valid" };
+      const original = repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, request);
+      expect(() => repo.generateTacticalMapForSession("local-owner", campaignId, sessionId, { ...request, idempotencyKey: "invalid", tokens: [{ ...request.tokens[0]!, position: { x: 0, y: 0 } }] })).toThrow(TacticalMapConflictError);
+      expect(repo.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)?.projection.mapId).toBe(original.projection.mapId);
+      expect(db.prepare("SELECT count(*) count FROM tactical_map_contexts_v2").get()).toEqual({ count: 1 });
+    } finally { db.close(); repo.close(); }
+  });
+
   it("keeps unknown D&D bindings fail closed without mutation", async () => {
     const { repo, campaignId, sessionId, actorId } = await fixture(true);
     const prepared = repo.createEncounter("local-owner", campaignId, { sessionId, name: "D&D map combat",
@@ -88,6 +142,28 @@ describe("tactical map repository", () => {
     expect(() => repo.previewTacticalMapMove("reader", campaignId, sessionId, "exploration", { actorId, destination: { x: 3, y: 1 }, expectedMapRevision: 0, expectedTokenRevision: 0 })).toThrow(TacticalMapStaleError);
     expect(() => repo.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", { ...move, destination: { x: 3, y: 1 } })).toThrow(TacticalMapConflictError);
     repo.close();
+    // Reconstruct the exact pre-v2 map schema around real retained map/preview/receipt rows.
+    const legacy = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    legacy.pragma("foreign_keys = OFF");
+    legacy.transaction(() => {
+      legacy.exec("DROP TABLE tactical_map_contexts_v2");
+      for (const table of ["tactical_maps_v58", "tactical_map_previews_v58"]) {
+        const objects = legacy.prepare("SELECT type,sql FROM sqlite_master WHERE tbl_name=? AND sql IS NOT NULL ORDER BY type DESC").all(table) as { type: string; sql: string }[];
+        const sql = objects.find((object) => object.type === "table")!.sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "").replace("  actor_location_revision INTEGER,\n", "");
+        const columns = (legacy.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).filter((column) => column.name !== "actor_location_revision").map((column) => column.name).join(",");
+        legacy.exec(`CREATE TEMP TABLE old_map_backup AS SELECT ${columns} FROM ${table}`);
+        legacy.exec(`DROP TABLE ${table}`); legacy.exec(sql);
+        legacy.exec(`INSERT INTO ${table}(${columns}) SELECT ${columns} FROM old_map_backup`);
+        legacy.exec("DROP TABLE old_map_backup");
+        for (const object of objects.filter((object) => object.type !== "table")) legacy.exec(object.sql);
+      }
+    })();
+    legacy.close();
+    const upgraded = createRepository();
+    try {
+      expect(upgraded.getTacticalMap("reader", campaignId, sessionId, "exploration", actorId)?.projection).toEqual(moved.snapshot.projection);
+      expect(upgraded.moveTacticalMapToken("reader", campaignId, sessionId, "exploration", move).receipt).toEqual(moved.receipt);
+    } finally { upgraded.close(); }
   });
 
   it("keeps only one active map per room and mode while retaining revisions", async () => {

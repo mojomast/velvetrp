@@ -48,6 +48,7 @@ import { CampaignContentPicker } from "../content/CampaignContentPicker";
 import { CampaignGeneratorPanel } from "./CampaignGeneratorPanel";
 import { GenerationRecoveryPanel, RulesetAdministrationPanel, SessionZeroSafetyPanel,
   VendorShopAdministrationPanel } from "../administration";
+import { createClientId } from "../../../utils/clientId";
 
 export interface CampaignAdministrationPageProps {
   campaignId: string;
@@ -90,9 +91,7 @@ export function resetCampaignAdministrationPageModuleStateForTests(): void {
 }
 
 function idempotencyKey(kind: string): string {
-  const unique = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `ui-${kind}-${unique}`;
+  return `ui-${kind}-${createClientId()}`;
 }
 
 function isKnownNonCommit(error: unknown): boolean {

@@ -9,7 +9,7 @@ useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
 const databasePath = () => path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
 
-function seed(sessionId = "room-active", state = "active") {
+function seed(sessionId = "room-active", state = "active", finalizeActors = true) {
   let sequence = 0;
   const repo = createRepository({ clock: { now: () => new Date(at) }, ids: { nextId: () => `id-${++sequence}` } });
   const campaign = repo.createCampaign("local-owner", { name: "Play" });
@@ -31,18 +31,20 @@ function seed(sessionId = "room-active", state = "active") {
       race: ORIGINAL_STARTER_RACE.reference, background: ORIGINAL_STARTER_BACKGROUND.reference,
       classes: [{ class: ORIGINAL_STARTER_CLASS.reference, level: 1 }], attributes: [], proficiencies: [], choices: [] },
   ).projection.actor;
-  const secondActor = createActor(first.id);
-  const firstActor = createActor(second.id);
+  const secondActor = finalizeActors ? createActor(first.id) : undefined;
+  const firstActor = finalizeActors ? createActor(second.id) : undefined;
   writer.updateCampaignAdministration("local-owner", campaign.id, {
     status: "published", expectedRevision: 0, idempotencyKey: "publish",
   });
   writer.close();
   const sessionDb = new DatabaseDriver(databasePath());
   sessionDb.pragma("foreign_keys = ON");
-  sessionDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='other-player' WHERE actor_id=?")
-    .run(secondActor.id);
-  sessionDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id=?")
-    .run(firstActor.id);
+  if (secondActor && firstActor) {
+    sessionDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='other-player' WHERE actor_id=?")
+      .run(secondActor.id);
+    sessionDb.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id=?")
+      .run(firstActor.id);
+  }
   sessionDb.prepare(`INSERT INTO sessions
     (id,character_id,title,state,preset_id,created_at,stopped_at,stop_reason)
     VALUES (?,?,?,?,'private',?,?,?)`).run(sessionId, second.id, "Private room", state, at,
@@ -51,7 +53,7 @@ function seed(sessionId = "room-active", state = "active") {
   sessionDb.prepare("INSERT INTO session_characters VALUES (?,?,1)").run(sessionId, first.id);
   sessionDb.prepare("INSERT INTO campaign_sessions VALUES (?,?,?)").run(sessionId, campaign.id, at);
   sessionDb.close();
-  return { campaignId: campaign.id, firstActor: firstActor.id, secondActor: secondActor.id, sessionId };
+  return { campaignId: campaign.id, firstActor: firstActor?.id, secondActor: secondActor?.id, sessionId };
 }
 
 function corrupt(sql: string) {
@@ -68,8 +70,10 @@ describe("campaign play bootstrap repository", () => {
     const repo = createRepository();
     const owner = repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId)!;
     expect(owner).toEqual({ campaignId: seeded.campaignId, sessionId: seeded.sessionId, expectedRevision: 1,
+      dm: { mode: "human", revision: 0 },
       session: { attached: true, attachedAt: at, active: true, adventureEligible: true },
       principal: { role: "owner", control: "all" },
+      capabilities: { campaignDice: { canView: true, canRoll: true } },
       playableActors: [{ actorId: seeded.firstActor, name: "First in room" },
         { actorId: seeded.secondActor, name: "Second in room" }] });
     expect(repo.getCampaignPlayBootstrap("gm", seeded.campaignId, seeded.sessionId)?.principal).toEqual({ role: "gm", control: "all" });
@@ -80,6 +84,36 @@ describe("campaign play bootstrap repository", () => {
     repo.close();
   });
 
+  it("derives dice capability from role, settings, membership, and controlled play actors on every read", () => {
+    const seeded = seed();
+    const repo = createRepository();
+    expect(repo.getCampaignPlayBootstrap("gm", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: true, canRoll: true });
+    expect(repo.getCampaignPlayBootstrap("player", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: true, canRoll: true });
+    expect(repo.getCampaignPlayBootstrap("observer", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: false, canRoll: false });
+
+    const db = new DatabaseDriver(databasePath());
+    db.pragma("foreign_keys = ON");
+    db.prepare("UPDATE campaigns SET settings=json_set(settings,'$.allowPlayerDice',json('false')) WHERE id=?")
+      .run(seeded.campaignId);
+    expect(repo.getCampaignPlayBootstrap("player", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: false, canRoll: false });
+    expect(repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: true, canRoll: true });
+
+    db.prepare("UPDATE campaigns SET settings=json_set(settings,'$.allowPlayerDice',json('true')) WHERE id=?")
+      .run(seeded.campaignId);
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='other-player' WHERE actor_id=?")
+      .run(seeded.firstActor);
+    expect(repo.getCampaignPlayBootstrap("player", seeded.campaignId, seeded.sessionId)?.capabilities.campaignDice)
+      .toEqual({ canView: true, canRoll: false });
+    db.prepare("DELETE FROM campaign_memberships WHERE campaign_id=? AND principal_id='player'").run(seeded.campaignId);
+    expect(repo.getCampaignPlayBootstrap("player", seeded.campaignId, seeded.sessionId)).toBeNull();
+    db.close(); repo.close();
+  });
+
   it("preserves opaque IDs while disabling strict adventure-stream eligibility", () => {
     const seeded = seed(" room/opaque ");
     const repo = createRepository();
@@ -87,6 +121,23 @@ describe("campaign play bootstrap repository", () => {
       sessionId: " room/opaque ", session: { active: true, adventureEligible: false },
     });
     expect(repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId.trim())).toBeNull();
+    repo.close();
+  });
+
+  it("projects an attached room with unfinalized participants as a valid prerequisite state", () => {
+    const seeded = seed("room-unfinalized", "active", false);
+    const repo = createRepository();
+    expect(repo.getCampaignPlayBootstrap("local-owner", seeded.campaignId, seeded.sessionId)).toMatchObject({
+      session: { active: true, adventureEligible: false },
+      principal: { role: "owner", control: "all" },
+      playableActors: [],
+    });
+    expect(repo.getCampaignPlayBootstrap("player", seeded.campaignId, seeded.sessionId)).toMatchObject({
+      principal: { role: "player", control: "controlled" }, playableActors: [],
+    });
+    expect(repo.getCampaignPlayBootstrap("observer", seeded.campaignId, seeded.sessionId)).toMatchObject({
+      principal: { role: "observer", control: "none" }, playableActors: [],
+    });
     repo.close();
   });
 

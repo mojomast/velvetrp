@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CampaignRole, ContentCatalogHttpCampaignContent, ContentCatalogHttpCampaignContentPutRequest, PublicationSummary } from "@velvet/contracts";
+import { createClientId } from "../../../utils/clientId";
 
 export interface CampaignContentPickerProps {
   actorRole: CampaignRole;
@@ -16,7 +17,7 @@ export interface CampaignContentPickerProps {
 type Pin = { packId: string; packVersion: string };
 const keyFor = (pin: Pin) => `${pin.packId}\0${pin.packVersion}`;
 const displayPin = (pin: Pin) => `${pin.packId} @ ${pin.packVersion}`;
-const commandKey = () => `ui-content-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+const commandKey = () => `ui-content-${createClientId()}`;
 
 function samePins(left: Pin[], right: Pin[]): boolean {
   return left.length === right.length && left.every((pin, index) => pin.packId === right[index]?.packId && pin.packVersion === right[index]?.packVersion);

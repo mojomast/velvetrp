@@ -1,3 +1,4 @@
+export { CampaignDmConflictError, CampaignDmUnavailableError, type CampaignDmRepository } from "./campaignDmRepo.js";
 // Preserve the established repository API without exposing domain-internal
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";
@@ -66,6 +67,13 @@ export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailab
 export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
 export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMapStaleError, TacticalMapConflictError, type TacticalMapRepository } from "./tacticalMapRepo.js";
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
+export {
+  CampaignStartingLocationAuthorizationError,
+  CampaignStartingLocationConflictError,
+  CampaignStartingLocationStaleError,
+  CampaignStartingLocationUnavailableError,
+  type CampaignStartingLocationRepository,
+} from "./campaignStartingLocationRepo.js";
 export {
   CompanionAuthorizationError,
   CompanionConflictError,

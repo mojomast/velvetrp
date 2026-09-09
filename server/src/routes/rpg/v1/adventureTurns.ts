@@ -323,7 +323,8 @@ function publicNarrationContext(repo:Repo&Repository,turn:PrivateAdventureTurn){
   if(!snapshot?.ruleset)return null;const currentActorName=snapshot.speakerPersona?.displayName??null;
   const cast=currentActorName?snapshot.visibleCast.filter(entry=>entry!==`${currentActorName}.`&&!entry.startsWith(`${currentActorName} at `)):snapshot.visibleCast;
   return{ruleset:snapshot.ruleset,currentLocation:snapshot.currentActorLocation,currentActorName,context:{canon:snapshot.humanCanon,
-    world:snapshot.visibleWorld,cast,quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts}};
+    world:snapshot.visibleWorld,cast,quests:snapshot.visibleQuests,recap:snapshot.recap,summary:snapshot.synthesizedSummaryFacts,
+    acceptedPublicPreparation:snapshot.publicPreparation??[]}};
 }
 async function narrate(repo: Repo & Repository, turn: PrivateAdventureTurn, dependencies: AdventureAgentDependencies | undefined,
   signal: AbortSignal): Promise<NarrationResult> {

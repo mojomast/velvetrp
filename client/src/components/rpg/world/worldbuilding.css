@@ -1,0 +1,19 @@
+.worldbuilding-context { margin-block: 1rem 1.5rem; padding: 1rem; border: 1px solid var(--border, #554b40); border-radius: 12px; }
+.worldbuilding-context p { max-width: 78ch; }
+.worldbuilding-context [aria-current="page"] { outline: 2px solid currentColor; outline-offset: 2px; }
+.worldbuilding-details { margin-block: 1rem; }
+.worldbuilding-details > summary { cursor: pointer; font-weight: 600; padding-block: .75rem; }
+.worldbuilding-links { display: grid; gap: .75rem; padding-left: 1.25rem; }
+.worldbuilding-links li { overflow-wrap: anywhere; }
+.worldbuilding-opening { margin-bottom: 1.5rem; }
+.campaign-starting-location { margin-block: 1rem 1.5rem; padding: 1rem; border: 1px solid var(--border, #554b40); border-radius: 12px; background: color-mix(in srgb, var(--surface, #171411) 92%, #8d6f3e); }
+.campaign-starting-location h4 { margin-top: 0; }
+.campaign-starting-location-choice, .campaign-starting-location-recovery { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
+.campaign-starting-location-choice label { display: grid; gap: .35rem; min-width: min(22rem, 100%); }
+.campaign-starting-location-choice select { min-height: 44px; }
+@media (max-width: 640px) {
+  .worldbuilding-context .button-row { display: grid; grid-template-columns: 1fr; }
+  .worldbuilding-context button { min-height: 44px; }
+  .campaign-starting-location-choice, .campaign-starting-location-recovery { display: grid; }
+  .campaign-starting-location-choice button, .campaign-starting-location-recovery button { min-height: 44px; width: 100%; }
+}

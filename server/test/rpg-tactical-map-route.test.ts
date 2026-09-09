@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
 import type { CampaignListRepository } from "../src/routes/rpg/v1/features.js";
-import { TacticalMapConflictError } from "../src/repo/tacticalMapRepo.js";
+import { TacticalMapConflictError, TacticalMapLocationMismatchError } from "../src/repo/tacticalMapRepo.js";
 
 afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS; });
 const enable = () => { process.env.FEATURE_RPG_CAMPAIGN = "true"; process.env.FEATURE_RPG_MECHANICS = "true"; };
@@ -13,6 +13,16 @@ function repository(overrides: Record<string, unknown> = {}): CampaignListReposi
   moveTacticalMapToken: vi.fn((_p, _c, _s, _m, input: { previewId: string; idempotencyKey: string }) => ({ receipt: { mapId: "map", tokenId: "token", previewId: input.previewId, idempotencyKey: input.idempotencyKey, mapRevision: 0, tokenRevisionBefore: 0, tokenRevisionAfter: 1, destination: { x: 2, y: 1 }, occurredAt: "2030-01-01T00:00:00.000Z" }, snapshot: { ...snapshot, tokenRevision: 1 } })), ...overrides } as unknown as CampaignListRepository; }
 
 describe("tactical map HTTP routes", () => {
+  it("returns a safe actionable location mismatch instead of a missing-map response", async () => {
+    enable();
+    const app = buildApp({ campaignRepositoryFactory: () => repository({ getTacticalMap: () => { throw new TacticalMapLocationMismatchError("private location or seed"); } }) });
+    try {
+      const response = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/rooms/session/tactical-maps/exploration/actors/actor" });
+      expect(response.statusCode).toBe(409);
+      expect(response.body).toContain("RPG_TACTICAL_MAP_LOCATION_MISMATCH");
+      expect(response.body).not.toContain("private location or seed");
+    } finally { await app.close(); }
+  });
   it("returns combat movement authority conflicts without exposing internal errors", async () => {
     enable();
     const repo = repository({ previewTacticalMapMove: vi.fn(() => { throw new TacticalMapConflictError("private authority details"); }),

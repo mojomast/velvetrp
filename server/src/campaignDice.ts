@@ -32,7 +32,7 @@ export class CampaignDiceUnavailableError extends Error {
 
 export interface CampaignDiceRepository extends Pick<Repository, "executeRollActorDiceForVisibleCharacter"> {
   transaction<T>(callback: (unit: Pick<RepositoryUnitOfWork,
-    "getCampaign" | "getCampaignTimeline" | "getCampaignCharacterRoster"
+    "getCampaign" | "getCampaignAdministration" | "getCampaignTimeline" | "getCampaignCharacterRoster"
     | "listCampaignCharacters" | "listRecentCampaignDiceEvents">) => T): T;
 }
 
@@ -40,23 +40,37 @@ interface InternalVisibleCharacter {
   public: CampaignDiceVisibleCharacter;
   campaignCharacterId: string;
   actorId: string;
+  controlledByCaller: boolean;
 }
 
 interface DiceSnapshot {
   timelineId: string;
   revision: number;
+  actorRole: "owner" | "gm" | "player";
   characters: InternalVisibleCharacter[];
 }
 
 function requireAuthorityAndRoster(
   unit: Pick<RepositoryUnitOfWork,
-    "getCampaign" | "getCampaignTimeline" | "getCampaignCharacterRoster" | "listCampaignCharacters">,
+    "getCampaign" | "getCampaignAdministration" | "getCampaignTimeline"
+    | "getCampaignCharacterRoster" | "listCampaignCharacters">,
   actorPrincipalId: string,
   campaignId: string,
+  allowPlayer: boolean,
 ): DiceSnapshot {
   const campaign = unit.getCampaign(actorPrincipalId, campaignId);
-  if (campaign === null || (campaign.actorRole !== "owner" && campaign.actorRole !== "gm")) {
+  if (campaign === null || (campaign.actorRole !== "owner" && campaign.actorRole !== "gm"
+      && (!allowPlayer || campaign.actorRole !== "player"))) {
     throw new CampaignDiceUnavailableError();
+  }
+  if (campaign.actorRole === "player") {
+    const administration = unit.getCampaignAdministration(actorPrincipalId, campaignId);
+    if (administration === null || administration.id !== campaignId
+        || administration.activeTimelineId !== campaign.activeTimelineId
+        || administration.actorRole !== "player") {
+      throw new Error("campaign dice authorization is inconsistent");
+    }
+    if (!administration.settings.allowPlayerDice) throw new CampaignDiceUnavailableError();
   }
   const timeline = unit.getCampaignTimeline(actorPrincipalId, campaignId, campaign.activeTimelineId);
   const roster = unit.getCampaignCharacterRoster(actorPrincipalId, campaignId);
@@ -67,11 +81,16 @@ function requireAuthorityAndRoster(
 
   const aggregate = unit.listCampaignCharacters(actorPrincipalId, campaignId);
   const actorByCharacter = new Map<string, string>();
+  const controlledCharacters = new Set<string>();
   for (const entry of aggregate) {
     const characterId = entry.projection.campaignCharacter.id;
     const actorId = entry.projection.actor.id;
     if (actorByCharacter.has(characterId)) throw new Error("campaign dice roster is ambiguous");
     actorByCharacter.set(characterId, actorId);
+    if (entry.access === "privileged"
+        && entry.projection.actor.controllerPrincipalId === actorPrincipalId) {
+      controlledCharacters.add(characterId);
+    }
   }
   if (aggregate.length !== roster.characters.length) throw new Error("campaign dice roster is inconsistent");
   const characters = roster.characters.map((character, index) => {
@@ -81,9 +100,10 @@ function requireAuthorityAndRoster(
       public: { position: index + 1, name: character.name },
       campaignCharacterId: character.id,
       actorId,
+      controlledByCaller: campaign.actorRole !== "player" || controlledCharacters.has(character.id),
     };
   });
-  return { timelineId: timeline.id, revision: timeline.revision, characters };
+  return { timelineId: timeline.id, revision: timeline.revision, actorRole: campaign.actorRole, characters };
 }
 
 function safeRoll(
@@ -99,14 +119,18 @@ export function createCampaignDiceService(repository: CampaignDiceRepository, co
   return {
     read(actorPrincipalId: string, campaignId: string): CampaignDiceHistoryResponse {
       const raw = repository.transaction((unit) => {
-        const snapshot = requireAuthorityAndRoster(unit, actorPrincipalId, campaignId);
+        const snapshot = requireAuthorityAndRoster(unit, actorPrincipalId, campaignId, true);
         const events = unit.listRecentCampaignDiceEvents(actorPrincipalId, campaignId, snapshot.timelineId);
-        const characterByActor = new Map(snapshot.characters.map((character) => [
+        const visibleCharacters = snapshot.actorRole === "player"
+          ? snapshot.characters.filter((character) => character.controlledByCaller)
+          : snapshot.characters;
+        const characterByActor = new Map(visibleCharacters.map((character) => [
           character.actorId, character.public,
         ]));
         return {
-          characters: snapshot.characters.map((character) => character.public),
-          rolls: events.map((event) => safeRoll(event, characterByActor)),
+          characters: visibleCharacters.map((character) => character.public),
+          rolls: events.filter((event) => characterByActor.has(event.actorId))
+            .map((event) => safeRoll(event, characterByActor)),
         };
       });
       return campaignDiceHistoryResponseSchema.parse(raw);
@@ -117,11 +141,12 @@ export function createCampaignDiceService(repository: CampaignDiceRepository, co
       // This transaction is preflight only. It is closed before ID generation,
       // RNG, command execution, or any dependency capable of writing.
       const selected = repository.transaction((unit) => {
-        const snapshot = requireAuthorityAndRoster(unit, actorPrincipalId, campaignId);
+        const snapshot = requireAuthorityAndRoster(unit, actorPrincipalId, campaignId, true);
         const character = snapshot.characters[request.character.position - 1];
         if (character === undefined || character.public.name !== request.character.name) {
           throw new CampaignDiceCharacterConflict();
         }
+        if (!character.controlledByCaller) throw new CampaignDiceUnavailableError();
         return { ...snapshot, character };
       });
 

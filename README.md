@@ -97,7 +97,7 @@ The following inventory is intentionally more concrete than the product overview
 
 The registered `dnd-5e@1.0.0` rules module is a tested development subset adapted from the 2014 SRD 5.1, not full D&D support or full SRD conformance. It provides pure deterministic helpers for the mechanics listed in the [coverage matrix](docs/srd-5.1-coverage.md); many rules and feature interactions remain partial or unsupported. This work includes material from Wizards of the Coast LLC's [official SRD source page](https://www.dndbeyond.com/srd) and the exact [System Reference Document 5.1 CC PDF](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). VelvetRP adapts and modifies that material into deterministic software mechanics; Wizards of the Coast LLC has not endorsed these modifications.
 
-The full operation contract is in the [API reference](docs/api.md). The implementation intentionally does not duplicate the route and schema tree here.
+The full operation contract is in the [API reference](docs/api.md): 144 counted explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases. The implementation intentionally does not duplicate the route and schema tree here.
 
 ## Requirements
 
@@ -221,7 +221,7 @@ Contracts-first changes keep HTTP and repository boundaries strict. RPG mutation
 
 The default database is `server/data/velvet.sqlite` when the server is launched through its workspace. Set `VELVET_DATA_DIR` to use another directory. The server creates the directory with best-effort owner-only permissions and enables SQLite WAL mode, foreign keys, and a busy timeout.
 
-A missing or empty database is initialized atomically from `server/src/repo/db/currentSchema.sql`. Every nonempty database must match that schema exactly and pass SQLite quick and foreign-key checks. Startup does not migrate, backfill, clean up, rewind, or import historical data. Stop the server and delete/recreate the local database after any schema change. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
+A missing or empty database is initialized atomically from `server/src/repo/db/currentSchema.sql` and `server/src/repo/db/campaignDmSchema.sql`. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact tactical-map and campaign-director predecessors. Supported upgrades add map-v2 storage, initialize pre-director campaigns in human mode, or upgrade exact director review-authority/narration schemas as applicable. The review-authority upgrade preserves historical rows but cancels planning/awaiting-approval runs; it does not replay paid work. Complete current-schema, SQLite quick/foreign-key, and required-reference checks must pass before commit; failure rolls back the upgrade. All other unknown, modified, or partially upgraded schemas are rejected without repairs, backfills, rewinds, or historical imports. See [Operations](docs/operations.md#data-directory-and-current-schema) for the exact supported shapes before changing stored data. Campaign export deliberately omits credentials, local paths, usage history, and private actor state.
 
 ## Limitations
 

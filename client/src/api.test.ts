@@ -148,7 +148,7 @@ describe("M3.7 adventure play API binding", () => {
   });
 
   it("binds bootstrap, GET, confirmation, and stream response headers to exact identities", async () => {
-    const bootstrap = { campaignId: "campaign", sessionId: "session", expectedRevision: 7, session: { attached: true, attachedAt: at, active: true, adventureEligible: true }, principal: { role: "player", control: "controlled" }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    const bootstrap = { dm: { mode: "human", revision: 0 }, campaignId: "campaign", sessionId: "session", expectedRevision: 7, session: { attached: true, attachedAt: at, active: true, adventureEligible: true }, principal: { role: "player", control: "controlled" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
     const durable = { turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Done", source: "provider-assisted" } };
     const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(bootstrap), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(durable), { status: 200 }))

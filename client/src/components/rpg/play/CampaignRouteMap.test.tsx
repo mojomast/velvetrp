@@ -27,7 +27,7 @@ describe("CampaignRouteMap", () => {
     expect(container.querySelector('[data-location-id="town"]')?.classList.contains("is-current")).toBe(true);
     expect(container.querySelector('[data-location-id="wood"]')?.classList.contains("is-reachable")).toBe(true);
     expect(container.querySelector('[data-location-id="tower"]')?.classList.contains("is-reachable")).toBe(false);
-    const destinations = screen.getByRole("region", { name: "Reachable destinations" });
+    const destinations = screen.getByRole("region", { name: "Outgoing route destinations" });
     expect(within(destinations).getAllByRole("button")).toHaveLength(1);
     fireEvent.click(within(destinations).getByRole("button", { name: "Prefill travel to Whisper Wood" }));
     expect(prefill).toHaveBeenCalledWith("Travel to Whisper Wood.");
@@ -43,14 +43,15 @@ describe("CampaignRouteMap", () => {
       ],
     };
     const { container } = render(<CampaignRouteMap world={projection} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
-    expect(screen.getByText("No outgoing reachable destinations for the selected actor.")).toBeTruthy();
+    expect(screen.getByText("No server-visible outgoing routes for the selected actor.")).toBeTruthy();
     expect(container.querySelectorAll(".route-map-connection")).toHaveLength(1);
     expect(screen.queryByText(/secret/i)).toBeNull();
   });
 
   it("uses stable hierarchy depth and order coordinates without mutating the projection", () => {
     const locationsBefore = structuredClone(world.visibleLocations);
-    const { container } = render(<CampaignRouteMap world={world} selectedActorId={null} onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    const { container, rerender } = render(<CampaignRouteMap world={world} selectedActorId={null} onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    rerender(<CampaignRouteMap world={{ ...world, visibleLocations: [...world.visibleLocations].reverse() }} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
     expect(container.querySelector('[data-location-id="town"]')?.getAttribute("transform")).toBe("translate(80 55)");
     expect(container.querySelector('[data-location-id="wood"]')?.getAttribute("transform")).toBe("translate(260 145)");
     expect(container.querySelector('[data-location-id="tower"]')?.getAttribute("transform")).toBe("translate(440 235)");
@@ -65,5 +66,15 @@ describe("CampaignRouteMap", () => {
     expect(destination.getAttribute("tabindex")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Open World" }));
     expect(openWorld).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws direction-aware endpoint arrows and separates reciprocal routes", () => {
+    const { container } = render(<CampaignRouteMap world={{ ...world, visibleConnections: [...world.visibleConnections, { connectionId: "return", fromLocationId: "wood", toLocationId: "town" }] }} selectedActorId="actor" onPrefillDeclaration={vi.fn()} onOpenWorld={vi.fn()} />);
+    const paths = container.querySelectorAll(".route-map-connection path");
+    expect(paths).toHaveLength(3);
+    expect(paths[0]?.getAttribute("marker-end")).toMatch(/^url\(#/);
+    expect(paths[0]?.getAttribute("d")).not.toEqual(paths[2]?.getAttribute("d"));
+    expect(container.querySelector("marker")?.getAttribute("orient")).toBe("auto-start-reverse");
+    expect(screen.getByText(/does not guarantee legal travel/)).toBeTruthy();
   });
 });

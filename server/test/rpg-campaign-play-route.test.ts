@@ -22,7 +22,9 @@ function repository(result: CampaignPlayBootstrap | null = null) {
 const response = (sessionId: string): CampaignPlayBootstrap => ({
   campaignId: "campaign", sessionId, expectedRevision: 3,
   session: { attached: true, attachedAt: at, active: true, adventureEligible: false },
-  principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }],
+  principal: { role: "owner", control: "all" },
+  capabilities: { campaignDice: { canView: true, canRoll: true } },
+  playableActors: [{ actorId: "actor", name: "Aria" }],
 });
 
 describe("campaign play bootstrap route", () => {
@@ -37,6 +39,25 @@ describe("campaign play bootstrap route", () => {
     expect(result.headers["cache-control"]).toBe("no-store");
     expect(result.json()).toEqual(response(sessionId));
     expect(repo.getCampaignPlayBootstrap).toHaveBeenCalledWith("local-owner", "campaign", sessionId);
+    await app.close();
+  });
+
+  it.each([
+    ["player", "controlled"],
+    ["observer", "none"],
+  ] as const)("returns the API Hydration Verification prerequisite shape for %s access", async (role, control) => {
+    enable();
+    const prerequisite: CampaignPlayBootstrap = {
+      campaignId: "campaign", sessionId: "room", expectedRevision: 3,
+      session: { attached: true, attachedAt: at, active: true, adventureEligible: false },
+      principal: { role, control }, capabilities: { campaignDice: { canView: false, canRoll: false } }, playableActors: [],
+    };
+    const repo = repository(prerequisite);
+    const app = buildApp({ campaignRepositoryFactory: () => repo });
+    const result = await app.inject({ method: "GET", url: "/api/rpg/v1/campaigns/campaign/rooms/room/play-bootstrap" });
+    expect(result.statusCode).toBe(200);
+    expect(result.headers["cache-control"]).toBe("no-store");
+    expect(result.json()).toEqual(prerequisite);
     await app.close();
   });
 

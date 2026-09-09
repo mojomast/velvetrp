@@ -1,0 +1,19 @@
+.character-journey { border-block: 1px solid var(--border, #675a48); padding-block: 1rem; margin-block: 1rem; }
+.character-journey ol { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .75rem; list-style: none; padding: 0; }
+.character-journey li { padding: .75rem; border: 1px solid transparent; border-radius: 8px; }
+.character-journey li[aria-current="step"] { border-color: currentColor; font-weight: 700; }
+.character-journey li span { display: inline-block; margin-right: .5rem; }
+.character-journey p { max-width: 80ch; }
+.character-builder-page [hidden] { display: none !important; }
+.character-builder-page .builder-stage-navigation { grid-column: 1 / -1; }
+.character-builder-page .button-row { display: flex; flex-wrap: wrap; gap: .75rem; }
+.character-builder-page .builder-section { grid-template-columns: minmax(0, 1fr); min-width: 0; overflow-wrap: anywhere; }
+.character-builder-page .persona-selection .field,
+.character-builder-page .persona-selection select { width: 100%; min-width: 0; }
+.character-builder-page .finalization-review .button-row { margin-top: 1rem; }
+.character-builder-page .inline-persona-creator fieldset { display: grid; gap: 1rem; min-width: 0; margin-block: 1rem; }
+.character-builder-page .inline-persona-creator :is(input:not([type="checkbox"]), textarea, select) { width: 100%; min-width: 0; box-sizing: border-box; }
+@media (max-width: 600px) {
+  .character-builder-page .character-builder-layout { grid-template-columns: minmax(0, 1fr); }
+  .character-builder-page .button-row > button { flex: 1 1 100%; }
+}

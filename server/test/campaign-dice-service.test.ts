@@ -13,11 +13,16 @@ const result = {
   terms: [{ value: 14, kept: true }], modifier: 0, total: 14,
 };
 
-function setup(role = "owner") {
+function setup(role = "owner", allowPlayerDice = true) {
   const unit = {
     getCampaign: vi.fn(() => ({
       id: "campaign", name: "Campaign", activeTimelineId: "timeline", ownerPrincipalId: "local-owner",
       createdAt: AT, updatedAt: AT, actorRole: role,
+    })),
+    getCampaignAdministration: vi.fn(() => ({
+      id: "campaign", status: "draft", activeTimelineId: "timeline", revision: 0,
+      updatedAt: AT, actorRole: role,
+      settings: { maxPlayers: 6, allowPlayerDice, safetyMode: "standard", recapVisibility: "members" },
     })),
     getCampaignTimeline: vi.fn(() => ({ id: "timeline", campaignId: "campaign", revision: 7, createdAt: AT })),
     getCampaignCharacterRoster: vi.fn(() => ({ campaignId: "campaign", characters: [
@@ -25,8 +30,9 @@ function setup(role = "owner") {
       { id: "cc-b", characterId: "persona-b", name: "Same" },
     ] })),
     listCampaignCharacters: vi.fn(() => [
-      { projection: { campaignCharacter: { id: "cc-a" }, actor: { id: "actor-a" } } },
-      { projection: { campaignCharacter: { id: "cc-b" }, actor: { id: "actor-b" } } },
+      { access: "privileged", projection: { campaignCharacter: { id: "cc-a" },
+        actor: { id: "actor-a", controllerPrincipalId: "player" } } },
+      { access: "public", projection: { campaignCharacter: { id: "cc-b" }, actor: { id: "actor-b" } } },
     ]),
     listRecentCampaignDiceEvents: vi.fn(() => [{
       eventId: "event-old", commandId: "command-old", campaignId: "campaign", timelineId: "timeline",
@@ -86,13 +92,41 @@ describe("trusted-local campaign dice service", () => {
       .toEqual([AT, laterTimestamp, laterTimestamp]);
   });
 
-  it.each(["player", "observer"])('masks role "%s" before roster, history, IDs, or execution', (role) => {
+  it('masks role "observer" before roster, history, IDs, or execution', () => {
+    const role = "observer";
     const fixture = setup(role);
     expect(() => createCampaignDiceService(fixture.repository, { nextId: fixture.nextId })
       .read("local-owner", "campaign")).toThrow(CampaignDiceUnavailableError);
     expect(fixture.unit.getCampaignCharacterRoster).not.toHaveBeenCalled();
     expect(fixture.unit.listRecentCampaignDiceEvents).not.toHaveBeenCalled();
     expect(fixture.nextId).not.toHaveBeenCalled();
+  });
+
+  it("lets enabled players read only controlled actors and their events", () => {
+    const fixture = setup("player");
+    const event = fixture.unit.listRecentCampaignDiceEvents()[0]!;
+    fixture.unit.listRecentCampaignDiceEvents.mockReturnValue([
+      { ...event, eventId: "controlled", actorId: "actor-a" },
+      { ...event, eventId: "other", actorId: "actor-b" },
+    ]);
+    const response = createCampaignDiceService(fixture.repository, { nextId: fixture.nextId }).read("player", "campaign");
+    expect(response.characters).toEqual([{ position: 1, name: "Same" }]);
+    expect(response.rolls).toEqual([{ character: { position: 1, name: "Same" }, occurredAt: AT, result }]);
+    expect(JSON.stringify(response)).not.toContain('"position":2');
+  });
+
+  it("denies disabled player history but returns an empty filtered view without control", () => {
+    const disabled = setup("player", false);
+    expect(() => createCampaignDiceService(disabled.repository, { nextId: disabled.nextId })
+      .read("player", "campaign")).toThrow(CampaignDiceUnavailableError);
+    expect(disabled.unit.listRecentCampaignDiceEvents).not.toHaveBeenCalled();
+
+    const uncontrolled = setup("player");
+    uncontrolled.unit.listCampaignCharacters.mockReturnValue(uncontrolled.unit.listCampaignCharacters()
+      .map((entry) => ({ ...entry, access: "public" })));
+    expect(createCampaignDiceService(uncontrolled.repository, { nextId: uncontrolled.nextId })
+      .read("player", "campaign")).toEqual({ characters: [], rolls: [] });
+    expect(uncontrolled.unit.listRecentCampaignDiceEvents).toHaveBeenCalledOnce();
   });
 
   it("preflights exact visible binding, then generates one internal identity and executes once", () => {
@@ -111,6 +145,47 @@ describe("trusted-local campaign dice service", () => {
     expect(fixture.execute.mock.calls[0]![2]).toEqual({
       position: 2, name: "Same", campaignCharacterId: "cc-b",
     });
+  });
+
+  it.each(["owner", "gm"])("allows %s to roll for any visible actor", (role) => {
+    const fixture = setup(role);
+    createCampaignDiceService(fixture.repository, { nextId: fixture.nextId }).roll(
+      role, "campaign", { character: { position: 2, name: "Same" }, expression: "1d20" },
+    );
+    expect(fixture.execute.mock.calls[0]![0]).toBe(role);
+    expect(fixture.unit.getCampaignAdministration).not.toHaveBeenCalled();
+  });
+
+  it("allows a player to roll only for their controlled actor when enabled", () => {
+    const fixture = setup("player");
+    createCampaignDiceService(fixture.repository, { nextId: fixture.nextId }).roll(
+      "player", "campaign", { character: { position: 1, name: "Same" }, expression: "1d20" },
+    );
+    expect(fixture.execute.mock.calls[0]![0]).toBe("player");
+    expect(fixture.execute.mock.calls[0]![1].actorId).toBe("actor-a");
+
+    const denied = setup("player");
+    expect(() => createCampaignDiceService(denied.repository, { nextId: denied.nextId }).roll(
+      "player", "campaign", { character: { position: 2, name: "Same" }, expression: "1d20" },
+    )).toThrow(CampaignDiceUnavailableError);
+    expect(denied.nextId).not.toHaveBeenCalled();
+    expect(denied.execute).not.toHaveBeenCalled();
+  });
+
+  it("denies players when campaign dice is disabled and always denies observers", () => {
+    const disabled = setup("player", false);
+    expect(() => createCampaignDiceService(disabled.repository, { nextId: disabled.nextId }).roll(
+      "player", "campaign", { character: { position: 1, name: "Same" }, expression: "1d20" },
+    )).toThrow(CampaignDiceUnavailableError);
+    expect(disabled.unit.getCampaignCharacterRoster).not.toHaveBeenCalled();
+    expect(disabled.nextId).not.toHaveBeenCalled();
+
+    const observer = setup("observer");
+    expect(() => createCampaignDiceService(observer.repository, { nextId: observer.nextId }).roll(
+      "observer", "campaign", { character: { position: 1, name: "Same" }, expression: "1d20" },
+    )).toThrow(CampaignDiceUnavailableError);
+    expect(observer.unit.getCampaignAdministration).not.toHaveBeenCalled();
+    expect(observer.nextId).not.toHaveBeenCalled();
   });
 
   it("classifies only stale visible bindings and does no ID generation or execution", () => {

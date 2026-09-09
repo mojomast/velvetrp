@@ -1,0 +1,11 @@
+.campaign-dm-panel { display: grid; gap: .85rem; }
+.campaign-dm-panel h3, .campaign-dm-panel h4, .campaign-dm-panel p { margin: 0; }
+.campaign-dm-panel .button-row { flex-wrap: wrap; }
+.campaign-dm-panel fieldset, .campaign-dm-panel label { display: grid; gap: .5rem; }
+.campaign-dm-panel select { min-width: 0; width: 100%; }
+.dm-review { border: 1px solid currentColor; padding: 1rem; display: grid; gap: .75rem; }
+.dm-blocker { border-left: 3px solid #b98746; padding-left: .75rem; }
+.dm-chronicle { padding: 1rem; border-bottom: 1px solid #73664a; }
+.dm-chronicle article { border-left: 2px solid #b98746; padding-left: 1rem; margin: 1rem 0; }
+.dm-chronicle p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.dm-chronicle small { display: block; }

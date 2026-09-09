@@ -1,0 +1,418 @@
+{
+  "version": 1,
+  "name": "Harness Wars",
+  "tone": "Tense industrial fantasy with humane choices and dry wit",
+  "exclusions": ["sexual violence", "graphic torture", "harm to children"],
+  "stages": [
+    {
+      "id": "factions",
+      "jobs": [
+        {
+          "id": "guild-factions",
+          "sections": ["factions"],
+          "brief": "Create two rival walking-engine guilds with distinct labor traditions, public grievances, leverage, and credible paths to compromise.",
+          "desiredCounts": { "factions": 2 }
+        },
+        {
+          "id": "civic-factions",
+          "sections": ["factions"],
+          "brief": "Create two non-guild powers affected by the Harness Wars: a neutral civic coalition and an independent group with reasons to resist both guilds.",
+          "desiredCounts": { "factions": 2 }
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "dependsOn": ["factions"],
+      "jobs": [
+        {
+          "id": "summit-foundation",
+          "sections": ["outline", "locations"],
+          "brief": "Establish the playable opening around a neutral repair city and a sabotaged peace summit. Create the summit district and one nearby operational location with a useful route between them.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 }
+          ],
+          "desiredCounts": { "outlines": 1, "locations": 2, "connections": 1 }
+        }
+      ]
+    },
+    {
+      "id": "wider-locations",
+      "dependsOn": ["foundation"],
+      "jobs": [
+        {
+          "id": "war-frontier-locations",
+          "sections": ["locations"],
+          "brief": "Add two contrasting locations beyond the summit district that expose civilian and industrial costs of the conflict. Connect them into the accepted travel network without duplicating accepted places.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "locations": 2, "connections": 3 }
+        }
+      ]
+    },
+    {
+      "id": "npcs",
+      "dependsOn": ["wider-locations"],
+      "jobs": [
+        {
+          "id": "summit-npcs",
+          "sections": ["npcs"],
+          "brief": "Create two public-facing negotiators tied to accepted factions and locations. Give each practical leverage and a compromise they cannot openly request.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "npcs": 2 }
+        },
+        {
+          "id": "workshop-npcs",
+          "sections": ["npcs"],
+          "brief": "Create two mechanics or logistics workers tied to accepted factions and places who can reveal how the sabotage was physically possible.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "npcs": 2 }
+        },
+        {
+          "id": "witness-npcs",
+          "sections": ["npcs"],
+          "brief": "Create two defectors, witnesses, or neutral observers tied to accepted factions and places. Their accounts should conflict honestly rather than identify one forced culprit.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "npcs": 2 }
+        }
+      ]
+    },
+    {
+      "id": "opening-story",
+      "dependsOn": ["npcs"],
+      "jobs": [
+        {
+          "id": "sabotage-opening",
+          "sections": ["arcs", "story", "clues"],
+          "brief": "Build the first playable movement of the summit sabotage mystery. Provide fair clues, two public developments, and a relationship that creates choices without declaring a single true culprit.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["outlines", "locations"], "limit": 3 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "workshop-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "arcs": 1, "storyNodes": 2, "storyRelationships": 1, "clues": 2 }
+        }
+      ]
+    },
+    {
+      "id": "wider-story",
+      "dependsOn": ["opening-story"],
+      "jobs": [
+        {
+          "id": "war-escalation",
+          "sections": ["arcs", "story", "clues"],
+          "brief": "Extend the sabotage mystery into the wider Harness Wars. Add reversible escalation, competing interpretations, and clue paths that keep diplomacy, investigation, and intervention viable.",
+          "expandFrom": [
+            { "jobId": "sabotage-opening", "fields": ["arcs", "storyNodes", "clues"], "limit": 5 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "arcs": 1, "storyNodes": 3, "storyRelationships": 3, "clues": 3 }
+        }
+      ]
+    },
+    {
+      "id": "quests",
+      "dependsOn": ["wider-story"],
+      "jobs": [
+        {
+          "id": "summit-quest",
+          "sections": ["quests"],
+          "brief": "Create one table-ready quest focused on stabilizing the sabotaged summit through investigation or negotiation, with useful objectives and rewards.",
+          "expandFrom": [
+            { "jobId": "sabotage-opening", "fields": ["arcs", "storyNodes"], "limit": 3 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "quests": 1 }
+        },
+        {
+          "id": "frontier-quest",
+          "sections": ["quests"],
+          "brief": "Create one table-ready quest on the industrial frontier that reveals the human cost of escalation and supports more than one resolution.",
+          "expandFrom": [
+            { "jobId": "war-escalation", "fields": ["arcs", "storyNodes"], "limit": 4 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "quests": 1 }
+        },
+        {
+          "id": "defection-quest",
+          "sections": ["quests"],
+          "brief": "Create one table-ready quest involving a defector or witness whose evidence can shift faction leverage without proving a single predetermined villain.",
+          "expandFrom": [
+            { "jobId": "sabotage-opening", "fields": ["arcs"], "limit": 1 },
+            { "jobId": "war-escalation", "fields": ["storyNodes"], "limit": 3 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "quests": 1 }
+        }
+      ]
+    },
+    {
+      "id": "monsters",
+      "dependsOn": ["quests"],
+      "jobs": [
+        {
+          "id": "monster-concept-1",
+          "sections": ["monster-concepts"],
+          "brief": "Create one setting-specific monster concept suitable as an industrial hazard, guardian, or consequence of damaged walking-engine infrastructure.",
+          "expandFrom": [{ "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "monsterConcepts": 1 }
+        },
+        {
+          "id": "monster-concept-2",
+          "sections": ["monster-concepts"],
+          "brief": "Create one distinct setting-specific monster concept tied to salvage, fuel, or abandoned machinery; keep it usable without forcing combat.",
+          "expandFrom": [{ "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "monsterConcepts": 1 }
+        },
+        {
+          "id": "monster-concept-3",
+          "sections": ["monster-concepts"],
+          "brief": "Create one distinct setting-specific monster concept that could complicate the peace summit or its repair works without serving a predetermined villain.",
+          "expandFrom": [{ "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "monsterConcepts": 1 }
+        },
+        {
+          "id": "monster-concept-4",
+          "sections": ["monster-concepts"],
+          "brief": "Create one distinct setting-specific monster concept associated with wartime displacement or a contested route, with nonviolent interaction possibilities.",
+          "expandFrom": [{ "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }],
+          "desiredCounts": { "monsterConcepts": 1 }
+        }
+      ]
+    },
+    {
+      "id": "quest-items",
+      "dependsOn": ["monsters"],
+      "jobs": [
+        {
+          "id": "summit-quest-item",
+          "sections": ["quest-items"],
+          "brief": "Create one distinctive quest item that advances the accepted summit quest and belongs naturally in an accepted summit location.",
+          "expandFrom": [
+            { "jobId": "summit-quest", "fields": ["quests"], "limit": 1 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "questItems": 1 }
+        },
+        {
+          "id": "frontier-quest-item",
+          "sections": ["quest-items"],
+          "brief": "Create one distinctive quest item that advances the accepted frontier quest and belongs naturally in an accepted frontier location.",
+          "expandFrom": [
+            { "jobId": "frontier-quest", "fields": ["quests"], "limit": 1 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "questItems": 1 }
+        },
+        {
+          "id": "defection-quest-item",
+          "sections": ["quest-items"],
+          "brief": "Create one distinctive evidence-bearing quest item that advances the accepted defection quest without conclusively naming one culprit.",
+          "expandFrom": [
+            { "jobId": "defection-quest", "fields": ["quests"], "limit": 1 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "questItems": 1 }
+        }
+      ]
+    },
+    {
+      "id": "encounter-plans",
+      "dependsOn": ["quest-items"],
+      "jobs": [
+        {
+          "id": "encounter-plan-1",
+          "sections": ["encounters"],
+          "brief": "Create one encounter plan for the summit district that rewards investigation or de-escalation and uses accepted people, places, or monster concepts where appropriate.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "monster-concept-3", "fields": ["monsterConcepts"], "limit": 1 }
+          ],
+          "desiredCounts": { "encounters": 1 }
+        },
+        {
+          "id": "encounter-plan-2",
+          "sections": ["encounters"],
+          "brief": "Create one encounter plan at a frontier location centered on hazardous machinery, rescue, or negotiation rather than mandatory combat.",
+          "expandFrom": [
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "workshop-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "monster-concept-1", "fields": ["monsterConcepts"], "limit": 1 }
+          ],
+          "desiredCounts": { "encounters": 1 }
+        },
+        {
+          "id": "encounter-plan-3",
+          "sections": ["encounters"],
+          "brief": "Create one encounter plan around disputed evidence or a witness, with escalating social pressure and multiple viable resolutions.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "monster-concept-3", "fields": ["monsterConcepts"], "limit": 1 }
+          ],
+          "desiredCounts": { "encounters": 1 }
+        },
+        {
+          "id": "encounter-plan-4",
+          "sections": ["encounters"],
+          "brief": "Create one encounter plan on a contested route where civilians, salvage, and a strange threat complicate both guilds' objectives.",
+          "expandFrom": [
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "monster-concept-2", "fields": ["monsterConcepts"], "limit": 1 },
+            { "jobId": "monster-concept-4", "fields": ["monsterConcepts"], "limit": 1 }
+          ],
+          "desiredCounts": { "encounters": 1 }
+        },
+        {
+          "id": "encounter-plan-5",
+          "sections": ["encounters"],
+          "brief": "Create one climactic but reversible encounter plan that tests the campaign's competing interpretations without resolving the whole war by force.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 1 },
+            { "jobId": "workshop-npcs", "fields": ["npcs"], "limit": 1 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 1 },
+            { "jobId": "monster-concept-1", "fields": ["monsterConcepts"], "limit": 1 },
+            { "jobId": "monster-concept-2", "fields": ["monsterConcepts"], "limit": 1 },
+            { "jobId": "monster-concept-3", "fields": ["monsterConcepts"], "limit": 1 },
+            { "jobId": "monster-concept-4", "fields": ["monsterConcepts"], "limit": 1 }
+          ],
+          "desiredCounts": { "encounters": 1 }
+        }
+      ]
+    },
+    {
+      "id": "lore",
+      "dependsOn": ["encounter-plans"],
+      "jobs": [
+        {
+          "id": "guild-lore",
+          "sections": ["lore"],
+          "brief": "Create one concise lore entry explaining a contested guild tradition or historical grievance through accepted public canon.",
+          "expandFrom": [
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "sabotage-opening", "fields": ["storyNodes"], "limit": 2 }
+          ],
+          "desiredCounts": { "lore": 1 }
+        },
+        {
+          "id": "city-lore",
+          "sections": ["lore"],
+          "brief": "Create one concise lore entry about the neutral repair city's role in earlier disputes and why the summit matters now.",
+          "expandFrom": [
+            { "jobId": "civic-factions", "fields": ["factions"], "limit": 2 },
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "sabotage-opening", "fields": ["storyNodes"], "limit": 2 }
+          ],
+          "desiredCounts": { "lore": 1 }
+        },
+        {
+          "id": "engine-lore",
+          "sections": ["lore"],
+          "brief": "Create one concise lore entry about walking-engine infrastructure whose details illuminate the wider war without establishing a canonical culprit.",
+          "expandFrom": [
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-escalation", "fields": ["storyNodes"], "limit": 3 }
+          ],
+          "desiredCounts": { "lore": 1 }
+        }
+      ]
+    },
+    {
+      "id": "handouts",
+      "dependsOn": ["lore"],
+      "jobs": [
+        {
+          "id": "investigation-handouts",
+          "sections": ["handouts"],
+          "brief": "Create two concise player-facing handouts that support the sabotage investigation without embedding a definitive solution.",
+          "expandFrom": [
+            { "jobId": "sabotage-opening", "fields": ["clues"], "limit": 2 },
+            { "jobId": "war-escalation", "fields": ["clues"], "limit": 3 },
+            { "jobId": "city-lore", "fields": ["lore"], "limit": 1 }
+          ],
+          "desiredCounts": { "handouts": 2 }
+        },
+        {
+          "id": "war-handouts",
+          "sections": ["handouts"],
+          "brief": "Create two concise player-facing handouts showing faction pressure and the material costs of the Harness Wars from contrasting perspectives.",
+          "expandFrom": [
+            { "jobId": "guild-lore", "fields": ["lore"], "limit": 1 },
+            { "jobId": "city-lore", "fields": ["lore"], "limit": 1 },
+            { "jobId": "engine-lore", "fields": ["lore"], "limit": 1 },
+            { "jobId": "guild-factions", "fields": ["factions"], "limit": 2 }
+          ],
+          "desiredCounts": { "handouts": 2 }
+        }
+      ]
+    },
+    {
+      "id": "scenes",
+      "dependsOn": ["handouts"],
+      "jobs": [
+        {
+          "id": "summit-scenes",
+          "sections": ["scene-prompts"],
+          "brief": "Create two concise scene prompts for tense conversations and discoveries in the summit district, grounded in accepted people and places.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "workshop-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "scenePrompts": 2 }
+        },
+        {
+          "id": "frontier-scenes",
+          "sections": ["scene-prompts"],
+          "brief": "Create two concise scene prompts for travel, repair work, or civilian pressure on the industrial frontier, grounded in accepted people and places.",
+          "expandFrom": [
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "workshop-npcs", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "scenePrompts": 2 }
+        },
+        {
+          "id": "escalation-scenes",
+          "sections": ["scene-prompts"],
+          "brief": "Create two concise scene prompts that surface competing interpretations of the sabotage and invite consequential choices without dictating outcomes.",
+          "expandFrom": [
+            { "jobId": "summit-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "war-frontier-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "summit-npcs", "fields": ["npcs"], "limit": 1 },
+            { "jobId": "witness-npcs", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "scenePrompts": 2 }
+        }
+      ]
+    }
+  ]
+}

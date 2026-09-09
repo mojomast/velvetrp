@@ -30,6 +30,15 @@ function snapshot(audience: CampaignAgentAudience): CampaignAgentContextSnapshot
 }
 
 describe("campaign agent context basket", () => {
+  it("budgets accepted public preparation separately and below committed state", () => {
+    const source = snapshot({ kind: "player", actorId: "hero" });
+    source.publicPreparation = ["x".repeat(4_001), "The guide speaks softly."];
+    const basket = assembleCampaignAgentContext({ snapshot: source, declaration: "Listen" });
+    expect(basket.truncation.preparationUtf16CodeUnits).toMatchObject({ includedLines: 1, omittedLines: 1, truncated: true });
+    expect(basket.layers.find((layer) => layer.kind === "approved-memory-lore")?.lines).toContain(
+      "Accepted public preparation (not committed events): The guide speaks softly.");
+    expect(campaignContextBasketText(basket)).toContain("GM preparation are planning-only");
+  });
   it.each([
     { kind: "player", actorId: "hero" }, { kind: "dm" }, { kind: "npc", npcId: "npc" },
     { kind: "companion", actorId: "companion" }, { kind: "enemy", combatantId: "enemy" },
@@ -63,7 +72,7 @@ describe("campaign agent context basket", () => {
     expect(assembleCampaignAgentContext(input)).toEqual(first);
     expect(Object.keys(first.truncation)).toEqual(["safetyControlUtf16CodeUnits", "humanCanonUtf16CodeUnits",
       "worldUtf16CodeUnits", "mechanicsUtf16CodeUnits", "questsUtf16CodeUnits", "privateTargetUtf16CodeUnits",
-      "recapUtf16CodeUnits", "loreUtf16CodeUnits", "memoryUtf16CodeUnits", "suggestionsUtf16CodeUnits"]);
+      "recapUtf16CodeUnits", "loreUtf16CodeUnits", "memoryUtf16CodeUnits", "suggestionsUtf16CodeUnits", "preparationUtf16CodeUnits"]);
     expect(Object.values(first.truncation).every((entry) => entry.usedUtf16CodeUnits <= entry.budgetUtf16CodeUnits)).toBe(true);
     expect(Object.values(first.truncation).some((entry) => entry.truncated)).toBe(true);
     expect(campaignContextBasketText(first)).not.toContain("…");

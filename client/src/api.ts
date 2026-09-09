@@ -1,4 +1,63 @@
 import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
+import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest } from "@velvet/contracts";
+import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest } from "@velvet/contracts";
+
+const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
+  const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
+  return `/rpg/v1/campaigns/${id(campaignId)}${sessionId === undefined ? "/dm" : `/rooms/${id(sessionId)}/dm`}${runId === undefined ? "" : `/runs/${id(runId)}`}`;
+};
+const dmRequest = async (path: string, init?: RequestInit) => (await requestResponse<unknown>(path, { ...init, cache: "no-store" }, { status: 200, message: "DM response status was not confirmed" })).body;
+function bindDmRun<T extends { campaignId: string; sessionId: string; runId: string }>(run: T, campaignId: string, sessionId: string, runId?: string): T {
+  if (run.campaignId !== campaignId || run.sessionId !== sessionId || (runId !== undefined && run.runId !== runId)) throw new Error("DM response did not match this room/run");
+  return run;
+}
+export async function getCampaignDmControl(campaignId: string) {
+  const value = campaignDmControlSchema.parse(await dmRequest(dmPath(campaignId)));
+  if (value.campaignId !== campaignId) throw new Error("DM control campaign mismatch");
+  return value;
+}
+export async function commandCampaignDmSceneBinding(campaignId: string, input: CampaignDmSceneBindingRequest) {
+  const body = parseApiInput(() => campaignDmSceneBindingRequestSchema.parse(input));
+  const accepted = campaignDmSceneBindingRequestSchema.parse(await dmRequest(`${dmPath(campaignId)}/scene-binding-commands`, { method: "POST", body: JSON.stringify(body) }));
+  if (accepted.nodeId !== body.nodeId || accepted.evidence.kind !== body.evidence.kind || accepted.evidence.targetId !== body.evidence.targetId
+    || accepted.expectedStoryRevision !== body.expectedStoryRevision || accepted.idempotencyKey !== body.idempotencyKey) throw new Error("Scene binding response did not match the exact request");
+  return accepted;
+}
+export async function commandCampaignDmMode(campaignId: string, input: CampaignDmModeRequest) {
+  const body = parseApiInput(() => campaignDmModeRequestSchema.parse(input));
+  const value = campaignDmControlSchema.parse(await dmRequest(`${dmPath(campaignId)}/mode-commands`, { method: "POST", body: JSON.stringify(body) }));
+  if (value.campaignId !== campaignId || value.mode !== body.mode || value.revision !== body.expectedRevision + 1) throw new Error("DM mode response mismatch");
+  return value;
+}
+export async function getCampaignDmHistory(campaignId: string, sessionId: string) {
+  const value = campaignDmHistorySchema.parse(await dmRequest(dmPath(campaignId, sessionId)));
+  if (value.control.campaignId !== campaignId) throw new Error("DM history campaign mismatch");
+  value.runs.forEach(run => bindDmRun(run, campaignId, sessionId));
+  return value;
+}
+export async function getCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
+  return bindDmRun(campaignDmRunSchema.parse(await dmRequest(dmPath(campaignId, sessionId, runId))), campaignId, sessionId, runId);
+}
+export async function getCampaignDmProposal(campaignId: string, sessionId: string, runId: string) {
+  const value = campaignDmPrivateRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/proposal`));
+  bindDmRun(value.run, campaignId, sessionId, runId); return value;
+}
+export async function commandCampaignDmBeat(campaignId: string, sessionId: string, input: CampaignDmBeatRequest) {
+  const body = parseApiInput(() => campaignDmBeatRequestSchema.parse(input));
+  const run = bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId)}/beat-commands`, { method: "POST", body: JSON.stringify(body) })), campaignId, sessionId);
+  if (run.intent !== body.intent || run.modeRevision !== body.expectedModeRevision) throw new Error("DM beat response mismatch");
+  return run;
+}
+export async function commandCampaignDmDecision(campaignId: string, sessionId: string, runId: string, input: CampaignDmDecisionRequest) {
+  const body = parseApiInput(() => campaignDmDecisionRequestSchema.parse(input));
+  const run = bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/decision-commands`, { method: "POST", body: JSON.stringify(body) })), campaignId, sessionId, runId);
+  if (run.revision <= body.expectedRevision || run.state === "awaiting-approval") throw new Error("DM decision was not confirmed");
+  return run;
+}
+export async function resumeCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
+  return bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/resume-commands`, { method: "POST", body: "{}" })), campaignId, sessionId, runId);
+}
+import { createClientId } from "./utils/clientId";
 import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import type { ApiProblem, CampaignAccess as ContractCampaignAccess, CampaignCharacterCreateRequest, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignCharacterWorkspaceResponse, CampaignCreateRequest, CampaignCreateResponse, CampaignDetail as ContractCampaignDetail, CampaignDetailResponse as ContractCampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollRequest, CampaignDiceRollResponse, CampaignListResponse as ContractCampaignListResponse, CampaignRenameRequest, CampaignRenameResponse, CampaignRoomAttachRequest, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, RoleplayFeatureFlags, RpgFeatureFlags } from "@velvet/contracts";
 import {
@@ -889,10 +948,7 @@ function streamSse(
   sessionId: string,
 ): StreamHandle {
   const controller = new AbortController();
-  const generationId =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `gen-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const generationId = createClientId();
 
   const done = (async () => {
     const res = await fetch(`/api${path}`, {

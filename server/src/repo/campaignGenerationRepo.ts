@@ -4,18 +4,21 @@ import {
   campaignGeneratedFoundationSchema, campaignGeneratedPlanningSchema, campaignPublishedMaterialsSchema,
   generatedCampaignContentProviderSchema, resourceIdSchema,
   stagedCampaignContentGenerationSchema, type DraftMutationInput, type GeneratedCampaignContentProvider,
-  type PrivateGenerationDraft,
+  type PrivateGenerationDraft, type CreateGenerationDraftInput,
 } from "@velvet/contracts";
 import type { RepositoryDependencies } from "./campaign/campaignTypes.js";
 import { AdventureTurnConflictError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./adventureTurn/errors.js";
 import { resolveCampaignRuleset } from "../rulesets/campaignBinding.js";
+import { recoverExpiredCampaignGeneration } from "./campaignGenerationRecovery.js";
+import { CampaignStartingLocationUnavailableError, preserveCampaignStartingLocation } from "./campaignStartingLocationRepo.js";
 
 type Drafts = {
+  createGenerationDraft(principal: string, input: CreateGenerationDraftInput): PrivateGenerationDraft;
   getGenerationDraft(principal: string, id: string): unknown;
   reviewGenerationDraft(principal: string, input: unknown): PrivateGenerationDraft;
   applyGenerationDraft(principal: string, input: unknown): PrivateGenerationDraft;
 };
-type CallState = { state: "running" | "succeeded" | "failed"; draftId: string | null; acquired: boolean; attempt: number; jobId: string };
+type CallState = { state: "running" | "succeeded" | "failed"; draftId: string | null; acquired: boolean; attempt: number; jobId: string; outcomeCode?: string | null };
 type StartMetadata = { provider:string; model:string; operation:string; stage:string; promptVersion:string; schemaVersion:string; jobId:string };
 type FinishMetadata = { responseModel:string|null; promptTokens:number|null; completionTokens:number|null; totalTokens:number|null; latencyMs:number; estimatedCostUsd:number|null };
 type ContextArtifact = { key:string; kind:string; visibility:"public"|"gm"; canonical:Record<string,unknown>; digest:string; sourceDraftId:string; serverResourceId:string|null };
@@ -23,6 +26,7 @@ type CatalogDefinition = { reference:{kind:"item"|"enemy-template";packId:string
 type CampaignRulesIdentity = { rulesProfileId:string; rulesetId:string; rulesetVersion:string };
 
 export interface CampaignGenerationRepository {
+  stageCampaignGenerationAtomically(principalId:string,input:CreateGenerationDraftInput,attempt:number,content:GeneratedCampaignContentProvider,dependencies:ContextArtifact[],metadata:FinishMetadata): PrivateGenerationDraft;
   beginCampaignGenerationCall(campaignId:string,idempotencyKey:string,requestDigest:string,metadata:StartMetadata,retryFailedAttempt:number|null,legacyRequestDigest?:string): CallState;
   getCampaignGenerationCall(campaignId:string,idempotencyKey:string,requestDigest:string,legacyRequestDigest?:string): CallState | null;
   finishCampaignGenerationCall(campaignId:string,idempotencyKey:string,attempt:number,draftId:string|null,outcomeCode:string,metadata?:FinishMetadata): void;
@@ -52,9 +56,10 @@ function artifactList(content:GeneratedCampaignContentProvider) {
 }
 
 /** Reconcile only when exactly one running session is attached to the same campaign. */
-export function reconcileGeneratedNpcPlacementsV52(db:DatabaseDriver.Database,campaignId:string,at:string):number {
+export function reconcileGeneratedNpcPlacementsV52(db:DatabaseDriver.Database,campaignId:string,at:string,target?:{sessionId:string;principalId:string}):number {
   const sessions=db.prepare(`SELECT attached.session_id FROM campaign_sessions attached JOIN sessions session ON session.id=attached.session_id
     WHERE attached.campaign_id=? AND session.state='active' AND session.stopped_at IS NULL ORDER BY attached.session_id`).all(campaignId) as Array<{session_id:string}>;
+  if(target&&(sessions.length!==1||sessions[0]!.session_id!==target.sessionId))throw new AdventureTurnConflictError("NPC placement room is ambiguous");
   if(sessions.length!==1)return 0;
   const sessionId=sessions[0]!.session_id;
   const intents=db.prepare(`SELECT npc_id,location_id,source_draft_id FROM generated_npc_placement_intents_v52
@@ -64,9 +69,13 @@ export function reconcileGeneratedNpcPlacementsV52(db:DatabaseDriver.Database,ca
   let root:number=rootRow?.revision??0;
   if(!rootRow)db.prepare("INSERT INTO npc_presence_session_revisions_v43 VALUES(?,?,0,?)").run(campaignId,sessionId,at);
   for(const intent of intents){
-    if(db.prepare("SELECT 1 FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=? AND state='present'").get(campaignId,sessionId,intent.npc_id))continue;
+    if(db.prepare("SELECT 1 FROM campaign_npc_presence_v43 WHERE campaign_id=? AND session_id=? AND npc_id=?").get(campaignId,sessionId,intent.npc_id)){
+      // An explicit existing presence decision takes precedence over generated placement.
+      db.prepare("UPDATE generated_npc_placement_intents_v52 SET state='placed',session_id=?,reconciled_at=? WHERE campaign_id=? AND npc_id=? AND state='pending'").run(sessionId,at,campaignId,intent.npc_id);
+      continue;
+    }
     const next:number=root+1,seed=`${intent.source_draft_id}:${intent.npc_id}`,commandId=stableId(campaignId,intent.source_draft_id,"placement-command",intent.npc_id),eventId=stableId(campaignId,intent.source_draft_id,"placement-event",intent.npc_id);
-    db.prepare("INSERT INTO npc_presence_commands_v43 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(campaignId,sessionId,commandId,`generated-${hash(seed).slice(0,40)}`,"local-owner",intent.npc_id,"present",intent.location_id,root,next,at);
+    db.prepare("INSERT INTO npc_presence_commands_v43 VALUES(?,?,?,?,?,?,?,?,?,?,?)").run(campaignId,sessionId,commandId,`generated-${hash(seed).slice(0,40)}`,target?.principalId??"local-owner",intent.npc_id,"present",intent.location_id,root,next,at);
     db.prepare("UPDATE npc_presence_session_revisions_v43 SET revision=?,updated_at=? WHERE campaign_id=? AND session_id=?").run(next,at,campaignId,sessionId);
     db.prepare("INSERT INTO npc_presence_events_v43 VALUES(?,?,?,?,?,?,?,?,?)").run(eventId,campaignId,sessionId,commandId,next,intent.npc_id,"present",intent.location_id,at);
     db.prepare("INSERT INTO npc_presence_receipts_v43 VALUES(?,?,?,?,?,?,?,?,?)").run(campaignId,sessionId,commandId,next,eventId,intent.npc_id,"present",intent.location_id,at);
@@ -90,10 +99,12 @@ export function createCampaignGenerationRepository(db:DatabaseDriver.Database,de
   };
   return {
     beginCampaignGenerationCall(campaignId,idempotencyKey,requestDigest,metadata,retryFailedAttempt,legacyRequestDigest){guard();return db.transaction(()=>{
+      recoverExpiredCampaignGeneration(db,campaignId,idempotencyKey,dependencies.clock.now());
       const row=call(campaignId,idempotencyKey);
       if(row){
         if(row.request_digest!==requestDigest&&row.request_digest!==legacyRequestDigest)throw new AdventureTurnConflictError("idempotency key was reused");
-        if(row.state!=="failed"||retryFailedAttempt===null)return {state:row.state,draftId:row.draft_id,acquired:false,attempt:row.attempt_count,jobId:row.job_id};
+        if(row.state!=="failed"||retryFailedAttempt===null)return {state:row.state,draftId:row.draft_id,acquired:false,attempt:row.attempt_count,jobId:row.job_id,outcomeCode:row.last_outcome_code};
+        if(row.attempt_count>=32)throw new AdventureTurnConflictError("generation attempt limit reached");
         if(retryFailedAttempt!==row.attempt_count)throw new AdventureTurnConflictError("failed attempt acknowledgement is stale");
         const attempt=row.attempt_count+1,at=dependencies.clock.now().toISOString();
         db.prepare("UPDATE campaign_generation_jobs_v52 SET state='running',attempt_count=?,last_outcome_code=NULL,updated_at=? WHERE job_id=? AND state='failed'").run(attempt,at,row.job_id);
@@ -107,8 +118,9 @@ export function createCampaignGenerationRepository(db:DatabaseDriver.Database,de
         VALUES(?,1,0,?,?,?,?,?,?,?)`).run(metadata.jobId,metadata.provider,metadata.model,metadata.operation,metadata.stage,metadata.promptVersion,metadata.schemaVersion,at);
       return {state:"running" as const,draftId:null,acquired:true,attempt:1,jobId:metadata.jobId};
     }).immediate();},
-    getCampaignGenerationCall(campaignId,idempotencyKey,requestDigest,legacyRequestDigest){guard();const row=call(campaignId,idempotencyKey);if(!row)return null;if(row.request_digest!==requestDigest&&row.request_digest!==legacyRequestDigest)throw new AdventureTurnConflictError("idempotency key was reused");return {state:row.state,draftId:row.draft_id,acquired:false,attempt:row.attempt_count,jobId:row.job_id};},
+    getCampaignGenerationCall(campaignId,idempotencyKey,requestDigest,legacyRequestDigest){guard();recoverExpiredCampaignGeneration(db,campaignId,idempotencyKey,dependencies.clock.now());const row=call(campaignId,idempotencyKey);if(!row)return null;if(row.request_digest!==requestDigest&&row.request_digest!==legacyRequestDigest)throw new AdventureTurnConflictError("idempotency key was reused");return {state:row.state,draftId:row.draft_id,acquired:false,attempt:row.attempt_count,jobId:row.job_id,outcomeCode:row.last_outcome_code};},
     finishCampaignGenerationCall(campaignId,idempotencyKey,attempt,draftId,outcomeCode,metadata){guard();db.transaction(()=>{
+      recoverExpiredCampaignGeneration(db,campaignId,idempotencyKey,dependencies.clock.now());
       const row=call(campaignId,idempotencyKey);if(!row||row.state!=="running"||row.attempt_count!==attempt)return;
       const at=dependencies.clock.now().toISOString();
       const changed=db.prepare(`UPDATE campaign_generation_attempts_v52 SET response_model=?,prompt_tokens=?,completion_tokens=?,total_tokens=?,latency_ms=?,estimated_cost_usd=?,terminal_at=?,outcome_code=?
@@ -116,6 +128,20 @@ export function createCampaignGenerationRepository(db:DatabaseDriver.Database,de
       if(changed.changes!==1)return;
       db.prepare("UPDATE campaign_generation_jobs_v52 SET state=?,draft_id=?,last_outcome_code=?,updated_at=? WHERE job_id=? AND state='running'").run(draftId?"succeeded":"failed",draftId,draftId?"ok":outcomeCode,at,row.job_id);
     }).immediate();},
+    stageCampaignGenerationAtomically(principalId,input,attempt,content,dependenciesInput,metadata){guard();
+      recoverExpiredCampaignGeneration(db,input.campaignId,input.idempotencyKey,dependencies.clock.now());
+      return db.transaction(()=>{
+        const row=call(input.campaignId,input.idempotencyKey),staged=stagedCampaignContentGenerationSchema.parse(input.stagedContent);
+        if(!row||row.state!=="running"||row.attempt_count!==attempt||row.request_digest!==staged.requestDigest)throw new AdventureTurnConflictError("generation ownership expired");
+        if(!input.validation.valid||canonical(staged.dependencyDigests)!==canonical(Object.fromEntries(dependenciesInput.map((item)=>[item.key,item.digest]))))throw new AdventureTurnConflictError("candidate validation or dependencies differ");
+        if(canonical(generatedCampaignContentProviderSchema.parse(content))!==canonical(generatedCampaignContentProviderSchema.parse(Object.fromEntries(collections.map(([,field])=>[field,staged[field]])))))throw new AdventureTurnConflictError("candidate differs from validated draft");
+        const draft=drafts.createGenerationDraft(principalId,input);
+        this.recordCampaignGenerationCandidate(draft.draftId,content,dependenciesInput);
+        this.finishCampaignGenerationCall(input.campaignId,input.idempotencyKey,attempt,draft.draftId,"ok",metadata);
+        if(call(input.campaignId,input.idempotencyKey)?.draft_id!==draft.draftId)throw new AdventureTurnConflictError("generation ownership expired");
+        return draft;
+      }).immediate();
+    },
     getCampaignGenerationContext(principalId,campaignId,keys){guard();if(!member(principalId,campaignId))return null;const all=accepted(campaignId),byKey=new Map(all.map((item)=>[item.key,item]));const artifacts=keys.map((key)=>byKey.get(key)).filter((item):item is ContextArtifact=>Boolean(item));if(artifacts.length!==keys.length)throw new AdventureTurnConflictError("an expansion key is unavailable");const revision=(db.prepare("SELECT count(*) count FROM campaign_content_commands_v42 WHERE campaign_id=?").get(campaignId) as {count:number}).count;const catalogRows=db.prepare(`SELECT visibility.kind,visibility.pack_id,visibility.pack_version,visibility.definition_id,visibility.public_definition_json FROM campaign_catalog_current_pins pin JOIN rpg_catalog_definition_visibility visibility ON visibility.pack_id=pin.pack_id AND visibility.pack_version=pin.pack_version WHERE pin.campaign_id=? AND visibility.publicly_reachable=1 AND visibility.kind IN ('item','enemy-template') ORDER BY visibility.kind,visibility.pack_id,visibility.pack_version,visibility.definition_id`).all(campaignId) as any[];const catalogDefinitions=catalogRows.map((row)=>{const value=JSON.parse(row.public_definition_json);return {reference:{kind:row.kind,packId:row.pack_id,packVersion:row.pack_version,definitionId:row.definition_id},name:typeof value.name==="string"?value.name:row.definition_id,description:typeof value.description==="string"?value.description:""};});const configured=db.prepare("SELECT 1 FROM campaign_rules_profiles WHERE campaign_id=?").get(campaignId);const binding=configured?resolveCampaignRuleset(db,campaignId):null,rulesIdentity=binding?{rulesProfileId:binding.rulesProfileId,rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion}:null;return {revision,artifacts,catalogDefinitions,rulesIdentity};},
     recordCampaignGenerationCandidate(draftId,content,dependenciesInput){guard();db.transaction(()=>{
       const insert=db.prepare("INSERT INTO campaign_generation_candidate_artifacts_v52 VALUES(?,?,?,?,?)");for(const item of artifactList(content))insert.run(draftId,item.key,item.kind,item.visibility,canonical(item.value));
@@ -181,7 +207,7 @@ export function createCampaignGenerationRepository(db:DatabaseDriver.Database,de
         const json=row.canonical_json;db.prepare("INSERT INTO campaign_generation_accepted_artifacts_v52 VALUES(?,?,?,?,?,?,?,?,?)").run(before.campaignId,value.key,kind,value.visibility,json,hash(json),before.draftId,serverId,at);
       }
       for(const row of selectedRows){if(row.artifact_kind!=="npc")continue;const value=JSON.parse(row.canonical_json);if(!value.locationKey)continue;const npcId=ids.get(value.key),locationId=ids.get(value.locationKey);if(!npcId||!locationId)throw new AdventureTurnConflictError("NPC placement reference is unavailable");db.prepare("INSERT INTO generated_npc_placement_intents_v52 VALUES(?,?,?,?,'pending',NULL,?,NULL)").run(before.campaignId,npcId,locationId,before.draftId,at);}
-      const outline=selectedRows.find((row)=>row.artifact_kind==="outline");if(outline){const value=JSON.parse(outline.canonical_json);if(value.startLocationKey){const start=ids.get(value.startLocationKey);if(!start)throw new AdventureTurnConflictError("starting location is unavailable");db.prepare("INSERT INTO campaign_starting_locations_v51(campaign_id,location_id,designated_at) VALUES(?,?,?) ON CONFLICT(campaign_id) DO NOTHING").run(before.campaignId,start,at);}}
+       const outline=selectedRows.find((row)=>row.artifact_kind==="outline");if(outline){const value=JSON.parse(outline.canonical_json);if(value.startLocationKey){const start=ids.get(value.startLocationKey);if(!start)throw new AdventureTurnConflictError("starting location is unavailable");try{preserveCampaignStartingLocation(db,before.campaignId,start,at);}catch(error){if(error instanceof CampaignStartingLocationUnavailableError)throw new AdventureTurnConflictError("starting location must be public");throw error;}}}
       reconcileGeneratedNpcPlacementsV52(db,before.campaignId,at);
       const result={scope:"campaign-content",selectedArtifactKeys:input.selectedArtifactKeys},applied=drafts.applyGenerationDraft(principalId,{draftId:before.draftId,expectedDraftRevision:reviewed.revision,expectedCampaignRevision:reviewed.campaignRevision,idempotencyKey:applyKey,result});db.prepare("INSERT INTO campaign_content_receipts_v42 VALUES(?,?,?,?,?,?)").run(stableId(before.campaignId,before.draftId,"receipt","apply"),commandId,before.campaignId,before.draftId,at,canonical(result));return applied;
     }).immediate();},

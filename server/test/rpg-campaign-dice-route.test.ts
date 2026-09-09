@@ -80,7 +80,8 @@ describe("GET/POST /api/rpg/v1/campaigns/:campaignId/dice-rolls", () => {
     expect(read.json()).toEqual({ characters: [{ position: 1, name: "Aria" }], rolls: [] });
 
     const write = await app.inject({ method: "POST", url: "/api/rpg/v1/campaigns/campaign/dice-rolls",
-      headers: { "x-command-id": "attacker", "idempotency-key": "attacker" },
+      headers: { "x-principal-id": "player", "x-campaign-role": "owner",
+        authorization: "Bearer player", "x-command-id": "attacker", "idempotency-key": "attacker" },
       payload: { character: { position: 1, name: "Aria" }, expression: "1d20" } });
     expect(write.statusCode).toBe(201);
     expect(write.headers.location).toBeUndefined();

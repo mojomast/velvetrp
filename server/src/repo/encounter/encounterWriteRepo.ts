@@ -849,12 +849,24 @@ function persistTurnAdvance(db:DatabaseDriver.Database,d:EncounterDependencies,e
 }
 
 function ensureRewardCurrency(db:DatabaseDriver.Database,campaignId:string):{code:string;reference:{kind:"currency";packId:string;packVersion:string;definitionId:string}}{
-  const rows=db.prepare(`SELECT definition.pack_id,definition.pack_version,definition.definition_id,definition.definition_json
+  const boundRows=db.prepare(`SELECT currency.currency_code,definition.pack_id,definition.pack_version,
+      definition.definition_id,definition.definition_json
+    FROM rpg_currency_references_v25 currency JOIN campaign_catalog_current_pins pin
+      ON pin.campaign_id=currency.campaign_id AND pin.pack_id=currency.pack_id AND pin.pack_version=currency.pack_version
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=currency.pack_id
+      AND definition.pack_version=currency.pack_version AND definition.kind=currency.kind
+      AND definition.definition_id=currency.definition_id
+    WHERE currency.campaign_id=? AND currency.kind='currency'
+    ORDER BY currency.currency_code COLLATE BINARY LIMIT 2`).all(campaignId) as Array<{
+      currency_code:string;pack_id:string;pack_version:string;definition_id:string;definition_json:string}>;
+  if(boundRows.length>1)throw new EncounterConflictError("combat reward currency is unavailable or ambiguous");
+  const rows=boundRows.length===1?boundRows:db.prepare(`SELECT NULL currency_code,definition.pack_id,definition.pack_version,
+      definition.definition_id,definition.definition_json
     FROM campaign_catalog_current_pins pin JOIN rpg_catalog_definitions definition
     ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
     WHERE pin.campaign_id=? AND definition.kind='currency'
     ORDER BY pin.position,definition.definition_id COLLATE BINARY LIMIT 2`).all(campaignId) as Array<{
-      pack_id:string;pack_version:string;definition_id:string;definition_json:string}>;
+      currency_code:null;pack_id:string;pack_version:string;definition_id:string;definition_json:string}>;
   if(rows.length!==1)throw new EncounterConflictError("combat reward currency is unavailable or ambiguous");
   const row=rows[0]!,definition=currencyCatalogDefinitionSchema.parse(JSON.parse(row.definition_json));
   if(definition.reference.packId!==row.pack_id||definition.reference.packVersion!==row.pack_version
@@ -868,6 +880,7 @@ function ensureRewardCurrency(db:DatabaseDriver.Database,campaignId:string):{cod
       (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,'currency',?)`)
       .run(campaignId,reference.packId,reference.packVersion,reference.definitionId);
   }
+  if(row.currency_code)return {code:row.currency_code,reference};
   const existing=db.prepare(`SELECT currency_code FROM rpg_currency_references_v25 WHERE campaign_id=?
     AND pack_id=? AND pack_version=? AND kind='currency' AND definition_id=?`)
     .get(campaignId,reference.packId,reference.packVersion,reference.definitionId) as {currency_code:string}|undefined;

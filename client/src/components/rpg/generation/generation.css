@@ -1,0 +1,13 @@
+.guided-generation, .campaign-brief-review, .campaign-coverage {
+  border: 1px solid var(--border, #675a48);
+  border-radius: 12px;
+  padding: clamp(1rem, 3vw, 1.5rem);
+  margin-block: 1rem;
+  min-width: 0;
+}
+.guided-generation-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.guided-generation button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+.campaign-brief-review pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.campaign-coverage ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .5rem 2rem; padding-left: 1.25rem; }
+.campaign-generator .generation-inputs { border: 0; padding: 0; margin: 0; min-width: 0; }
+.guided-generation textarea { width: 100%; box-sizing: border-box; }

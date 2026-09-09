@@ -2,6 +2,7 @@
 import DatabaseDriver from "better-sqlite3";
 import {
   MAX_CAMPAIGN_CHARACTER_ROSTER,
+  campaignSettingsSchema,
   commandEnvelopeSchema,
   commandReceiptSchema,
   publicCampaignCharacterSummarySchema,
@@ -429,7 +430,7 @@ function executeRollActorDiceForVisibleCharacterSync(
       throw new Error("campaign dice character ancestry is malformed");
     }
     if (actorId !== envelope.actorId) throw new CampaignDiceCharacterConflict();
-  });
+  }, true);
 }
 
 function resourceReceiptFromRetryRow(row: CommandRetryRow, envelope: CommandEnvelope): CommandReceipt {
@@ -898,7 +899,8 @@ const DICE_RETRY_INVALID_HISTORY_COUNT = `(SELECT COUNT(*) FROM campaign_events 
 
 function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: RepositoryDependencies,
   actorPrincipalId: string, input: CommandEnvelope,
-  validateLockedTarget?: (envelope: CommandEnvelope, principalId: string) => void): CommandReceipt {
+  validateLockedTarget?: (envelope: CommandEnvelope, principalId: string) => void,
+  allowControlledPlayer = false): CommandReceipt {
   const principalId = resourceIdSchema.parse(actorPrincipalId);
   const envelope = commandEnvelopeSchema.parse(input);
   if (envelope.command.type !== "roll_actor_dice") {
@@ -906,12 +908,25 @@ function executeRollActorDiceAtomic(db: DatabaseDriver.Database, dependencies: R
   }
   const command = envelope.command;
   const run = db.transaction(() => {
-    const authorized = db.prepare(`SELECT 1 FROM campaign_memberships membership
+    const authority = db.prepare(`SELECT membership.role, campaign.owner_principal_id, campaign.settings,
+        private_state.controller_principal_id
+      FROM campaign_memberships membership
       JOIN principals principal ON principal.id = membership.principal_id
       JOIN campaigns campaign ON campaign.id = membership.campaign_id
-      WHERE membership.campaign_id = ? AND membership.principal_id = ? AND
-        (membership.role = 'gm' OR (membership.role = 'owner' AND campaign.owner_principal_id = membership.principal_id))`)
-      .get(envelope.campaignId, principalId);
+      LEFT JOIN campaign_actor_private_state private_state ON private_state.campaign_id=campaign.id
+        AND private_state.actor_id=?
+      WHERE membership.campaign_id = ? AND membership.principal_id = ?`)
+      .get(envelope.actorId, envelope.campaignId, principalId) as {
+        role: string;
+        owner_principal_id: string;
+        settings: string;
+        controller_principal_id: string | null;
+      } | undefined;
+    const authorized = authority?.role === "gm"
+      || (authority?.role === "owner" && authority.owner_principal_id === principalId)
+      || (allowControlledPlayer && authority?.role === "player"
+        && authority.controller_principal_id === principalId
+        && campaignSettingsSchema.parse(JSON.parse(authority.settings)).allowPlayerDice);
     if (!authorized) throw new Error("roll actor dice command unavailable");
     validateLockedTarget?.(envelope, principalId);
     const collisions = db.prepare(`SELECT campaign_id, command_id, idempotency_key, timeline_id, actor_id,

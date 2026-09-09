@@ -1,6 +1,6 @@
 # Repository architecture
 
-This is the normative persistence guide for the single current development schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
+This is the normative persistence guide for the single current development schema. Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact tactical-map and campaign-director predecessor upgrades. It describes `server/src/repo/`; HTTP behavior belongs in [the API reference](api.md), and shared runtime schemas belong in `packages/contracts`.
 
 ## Public boundary and composition
 
@@ -26,15 +26,20 @@ RPG call          -> repo/index.ts -> createRepository() -> factory-owned SQLite
 | --- | --- |
 | `db.ts` | Stable facade, singleton-provider wiring, and public connection lifecycle re-exports. No domain query or command SQL belongs here. |
 | `db/connection.ts` | Data-directory resolution, connection ownership, `velvet.sqlite`, directory permissions, WAL, foreign keys, busy timeout, current-schema startup, singleton lifecycle, and factory connection opening. |
-| `db/schema.ts` | Atomic empty-database initialization, complete current-object inventory comparison, SQLite `quick_check`, foreign-key validation, and the delete/recreate failure message. Existing-database validation is read-only. |
-| `db/currentSchema.sql` | Sole DDL and required seed-data authority for a newly created database. Schema changes edit this file directly. |
+| `db/schema.ts` | Atomic empty-database initialization from both SQL files, complete current-object inventory comparison, SQLite `quick_check`, foreign-key validation, exact predecessor upgrade dispatch, and the delete/recreate failure message. Current-schema validation is read-only; recognized upgrades are transactional. |
+| `db/currentSchema.sql` | Base-domain DDL and required seed-data authority for a newly created database, composed with `db/campaignDmSchema.sql`. |
+| `db/campaignDmSchema.sql` | Current director control, runs, scene bindings, review-authority, narration, and related persistence objects. |
+| `db/campaignDmUpgrade.ts` | Exact pre-director and director review-authority/narration predecessor recognition, including the pre-director/pre-grounding combination; complete validation before commit. |
+| `server/src/map/schemaUpgrade.ts` | Exact map-only predecessor recognition and row-preserving map-v2 upgrade; complete validation before commit. |
 | `repoContext.ts` | Private provider bridge for legacy named wrappers. Only database setup configures it. |
 
-A missing or empty database creates the complete schema and required local-owner/reference rows in one transaction. Any nonempty database must match every current table, index, trigger, and view exactly and pass physical and foreign-key checks. Startup never upgrades, backfills, rewinds, cleans historical artifacts, imports `db.json`, or mutates a mismatched database. Version suffixes retained in domain table names are identifiers used by current repository SQL, not a supported migration lineage.
+A missing or empty database creates the complete schema and required local-owner/reference rows in one transaction. Nonempty databases must match every current table, index, trigger, and view exactly and pass physical, foreign-key, and required-reference checks, either already or after a supported exact upgrade. Startup first tries `db/campaignDmUpgrade.ts`, then `server/src/map/schemaUpgrade.ts`. The director path recognizes the exact current inventory without director objects, with or without the map-v2 changes, plus exact review-authority and narration predecessors. Pre-director campaigns receive human mode at revision zero with no delegator. The review-authority upgrade preserves historical rows while replacing membership foreign keys with principal foreign keys and installing current-authority triggers; it cancels planning/awaiting-approval runs with `director-security-upgrade-requires-new-beat`, without replaying paid work. The narration-only upgrade adds missing narration objects without resetting control or cancelling runs. The map-only path requires all non-map objects, including director objects, to be current; map upgrades preserve rows and do not infer legacy context.
+
+Complete startup validation runs inside each independent immediate upgrade transaction before commit, so failures roll back all changes. Unknown, modified, and other partially upgraded schemas are rejected without repairs. Apart from the explicit director initialization and pending-run cancellation, startup does not backfill domain state, rewind, clean historical artifacts, import `db.json`, or resume historical migration chains. Version suffixes retained in domain table names are identifiers used by current repository SQL, not a supported migration lineage. [Operations](operations.md#data-directory-and-current-schema) describes the exact supported inventories and recreation policy.
 
 ## Current schema contents
 
-`currentSchema.sql` contains the complete roleplay, campaign administration, catalog, character builder/progression, resources, combat, world, quest, story, durable adventure, agent, NPC presence, companion, exact-candidate, reroll, campaign-generation, settlement, placement, and material-delivery schema. Runtime repositories own the behavior and integrity of those domains; the SQL file owns only their current persistent layout and required initial rows.
+`currentSchema.sql` contains the roleplay, campaign administration, catalog, character builder/progression, resources, combat, world, quest, story, durable adventure, agent, NPC presence, companion, exact-candidate, reroll, campaign-generation, settlement, placement, and material-delivery schema. `campaignDmSchema.sql` adds the campaign director objects; together they define the complete current schema. Runtime repositories own domain behavior and integrity; the SQL files own the current persistent layout and required initial rows.
 
 ## Repository ownership
 

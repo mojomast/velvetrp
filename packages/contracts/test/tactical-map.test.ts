@@ -35,6 +35,11 @@ describe("tactical map contracts", () => {
     const generation = { mode: "combat", encounterId: "encounter", kind: "arena", seed: "exact-seed", width: 10, height: 10,
       tokens: [{ tokenId: "hero", label: "Hero", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false, actorId: "actor", combatantId: "combatant" }], idempotencyKey: "generate-one" };
     expect(tacticalMapGenerateRequestSchema.parse(generation)).toEqual(generation);
+    const grounded = { ...generation, grounding: { actorId: "actor", expectedLocationId: "place", expectedLocationRevision: 0 } };
+    expect(tacticalMapGenerateRequestSchema.parse(grounded)).toEqual(grounded);
+    expect(tacticalMapGenerateRequestSchema.safeParse({ ...grounded, width: 65 }).success).toBe(false);
+    expect(tacticalMapGenerateRequestSchema.safeParse({ ...grounded, tokens: [] }).success).toBe(false);
+    expect(tacticalMapGenerateRequestSchema.safeParse({ ...grounded, grounding: { ...grounded.grounding, description: "lava" } }).success).toBe(false);
     expect(tacticalMapGenerateRequestSchema.safeParse({ ...generation, mode: "exploration" }).success).toBe(false);
     const move = { actorId: "actor", destination: { x: 2, y: 2 }, previewId: "preview", expectedMapRevision: 0, expectedTokenRevision: 0, idempotencyKey: "move-one" };
     expect(tacticalMapMoveRequestSchema.parse(move)).toEqual(move);

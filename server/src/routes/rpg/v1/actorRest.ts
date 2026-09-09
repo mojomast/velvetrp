@@ -82,9 +82,10 @@ export const actorRestHttpRoutes: FastifyPluginAsync<ActorRestHttpOptions> = asy
           campaignId: campaignId.data,
           actorId: actorId.data,
         });
+        const { restId: _restId, campaignId: _campaignId, actorId: _actorId, ...receipt } = result.rest;
         return reply.code(200).send(restHttpResponseSchema.parse({
           actorState: result.actorState,
-          receipt: result.rest,
+          receipt,
         }));
       } catch (error) {
         return mapFailure(request, reply, error);

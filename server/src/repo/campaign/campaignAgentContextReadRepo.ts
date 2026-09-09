@@ -1,5 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import { npcPublicStateHttpSchema, resourceIdSchema } from "@velvet/contracts";
+import { generatedCampaignContentProviderSchema, npcPublicStateHttpSchema, resourceIdSchema } from "@velvet/contracts";
 import type {
   CampaignAgentAudience,
   CampaignAgentContextSnapshot,
@@ -210,8 +210,11 @@ export function createCampaignAgentContextReadRepository(
           LEFT JOIN campaign_npc_metadata_v32 metadata ON metadata.npc_id=npc.npc_id
           LEFT JOIN campaign_locations_v28 location ON location.campaign_id=presence.campaign_id
             AND location.location_id=presence.location_id
-          WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
-          ORDER BY presence.npc_id COLLATE BINARY`).all(campaign, sessionId) as PresentNpcRow[];
+           WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+             AND (?='dm' OR NOT EXISTS (SELECT 1 FROM campaign_generation_accepted_artifacts_v52 generated
+               WHERE generated.campaign_id=npc.campaign_id AND generated.server_resource_id=npc.npc_id
+                 AND generated.artifact_kind='npc' AND generated.visibility='gm'))
+          ORDER BY presence.npc_id COLLATE BINARY`).all(campaign, sessionId, audience.kind) as PresentNpcRow[];
         for (const row of presentNpcs) {
           const publicState = npcPublicStateHttpSchema.parse(row.public_state_json
             ? JSON.parse(row.public_state_json) as unknown
@@ -224,12 +227,12 @@ export function createCampaignAgentContextReadRepository(
       }
 
       const locationRows = audience.kind === "dm"
-        ? db.prepare(`SELECT DISTINCT location.public_name,location.public_description FROM campaign_actor_locations_v28 actor_location
+        ? db.prepare(`SELECT DISTINCT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 actor_location
             JOIN campaign_locations_v28 location ON location.campaign_id=actor_location.campaign_id AND location.location_id=actor_location.location_id
             WHERE actor_location.campaign_id=? AND actor_location.session_id=?
             ORDER BY location.public_name COLLATE BINARY,location.location_id COLLATE BINARY LIMIT 12`).all(campaign, sessionId)
         : audience.kind === "player" && targetActorId
-          ? db.prepare(`SELECT location.public_name,location.public_description FROM campaign_actor_locations_v28 current
+          ? db.prepare(`SELECT location.location_id,location.public_name,location.public_description FROM campaign_actor_locations_v28 current
               JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
               WHERE current.campaign_id=? AND current.session_id=? AND current.actor_id=?
                 AND location.visibility<>'gm' AND EXISTS(SELECT 1 FROM campaign_location_discoveries_v28 discovery
@@ -310,6 +313,92 @@ export function createCampaignAgentContextReadRepository(
         privateTargetFacts.push(`Target enemy: ${targetName}.`, `Target tactic: ${enemy.enemy_tactic}.`);
       }
 
+      // Accepted preparation is not discovered state. Restrict it to exact current places,
+      // present public NPCs and published material; never pass arbitrary canonical JSON on.
+      const publicPreparation: string[] = [];
+      let preparationSize = 0;
+      const addPreparation = (label: string, facts: (string | undefined)[]) => {
+        for (const fact of facts.flatMap((value) => value?.split(/\r?\n/) ?? [])) {
+          if (!fact) continue;
+          const line = `${label}: ${fact}`.replace(/\s+/g, " ").trim();
+          if (line.length > 1_000 || preparationSize + line.length + 1 > 4_000) continue;
+          publicPreparation.push(line);
+          preparationSize += line.length + 1;
+        }
+      };
+      const currentLocations = new Set((locationRows as Array<{ location_id: string }>).map((row) => row.location_id));
+      const presentNpcIds = new Set(sessionIsRunning ? (db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
+        WHERE campaign_id=? AND session_id=? AND state='present'`).all(campaign, sessionId) as Array<{ npc_id: string }>).map((row) => row.npc_id) : []);
+      const preparationRows = db.prepare(`SELECT artifact.artifact_key,artifact.artifact_kind,artifact.visibility,
+          artifact.canonical_json,artifact.server_resource_id,delivery.published_at
+        FROM campaign_generation_accepted_artifacts_v52 artifact
+        LEFT JOIN campaign_material_deliveries_v53 delivery USING(campaign_id,artifact_key)
+        WHERE artifact.campaign_id=? AND artifact.artifact_kind IN ('outline','location','npc','lore','scene-prompt','handout','arc')
+          AND (artifact.visibility='public' OR ?='dm')
+          AND (artifact.artifact_kind<>'location' OR artifact.server_resource_id IN (SELECT value FROM json_each(?)))
+          AND (artifact.artifact_kind<>'npc' OR artifact.server_resource_id IN (SELECT value FROM json_each(?)))
+          AND (artifact.artifact_kind<>'arc' OR artifact.visibility='gm')
+          AND (artifact.artifact_kind NOT IN ('scene-prompt','handout') OR artifact.visibility='gm' OR delivery.published_at IS NOT NULL)
+        ORDER BY CASE artifact.artifact_kind WHEN 'outline' THEN 0 WHEN 'location' THEN 1 WHEN 'npc' THEN 2 ELSE 3 END,
+          artifact.accepted_at DESC,artifact.artifact_key COLLATE BINARY LIMIT 256`).all(campaign, audience.kind,
+            JSON.stringify([...currentLocations]), JSON.stringify([...presentNpcIds])) as
+        Array<{ artifact_key: string; artifact_kind: string; visibility: string; canonical_json: string;
+          server_resource_id: string | null; published_at: string | null }>;
+      const resourceForKey = db.prepare(`SELECT server_resource_id FROM campaign_generation_accepted_artifacts_v52
+        WHERE campaign_id=? AND artifact_key=? AND visibility='public'`);
+      const locationIsCurrent = (key: string) => {
+        const resource = resourceForKey.get(campaign, key) as { server_resource_id: string } | undefined;
+        return Boolean(resource && currentLocations.has(resource.server_resource_id));
+      };
+      const npcIsPresent = (key: string) => {
+        const resource = resourceForKey.get(campaign, key) as { server_resource_id: string } | undefined;
+        return Boolean(resource && presentNpcIds.has(resource.server_resource_id));
+      };
+      const fields: Record<string, string> = { outline: "outlines", location: "locations", npc: "npcs", lore: "lore",
+        "scene-prompt": "scenePrompts", handout: "handouts", arc: "arcs" };
+      let includedOutline = false;
+      let gmPreparationSize = 0;
+      for (const row of preparationRows) {
+        let value: unknown;
+        try { value = JSON.parse(row.canonical_json); } catch { continue; }
+        const parsed = generatedCampaignContentProviderSchema.safeParse({ [fields[row.artifact_kind]!]: [value] });
+        if (!parsed.success) continue;
+        const content = parsed.data;
+        const artifact = [...content.outlines, ...content.locations, ...content.npcs, ...content.lore,
+          ...content.scenePrompts, ...content.handouts, ...content.arcs][0]!;
+        if (artifact.key !== row.artifact_key || artifact.visibility !== row.visibility) continue;
+        if (row.visibility === "gm") {
+          // The DM snapshot is already owner/GM-authorized. Other audiences never receive these plans.
+          const scene = content.scenePrompts[0], arc = content.arcs[0];
+          const plan = scene && (!scene.locationKey || locationIsCurrent(scene.locationKey))
+              && scene.npcKeys.every(npcIsPresent)
+            ? { title: scene.title, text: scene.prompt } : arc ? { title: arc.title, text: arc.summary } : null;
+          for (const paragraph of plan?.text.split(/\r?\n/).filter((line) => line.trim()) ?? []) {
+            const line = `GM preparation (possibility, not committed): ${plan!.title}: ${paragraph}`.replace(/\s+/g, " ");
+            if (line.length <= 1_000 && gmPreparationSize + line.length + 1 <= 2_000) {
+              privateTargetFacts.push(line); gmPreparationSize += line.length + 1;
+            }
+          }
+          continue;
+        }
+        const outline = content.outlines[0], location = content.locations[0], npc = content.npcs[0], lore = content.lore[0];
+        const scene = content.scenePrompts[0], handout = content.handouts[0];
+        if (outline && !includedOutline) {
+          addPreparation("Campaign premise", [outline.premise]); includedOutline = true;
+        } else if (location && row.server_resource_id && currentLocations.has(row.server_resource_id)) {
+          addPreparation(location.name, [location.description, location.atmosphere]);
+        } else if (npc && row.server_resource_id && presentNpcIds.has(row.server_resource_id)) {
+          addPreparation(`${npc.name} portrayal`, [npc.description]);
+        } else if (lore && lore.locationKeys.some(locationIsCurrent) && !lore.storyNodeKeys.length && !lore.factionKeys.length) {
+          addPreparation(lore.title, [lore.summary, ...lore.details]);
+        } else if (scene && row.published_at && (!scene.locationKey || locationIsCurrent(scene.locationKey))
+            && scene.npcKeys.every(npcIsPresent)) {
+          addPreparation(`Published scene ${scene.title}`, [scene.prompt]);
+        } else if (handout && row.published_at) {
+          addPreparation(`Published handout ${handout.title}`, [handout.content]);
+        }
+      }
+
       return {
         campaignId: campaign,
         ruleset: { id: ruleset.rulesetId, version: ruleset.rulesetVersion, descriptor: ruleset.module.descriptor },
@@ -331,6 +420,7 @@ export function createCampaignAgentContextReadRepository(
         visibleWorld,
         visibleCast,
         visibleQuests,
+        publicPreparation,
         legalActions,
         privateTargetFacts,
         attributeCandidates,

@@ -4,6 +4,7 @@ import type {
   CharacterProgressionHttpPreviewRequest, CharacterProgressionHttpState, CharacterSheetHttpResponse, ProgressionSelection,
 } from "@velvet/contracts";
 import { ApiError, ApiInputError } from "../../../api";
+import { createClientId } from "../../../utils/clientId";
 
 export interface LevelUpWizardApi {
   getProgression: (campaignId: string, campaignCharacterId: string) => Promise<CharacterProgressionHttpState>;
@@ -19,6 +20,9 @@ export interface LevelUpWizardProps {
   mode?: "standalone" | "workspace";
   onUnavailable?: () => void;
   onSheetRefreshed?: (sheet: CharacterSheetHttpResponse) => void;
+  blocked?: boolean;
+  reauthorize?: () => Promise<boolean>;
+  onLockChange?: (locked: boolean) => void;
 }
 
 type ApplyLock = { token: symbol; phase: "writing" | "uncertain"; message: string };
@@ -26,7 +30,7 @@ const applyLocks = new Map<string, ApplyLock>();
 const applyListeners = new Set<(key: string, lock: ApplyLock | null) => void>();
 const characterKey = (campaignId: string, characterId: string) => `${campaignId.length}:${campaignId}${characterId}`;
 function publish(key: string, lock: ApplyLock | null) { if (lock) applyLocks.set(key, lock); else applyLocks.delete(key); for (const listener of applyListeners) listener(key, lock); }
-function intentKey(kind: string) { const value = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`; return `ui-${kind}-${value}`; }
+function intentKey(kind: string) { return `ui-${kind}-${createClientId()}`; }
 function knownNonCommit(error: unknown) { return error instanceof ApiInputError || (error instanceof ApiError && [400, 404, 409, 415, 422].includes(error.status)); }
 function isMissingProgression(error: unknown) { return error instanceof ApiError && error.status === 404 && error.code === "RPG_CHARACTER_PROGRESSION_NOT_FOUND"; }
 function optionKey(option: ProgressionSelection["ability"]) { return `${option.packId}:${option.packVersion}:${option.definitionId}`; }
@@ -38,7 +42,7 @@ function selectionKey(selections: ProgressionSelection[]): string {
 export function resetLevelUpWizardModuleStateForTests(): void { applyLocks.clear(); applyListeners.clear(); }
 
 /** Applies one exact server preview. A document-lifetime lock prevents replay after an ambiguous outcome. */
-export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "standalone", onUnavailable = () => undefined, onSheetRefreshed = () => undefined }: LevelUpWizardProps) {
+export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "standalone", onUnavailable = () => undefined, onSheetRefreshed = () => undefined, blocked = false, reauthorize, onLockChange }: LevelUpWizardProps) {
   const key = characterKey(campaignId, campaignCharacterId);
   const [state, setState] = useState<CharacterProgressionHttpState | null>(null);
   const [preview, setPreview] = useState<CharacterProgressionHttpPreview | null>(null);
@@ -59,6 +63,11 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
   const retryRef = useRef<HTMLButtonElement>(null);
   const unavailableRef = useRef(onUnavailable); unavailableRef.current = onUnavailable;
   const sheetRefreshedRef = useRef(onSheetRefreshed); sheetRefreshedRef.current = onSheetRefreshed;
+  const authorityRef = useRef({ blocked, reauthorize }); authorityRef.current = { blocked, reauthorize };
+  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
+  useEffect(() => { onLockChange?.(Boolean(lock) || checking); }, [lock, checking, onLockChange]);
+  useEffect(() => () => onLockChange?.(false), [onLockChange]);
 
   const focusStatus = useCallback((generation: number, retry = false) => queueMicrotask(() => {
     if (mountedRef.current && generationRef.current === generation) (retry ? retryRef.current : statusRef.current)?.focus();
@@ -125,6 +134,11 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
   }
 
   async function applyOnce() {
+    if (authorityRef.current.blocked || checkingRef.current) return;
+    checkingRef.current = true; setChecking(true);
+    try {
+    if (authorityRef.current.reauthorize && !await authorityRef.current.reauthorize()) return;
+    if (!mountedRef.current || authorityRef.current.blocked) return;
     const currentSelectionKey = selectionKey(selections);
     if (!preview || previewSelectionKey !== currentSelectionKey || applyLocks.has(key)) return;
     const token = Symbol(key); const entry: ApplyLock = { token, phase: "writing", message: "Applying this reviewed advancement once…" };
@@ -156,6 +170,8 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
       else publish(key, { token, phase: "uncertain", message: "The apply outcome is uncertain. Applying again is locked until authoritative refresh; no write will be retried." });
       if (mountedRef.current && activeRef.current === key) { setError(knownNonCommit(applyError) ? "Advancement was rejected. The reviewed preview and sheet remain unchanged." : "The apply outcome is uncertain. Refresh authoritative state before continuing."); focusStatus(generationRef.current); }
     }
+    } catch { if (mountedRef.current) setError("Authorization could not be refreshed. No advancement was submitted."); }
+    finally { checkingRef.current = false; if (mountedRef.current) setChecking(false); }
   }
 
   if (omitted) return null;
@@ -171,7 +187,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
     {pending.length > 0 && <fieldset disabled={Boolean(lock)}><legend>All required choices</legend>{pending.map((choice) => <label className="field" key={choice.choiceId}><span>Level {choice.level} · required ability</span><select value={selections.find((item) => item.choiceId === choice.choiceId) ? optionKey(selections.find((item) => item.choiceId === choice.choiceId)!.ability) : ""} onChange={(event) => { const ability = choice.options.find((item) => optionKey(item) === event.target.value); if (ability) choose(choice.choiceId, ability); }}><option value="">Choose an ability</option>{choice.options.map((option) => <option key={optionKey(option)} value={optionKey(option)}>{option.definitionId}</option>)}</select></label>)}</fieldset>}
     <button className="ghost" disabled={Boolean(lock) || !allSelected} onClick={() => void updatePreview()}>Calculate exact changes</button>
     {previewCurrent && preview && <section className="level-crossings" aria-labelledby="level-crossings-heading"><h3 id="level-crossings-heading">Every crossed level</h3>{preview.levels.length === 0 ? <p>No levels are currently ready to apply.</p> : <ol>{preview.levels.map((level) => <li key={level.level}><h4>Level {level.level}</h4><dl><div><dt>Health</dt><dd>{level.hp.currentBefore} / {level.hp.maxBefore} → {level.hp.currentAfter} / {level.hp.maxAfter} (+{level.hp.gain} max)</dd></div><div><dt>Proficiency</dt><dd>{level.proficiency.before} → {level.proficiency.after}</dd></div><div><dt>Maximum health derived</dt><dd>{level.derivedBefore.maxHp} → {level.derivedAfter.maxHp}</dd></div><div><dt>Fixed abilities</dt><dd>{level.fixedAbilities.map((item) => item.definitionId).join(", ") || "None"}</dd></div><div><dt>Selected abilities</dt><dd>{level.selectedAbilities.map((item) => item.definitionId).join(", ") || "None"}</dd></div><div><dt>Spells</dt><dd>{level.spells.map((item) => item.definitionId).join(", ") || "None"}</dd></div>{level.resources.map((resource) => <div key={resource.resourceId}><dt>{resource.resourceId}</dt><dd>{resource.currentBefore}/{resource.maxBefore} → {resource.currentAfter}/{resource.maxAfter}</dd></div>)}</dl></li>)}</ol>}</section>}
-    {previewCurrent && preview.levels.length ? <button className="primary" disabled={Boolean(lock) || !allSelected} onClick={() => void applyOnce()}>Apply reviewed levels once</button> : null}
+    {previewCurrent && preview.levels.length ? <button className="primary" disabled={blocked || checking || Boolean(lock) || !allSelected} onClick={() => void applyOnce()}>Apply reviewed levels once</button> : null}
     {receipt && <p className="builder-receipt" role="status">Receipt confirmed revision {receipt.revisionBefore} → {receipt.revisionAfter} at {new Date(receipt.occurredAt).toLocaleString()}.</p>}
   </section>;
 }

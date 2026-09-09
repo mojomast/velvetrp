@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../api";
 import { beginNpcPresenceMutation, releaseNpcPresenceMutation, resetNpcPresenceMutationRegistryForTests } from "../narrativeMutationRegistry";
@@ -26,7 +26,90 @@ function api(overrides: Partial<CampaignContextDrawerApi> = {}): CampaignContext
 const props = { campaignId: "campaign", sessionId: "session", selectedActorId: "actor", playableActorIds: ["actor"], authorizationGeneration: 1 } as const;
 
 describe("CampaignContextDrawer NPC presence", () => {
-  afterEach(() => { cleanup(); localStorage.clear(); resetNpcPresenceMutationRegistryForTests(); });
+  it("grounds table generation in the exact actor location row, not the world revision", async () => {
+    const client = api({ getCampaignWorld: vi.fn().mockResolvedValue({ revision: 900, data: {
+      currentLocations: [{ actorId: "other", locationId: "elsewhere", revision: 99, updatedAt: at }, { actorId: "actor", locationId: "gate", revision: 7, updatedAt: at }],
+      visibleLocations: [{ locationId: "gate", parentLocationId: null, name: "Old North Gate", description: "Weathered stone above the harbor." }], visibleConnections: [],
+    } }), getTacticalMap: vi.fn().mockRejectedValue(new ApiError(404, "missing")), generateTacticalMap: vi.fn().mockResolvedValue({}), previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
+    render(<CampaignContextDrawer {...props} audience="gm" mapsOnly api={client} />);
+    await screen.findByRole("button", { name: "Generate tactical map" }, { timeout: 5000 });
+    expect(screen.getByRole("heading", { name: "Old North Gate" })).toBeTruthy();
+    fireEvent.click(screen.getByText("About this location"));
+    expect(screen.getByText("Weathered stone above the harbor.")).toBeTruthy();
+    expect((screen.getByLabelText("Exact seed") as HTMLInputElement).value).toBe("velvet-map:gate");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Generate tactical map" }));
+    await waitFor(() => expect(client.generateTacticalMap).toHaveBeenCalledWith("campaign", "session", expect.objectContaining({ grounding: { actorId: "actor", expectedLocationId: "gate", expectedLocationRevision: 7 } })));
+  });
+
+  it.each(["authorization", "location"])("retains the map DOM through refreshKey GETs but clears it on %s changes", async (boundary) => {
+    const canvasMock = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const snapshot = { campaignId: "campaign", sessionId: "session", encounterId: null, mode: "exploration", mapRevision: 1, tokenRevision: 1, controlledTokenId: "hero", movement: null, projection: { mapId: "map", width: 2, height: 1, grid: { kind: "square", feetPerCell: 5 }, tiles: [{ position: { x: 0, y: 0 }, terrain: "floor", visibility: "visible" }], tokens: [{ tokenId: "hero", label: "Private viewpoint", position: { x: 0, y: 0 }, footprint: { width: 1, height: 1 }, disposition: "friendly" }], reachable: [], authoritativePath: null } };
+    let resolve!: (value: unknown) => void;
+    const get = vi.fn().mockResolvedValueOnce(snapshot).mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const client = api({ getTacticalMap: get, generateTacticalMap: vi.fn(), previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
+    const rendered = render(<CampaignContextDrawer {...props} audience="player" api={client} />);
+    const controls = await screen.findByRole("group", { name: "Tactical map controls" }, { timeout: 5000 });
+    const canvas = rendered.container.querySelector("canvas");
+    fireEvent.keyDown(controls, { key: "ArrowRight" });
+    rendered.rerender(<CampaignContextDrawer {...props} audience="player" api={client} refreshKey={1} />);
+    expect(rendered.container.querySelector("canvas")).toBe(canvas);
+    await act(async () => resolve(snapshot));
+    expect(rendered.container.querySelector("canvas")).toBe(canvas);
+    expect(screen.getByText(/Map cursor: 2, 1/)).toBeTruthy();
+    if (boundary === "authorization") rendered.rerender(<CampaignContextDrawer {...props} audience="player" api={client} refreshKey={1} authorizationGeneration={2} />);
+    else {
+      vi.mocked(client.getCampaignWorld).mockResolvedValue({ revision: 2, data: { currentLocations: [{ actorId: "actor", locationId: "road", revision: 2, updatedAt: at }], visibleLocations: [], visibleConnections: [] } });
+      rendered.rerender(<CampaignContextDrawer {...props} audience="player" api={client} refreshKey={2} />);
+      await waitFor(() => expect(canvas?.isConnected).toBe(false));
+    }
+    expect(canvas?.isConnected).toBe(false);
+    expect(rendered.container.querySelector("canvas")).toBeNull();
+    expect(screen.queryByText(/Private viewpoint/)).toBeNull();
+    canvasMock.mockRestore();
+  });
+
+  afterEach(() => { cleanup(); localStorage.clear(); resetNpcPresenceMutationRegistryForTests(); vi.unstubAllGlobals(); });
+
+  it.each(["verified", "missing", "ambiguous", "stale", "read-only"])("checks exact combat roster binding: %s", async (scenario) => {
+    const actor = { kind: "actor", actorId: "actor", combatantId: "selected-combatant", team: "allies" };
+    const enemy = { kind: "enemy", combatantId: "enemy-combatant", team: "enemies", template: null };
+    const encounter = { encounterId: "encounter", sessionId: "session", name: "Gate skirmish", status: "active", combatId: "combat", revision: 2, combatants: [enemy, actor], createdAt: at, updatedAt: at };
+    const list = vi.fn().mockResolvedValue({ encounters: [encounter] });
+    if (scenario === "stale") list.mockResolvedValueOnce({ encounters: [encounter] }).mockResolvedValue({ encounters: [{ ...encounter, encounterId: "replacement" }] });
+    const generate = vi.fn().mockResolvedValue({});
+    const combatants = scenario === "missing" ? [enemy] : scenario === "ambiguous" ? [enemy, actor, { ...actor, combatantId: "duplicate" }] : [enemy, actor];
+    const combat = { round: 3, currentCombatant: "enemy-combatant", combatants: combatants.map((entry) => ({ ...entry, hitPoints: 10, maximumHitPoints: 10, status: "active" })), legalActions: [], revision: 2 };
+    if (scenario === "verified") vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => new Response(JSON.stringify(String(input).includes("/combats/") ? combat : { encounters: [encounter] }))));
+    const client = api({ listCampaignEncounters: list, getCombatState: vi.fn().mockResolvedValue(combat),
+      getTacticalMap: vi.fn().mockRejectedValue(new ApiError(404, "missing")), generateTacticalMap: generate, previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
+    const openCombat = vi.fn();
+    render(<CampaignContextDrawer {...props} mapsOnly audience="gm" readOnly={scenario === "read-only"} api={client} onOpenCombat={openCombat} />);
+    fireEvent.click(screen.getByRole("button", { name: "Combat grid" }));
+    fireEvent.click(screen.getByText("Combat readiness"));
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    if (scenario === "verified" || scenario === "read-only") await screen.findByText(/Verified selected combatant: selected-combatant/);
+    if (scenario === "verified") {
+      expect(screen.getByText(/Another combatant has the turn/)).toBeTruthy();
+      await screen.findByRole("group", { name: "Combat roster placement" });
+      for (const [index, entry] of encounter.combatants.entries()) {
+        for (const [field, value] of Object.entries({ x: String(index + 2), y: "2", width: "1", height: "1", visibility: index ? "visible" : "hidden", disposition: index ? "friendly" : "hostile" })) {
+          fireEvent.change(screen.getByLabelText(`${entry.combatantId} ${field}`), { target: { value } });
+        }
+      }
+      fireEvent.click(screen.getByRole("checkbox"));
+      fireEvent.click(await screen.findByRole("button", { name: "Generate tactical map" }));
+      await waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+      expect(generate).toHaveBeenCalledWith("campaign", "session", expect.objectContaining({ encounterId: "encounter", tokens: [
+        { tokenId: "enemy-combatant", combatantId: "enemy-combatant", actorId: null, label: "enemy-combatant", position: { x: 1, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "hostile", hidden: true },
+        { tokenId: "selected-combatant", combatantId: "selected-combatant", actorId: "actor", label: "actor", position: { x: 2, y: 1 }, footprint: { width: 1, height: 1 }, disposition: "friendly", hidden: false },
+      ] }));
+    } else {
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Generate tactical map" })).toBeNull());
+      expect(generate).not.toHaveBeenCalled();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "Open combat controls" })); expect(openCombat).toHaveBeenCalledOnce();
+  });
 
   it("renders only the authoritative player cast, not the management roster or private fields", async () => {
     const client = api(); render(<CampaignContextDrawer {...props} audience="player" api={client} />);

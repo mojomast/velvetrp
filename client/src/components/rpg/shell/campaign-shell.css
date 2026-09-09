@@ -1,0 +1,17 @@
+.control-plane { background: #191d1b; }
+.control-plane .control-rail { background: #151916; border-color: #383d36; }
+.control-plane .control-identity strong { font-family: Georgia, serif; font-weight: 500; }
+.control-plane .control-nav button[aria-current="page"] { background: #30382c; border-color: #697354; }
+.control-plane .control-toolbar { border-color: #383d36; background: #1d221e; }
+.control-plane .control-workspace { min-width: 0; }
+.control-plane .control-workspace-failure { display: grid; align-content: center; justify-items: start; min-height: calc(100dvh - 62px); padding: clamp(28px, 6vw, 72px); background: #1d221e; }
+.control-plane .control-workspace-failure h1 { margin: 8px 0 12px; font: clamp(30px, 5vw, 52px)/1.05 Georgia, serif; }
+.control-plane .control-workspace-failure p { max-width: 54ch; margin: 0; color: var(--muted); }
+.control-plane .control-workspace-failure-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.control-plane .control-workspace-failure:focus { outline: 2px solid var(--accent); outline-offset: -6px; }
+@media (max-width: 760px) {
+  .control-plane .control-toolbar { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+  .control-plane .control-toolbar nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  .control-plane .control-nav { overflow-x: auto; }
+  .control-plane .control-workspace-failure { min-height: 55dvh; padding: 28px 18px; }
+}

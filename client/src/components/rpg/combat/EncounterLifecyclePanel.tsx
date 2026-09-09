@@ -1,6 +1,7 @@
 import type { CombatEndCommandResponse, CombatReadResponse, EncounterCreateRequest, EncounterPublic, EncounterSetupCandidatesResponse } from "@velvet/contracts";
 import { useEffect, useRef, useState } from "react";
 import { createCampaignEncounter, getEncounterSetupCandidates } from "../../../api";
+import { createClientId } from "../../../utils/clientId";
 
 export interface EncounterLifecycleApi {
   listEncounters: (campaignId: string) => Promise<{ encounters: EncounterPublic[] }>;
@@ -14,7 +15,7 @@ export interface EncounterLifecycleApi {
 type Pending = { campaignId: string; encounterId: string; combatId: string | null; operation: "start" | "end"; startedAt: string }
   | { campaignId: string; operation: "create"; request: EncounterCreateRequest; startedAt: string };
 const key = (campaignId: string) => `velvet.encounter-lifecycle.v1:${campaignId}`;
-const commandId = () => `encounter-ui-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+const commandId = () => `encounter-ui-${createClientId()}`;
 const enemyKey = (enemy: EncounterSetupCandidatesResponse["enemies"][number]) => `${enemy.template.packId}\u0000${enemy.template.packVersion}\u0000${enemy.template.definitionId}`;
 const matchesCreatedEncounter = (encounter: EncounterPublic, request: EncounterCreateRequest) => encounter.sessionId === request.sessionId
   && encounter.name === request.name && encounter.status === "preparing" && encounter.combatId === null

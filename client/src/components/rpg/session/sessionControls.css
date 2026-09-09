@@ -1,0 +1,8 @@
+.session-controls { border: 1px solid var(--border-color, #666); border-radius: 12px; padding: 1rem; margin-block: 1rem; }
+.session-controls header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.session-controls h2, .session-controls h3 { margin-block: .4rem; }
+.session-controls ol { display: flex; flex-wrap: wrap; gap: 2rem; padding-inline-start: 1.5rem; }
+.session-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 1.25rem; }
+.session-controls button { white-space: normal; margin-block: .25rem; }
+.session-review { border-inline-start: 3px solid currentColor; padding: .75rem; margin-block-start: 1rem; }
+.session-review button + button { margin-inline-start: .75rem; }

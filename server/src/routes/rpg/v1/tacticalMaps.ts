@@ -16,6 +16,7 @@ import { sendApiProblem } from "../../../http/problem.js";
 import {
   TacticalMapAuthorizationError,
   TacticalMapConflictError,
+  TacticalMapLocationMismatchError,
   TacticalMapStaleError,
   TacticalMapUnavailableError,
   type TacticalMapRepository,
@@ -32,6 +33,7 @@ function unavailable(request: FastifyRequest, reply: Parameters<typeof sendApiPr
   return sendApiProblem(request, reply, 404, "RPG_TACTICAL_MAP_NOT_FOUND", "Tactical map not found");
 }
 function failure(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1], error: unknown) {
+  if (error instanceof TacticalMapLocationMismatchError) return sendApiProblem(request, reply, 409, "RPG_TACTICAL_MAP_LOCATION_MISMATCH", "Map is not prepared for the actor's current location; refresh world location before preparing a map");
   if (error instanceof TacticalMapAuthorizationError || error instanceof TacticalMapUnavailableError) return unavailable(request, reply);
   if (error instanceof TacticalMapStaleError) return sendApiProblem(request, reply, 409, "RPG_TACTICAL_MAP_STALE", "Tactical map revisions are stale; request a new preview");
   if (error instanceof TacticalMapConflictError) return sendApiProblem(request, reply, 409, "RPG_TACTICAL_MAP_CONFLICT", "Tactical map movement is not legal in the current state");

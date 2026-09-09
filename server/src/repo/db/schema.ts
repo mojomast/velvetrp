@@ -1,7 +1,10 @@
 import DatabaseDriver from "better-sqlite3";
 import { readFileSync } from "node:fs";
+import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
+import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 
-const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8");
+const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -85,7 +88,10 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       })();
       return;
     }
-    assertCurrentDatabase(db, databasePath);
+    if (!upgradeCampaignDmSchema(db, schemaObjects(db), expectedObjects(), () => assertCurrentDatabase(db, databasePath))
+      && !upgradeTacticalMapSchema(db, schemaObjects(db), expectedObjects(), () => assertCurrentDatabase(db, databasePath))) {
+      assertCurrentDatabase(db, databasePath);
+    }
   } catch (error) {
     if (error instanceof CurrentSchemaError) throw error;
     const reason = error instanceof Error ? error.message : "SQLite validation failed";

@@ -51,7 +51,7 @@ Changing an algorithm's output requires a new version identifier so saved proven
 
 Four strict no-store operations provide GM generation, actor projection, movement preview, and movement command. Generation and movement are never automatically retried. A missing or malformed response after issuing either write is ambiguous; clients perform an authoritative GET-only refresh and require a fresh preview before another move.
 
-Repository idempotent move replay returns the retained receipt without spending again, even after turn advance or restart, plus a current snapshot. Lookup remains scoped to the active map; commands on a replaced map are not recovered through the new active-map endpoint. Schema changes use fresh development stores, not an installed-database migration.
+Repository idempotent move replay returns the retained receipt without spending again, even after turn advance or restart, plus a current snapshot. Lookup remains scoped to the active map; commands on a replaced map are not recovered through the new active-map endpoint. Map-v2 upgrades recognize exact pre-grounding schemas, preserving existing rows without inventing legacy map context. Startup also supports narrowly recognized exact campaign-director predecessors, including the pre-director/pre-grounding combination. Complete startup validation occurs before commit and rolls back the upgrade on failure. All other unknown or partially upgraded schemas reject without repairs; see [Operations](operations.md#data-directory-and-current-schema) for the exact supported shapes.
 
 The current trusted-local routes use fixed `local-owner` authority on loopback. Repository authorization still derives campaign role and actor control. This is not a remote authentication boundary.
 

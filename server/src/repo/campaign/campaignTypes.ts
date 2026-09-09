@@ -76,6 +76,9 @@ import type { StoryRepository } from "../storyRepo.js";
 import type { RestRepository } from "../restRepo.js";
 import type { WorldRepository } from "../worldRepo.js";
 import type { CampaignGenerationRepository } from "../campaignGenerationRepo.js";
+import type { CampaignRoomActivationRepository } from "../campaignRoomActivationRepo.js";
+import type { CampaignStartingLocationRepository } from "../campaignStartingLocationRepo.js";
+import type { CampaignDmRepository } from "../campaignDmRepo.js";
 import type { TacticalMapRepository } from "../tacticalMapRepo.js";
 import type { CampaignAdministrationIntegrationRepository } from "../campaignAdministrationIntegrationRepo.js";
 
@@ -192,7 +195,7 @@ export interface OriginalStarterCampaignCharacterCreationResult {
 type SynchronousCallback<T> = (repository: RepositoryUnitOfWork) =>
   T & (T extends PromiseLike<unknown> ? never : unknown);
 
-export interface Repository extends RepositoryUnitOfWork, CampaignAdministrationRepository, CampaignAdministrationIntegrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, AdventureCheckRepository, AdventureInventoryRepository, AdventureCommerceRepository, AdventurePowerRestRepository, AdventureQuestProgressionRepository, PowerRepository, SpellcastingRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository, TacticalMapRepository {
+export interface Repository extends RepositoryUnitOfWork, CampaignDmRepository, CampaignRoomActivationRepository, CampaignStartingLocationRepository, CampaignAdministrationRepository, CampaignAdministrationIntegrationRepository, ContentCatalogRepository, CharacterBuilderRepository, CharacterProgressionRepository, ActorResourceRepository, InventoryRepository, EconomyRepository, RestRepository, CheckRepository, AdventureCheckRepository, AdventureInventoryRepository, AdventureCommerceRepository, AdventurePowerRestRepository, AdventureQuestProgressionRepository, PowerRepository, SpellcastingRepository, EffectRepository, EncounterRepository, WorldRepository, QuestRepository, StoryRepository, AdventureTurnRepository, CompanionRepository, ExactCandidateRepository, ExactCandidateProviderBridgeRepository, CampaignGenerationRepository, TacticalMapRepository {
   /** Explicit built-in setup path; no caller-supplied catalog data or identity. */
   installMechanicsStarterCatalog(actorPrincipalId: string): import("@velvet/contracts").OwnerCatalogProjection;
   configureMechanicsStarterCatalog(actorPrincipalId: string, campaignId: string, input: { expectedRevision: number; idempotencyKey: string }): import("@velvet/contracts").CampaignCatalogConfigurationResult;

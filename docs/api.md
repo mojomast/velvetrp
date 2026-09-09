@@ -25,7 +25,7 @@ Structured and normal HTTP responses include `X-Request-Id`. Intentionally prese
 
 `GET /rpg/v1/features` exposes the M0 RPG boundary as `{ campaign, mechanics, combat, studio, remoteAuthentication }`. Every flag defaults to `false` and is enabled only by the exact value `true` in `FEATURE_RPG_CAMPAIGN`, `FEATURE_RPG_MECHANICS`, `FEATURE_RPG_COMBAT`, `FEATURE_RPG_STUDIO`, or `FEATURE_REMOTE_AUTHENTICATION`. These are rollout controls, not authorization.
 
-Development databases use one current schema and are disposable; schema changes require deleting and recreating `velvet.sqlite`. Startup does not perform upgrades. The current schema changes in this tree therefore require recreating the development database. The trusted-local RPG surface has 130 counted explicit method/path operations. The inventory below includes all 131 explicit non-HEAD registrations and classifies `GET /api/rpg/v1/features` separately as discovery. The published count excludes that one discovery row and every Fastify-generated `HEAD` alias. A path registered for multiple methods counts once per method. Runtime Fastify registration is the executable authority; this table is the sole checked documentation inventory.
+Development databases use one current schema and are disposable; schema changes require deleting and recreating `velvet.sqlite`, except for narrowly recognized exact tactical-map and campaign-director predecessor upgrades. These cover pre-director schemas with or without map v2, exact director review-authority/narration predecessors, and the exact map-only predecessor. Each upgrade validates before commit and rolls back on failure; every other unknown or partially upgraded schema is rejected without repair. [Operations](operations.md#data-directory-and-current-schema) owns the exact persistence boundary. The trusted-local RPG surface has 144 counted explicit method/path operations. The inventory below includes all 145 explicit non-HEAD registrations and classifies `GET /api/rpg/v1/features` separately as discovery. The published count excludes that one discovery row and every Fastify-generated `HEAD` alias. A path registered for multiple methods counts once per method. Runtime Fastify registration is the executable authority; this table is the sole checked documentation inventory.
 
 Campaign administration and transfer require the campaign feature. Mechanics, actor, world, NPC, faction, quest, story, campaign-play, adventure-turn, and most generation routes require campaign plus mechanics. Encounter, combat, reviewed campaign-content generation, and generated foundation/planning/material routes require campaign plus mechanics plus combat. Feature flags remain rollout controls, not permissions. There is no general live exact-candidate generation/selection HTTP or client selection surface. The manual actor travel route and the narrow internal provider-selected travel and quest bridges are separate; no other candidate bridge should be inferred.
 
@@ -45,6 +45,8 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `GET` | `/api/rpg/v1/adventure-turns/:turnId` | operation |
 | `GET` | `/api/rpg/v1/adventure-turns/reconcile-initial` | operation |
 | `GET` | `/api/rpg/v1/campaign-content-drafts/:draftId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-readiness` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/starting-location` | operation |
 | `GET` | `/api/rpg/v1/campaigns` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId` | operation |
 | `GET` | `/api/rpg/v1/campaigns/:campaignId/actors/:actorId/inventory` | operation |
@@ -109,6 +111,9 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `POST` | `/api/rpg/v1/adventure-turns/:turnId/confirm` | operation |
 | `POST` | `/api/rpg/v1/adventure-turns/stream` | operation |
 | `POST` | `/api/rpg/v1/campaign-content-drafts` | operation |
+| `POST` | `/api/rpg/v1/campaign-content-drafts/reconcile` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/starting-location-commands` | operation |
 | `POST` | `/api/rpg/v1/campaign-content-drafts/:draftId/apply` | operation |
 | `POST` | `/api/rpg/v1/campaign-imports` | operation |
 | `POST` | `/api/rpg/v1/campaign-imports/:importId/apply` | operation |
@@ -165,7 +170,82 @@ Campaign administration and transfer require the campaign feature. Mechanics, ac
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/mechanics-starter-setup` | operation |
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/rooms` | operation |
 | `PUT` | `/api/rpg/v1/campaigns/:campaignId/starter-setup` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/dm` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/dm/mode-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/dm/scene-binding-commands` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId` | operation |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/proposal` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/beat-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/decision-commands` | operation |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/resume-commands` | operation |
 <!-- rpg-operation-inventory:end -->
+
+### Campaign director
+
+These nine registered operations require campaign plus mechanics features and use
+fixed trusted-local `local-owner`, not identity headers. Every route rejects query
+parameters and sets `private, no-store`; GETs have no implicit HEAD and reject bodies.
+Writes require strict JSON. Paths below include `/api`.
+
+| Method | Route | Request and result |
+| --- | --- | --- |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/dm` | No body; returns `{ campaignId, mode, revision }`. Default mode is `human`, revision zero. |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/dm/mode-commands` | `{ mode: "human"|"ai", expectedRevision, idempotencyKey }`; owner/GM only, returns control; no provider dispatch. |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/dm/scene-binding-commands` | `{ nodeId, evidence: { kind: "check-turn"|"quest-objective"|"encounter", targetId }, expectedStoryRevision, idempotencyKey }`; owner/GM-only, provider-free semantic evidence binding; returns the accepted request, not a completion receipt. |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm` | No body; returns `{ control, runs }`, at most 50 public run projections. |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId` | No body; returns the public run for read-only recovery. |
+| `GET` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/proposal` | No body; owner/GM-only `{ run, proposal }`, where proposal is null or `{ candidateId, digest, action, label }`. |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/beat-commands` | `{ intent: "open"|"continue", expectedModeRevision, idempotencyKey, evidenceTurnId? }`; returns public run after bounded orchestration. |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/decision-commands` | `{ decision: "approved"|"rejected", expectedRevision, idempotencyKey }`; owner/GM review of the exact proposal; returns public run. |
+| `POST` | `/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/runs/:runId/resume-commands` | Exactly `{}`; explicitly resumes the existing run, never creates a replacement identity; returns public run. |
+
+Public runs contain `runId`, `campaignId`, `sessionId`, `intent`, `mode`,
+`modeRevision`, `revision`, `state`, nullable `narration`, at most one safe
+`{ action, summary }` receipt, `blockers`, and `createdAt`. States are `planning`,
+`awaiting-approval`, `completed`, `blocked`, `cancelled`, and `unknown`. Private
+context, candidates, provider prose, and proposal digests are not public history.
+The supported action vocabulary is `encounter-materialize`, `encounter-start`,
+`enemy-turn`, `encounter-complete`, `reveal-node`, `resolve-node`, and `reveal-clue`.
+Only advertised, fresh, legal candidates execute; the model may select null to hold.
+Prepared descriptions alone do not prove scene completion or award rewards.
+
+AI `resolve-node` requires fresh committed evidence after the node's latest update
+and an exact GM-authored node/source binding. The binding target must exist in the
+same campaign; current story revision and exact idempotency identity are checked.
+Binding does not manufacture success, mutate node status, or authorize arbitrary
+successful checks/objectives/encounters to resolve unrelated scenes. Without that
+relationship the director blocks AI resolution with
+`scene-resolution-requires-gm-binding-or-human-adjudication`; human mode can offer
+an explicit adjudication proposal instead. GM-only generated nodes/clues produce
+`story-public-rendering-required`: author a separate reviewed public-safe rendering,
+not a prompt asking the narrator to redact private preparation. Scene binding has
+no dedicated browser editor or automatic public-conversion operation.
+
+Human mode requires owner/GM suggestion requests and exact approval. Persisted AI
+delegation permits eligible players to request a beat under the same server rules.
+Takeover revokes future delegation, not committed mechanics or an in-flight charge.
+Each beat uses the existing configured provider for at most one private planning
+call and one isolated public narration call, each with a 30-second deadline, bounded
+aggregate tokens/cost, and no paid retries. Approval may dispatch narration but does
+not replan. Narration failure preserves committed effects and uses safe fallback.
+
+GETs and mode changes are provider-free. Reconcile history and the saved run before
+explicit recovery; preserve exact request keys after ambiguous responses. Unknown
+outcomes must not be replaced with a new paid request. Loading/focus/polling never
+POST, and opening never submits a fake adventure declaration. Success is 200;
+malformed requests are 400, wrong media 415, unavailable/denied DM resources
+`404 RPG_DM_NOT_FOUND`, conflicts `409 RPG_DM_CONFLICT`, and unexpected failures
+redacted `500 RPG_INTERNAL_ERROR`. Disabled features return `404 RPG_ROUTE_NOT_FOUND`.
+See [director controls and limitations](ai-dungeon-master.md).
+
+### Campaign preparation and generation recovery
+
+Starting-location and room-activation routes require campaign plus mechanics flags, use fixed `local-owner`, reject query parameters, require JSON for writes, and return `private, no-store`. Their GETs disable implicit HEAD and reject request bodies. Successful reads and writes return 200 with strict shared-contract validation.
+
+- `GET /rpg/v1/campaigns/:campaignId/starting-location` reads the authoritative designation. `POST /rpg/v1/campaigns/:campaignId/starting-location-commands` accepts `campaignStartingLocationDesignationRequestSchema` with the public location, expected revision, and idempotency key. Missing/denied state is 404; stale/conflicting state is 409. Unexpected 500 outcomes require GET reconciliation without automatic retry.
+- `GET /rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-readiness` reads readiness and activation state. `POST /rpg/v1/campaigns/:campaignId/rooms/:sessionId/activation-commands` accepts `campaignRoomActivationRequestSchema` and returns readiness plus a receipt bound to the submitted revision/key. Missing state is 404 and conflicts are 409. Read readiness on conflict; an unknown 500 outcome must be reconciled using the identical activation request, not a new request identity.
+- `POST /rpg/v1/campaign-content-drafts/reconcile` is a provider-free recovery read transported as POST with `campaignContentGenerationRequestSchema`. It retains the generation lane's campaign/mechanics/combat gates and `no-store`, verifies campaign authority, and looks up the exact logical request digest and idempotency key without starting another generation attempt. The 200 response carries `campaignId`, `idempotencyKey`, `state`, `attempt`, and nullable `draftId`; states include `not-found` and `outcome-uncertain` as well as stored call states. It neither applies content nor authorizes an automatic paid retry. See [Campaign generation](campaign-generation.md) and [Hydration CLI](hydration-cli.md).
 
 ### Tactical maps (4 operations)
 
@@ -220,7 +300,7 @@ Slice 88 changes no schema or HTTP operation count. Its first-review remediation
 
 Setup has dual authority: fixed `local-owner` must be the sole canonical local application owner and the campaign pointer's sole canonical owner membership/principal. Inspection validates attributable campaign data before raw configuration identity, allowing exact configured starter namespace failures to become stable conflicts without hiding unrelated corruption. One preflight snapshot and both specialized immediate write transactions validate the full authority graph, campaign setup state, reserved exact profile, reserved pack across all versions, and complete/captured definition namespace before the first write. Exact manifest installation runs first, exact configuration second, then authoritative detail proof. This is convergent, not atomic: an install may remain after a valid first commit. Missing, extra, malformed, captured, wrong-version, unsealed, or incomplete reserved state conflicts without overwrite or repair. There is no hidden retry or automatic startup. The client exposes setup only to an exact owner, requires confirmation, binds success to owner/exact content, and uses GET—not an automatic PUT—to reconcile ambiguity. In-app back navigation is disabled while a mutation is in memory and reload receives a warning, but browsers cannot guarantee reload cancellation; a completed full reload remains ambiguous and must not be treated as permission to retry.
 
-All 130 counted current RPG operations, plus the separately classified feature-discovery GET, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
+All 144 counted current RPG operations, plus the separately classified feature-discovery GET, delegate with the fixed literal trusted-local principal `local-owner`; authorization and user identity headers are ignored. This is unauthenticated single-user local convenience, **not authentication or a remote-safe security boundary**. The server defaults to loopback `127.0.0.1`; these routes must remain on a trusted local loopback listener unless a separate real authentication boundary is added. Feature denial precedes query, path, media-type, and body validation. Routes share one lazy app-owned repository and cache either open success or failure for the plugin lifetime; a ready repository closes exactly once.
 
 Schema v15 and the public repository barrel provide campaign lifecycle/settings, audited membership and room administration, checkpoint/fork, recap, role-safe log/receipt reads, and bounded import/export operations. Transfer packages carry strict public gameplay events and portable actor mechanics while omitting private actor state, idempotency keys, credentials, local paths, and usage history. M2.1-M2.11 now expose the reviewed trusted-local HTTP surface for these and the later mechanics domains.
 
@@ -498,7 +578,7 @@ The server writes `: heartbeat` SSE comments every `VELVET_SSE_HEARTBEAT_MS`, de
 
 Generation kind is exactly `encounter`, `location`, `npc`, `faction`, `quest`, `storyline`, or `content-pack`; `brief` is trimmed, nonblank, and at most 8,000 characters, and `constraints` contains at most 64 trimmed nonblank strings of at most 1,000 characters. The M2.11 create lane is deterministic user-brief fallback, not provider generation. Its exact provenance is `{ source: "user-brief", method: "deterministic-fallback", applicationScope: "draft-review" }`; each change is `{ changeId, summary, content: { brief, constraints } }`; each validation issue is `{ path, code, severity, message }`. Draft field order is `{ draftId, campaignId, kind, state, revision, createdAt, updatedAt }`, with state `staged`, `in-review`, `approved`, `rejected`, `applied`, or `cancelled`.
 
-At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registered `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; v50-v53 expanded that lane and added generated foundation/planning and material-delivery operations described below. These routes require campaign plus mechanics plus combat. The campaign-content draft GET and the three generated campaign GETs do not disable Fastify's implicit HEAD aliases; discovery has an implicit HEAD as well. Every implicit alias is excluded from the historical 95-operation checkpoint and current 117-operation convention. The M2.11 baseline guarantees above are not retroactively extended to these later routes.
+At M2.11 completion, generation apply accepted only known staged change IDs and returned `application: { scope: "draft-only", campaignDomainMutated: false }` plus exactly one draft receipt `{ receiptId, reviewDecisionId, scope: "draft-only", selectedChanges, appliedAt }`. It was draft-only review sealing: it did not create a campaign command receipt or mutate campaign-domain content. M4.2, M4.5, and M4.6 subsequently completed tool bridging, encounter generation, and campaign-content generation/application respectively. M4.6 registered `POST /rpg/v1/campaign-content-drafts`, `GET /rpg/v1/campaign-content-drafts/:draftId`, and `POST /rpg/v1/campaign-content-drafts/:draftId/apply`; v50-v53 expanded that lane and added generated foundation/planning and material-delivery operations described below. These routes require campaign plus mechanics plus combat. The campaign-content draft GET and the three generated campaign GETs do not disable Fastify's implicit HEAD aliases; discovery has an implicit HEAD as well. Every implicit alias is excluded from both the historical 95- and 117-operation checkpoints and the current 144-operation count. The M2.11 baseline guarantees above are not retroactively extended to these later routes.
 
 ### NPC presence (M5.1, 2 operations)
 

@@ -8,6 +8,9 @@ import { PowerLibraryPanel } from "./PowerLibraryPanel";
 import {ApiError} from "../../../api";
 import {CombatRewards} from "./CombatRewards";
 
+const tacticalRender=vi.hoisted(()=>vi.fn());
+vi.mock("../map/TacticalMapPanel",()=>({TacticalMapPanel:(props:Record<string,unknown>)=>{tacticalRender(props);return <section aria-label="Wired tactical map"/>;}}));
+
 const at = "2030-01-01T00:00:00.000Z";
 const combat: CombatReadResponse = {
   round: 2, currentCombatant: "combatant-one", revision: 4,
@@ -36,6 +39,8 @@ const emptyEffects = { effects: [], concentration: [], revision: 0 } as const;
 const consumable={legalActionId:"consume:legal",kind:"use-consumable" as const,actingCombatantId:"combatant-one",inventoryEntryId:"entry",item:{kind:"item" as const,packId:"pack",packVersion:"1",definitionId:"tonic"},quantity:1 as const,actionCost:"action" as const,targetPolicy:"beneficial-only-self-or-ally" as const,target:{combatantId:"combatant-one",relation:"self" as const,actorBacked:true},effectPlan:{effectCount:1,effects:[{effectOrdinal:0,effect:{kind:"resource" as const,resource:"health" as const,amount:2}}]}};
 const reward:CombatRewardGrantPublic={rewardBundleId:"bundle-one",recipientActorId:"actor-one",createdAt:at,rewards:[{kind:"currency",currency:{kind:"currency",packId:"pack",packVersion:"1",definitionId:"gold"},amount:25}],claim:{state:"unclaimed"}};
 const claimedReward:CombatRewardGrantPublic={...reward,claim:{state:"claimed",rewardClaimId:"reward-claim",claimedAt:at}};
+const combatPower={legalActionId:"power-legal",powerName:"Arc bolt",targetCombatantId:"combatant-two",target:"Enemy 2",powerRef:{kind:"ability" as const,packId:"pack",packVersion:"1",definitionId:"arc-bolt"},cost:null,revisions:{combat:4,sourceM15:1,sourceM16:2,targetM15:null,targetM16:null}};
+const combatPowerResponse={request:{legalActionId:"power-legal",expectedCombatRevision:4,expectedSourceM15Revision:1,expectedSourceM16Revision:2,expectedTargetM15Revision:null,expectedTargetM16Revision:null,idempotencyKey:"power-key"},result:{commandId:"power-command",powerName:"Arc bolt",targetCombatantId:"combatant-two",cost:null,outcomes:[{kind:"damage" as const}],concentration:false,roundBefore:2,roundAfter:2,revisionBefore:4,revisionAfter:5,occurredAt:at}};
 
 function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
   return {
@@ -67,8 +72,42 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
 const combatReady = () => screen.findByRole("button", { name: /Inspect Ally 1/ });
 
 describe("M3.5 server-authoritative combat controls", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => { localStorage.clear(); tacticalRender.mockClear(); });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it("embeds room-bound legal actions without a second map or lifecycle controller", async () => {
+    const client = api({ getTacticalMap: vi.fn(), generateTacticalMap: vi.fn(), previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
+    const locked = vi.fn(); const changed = vi.fn();
+    render(<CombatTrackerPage embedded campaignId="campaign" sessionId="session" api={client} actorRole="player" audience="player" controlledActorId="actor-one" onBack={vi.fn()} onLockChange={locked} onStateChange={changed} />);
+    await combatReady();
+    expect(screen.queryByRole("main")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Combat tracker", level: 2 })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Encounter lifecycle" })).toBeNull();
+    expect(tacticalRender).not.toHaveBeenCalled();
+    expect(client.getCombat).toHaveBeenCalledWith("combat-one");
+    expect(changed).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "End turn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    await waitFor(() => expect(client.resolveAction).toHaveBeenCalledOnce());
+    expect(locked).toHaveBeenCalledWith(true);
+  });
+
+  it("locks embedded writes during a room operation and excludes other rooms", async () => {
+    const client = api();
+    vi.mocked(client.listEncounters).mockResolvedValue({ encounters: [
+      { encounterId: "combat-one", sessionId: "session", name: "Ambush", status: "active", combatId: "combat-one", combatants: [], revision: 4, createdAt: at, updatedAt: at },
+      { encounterId: "other", sessionId: "other-room", name: "Private battle", status: "active", combatId: "other", combatants: [], revision: 4, createdAt: at, updatedAt: at },
+    ] });
+    render(<CombatTrackerPage embedded blocked campaignId="campaign" sessionId="session" api={client} actorRole="player" audience="player" controlledActorId="actor-one" onBack={vi.fn()} />);
+    await combatReady();
+    expect(screen.queryByRole("option", { name: /Private battle/ })).toBeNull();
+    const attack = screen.getByRole("button", { name: "Attack" });
+    expect(attack.closest("fieldset")?.disabled).toBe(true);
+    fireEvent.click(attack);
+    expect(client.resolveAction).not.toHaveBeenCalled();
+    expect(client.getCombat).not.toHaveBeenCalledWith("other");
+  });
 
   it("renders only resolution-supported legal actions and exact server targets", () => {
     const submit = vi.fn();
@@ -320,5 +359,50 @@ describe("M3.5 server-authoritative combat controls", () => {
     const list=vi.fn().mockResolvedValueOnce([claimedReward]).mockRejectedValueOnce(new Error("offline"));
     const logs=vi.fn().mockRejectedValue(new Error("offline"));const service=api({listRewards:list,getCombatLog:logs});render(<CombatTrackerPage api={service} campaignId="campaign" initialCombatId="combat-one" onBack={()=>undefined}/>);
     await screen.findByText("Claimed");fireEvent.click(screen.getByRole("button",{name:"Retry log"}));await screen.findByText(/Existing claimed state is preserved/i);expect(screen.getByText("Claimed")).toBeTruthy();
+  });
+
+  it("gives a player only server legal actions for their own current combatant",async()=>{
+    const service=api({getConsumableActions:vi.fn().mockResolvedValue([consumable])});
+    render(<CombatTrackerPage api={service} campaignId="campaign" sessionId="session" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await combatReady();expect(screen.getByRole("button",{name:"Attack"})).toBeTruthy();expect(screen.getByRole("button",{name:/Use tonic on Ally 1/})).toBeTruthy();
+    expect(screen.queryByRole("heading",{name:"Encounter control"})).toBeNull();expect(screen.queryByRole("heading",{name:"Enemy turn"})).toBeNull();expect(screen.queryByLabelText(/Actor ID for powers/)).toBeNull();
+    cleanup();render(<CombatTrackerPage api={api({getCombat:vi.fn().mockResolvedValue({...combat,currentCombatant:"combatant-two"})})} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await combatReady();expect(screen.queryByRole("button",{name:"Attack"})).toBeNull();
+  });
+
+  it.each(["owner","gm"] as const)("gives the %s role lifecycle and enemy-turn workspaces",async(actorRole)=>{
+    render(<CombatTrackerPage api={api()} campaignId="campaign" actorRole={actorRole} audience="gm" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();
+    expect(screen.getByRole("heading",{name:"Encounter lifecycle"})).toBeTruthy();expect(screen.getByRole("heading",{name:"Enemy turn"})).toBeTruthy();
+  });
+
+  it("keeps observers to read-only combat state, log, and rewards",async()=>{
+    const service=api({listRewards:vi.fn().mockResolvedValue([reward])});
+    render(<CombatTrackerPage api={service} campaignId="campaign" sessionId="session" actorRole="observer" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await combatReady();expect(screen.getByRole("heading",{name:"Combat rewards"})).toBeTruthy();expect(screen.getByRole("heading",{name:"Combat log"})).toBeTruthy();expect(document.querySelector(".legal-action-tray")).toBeNull();expect(screen.queryByRole("button",{name:"Claim reward"})).toBeNull();expect(screen.queryByLabelText("Wired tactical map")).toBeNull();
+    expect(service.getConsumableActions).not.toHaveBeenCalled();expect(service.getCombatPowerActions).not.toHaveBeenCalled();expect(service.getPowers).not.toHaveBeenCalled();
+  });
+
+  it("wires the tactical map only from exact room, encounter, combat, actor, and combatant context",async()=>{
+    const service=api({getTacticalMap:vi.fn(),generateTacticalMap:vi.fn(),previewTacticalMapMove:vi.fn(),moveTacticalMapToken:vi.fn()});
+    render(<CombatTrackerPage api={service} campaignId="campaign" sessionId="session" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await screen.findByLabelText("Wired tactical map");expect(tacticalRender).toHaveBeenCalledWith(expect.objectContaining({campaignId:"campaign",sessionId:"session",actorId:"actor-one",audience:"player",mode:"combat",encounterId:"combat-one",combatantId:"combatant-one",readOnly:false,api:service}));
+    cleanup();tacticalRender.mockClear();render(<CombatTrackerPage api={service} campaignId="campaign" sessionId="wrong-session" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await combatReady();expect(screen.queryByLabelText("Wired tactical map")).toBeNull();expect(tacticalRender).not.toHaveBeenCalled();
+  });
+
+  it("uses initial IDs, returns to the room, and clears private controls on authorization downgrade",async()=>{
+    const room=vi.fn(),service=api();const view=render(<CombatTrackerPage api={service} campaignId="campaign" sessionId="session" actorRole="gm" audience="gm" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined} onReturnToRoom={room}/>);
+    await combatReady();expect(screen.queryByRole("combobox",{name:"Campaign encounter"})).toBeNull();expect(screen.queryByLabelText(/Actor ID for powers/)).toBeNull();fireEvent.click(screen.getByRole("button",{name:/Return to room/}));expect(room).toHaveBeenCalledTimes(1);
+    view.rerender(<CombatTrackerPage api={service} campaignId="campaign" sessionId="session" actorRole="observer" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);
+    await waitFor(()=>expect(document.querySelector(".combat-actor-lanes")).toBeNull());expect(document.querySelector(".legal-action-tray")).toBeNull();
+  });
+
+  it("persists an uncertain combat-power request and recovers its exact result after remount without replay",async()=>{
+    const use=vi.fn().mockRejectedValue(new Error("offline")),exact=vi.fn().mockImplementation((_combatId,command)=>Promise.resolve({...combatPowerResponse,request:command}));
+    const service=api({getCombatPowerActions:vi.fn().mockResolvedValue([combatPower]),useCombatPower:use,getCombatPowerResult:exact});
+    const first=render(<CombatTrackerPage api={service} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:"Use Arc bolt"}));await screen.findByText(/Combat power outcome is uncertain/i);
+    expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-power.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');first.unmount();
+    render(<CombatTrackerPage api={service} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findByText(/Combat power outcome unresolved/i);expect(use).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button",{name:/Read exact combat-power result/}));await screen.findByText(/Exact combat-power result confirmed/i);expect(exact).toHaveBeenCalledTimes(1);expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-power.v1:campaign:combat-one")).toBeNull();
   });
 });

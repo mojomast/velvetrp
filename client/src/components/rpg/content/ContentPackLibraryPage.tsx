@@ -13,6 +13,7 @@ import type {
 } from "@velvet/contracts";
 import { ContentPackEditor, createCompleteContentPackDraft, replaceDraftIdentity, type ContentPackDraft } from "./ContentPackEditor";
 import { PackValidationReport } from "./PackValidationReport";
+import { createClientId } from "../../../utils/clientId";
 
 export interface ContentPackLibraryApi {
   list: () => Promise<ContentCatalogHttpPublicationsResponse>;
@@ -34,7 +35,7 @@ const publicationLocks = new Map<string, PublicationLock>();
 const publicationLockListeners = new Set<(key: string, lock: PublicationLock | null) => void>();
 const KINDS: CatalogDefinitionKind[] = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template"];
 const exactKey = (packId: string, packVersion: string) => `${packId}\0${packVersion}`;
-const operationKey = () => `ui-publish-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+const operationKey = () => `ui-publish-${createClientId()}`;
 
 export function resetContentPackLibraryPageModuleStateForTests(): void {
   publicationLocks.clear();

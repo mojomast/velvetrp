@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CampaignAdministration, CampaignHistoryHttpCheckpoint, CampaignHistoryHttpEvent, CampaignHistoryHttpEventsQuery, CampaignHistoryHttpEventsResponse, CampaignHistoryHttpPublicReceipt, CampaignHistoryHttpRecap, CampaignHistoryHttpRecapRequest, CampaignHistoryHttpRecapResponse, CampaignHistoryHttpTimeline, CampaignHistoryHttpTimelinesResponse } from "@velvet/contracts";
 import { CheckpointTimeline } from "./CheckpointTimeline";
 import { RecapViewer } from "./RecapViewer";
+import { createClientId } from "../../../utils/clientId";
 
 const PAGE_SIZE = 25;
 function eventName(type: CampaignHistoryHttpEvent["type"]): string {
@@ -95,7 +96,7 @@ export function CampaignEventLogPage({ campaignId, api, onBack, onUnavailable, f
 
   async function openReceipt(commandId: string) { setReceipt(null); setReceiptError(""); try { setReceipt((await api.receipt(campaignId, commandId)).receipt); } catch { setReceiptError("No public receipt is available for this event."); } }
   async function createRecap(input: Parameters<NonNullable<React.ComponentProps<typeof RecapViewer>["onCreate"]>>[0]) {
-    try { const response = await api.createRecap(campaignId, { ...input, expectedRevision: revision, idempotencyKey: `recap-ui-${crypto.randomUUID()}` }); setRecaps((current) => [response.recap, ...current]); setRevision(response.receipt.revisionAfter); }
+    try { const response = await api.createRecap(campaignId, { ...input, expectedRevision: revision, idempotencyKey: `recap-ui-${createClientId()}` }); setRecaps((current) => [response.recap, ...current]); setRevision(response.receipt.revisionAfter); }
     catch { setPartial("The recap outcome could not be safely confirmed. It was not repeated; refresh authoritative history before trying again."); }
   }
   return <main className="page library-page campaign-page history-page"><section className="campaign-shell" aria-labelledby="history-heading">

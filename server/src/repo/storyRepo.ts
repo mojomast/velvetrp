@@ -7,6 +7,7 @@ import {
   type StoryStoryline,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../runtime.js";
+import { publicStorySourceSql } from "./storyDisclosure.js";
 
 type Database = DatabaseDriver.Database;
 type InternalReceipt = StoryCommandReceiptHttp & { commandId: string };
@@ -48,10 +49,12 @@ export function createStoryRepository(db: Database, dependencies?: { clock: Cloc
       // These statements never load secret columns, ancestry, edges, sources, answers, or hidden identifiers.
       const visibleNodes = (db.prepare(`SELECT node.node_id,node.title,node.description,state.status,state.updated_at FROM story_nodes_v34 node
         JOIN story_node_state_v34 state USING(campaign_id,storyline_id,node_id) WHERE node.campaign_id=? AND state.status<>'hidden'
+        AND ${publicStorySourceSql("node", "node_id")}
         ORDER BY state.updated_at,node.node_id`).all(campaignId) as any[]).map((row) => ({ nodeId: row.node_id,
           title: row.title, description: row.description, status: row.status, updatedAt: row.updated_at }));
       const discoveredClues = (db.prepare(`SELECT clue.clue_id,clue.title,clue.content,discovery.discovered_at FROM story_clues_v34 clue
-        JOIN story_discoveries_v34 discovery USING(campaign_id,storyline_id,clue_id) WHERE clue.campaign_id=? ORDER BY discovery.discovered_at,clue.clue_id`)
+        JOIN story_discoveries_v34 discovery USING(campaign_id,storyline_id,clue_id) WHERE clue.campaign_id=?
+        AND ${publicStorySourceSql("clue", "clue_id")} ORDER BY discovery.discovered_at,clue.clue_id`)
         .all(campaignId) as any[]).map((row) => ({ clueId: row.clue_id, title: row.title, content: row.content, discoveredAt: row.discovered_at }));
       return campaignStoryHttpResponseSchema.parse({ visibleNodes, discoveredClues });
     }

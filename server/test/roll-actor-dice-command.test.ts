@@ -754,6 +754,61 @@ describe("roll actor dice command", () => {
     unchanged.repository.close();
   });
 
+  it("allows the enabled player only through the controlled visible-character path", () => {
+    seed();
+    const db = new DatabaseDriver(dbPath());
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id='actor-one'").run();
+    db.close();
+    const binding = { position: 1, name: "One", campaignCharacterId: "cc-one" };
+    const guarded = guardedFactory();
+    expect(guarded.repository.executeRollActorDiceForVisibleCharacter("player", base, binding))
+      .toMatchObject({ revisionBefore: 0, revisionAfter: 1 });
+    expect(guarded.rng).toHaveBeenCalledOnce();
+    guarded.repository.close();
+  });
+
+  it.each([
+    ["other actor", "UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id='actor-other'", "player"],
+    ["disabled setting", `UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id='actor-one';
+      UPDATE campaigns SET settings=json_set(settings,'$.allowPlayerDice',json('false')) WHERE id='campaign-one'`, "player"],
+    ["observer", "UPDATE campaign_actor_private_state SET controller_principal_id='observer' WHERE actor_id='actor-one'", "observer"],
+  ])("denies specialized %s authorization before dependencies", (_label, mutation, principal) => {
+    seed(); const db = new DatabaseDriver(dbPath()); db.exec(mutation); db.close();
+    const guarded = guardedFactory();
+    expect(() => guarded.repository.executeRollActorDiceForVisibleCharacter(principal, base,
+      { position: 1, name: "One", campaignCharacterId: "cc-one" })).toThrow("command unavailable");
+    expectNoDependencies(guarded); guarded.repository.close();
+  });
+
+  it.each(["control", "setting"])("reauthorizes player %s before replay disclosure", (change) => {
+    seed(); const db = new DatabaseDriver(dbPath());
+    db.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id='actor-one'").run();
+    db.close();
+    const binding = { position: 1, name: "One", campaignCharacterId: "cc-one" };
+    const first = factory([6]);
+    const receipt = first.executeRollActorDiceForVisibleCharacter("player", base, binding);
+    first.close();
+
+    const changed = new DatabaseDriver(dbPath());
+    if (change === "control") {
+      changed.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='local-owner' WHERE actor_id='actor-one'").run();
+    } else {
+      changed.prepare("UPDATE campaigns SET settings=json_set(settings,'$.allowPlayerDice',json('false')) WHERE id='campaign-one'").run();
+    }
+    changed.close();
+    const guarded = guardedFactory();
+    expect(() => guarded.repository.executeRollActorDiceForVisibleCharacter("player", base, binding))
+      .toThrow("command unavailable");
+    expectNoDependencies(guarded);
+
+    const restored = new DatabaseDriver(dbPath());
+    restored.prepare("UPDATE campaign_actor_private_state SET controller_principal_id='player' WHERE actor_id='actor-one'").run();
+    restored.prepare("UPDATE campaigns SET settings=json_set(settings,'$.allowPlayerDice',json('true')) WHERE id='campaign-one'").run();
+    restored.close();
+    expect(guarded.repository.executeRollActorDiceForVisibleCharacter("player", base, binding)).toEqual(receipt);
+    expectNoDependencies(guarded); guarded.repository.close();
+  });
+
   it("does not classify malformed persisted roster data as character drift", () => {
     seed();
     const db = new DatabaseDriver(dbPath());

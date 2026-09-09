@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AdventureTurnConfirmRequest, AdventureTurnGetResponse, AdventureTurnHttpProposal } from "@velvet/contracts";
 import { ApiError, type AdventureTurnClientBinding } from "../../../api";
+import { createClientId } from "../../../utils/clientId";
 
 /** Narrow confirmation and reconciliation lane required by the banner. */
 export interface ConfirmationBannerApi {
@@ -22,7 +23,7 @@ export interface ConfirmationBannerProps {
 }
 
 const storageKey = (turnId: string) => `velvet.adventure-confirm.v1:${turnId}`;
-const makeKey = () => typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `confirm-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const makeKey = createClientId;
 const batchFingerprint = (ids: readonly string[]) => {
   let hash = 2166136261;
   for (const unit of ids.join("\0")) { hash ^= unit.charCodeAt(0); hash = Math.imul(hash, 16777619); }

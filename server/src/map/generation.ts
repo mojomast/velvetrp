@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { MapTerrain, MapTile, TacticalMap } from "./types.js";
+import { tacticalMapGenerationContextSchema, type MapGenerationProvenance, type TacticalMapGenerationContext } from "@velvet/contracts";
 
 export type MapGeneratorKind = "dungeon" | "cave" | "arena";
 
@@ -8,6 +9,8 @@ export interface GenerateMapOptions {
   readonly seed: string;
   readonly width: number;
   readonly height: number;
+  readonly algorithm?: MapGenerationProvenance["algorithm"];
+  readonly context?: TacticalMapGenerationContext;
 }
 
 function randomSource(seed: string): () => number {
@@ -90,12 +93,67 @@ export function generateTacticalMap(options: GenerateMapOptions): TacticalMap {
   if (!options.seed || !Number.isInteger(options.width) || !Number.isInteger(options.height) || options.width < 5 || options.height < 5 || options.width > 500 || options.height > 500) {
     throw new RangeError("Map generation requires a seed and integer dimensions from 5 to 500");
   }
-  const random = randomSource(`${options.kind}:${options.seed}:${options.width}x${options.height}`);
+  const algorithm = options.algorithm ?? `${options.kind}-v1`;
+  if (algorithm !== `${options.kind}-v1` && algorithm !== `${options.kind}-v2`) throw new RangeError("Map algorithm does not match layout kind");
+  const v2 = algorithm.endsWith("-v2");
+  if (v2 ? !options.context || options.width > 64 || options.height > 64 : options.context !== undefined) throw new RangeError("Invalid versioned map context or dimensions");
+  const context = v2 ? tacticalMapGenerationContextSchema.parse(options.context) : undefined;
+  const random = randomSource(`${options.kind}:${options.seed}:${options.width}x${options.height}${context ? `:${JSON.stringify(context)}` : ""}`);
   const tiles = options.kind === "dungeon" ? dungeon(options.width, options.height, random)
     : options.kind === "cave" ? cave(options.width, options.height, random)
       : arena(options.width, options.height, random);
-  const algorithm = `${options.kind}-v1` as const;
-  const content = { algorithm, seed: options.seed, width: options.width, height: options.height, tiles };
+  if (context) {
+    const { width, height } = options;
+    const terrain = options.kind === "cave" ? "stone" : options.kind === "arena" ? "sand" : "floor";
+    const carve = (x: number, y: number) => { tiles[y * width + x] = open({ x, y }, terrain); };
+    const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
+    // Guarantee a useful central room and preserve the explicitly submitted spawn footprints.
+    for (let y = Math.max(1, cy - 2); y <= Math.min(height - 2, cy + 2); y += 1)
+      for (let x = Math.max(1, cx - 2); x <= Math.min(width - 2, cx + 2); x += 1) carve(x, y);
+    const reserved = new Set<number>();
+    for (const spawn of context.spawns) {
+      if (spawn.position.x < 1 || spawn.position.y < 1 || spawn.position.x + spawn.footprint.width >= width || spawn.position.y + spawn.footprint.height >= height) throw new RangeError("Grounded spawns must fit inside the map boundary");
+      for (let y = spawn.position.y; y < spawn.position.y + spawn.footprint.height; y += 1)
+        for (let x = spawn.position.x; x < spawn.position.x + spawn.footprint.width; x += 1) {
+          if (reserved.has(y * width + x)) throw new RangeError("Grounded spawn footprints overlap");
+          reserved.add(y * width + x); carve(x, y);
+        }
+      // Give large tokens a footprint-wide route out, not just a walkable spawn island.
+      let { x, y } = spawn.position;
+      const targetX = Math.floor((width - spawn.footprint.width) / 2), targetY = Math.floor((height - spawn.footprint.height) / 2);
+      while (true) {
+        for (let yy = y; yy < y + spawn.footprint.height; yy += 1)
+          for (let xx = x; xx < x + spawn.footprint.width; xx += 1) carve(xx, yy);
+        if (x !== targetX) x += Math.sign(targetX - x);
+        else if (y !== targetY) y += Math.sign(targetY - y);
+        else break;
+      }
+    }
+    // Connect each walkable component to the central room using cardinal corridors.
+    const visited = new Set<number>();
+    for (let index = 0; index < tiles.length; index += 1) {
+      if (tiles[index]!.blocksMovement || visited.has(index)) continue;
+      const queue = [index]; visited.add(index);
+      for (let head = 0; head < queue.length; head += 1) {
+        const cell = queue[head]!;
+        for (const next of [cell - width, cell + width, cell - 1, cell + 1]) {
+          if (next < 0 || next >= tiles.length || visited.has(next) || tiles[next]!.blocksMovement) continue;
+          visited.add(next); queue.push(next);
+        }
+      }
+      let { x, y } = tiles[index]!.position;
+      while (x !== cx) { carve(x, y); x += Math.sign(cx - x); }
+      while (y !== cy) { carve(x, y); y += Math.sign(cy - y); }
+      carve(x, y);
+    }
+    // Detail is deterministic presentation, not prose-derived hazards or movement penalties.
+    for (const [index, tile] of tiles.entries()) if (!tile.blocksMovement) {
+      tiles[index] = open(tile.position, reserved.has(index) ? terrain
+        : options.kind === "cave" && (tile.position.x + 2 * tile.position.y) % 9 < 2 ? "rubble"
+          : options.kind === "arena" && (tile.position.x === cx || tile.position.y === cy) ? "stone" : terrain);
+    }
+  }
+  const content = { algorithm, seed: options.seed, width: options.width, height: options.height, tiles, ...(context ? { context } : {}) };
   const hash = createHash("sha256").update(JSON.stringify(content)).digest("hex");
   return {
     mapId: `generated-${hash.slice(0, 16)}`,
@@ -104,6 +162,6 @@ export function generateTacticalMap(options: GenerateMapOptions): TacticalMap {
     grid: { kind: "square", feetPerCell: 5 },
     tiles,
     tokens: [],
-    provenance: { algorithm, seed: options.seed, parameters: { width: options.width, height: options.height }, hash },
+    provenance: { algorithm, seed: options.seed, parameters: { width: options.width, height: options.height }, hash, ...(context ? { context } : {}) },
   };
 }

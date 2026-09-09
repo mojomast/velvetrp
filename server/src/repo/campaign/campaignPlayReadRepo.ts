@@ -4,6 +4,7 @@ import {
   campaignPlayBootstrapSchema,
   campaignPlayLifecycleSchema,
   campaignPlaySessionIdSchema,
+  campaignSettingsSchema,
   resourceIdSchema,
   revisionSchema,
   utcIsoTimestampSchema,
@@ -11,12 +12,15 @@ import {
 } from "@velvet/contracts";
 
 interface CampaignPlayRow {
+  dm_mode: "human" | "ai" | null;
+  dm_revision: number | null;
   row_kind: "authority" | "participant";
   campaign_id: string;
   owner_principal_id: string;
   campaign_owner_role: string;
   lifecycle_status: string;
   administration_revision: unknown;
+  campaign_settings: string;
   actor_campaign_id: string | null;
   actor_principal_id: string | null;
   actor_role: string | null;
@@ -92,7 +96,7 @@ export function createCampaignPlayReadRepository(
       const rows = db.prepare(`WITH authority AS MATERIALIZED (
         SELECT campaign.id AS campaign_id, campaign.owner_principal_id,
           campaign.owner_role AS campaign_owner_role, campaign.lifecycle_status,
-          campaign.administration_revision,
+          campaign.administration_revision, campaign.settings AS campaign_settings,
           actor_membership.campaign_id AS actor_campaign_id,
           actor_membership.principal_id AS actor_principal_id,
           actor_membership.role AS actor_role,
@@ -117,7 +121,7 @@ export function createCampaignPlayReadRepository(
         WHERE campaign.id = $campaignId
       ), authorized AS MATERIALIZED (
         SELECT campaign_id, owner_principal_id, campaign_owner_role, lifecycle_status,
-          administration_revision, actor_campaign_id, actor_principal_id, actor_role,
+          administration_revision, campaign_settings, actor_campaign_id, actor_principal_id, actor_role,
           actor_created_at, actor_parent_id, owner_count, owner_campaign_id,
           owner_membership_principal_id, owner_membership_role, owner_created_at, owner_parent_id
         FROM authority
@@ -127,7 +131,7 @@ export function createCampaignPlayReadRepository(
           AND (actor_role <> 'owner' OR owner_principal_id = $actorId)
       ), integrity_authorized AS MATERIALIZED (
         SELECT campaign_id, owner_principal_id, campaign_owner_role, lifecycle_status,
-          administration_revision, actor_campaign_id, actor_principal_id, actor_role,
+          administration_revision, campaign_settings, actor_campaign_id, actor_principal_id, actor_role,
           actor_created_at, actor_parent_id, owner_count, owner_campaign_id,
           owner_membership_principal_id, owner_membership_role, owner_created_at, owner_parent_id
         FROM authorized
@@ -144,7 +148,7 @@ export function createCampaignPlayReadRepository(
       ), target AS MATERIALIZED (
         SELECT authorized.campaign_id, authorized.owner_principal_id,
           authorized.campaign_owner_role, authorized.lifecycle_status,
-          authorized.administration_revision, authorized.actor_campaign_id,
+          authorized.administration_revision, authorized.campaign_settings, authorized.actor_campaign_id,
           authorized.actor_principal_id, authorized.actor_role, authorized.actor_created_at,
           authorized.actor_parent_id, authorized.owner_count, authorized.owner_campaign_id,
           authorized.owner_membership_principal_id, authorized.owner_membership_role,
@@ -163,6 +167,7 @@ export function createCampaignPlayReadRepository(
       )
       SELECT 'authority' AS row_kind, authority.campaign_id, authority.owner_principal_id,
         authority.campaign_owner_role, authority.lifecycle_status, authority.administration_revision,
+        authority.campaign_settings,
         authority.actor_campaign_id, authority.actor_principal_id, authority.actor_role,
         authority.actor_created_at, authority.actor_parent_id, authority.owner_count,
         authority.owner_campaign_id, authority.owner_membership_principal_id,
@@ -179,11 +184,14 @@ export function createCampaignPlayReadRepository(
         NULL AS actor_control, NULL AS actor_count, NULL AS private_actor_id,
         NULL AS private_state_count, NULL AS controller_principal_id, NULL AS controller_parent_id,
         NULL AS controller_campaign_id, NULL AS controller_role, NULL AS controller_created_at,
-        0 AS row_order, 0 AS participant_order
+        0 AS row_order, 0 AS participant_order,
+        (SELECT control.mode FROM dm_control control JOIN authorized ON authorized.campaign_id=control.campaign_id) AS dm_mode,
+        (SELECT control.revision FROM dm_control control JOIN authorized ON authorized.campaign_id=control.campaign_id) AS dm_revision
       FROM authority
       UNION ALL
       SELECT 'participant', target.campaign_id, target.owner_principal_id,
         target.campaign_owner_role, target.lifecycle_status, target.administration_revision,
+        target.campaign_settings,
         target.actor_campaign_id, target.actor_principal_id, target.actor_role,
         target.actor_created_at, target.actor_parent_id, target.owner_count,
         target.owner_campaign_id, target.owner_membership_principal_id,
@@ -217,7 +225,7 @@ export function createCampaignPlayReadRepository(
           AND item.actor_id = playable_actor.id),
         private_state.controller_principal_id, controller_parent.id,
         controller_membership.campaign_id, controller_membership.role, controller_membership.created_at,
-        1, participant.position
+        1, participant.position, NULL, NULL
       FROM target
       LEFT JOIN session_characters participant ON participant.session_id = target.session_id
       LEFT JOIN characters persona ON persona.id = participant.character_id
@@ -263,6 +271,7 @@ export function createCampaignPlayReadRepository(
           || authority.owner_parent_id !== authority.owner_principal_id) malformed();
         campaignPlayLifecycleSchema.parse(authority.lifecycle_status);
         revisionSchema.parse(authority.administration_revision);
+        campaignSettingsSchema.parse(JSON.parse(authority.campaign_settings));
       } catch (error) {
         if (error instanceof Error && error.message === "campaign play bootstrap is malformed") throw error;
         malformed();
@@ -294,14 +303,26 @@ export function createCampaignPlayReadRepository(
 
         const seenActors = new Set<string>();
         const allActors: Array<{ actorId: string; name: string; controller: string }> = [];
+        let hasUnfinalizedParticipant = false;
         for (const row of participants) {
           if (row.campaign_id !== id || row.session_id !== roomId
             || row.lifecycle_status !== first.lifecycle_status
             || row.administration_revision !== first.administration_revision
+            || row.campaign_settings !== first.campaign_settings
             || row.session_state !== first.session_state || row.attached_at !== first.attached_at
             || row.participant_count !== first.participant_count
-            || row.participant_character_id === null || row.participant_name === null
-            || row.campaign_character_id === null || row.campaign_character_count !== 1
+            || row.participant_character_id === null || row.participant_name === null) malformed();
+          if (row.campaign_character_id === null) {
+            if (row.campaign_character_count !== 0 || row.sheet_id !== null || row.sheet_count !== 0
+              || row.actor_id !== null || row.actor_kind !== null || row.actor_control !== null
+              || row.actor_count !== 0 || row.private_actor_id !== null || row.private_state_count !== 0
+              || row.controller_principal_id !== null || row.controller_parent_id !== null
+              || row.controller_campaign_id !== null || row.controller_role !== null
+              || row.controller_created_at !== null) malformed();
+            hasUnfinalizedParticipant = true;
+            continue;
+          }
+          if (row.campaign_character_count !== 1
             || row.sheet_id === null || row.sheet_count !== 1
             || row.actor_id === null || row.actor_count !== 1 || seenActors.has(row.actor_id)
             || row.actor_kind !== "player-character" || row.actor_control !== "principal"
@@ -323,18 +344,26 @@ export function createCampaignPlayReadRepository(
         const control = role === "owner" || role === "gm" ? "all" : role === "player" ? "controlled" : "none";
         const playableActors = control === "all" ? allActors
           : control === "controlled" ? allActors.filter(({ controller }) => controller === actorId) : [];
+        const settings = campaignSettingsSchema.parse(JSON.parse(authority.campaign_settings));
+        const playerDiceHistory = role === "player" && settings.allowPlayerDice;
+        const playerDiceRoll = playerDiceHistory && playableActors.length > 0;
         return campaignPlayBootstrapSchema.parse({
           campaignId: id,
           sessionId: roomId,
           expectedRevision: authority.administration_revision,
+          dm: { mode: authority.dm_mode ?? "human", revision: authority.dm_revision ?? 0 },
           session: {
             attached: true,
             attachedAt,
             active,
-            adventureEligible: authority.lifecycle_status === "published" && active
+            adventureEligible: !hasUnfinalizedParticipant && authority.lifecycle_status === "published" && active
               && resourceIdSchema.safeParse(roomId).success,
           },
           principal: { role, control },
+          capabilities: { campaignDice: {
+            canView: role === "owner" || role === "gm" || playerDiceHistory,
+            canRoll: role === "owner" || role === "gm" || playerDiceRoll,
+          } },
           playableActors: playableActors.map(({ actorId: playableActorId, name }) => ({ actorId: playableActorId, name })),
         });
       } catch (error) {

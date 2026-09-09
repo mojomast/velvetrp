@@ -61,7 +61,7 @@ describe("CampaignDetailPage", () => {
     vi.mocked(listCampaignCharacters).mockRejectedValue(new ApiError(404, "unsupported"));
     vi.mocked(getCampaignCharacterCreationOptions).mockRejectedValue(new ApiError(404, "unsupported"));
     vi.mocked(getCampaignAdministration).mockResolvedValue({ campaign: { id: unconfigured.id, actorRole: "gm", status: "draft", activeTimelineId: "timeline", revision: 0, updatedAt: unconfigured.updatedAt, settings: { maxPlayers: 6, allowPlayerDice: false, safetyMode: "standard", recapVisibility: "members", gmNotes: "" } } });
-    vi.mocked(getCampaignPlayBootstrap).mockResolvedValue({ campaignId: mechanicsConfigured.id, sessionId: "room", expectedRevision: 4, session: { attached: true, attachedAt: unconfigured.updatedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, playableActors: [{ actorId: "actor", name: "Aria" }] });
+    vi.mocked(getCampaignPlayBootstrap).mockResolvedValue({ dm: { mode: "human", revision: 0 }, campaignId: mechanicsConfigured.id, sessionId: "room", expectedRevision: 4, session: { attached: true, attachedAt: unconfigured.updatedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] });
   });
 
   it("leads with explicit campaign readiness and opens the first ready room", async () => {

@@ -106,6 +106,10 @@ import type { ContentCatalogRepository } from "../../../repo/contentCatalogRepo.
 import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js";
 import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { campaignPlayHttpRoutes } from "./campaignPlay.js";
+import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
+import { campaignDmHttpRoutes } from "./campaignDm.js";
+import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
+import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
 import { generationDraftsHttpRoutes } from "./generationDrafts.js";
 import type { GenerationDraftsHttpOptions } from "./generationDrafts.js";
 import { campaignContentGenerationHttpRoutes } from "./campaignContentGeneration.js";
@@ -179,11 +183,14 @@ export interface CampaignListRepository extends
   Partial<Pick<CompanionRepository,
     "getCompanionManagement" | "createCompanion" | "createCompanionGrant" | "revokeCompanionGrant">>,
   Partial<TacticalMapRepository>,
+  Partial<CampaignStartingLocationRepository>,
   Partial<CampaignAdministrationIntegrationRepository>,
   Partial<Pick<ContentCatalogRepository, "validateContentCatalog" | "publishContentCatalog" | "listContentCatalogPublicationPage" | "getContentCatalogForOwner" | "getCampaignContentCatalog" | "configureCampaignCatalog" | "resolveCampaignCatalog">> {
   getAdventureTurn?: AdventureTurnRepository["getAdventureTurn"];
   getAdventureTurnByInitialIdempotencyKey?: AdventureTurnRepository["getAdventureTurnByInitialIdempotencyKey"];
   getCampaignPlayBootstrap?: Repository["getCampaignPlayBootstrap"];
+  activateCampaignRoom?: Repository["activateCampaignRoom"];
+  getCampaignRoomActivationReadiness?: Repository["getCampaignRoomActivationReadiness"];
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
   createAdventureTurn?: AdventureTurnRepository["createAdventureTurn"];
   waitForToolConfirmation?: AdventureTurnRepository["waitForToolConfirmation"];
@@ -340,10 +347,11 @@ type AdventureTurnLaneRepository = Pick<AdventureTurnRepository, "getAdventureTu
   | "waitForToolConfirmation" | "decideToolProposals" | "reconcileAdventureTurnMechanics" | "updateAdventureTurnNarration">
   & Required<Pick<CampaignListRepository, "getCampaign">>;
 type CampaignPlayLaneRepository = Required<Pick<CampaignListRepository, "getCampaignPlayBootstrap">>;
+type CampaignStartingLocationLaneRepository = CampaignStartingLocationRepository;
 type GenerationDraftLaneRepository = Pick<AdventureTurnRepository, "getGenerationDraft" | "getGenerationDraftByIdempotencyKey"
   | "createGenerationDraft" | "applyEncounterGenerationDraftAtomically" | "applyCampaignContentGenerationDraftAtomically">
   & Required<Pick<CampaignListRepository, "getCampaign" | "getCampaignAdministration">>
-  & Pick<Repository, "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
+  & Pick<Repository, "stageCampaignGenerationAtomically" | "beginCampaignGenerationCall" | "getCampaignGenerationCall" | "finishCampaignGenerationCall"
     | "getCampaignGenerationContext" | "recordCampaignGenerationCandidate" | "getCampaignGeneratedFoundation"
     | "getCampaignGeneratedPlanning" | "getCampaignPublishedMaterials" | "publishCampaignMaterial" | "getSessionZeroSafetyPolicy">;
 
@@ -542,10 +550,15 @@ function assertAdventureTurnRepository(repository: CampaignListRepository): asse
 function assertCampaignPlayRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CampaignPlayLaneRepository {
   if (typeof repository.getCampaignPlayBootstrap !== "function") throw new UnsupportedCampaignRepositoryError();
 }
+function assertCampaignStartingLocationRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CampaignStartingLocationLaneRepository {
+  if (typeof repository.getCampaignStartingLocation !== "function" || typeof repository.designateCampaignStartingLocation !== "function") {
+    throw new UnsupportedCampaignRepositoryError();
+  }
+}
 function assertGenerationDraftRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & GenerationDraftLaneRepository {
   const methods: Array<keyof GenerationDraftLaneRepository> = ["getGenerationDraft", "getGenerationDraftByIdempotencyKey", "createGenerationDraft",
     "applyEncounterGenerationDraftAtomically", "applyCampaignContentGenerationDraftAtomically", "getCampaign", "getCampaignAdministration",
-    "beginCampaignGenerationCall", "getCampaignGenerationCall", "finishCampaignGenerationCall",
+    "stageCampaignGenerationAtomically", "beginCampaignGenerationCall", "getCampaignGenerationCall", "finishCampaignGenerationCall",
     "getCampaignGenerationContext", "recordCampaignGenerationCandidate", "getCampaignGeneratedFoundation",
     "getCampaignGeneratedPlanning", "getCampaignPublishedMaterials", "publishCampaignMaterial", "getSessionZeroSafetyPolicy"];
   if (methods.some((method) => typeof (repository as Partial<GenerationDraftLaneRepository>)[method] !== "function")) throw new UnsupportedCampaignRepositoryError();
@@ -703,6 +716,9 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   const tacticalMapRepositoryAccessor = (): TacticalMapLaneRepository => { const repository = getCampaignRepository(); assertTacticalMapRepository(repository); return repository; };
   const adventureTurnRepositoryAccessor = (): AdventureTurnLaneRepository & Repository => { const repository = getCampaignRepository(); assertAdventureTurnRepository(repository); return repository as unknown as AdventureTurnLaneRepository & Repository; };
   const campaignPlayRepositoryAccessor = (): CampaignPlayLaneRepository => { const repository = getCampaignRepository(); assertCampaignPlayRepository(repository); return repository; };
+  const startingLocationRepositoryAccessor = (): CampaignStartingLocationLaneRepository => {
+    const repository = getCampaignRepository(); assertCampaignStartingLocationRepository(repository); return repository;
+  };
   const generationDraftRepositoryAccessor = (): GenerationDraftLaneRepository => { const repository = getCampaignRepository(); assertGenerationDraftRepository(repository); return repository; };
   const administrationIntegrationsRepositoryAccessor = (): CampaignAdministrationIntegrationRepository => {
     const repository = getCampaignRepository();
@@ -755,6 +771,15 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(adventureTurnsHttpRoutes, { adventureTurnRepositoryAccessor,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
+  await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
+    ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  await app.register(campaignStartingLocationHttpRoutes, { startingLocationRepositoryAccessor });
+  await app.register(campaignRoomActivationHttpRoutes, { activationRepositoryAccessor: () => {
+    const repository = getCampaignRepository();
+    if (!repository.activateCampaignRoom || !repository.getCampaignRoomActivationReadiness) throw new Error("room activation repository is unavailable");
+    return { activateCampaignRoom: repository.activateCampaignRoom.bind(repository),
+      getCampaignRoomActivationReadiness: repository.getCampaignRoomActivationReadiness.bind(repository) };
+  } });
   await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
     ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });
   await app.register(campaignContentGenerationHttpRoutes, { generationDraftRepositoryAccessor,

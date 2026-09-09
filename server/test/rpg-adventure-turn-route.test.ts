@@ -15,7 +15,7 @@ import { DND_5E_RULESET_DESCRIPTOR, VELVET_LEGACY_RULESET_DESCRIPTOR } from "../
 useTmpDataDir();
 const at = "2035-01-01T00:00:00.000Z";
 const expires = "2099-01-01T00:00:00.000Z";
-afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS; delete process.env.VELVET_SSE_HEARTBEAT_MS; });
+afterEach(() => { delete process.env.FEATURE_RPG_CAMPAIGN; delete process.env.FEATURE_RPG_MECHANICS; delete process.env.FEATURE_RPG_COMBAT; delete process.env.VELVET_SSE_HEARTBEAT_MS; });
 const enable = () => { process.env.FEATURE_RPG_CAMPAIGN = "true"; process.env.FEATURE_RPG_MECHANICS = "true"; };
 const narrationResult = (narration: string, usage: ProviderCompletionUsage | null = null): ProviderCompletionResult => ({
   message: { role: "assistant", content: null, toolCalls: [{ id: "qwen-narration-call", name: "submit_adventure_narration",
@@ -58,6 +58,89 @@ function events(body: string) {
 }
 
 describe("M2.11 adventure turn routes", () => {
+  it("consumes accepted public preparation in planning and narration without GM or unpublished material", async () => {
+    enable();process.env.FEATURE_RPG_COMBAT="true";
+    const campaign=seed(),repo=createRepository();
+    const inputs:any[]=[];
+    const narration='You listen as the Guide speaks softly. "Welcome," she says, folding her hands. Rain taps the sill. She waits for your question. What do you ask?';
+    const dependencies:AdventureAgentDependencies={complete:async(input)=>{
+      inputs.push(input);return input.tools?.some((tool)=>tool.name==="submit_adventure_narration")
+        ? narrationResult(narration)
+        : {message:{role:"assistant",content:"complete",toolCalls:[]},usage:null,model:{requestedModel:"test",responseModel:"test"}};
+    },getProvider:async()=>({...defaultProviderSettings(),model:"test"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+    const app=buildApp({campaignRepositoryFactory:()=>repo,adventureAgentDependencies:dependencies});
+    const headers={"content-type":"application/json"};
+    const staged=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers,payload:{
+      campaignId:campaign.id,brief:"A playable mystery",tone:"Quiet",exclusions:[],idempotencyKey:"runtime-preparation",
+      sections:["outline","locations","lore","npcs","arcs","scene-prompts","handouts"],reviewedContent:{
+        outlines:[{key:"premise",premise:"PUBLIC_PREMISE",opening:"OPENING_NOT_REPLAYED",visibility:"public"}],
+        locations:[{key:"near",name:"Landing",description:"NEAR_LOCATION",atmosphere:"NEAR_ATMOSPHERE",visibility:"public",discoveries:["UNREVEALED_DISCOVERY"]},
+          {key:"far",name:"Tower",description:"FAR_LOCATION",visibility:"public"}],
+        lore:[{key:"near-lore",title:"Landing custom",summary:`${"x".repeat(1_200)}\nNEAR_LORE`,
+          details:Array.from({length:8},(_,index)=>`LOCAL_DETAIL_${index}_${"d".repeat(480)}`),locationKeys:["near"],visibility:"public"},
+          {key:"far-lore",title:"Tower custom",summary:"FAR_LORE",locationKeys:["far"],visibility:"public"}],
+        npcs:[{key:"guide",name:"Guide",archetype:"Guide",description:'PUBLIC_PORTRAYAL: speaks softly, folds her hands, says "Welcome".',privateGoals:"GM_SECRET_GOAL",visibility:"public"},
+          {key:"hidden-npc",name:"GM_SECRET_NPC",archetype:"Spy",description:"GM_SECRET_PORTRAYAL",visibility:"gm"},
+          {key:"absent-npc",name:"Absent Guide",archetype:"Guide",description:"ABSENT_PORTRAYAL",visibility:"public"}],
+        arcs:[{key:"finale",title:"Finale",summary:"GM_SECRET_FINALE",visibility:"gm"}],
+        scenePrompts:[{key:"public-scene",title:"Greeting",prompt:"PUBLIC_PUBLISHED_SCENE",visibility:"public",npcKeys:["guide"]},
+          {key:"gm-scene",title:"Recovery",prompt:"GM_SECRET_CLUE_RECOVERY",visibility:"gm"}],
+        handouts:[{key:"letter",title:"Letter",content:"UNPUBLISHED_LETTER",visibility:"public"},
+          {key:"unaccepted",title:"Unaccepted",content:"UNACCEPTED_SENTINEL",visibility:"public"}],
+      }}});
+    expect(staged.statusCode,staged.body).toBe(201);
+    expect(repo.getCampaignAgentContextSnapshot("local-owner",campaign.id,"session",{kind:"player",actorId:"actor"})!.publicPreparation).toEqual([]);
+    const applied=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${staged.json().draft.draftId}/apply`,headers,
+      payload:{expectedRevision:0,idempotencyKey:"runtime-preparation-apply",selectedArtifactKeys:["premise","near","far","near-lore","far-lore","guide","hidden-npc","absent-npc","finale","public-scene","gm-scene","letter"]}});
+    expect(applied.statusCode,applied.body).toBe(200);
+    const artifacts=repo.getCampaignGenerationContext("local-owner",campaign.id,["guide","hidden-npc"])!.artifacts;
+    for(const [index,artifact] of artifacts.entries())repo.mutateNpcPresence("local-owner",{campaignId:campaign.id,sessionId:"session",
+      npcId:artifact.serverResourceId!,expectedRevision:index,idempotencyKey:`place-prepared-${index}`,mutation:{kind:"place",locationId:null}});
+    const beforePublication=repo.getCampaignAgentContextSnapshot("local-owner",campaign.id,"session",{kind:"player",actorId:"actor"})!;
+    expect(JSON.stringify(beforePublication)).not.toMatch(/GM_SECRET_|PUBLIC_PUBLISHED_SCENE|UNPUBLISHED_|UNACCEPTED_|OPENING_NOT_REPLAYED/);
+    const dm=repo.getCampaignAgentContextSnapshot("local-owner",campaign.id,"session",{kind:"dm"})!;
+    expect(dm.privateTargetFacts.join(" ")).toContain("GM_SECRET_FINALE");
+    expect(dm.privateTargetFacts.join(" ")).toContain("GM_SECRET_CLUE_RECOVERY");
+    expect(JSON.stringify(dm.publicPreparation)).not.toContain("GM_SECRET_");
+    const published=await app.inject({method:"POST",url:`/api/rpg/v1/campaigns/${campaign.id}/material-publications`,headers,
+      payload:{artifactKey:"public-scene",expectedRevision:0,idempotencyKey:"publish-greeting"}});
+    expect(published.statusCode,published.body).toBe(200);
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers,
+      payload:{campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration:"I greet the Guide",expectedRevision:repo.getCampaignAdministration("local-owner",campaign.id)!.revision,idempotencyKey:"prepared-roleplay"}});
+    expect(response.statusCode,response.body).toBe(200);expect(inputs).toHaveLength(2);
+    for(const input of inputs){
+      const text=JSON.stringify(input.messages);
+      for(const sentinel of ["PUBLIC_PREMISE","PUBLIC_PORTRAYAL","PUBLIC_PUBLISHED_SCENE"])expect(text).toContain(sentinel);
+      expect(text).not.toMatch(/GM_SECRET_|UNPUBLISHED_|UNACCEPTED_|OPENING_NOT_REPLAYED|NEAR_|FAR_|UNREVEALED_|ABSENT_/);
+      for(const name of ["combat_start","story_change"])expect(input.tools.map((tool:any)=>tool.name)).not.toContain(name);
+    }
+    expect(inputs[1].messages[0].content).toContain("at most 8 sentences and 180 words");
+    expect(events(response.body).at(-1)).toMatchObject({type:"terminal",payload:{receipts:[],narrationStatus:{text:narration,source:"provider-assisted"}}});
+    expect(response.body).not.toMatch(/GM_SECRET_|UNPUBLISHED_|UNACCEPTED_/);
+    const turnId=response.headers["x-adventure-turn-id"] as string;
+    const read=await app.inject({method:"GET",url:`/api/rpg/v1/adventure-turns/${turnId}`});
+    expect(read.body).not.toMatch(/GM_SECRET_|UNPUBLISHED_|UNACCEPTED_/);
+    const near=repo.getCampaignGenerationContext("local-owner",campaign.id,["near"])!.artifacts[0]!.serverResourceId!;
+    const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
+    db.prepare("INSERT INTO campaign_actor_locations_v28 VALUES(?,? ,?,'session',0,?)").run(campaign.id,"actor",near,at);
+    const playerSnapshot=()=>repo.getCampaignAgentContextSnapshot("local-owner",campaign.id,"session",{kind:"player",actorId:"actor"})!;
+    expect(JSON.stringify(playerSnapshot().publicPreparation)).not.toContain("NEAR_");
+    db.prepare("INSERT INTO campaign_location_discoveries_v28 VALUES(?,?,?,?)").run(campaign.id,"actor",near,at);
+    const relevant=playerSnapshot().publicPreparation!;
+    for(const sentinel of ["NEAR_LOCATION","NEAR_ATMOSPHERE","NEAR_LORE"])expect(relevant.join(" ")).toContain(sentinel);
+    expect(relevant.join(" ")).not.toMatch(/FAR_|UNREVEALED_|GM_SECRET_/);
+    expect(relevant.join("\n").length).toBeLessThanOrEqual(4_000);
+    expect(relevant.join(" ")).not.toContain("x".repeat(1_200));
+    expect(relevant.filter((line)=>line.includes("LOCAL_DETAIL_")).length).toBeLessThan(8);
+    expect(playerSnapshot().publicPreparation).toEqual(relevant);
+    for(const role of ["player","observer"]){
+      db.prepare("INSERT INTO principals VALUES(?,?,0)").run(`preparation-${role}`,role);
+      db.prepare("INSERT INTO campaign_memberships VALUES(?,?,?,?)").run(campaign.id,`preparation-${role}`,role,at);
+      expect(repo.getCampaignAgentContextSnapshot(`preparation-${role}`,campaign.id,"session",{kind:"dm"})).toBeNull();
+    }
+    db.close();
+    await app.close();
+  });
   it("fails a planning budget denial closed without provider dispatch or mechanics", async () => {
     enable(); const campaign = seed(); let calls = 0;
     const dependencies: AdventureAgentDependencies = {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { campaignTransferHttpExportDocumentSchema, MAX_CAMPAIGN_IMPORT_BYTES } from "@velvet/contracts";
 import type { CampaignTransferHttpApplyRequest, CampaignTransferHttpApplyResponse, CampaignTransferHttpDryRunRequest, CampaignTransferHttpDryRunResponse, CampaignTransferPackage } from "@velvet/contracts";
+import { createClientId } from "../../../utils/clientId";
 
 const REPORT_MAX_AGE_MS = 5 * 60_000;
 const AMBIGUITY_KEY = "velvet.campaign-import.ambiguous.v1";
@@ -11,7 +12,7 @@ export interface CampaignImportApi {
 }
 export interface CampaignImportWizardProps { api: CampaignImportApi; onImported?: (campaignId: string) => void }
 
-function uniqueKey(): string { return `import-ui-${typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`}`; }
+function uniqueKey(): string { return `import-ui-${createClientId()}`; }
 function ambiguousImport(): boolean { try { return sessionStorage.getItem(AMBIGUITY_KEY) !== null; } catch { return false; } }
 function setAmbiguous(value: boolean): void { try { if (value) sessionStorage.setItem(AMBIGUITY_KEY, new Date().toISOString()); else sessionStorage.removeItem(AMBIGUITY_KEY); } catch { /* Storage is advisory; the in-memory lock still applies. */ } }
 

@@ -4,13 +4,16 @@ import path from "node:path";
 import { SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
-import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson } from "../src/routes/rpg/v1/campaignContentGeneration.js";
+import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson, normalizeGeneratedCampaignContentProvider } from "../src/routes/rpg/v1/campaignContentGeneration.js";
 import { createRepository, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG, updateProviderSettings } from "../src/repo/index.js";
 import { createSession, transitionSession } from "../src/repo/sessionRepo.js";
 import { useTmpDataDir } from "./helpers.js";
 
+const {completeWithProviderMock}=vi.hoisted(()=>({completeWithProviderMock:vi.fn()}));
+vi.mock("../src/provider/index.js",async(importOriginal)=>({...await importOriginal<typeof import("../src/provider/index.js")>(),completeWithProvider:completeWithProviderMock}));
+
 useTmpDataDir();
-afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;delete process.env.FEATURE_RPG_COMBAT;});
+afterEach(()=>{delete process.env.FEATURE_RPG_CAMPAIGN;delete process.env.FEATURE_RPG_MECHANICS;delete process.env.FEATURE_RPG_COMBAT;completeWithProviderMock.mockReset();});
 const enable=()=>{process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";process.env.FEATURE_RPG_COMBAT="true";};
 const content={
   outlines:[{key:"rainy-opening",opening:"Rain falls on the old road.",premise:"A courier is missing.",startLocationKey:"old-road",visibility:"public" as const}],
@@ -21,8 +24,75 @@ const request=(campaignId:string,idempotencyKey="content-draft")=>({campaignId,b
 const db=()=>new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
 
 describe("campaign-content section generation",()=>{
+  it("rejects a nominal full campaign with missing sections while retaining sparse requests", async () => {
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Full coverage"});
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>content});
+    const result=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{
+      ...request(campaign.id,"incomplete-full"),sections:["outline","arcs","locations","factions","npcs","quests","encounters","clues","story","lore","quest-items","monster-concepts","handouts","scene-prompts"]}});
+    expect(result.statusCode,result.body).toBe(503);
+    expect(repo.getCampaignGeneratedFoundation("local-owner",campaign.id)!.opening).toBeNull();
+    const sparse=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"sparse-still-valid")});
+    expect(sparse.statusCode,sparse.body).toBe(201);await app.close();
+  });
+  it("redacts private fields and nested GM data from accepted public expansion canon", async () => {
+    enable();
+    const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Safe expansion"});
+    let providerPrompt:any;
+    const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async(prompt)=>{
+      providerPrompt=prompt;return {arcs:[{key:"next-arc",title:"Next",summary:"New public direction.",visibility:"public"}]};
+    }});
+    const reviewedContent={
+      factions:[{key:"wardens",name:"Wardens",description:"PUBLIC_FACTION",visibility:"public",gmNotes:"SECRET_FACTION"}],
+      npcs:[{key:"guide",name:"Guide",archetype:"Guide",description:"PUBLIC_VOICE",visibility:"public",privateGoals:"SECRET_GOAL"}],
+      quests:[{key:"quest",title:"Quest",description:"Public task",visibility:"public",objectives:[
+        {key:"visible-task",description:"PUBLIC_OBJECTIVE",visibility:"public"},
+        {key:"hidden-task",description:"SECRET_OBJECTIVE",visibility:"gm"}],rewards:[
+        {key:"secret-reward",label:"SECRET_REWARD",kind:"custom",visibility:"gm"}]}],
+      arcs:[{key:"secret-arc",title:"SECRET_ARC",summary:"SECRET_FINALE",visibility:"gm"}],
+    };
+    const created=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},
+      payload:{...request(campaign.id,"private-base"),sections:["factions","npcs","quests","arcs"],reviewedContent}});
+    expect(created.statusCode,created.body).toBe(201);
+    const applied=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${created.json().draft.draftId}/apply`,headers:{"content-type":"application/json"},
+      payload:{expectedRevision:0,idempotencyKey:"private-base-apply",selectedArtifactKeys:["wardens","guide","quest","secret-arc"]}});
+    expect(applied.statusCode,applied.body).toBe(200);
+    const expanded=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},
+      payload:{...request(campaign.id,"safe-expansion"),sections:["arcs"],expandArtifactKeys:["wardens","guide","quest","secret-arc"]}});
+    expect(expanded.statusCode,expanded.body).toBe(201);
+    const canon=JSON.stringify(providerPrompt.acceptedPublicCanon);
+    expect(canon).toMatch(/PUBLIC_FACTION/);expect(canon).toMatch(/PUBLIC_VOICE/);expect(canon).toMatch(/PUBLIC_OBJECTIVE/);
+    expect(canon).not.toMatch(/SECRET_|gmNotes|privateGoals|hidden-task|secret-reward/);
+    expect(providerPrompt.outputRules).toMatch(/early\/middle\/final/);
+    expect(providerPrompt.outputRules).toMatch(/alternate finales/);
+    expect(providerPrompt.outputRules).toMatch(/two alternate ways/);
+    expect(providerPrompt.outputRules).toMatch(/knowledge boundaries/);
+    expect(repo.getCampaignGenerationContext("local-owner",campaign.id,["guide"])!.artifacts[0]!.canonical.privateGoals).toBe("SECRET_GOAL");
+    await app.close();
+  });
   it("canonicalizes request identity independently of object property order",()=>{
     expect(canonicalCampaignGenerationJson({z:1,nested:{b:2,a:1},list:[{d:4,c:3}]})).toBe(canonicalCampaignGenerationJson({list:[{c:3,d:4}],nested:{a:1,b:2},z:1}));
+  });
+
+  it("normalizes omitted provider sections through full-schema defaults",()=>{
+    const normalized=normalizeGeneratedCampaignContentProvider({outlines:[{key:"opening",opening:"Rain starts.",premise:"A bell is missing.",visibility:"public"}]});
+    expect(normalized.outlines).toHaveLength(1);expect(normalized.locations).toEqual([]);expect(normalized.connections).toEqual([]);expect(normalized.encounters).toEqual([]);expect(normalized.storyRelationships).toEqual([]);
+  });
+
+  it("sends strict schemas containing only requested fields and hydrates configured-provider output",async()=>{
+    enable();await updateProviderSettings({model:"configured-model"});const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Dynamic schema"});
+    const candidates=[
+      {outlines:[{key:"rain-opening",opening:"Rain starts.",premise:"A bell is missing.",visibility:"public"}]},
+      {encounters:[{key:"bridge-watch",title:"Bridge Watch",description:"Wardens watch the bridge.",visibility:"gm"}]},
+      {locations:[{key:"bell-tower",name:"Bell Tower",description:"A silent tower.",visibility:"public"}],connections:[],storyNodes:[{key:"bell-rings",title:"The Bell Rings",description:"The bell sounds at dusk.",visibility:"public"}],storyRelationships:[]},
+    ];
+    completeWithProviderMock.mockImplementation(async(input:any)=>({message:{role:"assistant",content:JSON.stringify(candidates.shift())},usage:null,model:{requestedModel:input.provider.model,responseModel:"deepseek-test"}}));
+    const app=buildApp({campaignRepositoryFactory:()=>repo}),sections=[["outline"],["encounters"],["locations","story"]] as const,responses=[];
+    for(const [index,value] of sections.entries())responses.push(await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,`dynamic-${index}`),sections:value}}));
+    expect(responses.map((response)=>response.statusCode)).toEqual([201,201,201]);
+    const schemas=completeWithProviderMock.mock.calls.map(([input])=>input.jsonSchema.schema);expect(schemas.map((schema:any)=>Object.keys(schema.properties))).toEqual([["outlines"],["encounters"],["locations","connections","storyNodes","storyRelationships"]]);
+    for(const schema of schemas){expect(schema.additionalProperties).toBe(false);expect(schema.required).toEqual(Object.keys(schema.properties));}
+    const draftId=responses[0]!.json().draft.draftId,applied=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${draftId}/apply`,headers:{"content-type":"application/json"},payload:{expectedRevision:0,idempotencyKey:"dynamic-apply",selectedArtifactKeys:["rain-opening"]}});expect(applied.statusCode,applied.body).toBe(200);
+    const foundation=await app.inject({method:"GET",url:`/api/rpg/v1/campaigns/${campaign.id}/generated-foundation`});expect(foundation.statusCode,foundation.body).toBe(200);expect(foundation.json().opening.premise).toBe("A bell is missing.");await app.close();
   });
 
   it("frames campaign text as untrusted data with contextual section guidance",async()=>{
@@ -65,7 +135,17 @@ describe("campaign-content section generation",()=>{
     const applied=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${id}/apply`,headers:{"content-type":"application/json"},payload});expect(applied.statusCode,applied.body).toBe(200);
     const replay=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${id}/apply`,headers:{"content-type":"application/json"},payload});expect(replay.json()).toEqual(applied.json());expect(generate).toHaveBeenCalledTimes(1);
     const foundation=await app.inject({method:"GET",url:`/api/rpg/v1/campaigns/${campaign.id}/generated-foundation`});expect(foundation.json().opening).toMatchObject({premise:"A courier is missing.",startLocationKey:"old-road",sourceDraftId:id});
-    const database=db();expect(database.prepare("SELECT state FROM generated_npc_placement_intents_v52 WHERE campaign_id=?").get(campaign.id)).toEqual({state:"pending"});expect((database.prepare("SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=?").get(campaign.id) as any).count).toBe(3);database.close();await app.close();
+     const database=db();expect(database.prepare("SELECT state FROM generated_npc_placement_intents_v52 WHERE campaign_id=?").get(campaign.id)).toEqual({state:"pending"});expect((database.prepare("SELECT count(*) count FROM campaign_generation_accepted_artifacts_v52 WHERE campaign_id=?").get(campaign.id) as any).count).toBe(3);database.close();await app.close();
+  });
+
+  it("hydrates reviewed content without requiring a provider",async()=>{
+    enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Reviewed API hydration"}),app=buildApp({campaignRepositoryFactory:()=>repo});
+    const created=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"reviewed-api"),reviewedContent:content}});
+    expect(created.statusCode,created.body).toBe(201);expect(created.json().draft.campaignId).toBe(campaign.id);expect(created.json().preview.locations).toHaveLength(1);
+    const draftId=created.json().draft.draftId;
+    const applied=await app.inject({method:"POST",url:`/api/rpg/v1/campaign-content-drafts/${draftId}/apply`,headers:{"content-type":"application/json"},payload:{expectedRevision:0,idempotencyKey:"reviewed-api-apply",selectedArtifactKeys:["rainy-opening","old-road","mara"]}});
+    expect(applied.statusCode,applied.body).toBe(200);
+    const foundation=await app.inject({method:"GET",url:`/api/rpg/v1/campaigns/${campaign.id}/generated-foundation`});expect(foundation.statusCode).toBe(200);expect(foundation.json().opening.premise).toBe("A courier is missing.");await app.close();
   });
 
   it("coalesces concurrent exact requests without a duplicate provider call",async()=>{
@@ -101,7 +181,7 @@ describe("campaign-content section generation",()=>{
     enable();const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Metrics"});await updateProviderSettings({model:"requested-model",pricing:{promptPerMillion:2,completionPerMillion:4}});const app=buildApp({campaignRepositoryFactory:()=>repo,campaignContentGeneration:async()=>({content,responseModel:"provider-model",usage:{promptTokens:100,completionTokens:50,totalTokens:150}})});const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"metrics")});expect(response.statusCode,response.body).toBe(201);
     const database=db(),row=database.prepare(`SELECT job.job_id,job.attempt_count,attempt.provider,attempt.requested_model,attempt.response_model,
       attempt.prompt_tokens,attempt.completion_tokens,attempt.total_tokens,attempt.latency_ms,attempt.estimated_cost_usd,
-      attempt.prompt_version,attempt.schema_version,attempt.terminal_at FROM campaign_generation_jobs_v52 job JOIN campaign_generation_attempts_v52 attempt ON attempt.job_id=job.job_id`).get() as any;expect(row).toMatchObject({attempt_count:1,requested_model:"requested-model",response_model:"provider-model",prompt_tokens:100,completion_tokens:50,total_tokens:150,prompt_version:"campaign-content-v5",schema_version:"campaign-content-v4"});expect(row.job_id).toMatch(/^campaign-generation-/);expect(row.latency_ms).toBeGreaterThanOrEqual(0);expect(row.estimated_cost_usd).toBeCloseTo(0.0004);expect(row.terminal_at).toBeTruthy();database.close();await app.close();
+       attempt.prompt_version,attempt.schema_version,attempt.terminal_at FROM campaign_generation_jobs_v52 job JOIN campaign_generation_attempts_v52 attempt ON attempt.job_id=job.job_id`).get() as any;expect(row).toMatchObject({attempt_count:1,requested_model:"requested-model",response_model:"provider-model",prompt_tokens:100,completion_tokens:50,total_tokens:150,prompt_version:"campaign-content-v6",schema_version:"campaign-content-v4"});expect(row.job_id).toMatch(/^campaign-generation-/);expect(row.latency_ms).toBeGreaterThanOrEqual(0);expect(row.estimated_cost_usd).toBeCloseTo(0.0004);expect(row.terminal_at).toBeTruthy();database.close();await app.close();
   });
 
   it("reconciles a pending NPC placement when one running attached session becomes available",async()=>{
@@ -143,5 +223,10 @@ describe("campaign-content section generation",()=>{
   it("does not log provider-controlled generation error text",async()=>{
     enable();const messages:string[]=[];const stream={write:(message:string)=>{messages.push(message);}};const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Log redaction"});const app=Fastify({logger:{level:"error",stream} as any});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>repo,generateCampaignContent:async()=>{throw new Error("PRIVATE_PROVIDER_ECHO");}});
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:request(campaign.id,"log-redaction")});expect(response.statusCode).toBe(503);expect(messages.join("\n")).not.toContain("PRIVATE_PROVIDER_ECHO");expect(response.body).not.toContain("PRIVATE_PROVIDER_ECHO");await app.close();
+  });
+
+  it("classifies malformed configured-provider output without logging its content",async()=>{
+    enable();const messages:string[]=[];const stream={write:(message:string)=>{messages.push(message);}};const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Structured failure"});completeWithProviderMock.mockResolvedValue({message:{role:"assistant",content:'{"outlines":[{"PRIVATE_PROVIDER_ECHO":true}]}'},usage:null,model:{requestedModel:"configured",responseModel:"deepseek-test"}});const app=Fastify({logger:{level:"error",stream} as any});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>repo});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"structured-log"),sections:["outline"]}}),logs=messages.join("\n");expect(response.statusCode).toBe(503);expect(response.json().code).toBe("RPG_GENERATION_UNAVAILABLE");expect(logs).toContain("invalid-structured-response");expect(logs).not.toContain("PRIVATE_PROVIDER_ECHO");expect(response.body).not.toContain("PRIVATE_PROVIDER_ECHO");await app.close();
   });
 });

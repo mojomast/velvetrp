@@ -409,17 +409,22 @@ describe("documentation drift guards", () => {
       ["docs/api.md", "Development databases use one current schema and are disposable"],
       ["docs/operations.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
       ["docs/repo-architecture.md", "Development databases are disposable: schema changes require deleting and recreating `velvet.sqlite`"],
-      ["docs/ROADMAP.md", "Development persistence uses one current disposable schema with no startup upgrades"],
-      ["devplan.md", "Development persistence uses one current disposable schema with no startup upgrades"],
+      ["docs/ROADMAP.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
+      ["devplan.md", "Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
       ["handoff.md", "Persistence: one current disposable development schema"],
-      ["docs/roleplay-architecture-2026.md", "one disposable schema with no startup upgrades"],
-      ["docs/rpg-integration-plan.md", "one disposable schema with no startup upgrades"],
+      ["docs/roleplay-architecture-2026.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
+      ["docs/rpg-integration-plan.md", "one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2"],
+      ["docs/operations.md", "Startup recognizes that predecessor only when every schema object exactly matches the current schema minus the map-v2 changes"],
+      ["docs/operations.md", "The upgrade uses one independent immediate transaction"],
+      ["docs/operations.md", "an explicit foreign-key check plus complete current-schema, SQLite quick-check, local-ownership, and effect-vocabulary validation must succeed before commit"],
+      ["docs/operations.md", "Any failure rolls back schema and data changes"],
+      ["docs/operations.md", "Every other unknown, modified, or partially upgraded schema is rejected without repair"],
     ];
     for (const [relativePath, claim] of schemaClaims) expect(read(relativePath), relativePath).toContain(claim);
 
     const operations = documentedOperations();
     const count = operations.filter((operation) => operation.inventoryClass === "operation").length;
-    expect(count).toBe(130);
+    expect(count).toBe(144);
     const countClaims = ["README.md", "docs/api.md", "docs/operations.md", "docs/ROADMAP.md", "devplan.md", "handoff.md"];
     for (const relativePath of countClaims) expect(read(relativePath), relativePath).toContain(`${count} counted`);
   });

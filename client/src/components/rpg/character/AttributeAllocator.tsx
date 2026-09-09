@@ -37,7 +37,7 @@ export function AttributeAllocator({ disabled = false, onContinue }: AttributeAl
   function submit() { if (parsed.success) onContinue(parsed.data); }
 
   return <section className="builder-section attribute-allocator" aria-labelledby="allocation-heading">
-    <div className="builder-section-heading"><div><p className="eyebrow">STEP 1</p><h2 id="allocation-heading">Allocate attributes</h2></div></div>
+    <div className="builder-section-heading"><div><p className="eyebrow">RULES CHOICES</p><h2 id="allocation-heading">Allocate attributes</h2></div></div>
     <p className="builder-help">Choose a rules-supported method. Rolls and all derived statistics are calculated only by the server.</p>
     <fieldset disabled={disabled}>
       <legend>Allocation method</legend>

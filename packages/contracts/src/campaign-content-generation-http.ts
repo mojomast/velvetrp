@@ -18,26 +18,12 @@ export const campaignGenerationSectionSchema = z.enum([
 
 const retryFailedAttemptSchema = z.object({ failedAttempt: z.number().int().min(1).max(32) }).strict();
 
-/** Prose-only direction. retryFailedAttempt is an explicit acknowledgement of one known failed paid attempt. */
-export const campaignContentGenerationRequestSchema = z.object({
-  campaignId: campaignIdSchema,
-  brief: text.max(2_000),
-  tone: name,
-  exclusions: z.array(name).max(16),
-  idempotencyKey: idempotencyKeySchema,
-  sections: z.array(campaignGenerationSectionSchema).min(1).max(14).default([
-    "outline", "locations", "factions", "quests", "npcs",
-  ]),
-  expandArtifactKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
-  revisionFeedback: text.max(2_000).nullable().default(null),
-  retryFailedAttempt: retryFailedAttemptSchema.nullable().default(null),
-}).strict();
-
 const outline = z.object({
   key: generatedArtifactKeySchema, opening: text, premise: text,
   startLocationKey: generatedArtifactKeySchema.optional(), visibility,
 }).strict();
-const arc = z.object({ key: generatedArtifactKeySchema, title: name, summary: text, visibility }).strict();
+const arc = z.object({ key: generatedArtifactKeySchema, title: name, summary: text, visibility }).strict()
+  .describe("Runnable arc: stakes, entry, branching progression, setbacks, transition and alternate endings. Future outcomes and antagonist plans require visibility gm; public summaries are spoiler-free.");
 const location = z.object({
   key: generatedArtifactKeySchema, name, description: text, visibility,
   atmosphere: text.max(1_000).optional(), discoveries: detailList, hazards: detailList, hooks: detailList,
@@ -51,7 +37,7 @@ const faction = z.object({ key: generatedArtifactKeySchema, name, description: t
 const npc = z.object({
   key: generatedArtifactKeySchema, name, archetype: name, description: text, visibility,
   locationKey: generatedArtifactKeySchema.optional(), factionKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
-  privateGoals: text.optional(),
+  privateGoals: text.optional().describe("GM-only motives, knowledge boundaries, negotiation leverage and reactions; never public dialogue."),
 }).strict();
 const questObjective = z.object({
   key: generatedArtifactKeySchema,
@@ -95,7 +81,7 @@ const handout = z.object({ key: generatedArtifactKeySchema, title: name, content
 const scenePrompt = z.object({
   key: generatedArtifactKeySchema, title: name, prompt: text, visibility,
   locationKey: generatedArtifactKeySchema.optional(), npcKeys: z.array(generatedArtifactKeySchema).max(8).default([]),
-}).strict();
+}).strict().describe("GM scenes contain entry, framing, portrayal, approaches, escalation, clue recovery, reveal conditions and exit hooks. Public scenes contain only spoiler-free read-aloud prose and require publication before delivery.");
 const lore = z.object({
   key: generatedArtifactKeySchema, title: name, summary: text, visibility,
   details: detailList,
@@ -143,7 +129,34 @@ export const generatedCampaignContentProviderSchema = z.object({
   scenePrompts: z.array(scenePrompt).max(16).default([]),
 }).strict();
 
+/** Prose-only direction. retryFailedAttempt is an explicit acknowledgement of one known failed paid attempt. */
+export const campaignContentGenerationRequestSchema = z.object({
+  campaignId: campaignIdSchema,
+  brief: text.max(2_000),
+  tone: name,
+  exclusions: z.array(name).max(16),
+  idempotencyKey: idempotencyKeySchema,
+  sections: z.array(campaignGenerationSectionSchema).min(1).max(14).default([
+    "outline", "locations", "factions", "quests", "npcs",
+  ]),
+  expandArtifactKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
+  revisionFeedback: text.max(2_000).nullable().default(null),
+  retryFailedAttempt: retryFailedAttemptSchema.nullable().default(null),
+  /** Optional reviewed candidate content for provider-free API hydration. */
+  reviewedContent: generatedCampaignContentProviderSchema.optional(),
+}).strict();
+
 const publicFaction = faction.omit({ gmNotes: true });
+/** Reconciliation never dispatches a provider, including for a missing job. */
+export const campaignContentGenerationRecoverySchema = z.object({
+  campaignId: campaignIdSchema,
+  idempotencyKey: idempotencyKeySchema,
+  state: z.enum(["not-found", "running", "succeeded", "failed", "outcome-uncertain"]),
+  attempt: z.number().int().min(0).max(32),
+  draftId: resourceIdSchema.nullable(),
+}).strict().refine((value) => (value.state === "succeeded") === (value.draftId !== null)
+  && (value.state === "not-found" ? value.attempt === 0 : value.attempt > 0));
+
 const publicNpc = npc.omit({ privateGoals: true });
 export const campaignContentGenerationPreviewSchema = generatedCampaignContentProviderSchema
   .omit({ factions: true, npcs: true })

@@ -5528,7 +5528,7 @@ CREATE TABLE tactical_maps_v58 (
   campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, mode TEXT NOT NULL CHECK(mode IN('exploration','combat')),
   encounter_id TEXT, active INTEGER NOT NULL CHECK(active IN(0,1)), map_revision INTEGER NOT NULL,
   token_revision INTEGER NOT NULL DEFAULT 0, width INTEGER NOT NULL CHECK(width BETWEEN 5 AND 500), height INTEGER NOT NULL CHECK(height BETWEEN 5 AND 500),
-  algorithm TEXT NOT NULL CHECK(algorithm IN('dungeon-v1','cave-v1','arena-v1')), seed TEXT NOT NULL CHECK(length(seed) BETWEEN 1 AND 256),
+  algorithm TEXT NOT NULL CHECK(algorithm IN('dungeon-v1','cave-v1','arena-v1','dungeon-v2','cave-v2','arena-v2')), seed TEXT NOT NULL CHECK(length(seed) BETWEEN 1 AND 256),
   provenance_hash TEXT NOT NULL CHECK(length(provenance_hash)=64), tiles_json TEXT NOT NULL CHECK(json_valid(tiles_json) AND json_type(tiles_json)='array'),
   created_at TEXT NOT NULL,
   CHECK((mode='combat' AND encounter_id IS NOT NULL) OR (mode='exploration' AND encounter_id IS NULL)),
@@ -5537,6 +5537,12 @@ CREATE TABLE tactical_maps_v58 (
   FOREIGN KEY(encounter_id) REFERENCES encounter(encounter_id) ON DELETE RESTRICT
 );
 CREATE UNIQUE INDEX uq_tactical_maps_v58_active ON tactical_maps_v58(session_id,mode) WHERE active=1;
+CREATE TABLE tactical_map_contexts_v2 (
+  map_id TEXT PRIMARY KEY REFERENCES tactical_maps_v58(map_id) ON DELETE RESTRICT,
+  context_json TEXT NOT NULL CHECK(json_valid(context_json) AND json_type(context_json)='object')
+);
+CREATE TRIGGER tactical_map_contexts_v2_update BEFORE UPDATE ON tactical_map_contexts_v2 BEGIN SELECT RAISE(ABORT,'map generation context is immutable'); END;
+CREATE TRIGGER tactical_map_contexts_v2_delete BEFORE DELETE ON tactical_map_contexts_v2 BEGIN SELECT RAISE(ABORT,'map generation context is immutable'); END;
 CREATE TABLE tactical_map_tokens_v58 (
   map_id TEXT NOT NULL, token_id TEXT NOT NULL, actor_id TEXT, combatant_id TEXT, label TEXT NOT NULL,
   x INTEGER NOT NULL, y INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL,
@@ -5556,6 +5562,7 @@ CREATE TABLE tactical_map_previews_v58 (
   destination_x INTEGER NOT NULL, destination_y INTEGER NOT NULL, map_revision INTEGER NOT NULL, token_revision INTEGER NOT NULL,
   authority_revision INTEGER NOT NULL, path_json TEXT NOT NULL CHECK(json_valid(path_json) AND json_type(path_json)='array'), path_cost_feet INTEGER NOT NULL, budget_feet INTEGER NOT NULL, created_at TEXT NOT NULL,
   turn_id TEXT REFERENCES combat_turn_economy_v60(turn_id) ON DELETE RESTRICT,
+  actor_location_revision INTEGER,
   FOREIGN KEY(map_id,token_id) REFERENCES tactical_map_tokens_v58(map_id,token_id) ON DELETE RESTRICT,
   FOREIGN KEY(actor_id) REFERENCES campaign_actors(id) ON DELETE RESTRICT
 );

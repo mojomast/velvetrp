@@ -2,7 +2,7 @@ import type { CampaignWorldHttpResponse } from "@velvet/contracts";
 import { useMemo, useRef, useState } from "react";
 
 type Location = CampaignWorldHttpResponse["visibleLocations"][number];
-export function LocationTree({ locations, currentLocationIds = [] }: { locations: Location[]; currentLocationIds?: string[] }) {
+export function LocationTree({ locations, currentLocationIds = [], onSelect, selectedLocationId }: { locations: Location[]; currentLocationIds?: string[]; onSelect?: (locationId: string) => void; selectedLocationId?: string }) {
   const [selected, setSelected] = useState(0);
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
   const ordered = useMemo(() => {
@@ -21,7 +21,7 @@ export function LocationTree({ locations, currentLocationIds = [] }: { locations
   return <ul className="location-tree" role="tree" aria-label="Known location hierarchy">
     {ordered.map(({ location, level }, index) => <li key={location.locationId} role="none">
       <button ref={(node) => { refs.current[index] = node; }} type="button" role="treeitem" aria-level={level} aria-current={currentLocationIds.includes(location.locationId) ? "location" : undefined} tabIndex={index === selected ? 0 : -1}
-        style={{ "--tree-depth": level - 1 } as React.CSSProperties}
+        aria-selected={onSelect ? selectedLocationId === location.locationId : undefined} onClick={() => onSelect?.(location.locationId)} style={{ "--tree-depth": level - 1 } as React.CSSProperties}
         onFocus={() => setSelected(index)} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); focus(index + 1); } else if (event.key === "ArrowUp") { event.preventDefault(); focus(index - 1); } else if (event.key === "Home") { event.preventDefault(); focus(0); } else if (event.key === "End") { event.preventDefault(); focus(ordered.length - 1); } }}>
         <strong><bdi dir="auto">{location.name}</bdi></strong>{currentLocationIds.includes(location.locationId) && <span>Current</span>}
         {location.description && <small><bdi dir="auto">{location.description}</bdi></small>}

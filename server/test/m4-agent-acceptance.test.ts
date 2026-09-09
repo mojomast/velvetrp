@@ -189,7 +189,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(narrationData).toEqual({
       mandatorySessionZeroSafetyPolicy: { hardLimits: [], veils: [], pvpPolicy: "explicit-consent",
         romancePolicy: "fade-to-black", lethalityPolicy: "consent-required", paused: false, revision: 1 },
-      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [] },
+      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [], acceptedPublicPreparation: [] },
       verifiedReceiptFacts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }],
     });
     await restarted.close();

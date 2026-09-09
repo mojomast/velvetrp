@@ -8,6 +8,7 @@ export interface CampaignRouteMapProps {
   selectedActorId: string | null;
   onPrefillDeclaration: (declaration: string) => void;
   onOpenWorld: () => void;
+  canPrefill?: boolean;
 }
 
 type PositionedLocation = {
@@ -33,13 +34,15 @@ function hierarchyDepth(location: VisibleLocation, byId: ReadonlyMap<string, Vis
 }
 
 /** A presentation-only view of the directed routes in the server's world projection. */
-export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration, onOpenWorld }: CampaignRouteMapProps) {
+export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration, onOpenWorld, canPrefill = true }: CampaignRouteMapProps) {
   const headingId = useId();
   const descriptionId = useId();
+  const arrowId = useId();
   const { positioned, positions, width, height } = useMemo(() => {
     const byId = new Map<string, VisibleLocation>();
     for (const location of world.visibleLocations) if (!byId.has(location.locationId)) byId.set(location.locationId, location);
-    const rows = world.visibleLocations.map((location, order) => {
+    const ordered = [...byId.values()].sort((a, b) => hierarchyDepth(a, byId) - hierarchyDepth(b, byId) || (a.locationId < b.locationId ? -1 : a.locationId > b.locationId ? 1 : 0));
+    const rows = ordered.map((location, order) => {
       const depth = hierarchyDepth(location, byId);
       return { location, depth, x: 80 + depth * 180, y: 55 + order * 90 };
     });
@@ -67,14 +70,21 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
     <p id={descriptionId} className="route-map-note">Topological route map, not to scale. Arrows show only server-visible directed connections.</p>
     {positioned.length === 0 ? <p className="quick-empty">No known locations.</p> : <svg className="route-map-canvas" role="img" aria-labelledby={`${headingId} ${descriptionId}`}
       viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin meet">
+      <defs><marker id={arrowId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" /></marker></defs>
       {world.visibleConnections.map((connection, index) => {
         const from = positions.get(connection.fromLocationId);
         const to = positions.get(connection.toLocationId);
         if (!from || !to) return null;
         const isOutgoing = connection.fromLocationId === currentLocationId;
+        const distance = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+        const dx = (to.x - from.x) / distance; const dy = (to.y - from.y) / distance;
+        const start = { x: from.x + dx * 26, y: from.y + dy * 26 };
+        const end = { x: to.x - dx * 26, y: to.y - dy * 26 };
+        // Offset reciprocal edges so both directions remain visible.
+        const bend = world.visibleConnections.some((edge) => edge.fromLocationId === connection.toLocationId && edge.toLocationId === connection.fromLocationId) ? 24 : 0;
         return <g className={`route-map-connection${isOutgoing ? " is-reachable" : ""}`} key={`${connection.connectionId}-${index}`}>
-          <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="currentColor" strokeWidth={isOutgoing ? 3 : 1.5} />
-          <text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 5} textAnchor="middle" aria-hidden="true">→</text>
+          <title>{from.location.name} to {to.location.name}</title>
+          <path d={from === to ? `M ${from.x - 18} ${from.y - 18} C ${from.x - 65} ${from.y - 60}, ${from.x + 65} ${from.y - 60}, ${from.x + 18} ${from.y - 18}` : `M ${start.x} ${start.y} Q ${(from.x + to.x) / 2 - dy * bend} ${(from.y + to.y) / 2 + dx * bend} ${end.x} ${end.y}`} fill="none" markerEnd={`url(#${arrowId})`} stroke="currentColor" strokeWidth={isOutgoing ? 3 : 1.5} />
         </g>;
       })}
       {positioned.map(({ location, depth, x, y }, index) => {
@@ -82,7 +92,7 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
         const isReachable = reachableIds.has(location.locationId);
         return <g className={`route-map-location${isCurrent ? " is-current" : ""}${isReachable ? " is-reachable" : ""}`}
           data-location-id={location.locationId} data-depth={depth} transform={`translate(${x} ${y})`} key={`${location.locationId}-${index}`}>
-          <title>{location.name}{isCurrent ? ", current location" : isReachable ? ", reachable destination" : ""}</title>
+          <title>{location.name}{isCurrent ? ", current location" : isReachable ? ", outgoing route destination" : ""}</title>
           <circle r={isCurrent ? 22 : 18} fill={isCurrent ? "currentColor" : "Canvas"} stroke="currentColor" strokeWidth={isReachable ? 4 : 2} />
           {isCurrent && <circle r="7" fill="Canvas" />}
           <text y="35" textAnchor="middle" fill="currentColor"><tspan>{location.name}</tspan></text>
@@ -90,14 +100,15 @@ export function CampaignRouteMap({ world, selectedActorId, onPrefillDeclaration,
       })}
     </svg>}
     <section className="route-map-destinations" aria-labelledby={`${headingId}-destinations`}>
-      <h3 id={`${headingId}-destinations`}>Reachable destinations</h3>
+      <h3 id={`${headingId}-destinations`}>Outgoing route destinations</h3>
       {outgoing.length > 0 ? <ul>{outgoing.map((connection, index) => {
         const destination = positions.get(connection.toLocationId)!.location;
         return <li key={`${connection.connectionId}-${index}`}><button type="button" className="ghost"
-          onClick={() => onPrefillDeclaration(`Travel to ${destination.name}.`)}>
+          disabled={!canPrefill} onClick={() => onPrefillDeclaration(`Travel to ${destination.name}.`)}>
           Prefill travel to <bdi dir="auto">{destination.name}</bdi>
         </button></li>;
-      })}</ul> : <p className="quick-empty">No outgoing reachable destinations for the selected actor.</p>}
+      })}</ul> : <p className="quick-empty">No server-visible outgoing routes for the selected actor.</p>}
     </section>
+    <p className="route-map-note">An outgoing route does not guarantee legal travel. Travel buttons only prepare a declaration. Submit it in play, or open World for authoritative travel controls.</p>
   </section>;
 }

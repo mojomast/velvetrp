@@ -20,6 +20,7 @@ const statusLabel = (status: string) => status.replaceAll("-", " ");
 export function CampaignConversation({ transcript, transcriptState, legacyMessages, legacyParticipants, current, liveEvents,
   actorNames, onPrefillChoice, canPrefill }: CampaignConversationProps) {
   const logRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
   const liveTurn = [...liveEvents].reverse().find((event) => event.type === "turn_started");
   const activeTurn = liveTurn?.type === "turn_started" ? liveTurn.payload.turn : current?.turn ?? null;
   const represented = activeTurn && transcript.some((entry) => entry.turnId === activeTurn.turnId || entry.turnId === activeTurn.priorTurnId);
@@ -33,13 +34,14 @@ export function CampaignConversation({ transcript, transcriptState, legacyMessag
   const latestStatus = [...liveEvents].reverse().find((event) => event.type === "agent_status");
   const legacySpeaker = (message: ChatMessage) => message.role === "user" ? "Player" : message.role === "system" ? "System"
     : legacyParticipants.find((participant) => participant.id === message.speakerCharacterId)?.name ?? "Character";
-  useEffect(() => { const log = logRef.current; if (log) log.scrollTop = log.scrollHeight; }, [liveEvents.length, transcript.length]);
+  useEffect(() => { const log = logRef.current; if (log && followLatestRef.current) log.scrollTop = log.scrollHeight; }, [liveEvents.length, transcript.length]);
 
   return <section className="campaign-conversation" aria-labelledby="campaign-conversation-heading">
     <header><div><p className="eyebrow">AUTHORITATIVE ADVENTURE</p><h2 id="campaign-conversation-heading">Campaign conversation</h2></div>
       {transcriptState === "loading" && <span role="status">Loading transcript...</span>}
       {transcriptState === "error" && <span role="alert">Transcript unavailable.</span>}</header>
-    <div ref={logRef} className="campaign-conversation-log" role="log" aria-live="polite" aria-busy={transcriptState === "loading"}>
+    <div ref={logRef} className="campaign-conversation-log" role="log" aria-live="polite" aria-busy={transcriptState === "loading"}
+      onScroll={(event) => { const log = event.currentTarget; followLatestRef.current = log.scrollHeight - log.scrollTop - log.clientHeight < 48; }}>
       {legacyMessages.length > 0 && <section className="legacy-campaign-history" aria-labelledby="legacy-campaign-history-heading"><h3 id="legacy-campaign-history-heading">Read-only pre-campaign history</h3><p>These legacy room messages are historical context only. Continue play with the action composer below.</p>
         {legacyMessages.map((message) => <article className="conversation-exchange legacy" key={message.id}><strong>{legacySpeaker(message)}</strong><p>{message.content}</p></article>)}</section>}
       {transcript.map((entry) => <article className="conversation-turn" key={entry.turnId}><div className="conversation-exchange declaration"><strong>{actorNames.get(entry.actorId) ?? "Adventurer"}</strong><p>{entry.declaration}</p></div><div className="conversation-exchange dm"><strong>Dungeon Master</strong><p>{entry.narration}</p><time dateTime={entry.completedAt}>{new Date(entry.completedAt).toLocaleString()}</time></div></article>)}

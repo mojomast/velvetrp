@@ -52,6 +52,20 @@ export const campaignPlayPrincipalSchema = z.object({
   if (control !== expected) context.addIssue({ code: "custom", path: ["control"], message: "control must match role" });
 });
 
+/** Server-derived campaign dice authorization for the current principal. */
+export const campaignPlayCampaignDiceCapabilitySchema = z.object({
+  canView: z.boolean(),
+  canRoll: z.boolean(),
+}).strict().refine(({ canView, canRoll }) => !canRoll || canView, {
+  message: "campaign dice rolling requires history visibility",
+  path: ["canRoll"],
+});
+
+/** Closed capability set consumed by campaign play clients without inference. */
+export const campaignPlayCapabilitiesSchema = z.object({
+  campaignDice: campaignPlayCampaignDiceCapabilitySchema,
+}).strict();
+
 /**
  * Minimal bootstrap for a campaign play room. The projection intentionally
  * excludes principal, controller, persona, campaign-character, sheet, and
@@ -61,8 +75,10 @@ export const campaignPlayBootstrapSchema = z.object({
   campaignId: resourceIdSchema,
   sessionId: campaignPlaySessionIdSchema,
   expectedRevision: revisionSchema,
+  dm: z.object({ mode: z.enum(["human", "ai"]), revision: revisionSchema }).strict().optional(),
   session: campaignPlaySessionSchema,
   principal: campaignPlayPrincipalSchema,
+  capabilities: campaignPlayCapabilitiesSchema,
   playableActors: z.array(campaignPlayActorSchema).max(MAX_CAMPAIGN_PLAY_ACTORS),
 }).strict().superRefine((value, context) => {
   if (value.principal.control === "none" && value.playableActors.length !== 0) {
@@ -70,6 +86,16 @@ export const campaignPlayBootstrapSchema = z.object({
   }
   if (value.session.adventureEligible && !resourceIdSchema.safeParse(value.sessionId).success) {
     context.addIssue({ code: "custom", path: ["session", "adventureEligible"], message: "adventure stream requires a strict session ID" });
+  }
+  const dice = value.capabilities.campaignDice;
+  if (value.principal.role === "observer" && (dice.canView || dice.canRoll)) {
+    context.addIssue({ code: "custom", path: ["capabilities", "campaignDice"], message: "observers cannot use campaign dice" });
+  }
+  if ((value.principal.role === "owner" || value.principal.role === "gm") && (!dice.canView || !dice.canRoll)) {
+    context.addIssue({ code: "custom", path: ["capabilities", "campaignDice"], message: "privileged roles can use campaign dice" });
+  }
+  if (value.principal.role === "player" && dice.canRoll && value.playableActors.length === 0) {
+    context.addIssue({ code: "custom", path: ["capabilities", "campaignDice", "canRoll"], message: "player dice rolling requires a controlled actor" });
   }
 });
 

@@ -36,14 +36,25 @@ export const authoritativeMapTokenSchema = z.object({
   hidden: z.boolean(),
 }).strict();
 
+/** Server-only replay inputs. Never include this context in a player projection. */
+export const tacticalMapGenerationContextSchema = z.object({
+  campaignId: resourceIdSchema,
+  sessionId: z.string().min(1).max(512),
+  locationId: resourceIdSchema,
+  actorId: resourceIdSchema,
+  actorLocationRevision: revisionSchema,
+  spawns: z.array(z.object({ position: mapPointSchema, footprint: mapFootprintSchema }).strict()).max(64),
+}).strict();
+
 export const mapGenerationProvenanceSchema = z.object({
-  algorithm: z.enum(["dungeon-v1", "cave-v1", "arena-v1"]),
+  algorithm: z.enum(["dungeon-v1", "cave-v1", "arena-v1", "dungeon-v2", "cave-v2", "arena-v2"]),
   seed: z.string().min(1).max(256),
   parameters: z.object({
     width: z.number().int().min(5).max(500),
     height: z.number().int().min(5).max(500),
   }).strict(),
   hash: z.string().regex(/^[a-f0-9]{64}$/),
+  context: tacticalMapGenerationContextSchema.optional(),
 }).strict();
 
 export const authoritativeTacticalMapSchema = z.object({
@@ -131,7 +142,15 @@ export const tacticalMapGenerateRequestSchema = z.object({
   height: z.number().int().min(5).max(500),
   tokens: z.array(tacticalMapGenerationTokenSchema).max(2_000),
   idempotencyKey: idempotencyKeySchema,
+  grounding: z.object({
+    actorId: resourceIdSchema,
+    expectedLocationId: resourceIdSchema,
+    expectedLocationRevision: expectedRevisionSchema,
+  }).strict().optional(),
 }).strict().superRefine((input, context) => {
+  if (input.grounding && (input.width > 64 || input.height > 64 || input.tokens.length > 64 || !input.tokens.some((token) => token.actorId === input.grounding!.actorId))) {
+    context.addIssue({ code: "custom", path: ["grounding"], message: "grounded maps require an anchor actor token and at most 64 by 64 cells and 64 tokens" });
+  }
   if ((input.mode === "combat") !== (input.encounterId !== null)) {
     context.addIssue({ code: "custom", path: ["encounterId"], message: "combat maps require an encounter and exploration maps forbid one" });
   }
@@ -152,6 +171,7 @@ export const tacticalMapSnapshotSchema = z.object({
   controlledTokenId: resourceIdSchema.nullable(),
   movement: tacticalMapMovementSchema.nullable(),
   projection: tacticalMapProjectionSchema,
+  locationBinding: z.object({ locationId: resourceIdSchema }).strict().optional(),
 }).strict();
 
 export const tacticalMapGenerateResponseSchema = tacticalMapSnapshotSchema;
@@ -200,6 +220,7 @@ export type MapFootprint = z.infer<typeof mapFootprintSchema>;
 export type AuthoritativeMapTile = z.infer<typeof authoritativeMapTileSchema>;
 export type AuthoritativeMapToken = z.infer<typeof authoritativeMapTokenSchema>;
 export type MapGenerationProvenance = z.infer<typeof mapGenerationProvenanceSchema>;
+export type TacticalMapGenerationContext = z.infer<typeof tacticalMapGenerationContextSchema>;
 export type AuthoritativeTacticalMap = z.infer<typeof authoritativeTacticalMapSchema>;
 export type ProjectedMapTile = z.infer<typeof projectedMapTileSchema>;
 export type ProjectedMapToken = z.infer<typeof projectedMapTokenSchema>;

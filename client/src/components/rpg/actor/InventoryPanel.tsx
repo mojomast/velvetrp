@@ -1,6 +1,6 @@
 import { resourceIdSchema } from "@velvet/contracts";
 import type { InventoryHttpCommandRequest, InventoryHttpGetResponse } from "@velvet/contracts";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EquipmentSlots } from "./EquipmentSlots";
 
 export type InventoryIntent = InventoryHttpCommandRequest extends infer Command
@@ -18,6 +18,7 @@ export interface InventoryPanelProps {
   disabled?: boolean;
   describeItem: (item: InventoryHttpGetResponse["entries"][number]["item"]) => InventoryItemPresentation;
   onCommand: (command: InventoryIntent) => void;
+  onReviewChange?: (reviewing: boolean) => void;
 }
 
 const exactReference = (item: InventoryHttpGetResponse["entries"][number]["item"]) =>
@@ -32,8 +33,10 @@ function consequence(kind: InventoryIntent["kind"]): string {
   return "The server will enforce ownership, binding, recipient, and capacity policy before gifting the exact quantity.";
 }
 
-export function InventoryPanel({ inventory, disabled = false, describeItem, onCommand }: InventoryPanelProps) {
+export function InventoryPanel({ inventory, disabled = false, describeItem, onCommand, onReviewChange }: InventoryPanelProps) {
   const [review, setReview] = useState<InventoryIntent | null>(null);
+  useEffect(() => { onReviewChange?.(review !== null); }, [review, onReviewChange]);
+  useEffect(() => () => onReviewChange?.(false), [onReviewChange]);
   const [confirmedSnapshot, setConfirmedSnapshot] = useState<string | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [recipient, setRecipient] = useState("");

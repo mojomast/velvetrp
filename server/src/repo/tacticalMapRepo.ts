@@ -11,6 +11,9 @@ import {
   tacticalMapSnapshotSchema,
   utcIsoTimestampSchema,
   resourceIdSchema,
+  tacticalMapGenerationContextSchema,
+  type TacticalMapGenerationContext,
+  type MapGenerationProvenance,
   type AuthoritativeTacticalMap,
   type MapPoint,
   type TacticalMapGenerateRequest,
@@ -34,10 +37,11 @@ export class TacticalMapAuthorizationError extends Error {}
 export class TacticalMapUnavailableError extends Error {}
 export class TacticalMapStaleError extends Error {}
 export class TacticalMapConflictError extends Error {}
+export class TacticalMapLocationMismatchError extends TacticalMapConflictError {}
 
 type Mode = "exploration" | "combat";
 type MapRow = { map_id: string; campaign_id: string; session_id: string; mode: Mode; encounter_id: string | null; map_revision: number;
-  token_revision: number; width: number; height: number; algorithm: "dungeon-v1" | "cave-v1" | "arena-v1"; seed: string; provenance_hash: string; tiles_json: string; created_at: string };
+  token_revision: number; width: number; height: number; algorithm: MapGenerationProvenance["algorithm"]; seed: string; provenance_hash: string; tiles_json: string; created_at: string };
 type TokenRow = { token_id: string; actor_id: string | null; combatant_id: string | null; label: string; x: number; y: number; width: number; height: number;
   disposition: "friendly" | "neutral" | "hostile"; hidden: number; state_revision: number };
 
@@ -58,13 +62,34 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
   const tokenRows = (mapId: string) => db.prepare("SELECT * FROM tactical_map_tokens_v58 WHERE map_id=? ORDER BY token_id").all(mapId) as TokenRow[];
   const mayControl = (principalId: string, campaignId: string, actorId: string, actorRole: string) => actorRole === "owner" || actorRole === "gm" || Boolean(db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(campaignId, actorId, principalId));
 
+  const actorLocation = (campaignId: string, sessionId: string, actorId: string) => db.prepare(`SELECT state.location_id,state.state_revision FROM campaign_actor_locations_v28 state
+    JOIN campaign_locations_v28 location ON location.campaign_id=state.campaign_id AND location.location_id=state.location_id
+    WHERE state.campaign_id=? AND state.session_id=? AND state.actor_id=?`).get(campaignId, sessionId, actorId) as { location_id: string; state_revision: number } | undefined;
+
+  function generationContext(row: MapRow): TacticalMapGenerationContext | undefined {
+    const stored = db.prepare("SELECT context_json FROM tactical_map_contexts_v2 WHERE map_id=?").get(row.map_id) as { context_json: string } | undefined;
+    if (row.algorithm.endsWith("-v1")) { if (stored) throw new Error("legacy map has unexpected context"); return undefined; }
+    if (!stored) throw new Error("grounded map context is missing");
+    const context = tacticalMapGenerationContextSchema.parse(JSON.parse(stored.context_json));
+    if (context.campaignId !== row.campaign_id || context.sessionId !== row.session_id) throw new Error("grounded map context binding is corrupt");
+    return context;
+  }
+
+  function locationRevision(row: MapRow, actorId: string): number | null {
+    const context = generationContext(row); if (!context) return null;
+    const current = actorLocation(row.campaign_id, row.session_id, actorId);
+    if (!current || current.location_id !== context.locationId) throw new TacticalMapLocationMismatchError("map is not bound to the actor's current location");
+    return current.state_revision;
+  }
+
   function load(row: MapRow): { map: AuthoritativeTacticalMap; tokens: TokenRow[] } {
     const tokens = tokenRows(row.map_id);
+    const context = generationContext(row);
     const map = authoritativeTacticalMapSchema.parse({ mapId: row.map_id, width: row.width, height: row.height,
       grid: { kind: "square", feetPerCell: 5 }, tiles: JSON.parse(row.tiles_json), tokens: tokens.map((token) => ({ tokenId: token.token_id, label: token.label,
         position: { x: token.x, y: token.y }, footprint: { width: token.width, height: token.height }, disposition: token.disposition, hidden: token.hidden === 1 })),
-      provenance: { algorithm: row.algorithm, seed: row.seed, parameters: { width: row.width, height: row.height }, hash: row.provenance_hash } });
-    const generated = generateTacticalMap({ kind: row.algorithm.replace("-v1", "") as "dungeon" | "cave" | "arena", seed: row.seed, width: row.width, height: row.height });
+      provenance: { algorithm: row.algorithm, seed: row.seed, parameters: { width: row.width, height: row.height }, hash: row.provenance_hash, ...(context ? { context } : {}) } });
+    const generated = generateTacticalMap({ kind: row.algorithm.split("-v")[0] as "dungeon" | "cave" | "arena", algorithm: row.algorithm, seed: row.seed, width: row.width, height: row.height, ...(context ? { context } : {}) });
     if (generated.provenance?.hash !== row.provenance_hash || canonical(generated.tiles) !== canonical(map.tiles)) throw new Error("tactical map provenance verification failed");
     return { map, tokens };
   }
@@ -133,12 +158,14 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
     const actorRole = role(principalId, row.campaign_id); if (!actorRole) throw new TacticalMapAuthorizationError();
     const { map, tokens } = load(row); const token = actorId ? tokens.find((value) => value.actor_id === actorId) : undefined;
     if (actorId && (!token || !mayControl(principalId, row.campaign_id, actorId, actorRole))) throw new TacticalMapAuthorizationError();
+    if (actorId) locationRevision(row, actorId);
+    const context = generationContext(row);
     const move = actorId ? movement(row, actorId) : null;
     const view = visibility(row, map, actorId ?? "", actorRole);
     const reachable = token && move ? reachableCells(map, { x: token.x, y: token.y }, Math.floor(move.budgetFeet / 5), { footprint: { width: token.width, height: token.height }, blocked: blocked(map, token.token_id) }) : [];
     return tacticalMapSnapshotSchema.parse({ campaignId: row.campaign_id, sessionId: row.session_id, encounterId: row.encounter_id, mode: row.mode,
       mapRevision: row.map_revision, tokenRevision: row.token_revision, controlledTokenId: token?.token_id ?? null, movement: move ? { policy: move.policy, budgetFeet: move.budgetFeet } : null,
-      projection: projectTacticalMap(map, { ...view, authoritativePath: path, reachable }) });
+      projection: projectTacticalMap(map, { ...view, authoritativePath: path, reachable }), ...(context ? { locationBinding: { locationId: context.locationId } } : {}) });
   }
 
   function reveal(row: MapRow, actorId: string, now: string): void {
@@ -163,7 +190,21 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
         const retry = db.prepare("SELECT request_json,map_id FROM tactical_map_generation_keys_v58 WHERE campaign_id=? AND session_id=? AND mode=? AND idempotency_key=?").get(campaignId, sessionId, input.mode, input.idempotencyKey) as { request_json: string; map_id: string } | undefined;
         if (retry) { if (retry.request_json !== requestJson) throw new TacticalMapConflictError("idempotency key was reused"); const existing = rowById(retry.map_id); if (!existing) throw new Error("map generation receipt is corrupt"); return snapshot(existing, principalId, null); }
         if (input.mode === "combat") { const encounter = db.prepare("SELECT 1 FROM encounter WHERE encounter_id=? AND campaign_id=? AND session_id=? AND status='active'").get(input.encounterId, campaignId, sessionId); if (!encounter) throw new TacticalMapConflictError("active encounter is unavailable"); }
-        const generated = generateTacticalMap(input); const parsed = authoritativeTacticalMapSchema.parse({ ...generated, mapId: resourceIdSchema.parse(dependencies.ids.nextId()), tokens: input.tokens.map(({ actorId: _actor, combatantId: _combatant, ...token }) => token) });
+        let context: TacticalMapGenerationContext | undefined;
+        if (input.grounding) {
+          const anchor = actorLocation(campaignId, sessionId, input.grounding.actorId);
+          if (!anchor || anchor.location_id !== input.grounding.expectedLocationId) throw new TacticalMapLocationMismatchError("generation location changed or is unavailable");
+          if (anchor.state_revision !== input.grounding.expectedLocationRevision) throw new TacticalMapStaleError("actor location revision changed");
+          for (const token of input.tokens) if (token.actorId) {
+            if (actorLocation(campaignId, sessionId, token.actorId)?.location_id !== anchor.location_id) throw new TacticalMapLocationMismatchError("all placed actors must share the map location");
+          }
+          context = { campaignId, sessionId, locationId: anchor.location_id, actorId: input.grounding.actorId, actorLocationRevision: anchor.state_revision,
+            spawns: input.tokens.map(({ position, footprint }) => ({ position, footprint })).sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x || a.footprint.height - b.footprint.height || a.footprint.width - b.footprint.width) };
+        }
+        let generated: AuthoritativeTacticalMap;
+        try { generated = generateTacticalMap({ ...input, ...(context ? { algorithm: `${input.kind}-v2` as const, context } : {}) }); }
+        catch (error) { if (error instanceof RangeError) throw new TacticalMapConflictError(error.message); throw error; }
+        const parsed = authoritativeTacticalMapSchema.parse({ ...generated, mapId: resourceIdSchema.parse(dependencies.ids.nextId()), tokens: input.tokens.map(({ actorId: _actor, combatantId: _combatant, ...token }) => token) });
         const occupied = new Set<string>();
         for (const token of input.tokens) {
           if (token.actorId && !db.prepare("SELECT 1 FROM campaign_actors WHERE campaign_id=? AND id=?").get(campaignId, token.actorId)) throw new TacticalMapConflictError("token actor binding is unavailable");
@@ -174,6 +215,7 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
         if (prior) db.prepare("UPDATE tactical_maps_v58 SET active=0 WHERE map_id=?").run(prior.map_id);
         db.prepare("INSERT INTO tactical_maps_v58(map_id,campaign_id,session_id,mode,encounter_id,active,map_revision,token_revision,width,height,algorithm,seed,provenance_hash,tiles_json,created_at) VALUES(?,?,?,?,?,1,?,0,?,?,?,?,?,?,?)")
           .run(parsed.mapId, campaignId, sessionId, input.mode, input.encounterId, mapRevision, parsed.width, parsed.height, parsed.provenance!.algorithm, parsed.provenance!.seed, parsed.provenance!.hash, canonical(parsed.tiles), now);
+        if (context) db.prepare("INSERT INTO tactical_map_contexts_v2 VALUES(?,?)").run(parsed.mapId, canonical(context));
         const insertToken = db.prepare("INSERT INTO tactical_map_tokens_v58(map_id,token_id,actor_id,combatant_id,label,x,y,width,height,disposition,hidden,state_revision) VALUES(?,?,?,?,?,?,?,?,?,?,?,0)");
         for (const token of input.tokens) insertToken.run(parsed.mapId, token.tokenId, token.actorId, token.combatantId, token.label, token.position.x, token.position.y, token.footprint.width, token.footprint.height, token.disposition, token.hidden ? 1 : 0);
         db.prepare("INSERT INTO tactical_map_generation_keys_v58 VALUES(?,?,?,?,?,?)").run(campaignId, sessionId, input.mode, input.idempotencyKey, requestJson, parsed.mapId);
@@ -192,13 +234,14 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
       if (row.map_revision !== input.expectedMapRevision || row.token_revision !== input.expectedTokenRevision) throw new TacticalMapStaleError();
       const actorRole = role(principalId, campaignId); if (!actorRole || !mayControl(principalId, campaignId, input.actorId, actorRole)) throw new TacticalMapAuthorizationError();
       const { map, tokens } = load(row); const token = tokens.find((value) => value.actor_id === input.actorId); if (!token) throw new TacticalMapUnavailableError();
+      const actorLocationRevision = locationRevision(row, input.actorId);
       const budget = movement(row, input.actorId, true); const path = findPath(map, { x: token.x, y: token.y }, input.destination, { footprint: { width: token.width, height: token.height }, blocked: blocked(map, token.token_id) });
       if (!path) throw new TacticalMapConflictError("destination is unreachable"); const cost = pathCost(map, path, token.width, token.height); if (cost > budget.budgetFeet) throw new TacticalMapConflictError("destination exceeds movement budget");
       const authorityRevision = movementAuthorityRevision(row);
       const turnId = budget.economy?.turnId ?? null;
-      const previewId = `map-preview-${createHash("sha256").update(canonical({ mapId: row.map_id, actorId: input.actorId, destination: input.destination, mapRevision: row.map_revision, tokenRevision: row.token_revision, authorityRevision, turnId, path, cost, budget: budget.budgetFeet })).digest("hex").slice(0, 48)}`;
+      const previewId = `map-preview-${createHash("sha256").update(canonical({ mapId: row.map_id, actorId: input.actorId, destination: input.destination, mapRevision: row.map_revision, tokenRevision: row.token_revision, authorityRevision, turnId, path, cost, budget: budget.budgetFeet, ...(actorLocationRevision === null ? {} : { actorLocationRevision }) })).digest("hex").slice(0, 48)}`;
       const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString());
-      db.prepare("INSERT OR REPLACE INTO tactical_map_previews_v58 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(previewId, row.map_id, input.actorId, token.token_id, input.destination.x, input.destination.y, row.map_revision, row.token_revision, authorityRevision, canonical(path), cost, budget.budgetFeet, now, turnId);
+      db.prepare("INSERT OR REPLACE INTO tactical_map_previews_v58 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(previewId, row.map_id, input.actorId, token.token_id, input.destination.x, input.destination.y, row.map_revision, row.token_revision, authorityRevision, canonical(path), cost, budget.budgetFeet, now, turnId, actorLocationRevision);
       return tacticalMapPreviewResponseSchema.parse({ ...snapshot(row, principalId, input.actorId, path), previewId, pathCostFeet: cost });
       }).immediate();
     },
@@ -210,8 +253,10 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
         if (retry) { if (retry.request_json !== requestJson) throw new TacticalMapConflictError("idempotency key was reused"); const receipt = tacticalMapMoveReceiptSchema.parse(JSON.parse(retry.result_json)); return tacticalMapMoveResponseSchema.parse({ receipt, snapshot: snapshot(row, principalId, input.actorId) }); }
         if (row.map_revision !== input.expectedMapRevision || row.token_revision !== input.expectedTokenRevision) throw new TacticalMapStaleError();
         const token = tokenRows(row.map_id).find((value) => value.actor_id === input.actorId); if (!token) throw new TacticalMapUnavailableError();
+        const actorLocationRevision = locationRevision(row, input.actorId);
         const budget = movement(row, input.actorId, true);
-        const preview = db.prepare("SELECT * FROM tactical_map_previews_v58 WHERE preview_id=? AND map_id=? AND actor_id=? AND token_id=?").get(input.previewId, row.map_id, input.actorId, token.token_id) as { destination_x: number; destination_y: number; map_revision: number; token_revision: number; authority_revision: number; path_cost_feet: number; budget_feet: number; turn_id: string | null } | undefined;
+        const preview = db.prepare("SELECT * FROM tactical_map_previews_v58 WHERE preview_id=? AND map_id=? AND actor_id=? AND token_id=?").get(input.previewId, row.map_id, input.actorId, token.token_id) as { destination_x: number; destination_y: number; map_revision: number; token_revision: number; authority_revision: number; path_cost_feet: number; budget_feet: number; turn_id: string | null; actor_location_revision: number | null } | undefined;
+        if (preview && preview.actor_location_revision !== actorLocationRevision) throw new TacticalMapStaleError("actor location changed after preview");
         if (!preview || preview.destination_x !== input.destination.x || preview.destination_y !== input.destination.y || preview.map_revision !== row.map_revision || preview.token_revision !== row.token_revision || preview.authority_revision !== movementAuthorityRevision(row)) throw new TacticalMapConflictError("an exact current preview is required");
         if (preview.turn_id !== (budget.economy?.turnId ?? null) || !Number.isSafeInteger(preview.path_cost_feet) || preview.path_cost_feet < 0 || preview.path_cost_feet > budget.budgetFeet || preview.budget_feet !== budget.budgetFeet) throw new TacticalMapConflictError("movement authority changed after preview");
         const now = utcIsoTimestampSchema.parse(dependencies.clock.now().toISOString()); const after = row.token_revision + 1;

@@ -470,6 +470,7 @@ test("M2.7 economy quotes, replays, purchases, and reconciles authoritative stat
 });
 
 test("critical browser and public API workflows", async ({ page, request }) => {
+  test.slow();
   const characterIds: string[] = [];
   const sessionIds: string[] = [];
   const loreIds: string[] = [];
@@ -484,13 +485,13 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Velvet" })).toBeVisible();
     expect(await json<{ ok: boolean }>(request, "GET", "/health")).toEqual({ ok: true });
-    await page.getByRole("button", { name: "Campaigns" }).click();
-    await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
     const campaignName = `${runId}-Campaign`;
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Create campaign" }).click();
     await expect(page.locator(".campaign-card").filter({ hasText: campaignName })).toBeFocused();
     await page.locator(".campaign-card").filter({ hasText: campaignName }).getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+    await page.getByRole("button", { name: "Open advanced setup" }).click();
     await expect(page.getByRole("heading", { name: campaignName })).toBeVisible();
     const createdCampaigns = await json<{ campaigns: Array<{ id: string; name: string }> }>(request, "GET", "/rpg/v1/campaigns");
     const campaignId = createdCampaigns.campaigns.find((campaign) => campaign.name === campaignName)!.id;
@@ -590,6 +591,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await page.getByRole("button", { name: "Rename campaign" }).click();
     await expect(page.getByRole("heading", { name: renamedCampaignName })).toBeVisible();
     await expect(page.getByText(`Campaign renamed to “${renamedCampaignName}”.`)).toBeAttached();
+    await page.getByRole("radio", { name: /Original metadata starter/i }).check();
     await expect(page.getByRole("button", { name: "Set up original starter" })).toBeDisabled();
     await page.getByRole("checkbox", { name: /metadata-only setup is final/i }).check();
     await page.getByRole("button", { name: "Set up original starter" }).click();
@@ -657,7 +659,7 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await expect(workspaceHeading).toBeFocused();
     await expect(page.getByRole("heading", { name: "Attributes" })).toBeVisible();
     await expect(page.getByText("No resources.")).toBeVisible();
-    await expect(page.getByRole("button")).toHaveCount(1);
+    await expect(page.getByRole("main").getByRole("button")).toHaveCount(1);
     const workspaceBack = page.getByRole("button", { name: "← Back to campaign" });
     expect((await workspaceBack.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     const identityCards = page.locator(".workspace-identity > article");
@@ -692,8 +694,9 @@ test("critical browser and public API workflows", async ({ page, request }) => {
     await expect(page.getByRole("heading", { name: "Campaigns" })).toBeVisible();
     await expect(page.getByRole("button", { name: `Open campaign ${renamedCampaignName}` })).toBeVisible();
     await page.getByRole("button", { name: `Open campaign ${mechanicsCampaignName}` }).click();
+    await page.getByRole("button", { name: "Open advanced setup" }).click();
     await expect(page.getByRole("heading", { name: mechanicsCampaignName })).toBeVisible();
-    await expect(page.getByRole("radio", { name: /Original metadata starter/i })).toBeChecked();
+    await expect(page.getByRole("radio", { name: /SRD 5.1 starter/i })).toBeChecked();
     await page.getByRole("radio", { name: /Mechanics starter/i }).check();
     await expect(page.getByText(/future builder and progression UI/i)).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
@@ -707,8 +710,8 @@ test("critical browser and public API workflows", async ({ page, request }) => {
         mechanicsSetupRequests.push(browserRequest.method());
       }
     });
-    await page.getByRole("checkbox", { name: /explicitly confirm mechanics starter activation/i }).check();
-    await page.getByRole("button", { name: "Activate mechanics starter" }).click();
+    await page.getByRole("checkbox", { name: /explicitly confirm Velvet mechanics starter activation/i }).check();
+    await page.getByRole("button", { name: "Activate Velvet mechanics starter" }).click();
     await expect(page.getByText(/Mechanics starter setup is complete/i)).toBeAttached();
     expect(mechanicsSetupRequests).toEqual(["PUT", "GET"]);
     await page.getByText("Campaign details & maintenance", { exact: true }).click();
@@ -1435,6 +1438,14 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
     characterId: playerPersona.id, title: `${runId}-M5.1-Room`,
   });
   await json(request, "PUT", `/rpg/v1/campaigns/${campaignId}/rooms`, { sessionId: room.id });
+  const readyAdministration = await json<{ campaign: { revision: number } }>(
+    request, "GET", `/rpg/v1/campaigns/${campaignId}/administration`,
+  );
+  await json(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/administration`, {
+    expectedRevision: readyAdministration.campaign.revision,
+    idempotencyKey: `${runId}-m5.1-publish`,
+    status: "published",
+  });
 
   const locationFixture = { campaignId, locationId, parentLocationId: null, name: locationName, description: locationDescription };
   const materializeLocation = (data: unknown, suffix = "") =>
@@ -1484,16 +1495,19 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   }, 200);
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Campaigns" }).click();
+  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
   await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Tactical map" })).toBeVisible();
+  await page.getByText("Accessible cells and tokens", { exact: true }).click();
   await page.getByRole("button", { name: "3, 2" }).click();
   await expect(page.getByText(/Preview: 5 feet/)).toBeVisible();
   await page.getByRole("button", { name: "Confirm move" }).click();
   await expect(page.getByText("Token moved and exploration refreshed from the server.")).toBeVisible();
   await expect(page.getByText(/token revision 1/)).toBeVisible();
+  await page.getByRole("button", { name: "Context", exact: true }).click();
   await expect(page.getByRole("heading", { name: "NPCs present now" })).toBeVisible();
   await expect(page.getByText("No NPCs marked present.")).toBeVisible();
 
@@ -1525,6 +1539,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   };
   await assertNoPrivateClientState();
   await page.reload();
+  await page.getByRole("button", { name: "Context", exact: true }).click();
   await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
   await assertNoPrivateClientState();
 
@@ -1545,7 +1560,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await expect(page.getByText("No NPCs marked present.")).toBeVisible();
   await expect(page.getByRole("alert").filter({ hasText: "NPC presence updated" })).toBeFocused();
   expect(presenceRequests).toEqual([
-    "POST", "GET", "GET", "GET",
+    "POST", "GET", "GET", "GET", "GET", "GET",
     "POST", "GET", "POST", "GET", "POST", "GET",
   ]);
 
@@ -1609,6 +1624,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   );
   expect(stoppedAfter).toEqual(stoppedBefore);
   await page.reload();
+  await page.getByRole("button", { name: "Context", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Present at stop/history" })).toBeVisible();
   await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
   await expect(page.getByText(/stopped and is read-only/)).toBeVisible();
@@ -1645,11 +1661,12 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
     if(relevant(url.pathname))productionTraffic.push(browserRequest.postData()??"");});
   page.on("response",async response=>{const url=new URL(response.url());if(relevant(url.pathname)&&response.request().resourceType()!=="eventsource")
     productionTraffic.push(await response.text().catch(()=>""));});
-  await page.goto("/");await page.getByRole("button",{name:"Campaigns"}).click();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
+  await page.goto("/");await expect(page.getByRole("heading",{name:"Campaigns",exact:true})).toBeVisible();await page.getByRole("button",{name:`Open campaign ${runId}-M5.4-Travel`}).click();
+  await page.getByRole("button",{name:"Open advanced setup"}).click();
   await page.getByRole("button",{name:"Open attached room 1 of 1"}).click();
   await page.setViewportSize({width:1366,height:768});await expect(page.getByLabel("What do you do?")).toBeVisible();
   await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-desktop-1366x768.png"});
-  await page.setViewportSize({width:390,height:844});await expect(page.getByLabel("What do you do?")).toBeVisible();
+  await page.setViewportSize({width:390,height:844});await page.getByRole("button",{name:"Conversation",exact:true}).click();await expect(page.getByLabel("What do you do?")).toBeVisible();
   await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-mobile-390x844.png",fullPage:true});
   await page.setViewportSize({width:1366,height:768});
   const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
@@ -1767,16 +1784,19 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   });
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Campaigns" }).click();
+  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open attached room 1 of 1" }).click();
   await expect(page.getByRole("heading", { name: "Adventure room" })).toBeVisible();
   await expect(page.getByLabel("What do you do?")).toHaveCount(1);
+  await page.getByText("World routes and travel", { exact: true }).click();
   await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
   await expect(page.getByRole("button", { name: `Prefill travel to ${destinationName}` })).toBeVisible();
 
   const composer = page.getByLabel("What do you do?");
   await composer.fill("Consult my character sheet before I investigate: ");
+  await page.getByRole("button", { name: "Character", exact: true }).click();
   await page.getByRole("button", { name: "Open character sheet" }).click();
   const sheet = page.getByRole("dialog", { name: `${playerName}'s character sheet` });
   await expect(sheet).toBeVisible();
@@ -1788,6 +1808,7 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await sheet.getByRole("button", { name: "Close character sheet" }).click();
 
   const declaration = await composer.inputValue();
+  await page.getByRole("button", { name: "Conversation", exact: true }).click();
   await page.getByRole("button", { name: "Declare action" }).click();
   await expect.poll(() => adventureRequests.length).toBe(1);
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -1798,6 +1819,7 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   expect(afterStats.narrationResponses).toBeGreaterThan(beforeStats.narrationResponses);
 
   await page.reload();
+  await page.getByText("World routes and travel", { exact: true }).click();
   await expect(page.getByText(declaration, { exact: true })).toBeVisible();
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: /Known routes/ })).toBeVisible();
@@ -1976,14 +1998,15 @@ test("M5.3 browser reconciles one committed consumable POST without replay", asy
     target: expect.objectContaining({ actorBacked: true }) })]);
 
   await page.goto("/");
-  await page.getByRole("button", { name: "Campaigns" }).click();
+  await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Open campaign ${campaignName}` }).click();
+  await page.getByRole("button", { name: "Open advanced setup" }).click();
   await page.getByRole("button", { name: "Open combat tracker" }).click();
   await page.getByLabel("Campaign encounter").selectOption(started.combat.combatId);
   await page.getByRole("button", { name: "Load combat" }).click();
   await expect(page.getByRole("heading", { name: "Consumables" })).toBeVisible();
   await expect(page.getByText("Quantity 1 · Cost: action.")).toBeVisible();
-  const use = page.getByRole("button", { name: `Use ${consumableItem.definitionId} on ${actorId}` });
+  const use = page.getByRole("button", { name: `Use ${consumableItem.definitionId} on Ally 1` });
   await expect(use).toBeVisible();
 
   const commandPath = `${actionsPath}/commands`;

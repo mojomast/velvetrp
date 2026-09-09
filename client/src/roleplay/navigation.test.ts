@@ -130,6 +130,12 @@ describe("navigation persistence", () => {
       .toMatchObject({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-detail" });
     expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-character-sheet" }).combatReturnView).toBe("campaign-detail");
     expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", campaignCharacterId: "character-one", combatReturnView: "campaign-character-sheet" }).combatReturnView).toBe("campaign-character-sheet");
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", sessionId: "room-one", combatReturnView: "campaign-play", combatActorRole: "player", combatControlledActorId: "actor-one", combatId: "combat-one", combatReturnPane: "context", combatReturnFocus: "navigation" }))
+      .toMatchObject({ view: "campaign-combat", campaignId: "campaign-one", sessionId: "room-one", combatReturnView: "campaign-play", combatActorRole: "player", combatControlledActorId: "actor-one", combatId: "combat-one", combatReturnPane: "context", combatReturnFocus: "navigation" });
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-play", combatActorRole: "gm", combatControlledActorId: "actor-one", combatId: "combat-one" }))
+      .toEqual({ view: "campaign-combat", campaignId: "campaign-one", combatReturnView: "campaign-detail", selectedIds: [] });
+    expect(parseStoredNavigation({ view: "campaign-combat", campaignId: "campaign-one", sessionId: "room-one", combatReturnView: "campaign-play", combatActorRole: "admin", combatControlledActorId: "bad/id", combatId: "bad/id" }))
+      .toEqual({ view: "campaign-combat", campaignId: "campaign-one", sessionId: "room-one", combatReturnView: "campaign-play", selectedIds: [] });
   });
 
   it("requires both strict workspace IDs and falls back to the nearest safe campaign view", () => {
@@ -224,5 +230,15 @@ describe("navigation persistence", () => {
     const navigation: Record<string, unknown> = { view: "home" };
     navigation.circular = navigation;
     expect(() => writeNavigation(navigation as unknown as StoredNavigation)).not.toThrow();
+  });
+});
+describe("task workspace persistence", () => {
+  it("retains new journey return intent without changing legacy saved views", () => {
+    expect(parseStoredNavigation({ view: "campaign-character-builder", campaignId: "campaign-one", campaignEntry: "overview" }).campaignEntry).toBe("overview");
+    expect(parseStoredNavigation({ view: "campaign-detail", campaignId: "campaign-one" }).campaignEntry).toBeUndefined();
+  });
+  it.each(["campaign-overview", "campaign-rooms", "campaign-party", "campaign-create"])("restores %s only with a valid campaign", view => {
+    expect(parseStoredNavigation({ view, campaignId: "campaign-one" }).view).toBe(view);
+    expect(parseStoredNavigation({ view }).view).toBe("campaigns");
   });
 });

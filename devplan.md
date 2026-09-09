@@ -1,6 +1,6 @@
 # Development Plan
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with no startup upgrades, and the checked trusted-local RPG inventory has 130 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2 and the exact campaign-director predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. Director upgrades cover pre-director databases with or without map v2 and exact review-authority/narration predecessors, not arbitrary combinations or historical migration chains. The checked trusted-local RPG inventory has 144 counted operations plus feature discovery.
 
 ## Delivered
 

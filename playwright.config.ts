@@ -17,7 +17,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: "node e2e/support/start-deterministic-server.mjs",
+      command: "FEATURE_RPG_STUDIO=true node e2e/support/start-deterministic-server.mjs",
       url: "http://127.0.0.1:18787/api/health",
       reuseExistingServer: false,
     },
