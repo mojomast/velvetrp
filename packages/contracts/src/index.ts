@@ -1,4 +1,5 @@
 export * from "./campaign-dm-http.js";
+export * from "./campaign-dm-readiness-http.js";
 export {
   apiProblemIssueSchema,
   apiProblemSchema,

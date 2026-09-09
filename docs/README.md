@@ -42,6 +42,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 
 - [Playability execution protocol](playability-execution.md) - Ordered three-plan program, small-context subagent workflow, API budget, milestone commits, and reusable execution trigger.
 - [Plan 1: Campaign readiness](plan-1-campaign-readiness.md) - Private provider-free preparation diagnostics and actionable GM remedies; planned, not an activation replacement.
+- [Campaign readiness contract](campaign-readiness.md) - Versioned strict DTO, issue taxonomy, and bounded inspection coverage for GM preparation diagnostics.
 - [Plan 2: Complete reviewed adventure](plan-2-reviewed-adventure.md) - Supported human/AI branch completion, deterministic recovery, bounded configured-provider evaluation, and source-bound observations.
 - [Plan 3: Measured memory improvements](plan-3-memory-evaluation.md) - Persisted-context inspection, golden recall evaluation, and evidence-selected runtime improvements.
 - [Bounded campaign memory](campaign-memory.md) - Implemented direct SQLite recall, source/authority scope, exact packing limits, scan limitations, immutable narration provenance, and migration behavior.
