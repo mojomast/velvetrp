@@ -108,3 +108,16 @@ readiness separate from preparation issues, shows bounded coverage and manual
 review limits, and uses the existing scene-binding controls for binding
 remediation. Inspection does not acquire the DM command lock, write browser
 recovery storage, or replace pending command/map/draft recovery.
+
+## Acceptance Evidence
+
+The provider-free acceptance fixture starts with activation-ready content and a
+public finale blocked by an unresolved required public predecessor. A GM can
+inspect the report in the normal Director drawer, then use normal story commands
+to reveal and resolve the predecessor; reinspection removes the finale
+`room-obstacle`. The fixture verifies private no-store reads, no readiness GET
+before explicit inspection, no command/provider work on inspection or reload,
+private marker/digest exclusion, mobile overflow bounds, and discard of a delayed
+response after leaving and re-entering the Director context. Browser player-role
+coverage is a client projection only because the HTTP boundary remains fixed
+trusted-local `local-owner`; repository and route tests own actual authorization.

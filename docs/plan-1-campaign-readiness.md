@@ -1,6 +1,6 @@
 # Plan 1: Campaign readiness
 
-Status: planned, not implemented. Researched against `9e5f1b7`.
+Status: delivered through P1.6; final acceptance commit is recorded in the execution ledger.
 
 Execute under [the shared execution protocol](playability-execution.md). Finish
 this plan before [Plan 2](plan-2-reviewed-adventure.md); its reports become

@@ -6,6 +6,8 @@ All milestones preserve existing roleplay APIs and local-first SQLite operation.
 
 M1.1-M1.10, trusted-local HTTP milestones M2.1-M2.11, client milestones M3.1-M3.8, and M4.1-M4.6 are complete. Earlier schema digests and milestone baseline descriptions remain historical records in the sections below.
 
+Campaign preparation readiness is delivered: owner/GM-only, provider-free diagnostics compose activation readiness with bounded structural preparation checks and a private Living Atlas Director inspection. It is not an activation gate or a campaign-solvability proof. The next playability program step is the reviewed adventure fixture and matched human/AI journey evidence.
+
 ## Approved post-M4 milestone DAG and status
 
 Planning-board revision 2 (saved 2026-08-11T00:47:24.296Z, ready with no blockers) is preserved as an approved historical execution design. The [revision 2 integration plan](revision-2-integration-plan.md) does not override this roadmap, current contracts, or the active handoff. Its dependency order at that checkpoint was:

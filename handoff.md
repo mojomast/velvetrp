@@ -21,6 +21,7 @@ Commit `11e0107` (`feat(rpg): add Living Atlas and AI campaign director`) is the
 - `npm run typecheck`: all workspaces pass.
 - Final focused E2E: all 12 director/control-plane/combat-map/session-recovery tests pass.
 - Documentation inventory: 145 counted explicit operations plus separately classified feature discovery; the strict documentation drift check is known passing.
+- Playability Plan 1 is complete through P1.6: `CampaignDmReadinessResponse` v1.0, `GET /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness`, owner/GM-only private no-store projection, and the explicit Director `Inspect preparation` UI. It is provider-free, read-only, bounded, and not an activation gate or solvability proof. Plan 2 must preserve its optional/private and awaiting-play-evidence warnings.
 
 These are the supplied accumulated-work validation results, not fresh full-suite runs from the docs-only audit. Before commit, select intended files explicitly: `.opencode/skills/seed-test-campaign/` and `server/test/two-player-gameplay-api.test.ts` must remain untracked. The audit does not stage or commit files.
 

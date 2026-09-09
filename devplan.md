@@ -4,6 +4,8 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 
 ## Delivered
 
+- [x] Plan 1 campaign readiness: strict diagnostics v1.0, pure structural checks, authorized read-only projection, private no-store GET, GM-only Director panel, and deterministic browser acceptance. It is not a solvability claim or an additional activation gate.
+
 - [✅] Add an explicit test-only repository seam for domain corruption fixtures while retaining strict production schema validation.
 - [x] M1.1-M1.10: core RPG persistence and deterministic mechanics.
 - [x] M2.1-M2.11: trusted-local RPG HTTP surfaces.

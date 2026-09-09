@@ -1,5 +1,14 @@
 # Campaign Control Plane
 
+## Preparation Readiness
+
+The Director drawer includes an owner/GM-only, explicit `Inspect preparation`
+read. Its private report separates existing activation readiness from bounded
+preparation diagnostics, coverage, awaiting evidence, and manual-review limits.
+It neither starts a scene nor asserts campaign solvability. The panel is not
+persisted in browser storage, does not own command recovery, clears when its
+campaign/room/role identity changes, and discards delayed responses.
+
 ## Implemented Milestone
 
 The normal campaign entry now uses dedicated Overview, Rooms, Party, and Create
