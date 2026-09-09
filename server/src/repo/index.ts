@@ -1,4 +1,5 @@
 export { CampaignDmConflictError, CampaignDmUnavailableError, type CampaignDmRepository } from "./campaignDmRepo.js";
+export { CampaignDmReadinessUnavailableError, type CampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
 // Preserve the established repository API without exposing domain-internal
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";

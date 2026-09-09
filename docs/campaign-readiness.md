@@ -77,3 +77,22 @@ never count as executable exact rosters. The check result always includes finite
 manual-review reminders for clue alternatives/fail-forward, finale/aftermath,
 player choice, and the fact that required paths or endings are not inferred from
 titles or prose.
+
+## Repository Projection
+
+`createCampaignDmReadinessRepository` exposes the read-only
+`getCampaignDmPreparationReadiness` projection. It authorizes the attached room
+and owner/GM membership before reading preparation, story, binding, catalog, or
+placement facts. The response uses the active campaign timeline and preserves
+the existing activation readiness object unchanged. Activation inspection is
+shared through a transaction-safe `createCampaignRoomActivationReadinessInspector`
+so readiness and activation use the same authorization and blocker semantics
+without starting a director run.
+
+Scene bindings retain their evidence kind and target ID. A binding is
+`awaiting-play-evidence` until persisted `dm_story_evidence` is joined to a run
+whose authorized context contains the exact source; encounter materialization
+bindings are not treated as scene evidence. Generated and authored public story
+nodes/clues both participate in disclosure checks. Encounter rosters require
+exact pinned `enemy-template` references, and all resource lists are bounded;
+overflow is explicit partial coverage.

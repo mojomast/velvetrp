@@ -25,12 +25,12 @@ export interface CampaignRoomActivationRepository {
 const hash = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const scope = "campaign-room-activation:v1";
 
-export function createCampaignRoomActivationRepository(db: DatabaseDriver.Database, deps: RepositoryDependencies,
-  guard: () => void, catalog: (principalId: string, campaignId: string) => CampaignCatalogResolutionReport | null,
-): CampaignRoomActivationRepository {
+export function createCampaignRoomActivationReadinessInspector(db: DatabaseDriver.Database,
+  catalog: (principalId: string, campaignId: string) => CampaignCatalogResolutionReport | null,
+): (principalId: string, campaignId: string, sessionId: string) => CampaignRoomActivationReadiness {
   const play = createCampaignPlayReadRepository(db);
   const lifecycle = createCampaignRoomSessionLifecycleRepository(db);
-  function inspect(principalId: string, campaignId: string, sessionId: string): CampaignRoomActivationReadiness {
+  return function inspect(principalId: string, campaignId: string, sessionId: string): CampaignRoomActivationReadiness {
     [principalId, campaignId, sessionId].forEach(value => resourceIdSchema.parse(value));
     const campaign = db.prepare(`SELECT campaign.lifecycle_status, campaign.administration_revision FROM campaigns campaign
       JOIN campaign_memberships member ON member.campaign_id=campaign.id
@@ -76,7 +76,13 @@ export function createCampaignRoomActivationRepository(db: DatabaseDriver.Databa
     }
     return campaignRoomActivationReadinessSchema.parse({ campaignId, sessionId, expectedRevision: campaign.administration_revision,
       active: state.state === "active" && state.stopped_at === null, ready: blockers.length === 0, blockers, actorIds });
-  }
+  };
+}
+
+export function createCampaignRoomActivationRepository(db: DatabaseDriver.Database, deps: RepositoryDependencies,
+  guard: () => void, catalog: (principalId: string, campaignId: string) => CampaignCatalogResolutionReport | null,
+): CampaignRoomActivationRepository {
+  const inspect = createCampaignRoomActivationReadinessInspector(db, catalog);
   return {
     getCampaignRoomActivationReadiness(principalId, campaignId, sessionId) {
       guard(); return db.transaction(() => inspect(principalId, campaignId, sessionId))();

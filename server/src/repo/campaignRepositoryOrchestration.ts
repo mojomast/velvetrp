@@ -99,7 +99,8 @@ import { createCampaignDmRepository } from "./campaignDmRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
-import { createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
+import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
+import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
 import { createCampaignStartingLocationRepository } from "./campaignStartingLocationRepo.js";
 import { createTacticalMapRepository } from "./tacticalMapRepo.js";
 import { createCampaignAdministrationIntegrationRepository } from "./campaignAdministrationIntegrationRepo.js";
@@ -796,6 +797,9 @@ function createRepositoryComposition<T>(
   const campaignAdministrationIntegrationRepository = createCampaignAdministrationIntegrationRepository(db, dependencies, () => {
     assertOpen(); if (transactionDepth > 0) throw new Error("campaign administration integration cannot run inside a repository transaction");
   });
+  const activationReadinessInspector = createCampaignRoomActivationReadinessInspector(db,
+    (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId));
+  const campaignDmReadinessRepository = createCampaignDmReadinessRepository(db, activationReadinessInspector, () => assertOpen());
   const recallRepository = createCampaignRecallReadRepository(db, {
     getCampaignAgentContextSnapshot: (...args) => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(...args),
     getAdventureCheckPublicReceipt: (...args) => adventureCheckRepository.getAdventureCheckPublicReceipt(...args),
@@ -815,6 +819,7 @@ function createRepositoryComposition<T>(
   });
   const repository: Repository = {
     ...recallRepository,
+    ...campaignDmReadinessRepository,
     ...createCampaignDmRepository(db, dependencies, {
       ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
       ...campaignAdministrationIntegrationRepository,
