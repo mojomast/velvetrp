@@ -18,7 +18,7 @@ describe("campaign DM readiness pure checks", () => {
     });
     expect(issue(result, "private-artifact", "private-node")).toBeDefined();
     expect(issue(result, "missing-public-rendering", "public-node")).toBeDefined();
-    expect(issue(result, "awaiting-play-evidence", "binding-1")).toBeDefined();
+    expect(issue(result, "awaiting-play-evidence", "binding-1")).toMatchObject({ severity: "review", scope: "awaiting-play-evidence" });
     expect(issue(result, "unsupported-encounter-roster", "encounter-1")).toBeDefined();
   });
 

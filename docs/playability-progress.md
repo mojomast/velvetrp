@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 1 complete; Plan 2 / P2.1 pending predecessor commit
-- Last accepted milestone and commit: P1.6 browser acceptance and Plan 1 handoff, commit to be recorded below
-- Next small assignment: define the reviewed Last Harbor Light fixture and branch specification from the committed Plan 1 handoff
+- Active plan/milestone: Plan 2 / P2.F, fixture-triggered bounded readiness-reference fix
+- Last accepted milestone and commit: Plan 1 readiness handoff, `2bda645`
+- Next small assignment: correct reviewed fixture target ownership/finale binding, then restore readiness severity/reference compatibility
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none; no provider calls authorized or required yet
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
@@ -23,15 +23,19 @@
 | P1.3 | accepted | `599fe9d` | readiness 3; activation 14; generated 2; binding evidence 2; server typecheck; independent integration review accepted | campaign-readiness guide; ledger; activation/repository integration | full shared live envelope unused |
 | P1.4 | accepted | `f01cb68` | route 4; server typecheck; client API 6; client typecheck; documentation drift 7; independent transport review accepted | API inventory/counts; campaign-readiness guide; docs index; ledger | full shared live envelope unused |
 | P1.5 | accepted | `04a5125` | CampaignDmPanel 16; readiness panel 3; client typecheck; independent UI review accepted | campaign-readiness guide; ledger | full shared live envelope unused |
-| P1.6 | accepted | pending coordinator commit | readiness E2E 1 (24.3s); E2E typecheck; documentation drift 7; independent acceptance review accepted | readiness/Director/roadmap/devplan/handoff/ledger docs | full shared live envelope unused |
-| P1 | accepted | pending coordinator commit | P1.1-P1.6 focused gates accepted; zero provider calls | Plan 1 handoff recorded | full shared live envelope unused |
+| P1.6 | accepted | `2bda645` | readiness E2E 1 (24.3s); E2E typecheck; documentation drift 7; independent acceptance review accepted | readiness/Director/roadmap/devplan/handoff/ledger docs | full shared live envelope unused |
+| P1 | accepted | `2bda645` | P1.1-P1.6 focused gates accepted; zero provider calls | Plan 1 handoff recorded | full shared live envelope unused |
+| P2.1 | in-progress | | fixture test and server typecheck pending | | full shared live envelope unused |
+| P2.F | accepted | pending coordinator commit | readiness/checks/fixture 12; server typecheck; independent review accepted | scope amendment and binding-reference policy in ledger | full shared live envelope unused |
 
 ## Next agent task
-Assignment: P2.1 reviewed fixture and branch specification
-Goal: create the provider-free reviewed Last Harbor Light fixture, versioned manifest/digest, expected readiness warnings, and branch oracle without pre-earned outcomes or live provider work.
-Baseline/predecessor: committed Plan 1 handoff; preserve readiness v1.0 warnings and do not treat all future bindings as failures at startup.
-Read first: `docs/plan-2-reviewed-adventure.md`; `docs/playability-progress.md`; `server/test/fixtures/dmCampaign.ts`; `server/test/rpg-generated-campaign-journey.test.ts`; `server/test/campaign-dm-generated.test.ts`; `server/test/campaign-dm-binding-evidence.test.ts`.
-Own writes: P2.1 fixture/test/guide paths exactly as the Plan 2 milestone assigns. No shared routes/contracts/ledger changes without coordinator assignment.
-Acceptance: strict manifest/digest, disposable empty target refusal, real returned IDs, pinned supported roster, separate private/public content, normal activation/binding setup, no pre-earned progress/resolution/roll/reward, and zero provider calls.
-Validation: focused fixture test and server typecheck. No commits/pushes/live API calls.
-Return: files, interface/digest, exact results, expected readiness warnings, and smallest next task.
+Amendment: P2.1 found that the P1 readiness projection serializes scene-binding tuple IDs as `nodeId:evidenceKind:targetId`; valid generated IDs can exceed the DTO's 128-character `resourceId` cap. This blocks inspection of a real reviewed fixture. The fix is limited to deterministic bounded synthetic binding references in the readiness projection. Review additionally found fixture target-directory ownership was not passed to `createRepository`, the finale binding did not target its final objective, normal awaiting evidence was classified contrary to the readiness guide, and short existing binding references were unnecessarily replaced. These corrections preserve authority and require no schema/provider change.
+
+Assignment: P2.F bounded readiness binding reference
+Goal: emit deterministic bounded non-candidate binding reference IDs for readiness diagnostics/coverage while preserving exact internal node/kind/target binding semantics.
+Baseline/predecessor: P2.1 fixture worktree; P1 readiness DTO rejects 64-character digest-shaped IDs and caps resource references at 128.
+Read first: `server/src/repo/campaignDmReadinessRepo.ts`; `server/src/repo/campaignDmReadinessChecks.ts`; `packages/contracts/src/campaign-dm-readiness-http.ts`; `server/test/campaign-dm-readiness.test.ts`; `server/test/fixtures/reviewedAdventure.ts`.
+Own writes: `server/src/repo/campaignDmReadinessRepo.ts`, `server/src/repo/campaignDmReadinessChecks.ts`, `server/test/campaign-dm-readiness.test.ts`, and `server/test/campaign-dm-readiness-checks.test.ts` only. Do not edit contracts, fixture, routes, docs, or any authority logic.
+Acceptance: generated long binding tuple is inspectable; projected binding reference is <=128, deterministic, non-candidate-shaped, collision-resistant for fixture-scale tuples, and contains no target/private text; qualifying evidence still maps to `evidence-committed`; no provider/mutation/recovery work; existing simple binding output remains valid.
+Validation: focused readiness repository test, reviewed fixture test, and server typecheck. No live API/provider calls or commits.
+Return: changed files, projected-ID policy, exact results, risk, and smallest next task.

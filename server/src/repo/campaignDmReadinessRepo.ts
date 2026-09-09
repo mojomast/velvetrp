@@ -1,4 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
+import { createHash } from "node:crypto";
 import {
   campaignDmReadinessCoverageCaps,
   campaignDmReadinessResponseSchema,
@@ -25,6 +26,14 @@ const families = Object.keys(campaignDmReadinessCoverageCaps) as Array<keyof typ
 
 const reference = (kind: RefKind, id: string): Ref => ({ kind, id });
 const stable = (a: string, b: string) => a === b ? 0 : a < b ? -1 : 1;
+const bindingTuple = (nodeId: string, evidenceKind: string, targetId: string) => JSON.stringify([nodeId, evidenceKind, targetId]);
+/** Diagnostics-only binding identity; it is never used for authority or evidence matching. */
+export const projectCampaignDmReadinessBindingReference = (nodeId: string, evidenceKind: string, targetId: string) => {
+  const projected = `${nodeId}:${evidenceKind}:${targetId}`;
+  if (![nodeId, evidenceKind, targetId].some(component => component.includes(":"))
+    && resourceIdSchema.safeParse(projected).success && !/^[0-9a-f]{64}$/.test(projected)) return projected;
+  return `binding:${createHash("sha256").update(bindingTuple(nodeId, evidenceKind, targetId)).digest("hex").slice(0, 48)}`;
+};
 const artifactRef = (row: Pick<ArtifactRow, "artifact_kind" | "artifact_key" | "server_resource_id">): Ref => {
   const kind: RefKind = row.artifact_kind === "location" ? "location"
     : row.artifact_kind === "connection" ? "location"
@@ -124,7 +133,7 @@ export function createCampaignDmReadinessRepository(
            JOIN json_each(json_extract(run.context_json,'$.evidence.sources')) source
            WHERE binding.campaign_id=? AND json_extract(source.value,'$.kind')=binding.evidence_kind
              AND json_extract(source.value,'$.targetId')=binding.target_id
-           ORDER BY binding.node_id,binding.evidence_kind,binding.target_id`).all(campaignId) as Array<{ node_id: string; evidence_kind: string; target_id: string }>).map(row => `${row.node_id}:${row.evidence_kind}:${row.target_id}`));
+           ORDER BY binding.node_id,binding.evidence_kind,binding.target_id`).all(campaignId) as Array<{ node_id: string; evidence_kind: string; target_id: string }>).map(row => bindingTuple(row.node_id, row.evidence_kind, row.target_id)));
          const encounterBindings = new Set((db.prepare("SELECT artifact_key FROM dm_encounter_bindings WHERE campaign_id=? ORDER BY artifact_key").all(campaignId) as Array<{ artifact_key: string }>).map(row => row.artifact_key));
          const pinned = new Set((db.prepare(`SELECT definition.kind,definition.pack_id,definition.pack_version,definition.definition_id
            FROM campaign_catalog_current_pins pin JOIN rpg_campaign_catalog_definitions_v25 definition
@@ -151,11 +160,11 @@ export function createCampaignDmReadinessRepository(
             edges: edgeRows.map(row => ({ id: row.edge_id, kind: row.kind, fromId: row.from_node_id, toId: row.to_node_id })),
             clues: clueRows.map(row => ({ id: row.clue_id, revealThreshold: row.reveal_threshold, availableSourceCount: row.available_source_count, visibility: row.visibility, optional: false })) },
           bindings: [
-             ...bindings.map(row => ({ id: `${row.node_id}:${row.evidence_kind}:${row.target_id}`,
+              ...bindings.map(row => ({ id: projectCampaignDmReadinessBindingReference(row.node_id, row.evidence_kind, row.target_id),
                targetKind: row.evidence_kind === "encounter" ? "encounter" as const
                  : row.evidence_kind === "check-turn" ? "evidence" as const : "quest-objective" as const,
                targetId: row.target_id,
-               state: committedBindings.has(`${row.node_id}:${row.evidence_kind}:${row.target_id}`) ? "evidence-committed" as const : "prepared" as const })),
+               state: committedBindings.has(bindingTuple(row.node_id, row.evidence_kind, row.target_id)) ? "evidence-committed" as const : "prepared" as const })),
            ],
           encounters: encounterFacts,
           ...(currentLocation ? { connectivity: { startLocationId: currentLocation, locations: locations.map(row => ({ id: row.location_id, visibility: row.visibility === "gm" ? "private" as const : "public" as const })), connections: connections.map(row => ({ id: row.connection_id, fromId: row.from_location_id, toId: row.to_location_id, visibility: row.visibility === "gm" ? "private" as const : "public" as const })) } } : {}),
@@ -171,7 +180,7 @@ export function createCampaignDmReadinessRepository(
         add("story", nodeRows.map(row => reference("story-node", row.node_id)));
         add("clues", clueRows.map(row => reference("clue", row.clue_id)));
         add("artifacts", artifacts.map(row => artifactRef(row)));
-        add("bindings", [...bindings.map(row => reference("binding", `${row.node_id}:${row.evidence_kind}:${row.target_id}`)), ...encounterFacts.filter(row => encounterBindings.has(row.id)).map(row => reference("binding", row.id))]);
+        add("bindings", [...bindings.map(row => reference("binding", projectCampaignDmReadinessBindingReference(row.node_id, row.evidence_kind, row.target_id))), ...encounterFacts.filter(row => encounterBindings.has(row.id)).map(row => reference("binding", row.id))]);
         add("evidence", (db.prepare("SELECT turn_id FROM dm_story_evidence WHERE campaign_id=? ORDER BY turn_id").all(campaignId) as Array<{ turn_id: string }>).map(row => reference("evidence", row.turn_id)));
         const coverageEntries = families.map(family => { const refs = coverage.get(family)!; const cap = campaignDmReadinessCoverageCaps[family]; const truncated = refs.length > cap; return { family, state: truncated ? "partial" as const : "complete" as const, inspected: refs.slice(0, cap), omitted: truncated ? refs.slice(cap, cap * 2) : [] }; });
         const truncated = coverageEntries.filter(entry => entry.state === "partial");

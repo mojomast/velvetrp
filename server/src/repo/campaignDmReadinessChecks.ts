@@ -163,7 +163,7 @@ export function checkBindings(facts: readonly BindingFact[] = []): CampaignDmRea
     const reference = ref(fact.targetKind, fact.targetId);
     if (fact.state === "missing") return [makeIssue("missing-binding", fact.optional ? "warning" : "blocker", scope(fact.optional, fact.locationScope), reference)];
     if (fact.state === "prepared" || fact.state === "awaiting-evidence")
-      return [makeIssue("awaiting-play-evidence", "warning", "awaiting-play-evidence", ref("binding", fact.id))];
+      return [makeIssue("awaiting-play-evidence", "review", "awaiting-play-evidence", ref("binding", fact.id))];
     return [];
   }));
 }
