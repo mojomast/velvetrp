@@ -58,3 +58,22 @@ Partial coverage is represented with `coverage.state: "partial"`, family entries
 marked `partial` or `omitted`, omitted references, and a manual limitation. It
 cannot be represented as `state: "complete"`; `coverage-truncated` is the finite
 code for an issue caused by an inspection bound.
+
+## Pure Check Interface
+
+`checkCampaignDmReadiness` consumes explicit, already-authorized fact objects and
+does not open storage, call a provider, interpret prose, or mutate state. Its
+fact families cover public rendering, story `requires` dependencies and reveal
+thresholds, explicit scene bindings, exact pinned encounter rosters, and directed
+location connections. Every `requires` predecessor must be resolved and have
+reviewed public rendering before it contributes to a threshold; private or
+private-companion nodes are reported as private resources rather than blocked by
+their own thresholds. Reverse-only location edges do not establish reachability.
+
+Facts carry `current-room` or `later-location` scope. Optional resources remain
+warnings at campaign scope, while missing required resources retain blocker
+severity. Encounter concepts, participant-NPC lists, and empty enemy references
+never count as executable exact rosters. The check result always includes finite
+manual-review reminders for clue alternatives/fail-forward, finale/aftermath,
+player choice, and the fact that required paths or endings are not inferred from
+titles or prose.
