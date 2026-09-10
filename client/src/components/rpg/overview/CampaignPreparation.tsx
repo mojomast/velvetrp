@@ -5,7 +5,7 @@ import { useCampaignShell } from "../shell/CampaignShell";
 import { createClientId } from "../../../utils/clientId";
 
 type Snapshot = { detail: Awaited<ReturnType<typeof getCampaignDetail>>; administration: Awaited<ReturnType<typeof getCampaignAdministration>>; integrations: Awaited<ReturnType<typeof getCampaignAdministrationIntegrations>>; rooms: Awaited<ReturnType<typeof listCampaignRooms>>; party: Awaited<ReturnType<typeof listCampaignCharacters>> };
-type Command = { kind: "safety"; input: SessionZeroSafetyUpdateCommand } | { kind: "publish"; input: Parameters<typeof updateCampaignAdministration>[1] } | { kind: "setup" | "attach" | "create" };
+type Command = { kind: "safety"; input: SessionZeroSafetyUpdateCommand } | { kind: "publish" | "complete"; input: Parameters<typeof updateCampaignAdministration>[1] } | { kind: "setup" | "attach" | "create" };
 // A remount must not issue a second request while the original is in flight.
 const writing = new Set<string>();
 const stages = ["Rules", "Safety", "Publication", "Rooms"] as const;
@@ -35,10 +35,10 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
       if (raw) {
         const command = JSON.parse(raw) as Command;
         if (command.kind === "safety") setSaved({ kind: "safety", input: sessionZeroSafetyUpdateCommandSchema.parse(command.input) });
-        else if (command.kind === "publish") {
+        else if (command.kind === "publish" || command.kind === "complete") {
           const input = campaignAdministrationHttpPatchRequestSchema.parse(command.input);
-          if (input.status !== "published" || input.settings !== undefined) throw new Error("Invalid publication recovery");
-          setSaved({ kind: "publish", input });
+          if ((command.kind === "publish" ? input.status !== "published" : input.status !== "completed") || input.settings !== undefined) throw new Error("Invalid lifecycle recovery");
+          setSaved({ kind: command.kind, input });
         } else if (["setup", "attach", "create"].includes(command.kind)) setSaved({ kind: command.kind });
         else throw new Error("Invalid recovery record");
       }
@@ -69,7 +69,7 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
     const role = data.detail.campaign.actorRole;
     const owner = role === "owner" && data.administration.campaign.actorRole === "owner";
     const gm = (role === "owner" || role === "gm") && ["owner", "gm"].includes(data.integrations.actorRole);
-    if ((command.kind === "publish" || command.kind === "setup") ? !owner : !gm) return;
+    if ((command.kind === "publish" || command.kind === "complete" || command.kind === "setup") ? !owner : !gm) return;
     if (!saved && !(command.kind === "create" ? roomConfirmed : confirmed)) return;
     try { localStorage.setItem(key, JSON.stringify(command)); }
     catch { setStorageError(true); setNotice("Safe recovery storage is unavailable. Nothing was sent."); return; }
@@ -77,15 +77,18 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
     lock.current = true; writing.add(campaignId); setBusy(true); setSaved(command); setReconciled(false); setConfirmed(false); setRoomConfirmed(false);
     try {
       if (command.kind === "safety") await updateCampaignSessionZeroSafety(campaignId, command.input);
-      else if (command.kind === "publish") await updateCampaignAdministration(campaignId, command.input);
+      else if (command.kind === "publish" || command.kind === "complete") {
+        const result = await updateCampaignAdministration(campaignId, command.input);
+        if (command.kind === "complete" && alive.current) setNotice(`Campaign marked completed. Receipt confirmed at revision ${result.receipt.revisionAfter}.`);
+      }
       else if (operation) await operation();
       else throw new Error("This operation cannot be retried");
       localStorage.removeItem(key);
-      if (alive.current) { setSaved(null); setData(null); setNotice("Server response confirmed. Read current preparation before the next step."); }
+      if (alive.current) { setSaved(null); setData(null); if (command.kind !== "complete") setNotice("Server response confirmed. Read current preparation before the next step."); }
     } catch (error) {
       // Only a first, definitive rejection can release an exact command.
       // Starter setup spans transactions and may leave catalog changes behind.
-      const rejected = !retry && (command.kind === "safety" || command.kind === "publish") && error instanceof ApiError && [400, 403, 404, 409, 415, 422].includes(error.status);
+      const rejected = !retry && (command.kind === "safety" || command.kind === "publish" || command.kind === "complete") && error instanceof ApiError && [400, 403, 404, 409, 415, 422].includes(error.status);
       if (rejected) localStorage.removeItem(key);
       if (alive.current) { if (rejected) setSaved(null); setNotice(rejected ? "Command rejected. Read current preparation and review again; no retry was made." : "Write outcome uncertain. Read current preparation. Only revision-bound commands offer exact retry; creation, attachment and starter setup are never repeated automatically."); setData(null); }
     } finally { writing.delete(campaignId); lock.current = false; if (alive.current) setBusy(false); }
@@ -106,7 +109,7 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
     {notice && <p role="status">{notice}</p>}
     {storageError && <p role="alert">Recovery storage is unavailable or invalid. Writes are blocked; do not discard an unresolved command.</p>}
     {saved && <aside className="entry-recovery" role="alert"><h3>Resolve the earlier {saved.kind} attempt</h3><p>Reading never repeats a write. Review attached and available rooms before deciding whether a new room is needed. A matching title alone does not identify a creation receipt.</p>
-      {(saved.kind === "safety" || saved.kind === "publish") ? <button disabled={busy || !data || !(saved.kind === "publish" ? owner : privileged)} onClick={() => void write(saved)}>Retry exact {saved.kind} command</button> : <button disabled={busy || !reconciled || !data} onClick={() => { try { localStorage.removeItem(key); setSaved(null); setNotice("Current state reviewed. Earlier outcome remains unattributed. Any further submission is a new, explicitly confirmed operation, not a retry."); } catch { setStorageError(true); } }}>I reviewed current state; allow a new decision</button>}
+      {(saved.kind === "safety" || saved.kind === "publish" || saved.kind === "complete") ? <button disabled={busy || !data || !((saved.kind === "publish" || saved.kind === "complete") ? owner : privileged)} onClick={() => void write(saved)}>Retry exact {saved.kind} command</button> : <button disabled={busy || !reconciled || !data} onClick={() => { try { localStorage.removeItem(key); setSaved(null); setNotice("Current state reviewed. Earlier outcome remains unattributed. Any further submission is a new, explicitly confirmed operation, not a retry."); } catch { setStorageError(true); } }}>I reviewed current state; allow a new decision</button>}
     </aside>}
     {data && <>
       {!privileged && <p>Only the owner or GM can prepare rooms and safety. Ask your DM to complete these steps.</p>}
@@ -134,7 +137,7 @@ export function CampaignPreparation({ campaignId, mechanics, initialStage, onRea
         </fieldset>
         <button disabled={busy} onClick={() => { setStage(2); setConfirmed(false); }}>Next: review publication</button>
       </div>}
-      {stage === 2 && <div><h3>Make the campaign available for play</h3><p>Campaign status: {status}. Publication changes campaign availability. It does not approve AI drafts, publish generated materials, clear a safety pause or start any room.</p>{status === "published" ? <button onClick={() => { setStage(3); setConfirmed(false); }}>Next: connect a room</button> : <fieldset disabled={locked || !owner || !configured || !["draft", "paused"].includes(status ?? "")}><legend>Explicit publication</legend>{!owner && <p>Only the campaign owner can publish or resume the campaign.</p>}<label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I reviewed the rules and safety agreement and confirm making this campaign available for play.</label><button disabled={!confirmed} onClick={() => void write({ kind: "publish", input: { expectedRevision: data.administration.campaign.revision, idempotencyKey: createClientId(), status: "published" } })}>{status === "paused" ? "Resume campaign publication" : "Publish campaign"}</button></fieldset>}</div>}
+      {stage === 2 && <div><h3>Make the campaign available for play</h3><p>Campaign status: {status}. Publication changes campaign availability. It does not approve AI drafts, publish generated materials, clear a safety pause or start any room.</p>{status === "published" ? <><button onClick={() => { setStage(3); setConfirmed(false); }}>Next: connect a room</button>{owner && <fieldset disabled={locked}><legend>Complete this campaign</legend><p>Completion ends normal campaign play. This cannot be undone here.</p><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I confirm that this published campaign is complete.</label><button disabled={!confirmed} onClick={() => void write({ kind: "complete", input: { expectedRevision: data.administration.campaign.revision, idempotencyKey: createClientId(), status: "completed" } })}>Mark campaign complete</button></fieldset>}</> : <fieldset disabled={locked || !owner || !configured || !["draft", "paused"].includes(status ?? "")}><legend>Explicit publication</legend>{!owner && <p>Only the campaign owner can publish or resume the campaign.</p>}<label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I reviewed the rules and safety agreement and confirm making this campaign available for play.</label><button disabled={!confirmed} onClick={() => void write({ kind: "publish", input: { expectedRevision: data.administration.campaign.revision, idempotencyKey: createClientId(), status: "published" } })}>{status === "paused" ? "Resume campaign publication" : "Publish campaign"}</button></fieldset>}</div>}
       {stage === 3 && <div><h3>Connect your session</h3><p>Create a room from campaign personas, then attach it explicitly from the available list. Neither action activates gameplay.</p><h4>Attached rooms</h4>{data.rooms.attached.length ? <ul>{data.rooms.attached.map(room => <li key={room.sessionId}>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</li>)}</ul> : <p>No rooms attached.</p>}<h4>Available rooms</h4>{!data.rooms.eligible.length && <p>No eligible rooms found.</p>}<fieldset disabled={locked || !privileged || !editable}><legend>Attach an existing room</legend><label><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /> I confirm the selected room operation.</label>{data.rooms.eligible.map(room => <article key={room.sessionId}><p>{room.title ?? "Untitled room"} / {room.participantNames.join(", ")}</p><button disabled={!confirmed} onClick={() => void write({ kind: "attach" }, () => attachCampaignRoom(campaignId, { sessionId: room.sessionId }))}>Attach {room.title ?? "untitled room"}</button></article>)}</fieldset>
       <details>
         <summary>Create a new room</summary>

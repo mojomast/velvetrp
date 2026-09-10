@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 / P2.3 interruption and supported-withdrawal boundaries
-- Last accepted milestone and commit: P2.2 human/AI reviewed adventure completion, `227b926`
-- Next small assignment: cover deferred planning/narration, takeover, evidence/recovery failures, and pre-activation withdrawal
+- Active plan/milestone: Plan 2 / P2.F, owner campaign completion UI
+- Last accepted milestone and commit: P2.3 interruption/recovery boundaries, `bbcbae3`
+- Next small assignment: add a narrow owner-only campaign completion control over the existing administration PATCH
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
@@ -30,6 +30,9 @@
 | P2.2 | accepted | `227b926` | journey 13; server typecheck; independent final review accepted; zero live provider calls | journey oracle and reviewed fixture docs committed | full shared live envelope unused |
 | P2.F.2 | accepted | `609fbf5` | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
 | P2.F combat | accepted | `227b926` | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs committed | full shared live envelope unused |
+| P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
+| P2.4 | blocked | | owner completion exists only as administration PATCH; no normal browser control | P2.F UI evidence recorded | full shared live envelope unused |
+| P2.F UI | in-progress | | owner completion UI/validation pending | scope amendment in ledger | full shared live envelope unused |
 | P2.F.3 | in-progress | | negotiation-capable fixture profile decision pending | scope amendment in ledger | full shared live envelope unused |
 
 ## Next agent task
@@ -46,6 +49,8 @@ Amendment: P2.2 terminal-combat probes reach active SRD Goblin combat in human a
 Evidence: D&D `legalCombatActions` requires `resolveSrdEquipment(...).weapon` before advertising attack. The reviewed Human/Acolyte/Fighter has no equipped weapon. Existing `server/test/fixtures/srdEquipment.ts` creates stock using direct SQL and then equips through the repository; P2 forbids that direct-stock shortcut for proving the complete production journey. No normal inventory grant command exists in the reviewed setup path. User selected the narrow authoritative normal grant path. It must be catalog-pinned, idempotent, revisioned, receipt-backed, and fixture-scoped rather than a generalized arbitrary grant API.
 
 P2.F combat handoff: `class-starter-kit` is item-only. The exact SRD Fighter kit appends one pinned longsword through shared preview/finalization grant derivation, durable grant materialization, finalization receipt, and exact predecessor schema migration. The reviewed fixture equips that entry only through `mutateInventoryForActor` with current revision and an idempotency key. Terminal combat/reward proof passes in human/AI without fixture SQL stock. P2.2 completes the final objective evidence, one-time bound scenes, custom claim with no economy effect, explicit owner completion, and true reopen/reload with no extra dispatch.
+
+Amendment: P2.4 found owner completion is implemented only through `PATCH /campaigns/:id/administration`, with no normal browser control. Add a narrow owner-only completion control using existing typed administration transport, explicit confirmation, current revision, idempotency, receipt/reload reconciliation, and no new lifecycle API. Do not let GM/player/observer complete a campaign or add a generic admin panel.
 
 Assignment: P2.F.2 optional encounter fixture variant
 Goal: add a journey-only reviewed fixture option that does not pre-create the optional encounter, while retaining the existing P2.1 default fixture and all unearned-state guarantees.

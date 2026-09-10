@@ -12,9 +12,9 @@ const stamp = "2030-01-01T00:00:00.000Z";
 const props = { campaignId: "campaign-one", mechanics: true, initialStage: 0, onRead: vi.fn(), onBuilder: vi.fn() };
 const policy = { revision: 7, paused: true, hardLimits: ["No torture"], veils: ["Injury"], pvpPolicy: "disallowed" as const, romancePolicy: "explicit-consent" as const, lethalityPolicy: "consent-required" as const };
 const room = { sessionId: "opaque-room", title: "Crossing", participantNames: ["Rowan"], createdAt: stamp, stopped: false };
-function authority(role: "owner" | "gm" | "player" | "observer" = "owner", configured = false) {
+function authority(role: "owner" | "gm" | "player" | "observer" = "owner", configured = false, status: "draft" | "published" = "draft") {
   vi.mocked(api.getCampaignDetail).mockResolvedValue({ campaign: { id: props.campaignId, name: "Salt Road", actorRole: role, content: configured ? { status: "configured", rulesProfileId: "rules-one", contentPacks: [] } : { status: "unconfigured" }, createdAt: stamp, updatedAt: stamp } });
-  const base = { id: props.campaignId, status: "draft" as const, revision: 7, activeTimelineId: "timeline-one", updatedAt: stamp };
+  const base = { id: props.campaignId, status, revision: 7, activeTimelineId: "timeline-one", updatedAt: stamp };
   const settings = { maxPlayers: 4, safetyMode: "strict" as const, allowPlayerDice: true, recapVisibility: "members" as const };
   vi.mocked(api.getCampaignAdministration).mockResolvedValue({ campaign: role === "owner" || role === "gm" ? { ...base, actorRole: role, settings: { ...settings, gmNotes: "" } } : { ...base, actorRole: role, settings } });
   // Only fields consumed by the component are mocked; transport schema tests own wire validation.
@@ -70,6 +70,32 @@ describe("progressive campaign preparation", () => {
     authority(role, true); await open(2);
     expect((screen.getByRole("button", { name: "Publish campaign" }) as HTMLButtonElement).closest("fieldset")?.disabled).toBe(true);
     expect(api.updateCampaignAdministration).not.toHaveBeenCalled();
+  });
+  it.each(["gm", "player", "observer"] as const)("does not show %s the owner-only completion control", async role => {
+    authority(role, true, "published"); await open(2);
+    expect(screen.queryByRole("button", { name: "Mark campaign complete" })).toBeNull();
+  });
+  it("completes a published campaign with explicit confirmation, current revision, and receipt", async () => {
+    authority("owner", true, "published");
+    vi.mocked(api.updateCampaignAdministration).mockResolvedValue({ campaign: { id: props.campaignId, actorRole: "owner", status: "completed", revision: 8 }, receipt: { revisionAfter: 8 } } as Awaited<ReturnType<typeof api.updateCampaignAdministration>>);
+    await open(2);
+    fireEvent.click(screen.getByLabelText("I confirm that this published campaign is complete."));
+    fireEvent.click(screen.getByRole("button", { name: "Mark campaign complete" }));
+    await screen.findByText("Campaign marked completed. Receipt confirmed at revision 8.");
+    expect(api.updateCampaignAdministration).toHaveBeenCalledExactlyOnceWith("campaign-one", { expectedRevision: 7, idempotencyKey: expect.any(String), status: "completed" });
+  });
+  it("persists an uncertain completion and only retries the exact command after a current-state read", async () => {
+    authority("owner", true, "published");
+    vi.mocked(api.updateCampaignAdministration).mockRejectedValueOnce(new TypeError("lost"));
+    const page = await open(2);
+    fireEvent.click(screen.getByLabelText("I confirm that this published campaign is complete."));
+    fireEvent.click(screen.getByRole("button", { name: "Mark campaign complete" }));
+    await screen.findByText(/Write outcome uncertain/);
+    const command = vi.mocked(api.updateCampaignAdministration).mock.calls[0]![1];
+    page.unmount(); await open(2);
+    expect(api.updateCampaignAdministration).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Retry exact complete command" }));
+    await waitFor(() => expect(vi.mocked(api.updateCampaignAdministration).mock.calls[1]![1]).toEqual(command));
   });
   it.each(["player", "observer"] as const)("does not grant %s safety or room writes", async role => {
     authority(role); await open(1);
