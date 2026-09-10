@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["hydrate-campaign.ts", "test/**/*.ts"]
+  "include": ["hydrate-campaign.ts", "run-reviewed-adventure.ts", "test/**/*.ts"]
 }

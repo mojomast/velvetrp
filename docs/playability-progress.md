@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 blocked at P2.F browser objective-evidence parity
-- Last accepted milestone and commit: P2.F Director map retention, `5d65d98`
-- Next small assignment: compare browser objective receipt/progress sources with the passing HTTP oracle to explain absent bound Lens candidate
+- Active plan/milestone: Plan 2 / P2.5 configured-provider envelope completion
+- Last accepted milestone and commit: P2.4 reviewed browser table paths, `5d27a9f`
+- Next small assignment: add aggregate reservation, unit-safe cost/token accounting, durable preflight audit, and matched-path plan to runner
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
@@ -31,8 +31,8 @@
 | P2.F.2 | accepted | `609fbf5` | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
 | P2.F combat | accepted | `227b926` | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs committed | full shared live envelope unused |
 | P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
-| P2.4 | blocked | | browser sends evidence after Hear/Secure objectives, but planning table lacks bound Lens candidate | P2.F browser/objective evidence parity recorded | full shared live envelope unused |
-| P2.F browser evidence | in-progress | | browser objective receipt/progression versus HTTP oracle investigation pending | scope amendment in ledger | full shared live envelope unused |
+| P2.4 | accepted | `5d27a9f` | reviewed E2E 2; E2E typecheck; independent review accepted | browser paths and evidence propagation committed | full shared live envelope unused |
+| P2.5 | blocked | | runner audit lacks aggregate reservation/cost/accounting and matched reviewed path envelope | P2.5 audit findings recorded | full shared live envelope unused |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
@@ -64,6 +64,8 @@ Amendment: P2.4 full human path reaches accepted quest and normal Travel to Keep
 Evidence update: exact quest-objective selection is intentionally confirmation-never, so the browser harness now asserts its direct SSE terminal receipt rather than a batch. After that completed Secure Lens objective, normal Director Continue with an exact fake `Resolve bound scene: Lens Recovered` planner selection still renders no `Approve exact proposal`. Investigate transcript/evidenceTurn propagation and human Director proposal state; no hidden HTTP resolution is authorized.
 
 Evidence update: the client now sends the completed original turn ID and the browser performs Hear Keeper then Secure Lens in order, but the server planning table still lacks the exact `Resolve bound scene: Lens Recovered` candidate. Compare the persisted browser objective receipts/progress with the passing HTTP journey before changing authority or browser coverage.
+
+P2.5 audit: current runner is a safe provider capability probe only. Before any live call, add durable failed-preflight audit, target/ledger separation, USD-per-million positive rate units, prompt/completion reservations, aggregate 130-call/250,000-token/USD2 envelope accounting, over-reservation stop state, and a deterministic matched human/AI reviewed-path reservation/identity plan. Guard tests remain network-free; no automatic retry or model switch.
 
 Assignment: P2.F.2 optional encounter fixture variant
 Goal: add a journey-only reviewed fixture option that does not pre-create the optional encounter, while retaining the existing P2.1 default fixture and all unearned-state guarantees.

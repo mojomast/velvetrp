@@ -1,0 +1,71 @@
+#!/usr/bin/env node
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { defaultHarnessSettings } from "../server/src/defaults.js";
+import { completeWithProvider, type ProviderCompletionInput, type ProviderCompletionResult } from "../server/src/provider/index.js";
+import { getProviderSettings } from "../server/src/repo/index.js";
+import { getPromptPreset } from "../server/src/presets.js";
+import { adventureProviderPromptEstimate } from "../server/src/agent/adventureOrchestrator.js";
+import { createReviewedAdventure, REVIEWED_ADVENTURE_MANIFEST_DIGEST } from "../server/test/fixtures/reviewedAdventure.js";
+
+export type MatchedPlan = { human: { calls: number; tokens: number; costUsd: number; elapsedMs: number }; ai: { calls: number; tokens: number; costUsd: number; elapsedMs: number } };
+export type Accounting = { policyVersion: 1; units: "USD per million tokens"; limits: { calls: number; tokens: number; costUsd: number; elapsedMs: number; concurrency: 1 }; reserved: { promptTokens: number; completionTokens: number; costUsd: number }; reported: { promptTokens: number; completionTokens: number }; settled: { promptTokens: number; completionTokens: number; costUsd: number }; remaining: { calls: number; tokens: number; costUsd: number }; matchedPlan: MatchedPlan };
+export type RunnerLedger = { version: 2; manifestDigest: string; mode: "provider-free" | "live"; provider?: { type: string; model: string; baseUrlDigest: string; pricing: { promptPerMillion: number; completionPerMillion: number } }; state: "preflight" | "complete" | "unknown" | "failed"; calls: number; cap: number; accounting: Accounting; audit: string[] };
+export type RunnerOptions = { target: string; ledger: string; live?: boolean; maxCalls?: number; provider?: () => Promise<Awaited<ReturnType<typeof getProviderSettings>>>; complete?: (input: ProviderCompletionInput) => Promise<ProviderCompletionResult>; now?: () => number; matchedPlan?: MatchedPlan; };
+
+const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+const fail = (message: string): never => { throw new Error(message); };
+const safeProvider = (provider: Awaited<ReturnType<typeof getProviderSettings>>) => ({ type: provider.providerType, model: provider.model, baseUrlDigest: digest(provider.baseUrl.trim()), pricing: { promptPerMillion: provider.pricing.promptPerMillion ?? NaN, completionPerMillion: provider.pricing.completionPerMillion ?? NaN } });
+const sameProvider = (left: NonNullable<RunnerLedger["provider"]>, right: NonNullable<RunnerLedger["provider"]>) => left.type === right.type && left.model === right.model && left.baseUrlDigest === right.baseUrlDigest && left.pricing.promptPerMillion === right.pricing.promptPerMillion && left.pricing.completionPerMillion === right.pricing.completionPerMillion;
+const LIMITS = { calls: 130, tokens: 250_000, costUsd: 2, elapsedMs: 40 * 60_000, concurrency: 1 as const };
+const cost = (prompt: number, completion: number, pricing: { promptPerMillion: number; completionPerMillion: number }) => prompt * pricing.promptPerMillion / 1_000_000 + completion * pricing.completionPerMillion / 1_000_000;
+const plan = (pricing: { promptPerMillion: number; completionPerMillion: number }) => { const calls = 12, tokens = 12 * 1_024; const entry = { calls, tokens, costUsd: cost(tokens / 2, tokens / 2, pricing), elapsedMs: 12 * 60_000 }; return { human: entry, ai: { ...entry } }; };
+const accounting = (pricing?: { promptPerMillion: number; completionPerMillion: number }, matchedPlan?: MatchedPlan): Accounting => { const planValue = matchedPlan ?? (pricing ? plan(pricing) : { human: { calls: 12, tokens: 12_288, costUsd: 0, elapsedMs: 720_000 }, ai: { calls: 12, tokens: 12_288, costUsd: 0, elapsedMs: 720_000 } }); return { policyVersion: 1, units: "USD per million tokens", limits: LIMITS, reserved: { promptTokens: 0, completionTokens: 0, costUsd: 0 }, reported: { promptTokens: 0, completionTokens: 0 }, settled: { promptTokens: 0, completionTokens: 0, costUsd: 0 }, remaining: { calls: LIMITS.calls, tokens: LIMITS.tokens, costUsd: LIMITS.costUsd }, matchedPlan: planValue }; };
+const validPlan = (planValue: MatchedPlan) => { const total = [planValue.human, planValue.ai].reduce((sum, entry) => ({ calls: sum.calls + entry.calls, tokens: sum.tokens + entry.tokens, costUsd: sum.costUsd + entry.costUsd, elapsedMs: sum.elapsedMs + entry.elapsedMs }), { calls: 0, tokens: 0, costUsd: 0, elapsedMs: 0 }); return total.calls <= LIMITS.calls && total.tokens <= LIMITS.tokens && total.costUsd <= LIMITS.costUsd && total.elapsedMs <= LIMITS.elapsedMs; };
+function reserve(ledger: RunnerLedger, promptTokens: number, completionTokens: number) { const total = promptTokens + completionTokens, value = cost(promptTokens, completionTokens, ledger.provider!.pricing); if (ledger.calls >= Math.min(ledger.cap, LIMITS.calls) || ledger.accounting.reserved.promptTokens + ledger.accounting.reserved.completionTokens + total > LIMITS.tokens || ledger.accounting.reserved.costUsd + value > LIMITS.costUsd) fail("aggregate reservation exceeds configured live envelope"); ledger.calls += 1; ledger.accounting.reserved.promptTokens += promptTokens; ledger.accounting.reserved.completionTokens += completionTokens; ledger.accounting.reserved.costUsd += value; ledger.accounting.remaining = { calls: LIMITS.calls - ledger.calls, tokens: LIMITS.tokens - ledger.accounting.reserved.promptTokens - ledger.accounting.reserved.completionTokens, costUsd: LIMITS.costUsd - ledger.accounting.reserved.costUsd }; }
+function settle(ledger: RunnerLedger, usage: ProviderCompletionResult["usage"]) { const prompt = Math.max(ledger.accounting.reserved.promptTokens, usage?.promptTokens ?? 0), completion = Math.max(ledger.accounting.reserved.completionTokens, usage?.completionTokens ?? 0), value = cost(prompt, completion, ledger.provider!.pricing); if (prompt + completion > LIMITS.tokens || value > LIMITS.costUsd) fail("reported usage exceeds configured live envelope"); ledger.accounting.reported = { promptTokens: usage?.promptTokens ?? 0, completionTokens: usage?.completionTokens ?? 0 }; ledger.accounting.settled = { promptTokens: prompt, completionTokens: completion, costUsd: value }; ledger.accounting.remaining = { calls: LIMITS.calls - ledger.calls, tokens: LIMITS.tokens - prompt - completion, costUsd: LIMITS.costUsd - value }; }
+async function materialize(target: string) { const prior = { FEATURE_RPG_CAMPAIGN: process.env.FEATURE_RPG_CAMPAIGN, FEATURE_RPG_MECHANICS: process.env.FEATURE_RPG_MECHANICS, FEATURE_RPG_COMBAT: process.env.FEATURE_RPG_COMBAT }; Object.assign(process.env, { FEATURE_RPG_CAMPAIGN: "true", FEATURE_RPG_MECHANICS: "true", FEATURE_RPG_COMBAT: "true" }); try { const prepared = await createReviewedAdventure(target, { prepareOptionalEncounter: false }); prepared.repo.close(); } finally { if (prior.FEATURE_RPG_CAMPAIGN === undefined) delete process.env.FEATURE_RPG_CAMPAIGN; else process.env.FEATURE_RPG_CAMPAIGN = prior.FEATURE_RPG_CAMPAIGN; if (prior.FEATURE_RPG_MECHANICS === undefined) delete process.env.FEATURE_RPG_MECHANICS; else process.env.FEATURE_RPG_MECHANICS = prior.FEATURE_RPG_MECHANICS; if (prior.FEATURE_RPG_COMBAT === undefined) delete process.env.FEATURE_RPG_COMBAT; else process.env.FEATURE_RPG_COMBAT = prior.FEATURE_RPG_COMBAT; } }
+
+async function empty(directory: string) { try { return (await stat(directory)).isDirectory() && (await (await import("node:fs/promises")).readdir(directory)).length === 0; } catch { return false; } }
+async function readLedger(file: string): Promise<RunnerLedger | null> { try { return JSON.parse(await readFile(file, "utf8")) as RunnerLedger; } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; } }
+async function save(file: string, ledger: RunnerLedger) { await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, `${JSON.stringify(ledger)}\n`, { mode: 0o600 }); }
+
+/** Runs one explicitly bounded configured-provider capability call after a provider-free fixture preflight. */
+export async function runReviewedAdventure(options: RunnerOptions): Promise<RunnerLedger> {
+  const live = options.live === true, cap = options.maxCalls ?? 1;
+  const now = options.now ?? Date.now, startedAt = now();
+  const target = path.resolve(options.target), ledgerPath = path.resolve(options.ledger); if (ledgerPath === target || ledgerPath.startsWith(`${target}${path.sep}`)) fail("ledger must be outside the isolated target");
+  const failPreflight = async (message: string): Promise<never> => { const ledger: RunnerLedger = { version: 2, manifestDigest: REVIEWED_ADVENTURE_MANIFEST_DIGEST, mode: live ? "live" : "provider-free", state: "failed", calls: 0, cap, accounting: accounting(), audit: [`preflight failed: ${message}`] }; await save(options.ledger, ledger); return fail(message); };
+  if (!Number.isInteger(cap) || cap < 1 || cap > LIMITS.calls) await failPreflight("dispatch cap must be an integer within the aggregate live envelope");
+  const prior = await readLedger(options.ledger);
+  if (prior?.state === "unknown") fail("prior run outcome is unknown; refusing automatic resume");
+  if (prior?.state === "complete") fail("duplicate reviewed adventure resume refused");
+  if (prior && prior.manifestDigest !== REVIEWED_ADVENTURE_MANIFEST_DIGEST) await failPreflight("manifest digest mismatch");
+  if (!await empty(options.target)) await failPreflight("reviewed adventure target must exist and be empty");
+  if (!live) {
+    const ledger: RunnerLedger = { version: 2, manifestDigest: REVIEWED_ADVENTURE_MANIFEST_DIGEST, mode: "provider-free", state: "preflight", calls: 0, cap, accounting: accounting(), audit: ["provider-free preflight; live dispatch not requested"] };
+    await save(options.ledger, ledger); await materialize(options.target); const complete = { ...ledger, state: "complete" as const, audit: [...ledger.audit, "reviewed fixture materialized"] }; await save(options.ledger, complete); return complete;
+  }
+  const provider = await (options.provider ?? getProviderSettings)();
+  const identity = safeProvider(provider);
+  if (!Number.isFinite(identity.pricing.promptPerMillion) || !Number.isFinite(identity.pricing.completionPerMillion) || identity.pricing.promptPerMillion <= 0 || identity.pricing.completionPerMillion <= 0) await failPreflight("live runner requires positive configured USD-per-million prompt and completion pricing");
+  if (prior?.provider && !sameProvider(prior.provider, identity)) await failPreflight("configured provider identity mismatch");
+  const ledger: RunnerLedger = { version: 2, manifestDigest: REVIEWED_ADVENTURE_MANIFEST_DIGEST, mode: "live", provider: identity, state: "preflight", calls: 0, cap, accounting: accounting(identity.pricing, options.matchedPlan), audit: ["live preflight passed; credentials, URLs, prompts, and provider responses omitted", "matched human/AI deterministic plan reserved for review only; no branches dispatched"] };
+  if (!validPlan(ledger.accounting.matchedPlan)) { ledger.state = "failed"; ledger.audit.push("matched human/AI plan exceeds aggregate live envelope"); await save(options.ledger, ledger); fail("matched human/AI plan exceeds aggregate live envelope"); }
+  await save(options.ledger, ledger);
+  await materialize(options.target);
+  if (now() - startedAt > LIMITS.elapsedMs) { ledger.state = "failed"; ledger.audit.push("elapsed live envelope expired before dispatch"); await save(options.ledger, ledger); fail("elapsed live envelope expired before dispatch"); }
+  const probe: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: Math.min(256, provider.samplers.maxTokens ?? 256) } }, harness: defaultHarnessSettings(), preset: getPromptPreset("default"), toolChoice: "none", messages: [{ role: "user", content: "Return a single JSON object with ok true." }], jsonSchema: { name: "reviewed_adventure_probe", schema: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"], additionalProperties: false } } };
+  const promptTokens = Math.ceil(Buffer.byteLength(adventureProviderPromptEstimate(probe), "utf8") / 3), completionTokens = probe.provider.samplers.maxTokens ?? 256;
+  try { reserve(ledger, promptTokens, completionTokens); } catch (error) { ledger.state = "failed"; ledger.audit.push(`reservation refused: ${error instanceof Error ? error.message : "error"}`); await save(options.ledger, ledger); throw error; }
+  ledger.audit.push("capability probe reservation recorded before dispatch"); await save(options.ledger, ledger);
+  let result: ProviderCompletionResult;
+  try { result = await (options.complete ?? completeWithProvider)(probe); } catch (error) { ledger.state = "unknown"; ledger.audit.push(`dispatch outcome unknown: ${error instanceof Error ? error.name : "error"}`); await save(options.ledger, ledger); throw error; }
+  try { settle(ledger, result.usage); } catch (error) { ledger.state = "failed"; ledger.audit.push(`reported usage over-budget: ${error instanceof Error ? error.message : "error"}`); await save(options.ledger, ledger); throw error; }
+  ledger.state = "complete"; ledger.audit.push("one configured-provider capability dispatch completed"); await save(options.ledger, ledger); return ledger;
+}
+
+async function main() { const args = new Set(process.argv.slice(2)), target = [...args].find(value => value.startsWith("--target="))?.slice(9), ledger = [...args].find(value => value.startsWith("--ledger="))?.slice(9); if (!target || !ledger) fail("usage: run-reviewed-adventure --target=DIR --ledger=FILE [--live] [--max-calls=N]"); await runReviewedAdventure({ target: path.resolve(target!), ledger: path.resolve(ledger!), live: args.has("--live"), maxCalls: Number([...args].find(value => value.startsWith("--max-calls="))?.slice(12) ?? "1") }); }
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main();
