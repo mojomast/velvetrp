@@ -24,3 +24,13 @@
 .dm-readiness-review { color: #536b8a; }
 .dm-readiness-coverage { columns: 2 14rem; }
 @media (max-width: 600px) { .dm-readiness-coverage { columns: 1; } }
+.dm-context-inspection { border: 1px solid #73664a; padding: 1rem; display: grid; gap: .75rem; }
+.dm-context-inspection-result { max-height: min(34rem, 65vh); overflow: auto; border-top: 1px solid #73664a; padding-top: .75rem; display: grid; gap: .65rem; }
+.dm-context-inspection-result h5, .dm-context-inspection-result h6 { margin: 0; }
+.dm-context-inspection-section { border-left: 2px solid #b98746; padding-left: .75rem; display: grid; gap: .35rem; }
+.dm-context-inspection-section p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.dm-context-withheld { border-left: 3px solid #8a651e; padding-left: .75rem; }
+.dm-context-usage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .5rem 1rem; margin: 0; }
+.dm-context-usage div { min-width: 0; }
+.dm-context-usage dt { font-size: .8rem; }
+.dm-context-usage dd { margin: .15rem 0 0; overflow-wrap: anywhere; }

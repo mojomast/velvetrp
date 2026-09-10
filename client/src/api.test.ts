@@ -10,9 +10,37 @@ import { createEncounterGenerationDraft, getEncounterGenerationDraft } from "./a
 import { commandNpcPresence, getCampaignPresentCast } from "./api";
 import {canonicalCombatRewardClaimRequestFrame,canonicalUseConsumableRequestFrame} from "@velvet/contracts";
 import { generateTacticalMap, getTacticalMap, moveTacticalMapToken, previewTacticalMapMove } from "./api";
+import { getCampaignContextInspection, getCampaignContextInspectionReferences } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("P3.5 context inspection API binding", () => {
+  const selector = { version: "1.0", identity: { campaignId: "campaign:one", sessionId: "room.exact", source: { kind: "director-run" as const, sourceId: "run:one" } }, references: [{ lane: "director-planning" as const, dispatchId: "dispatch:one" }] };
+  const inspection = { version: "1.0", identity: { campaignId: "campaign:one", sessionId: "room.exact", lane: "director-planning" as const, dispatchId: "dispatch:one" }, availability: "available" as const,
+    dispatch: { recordedPhase: "planned" as const, certainty: "recorded" as const, settlement: "claimed" as const }, sections: [], recallHits: [],
+    usage: { storedRecallPacketUtf8Bytes: 0, storedMessageContentUtf8Bytes: 0, serializedStoredRequestUtf8Bytes: 0, displayedSafeResponseUtf8Bytes: 0, reportedPromptTokens: null, reportedCompletionTokens: null, reservedPromptTokens: null, reservedCompletionTokens: null } };
+
+  it("uses strict no-store reads and verifies both exact identities", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(selector), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(inspection), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignContextInspectionReferences("campaign:one", "room.exact", { kind: "director-run", sourceId: "run:one" })).resolves.toEqual(selector);
+    await expect(getCampaignContextInspection("campaign:one", "room.exact", "director-planning", "dispatch:one")).resolves.toEqual(inspection);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/rpg/v1/campaigns/campaign%3Aone/rooms/room.exact/context-inspection/references/director-run/run%3Aone", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/rpg/v1/campaigns/campaign%3Aone/rooms/room.exact/context-inspection/director-planning/dispatch%3Aone", expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("rejects malformed or mismatched success identities", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ ...selector, identity: { ...selector.identity, source: { ...selector.identity.source, sourceId: "other" } } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...inspection, identity: { ...inspection.identity, dispatchId: "other" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...selector, rawRequest: {} }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getCampaignContextInspectionReferences("campaign:one", "room.exact", { kind: "director-run", sourceId: "run:one" })).rejects.toThrow(/exact source/);
+    await expect(getCampaignContextInspection("campaign:one", "room.exact", "director-planning", "dispatch:one")).rejects.toThrow(/exact dispatch/);
+    await expect(getCampaignContextInspectionReferences("campaign:one", "room.exact", { kind: "director-run", sourceId: "run:one" })).rejects.toThrow();
+  });
 });
 
 describe("tactical map API binding", () => {

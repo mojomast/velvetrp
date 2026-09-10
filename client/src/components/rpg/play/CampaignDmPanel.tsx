@@ -5,6 +5,7 @@ import { campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignD
 import { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmHistory, getCampaignDmPreparationReadiness, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun, commandCampaignDmSceneBinding, getCampaignStory, listCampaignQuests, listCampaignEncounters } from "../../../api";
 import { createClientId } from "../../../utils/clientId";
 import { CampaignDmReadinessPanel } from "./CampaignDmReadinessPanel";
+import { CampaignContextInspectionPanel, type CampaignContextInspectionApi } from "./CampaignContextInspectionPanel";
 import "./campaignDmPanel.css";
 
 export const campaignDmApi = { commandCampaignDmBeat, commandCampaignDmDecision, commandCampaignDmMode, getCampaignDmHistory, getCampaignDmProposal, getCampaignDmRun, resumeCampaignDmRun,
@@ -12,6 +13,8 @@ export const campaignDmApi = { commandCampaignDmBeat, commandCampaignDmDecision,
   getBindingQuests: (campaignId: string) => listCampaignQuests(campaignId, "gm"), listCampaignEncounters };
 export type CampaignDmApi = Omit<typeof campaignDmApi, "getCampaignDmPreparationReadiness"> & {
   getCampaignDmPreparationReadiness?: typeof campaignDmApi.getCampaignDmPreparationReadiness;
+  getCampaignContextInspectionReferences?: CampaignContextInspectionApi["getCampaignContextInspectionReferences"];
+  getCampaignContextInspection?: CampaignContextInspectionApi["getCampaignContextInspection"];
 };
 const operationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("beat"), request: campaignDmBeatRequestSchema }).strict(),
@@ -24,8 +27,8 @@ const terminal = (run: CampaignDmRun) => ["completed", "blocked", "cancelled"].i
 type BindingChoices = { revision: number; scenes: { id: string; label: string }[]; evidence: { kind: "quest-objective" | "encounter"; id: string; label: string }[] };
 
 /** Always mounted: closing the drawer never drops a durable command or its room lock. */
-export function CampaignDmPanel({ bootstrap, api, blocked, canAct, evidenceTurnId, onHistory, onLockChange, onStateChange }: {
-  bootstrap: CampaignPlayBootstrap; api: CampaignDmApi; blocked: boolean; canAct: boolean; evidenceTurnId?: string;
+export function CampaignDmPanel({ bootstrap, api, blocked, canAct, evidenceTurnId, contextTurnId, onHistory, onLockChange, onStateChange }: {
+  bootstrap: CampaignPlayBootstrap; api: CampaignDmApi; blocked: boolean; canAct: boolean; evidenceTurnId?: string; contextTurnId?: string;
   onHistory: (history: CampaignDmHistory) => void; onLockChange: (locked: boolean) => void; onStateChange: () => void;
 }) {
   const { campaignId, sessionId } = bootstrap;
@@ -205,6 +208,9 @@ export function CampaignDmPanel({ bootstrap, api, blocked, canAct, evidenceTurnI
     </section>}
     {modeOperation && gm && <button type="button" disabled={modeBusy || invalid} onClick={() => void changeMode(true)}>Recover exact mode request</button>}
     {gm && api.getCampaignDmPreparationReadiness && <CampaignDmReadinessPanel campaignId={campaignId} sessionId={sessionId} role={bootstrap.principal.role} api={{ getCampaignDmPreparationReadiness: api.getCampaignDmPreparationReadiness }} />}
+    {gm && history && api.getCampaignContextInspectionReferences && api.getCampaignContextInspection && <CampaignContextInspectionPanel campaignId={campaignId} sessionId={sessionId}
+      role={bootstrap.principal.role as "owner" | "gm"} runs={history.runs} currentTurnId={contextTurnId}
+      api={{ getCampaignContextInspectionReferences: api.getCampaignContextInspectionReferences, getCampaignContextInspection: api.getCampaignContextInspection }} />}
     {gm && <details><summary>Prepare scene resolution (GM only)</summary>
       <p>Link a named scene to evidence you judge sufficient to finish it. The server still requires qualifying committed evidence and legal story dependencies. This authors a rule; it does not complete an objective, end an encounter, resolve a scene, or reveal secrets.</p>
       <button type="button" disabled={blocked || locked || !allowed} onClick={() => void prepareBinding(false)}>Load scene preparation choices</button>

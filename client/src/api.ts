@@ -1,6 +1,8 @@
 import { actorGameplaySheetResponseSchema } from "@velvet/contracts";
 import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest } from "@velvet/contracts";
 import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, campaignDmReadinessResponseSchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest, type CampaignDmReadinessResponse } from "@velvet/contracts";
+import { campaignContextInspectionDispatchReferenceSelectorIdentitySchema, campaignContextInspectionDispatchReferenceSelectorSchema, campaignContextInspectionIdentitySchema, campaignContextInspectionResponseSchema,
+  type CampaignContextInspectionDispatchReferenceSource, type CampaignContextInspectionLane } from "@velvet/contracts";
 
 const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
   const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
@@ -64,6 +66,28 @@ export async function commandCampaignDmDecision(campaignId: string, sessionId: s
 }
 export async function resumeCampaignDmRun(campaignId: string, sessionId: string, runId: string) {
   return bindDmRun(campaignDmRunSchema.parse(await dmRequest(`${dmPath(campaignId, sessionId, runId)}/resume-commands`, { method: "POST", body: "{}" })), campaignId, sessionId, runId);
+}
+export async function getCampaignContextInspectionReferences(campaignId: string, sessionId: string, source: CampaignContextInspectionDispatchReferenceSource) {
+  const identity = parseApiInput(() => campaignContextInspectionDispatchReferenceSelectorIdentitySchema.parse({ campaignId, sessionId, source }));
+  const id = (value: string) => encodeURIComponent(value);
+  const value = campaignContextInspectionDispatchReferenceSelectorSchema.parse(await dmRequest(
+    `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/references/${id(identity.source.kind)}/${id(identity.source.sourceId)}`,
+  ));
+  if (value.identity.campaignId !== identity.campaignId || value.identity.sessionId !== identity.sessionId
+    || value.identity.source.kind !== identity.source.kind || value.identity.source.sourceId !== identity.source.sourceId)
+    throw new Error("Context inspection references did not match the exact source");
+  return value;
+}
+export async function getCampaignContextInspection(campaignId: string, sessionId: string, lane: CampaignContextInspectionLane, dispatchId: string) {
+  const identity = parseApiInput(() => campaignContextInspectionIdentitySchema.parse({ campaignId, sessionId, lane, dispatchId }));
+  const id = (value: string) => encodeURIComponent(value);
+  const value = campaignContextInspectionResponseSchema.parse(await dmRequest(
+    `/rpg/v1/campaigns/${id(identity.campaignId)}/rooms/${id(identity.sessionId)}/context-inspection/${id(identity.lane)}/${id(identity.dispatchId)}`,
+  ));
+  if (value.identity.campaignId !== identity.campaignId || value.identity.sessionId !== identity.sessionId
+    || value.identity.lane !== identity.lane || value.identity.dispatchId !== identity.dispatchId)
+    throw new Error("Context inspection response did not match the exact dispatch");
+  return value;
 }
 import { createClientId } from "./utils/clientId";
 import { apiProblemSchema, campaignCharacterCreateRequestSchema, campaignCharacterCreateResponseSchema, campaignCharacterCreationOptionsResponseSchema, campaignCharacterListResponseSchema, campaignCharacterWorkspaceResponseSchema, campaignCreateRequestSchema, campaignCreateResponseSchema, campaignDetailResponseSchema, campaignDiceHistoryResponseSchema, campaignDiceRollRequestSchema, campaignDiceRollResponseSchema, campaignListResponseSchema, campaignMechanicsStarterSetupRequestSchema, campaignMechanicsStarterSetupResponseSchema, campaignRenameRequestSchema, campaignRenameResponseSchema, campaignRoomAttachRequestSchema, campaignRoomAttachResponseSchema, campaignRoomLinkingResponseSchema, campaignStarterSetupRequestSchema, MECHANICS_STARTER_ID, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_ID, ORIGINAL_STARTER_PRESENTATION, resourceIdSchema, roleplayFeatureFlagsSchema, rpgFeatureFlagsSchema, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
