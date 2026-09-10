@@ -13,6 +13,7 @@ export const campaignContextInspectionLaneSchema = z.enum([
 export const MAX_CAMPAIGN_CONTEXT_INSPECTION_SECTIONS = 16;
 export const MAX_CAMPAIGN_CONTEXT_INSPECTION_SECTION_TEXT_UTF8_BYTES = 8_192;
 export const MAX_CAMPAIGN_CONTEXT_INSPECTION_RECALL_HITS = 8;
+export const MAX_CAMPAIGN_CONTEXT_INSPECTION_DISPATCH_REFERENCES = 6;
 export const MAX_CAMPAIGN_CONTEXT_INSPECTION_RECALL_TEXT_UTF8_BYTES = 2_048;
 export const MAX_CAMPAIGN_CONTEXT_INSPECTION_SAFE_RESPONSE_UTF8_BYTES = 24 * 1_024;
 
@@ -37,6 +38,44 @@ export const campaignContextInspectionIdentitySchema = z.object({
   lane: campaignContextInspectionLaneSchema,
   dispatchId: resourceIdSchema,
 }).strict();
+
+export const campaignContextInspectionDispatchReferenceSourceSchema = z.object({
+  kind: z.enum(["adventure-turn", "director-run"]),
+  sourceId: resourceIdSchema,
+}).strict();
+
+/** Exact public source identity used to select its recorded dispatch references. */
+export const campaignContextInspectionDispatchReferenceSelectorIdentitySchema = z.object({
+  campaignId: resourceIdSchema,
+  sessionId: resourceIdSchema,
+  source: campaignContextInspectionDispatchReferenceSourceSchema,
+}).strict();
+
+export const campaignContextInspectionDispatchReferenceSchema = z.object({
+  lane: campaignContextInspectionLaneSchema,
+  dispatchId: resourceIdSchema,
+}).strict();
+
+/** Bounded references for one exact turn or run; repositories define deterministic order. */
+export const campaignContextInspectionDispatchReferenceSelectorSchema = z.object({
+  version: campaignContextInspectionVersionSchema,
+  identity: campaignContextInspectionDispatchReferenceSelectorIdentitySchema,
+  references: z.array(campaignContextInspectionDispatchReferenceSchema)
+    .max(MAX_CAMPAIGN_CONTEXT_INSPECTION_DISPATCH_REFERENCES),
+}).strict().superRefine((value, context) => {
+  const seen = new Set<string>();
+  value.references.forEach((reference, index) => {
+    const key = `${reference.lane}\u0000${reference.dispatchId}`;
+    if (seen.has(key)) {
+      context.addIssue({
+        code: "custom",
+        path: ["references", index],
+        message: "dispatch references must be unique by lane and dispatchId",
+      });
+    }
+    seen.add(key);
+  });
+});
 
 export const campaignContextInspectionUnavailableReasonSchema = z.enum([
   "dispatch-not-found",
@@ -104,7 +143,7 @@ export const campaignContextInspectionSectionSchema = z.discriminatedUnion("stat
 export const campaignContextInspectionRecallHitSchema = z.object({
   sourceId: resourceIdSchema,
   sourceLabel: safeLabelSchema,
-  sourceLink: z.string().startsWith("/").max(512).nullable(),
+  sourceLink: z.string().regex(/^\/(?![\\/])[^\\]*$/, "sourceLink must be an internal absolute path").max(512).nullable(),
   authority: campaignContextInspectionAuthoritySchema,
   text: z.string().min(1).refine(
     (value) => utf8ByteLength(value) <= MAX_CAMPAIGN_CONTEXT_INSPECTION_RECALL_TEXT_UTF8_BYTES,
@@ -184,6 +223,10 @@ export const campaignContextInspectionResponseSchema = z.discriminatedUnion("ava
 
 export type CampaignContextInspectionIdentity = z.infer<typeof campaignContextInspectionIdentitySchema>;
 export type CampaignContextInspectionLane = z.infer<typeof campaignContextInspectionLaneSchema>;
+export type CampaignContextInspectionDispatchReferenceSource = z.infer<typeof campaignContextInspectionDispatchReferenceSourceSchema>;
+export type CampaignContextInspectionDispatchReferenceSelectorIdentity = z.infer<typeof campaignContextInspectionDispatchReferenceSelectorIdentitySchema>;
+export type CampaignContextInspectionDispatchReference = z.infer<typeof campaignContextInspectionDispatchReferenceSchema>;
+export type CampaignContextInspectionDispatchReferenceSelector = z.infer<typeof campaignContextInspectionDispatchReferenceSelectorSchema>;
 export type CampaignContextInspectionSection = z.infer<typeof campaignContextInspectionSectionSchema>;
 export type CampaignContextInspectionRecallHit = z.infer<typeof campaignContextInspectionRecallHitSchema>;
 export type CampaignContextInspectionUsage = z.infer<typeof campaignContextInspectionUsageSchema>;

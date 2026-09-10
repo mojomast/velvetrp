@@ -26,6 +26,29 @@ The reader must authorize before reading the payload. It must not run recall,
 settlement, recovery, or any provider call. Historical access is also subject to
 current source visibility. No player or role-toggle projection is defined here.
 
+## Dispatch-reference selector
+
+P3.5 adds `campaignContextInspectionDispatchReferenceSelectorSchema` so a client
+can discover recorded dispatches for one exact public source without deriving a
+dispatch ID. Its version is `1.0`. The strict identity contains `campaignId`,
+`sessionId`, and a strict source with exactly `kind` and `sourceId`; `kind` is
+either `adventure-turn` or `director-run`, and `sourceId` is that exact turn or
+run resource ID. Each strict reference contains exactly a finite inspection
+`lane` and its exact durable `dispatchId`.
+
+The selector returns at most six references and each `lane` plus `dispatchId`
+pair is unique. Empty results are valid. Repository implementations own and must
+document deterministic ordering; consumers must not infer chronology or choose a
+"latest" dispatch by reordering the response.
+
+Selection has the same owner/GM-only authorization boundary as inspection. The
+repository must authorize the exact campaign room and exact source before
+returning references. It must not broaden from the source to another turn or run,
+infer references from mutable state, replay a request, run recall, settle or
+recover a dispatch, or call a provider. The selector carries references only: no
+raw context, prompt/request text, recall material, provider payload, or private
+provenance may cross this boundary.
+
 ## Response states and bounds
 
 `campaignContextInspectionResponseSchema` is a strict discriminated union. An
@@ -43,6 +66,14 @@ UTF-8 bytes per displayed recall hit. The declared safe displayed response and
 the serialized safe DTO are each at most 24 KiB; if safe metadata cannot fit,
 the reader withholds it with the recorded `metadata-overflow` or
 `display-budget-exceeded` reason.
+
+The current provenance writer records an ordered, lane-specific inventory of
+context categories, such as decision identity, campaign context, historical
+recall, legal candidates, committed public context, and provider request. The
+reader can display those safe category labels while withholding their payloads;
+it does not claim to expose raw prompts or every recalled source. `recallHits`
+therefore remains empty when the frozen source payload cannot be reauthorized
+without decoding restricted historical JSON.
 
 The DTO contains separate, non-additive counters for stored recall-packet UTF-8
 bytes, stored message-content UTF-8 bytes, serialized stored-request UTF-8

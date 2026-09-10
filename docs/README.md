@@ -48,6 +48,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [The Last Harbor Light](reviewed-adventure.md) - Provider-free reviewed fixture, exact branch oracle, readiness observations, and P2 journey constraints.
 - [Plan 3: Measured memory improvements](plan-3-memory-evaluation.md) - Persisted-context inspection, golden recall evaluation, and evidence-selected runtime improvements.
 - [Context inspection contract](context-inspection.md) - GM-only bounded persisted-dispatch inspection lanes, withholding policy, and byte/token units.
+- [Reviewed adventure runner](reviewed-adventure-runner.md) - Bounded provider-free and explicitly authorized live execution policy.
+- [Reviewed adventure report template](reviewed-adventure-report-template.md) - Stable evidence and observation format for matched branches.
 - [Bounded campaign memory](campaign-memory.md) - Implemented direct SQLite recall, source/authority scope, exact packing limits, scan limitations, immutable narration provenance, and migration behavior.
 - [RPG memory framework evaluation](memory-framework-evaluation.md) - Research comparison of SQLite, LangGraph, Mem0, Graphiti/Zep, and Letta, with proposed evaluation gates rather than implementation claims.
 - [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
