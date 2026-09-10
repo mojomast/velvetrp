@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 / P2.6 provider-free observations and Plan 3 corpus handoff
-- Last accepted milestone and commit: P2.5 RouteTok runner policy, `980ee96`
-- Next small assignment: record deterministic reviewed observations/source oracles and live pilot status without raw traces
+- Active plan/milestone: Plan 3 / P3.1 and P3.2 contract/corpus lanes
+- Last accepted milestone and commit: Plan 2 reviewed adventure observations, `f3c14d2`
+- Next small assignment: correct P3.1 byte/withholding/export rigor and P3.2 source/timeline fixture rigor
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none. One RouteTok capability probe passed; full matched live branches remain optional and must fit a fresh reservation.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 1.99996208, 129 dispatches, 249,504 reserved/settled tokens, under 40 minutes; sanitized audit `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`; no uncertain dispatch IDs.
@@ -33,7 +33,10 @@
 | P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
 | P2.4 | accepted | `5d27a9f` | reviewed E2E 2; E2E typecheck; independent review accepted | browser paths and evidence propagation committed | full shared live envelope unused |
 | P2.5 | accepted | `980ee96` | runner guard tests 22; scripts typecheck; RouteTok probe passed (1 reserved/settled call) | runner/docs and RouteTok policy committed; sanitized audit external | USD 1.99996208; 129 calls; 249,504 tokens |
-| P2.6 | in-progress | | deterministic observations/live status report pending | | USD 1.99996208; 129 calls; 249,504 tokens |
+| P2.6 | accepted | `f3c14d2` | observations test; server typecheck; independent review accepted; RouteTok capability probe documented | Plan 3 source/oracle handoff committed | USD 1.99996208; 129 calls; 249,504 tokens |
+| P2 | accepted | `f3c14d2` | P2.1-P2.6 deterministic gates accepted; live probe capability-only | reviewed fixture/report/corpus committed | USD 1.99996208; 129 calls; 249,504 tokens |
+| P3.1 | blocked | | review found missing barrel/index, unverifiable byte counters, and restricted totals leakage | P3.1 corrections pending | USD 1.99996208; 129 calls; 249,504 tokens |
+| P3.2 | blocked | | review found conflated source IDs, no alternate timeline, flattened source authority, insufficient reopen coverage | P3.2 corrections pending | USD 1.99996208; 129 calls; 249,504 tokens |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
