@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 blocked at P2.F Director map retention
-- Last accepted milestone and commit: P2.F Travel UI wiring, `dc203ee`
-- Next small assignment: identify why closing Director remounts Campaign maps in reviewed table flow
+- Active plan/milestone: Plan 2 blocked at P2.F browser objective-evidence parity
+- Last accepted milestone and commit: P2.F Director map retention, `5d65d98`
+- Next small assignment: compare browser objective receipt/progress sources with the passing HTTP oracle to explain absent bound Lens candidate
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
@@ -31,8 +31,9 @@
 | P2.F.2 | accepted | `609fbf5` | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
 | P2.F combat | accepted | `227b926` | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs committed | full shared live envelope unused |
 | P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
-| P2.4 | blocked | | normal quest acceptance and Travel pass; closing Director disconnects Campaign maps | P2.F map-retention evidence recorded | full shared live envelope unused |
-| P2.F map | in-progress | | drawer/map remount investigation pending | scope amendment in ledger | full shared live envelope unused |
+| P2.4 | blocked | | browser sends evidence after Hear/Secure objectives, but planning table lacks bound Lens candidate | P2.F browser/objective evidence parity recorded | full shared live envelope unused |
+| P2.F browser evidence | in-progress | | browser objective receipt/progression versus HTTP oracle investigation pending | scope amendment in ledger | full shared live envelope unused |
+| P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
 | P2.F.3 | in-progress | | negotiation-capable fixture profile decision pending | scope amendment in ledger | full shared live envelope unused |
@@ -57,6 +58,12 @@ Amendment: P2.4 found owner completion is implemented only through `PATCH /campa
 Amendment: P2.4 rerun found the normal Living Atlas Travel drawer opens but `CampaignPlayPage` takes its unavailable-world-services path, so `WorldExplorerPage` and its Eligible route review control do not mount. Do not use HTTP travel as browser coverage. Inspect existing world service API composition and wire it narrowly into the play page; no new travel authority or candidate API is authorized.
 
 Amendment: P2.4 browser path now reaches normal quest acceptance and Travel review/confirm, but opening then closing Director disconnects the pre-existing Campaign maps region. This violates map retention; preserve map/conversation mount identity across drawer transitions without changing travel/director authority.
+
+Amendment: P2.4 full human path reaches accepted quest and normal Travel to Keeper House, but the first post-travel objective declaration renders no `Approve selected batch`. The browser cannot confirm an objective action, blocking bound Lens/Finale progression, custom claim, and owner completion. Investigate existing objective candidate-to-composer confirmation wiring; do not add a hidden HTTP action or generic objective UI.
+
+Evidence update: exact quest-objective selection is intentionally confirmation-never, so the browser harness now asserts its direct SSE terminal receipt rather than a batch. After that completed Secure Lens objective, normal Director Continue with an exact fake `Resolve bound scene: Lens Recovered` planner selection still renders no `Approve exact proposal`. Investigate transcript/evidenceTurn propagation and human Director proposal state; no hidden HTTP resolution is authorized.
+
+Evidence update: the client now sends the completed original turn ID and the browser performs Hear Keeper then Secure Lens in order, but the server planning table still lacks the exact `Resolve bound scene: Lens Recovered` candidate. Compare the persisted browser objective receipts/progress with the passing HTTP journey before changing authority or browser coverage.
 
 Assignment: P2.F.2 optional encounter fixture variant
 Goal: add a journey-only reviewed fixture option that does not pre-create the optional encounter, while retaining the existing P2.1 default fixture and all unearned-state guarantees.

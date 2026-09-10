@@ -477,7 +477,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
         <CampaignDmPanel key={`dm:${campaignId}:${sessionId}:${authorizationGeneration}`} bootstrap={bootstrap} api={api.dm}
           blocked={sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked || !["idle", "terminal"].includes(phase)}
           canAct={authorizationCanAct} onHistory={setDmHistory} onLockChange={setDmLocked} onStateChange={refreshAfterTool}
-          evidenceTurnId={transcriptState === "ready" && transcript.at(-1)?.turnId === turn?.turn.turnId && turn?.turn.state === "completed" && turn.turn.mode === "original" && turn.receipts.length > 0 && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId ? turn.turn.turnId : undefined} />
+          evidenceTurnId={turn?.turn.state === "completed" && turn.turn.mode === "original" && turn.turn.campaignId === campaignId && turn.turn.sessionId === sessionId ? turn.turn.turnId : undefined} />
       </AtlasDrawer>
       <div id="atlas-character" className="atlas-drawer-slot atlas-character-reference" hidden={activeTool !== "character"}>
         <nav className="atlas-character-actions" aria-label="Character mechanics"><button type="button" onClick={() => openTool("inventory")}>Inventory & equipment</button><button type="button" onClick={() => openTool("advancement")}>Advancement</button></nav>
