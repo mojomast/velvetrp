@@ -4,7 +4,7 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defaultHarnessSettings } from "../server/src/defaults.js";
-import { completeWithProvider, type ProviderCompletionInput, type ProviderCompletionResult } from "../server/src/provider/index.js";
+import { completeWithProvider, ProviderConfigurationError, type ProviderCompletionInput, type ProviderCompletionResult } from "../server/src/provider/index.js";
 import { getProviderSettings } from "../server/src/repo/index.js";
 import { getPromptPreset } from "../server/src/presets.js";
 import { adventureProviderPromptEstimate } from "../server/src/agent/adventureOrchestrator.js";
@@ -62,7 +62,7 @@ export async function runReviewedAdventure(options: RunnerOptions): Promise<Runn
   try { reserve(ledger, promptTokens, completionTokens); } catch (error) { ledger.state = "failed"; ledger.audit.push(`reservation refused: ${error instanceof Error ? error.message : "error"}`); await save(options.ledger, ledger); throw error; }
   ledger.audit.push("capability probe reservation recorded before dispatch"); await save(options.ledger, ledger);
   let result: ProviderCompletionResult;
-  try { result = await (options.complete ?? completeWithProvider)(probe); } catch (error) { ledger.state = "unknown"; ledger.audit.push(`dispatch outcome unknown: ${error instanceof Error ? error.name : "error"}`); await save(options.ledger, ledger); throw error; }
+  try { result = await (options.complete ?? completeWithProvider)(probe); } catch (error) { ledger.state = error instanceof ProviderConfigurationError ? "failed" : "unknown"; ledger.audit.push(error instanceof ProviderConfigurationError ? "provider configuration rejected before transport" : `dispatch outcome unknown: ${error instanceof Error ? error.name : "error"}`); await save(options.ledger, ledger); throw error; }
   try { settle(ledger, result.usage); } catch (error) { ledger.state = "failed"; ledger.audit.push(`reported usage over-budget: ${error instanceof Error ? error.message : "error"}`); await save(options.ledger, ledger); throw error; }
   ledger.state = "complete"; ledger.audit.push("one configured-provider capability dispatch completed"); await save(options.ledger, ledger); return ledger;
 }

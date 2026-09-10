@@ -1,6 +1,7 @@
 import type { ProviderSettings } from "../types.js";
 
 const SUPPORTED_HOSTED_PROVIDER_HOSTS = new Set(["api.openai.com", "openrouter.ai", "router.requesty.ai", "requesty.ai"]);
+const AUTHORIZED_HTTP_PROVIDER = { hostname: "100.72.41.9", port: "8787", pathname: "/v1" } as const;
 
 function providerHostname(baseUrl: string): string | null {
   try {
@@ -8,6 +9,18 @@ function providerHostname(baseUrl: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** The sole non-loopback HTTP provider endpoint authorized for live validation. */
+function isAuthorizedHttpProvider(url: URL): boolean {
+  return url.protocol === "http:"
+    && url.hostname === AUTHORIZED_HTTP_PROVIDER.hostname
+    && url.port === AUTHORIZED_HTTP_PROVIDER.port
+    && url.pathname.replace(/\/+$/, "") === AUTHORIZED_HTTP_PROVIDER.pathname
+    && !url.search
+    && !url.hash
+    && !url.username
+    && !url.password;
 }
 
 /** Returns whether a hostname identifies a loopback-only destination. */
@@ -27,8 +40,8 @@ export function validateProviderBaseUrl(baseUrl: string): { ok: true } | { ok: f
     return { ok: false, reason: "baseUrl is not a valid URL" };
   }
   if (url.protocol === "https:") return { ok: true };
-  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return { ok: true };
-  return { ok: false, reason: "baseUrl must use https, or http only for loopback hosts (localhost, 127.x, ::1)" };
+  if (url.protocol === "http:" && (isLoopbackHost(url.hostname) || isAuthorizedHttpProvider(url))) return { ok: true };
+  return { ok: false, reason: "baseUrl must use https, http loopback, or the exact authorized live-validation endpoint" };
 }
 
 /**
@@ -46,20 +59,22 @@ export function canUseProvider(provider: ProviderSettings): boolean {
     baseUrl
       && hostname
       && validateProviderBaseUrl(baseUrl).ok
-      && (!SUPPORTED_HOSTED_PROVIDER_HOSTS.has(hostname) || provider.apiKey.trim()),
+       && (!(SUPPORTED_HOSTED_PROVIDER_HOSTS.has(hostname) || (() => { try { return isAuthorizedHttpProvider(new URL(baseUrl)); } catch { return false; } })()) || provider.apiKey.trim()),
   );
 }
 
 /**
  * Builds scoped provider headers without sending credentials to arbitrary hosts.
- * Credentials are limited to exact supported hosted hosts and loopback; this
+ * Credentials are limited to exact supported hosted hosts, loopback, and the
+ * one authorized live-validation endpoint; this
  * function intentionally does not authorize hosted-provider subdomains.
  */
 export function buildProviderHeaders(baseUrl: string, provider: ProviderSettings): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const hostname = providerHostname(baseUrl);
   if (!hostname) return headers;
-  if (provider.apiKey.trim() && (SUPPORTED_HOSTED_PROVIDER_HOSTS.has(hostname) || isLoopbackHost(hostname))) {
+  let authorizedHttp = false; try { authorizedHttp = isAuthorizedHttpProvider(new URL(baseUrl.trim())); } catch { /* invalid URLs never receive credentials */ }
+  if (provider.apiKey.trim() && (SUPPORTED_HOSTED_PROVIDER_HOSTS.has(hostname) || isLoopbackHost(hostname) || authorizedHttp)) {
     headers.Authorization = `Bearer ${provider.apiKey.trim()}`;
   }
   if (hostname === "openrouter.ai" || isLoopbackHost(hostname)) {
