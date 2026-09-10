@@ -1,6 +1,6 @@
 # Plan 3: Inspectable, measured memory
 
-Status: planned, not implemented. Researched against `9e5f1b7`.
+Status: implemented; deterministic gates accepted. Optional matched live reading-quality comparison was not dispatched.
 
 Prerequisites: [Plan 1](plan-1-campaign-readiness.md) and
 [Plan 2](plan-2-reviewed-adventure.md) accepted, with committed observation oracles.

@@ -51,6 +51,8 @@ SQLite fits existing persistence and authorization ownership and avoids another 
 
 ## Privacy before retrieval
 
+The measured runtime correction is deliberately narrower than a temporal parser: only a retained query term `now` also matches the whole source term `current`. It does not globally prefer recent records or expand any other query term. Development MRR/nDCG improved from `0.75`/`0.7651072792582452` to `0.7692307692307693`/`0.779302288736266`; frozen holdout MRR/nDCG improved from `0.5`/`0.5436432511904858` to `0.6666666666666666`/`0.6666666666666666`. Recall, privacy, negative, packing, and hydration rates remained `1`.
+
 The repository obtains a current authorized audience snapshot before searching. SQL candidate eligibility applies campaign, actor, timeline, recap visibility, and source-specific disclosure before matching/ranking; receipt readers further validate hydrated outcomes. Public adventure narration requires a player audience; director purposes require a DM audience. Owner invocation does not remove the player actor filter or expose GM-only recaps. Authorization is read again on each call; there is no reusable search cache or new forgetting API.
 
 Public narration context excludes private target facts. Director narration gets only eligible public director outcomes, not private planning or prior presentation. These are source/access boundaries, not a complete in-world NPC knowledge model. Future aliases, summaries, caches, FTS statistics, and vectors would need the same pre-ranking visibility policy and invalidation; none is implemented here.

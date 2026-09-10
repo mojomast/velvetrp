@@ -23,6 +23,10 @@ test("uses production recall ordering, hydrated source kinds, and packet limits"
     process.env.VELVET_DATA_DIR = directory; closeRepo(); const fixture = await createMemoryEvalFixture(directory);
     const recall = () => fixture.repo.getCampaignRecall("local-owner", { campaignId: fixture.campaign.id, sessionId: fixture.session.id, audience: { kind: "player", actorId: fixture.actors.aster }, query: "beacon status", purpose: "public-narration" })!;
     const first = recall();
+    const current = fixture.repo.getCampaignRecall("local-owner", { campaignId: fixture.campaign.id, sessionId: fixture.session.id, audience: { kind: "player", actorId: fixture.actors.aster }, query: "What is the beacon status now?", purpose: "public-narration" })!;
+    assert.equal(current.hits[0]?.sourceId, fixture.sourceIds["current:beacon"]);
+    const historical = fixture.repo.getCampaignRecall("local-owner", { campaignId: fixture.campaign.id, sessionId: fixture.session.id, audience: { kind: "player", actorId: fixture.actors.aster }, query: "What was the earlier dim beacon?", purpose: "public-narration" })!;
+    assert.equal(historical.hits[0]?.sourceId, fixture.sourceIds["past:beacon"]);
     fixture.repo.createAdventureTurn("local-owner", { campaignId: fixture.campaign.id, sessionId: fixture.session.id, timelineId: fixture.repo.getCampaign("local-owner", fixture.campaign.id)!.activeTimelineId, actorId: fixture.actors.aster, declaration: "beacon status distraction: the older beacon was dim.", expectedCampaignRevision: fixture.repo.getCampaignAdministration("local-owner", fixture.campaign.id)!.revision, idempotencyKey: "memory-eval-script:reorder" });
     const second = recall();
     assert.ok(second.hits.some(hit => hit.sourceId === fixture.sourceIds["current:beacon"]));

@@ -183,6 +183,14 @@ describe("bounded source-attributed campaign recall", () => {
     declare(f, "Remember the jade raven", "survives");
     f.repo.close();
     const db = database();
+    db.exec(`DROP TRIGGER campaign_context_inspection_sources_v61_replace;
+      DROP TRIGGER campaign_context_inspection_sources_v61_delete;
+      DROP TRIGGER campaign_context_inspection_sources_v61_update;
+      DROP TRIGGER campaign_context_inspection_headers_v61_replace;
+      DROP TRIGGER campaign_context_inspection_headers_v61_delete;
+      DROP TRIGGER campaign_context_inspection_headers_v61_update;
+      DROP TABLE campaign_context_inspection_sources_v61;
+      DROP TABLE campaign_context_inspection_headers_v61;`);
     db.exec("DROP TABLE adventure_narration_contexts");
     db.close();
     const repo = createRepository(f.options);

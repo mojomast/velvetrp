@@ -1,12 +1,14 @@
 # Velvet RPG Integration Plan (Original/Historical)
 
+The current boundary retains one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2 and other narrowly recognized exact predecessor upgrades.
+
 ## Current status (disposable schema; original plan retained as history)
 
 > **Normative current sources:** [ROADMAP.md](ROADMAP.md) owns milestone status and next work, [api.md](api.md) owns the current HTTP contract, and [repo-architecture.md](repo-architecture.md) owns current repository structure and dependency rules. This document preserves the original integration design and historical implementation ledgers; the normative sources win for current behavior.
 
 The canonical current engineering handoff is lowercase [`handoff.md`](../handoff.md).
 
-- Current development persistence uses **one disposable schema with only the exact pre-grounding tactical-map upgrade to map v2 and exact campaign-director predecessor upgrades**, with **145 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
+- Current development persistence uses **one disposable schema with narrowly recognized exact predecessor upgrades**, with **147 counted explicit trusted-local RPG HTTP operations** plus separately classified feature discovery. The boundary remains fixed unauthenticated `local-owner` loopback-only authority; it is not a remote-safe or multi-user identity boundary.
 - Milestones **M1-M3, M4.1-M4.6, and M5.1 are complete**. Later delivered slices include companion transport, bounded consumables, exact travel, character rerolls, reviewed campaign expansion, starter/reward/placement settlement, and explicit material publication. Remaining integration and exclusions are statused only by [ROADMAP.md](ROADMAP.md).
 - The v37r1/M2.11 description of deterministic fallback narration, no provider tool bridge, and review-only campaign drafts is historical. M4 subsequently delivered campaign-aware context, the bounded provider/tool and deterministic command bridge, durable confirmation/resume, receipt-aware narration, and reviewed encounter and campaign-content generation/application.
 - Historical migration notes below describe earlier checkpoints only. Current startup accepts the exact current schema or narrowly recognized tactical-map and campaign-director predecessors, validates each upgrade before commit, and rolls back on failure. Director recognition covers exact pre-director schemas with or without map v2 and exact review-authority/narration predecessors, not arbitrary partial upgrades. Every other unknown or partially upgraded schema rejects without repairs; other schema changes require database recreation. See [Operations](operations.md#data-directory-and-current-schema).

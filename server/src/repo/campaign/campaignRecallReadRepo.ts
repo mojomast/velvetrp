@@ -70,7 +70,8 @@ export function createCampaignRecallReadRepository(db: DatabaseDriver.Database, 
       db.function("velvet_recall_score", { deterministic: true }, (value: unknown) => {
         if (typeof value !== "string") return 0;
         const text = ` ${normalize(value)} `;
-        const count = terms.filter(term => text.includes(` ${term} `)).length;
+        const count = terms.filter(term => text.includes(` ${term} `)
+          || (term === "now" && text.includes(" current "))).length;
         return count ? count * 10 + (text.includes(` ${terms.join(" ")} `) ? 20 : 0) : 0;
       });
       const dm = input.audience.kind === "dm";
