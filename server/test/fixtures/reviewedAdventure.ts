@@ -112,7 +112,7 @@ const reviewedContent = {
   scenePrompts: [{ key: "sentinel-preparation", title: "Sentinel preparation", prompt: REVIEWED_ADVENTURE_PRIVATE_SENTINEL, visibility: "gm" as const, locationKey: "breakwater-cave", npcKeys: [] }],
 };
 
-export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR, options: { prepareOptionalEncounter?: boolean; rng?: { integer(minimum: number, maximum: number): number }; clock?: { now(): Date } } = {}): Promise<{
+export async function createReviewedAdventure(targetDirectory = process.env.VELVET_DATA_DIR, options: { activateRoom?: boolean; prepareOptionalEncounter?: boolean; rng?: { integer(minimum: number, maximum: number): number }; clock?: { now(): Date } } = {}): Promise<{
   repo: ReturnType<typeof createRepository>;
   campaignId: string;
   sessionId: string;
@@ -158,10 +158,12 @@ export async function createReviewedAdventure(targetDirectory = process.env.VELV
   if (applied.statusCode !== 200) throw new Error(`reviewed application failed: ${applied.body}`);
   const administration = repo.getCampaignAdministration(OWNER, campaign.id)!;
   repo.updateCampaignAdministration(OWNER, campaign.id, { status: "published", expectedRevision: administration.revision, idempotencyKey: "harbor-publish" });
-  const activationInspection = repo.getCampaignRoomActivationReadiness(OWNER, campaign.id, session.id);
-  if (!activationInspection.ready) throw new Error(`reviewed room is not activation-ready: ${activationInspection.blockers.join(",")}`);
-   const activation = repo.activateCampaignRoom(OWNER, campaign.id, session.id, { expectedRevision: activationInspection.expectedRevision, idempotencyKey: "harbor-activate" });
-   if (!activation.readiness.ready) throw new Error("reviewed room did not activate");
+   const activationInspection = repo.getCampaignRoomActivationReadiness(OWNER, campaign.id, session.id);
+   if (!activationInspection.ready) throw new Error(`reviewed room is not activation-ready: ${activationInspection.blockers.join(",")}`);
+   if (options.activateRoom !== false) {
+    const activation = repo.activateCampaignRoom(OWNER, campaign.id, session.id, { expectedRevision: activationInspection.expectedRevision, idempotencyKey: "harbor-activate" });
+    if (!activation.readiness.ready) throw new Error("reviewed room did not activate");
+   }
    const inventory = repo.getActorInventorySnapshot(OWNER, campaign.id, actorId);
    if (!inventory) throw new Error("reviewed actor inventory is unavailable");
    const longswords = inventory.inventory.items.filter(item => item.kind === "instanced" && item.item.definitionId === "srd-5.1:item:longsword");
