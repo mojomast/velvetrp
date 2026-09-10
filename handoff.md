@@ -3,7 +3,7 @@
 ## Current Baseline
 
 - Persistence: one current disposable development schema; schema changes require deleting/recreating `velvet.sqlite` except for narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessors. Director upgrades also recognize exact review-authority/narration predecessors, preserving historical rows and cancelling pending planning/approval runs during the review-authority upgrade. The new third SQL asset adds immutable adventure narration dispatch context; exact older director/map upgrades install it within their validated transaction when absent. Complete startup validation precedes commit and failure rolls back; every other unknown or partially upgraded schema rejects without repair.
-- HTTP: 145 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
+- HTTP: 147 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
 - Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
 
@@ -20,12 +20,14 @@ Commit `11e0107` (`feat(rpg): add Living Atlas and AI campaign director`) is the
 - Targeted server run: 71 passed, with one documentation timeout; the focused rerun passed all 7 tests. The full server suite was not rerun after a prior 15-minute timeout; no current full-server green claim is made.
 - `npm run typecheck`: all workspaces pass.
 - Final focused E2E: all 12 director/control-plane/combat-map/session-recovery tests pass.
-- Documentation inventory: 145 counted explicit operations plus separately classified feature discovery; the strict documentation drift check is known passing.
+- Documentation inventory: 147 counted explicit operations plus separately classified feature discovery; the strict documentation drift check is known passing.
 - Playability Plan 1 is complete through P1.6: `CampaignDmReadinessResponse` v1.0, `GET /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness`, owner/GM-only private no-store projection, and the explicit Director `Inspect preparation` UI. It is provider-free, read-only, bounded, and not an activation gate or solvability proof. Plan 2 must preserve its optional/private and awaiting-play-evidence warnings.
 
 These are the supplied accumulated-work validation results, not fresh full-suite runs from the docs-only audit. Before commit, select intended files explicitly: `.opencode/skills/seed-test-campaign/` and `server/test/two-player-gameplay-api.test.ts` must remain untracked. The audit does not stage or commit files.
 
 ## Current Work: Bounded Campaign Memory
+
+Plan 3 is deterministically complete in the working tree. It adds exact four-lane immutable dispatch provenance, GM-only no-store reference/inspection GETs, a bounded Director inspector, browser no-replay acceptance, and a measured query-bounded `now`/`current` retrieval correction. The optional matched live reading-quality comparison was not dispatched; the prior RouteTok capability probe remains the only live evidence.
 
 The working tree adds source-attributed direct SQLite recall, immutable epistemic prompts, independently bounded recent history, assembly/dispatch integration, and the `adventure_narration_contexts` sidecar in `recallSchema.sql`. This sidecar freezes dispatched narration context/request; it is not searchable memory or new campaign truth. Exact pre-recall migration preserves durable data, and recognized director/map predecessors retain their existing upgrade semantics.
 

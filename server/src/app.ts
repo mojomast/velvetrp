@@ -31,6 +31,7 @@ interface NormalizedCampaignResourceRoute {
   mechanics?: boolean;
   combat?: boolean;
   noStore?: boolean;
+  privateNoStore?: boolean;
 }
 
 interface RequestLogInput {
@@ -250,6 +251,26 @@ function normalizedCampaignResourceRoute(method: string, rawUrl: string): Normal
         ? "Campaign rooms do not accept query parameters"
         : method === "PUT" ? "Campaign room attachment does not accept query parameters" : null,
       noStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/context-inspection\/references\/[^/]+\/[^/]+$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/context-inspection/references/:sourceKind/:sourceId",
+      hasQuery,
+      queryDetail: method === "GET" ? "Campaign context inspection does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+      privateNoStore: true,
+    };
+  }
+  if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/context-inspection\/[^/]+\/[^/]+$/.test(instance)) {
+    return {
+      instance: "/api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/context-inspection/:lane/:dispatchId",
+      hasQuery,
+      queryDetail: method === "GET" ? "Campaign context inspection does not accept query parameters" : null,
+      mechanics: true,
+      noStore: true,
+      privateNoStore: true,
     };
   }
   if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/dm\/preparation-readiness$/.test(instance)) {
@@ -555,7 +576,7 @@ export function buildApp(options: {
         // Normalize only reviewed campaign resource shapes and set correlation
         // before the ordinary onRequest hook has had a chance to run.
         reply.raw.setHeader("x-request-id", request.id);
-        if (normalizedRoute.noStore === true) reply.raw.setHeader("cache-control", "no-store");
+        if (normalizedRoute.noStore === true) reply.raw.setHeader("cache-control", normalizedRoute.privateNoStore ? "private, no-store" : "no-store");
         const flags = readRpgFeatureFlags();
         if (!flags.campaign || (normalizedRoute.mechanics === true && !flags.mechanics)
             || (normalizedRoute.combat === true && !flags.combat)
@@ -738,6 +759,13 @@ export function buildApp(options: {
   app.setNotFoundHandler((request, reply) => {
     const rawUrl = request.raw.url ?? request.url;
     const instance = rawUrl.split("?", 1)[0]!;
+    if (/^\/api\/rpg\/v1\/campaigns\/[^/]+\/rooms\/[^/]+\/context-inspection\//.test(instance)) {
+      reply.header("cache-control", "private, no-store");
+      const normalized = normalizedCampaignResourceRoute(request.method, rawUrl);
+      return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found", {
+        instance: normalized?.instance ?? instance,
+      });
+    }
     const consumable=normalizedCampaignResourceRoute(request.method,rawUrl);
     if(consumable?.instance.startsWith("/api/rpg/v1/combats/:combatId/consumable-actions")){
       reply.header("cache-control","no-store");

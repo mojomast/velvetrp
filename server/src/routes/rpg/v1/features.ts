@@ -148,6 +148,8 @@ import { tacticalMapHttpRoutes } from "./tacticalMaps.js";
 import type { TacticalMapRepository } from "../../../repo/tacticalMapRepo.js";
 import type { CampaignAdministrationIntegrationRepository } from "../../../repo/campaignAdministrationIntegrationRepo.js";
 import { campaignAdministrationIntegrationsHttpRoutes } from "./campaignAdministrationIntegrations.js";
+import { campaignContextInspectionHttpRoutes } from "./campaignContextInspection.js";
+import type { CampaignContextInspectionReadRepository } from "../../../repo/campaign/campaignContextInspectionReadRepo.js";
 
 /** Shared lazy repository shape from which each RPG HTTP lane selects a narrow capability set. */
 export interface CampaignListRepository extends
@@ -191,6 +193,8 @@ export interface CampaignListRepository extends
   getCampaignPlayBootstrap?: Repository["getCampaignPlayBootstrap"];
   activateCampaignRoom?: Repository["activateCampaignRoom"];
   getCampaignRoomActivationReadiness?: Repository["getCampaignRoomActivationReadiness"];
+  inspectCampaignContext?: CampaignContextInspectionReadRepository["inspectCampaignContext"];
+  resolveCampaignContextInspectionDispatchReferences?: CampaignContextInspectionReadRepository["resolveCampaignContextInspectionDispatchReferences"];
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
   createAdventureTurn?: AdventureTurnRepository["createAdventureTurn"];
   waitForToolConfirmation?: AdventureTurnRepository["waitForToolConfirmation"];
@@ -773,6 +777,12 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(campaignPlayHttpRoutes, { campaignPlayRepositoryAccessor });
   await app.register(campaignDmHttpRoutes, { repositoryAccessor: () => getCampaignRepository() as Repository,
     ...(options.adventureAgentDependencies ? { agentDependencies: options.adventureAgentDependencies } : {}) });
+  await app.register(campaignContextInspectionHttpRoutes, { repositoryAccessor: () => {
+    const repository = getCampaignRepository();
+    if (typeof repository.inspectCampaignContext !== "function"
+      || typeof repository.resolveCampaignContextInspectionDispatchReferences !== "function") throw new UnsupportedCampaignRepositoryError();
+    return repository as CampaignListRepository & CampaignContextInspectionReadRepository;
+  } });
   await app.register(campaignStartingLocationHttpRoutes, { startingLocationRepositoryAccessor });
   await app.register(campaignRoomActivationHttpRoutes, { activationRepositoryAccessor: () => {
     const repository = getCampaignRepository();
@@ -1576,7 +1586,8 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   app.setNotFoundHandler((request, reply) => {
     // Scoped misses include unsupported methods (including Fastify's implicit
     // HEAD/OPTIONS paths); none may be cached differently from RPG resources.
-    reply.header("cache-control", "no-store");
+    reply.header("cache-control", (request.raw.url ?? request.url).includes("/context-inspection/")
+      ? "private, no-store" : "no-store");
     return sendApiProblem(request, reply, 404, "RPG_ROUTE_NOT_FOUND", "RPG route not found");
   });
 };
