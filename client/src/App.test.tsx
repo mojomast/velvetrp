@@ -497,6 +497,7 @@ describe("persistence and multi-character frontend", () => {
   it("opens a mechanics-enabled campaign room in authoritative play with read-only legacy history", async () => {
     const attached = { sessionId: baseSession.id, title: "Night watch", participantNames: [aria.name], createdAt: baseSession.createdAt, attachedAt: "2030-01-03T00:00:00.000Z", stopped: false };
     const playBootstrap = { dm: { mode: "human", revision: 0 }, campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: attached.attachedAt, active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
+    const world = { currentLocations: [{ actorId: "actor", locationId: "harbor", revision: 0, updatedAt: attached.attachedAt }], visibleLocations: [{ locationId: "harbor", parentLocationId: null, name: "Harbor", description: "Salt air" }, { locationId: "road", parentLocationId: null, name: "Road", description: "Inland" }], visibleConnections: [{ connectionId: "route", fromLocationId: "harbor", toLocationId: "road" }] };
     installFetch([aria], [baseSession], true, true);
     routes.push(
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
@@ -506,7 +507,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify(world), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
@@ -518,6 +519,9 @@ describe("persistence and multi-character frontend", () => {
     expect(screen.queryByLabelText(/Message for/)).toBeNull(); expect(screen.getByLabelText("What do you do?")).toBeTruthy();
     await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
     const storedPlay = JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}"); expect(storedPlay.selectedIds).toBeUndefined(); expect(storedPlay.primaryId).toBeUndefined();
+    fireEvent.click(screen.getByRole("button", { name: "Travel" }));
+    await screen.findByRole("heading", { name: "World explorer" });
+    expect(screen.getByLabelText("Eligible route")).toBeTruthy();
   });
 
   it("restores a persisted adventure turn through the play page and preserves its locator", async () => {

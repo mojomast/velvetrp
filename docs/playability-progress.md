@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 / P2.F, owner campaign completion UI
-- Last accepted milestone and commit: P2.3 interruption/recovery boundaries, `bbcbae3`
-- Next small assignment: add a narrow owner-only campaign completion control over the existing administration PATCH
+- Active plan/milestone: Plan 2 blocked at P2.F Travel UI wiring
+- Last accepted milestone and commit: P2.F owner completion UI, `ffecbc5`
+- Next small assignment: inspect and wire existing world services into Living Atlas Travel for reviewed browser routes
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
@@ -31,8 +31,9 @@
 | P2.F.2 | accepted | `609fbf5` | reviewed fixture 4; server typecheck; independent review accepted | scope amendment in ledger | full shared live envelope unused |
 | P2.F combat | accepted | `227b926` | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs committed | full shared live envelope unused |
 | P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
-| P2.4 | blocked | | owner completion exists only as administration PATCH; no normal browser control | P2.F UI evidence recorded | full shared live envelope unused |
-| P2.F UI | in-progress | | owner completion UI/validation pending | scope amendment in ledger | full shared live envelope unused |
+| P2.4 | blocked | | Living Atlas Travel renders unavailable-world-services; no route review UI | P2.F Travel wiring evidence recorded | full shared live envelope unused |
+| P2.F Travel | in-progress | | existing world-service client wiring investigation pending | scope amendment in ledger | full shared live envelope unused |
+| P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
 | P2.F.3 | in-progress | | negotiation-capable fixture profile decision pending | scope amendment in ledger | full shared live envelope unused |
 
 ## Next agent task
@@ -51,6 +52,8 @@ Evidence: D&D `legalCombatActions` requires `resolveSrdEquipment(...).weapon` be
 P2.F combat handoff: `class-starter-kit` is item-only. The exact SRD Fighter kit appends one pinned longsword through shared preview/finalization grant derivation, durable grant materialization, finalization receipt, and exact predecessor schema migration. The reviewed fixture equips that entry only through `mutateInventoryForActor` with current revision and an idempotency key. Terminal combat/reward proof passes in human/AI without fixture SQL stock. P2.2 completes the final objective evidence, one-time bound scenes, custom claim with no economy effect, explicit owner completion, and true reopen/reload with no extra dispatch.
 
 Amendment: P2.4 found owner completion is implemented only through `PATCH /campaigns/:id/administration`, with no normal browser control. Add a narrow owner-only completion control using existing typed administration transport, explicit confirmation, current revision, idempotency, receipt/reload reconciliation, and no new lifecycle API. Do not let GM/player/observer complete a campaign or add a generic admin panel.
+
+Amendment: P2.4 rerun found the normal Living Atlas Travel drawer opens but `CampaignPlayPage` takes its unavailable-world-services path, so `WorldExplorerPage` and its Eligible route review control do not mount. Do not use HTTP travel as browser coverage. Inspect existing world service API composition and wire it narrowly into the play page; no new travel authority or candidate API is authorized.
 
 Assignment: P2.F.2 optional encounter fixture variant
 Goal: add a journey-only reviewed fixture option that does not pre-create the optional encounter, while retaining the existing P2.1 default fixture and all unearned-state guarantees.

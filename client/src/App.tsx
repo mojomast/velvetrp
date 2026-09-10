@@ -658,7 +658,7 @@ export default function App() {
       <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
         authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
         onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading={combatReturnView !== "campaign-play"} combatAvailable={combatAvailable} combatApi={combatTrackerApi}
-        authorization={authorization} worldApi={narrativeStudioAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}
+        authorization={authorization} worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}
         onBack={returnToCampaign} onUnavailable={returnToCampaign} legacyMessages={messages} legacyParticipants={session.participants} />}
     </CampaignAuthorizationGate>;
   }
