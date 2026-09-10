@@ -72,3 +72,21 @@ The oracle does not claim supported active-combat retreat, durable social
 agreement from a successful check, arbitrary settlement from a custom reward, or
 campaign completion from narration. P2.2 must execute these branches over the
 production HTTP/SSE path with deterministic rolls and fake completions.
+
+## Deterministic Evidence And Plan 3 Sources
+
+The completed deterministic evidence is journey oracle `13`, recovery boundaries
+`6`, and isolated browser paths `2`. `server/test/fixtures/playability-observations.ts`
+defines stable Plan 3 recall probes for attempted/fulfilled tasks, failed
+negotiation and alternate, Keeper Maren's statement, clue timing, reward claim
+state, past/current location, post-finale callback, and unsupported negatives.
+Each probe names its source kind, authority, audience, timeline, supported fact,
+and forbidden inference; it is not a raw transcript or private-state export.
+
+## Live Capability Status
+
+The only live validation is a RouteTok solar-model capability probe: one call,
+reserved/settled `496` tokens and USD `0.00003792`, with `67` reported tokens.
+It is not a branch-quality result, contains no raw trace, prompt, URL, credential,
+or provider response, and human review remains pending. See
+`docs/reviewed-adventure-report-template.md` for the sanitized report envelope.

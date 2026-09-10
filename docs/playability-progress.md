@@ -2,12 +2,12 @@
 
 ## Current checkpoint
 - Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 2 / P2.5 configured-provider envelope completion
-- Last accepted milestone and commit: P2.4 reviewed browser table paths, `5d27a9f`
-- Next small assignment: add aggregate reservation, unit-safe cost/token accounting, durable preflight audit, and matched-path plan to runner
+- Active plan/milestone: Plan 2 / P2.6 provider-free observations and Plan 3 corpus handoff
+- Last accepted milestone and commit: P2.5 RouteTok runner policy, `980ee96`
+- Next small assignment: record deterministic reviewed observations/source oracles and live pilot status without raw traces
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
-- Blockers and decision required: none; P2.2 accepted. No provider calls authorized or required yet.
-- Live budget remaining / audit path / uncertain dispatch IDs: USD 2.00, 130 dispatches, 250,000 reserved/settled tokens, 40 minutes; no live dispatches; no audit IDs
+- Blockers and decision required: none. One RouteTok capability probe passed; full matched live branches remain optional and must fit a fresh reservation.
+- Live budget remaining / audit path / uncertain dispatch IDs: USD 1.99996208, 129 dispatches, 249,504 reserved/settled tokens, under 40 minutes; sanitized audit `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`; no uncertain dispatch IDs.
 
 ## Interface handoffs
 - P1 readiness DTO, codes, API, coverage, and expected warnings: v1.0 `CampaignDmReadinessResponse`; fixed-safe issue taxonomy; private GET `/campaigns/:campaignId/rooms/:sessionId/dm/preparation-readiness`; 128 issues, labels <=200, explanations <=800, exact ten bounded coverage families; activation revision remains separate; expected warnings include optional/private resources and prepared bindings awaiting committed evidence; no solvability inference.
@@ -32,7 +32,8 @@
 | P2.F combat | accepted | `227b926` | contracts, migration/builder 27, fixture 4, journey 13, server typecheck/build; independent review accepted | authoritative grant policy and fixture docs committed | full shared live envelope unused |
 | P2.3 | accepted | `bbcbae3` | recovery 6; server typecheck; independent review accepted | fixture hook and recovery coverage committed | full shared live envelope unused |
 | P2.4 | accepted | `5d27a9f` | reviewed E2E 2; E2E typecheck; independent review accepted | browser paths and evidence propagation committed | full shared live envelope unused |
-| P2.5 | blocked | | runner audit lacks aggregate reservation/cost/accounting and matched reviewed path envelope | P2.5 audit findings recorded | full shared live envelope unused |
+| P2.5 | accepted | `980ee96` | runner guard tests 22; scripts typecheck; RouteTok probe passed (1 reserved/settled call) | runner/docs and RouteTok policy committed; sanitized audit external | USD 1.99996208; 129 calls; 249,504 tokens |
+| P2.6 | in-progress | | deterministic observations/live status report pending | | USD 1.99996208; 129 calls; 249,504 tokens |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
