@@ -8,6 +8,7 @@ export * from "./campaignCharacterRosterRepo.js";
 export * from "./campaignCharacterSheetSnapshotRepo.js";
 export * from "./campaignCharacterWorkspaceRepo.js";
 export * from "./campaignCharacterWriteRepo.js";
+export * from "./campaignContextInspectionReadRepo.js";
 export * from "./campaignCommandRepo.js";
 export * from "./campaignCommandWriteRepo.js";
 export * from "./campaignContentConfigurationReadRepo.js";

@@ -9,18 +9,19 @@ export type MemoryEvalFixture = Awaited<ReturnType<typeof createMemoryEvalFixtur
 
 const OWNER = "local-owner";
 
-function deterministicOptions(dataDir: string): CreateRepositoryOptions {
+function deterministicOptions(dataDir: string, contextInspectionProvenance: NonNullable<CreateRepositoryOptions["contextInspectionProvenance"]>): CreateRepositoryOptions {
   let sequence = 0;
   return {
     dataDir,
     clock: { now: () => new Date("2037-04-05T06:07:08.000Z") },
     ids: { nextId: () => `memory-eval:${String(++sequence).padStart(4, "0")}` },
     rng: { integer: (minimum: number) => minimum },
+    contextInspectionProvenance,
   };
 }
 
-export async function createMemoryEvalFixture(dataDir: string) {
-  const options = deterministicOptions(dataDir);
+export async function createMemoryEvalFixture(dataDir: string, contextInspectionProvenance: NonNullable<CreateRepositoryOptions["contextInspectionProvenance"]> = "normal") {
+  const options = deterministicOptions(dataDir, contextInspectionProvenance);
   const repo = createRepository(options);
   const campaign = repo.createCampaign(OWNER, { name: "Memory evaluation corpus" });
   repo.installMechanicsStarterCatalog(OWNER);
@@ -112,6 +113,11 @@ export async function createMemoryEvalFixture(dataDir: string) {
   if (!travelReceipt) throw new Error("memory evaluation travel receipt missing");
   sourceIds["travel:hydration"] = travelReceipt.commandId;
   sourceStorage["travel:hydration"] = "travel-receipt";
+  const narrationTurn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId: aster.actorId, declaration: "I await the public narration dispatch.", expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:narration:turn" });
+  const narrating = repo.updateAdventureTurnNarration(OWNER, { turnId: narrationTurn.turnId, expectedTurnRevision: narrationTurn.revision, expectedCampaignRevision: narrationTurn.campaignRevision, idempotencyKey: "memory-eval:narration:start", narrationStatus: "in-progress" });
+  const narrationClaim = repo.claimNarrationProviderDispatch(OWNER, { turnId: narrationTurn.turnId, callId: "memory-eval-narration", provider: "deterministic-fake", model: "memory-eval", fallbackNarration: "Public fallback.", leaseMs: 60_000, context: { public: "safe" }, request: { version: 1 } });
+  if (narrationClaim.state !== "claimed") throw new Error("memory evaluation narration claim missing");
+  repo.settleNarrationProviderDispatch(OWNER, { turnId: narrationTurn.turnId, callId: "memory-eval-narration", claimId: narrationClaim.claimId, source: "provider-assisted", narration: "Public narration settled.", outcomeCode: "completed", promptTokens: 3, completionTokens: 2 });
   for (const observation of PLAYABILITY_OBSERVATIONS) {
     const sourceKey = `p2:${observation.id}`;
     if (observation.sourceKind === "turn-receipt") {
@@ -158,5 +164,5 @@ export async function createMemoryEvalFixture(dataDir: string) {
   recap("holdout:tide-past", "Earlier public state: the tide signal was red.");
   recap("holdout:tide-current", "Current public state: the tide signal is green, replacing the earlier red signal.");
   declare("holdout:bryn-private", bryn.actorId, "Bryn alone knows the nightjar cipher.");
-  return { repo, options, campaign, session, actors: { aster: aster.actorId, bryn: bryn.actorId }, sourceIds, sourceStorage };
+  return { repo, options, campaign, session, actors: { aster: aster.actorId, bryn: bryn.actorId }, narrationDispatchId: narrationClaim.claimId, sourceIds, sourceStorage };
 }

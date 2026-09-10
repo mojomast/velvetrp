@@ -1,6 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import { createHash } from "node:crypto";
 import type { Clock, IdGenerator } from "../runtime.js";
+import type { ContextInspectionProvenanceMode } from "./campaign/campaignContextInspectionProvenanceWrite.js";
 import type { CommandEnvelope, PrivateAdventureTurn } from "@velvet/contracts";
 import { createAdventureTurnReadRepository, createAdventureTurnWriteRepository,
   createAdventureTurnAgentExecutionRepository, type AdventureTurnAgentExecutionRepository,
@@ -27,7 +28,7 @@ type AgentCommandExecutors={
 };
 
 /** Creates the composed M1.10 repository facade. */
-export function createAdventureTurnRepository(db: DatabaseDriver.Database, dependencies: { clock: Clock; ids: IdGenerator }, guard: () => void,
+export function createAdventureTurnRepository(db: DatabaseDriver.Database, dependencies: { clock: Clock; ids: IdGenerator; contextInspectionProvenance: ContextInspectionProvenanceMode }, guard: () => void,
   executors?:AgentCommandExecutors): AdventureTurnRepository {
   const reads = createAdventureTurnReadRepository(db);
   const writes=createAdventureTurnWriteRepository(db,{...dependencies,guard},reads);

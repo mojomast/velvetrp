@@ -19,6 +19,7 @@ import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
 import type { CampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
+import { recordContextInspectionProvenance, type ContextInspectionProvenanceMode } from "./campaign/campaignContextInspectionProvenanceWrite.js";
 
 export class CampaignDmUnavailableError extends Error {}
 export class CampaignDmConflictError extends Error {}
@@ -67,7 +68,7 @@ type Services = CampaignAgentContextReadRepository & CampaignRecallReadRepositor
   & Pick<CampaignAdministrationIntegrationRepository, "getSessionZeroSafetyPolicy">;
 
 /** Private director aggregate. No player-turn proposal or transcript is used for GM state. */
-export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { clock: Clock; ids: IdGenerator }, services: Services,
+export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { clock: Clock; ids: IdGenerator; contextInspectionProvenance: ContextInspectionProvenanceMode }, services: Services,
   guard: () => void): CampaignDmRepository {
   const now = () => deps.clock.now().toISOString();
   const role = (p: string, c: string) => (db.prepare("SELECT role FROM campaign_memberships WHERE campaign_id=? AND principal_id=?").get(c, p) as { role: string } | undefined)?.role;
@@ -492,10 +493,11 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return null;
       }
       const claimId=deps.ids.nextId(),context=JSON.parse(r.context_json),candidates=bindings.map(b=>b.candidate);
-      db.prepare("INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,23744,256)").run(id,claimId,
-        json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:256,durationMs:30000}}),provider,model,
-        new Date(deps.clock.now().getTime()+30_000).toISOString());
-      return {runId:id,claimId,context,candidates};
+       db.prepare("INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,23744,256)").run(id,claimId,
+         json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:256,durationMs:30000}}),provider,model,
+         new Date(deps.clock.now().getTime()+30_000).toISOString());
+       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
+       return {runId:id,claimId,context,candidates};
     }).immediate();},
     bindDmProviderRequest(p,id,claimId,request,promptTokens,completionTokens){guard();return db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);
@@ -570,10 +572,11 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       const work=api.getDmNarrationWork(p,id);if(!work)return null;
       if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||completionTokens<1||completionTokens>768
         ||work.planning.tokens+promptTokens+completionTokens>Math.min(24000,work.planning.maxTotalTokens))throw new CampaignDmConflictError("narration budget exceeded");
-      const claimId=deps.ids.nextId();
-      db.prepare("INSERT INTO dm_narration_dispatches VALUES(?,?,?,?,?,?,?,?,'claimed',NULL,NULL,NULL)").run(id,claimId,provider,model,json(request),
-        new Date(deps.clock.now().getTime()+30_000).toISOString(),promptTokens,completionTokens);
-      return claimId;
+       const claimId=deps.ids.nextId();
+       db.prepare("INSERT INTO dm_narration_dispatches VALUES(?,?,?,?,?,?,?,?,'claimed',NULL,NULL,NULL)").run(id,claimId,provider,model,json(request),
+         new Date(deps.clock.now().getTime()+30_000).toISOString(),promptTokens,completionTokens);
+       const r=row(id);recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-narration",recordedPhase:"narrated",createdAt:now()},deps.contextInspectionProvenance);
+       return claimId;
     }).immediate();},
     settleDmNarration(p,id,claimId,scene,outcome){guard();db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);const job=db.prepare("SELECT * FROM dm_narration_jobs WHERE run_id=?").get(id) as any;

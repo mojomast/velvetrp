@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json && node -e \"for (const name of ['currentSchema.sql','campaignDmSchema.sql','recallSchema.sql']) require('node:fs').copyFileSync('src/repo/db/'+name,'dist/repo/db/'+name)\"",
+    "build": "tsc -p tsconfig.json && node -e \"for (const name of ['currentSchema.sql','campaignDmSchema.sql','recallSchema.sql','contextInspectionProvenanceSchema.sql']) require('node:fs').copyFileSync('src/repo/db/'+name,'dist/repo/db/'+name)\"",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"

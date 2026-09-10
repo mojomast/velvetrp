@@ -6,6 +6,7 @@ import type { Clock, IdGenerator } from "../../runtime.js";
 import { AdventureTurnConflictError, AdventureTurnStaleError, AdventureTurnUnavailableError } from "./errors.js";
 import { boundAdventureQuestReceipts } from "../quest/adventureQuestBinding.js";
 import { buildCombatActionPlans } from "../encounter/combatActionPlan.js";
+import { recordContextInspectionProvenance, type ContextInspectionProvenanceMode } from "../campaign/campaignContextInspectionProvenanceWrite.js";
 
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export interface ProviderContextInput { turnId:string; providerCallId:string; round:number; expectedCampaignRevision:number;
@@ -40,7 +41,7 @@ export type NarrationDispatchState={state:"claimed";claimId:string;leaseExpiresA
   |{state:"settled";source:"provider-assisted"|"deterministic-fallback";narration:string;outcomeCode:string;
     promptTokens:number|null;completionTokens:number|null;provider:string;model:string};
 
-export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Database,deps:{clock:Clock;ids:IdGenerator;guard():void}):AdventureTurnAgentResponseRepository {
+export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Database,deps:{clock:Clock;ids:IdGenerator;contextInspectionProvenance:ContextInspectionProvenanceMode;guard():void}):AdventureTurnAgentResponseRepository {
   const now=()=>utcIsoTimestampSchema.parse(deps.clock.now().toISOString());
   const immediate=<T>(fn:()=>T)=>{deps.guard();return db.transaction(fn).immediate();};
   const turn=(id:string)=>{const row=db.prepare("SELECT * FROM adventure_turns WHERE id=?").get(id) as any;if(!row)throw new AdventureTurnUnavailableError();return row;};
@@ -76,8 +77,9 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       const leaseExpiresAt=utcIsoTimestampSchema.parse(new Date(deps.clock.now().getTime()+input.leaseMs).toISOString()),claimId=deps.ids.nextId();
       db.prepare("INSERT INTO adventure_narration_dispatches_v60(claim_id,campaign_id,turn_id,call_id,provider,model,claimed_at,lease_expires_at,status) VALUES(?,?,?,?,?,?,?,?,'claimed')")
         .run(claimId,row.campaign_id,row.id,input.callId,input.provider,input.model,at,leaseExpiresAt);
-      if (input.context !== undefined && input.request !== undefined) db.prepare("INSERT INTO adventure_narration_contexts VALUES(?,?,?)")
-        .run(claimId,JSON.stringify(input.context),JSON.stringify(input.request));
+       if (input.context !== undefined && input.request !== undefined) db.prepare("INSERT INTO adventure_narration_contexts VALUES(?,?,?)")
+         .run(claimId,JSON.stringify(input.context),JSON.stringify(input.request));
+       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:row.campaign_id,sessionId:row.session_id,lane:"adventure-narration",recordedPhase:"narrated",createdAt:at},deps.contextInspectionProvenance);
       return{state:"claimed" as const,claimId,leaseExpiresAt};});},
     settleNarrationProviderDispatch(principal,input){return immediate(()=>{const row=turn(input.turnId);authority(principal,row);const at=now();
       const value=db.prepare("SELECT * FROM adventure_narration_dispatches_v60 WHERE claim_id=? AND campaign_id=? AND turn_id=? AND call_id=?")
@@ -133,8 +135,10 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       db.prepare("INSERT INTO agent_provider_starts_v38 VALUES(?,?,?,?,?,?,?)").run(operationId,row.campaign_id,row.id,start.providerCallId,"started",resulting,at);
       const contextId=deps.ids.nextId();db.prepare("INSERT INTO agent_provider_contexts_v39 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         .run(contextId,row.campaign_id,row.id,start.providerCallId,input.round,input.timelineId,input.timelineRevision,input.expectedCampaignRevision,input.expectedTurnRevision,contextJson,hash(contextJson),requestJson,hash(requestJson),at);
-      db.prepare("INSERT INTO agent_provider_dispatch_claims_v39 VALUES(?,?,?,?,?,?,?)")
+       db.prepare("INSERT INTO agent_provider_dispatch_claims_v39 VALUES(?,?,?,?,?,?,?)")
         .run(deps.ids.nextId(),contextId,row.campaign_id,row.id,start.providerCallId,at,run.deadline_at);
+       const claimId=(db.prepare("SELECT claim_id FROM agent_provider_dispatch_claims_v39 WHERE context_id=?").get(contextId) as {claim_id:string}).claim_id;
+       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:row.campaign_id,sessionId:row.session_id,lane:"adventure-planning",recordedPhase:"planned",createdAt:at},deps.contextInspectionProvenance);
       return{claimed:true,leaseExpiresAt:run.deadline_at,expired:false};
     });},
     bindAgentProviderContext(principal,raw){const input={...raw,context:agentResultObjectSchema.parse(raw.context),request:agentRequestObjectSchema.parse(raw.request)};
@@ -204,7 +208,8 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
       const context=db.prepare("SELECT context_id FROM agent_provider_contexts_v39 WHERE campaign_id=? AND turn_id=? AND provider_call_id=?").get(row.campaign_id,turnId,providerCallId) as {context_id:string}|undefined;
        if(!context)throw new AdventureTurnConflictError("provider context missing");const old=db.prepare("SELECT lease_expires_at FROM agent_provider_dispatch_claims_v39 WHERE campaign_id=? AND turn_id=? AND provider_call_id=?").get(row.campaign_id,turnId,providerCallId) as {lease_expires_at:string}|undefined;
        if(old)return{claimed:false,leaseExpiresAt:old.lease_expires_at,expired:now()>=old.lease_expires_at};const run=db.prepare("SELECT deadline_at FROM adventure_agent_executions_v38 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id,turnId) as {deadline_at:string};const at=now();
-      if(at>=run.deadline_at)throw new AdventureTurnConflictError("provider dispatch deadline expired");db.prepare("INSERT INTO agent_provider_dispatch_claims_v39 VALUES(?,?,?,?,?,?,?)").run(deps.ids.nextId(),context.context_id,row.campaign_id,row.id,providerCallId,at,run.deadline_at);
+       if(at>=run.deadline_at)throw new AdventureTurnConflictError("provider dispatch deadline expired");const claimId=deps.ids.nextId();db.prepare("INSERT INTO agent_provider_dispatch_claims_v39 VALUES(?,?,?,?,?,?,?)").run(claimId,context.context_id,row.campaign_id,row.id,providerCallId,at,run.deadline_at);
+       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:row.campaign_id,sessionId:row.session_id,lane:"adventure-planning",recordedPhase:"planned",createdAt:at},deps.contextInspectionProvenance);
       return{claimed:true,leaseExpiresAt:run.deadline_at,expired:false};});},
     getAgentProviderRecovery(principal,turnId){const row=turn(turnId);authority(principal,row);const start=db.prepare(`SELECT start.provider_call_id,context.round_number,provider.provider,provider.model,provider.attempt,context.context_json,context.request_json,claim.claimed_at,claim.lease_expires_at,response.status,response.response_json
       FROM agent_provider_starts_v38 start JOIN provider_call_metadata provider ON provider.campaign_id=start.campaign_id AND provider.turn_id=start.turn_id AND provider.call_id=start.provider_call_id AND provider.phase='started'

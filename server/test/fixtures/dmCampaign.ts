@@ -1,12 +1,13 @@
 import { CHARACTER_BUILDER_STANDARD_ARRAY, SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS, type CampaignDmCandidate } from "@velvet/contracts";
-import { createRepository, createSession, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG } from "../../src/repo/index.js";
+import { createRepository, createSession, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG, type CreateRepositoryOptions } from "../../src/repo/index.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../../src/defaults.js";
 import type { AdventureAgentDependencies } from "../../src/agent/adventureOrchestrator.js";
+import { orchestrateCampaignDmBeat } from "../../src/agent/campaignDmOrchestrator.js";
 import type { ProviderCompletionInput, ProviderCompletionResult } from "../../src/provider/index.js";
 
-export async function dmFixture(dnd = false) {
+export async function dmFixture(dnd = false, repositoryOptions: Pick<CreateRepositoryOptions, "dataDir" | "contextInspectionProvenance"> = {}) {
   let time = Date.parse("2036-01-01T00:00:00.000Z");
-  const options = { clock: { now: () => new Date(time) }, rng: { integer: (min: number, _max: number) => min } };
+  const options = { ...repositoryOptions, clock: { now: () => new Date(time) }, rng: { integer: (min: number, _max: number) => min } };
   const repo = createRepository(options);
   const campaign = repo.createCampaign("local-owner", { name: "Director campaign" });
   const catalog = dnd ? SRD_5_1_STARTER_CATALOG : MECHANICS_STARTER_CATALOG;
@@ -48,4 +49,13 @@ export function dmCompletion(input: ProviderCompletionInput, action?: CampaignDm
 }
 export function dmDependencies(complete: AdventureAgentDependencies["complete"] = async input=>dmCompletion(input)): AdventureAgentDependencies {
   return {complete,getProvider:async()=>({...defaultProviderSettings(),model:"fake-dm"}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
+}
+
+/** Creates settled planning and narration dispatches through the production DM orchestrator. */
+export async function createSettledDmDispatches(fixture: Awaited<ReturnType<typeof dmFixture>>) {
+  fixture.graph();
+  fixture.repo.setDmControl("local-owner", fixture.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "fixture-inspection-ai" });
+  const run = fixture.repo.openDmBeat("local-owner", fixture.campaign.id, fixture.session.id, { intent: "open", expectedModeRevision: 1, idempotencyKey: "fixture-inspection-open" });
+  await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, dmDependencies());
+  return run;
 }

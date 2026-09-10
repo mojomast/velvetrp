@@ -750,7 +750,10 @@ describe("bounded adventure orchestrator", () => {
       sessionId:"session",actorId:"actor",declaration:"Crash",expectedCampaignRevision:0,idempotencyKey:"crash-claim"});const planning=repository.getDurableAgentPlanningState("local-owner",turn.turnId)!;
     repository.startAgentProviderCall("local-owner",{turnId:turn.turnId,providerCallId:"claimed",provider:"fake",model:"fake",attempt:1,expectedCampaignRevision:0,expectedTurnRevision:0,expectedExecutionRevision:planning.executionRevision,idempotencyKey:"claimed-start"});
     repository.bindAgentProviderContext("local-owner",{turnId:turn.turnId,providerCallId:"claimed",round:1,expectedCampaignRevision:0,expectedTurnRevision:0,timelineId:campaign.activeTimelineId,timelineRevision:0,
-      context:{orphanedBeforeDispatch:true},request:{}});expect(repository.claimAgentProviderDispatch("local-owner",turn.turnId,"claimed").claimed).toBe(true);clock=new Date(clock.getTime()+120_000);
+      context:{orphanedBeforeDispatch:true},request:{}});expect(repository.claimAgentProviderDispatch("local-owner",turn.turnId,"claimed").claimed).toBe(true);
+    expect(repository.resolveCampaignContextInspectionDispatchReferences("local-owner", { campaignId: campaign.id, sessionId: "session",
+      source: { kind: "adventure-turn", sourceId: turn.turnId } }).references).toEqual([expect.objectContaining({ lane: "adventure-planning" })]);
+    clock=new Date(clock.getTime()+120_000);
     let calls=0;const deps=dependencies([]);deps.complete=async()=>{calls+=1;return completion();};await orchestrateAdventureTurn(repository,turn.turnId,deps);
     expect(calls).toBe(0);expect(repository.getAgentProviderRecovery("local-owner",turn.turnId)?.response?.status).toBe("failed");repository.close();
   });

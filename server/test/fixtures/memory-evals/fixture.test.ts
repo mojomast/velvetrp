@@ -15,6 +15,7 @@ describe("memory evaluation corpus fixtures", () => {
     expect(Object.isFrozen(MEMORY_EVAL_HOLDOUTS)).toBe(true);
     expect(MEMORY_EVAL_HOLDOUTS.every(item => Object.isFrozen(item) && Object.isFrozen(item.requiredSourceKeys))).toBe(true);
     const fixture = await createMemoryEvalFixture(makeTmpDataDir());
+    expect(fixture.narrationDispatchId).toBeTruthy();
     const expectedKeys = new Set([...MEMORY_EVAL_DEVELOPMENT_CASES, ...MEMORY_EVAL_HOLDOUTS].flatMap(item => [...item.requiredSourceKeys, ...item.forbiddenSourceKeys]));
     for (const key of expectedKeys) expect(fixture.sourceIds[key]).toBeTruthy();
     expect(fixture.sourceIds["promise:lantern"]).not.toBe(fixture.sourceIds["outcome:lantern"]);

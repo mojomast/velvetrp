@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { createCampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
+import { createCampaignContextInspectionReadRepository } from "./campaign/campaignContextInspectionReadRepo.js";
 import DatabaseDriver from "better-sqlite3";
 import {
   addCampaignMembershipInputSchema,
@@ -600,6 +601,7 @@ function createRepositoryComposition<T>(
     clock: options.clock ?? systemRuntime.clock,
     ids: options.ids ?? systemRuntime.ids,
     rng: options.rng ?? systemRuntime.rng,
+    contextInspectionProvenance: options.contextInspectionProvenance ?? "normal",
   };
   const db = openDatabase(path.resolve(options.dataDir ?? resolveDataDir()));
   const campaignCommandWriteOperations = createCampaignCommandWriteOperations(db, dependencies);
@@ -800,6 +802,7 @@ function createRepositoryComposition<T>(
   const activationReadinessInspector = createCampaignRoomActivationReadinessInspector(db,
     (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId));
   const campaignDmReadinessRepository = createCampaignDmReadinessRepository(db, activationReadinessInspector, () => assertOpen());
+  const campaignContextInspectionRepository = createCampaignContextInspectionReadRepository(db);
   const recallRepository = createCampaignRecallReadRepository(db, {
     getCampaignAgentContextSnapshot: (...args) => campaignAgentContextReadRepository.getCampaignAgentContextSnapshot(...args),
     getAdventureCheckPublicReceipt: (...args) => adventureCheckRepository.getAdventureCheckPublicReceipt(...args),
@@ -820,6 +823,7 @@ function createRepositoryComposition<T>(
   const repository: Repository = {
     ...recallRepository,
     ...campaignDmReadinessRepository,
+    ...campaignContextInspectionRepository,
     ...createCampaignDmRepository(db, dependencies, {
       ...encounterRepository, ...storyRepository, ...campaignGenerationRepository, ...adventureTurnRepository, ...adventureCheckRepository,
       ...campaignAdministrationIntegrationRepository,
