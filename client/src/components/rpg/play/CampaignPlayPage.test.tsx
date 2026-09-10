@@ -30,8 +30,10 @@ describe("CampaignPlayPage", () => {
     fireEvent.change(composer, { target: { value: "My own next action" } });
     fireEvent.click(screen.getByRole("button", { name: "Director" }));
     await waitFor(() => expect((screen.getByText("Open scene") as HTMLButtonElement).disabled).toBe(false));
+    expect(map.isConnected).toBe(true);
     fireEvent.click(screen.getByText("Open scene"));
     await screen.findByText("Lanterns stir above the quay.");
+    expect(map.isConnected).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Close Director" }));
     expect(screen.getByText("Lanterns stir above the quay.").closest("[hidden]")).toBeNull();
     expect(screen.getByRole("region", { name: "Campaign maps" })).toBe(map); expect(screen.getByRole("log")).toBe(log);

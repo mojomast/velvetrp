@@ -72,7 +72,7 @@ const presenceKey = () => `presence-ui-${createClientId()}`;
 /** Loads and renders only server projections; it performs no authoritative calculations. */
 export function CampaignContextDrawer(props: CampaignContextDrawerProps) {
   // Refreshes reuse this tree; authority and viewpoint changes must not reuse private projections.
-  return <BoundCampaignContextDrawer key={JSON.stringify([props.campaignId, props.sessionId, props.selectedActorId, [...props.playableActorIds].sort(), props.audience, props.authorizationGeneration, Boolean(props.readOnly)])} {...props} />;
+  return <BoundCampaignContextDrawer key={JSON.stringify([props.campaignId, props.sessionId, props.selectedActorId, [...props.playableActorIds].sort(), props.audience, props.authorizationGeneration])} {...props} />;
 }
 
 function refreshing<T>(old: Load<T>): Load<T> {
