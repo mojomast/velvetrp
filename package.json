@@ -16,6 +16,7 @@
     "planning-board": "node planning-board/server.js",
     "hydrate:campaign": "tsx scripts/hydrate-campaign.ts",
     "run:reviewed-adventure": "tsx scripts/run-reviewed-adventure.ts",
+    "evaluate:campaign-memory": "tsx scripts/evaluate-campaign-memory.ts",
     "test:hydration-cli": "tsx --test scripts/test/*.test.ts",
     "typecheck:hydration-cli": "tsc --noEmit -p scripts/tsconfig.json",
     "test:planning-board": "node --test planning-board/test/*.test.js",

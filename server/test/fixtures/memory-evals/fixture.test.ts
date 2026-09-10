@@ -20,7 +20,7 @@ describe("memory evaluation corpus fixtures", () => {
     expect(fixture.sourceIds["promise:lantern"]).not.toBe(fixture.sourceIds["outcome:lantern"]);
     for (const observation of PLAYABILITY_OBSERVATIONS) {
       const key = `p2:${observation.id}`;
-      expect(fixture.sourceStorage[key]).toBe(observation.sourceKind === "turn-receipt" ? "mechanic-receipt" : observation.sourceKind === "dm-receipt" ? "director-receipt" : observation.authority === "player" ? "declaration" : "recap");
+      expect(fixture.sourceStorage[key]).toBe(observation.sourceKind === "turn-receipt" ? "mechanic-receipt" : observation.sourceKind === "dm-receipt" ? "director-receipt" : observation.id === "quest-hydration-v1" ? "quest-receipt" : observation.id === "travel-hydration-v1" ? "travel-receipt" : observation.authority === "player" ? "declaration" : "recap");
     }
     fixture.repo.close();
     const reopened = createRepository(fixture.options);
@@ -51,6 +51,14 @@ describe("memory evaluation corpus fixtures", () => {
     expect(retryHits.every(hit => hit.rootTurnId === fixture.sourceIds["retry:compass"])).toBe(true);
     expect(recall("oversized meteor").hits).toEqual([]);
     expect(recall("harbor ledger").hits.length).toBeLessThanOrEqual(8);
+    const quest = recall("public quest receipt").hits.find(hit => hit.sourceId === fixture.sourceIds["quest:hydration"]);
+    expect(quest).toMatchObject({ sourceKind: "quest-receipt", authority: "committed-outcome" });
+    expect(Buffer.byteLength(quest?.text ?? "")).toBeGreaterThan(0);
+    expect(Buffer.byteLength(JSON.stringify(recall("public quest receipt")))).toBeLessThanOrEqual(6_144);
+    const travel = recall("memory destination").hits.find(hit => hit.sourceId === fixture.sourceIds["travel:hydration"]);
+    expect(travel).toMatchObject({ sourceKind: "travel-receipt", authority: "committed-outcome" });
+    expect(Buffer.byteLength(travel?.text ?? "")).toBeGreaterThan(0);
+    expect(Buffer.byteLength(JSON.stringify(recall("memory destination")))).toBeLessThanOrEqual(6_144);
     reopened.close();
   });
 });

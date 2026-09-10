@@ -1,4 +1,6 @@
 import { CHARACTER_BUILDER_STANDARD_ARRAY } from "@velvet/contracts";
+import { orchestrateAdventureTurn } from "../../../src/agent/adventureOrchestrator.js";
+import { defaultHarnessSettings, defaultProviderSettings } from "../../../src/defaults.js";
 import { createSession, createRepository, MECHANICS_STARTER_CATALOG } from "../../../src/repo/index.js";
 import type { CreateRepositoryOptions } from "../../../src/repo/index.js";
 import { PLAYABILITY_OBSERVATIONS } from "../playability-observations.js";
@@ -42,7 +44,7 @@ export async function createMemoryEvalFixture(dataDir: string) {
   repo.attachCampaignSession(OWNER, { campaignId: campaign.id, sessionId: session.id });
   repo.transitionSession(session.id, "active", "Deterministic corpus setup");
   const sourceIds: Record<string, string> = {};
-  const sourceStorage: Record<string, "declaration" | "presentation" | "recap" | "mechanic-receipt" | "director-receipt"> = {};
+  const sourceStorage: Record<string, "declaration" | "presentation" | "recap" | "mechanic-receipt" | "director-receipt" | "quest-receipt" | "travel-receipt"> = {};
   const activeTimelineId = () => repo.getCampaign(OWNER, campaign.id)!.activeTimelineId;
   const declare = (sourceKey: string, actorId: string, declaration: string) => {
     const turn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId, declaration,
@@ -72,6 +74,44 @@ export async function createMemoryEvalFixture(dataDir: string) {
     storylineId: "memory-eval-story", title: "Keeper statement", summary: "Public corpus story", nodes: [{ nodeId: "keeper-statement", title: "Keeper statement", description: "keeper statement published", gmNotes: "", revealThreshold: 0 }], edges: [], plotPoints: [], clues: [],
   } });
   repo.setDmControl(OWNER, campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: "memory-eval:dm-control" });
+  const questRevision = repo.listCampaignQuests(OWNER, campaign.id)!.revision;
+  repo.createCampaignQuest(OWNER, campaign.id, { quest: { questId: "memory-eval-quest", storylineId: "memory-eval-story", title: "Memory receipt quest", description: "Hydrate the public objective.", visibility: "public", journalText: "Public objective", objectives: [{ objectiveId: "memory-eval-quest-objective", description: "Record the public quest receipt", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }], rewards: [] }, expectedRevision: questRevision, idempotencyKey: "memory-eval:quest:create" });
+  repo.executeQuestCommand(OWNER, "memory-eval-quest", { kind: "accept", expectedRevision: repo.listCampaignQuests(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:quest:accept" } as any);
+  const questTurn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId: aster.actorId, declaration: "I record the public quest receipt.", expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:quest:turn" });
+  const questCandidate = repo.listAdventureQuestObjectiveCandidates(OWNER, questTurn.turnId).find(candidate => candidate.objectiveId === "memory-eval-quest-objective");
+  if (!questCandidate) throw new Error("memory evaluation quest objective candidate missing");
+  const questDeps = { getProvider: async () => ({ ...defaultProviderSettings(), model: "memory-eval" }), getHarness: async () => defaultHarnessSettings(), now: () => new Date("2037-04-05T06:07:08.000Z"), complete: async () => ({ message: { role: "assistant" as const, content: null, toolCalls: [{ id: "memory-eval-quest-choice", name: "exact_quest_objective.select", arguments: JSON.stringify({ candidateId: questCandidate.candidateId, digest: questCandidate.digest }) }] }, usage: null, model: { requestedModel: "memory-eval", responseModel: "memory-eval" } }) };
+  let questResult = await orchestrateAdventureTurn(repo, questTurn.turnId, questDeps);
+  if (questResult.outcome === "awaiting-confirmation") {
+    const proposal = questResult.turn.toolCalls[0]?.proposal;
+    if (!proposal) throw new Error("memory evaluation quest proposal missing");
+    repo.decideToolProposals(OWNER, { turnId: questTurn.turnId, proposalIds: [proposal.proposalId], decision: "approved", expectedTurnRevision: questResult.turn.revision, expectedCampaignRevision: questResult.turn.campaignRevision, idempotencyKey: "memory-eval:quest:approve" });
+    questResult = await orchestrateAdventureTurn(repo, questTurn.turnId, { ...questDeps, complete: async () => { throw new Error("confirmed quest must not redispatch"); } });
+  }
+  const questReceipt = questResult.turn.receiptLinks[0];
+  if (!questReceipt) throw new Error("memory evaluation quest receipt missing");
+  sourceIds["quest:hydration"] = questReceipt.commandId;
+  sourceStorage["quest:hydration"] = "quest-receipt";
+  const world = repo as any;
+  world.createLocation(OWNER, { campaignId: campaign.id, locationId: "memory-eval-origin", name: "Memory Origin", description: "Public origin.", visibility: "public" });
+  world.createLocation(OWNER, { campaignId: campaign.id, locationId: "memory-eval-destination", name: "Memory Destination", description: "Public destination.", visibility: "public" });
+  world.createLocationConnection(OWNER, { campaignId: campaign.id, locationConnectionId: "memory-eval-route", fromLocationId: "memory-eval-origin", toLocationId: "memory-eval-destination", visibility: "public" });
+  world.placeActor(OWNER, aster.actorId, { campaignId: campaign.id, locationId: "memory-eval-origin", expectedRevision: world.getCampaignWorld(OWNER, campaign.id).revision, idempotencyKey: "memory-eval:travel:place" });
+  const travelTurn = repo.createAdventureTurn(OWNER, { campaignId: campaign.id, sessionId: session.id, timelineId: activeTimelineId(), actorId: aster.actorId, declaration: "I travel to Memory Destination.", expectedCampaignRevision: repo.getCampaignAdministration(OWNER, campaign.id)!.revision, idempotencyKey: "memory-eval:travel:turn" });
+  let travelCalls = 0;
+  const travelResult = await orchestrateAdventureTurn(repo, travelTurn.turnId, { ...questDeps, complete: async input => {
+    travelCalls += 1;
+    if (travelCalls === 1) {
+      const tool = input.tools?.find(value => value.name === "exact_actor_travel.select") as any;
+      if (!tool) throw new Error("memory evaluation exact travel tool missing");
+      return { message: { role: "assistant" as const, content: null, toolCalls: [{ id: "memory-eval-travel-choice", name: "exact_actor_travel.select", arguments: JSON.stringify({ candidateId: tool.parameters.oneOf[0].properties.candidateId.const, kind: "actor.travel", version: "v1", choices: [] }) }] }, usage: null, model: { requestedModel: "memory-eval", responseModel: "memory-eval" } };
+    }
+    return { message: { role: "assistant" as const, content: null, toolCalls: [{ id: "memory-eval-travel-narration", name: "submit_adventure_narration", arguments: JSON.stringify({ narration: "The public route reaches Memory Destination." }) }] }, usage: null, model: { requestedModel: "memory-eval", responseModel: "memory-eval" } };
+  } });
+  const travelReceipt = travelResult.turn.receiptLinks[0];
+  if (!travelReceipt) throw new Error("memory evaluation travel receipt missing");
+  sourceIds["travel:hydration"] = travelReceipt.commandId;
+  sourceStorage["travel:hydration"] = "travel-receipt";
   for (const observation of PLAYABILITY_OBSERVATIONS) {
     const sourceKey = `p2:${observation.id}`;
     if (observation.sourceKind === "turn-receipt") {
