@@ -135,6 +135,15 @@ describe("non-stream provider completion request", () => {
     expect(result.message).toEqual({ role: "assistant", content: "The door opens." });
   });
 
+  it("merges provider-specific body overrides last but refuses to replace core fields", async () => {
+    const fake = await startProvider({ body: textResponse() });
+    await completeWithProvider({ ...input(provider(fake.baseUrl)), bodyOverrides: { reasoning_effort: "none", temperature: 0.9 } });
+    expect(fake.requests[0]?.body).toMatchObject({ reasoning_effort: "none", temperature: 0.9, model: "requested-model" });
+    await expect(completeWithProvider({ ...input(provider(fake.baseUrl)), bodyOverrides: { model: "hijacked" } }))
+      .rejects.toThrow(/may not replace model/);
+    expect(fake.requests).toHaveLength(1);
+  });
+
   it("wires schema-bound tools without outbound strict mode, plus named choice and tool transcripts", async () => {
     const fake = await startProvider({ body: {
       choices: [{ message: { role: "assistant", content: null, tool_calls: [

@@ -87,6 +87,12 @@ export interface ProviderCompletionInput {
   promptVersion?: string;
   schemaVersion?: string;
   signal?: AbortSignal;
+  /**
+   * Provider-specific body fields merged last for capability or reasoning control.
+   * Core request fields (model, messages, tools, tool_choice, stream, response_format)
+   * cannot be replaced here.
+   */
+  bodyOverrides?: { [key: string]: CompletionJsonValue };
 }
 
 /** Valid provider token accounting. Invalid or incomplete accounting is returned as null. */
@@ -268,6 +274,16 @@ function applyJsonSchema(body: Record<string, unknown>, format: CompletionJsonSc
       strict: true,
     },
   };
+}
+
+const RESERVED_BODY_KEYS = new Set(["model", "messages", "tools", "tool_choice", "stream", "response_format"]);
+
+function applyBodyOverrides(body: Record<string, unknown>, overrides: ProviderCompletionInput["bodyOverrides"]): void {
+  if (!overrides) return;
+  for (const key of Object.keys(overrides)) {
+    if (RESERVED_BODY_KEYS.has(key)) throw new ProviderConfigurationError(`bodyOverrides may not replace ${key}`);
+  }
+  Object.assign(body, overrides);
 }
 
 interface ResponseToolPolicy {
@@ -473,6 +489,7 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
   if (input.parallelToolCalls !== undefined) body.parallel_tool_calls = input.parallelToolCalls;
   const advertisedNames = applyTools(body, input);
   applyJsonSchema(body, input.jsonSchema);
+  applyBodyOverrides(body, input.bodyOverrides);
   const requestedModel = String(body.model);
 
   const timeout = new AbortController();

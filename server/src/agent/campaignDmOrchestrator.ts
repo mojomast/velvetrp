@@ -12,6 +12,9 @@ import { dmReadToolSchemas, parseDmReadCall, type DmReadToolRequest } from "./dm
 const dependencies: AdventureAgentDependencies = { complete: completeWithProvider, getProvider: getProviderSettings,
   getHarness: getHarnessSettings, now: () => new Date() };
 const DM_GROUNDING_OBSERVATION_MAX_BYTES = 12_000;
+// A reasoning model otherwise spends its small completion budget on hidden reasoning, and some
+// routers reject a forced tool_choice while thinking. Disabling reasoning makes beat selection exact.
+const DIRECTOR_BODY_OVERRIDES = { reasoning_effort: "none" };
 
 function usageRecord(usage:ProviderCompletionResult['usage'],prompt:number,completion:number,price:ProviderCompletionInput['provider']['pricing']):DmProviderUsage {
   const known=usage&&[usage.promptTokens,usage.completionTokens,usage.totalTokens].every(value=>Number.isSafeInteger(value)&&value>=0);
@@ -88,7 +91,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     const input: ProviderCompletionInput = {
       provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } }, harness, preset: getPromptPreset("default"),
       promptVersion: "campaign-dm-v1", schemaVersion: "campaign-dm-v1", parallelToolCalls: false,
-      toolChoice: forced ? { name: "select_dm_beat" } : "auto", tools, messages,
+      toolChoice: forced ? { name: "select_dm_beat" } : "auto", tools, messages, bodyOverrides: DIRECTOR_BODY_OVERRIDES,
     };
     // UTF-8 bytes are a conservative token upper bound; charge the full reservation on unknown outcome.
     const promptBound = 1024 + Buffer.byteLength(JSON.stringify(input.messages) + JSON.stringify(input.tools) + JSON.stringify(harness));
@@ -101,6 +104,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     }
     const request = { messages: input.messages, tools: input.tools, toolChoice: input.toolChoice, harness, preset: input.preset,
       model: provider.model, samplers: input.provider.samplers, promptVersion: input.promptVersion, schemaVersion: input.schemaVersion,
+      bodyOverrides: DIRECTOR_BODY_OVERRIDES,
       budget: { costUsd: cost, pricing: price, maxTotalTokens: tokenCap, maxCostUsd: costCap } };
     let claimId: string;
     if (round === 0) {
@@ -172,7 +176,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
     const input:ProviderCompletionInput={provider:{...provider,samplers:{...provider.samplers,maxTokens:completionLimit}},
       harness,preset:getPromptPreset("default"),promptVersion:"campaign-dm-narration-v1",schemaVersion:"campaign-dm-narration-v1",
       messages:dmNarrationMessages(work.context,work.fallback),parallelToolCalls:false,toolChoice:{name:"submit_dm_scene"},
-      tools:[dmNarrationTool(work.context)]};
+      tools:[dmNarrationTool(work.context)],bodyOverrides:DIRECTOR_BODY_OVERRIDES};
     const promptBound=1024+Buffer.byteLength(JSON.stringify(input.messages)+JSON.stringify(input.tools)+JSON.stringify(harness));
     const total=promptBound+completionLimit;
     const price=provider.pricing;
@@ -186,7 +190,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
     } else {
       claimId=repository.claimDmNarration(principal,runId,provider.providerType||"openai-compatible",provider.model||"unconfigured",
         {messages:input.messages,tools:input.tools,toolChoice:input.toolChoice,harness,preset:input.preset,model:provider.model,
-          samplers:input.provider.samplers,promptVersion:input.promptVersion,schemaVersion:input.schemaVersion,
+          samplers:input.provider.samplers,promptVersion:input.promptVersion,schemaVersion:input.schemaVersion,bodyOverrides:DIRECTOR_BODY_OVERRIDES,
           budget:{pricing:price,maxTotalTokens:Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens),
             maxCostUsd:caps.length?Math.min(...caps):null}},promptBound,completionLimit);
       if(!claimId)return;

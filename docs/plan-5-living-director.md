@@ -197,6 +197,19 @@ final selection quality remains model-dependent. Live grounding itself is
 proven; raising or removing the forced-read instruction is a P5.6 evaluation
 question.
 
+Live reliability hardening: a reasoning model exposed two failures. With the
+256-token planning cap it returned reasoning-only output (`finish_reason:
+length`, no tool call), and a forced tool choice could return HTTP 400 in
+thinking mode. The Director now sends `reasoning_effort: "none"` through a
+bounded provider `bodyOverrides` (core body fields cannot be replaced), so
+planning and narration return exact tool calls in tens of completion tokens.
+Transition beats are also offered when the only blockers are table-wait codes
+(`waiting-for-player-combat-action`,
+`scene-resolution-requires-gm-binding-or-human-adjudication`), so an AI room
+keeps pacing instead of dead-locking while the players decide. A 6-beat live run
+then completed 6/6 beats with all four grounding reads and no unknown outcomes
+(~53.6k tokens, ~USD 0.0057).
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient

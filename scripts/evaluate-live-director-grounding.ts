@@ -13,10 +13,10 @@ import type { AdventureAgentDependencies } from "../server/src/agent/adventureOr
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
 
 // Hard sub-cap for this live run only; never exceeded and never retried automatically.
-const MAX_BEATS = 3;
-const MAX_CALLS = 15;
-const MAX_TOKENS = 60_000;
-const MAX_USD = 0.05;
+const MAX_BEATS = 6;
+const MAX_CALLS = 40;
+const MAX_TOKENS = 200_000;
+const MAX_USD = 0.5;
 const OWNER = "local-owner";
 
 // RouteTok proxy in `projects/agentrouterrouter`, serving AgentRouter `deepseek-v4-flash`.
@@ -89,10 +89,26 @@ export async function evaluateLiveDirectorGrounding() {
     db.pragma("foreign_keys=ON");
     audit.push("deterministic provider-free seed complete");
 
-    const deps: AdventureAgentDependencies = {
-      complete: completeWithProvider, getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => new Date(),
+    // Sanitized per-call diagnostics: phase, finish reason, tool names, usage. Never prompt or response text.
+    const providerCalls: Array<{ phase: string; ok: boolean; finishReason: string; tools: string[]; completionTokens: number; reasoningHint: string }> = [];
+    const instrumentedDeps: AdventureAgentDependencies = {
+      complete: async (input) => {
+        try {
+          const result = await completeWithProvider(input);
+          providerCalls.push({ phase: input.promptVersion ?? "unknown", ok: true,
+            finishReason: result.provenance?.finishReason ?? "unknown", tools: result.message.toolCalls?.map(call => call.name) ?? [],
+            completionTokens: result.usage?.completionTokens ?? -1,
+            reasoningHint: result.message.content === null && !result.message.toolCalls?.length ? "empty" : "content-or-tool" });
+          return result;
+        } catch (error) {
+          providerCalls.push({ phase: input.promptVersion ?? "unknown", ok: false, finishReason: (error as Error).name,
+            tools: [], completionTokens: -1, reasoningHint: (error as Error).message.slice(0, 60) });
+          throw error;
+        }
+      },
+      getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => new Date(),
     };
-    const beats: Array<{ intent: "open" | "continue"; state: string; receipts: number; narration: boolean }> = [];
+    const beats: Array<{ intent: "open" | "continue"; state: string; receipts: number; narration: boolean; blockers: string[] }> = [];
     let capHit: string | null = null;
     for (let beat = 0; beat < MAX_BEATS; beat += 1) {
       const before = usageTotals(db, f.campaign.id);
@@ -100,19 +116,25 @@ export async function evaluateLiveDirectorGrounding() {
       if (before.tokens >= MAX_TOKENS) { capHit = "max-tokens"; break; }
       if (before.cost >= MAX_USD) { capHit = "max-usd"; break; }
       const intent = beat === 0 ? "open" as const : "continue" as const;
-      const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, { intent, expectedModeRevision: 1, idempotencyKey: `live-beat-${beat}` });
-      await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, deps);
+      let run;
+      try {
+        run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, { intent, expectedModeRevision: 1, idempotencyKey: `live-beat-${beat}` });
+      } catch (error) {
+        audit.push(`beat ${beat} (${intent}) could not open: ${(error as Error).name}`);
+        break;
+      }
+      await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, instrumentedDeps);
       const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
-      beats.push({ intent, state: executed.state, receipts: executed.receipts.length, narration: executed.narration !== null });
+      beats.push({ intent, state: executed.state, receipts: executed.receipts.length, narration: executed.narration !== null, blockers: executed.blockers });
       const after = usageTotals(db, f.campaign.id);
-      audit.push(`beat ${beat} (${intent}) state=${executed.state} receipts=${executed.receipts.length} calls=${after.calls} tokens=${after.tokens}`);
-      if (executed.state !== "completed") { audit.push(`beat ${beat} stopped at state ${executed.state}`); break; }
+      audit.push(`beat ${beat} (${intent}) state=${executed.state} receipts=${executed.receipts.length} calls=${after.calls} tokens=${after.tokens} blockers=${executed.blockers.join(",") || "none"}`);
+      // Continue after a non-completed beat to measure reliability; each unknown is already terminal and unreplayed.
     }
     const total = usageTotals(db, f.campaign.id);
     const artifact = {
       version: 1, mode: "live", model: provider.model, baseUrlDigest: createHash("sha256").update(provider.baseUrl).digest("hex"),
       pricing: provider.pricing, caps: { beats: MAX_BEATS, calls: MAX_CALLS, tokens: MAX_TOKENS, costUsd: MAX_USD },
-      totals: total, capHit, beats, readToolsUsed: readToolsUsed(db, f.campaign.id),
+      totals: total, capHit, beats, readToolsUsed: readToolsUsed(db, f.campaign.id), providerCalls,
       audit: [...audit, "credentials, URLs, prompts, and provider responses omitted"],
     };
     db.close(); f.repo.close();

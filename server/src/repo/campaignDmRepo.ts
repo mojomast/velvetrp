@@ -38,6 +38,8 @@ export const DM_WORLD_TIME_STEP_MINUTES = 30;
 const DM_WORLD_TIME_MAX_STEP_MINUTES = 60;
 /** Narration prompt ceiling, raised for continuity context; the 24k aggregate still reserves planning plus narration. */
 export const DM_NARRATION_PROMPT_MAX_TOKENS = 12_000;
+/** Blockers that mean the table is deciding; the world may still pace and breathe rather than hard-block. */
+const PACING_BLOCKERS = new Set(["waiting-for-player-combat-action", "scene-resolution-requires-gm-binding-or-human-adjudication"]);
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -518,9 +520,10 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
       }
-      // Transition beats are a pacing fallback only when nothing is blocked or awaiting a public rendering.
+      // Transition beats are a pacing fallback unless something needs GM attention or a public rendering.
+      // Waiting on the table (player combat, scene adjudication) still lets the world pace.
       // The step is server-fixed and recorded in the binding, so the model only selects it.
-      if (blockers.length === 0) {
+      if (blockers.every(code => PACING_BLOCKERS.has(code))) {
         const expedition = db.prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?")
           .get(c, s) as { elapsed_minutes: number } | undefined;
         const elapsed = expedition?.elapsed_minutes ?? 0;
