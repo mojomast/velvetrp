@@ -107,6 +107,29 @@ describe("world time and ambient transition beats", () => {
     f.repo.close();
   });
 
+  it("keeps pacing available while a revealed scene waits on the table", async () => {
+    const f = await transitionFixture();
+    f.graph();
+    const first = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id,
+      { intent: "open", expectedModeRevision: 1, idempotencyKey: "pace-open" });
+    const firstWork = f.repo.claimDmPlanning("local-owner", first.runId, "fake", "fake")!;
+    const reveal = firstWork.candidates.find(({ action }) => action === "reveal-node")!;
+    f.repo.settleDmPlanning("local-owner", first.runId, firstWork.claimId, select(reveal), null);
+    f.repo.executeDmBeat("local-owner", first.runId);
+    const firstClaim = f.repo.claimDmNarration("local-owner", first.runId, "fake", "fake", { messages: [] }, 100, 100)!;
+    f.repo.settleDmNarration("local-owner", first.runId, firstClaim, "The gate stands open. What do you do?", "ok");
+    f.repo.getDmNarrationWork("local-owner", first.runId);
+
+    const next = f.repo.openDmBeat("local-owner", f.campaign.id, f.session.id,
+      { intent: "continue", expectedModeRevision: 1, idempotencyKey: "pace-continue" });
+    const work = f.repo.claimDmPlanning("local-owner", next.runId, "fake", "fake")!;
+    // The only blocker is table-wait, so the world may still pace rather than dead-lock.
+    expect(f.repo.getDmRun("local-owner", f.campaign.id, f.session.id, next.runId).blockers)
+      .toContain("scene-resolution-requires-gm-binding-or-human-adjudication");
+    expect(work.candidates.map(({ action }) => action)).toEqual(expect.arrayContaining(["advance-time", "ambient-beat"]));
+    f.repo.close();
+  });
+
   it("narrates a transition beat without a question through the orchestrator", async () => {
     const f = await transitionFixture();
     const complete = vi.fn(async (input: ProviderCompletionInput): Promise<ProviderCompletionResult> => {
