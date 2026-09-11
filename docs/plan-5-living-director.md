@@ -232,7 +232,9 @@ transition selection on stalled beats from about a quarter to about three
 quarters, and a recovery check proves re-orchestrating a completed run never
 spends a provider call. The campaign stopped when the agentrouter account quota
 was exhausted (HTTP 403 `token quota is not enough`); the harness now aborts with
-`provider-quota` rather than burning beats.
+`provider-quota` rather than burning beats. The guarded
+`scripts/test/live-director-playtest.test.ts` (set `LIVE_DIRECTOR_PLAYTEST=1`)
+runs the harness as a test; the default scripts run keeps CI provider-free.
 
 ### P5.3: World time and ambient beats
 
