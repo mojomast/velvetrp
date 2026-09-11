@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import type { Clock, IdGenerator } from "../../runtime.js";
 import {
@@ -11,6 +12,10 @@ export const MAX_TELL_FANOUT = 12;
 export const MAX_TELL_PER_ARRIVAL = 8;
 export const MAX_HOP_COUNT = 2;
 export const MAX_OBSERVATIONS_PER_AGENT = 256;
+export const TOWN_GOSSIP_AGENT_ID = "town-square";
+export const MAX_GOSSIP_FANOUT = 12;
+export const MAX_GOSSIP_SOURCE_ITEMS = 8;
+export const MAX_GOSSIP_PER_NPC = 2;
 
 const MAX_KNOWER_OBSERVATIONS = 8;
 /** Membership roles whose NPCs are considered to share observation with their faction. */
@@ -40,9 +45,16 @@ export interface ToldOnArrivalInput {
   observedRevision: number;
 }
 
+export interface GossipSampleInput {
+  campaignId: string;
+  timelineId: string;
+  sessionId: string;
+}
+
 interface NpcIdRow { npc_id: string }
 interface FactionIdRow { faction_id: string }
 interface CountRow { count: number }
+interface GossipRow { source_command_id: string; text: string; observed_revision: number }
 interface KnowerObservationRow { source_command_id: string; hop_count: number; text: string; observed_revision: number }
 
 const KNOWS_ROW = "observation_id";
@@ -128,6 +140,105 @@ export function propagateFactionWitnessObservations(
       text: input.summary,
       authority: input.authority ?? "verified",
     }));
+  }
+  return recorded;
+}
+
+/**
+ * Deterministic per-NPC gossip sampling. The same NPC hears the same pool item
+ * every time, but roughly half of the present cast hears any given item, so the
+ * pool never implies that "everyone knows".
+ */
+export function gossipSampleIncluded(npcId: string, sourceCommandId: string): boolean {
+  const digest = createHash("sha256").update(`${npcId}\u0000${sourceCommandId}`).digest();
+  return (digest[0]! & 1) === 0;
+}
+
+/**
+ * Adds one campaign-scoped `town` gossip row for a public receipt. The row is
+ * explicitly `rumor` authority and is never derived from a private receipt;
+ * callers must only wire this to public receipt paths. Idempotent per source
+ * command and capped per agent.
+ */
+export function propagateTownGossipObservations(
+  db: DatabaseDriver.Database,
+  dependencies: PropagationDependencies,
+  input: WitnessObservationInput,
+): AgentObservation[] {
+  const repository = createAgentObservationRepository(db, dependencies);
+  const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='town' AND agent_id=?`);
+  const selectExisting = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='town' AND agent_id=? AND source_command_id=? AND hop_count=0
+      AND relayer_agent_id IS NULL`);
+  if (selectExisting.get(input.campaignId, TOWN_GOSSIP_AGENT_ID, input.sourceCommandId) !== undefined) return [];
+  if ((countObservations.get(input.campaignId, TOWN_GOSSIP_AGENT_ID) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) return [];
+  return [repository.record({
+    campaignId: input.campaignId,
+    timelineId: input.timelineId,
+    agentKind: "town",
+    agentId: TOWN_GOSSIP_AGENT_ID,
+    sourceCommandId: input.sourceCommandId,
+    observedRevision: input.observedRevision,
+    channel: "witnessed",
+    hopCount: 0,
+    text: input.summary,
+    authority: "rumor",
+  })];
+}
+
+/**
+ * Lets present NPCs sample the town gossip pool as `told` hop-1 rows attributed
+ * to `town-square` ("you heard it around"). Sampling is deterministic, bounded
+ * per NPC, capped by the per-agent write cap, and skips NPCs that already
+ * witnessed the underlying event. The caller owns the transaction.
+ */
+export function propagateGossipToPresentNpcs(
+  db: DatabaseDriver.Database,
+  dependencies: PropagationDependencies,
+  input: GossipSampleInput,
+): AgentObservation[] {
+  const repository = createAgentObservationRepository(db, dependencies);
+  const present = db.prepare(`SELECT npc_id FROM campaign_npc_presence_v43
+    WHERE campaign_id=? AND session_id=? AND state='present' ORDER BY npc_id LIMIT ?`)
+    .all(input.campaignId, input.sessionId, MAX_GOSSIP_FANOUT) as NpcIdRow[];
+  const gossip = db.prepare(`SELECT source_command_id,text,observed_revision FROM agent_observations
+    WHERE campaign_id=? AND timeline_id=? AND agent_kind='town' AND agent_id=?
+    ORDER BY created_at DESC, observation_id DESC LIMIT ?`)
+    .all(input.campaignId, input.timelineId, TOWN_GOSSIP_AGENT_ID, MAX_GOSSIP_SOURCE_ITEMS) as GossipRow[];
+  const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='npc' AND agent_id=? AND source_command_id=? AND hop_count=0`);
+  const selectTold = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='npc' AND agent_id=? AND source_command_id=? AND hop_count=1
+      AND relayer_agent_id=?`);
+  const countTold = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='npc' AND agent_id=? AND channel='told' AND relayer_agent_id=?`);
+  const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?`);
+  const recorded: AgentObservation[] = [];
+  for (const { npc_id: npcId } of present) {
+    let sampled = (countTold.get(input.campaignId, npcId, TOWN_GOSSIP_AGENT_ID) as CountRow).count;
+    for (const item of gossip) {
+      if (sampled >= MAX_GOSSIP_PER_NPC) break;
+      if (!gossipSampleIncluded(npcId, item.source_command_id)) continue;
+      if (selectWitnessed.get(input.campaignId, npcId, item.source_command_id) !== undefined) continue;
+      if (selectTold.get(input.campaignId, npcId, item.source_command_id, TOWN_GOSSIP_AGENT_ID) !== undefined) continue;
+      if ((countObservations.get(input.campaignId, npcId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) break;
+      recorded.push(repository.record({
+        campaignId: input.campaignId,
+        timelineId: input.timelineId,
+        agentKind: "npc",
+        agentId: npcId,
+        sourceCommandId: item.source_command_id,
+        observedRevision: item.observed_revision,
+        channel: "told",
+        relayerAgentId: TOWN_GOSSIP_AGENT_ID,
+        hopCount: 1,
+        text: item.text,
+        authority: "rumor",
+      }));
+      sampled += 1;
+    }
   }
   return recorded;
 }

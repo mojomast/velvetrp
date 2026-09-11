@@ -2,10 +2,10 @@
 
 Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
 co-presence propagation), P4.3 (trust-gated knowledge reads), P4.4 (Director
-narration knowledge channel), and P4.5 (faction knowledge + gated reaction) are
-implemented and committed; later milestones are planned, not implemented.
-Researched against current `main` after Plan 3 closeout. Design research and
-sources:
+narration knowledge channel), P4.5 (faction knowledge + gated reaction), and
+P4.6 (town gossip pool) are implemented and committed; later milestones are
+planned, not implemented. Researched against current `main` after Plan 3
+closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -149,9 +149,21 @@ Own: campaign-scoped pool derived from public receipts; present-NPC sampling
 with attribution.
 
 Gate: no private receipt enters the pool; no "everyone knows" semantics;
-player-facing projections stay structural. Run pool + privacy tests and
-server typecheck.
+player-facing projections stay structural. Run pool + privacy tests and server
+typecheck.
 Commit: `feat(repo): town-level rumor pool for present NPCs`.
+
+Implemented as `agent_kind='town'` rows with fixed agent id
+`TOWN_GOSSIP_AGENT_ID` (`town-square`): `propagateTownGossipObservations`
+records one `rumor`-authority pool entry per public committed check, and
+`propagateGossipToPresentNpcs` lets each present NPC deterministically sample up
+to `MAX_GOSSIP_PER_NPC` items as `told` hop-1 rows attributed to `town-square`
+("you heard it around"). Sampling uses the exported `gossipSampleIncluded`
+(pure hash parity) so roughly half the cast hears any given item — there is no
+"everyone knows" broadcast — and NPCs that already witnessed the event are
+skipped. The pool is only written from the public adventure-check receipt path;
+no private receipt is wired to it. Player projections are unchanged; reads stay
+GM/owner-gated through P4.3.
 
 ### P4.7: Quest and story integration
 

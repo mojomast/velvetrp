@@ -8,10 +8,16 @@ import {
 } from "../src/repo/observations/agentObservationRepo.js";
 import {
   MAX_FACTION_WITNESS_FANOUT,
+  MAX_GOSSIP_PER_NPC,
+  MAX_GOSSIP_SOURCE_ITEMS,
   MAX_TELL_PER_ARRIVAL,
   MAX_WITNESS_FANOUT,
+  TOWN_GOSSIP_AGENT_ID,
+  gossipSampleIncluded,
   propagateFactionWitnessObservations,
+  propagateGossipToPresentNpcs,
   propagateToldOnArrival,
+  propagateTownGossipObservations,
   propagateWitnessObservations,
   type PropagationDependencies,
 } from "../src/repo/observations/agentObservationPropagation.js";
@@ -106,6 +112,9 @@ async function fixture(npcCount = 3) {
   const factionObservations = (agentId: string) => db.prepare(`SELECT observation_id,agent_id,source_command_id,channel,hop_count,
     relayer_agent_id,text,authority FROM agent_observations WHERE campaign_id=? AND agent_kind='faction' AND agent_id=?
     ORDER BY observation_id`).all(campaign.id, agentId) as ObservationRow[];
+  const townObservations = () => db.prepare(`SELECT observation_id,agent_id,source_command_id,channel,hop_count,
+    relayer_agent_id,text,authority FROM agent_observations WHERE campaign_id=? AND agent_kind='town' AND agent_id=?
+    ORDER BY observation_id`).all(campaign.id, TOWN_GOSSIP_AGENT_ID) as ObservationRow[];
   const addFaction = (factionId: string, memberships: Array<{ npcId: string; role?: string }>) => {
     db.prepare("INSERT INTO campaign_factions_v28 VALUES(?,?,?,?,?)").run(factionId, campaign.id, factionId, "public", at);
     for (const { npcId, role } of memberships) {
@@ -121,7 +130,7 @@ async function fixture(npcCount = 3) {
     observedRevision, channel: "witnessed", hopCount: 0, text, authority: "verified", ...overrides,
   });
   return { repo, db, campaign, session, otherSession, npcs, dependencies, place, placeIn, rootRevision, observations,
-    factionObservations, addFaction, allObservations, row };
+    factionObservations, townObservations, addFaction, allObservations, row };
 }
 
 describe("agent observation propagation", () => {
@@ -242,6 +251,88 @@ describe("agent observation propagation", () => {
     const second = propagateFactionWitnessObservations(f.db, f.dependencies, input);
     expect(second).toEqual(first);
     expect(f.factionObservations("faction-replay")).toHaveLength(1);
+    f.repo.close();
+  });
+
+  it("records one campaign gossip row per public receipt and replays idempotently", async () => {
+    const f = await fixture(1);
+    const input = {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:town", observedRevision: 2, summary: "The hero won a bet at the docks.",
+    };
+    const first = propagateTownGossipObservations(f.db, f.dependencies, input);
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({ agentKind: "town", agentId: TOWN_GOSSIP_AGENT_ID, channel: "witnessed",
+      hopCount: 0, relayerAgentId: null, authority: "rumor", text: "The hero won a bet at the docks." });
+    expect(propagateTownGossipObservations(f.db, f.dependencies, input)).toEqual([]);
+    expect(f.townObservations()).toHaveLength(1);
+    f.repo.close();
+  });
+
+  it("samples gossip to present NPCs with town attribution without claiming everyone knows", async () => {
+    const f = await fixture(12);
+    for (const npcId of f.npcs) f.place(npcId);
+    propagateTownGossipObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:gossip", observedRevision: 3, summary: "A brawl broke out in the square.",
+    });
+    const rows = propagateGossipToPresentNpcs(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+    });
+    const expected = f.npcs.filter((npcId) => gossipSampleIncluded(npcId, "check-command:gossip")).sort();
+    expect(rows.map(({ agentId }) => agentId).sort()).toEqual(expected);
+    for (const row of rows) {
+      expect(row).toMatchObject({ agentKind: "npc", channel: "told", hopCount: 1,
+        relayerAgentId: TOWN_GOSSIP_AGENT_ID, authority: "rumor", sourceCommandId: "check-command:gossip" });
+    }
+    const synthetic = Array.from({ length: 100 }, (_, index) => `npc-${index}`);
+    const included = synthetic.filter((npcId) => gossipSampleIncluded(npcId, "check-command:gossip"));
+    expect(included.length).toBeGreaterThan(0);
+    expect(included.length).toBeLessThan(synthetic.length);
+    expect(propagateGossipToPresentNpcs(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+    })).toEqual([]);
+    f.repo.close();
+  });
+
+  it("does not tell gossip to an NPC that witnessed the event", async () => {
+    const f = await fixture(12);
+    for (const npcId of f.npcs) f.place(npcId);
+    const source = "check-command:witnessed-gossip";
+    propagateWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: source, observedRevision: 1, summary: "Everyone in the room saw this.",
+    });
+    propagateTownGossipObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: source, observedRevision: 1, summary: "Everyone in the room saw this.",
+    });
+    expect(propagateGossipToPresentNpcs(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+    })).toEqual([]);
+    f.repo.close();
+  });
+
+  it("bounds gossip sampled per NPC by MAX_GOSSIP_PER_NPC", async () => {
+    const f = await fixture(12);
+    for (const npcId of f.npcs) f.place(npcId);
+    const pool: string[] = [];
+    for (let index = 0; index < MAX_GOSSIP_SOURCE_ITEMS; index += 1) {
+      pool.push(`gossip-${index}`);
+      propagateTownGossipObservations(f.db, f.dependencies, {
+        campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+        sourceCommandId: `gossip-${index}`, observedRevision: index + 1, summary: `Rumor ${index}`,
+      });
+    }
+    const rows = propagateGossipToPresentNpcs(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+    });
+    const perNpc = new Map<string, number>();
+    for (const row of rows) perNpc.set(row.agentId, (perNpc.get(row.agentId) ?? 0) + 1);
+    for (const npcId of f.npcs) {
+      const sampled = pool.filter((source) => gossipSampleIncluded(npcId, source)).length;
+      expect(perNpc.get(npcId) ?? 0).toBe(Math.min(sampled, MAX_GOSSIP_PER_NPC));
+    }
     f.repo.close();
   });
 
@@ -441,7 +532,7 @@ describe("agent observation propagation", () => {
     const commandId = result.turn.receiptLinks[0]!.commandId;
     const db = new DatabaseDriver(dbPath());
     const rows = db.prepare(`SELECT agent_id,channel,hop_count,text,authority FROM agent_observations
-      WHERE campaign_id=? AND source_command_id=?`).all(campaign.id, commandId) as Array<{ agent_id: string; channel: string; hop_count: number; text: string; authority: string }>;
+      WHERE campaign_id=? AND agent_kind='npc' AND source_command_id=?`).all(campaign.id, commandId) as Array<{ agent_id: string; channel: string; hop_count: number; text: string; authority: string }>;
     db.close();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toEqual({ agent_id: npc.npcId, channel: "witnessed", hop_count: 0,

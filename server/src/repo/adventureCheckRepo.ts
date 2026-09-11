@@ -3,7 +3,12 @@ import type DatabaseDriver from "better-sqlite3";
 import { canonicalAgentJson, resourceIdSchema, utcIsoTimestampSchema } from "@velvet/contracts";
 import { z } from "zod";
 import type { M16Dependencies } from "./effectRepo.js";
-import { propagateFactionWitnessObservations, propagateWitnessObservations } from "./observations/agentObservationPropagation.js";
+import {
+  propagateFactionWitnessObservations,
+  propagateGossipToPresentNpcs,
+  propagateTownGossipObservations,
+  propagateWitnessObservations,
+} from "./observations/agentObservationPropagation.js";
 import { DND_5E_RULESET_DESCRIPTOR, resolveCampaignRuleset } from "../rulesets/index.js";
 import { exactPairParameters, stripCandidateLabels } from "../agent/providerCandidateProjection.js";
 
@@ -220,6 +225,19 @@ export function createAdventureCheckRepository(db: DatabaseDriver.Database, deps
           sourceCommandId: commandId,
           observedRevision: current.timelineRevision,
           summary: witnessSummary,
+        });
+        propagateTownGossipObservations(db, deps, {
+          campaignId: current.campaignId,
+          timelineId: current.timelineId,
+          sessionId: current.sessionId,
+          sourceCommandId: commandId,
+          observedRevision: current.timelineRevision,
+          summary: witnessSummary,
+        });
+        propagateGossipToPresentNpcs(db, deps, {
+          campaignId: current.campaignId,
+          timelineId: current.timelineId,
+          sessionId: current.sessionId,
         });
         return { commandId, receipt };
       }).immediate();
