@@ -76,7 +76,7 @@ describe("CampaignPlayPage", () => {
     const client = api(), navigate = vi.fn();
     const at = "2030-01-01T00:00:00.000Z";
     const world = { currentLocations: [{ actorId: "actor", locationId: "harbor", revision: 2, updatedAt: at }], visibleLocations: [{ locationId: "harbor", parentLocationId: null, name: "Harbor", description: "Salt air" }, { locationId: "road", parentLocationId: null, name: "Road", description: "Inland" }], visibleConnections: [{ connectionId: "route", fromLocationId: "harbor", toLocationId: "road" }] };
-    const worldApi = { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn() };
+    const worldApi = { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn(), place: vi.fn(), camp: vi.fn() };
     const authorization: StudioAuthorization = { role: "player", audience: "player", generation: 1, reauthorize: vi.fn() };
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} worldApi={worldApi} authorization={authorization} onBack={vi.fn()} onUnavailable={vi.fn()} onNavigate={navigate} />);
     await screen.findByRole("heading", { name: "Adventure room" });

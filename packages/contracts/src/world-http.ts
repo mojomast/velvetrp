@@ -69,9 +69,11 @@ export type CampaignWorldHttpResponse=z.infer<typeof campaignWorldHttpResponseSc
 export type ActorTravelCommandRequest=z.infer<typeof actorTravelCommandRequestSchema>;
 export type ActorTravelCommandResponse=z.infer<typeof actorTravelCommandResponseSchema>;
 export type ActorPlacementCommandRequest=z.infer<typeof actorPlacementCommandRequestSchema>;
+export type ActorPlacementCommandResponse=z.infer<typeof actorPlacementCommandResponseSchema>;
 export type WorldCurrentLocationHttp=z.infer<typeof worldCurrentLocationHttpSchema>;
 export type ActorTravelDiscoveryHttp=z.infer<typeof actorTravelDiscoveryHttpSchema>;
 export type ActorCampCommandRequest=z.infer<typeof actorCampCommandRequestSchema>;
+export type ActorCampCommandResponse=z.infer<typeof actorCampCommandResponseSchema>;
 
 export const npcPublicStateHttpSchema=z.object({name:z.string().trim().min(1).max(200),
   description:z.string().trim().min(1).max(4_000).optional(),archetype:z.string().trim().min(1).max(200).optional()}).strict();

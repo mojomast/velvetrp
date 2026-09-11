@@ -1,4 +1,4 @@
-import type { ActorTravelCommandRequest, ActorTravelCommandResponse, CampaignWorldHttpResponse } from "@velvet/contracts";
+import type { ActorCampCommandRequest, ActorCampCommandResponse, ActorPlacementCommandRequest, ActorPlacementCommandResponse, ActorTravelCommandRequest, ActorTravelCommandResponse, CampaignWorldHttpResponse } from "@velvet/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "../../../api";
 import { isDefiniteNarrativeRejection, NarrativeMutationStatus, receiptFrom } from "../NarrativeMutationStatus";
@@ -6,12 +6,18 @@ import { beginNarrativeMutation, blocksNarrativeMutation, clearNarrativeMutation
 import type { StudioAuthorization } from "../StudioAuthorization";
 import { LocationTree } from "./LocationTree";
 import { TravelDialog } from "./TravelDialog";
+import { WorldExpeditionPanel } from "./WorldExpeditionPanel";
 import { WorldbuildingNavigation } from "./WorldbuildingNavigation";
 import { LocationRelationships } from "./LocationRelationships";
 import { CampaignStartingLocationPanel } from "../generation/CampaignStartingLocationPanel";
 import { campaignStartingLocationApi, type CampaignStartingLocationApi } from "../generation/campaignStartingLocationApi";
 
-export interface WorldExplorerApi { getWorld: (campaignId: string) => Promise<{ data: CampaignWorldHttpResponse; revision: number }>; travel: (actorId: string, input: ActorTravelCommandRequest) => Promise<ActorTravelCommandResponse> }
+export interface WorldExplorerApi {
+  getWorld: (campaignId: string) => Promise<{ data: CampaignWorldHttpResponse; revision: number }>;
+  travel: (actorId: string, input: ActorTravelCommandRequest) => Promise<ActorTravelCommandResponse>;
+  place: (actorId: string, input: ActorPlacementCommandRequest) => Promise<ActorPlacementCommandResponse>;
+  camp: (actorId: string, input: ActorCampCommandRequest) => Promise<ActorCampCommandResponse>;
+}
 export function WorldExplorerPage(props: React.ComponentProps<typeof WorldExplorerWorkspace>) {
   return <WorldExplorerWorkspace key={`${props.campaignId}:${props.authorization.role}:${props.authorization.audience}:${props.authorization.generation}`} {...props} />;
 }
@@ -42,13 +48,30 @@ function WorldExplorerWorkspace({ campaignId, authorization, api, startingLocati
     if (mounted.current) changedRef.current?.();
     } finally { busy.current = false; if (mounted.current) setChecking(false); }
   }
+  async function expedition<T extends { receipt: { revisionAfter: number } }>(actorId: string, operation: string, identity: { expectedRevision: number; idempotencyKey: string }, issue: () => Promise<T>) {
+    if (blockedRef.current || busy.current || (actors && !actors.some((actor) => actor.actorId === actorId))) return;
+    busy.current = true; setChecking(true);
+    try {
+    let freshAuthorization; try { freshAuthorization = await authorization.reauthorize(); } catch { return; }
+    if (!mounted.current || blockedRef.current || freshAuthorization.role !== authorization.role || freshAuthorization.audience !== authorization.audience) return;
+    if (freshAuthorization.role === "observer") { setStatus(`${operation} requires a GM.`); return; }
+    const pending = beginNarrativeMutation(campaignId, "travel", operation, { resourceId:actorId,idempotencyKey:identity.idempotencyKey,expectedRevision:identity.expectedRevision }); if (!pending) return;
+    try { const result = await issue(); const receipt=receiptFrom(result);markNarrativeConfirmed(pending, result, receipt); const refreshed = await api.getWorld(campaignId).then((next) => { if (mounted.current) { setWorld(next.data); setRevision(next.revision); setPhase("ready"); } return next.revision; }).catch(() => false); const confirmed={...pending,phase:"confirmed" as const,memoryResult:result,receipt,resultingRevision:receipt?.revisionAfter,refresh:"required" as const};if (refreshed !== false && receipt && refreshed === receipt.revisionAfter) consumeNarrativeConfirmed(confirmed); else markNarrativePartial(confirmed); }
+    catch (error) { if (isDefiniteNarrativeRejection(error)) { clearNarrativeMutation(campaignId, "travel"); setStatus(`${operation} was definitely rejected as stale or conflicting. Refresh before creating a new command.`); } else markNarrativeAmbiguous(pending); }
+    if (mounted.current) changedRef.current?.();
+    } finally { busy.current = false; if (mounted.current) setChecking(false); }
+  }
+  const place = (actorId: string, command: ActorPlacementCommandRequest) => expedition(actorId, "Place actor", command, () => api.place(actorId, command));
+  const camp = (actorId: string, command: ActorCampCommandRequest) => expedition(actorId, "Make camp", command, () => api.camp(actorId, command));
   const names = new Map(world?.visibleLocations.map((item) => [item.locationId, item.name]) ?? []), currentIds = world?.currentLocations.map((item) => item.locationId) ?? [];
   const location = world?.visibleLocations.find(item => item.locationId === selectedLocation) ?? world?.visibleLocations[0];
   const Container = embedded ? "section" : "main", Heading = embedded ? "h3" : "h1";
   const travelPlan = world && <TravelDialog inline={embedded} actors={actors} onReviewChange={setReviewing} world={world} revision={revision} disabled={blocked || checking || phase !== "ready" || blocksNarrativeMutation(mutation) || authorization.role === "observer"} onTravel={travel} />;
+  const expeditionPlan = world && actors && actors.length > 0 && <WorldExpeditionPanel campaignId={campaignId} revision={revision} world={world} actors={actors} canCommand={authorization.role === "owner" || authorization.role === "gm"} disabled={blocked || checking || phase !== "ready" || blocksNarrativeMutation(mutation)} api={{ place, camp }} />;
   return <Container className={embedded ? "atlas-world-tools" : "studio-page"} aria-labelledby="world-heading"><div className={embedded ? "atlas-world-body" : "studio-shell"}><header className={embedded ? "atlas-domain-heading" : "studio-header"}><div>{!embedded && <button className="back-link" onClick={onBack}>← Campaign</button>}<p className="eyebrow">KNOWN WORLD</p><Heading ref={heading} tabIndex={-1} id="world-heading">World explorer</Heading></div>{!embedded && travelPlan}</header>
     {embedded && travelPlan}
     <NarrativeMutationStatus mutation={mutation} onRefresh={() => void authorizeAndRefresh()} />{status && <p role="status">{status}</p>}
+    {expeditionPlan}
     {!embedded && <><WorldbuildingNavigation current="world" authorization={authorization} />
     <CampaignStartingLocationPanel campaignId={campaignId} candidates={(world?.visibleLocations ?? []).map(({ locationId, name }) => ({ locationId, name }))} canDesignate={authorization.role === "owner" || authorization.role === "gm"} api={startingLocationApi} /></>}
     <button className="ghost" onClick={() => void authorizeAndRefresh()}>Reauthorize & refresh</button>

@@ -230,6 +230,8 @@ import type {
 } from "@velvet/contracts";
 import {
   actorCheckCommandRequestSchema, actorCheckCommandResponseSchema,
+  actorCampCommandRequestSchema, actorCampCommandResponseSchema,
+  actorPlacementCommandRequestSchema, actorPlacementCommandResponseSchema,
   actorTravelCommandRequestSchema, actorTravelCommandResponseSchema, gmCampaignQuestsHttpResponseSchema, gmCampaignStoryHttpResponseSchema,
   campaignWorldHttpResponseSchema, createCampaignFactionHttpRequestSchema, createCampaignFactionHttpResponseSchema,
   createCampaignNpcHttpRequestSchema, createCampaignNpcHttpResponseSchema, createCampaignQuestHttpRequestSchema,
@@ -242,7 +244,9 @@ import {
   storylineCommandHttpRequestSchema, storylineCommandHttpResponseSchema,
 } from "@velvet/contracts";
 import type {
-  ActorCheckCommandRequest, ActorCheckCommandResponse, ActorTravelCommandRequest, ActorTravelCommandResponse,
+  ActorCampCommandRequest, ActorCampCommandResponse, ActorCheckCommandRequest, ActorCheckCommandResponse,
+  ActorPlacementCommandRequest, ActorPlacementCommandResponse,
+  ActorTravelCommandRequest, ActorTravelCommandResponse,
   CampaignQuestsHttpResponse, CampaignStoryHttpResponse,
   CampaignWorldHttpResponse, CreateCampaignFactionHttpRequest, CreateCampaignNpcHttpRequest,
   CreateCampaignQuestHttpRequest, CreateCampaignStorylineHttpRequest, FactionReputationCommandHttpRequest,
@@ -2770,6 +2774,29 @@ export async function travelActor(actorId: string, input: ActorTravelCommandRequ
   requireStatus(success, 200, "Actor travel");
   const response = actorTravelCommandResponseSchema.parse(success.body); bindReceipt(response.receipt, body, "Actor travel");
   if (JSON.stringify(response.locations.map((item) => item.actorId)) !== JSON.stringify(body.partyActorIds)) throw new Error("Actor travel response did not match the exact party");
+  return response;
+}
+
+/** GM-only bootstrap placement of one previously unplaced actor; never retried automatically. */
+export async function placeActor(actorId: string, input: ActorPlacementCommandRequest): Promise<ActorPlacementCommandResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorPlacementCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "placement-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor placement");
+  const response = actorPlacementCommandResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Actor placement");
+  if (response.location.actorId !== id || response.location.locationId !== body.locationId) throw new Error("Actor placement response did not match the request");
+  return response;
+}
+
+/** Establishes one camp at the actor's current location; never retried automatically. */
+export async function establishActorCamp(actorId: string, input: ActorCampCommandRequest): Promise<ActorCampCommandResponse> {
+  const id = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => actorCampCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(resourceLane("actors", id, "camp-commands"), { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor camp");
+  const response = actorCampCommandResponseSchema.parse(success.body);
+  bindReceipt(response.receipt, body, "Actor camp");
   return response;
 }
 

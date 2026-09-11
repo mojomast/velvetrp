@@ -37,7 +37,7 @@ function authorization(role: StudioAuthorization["role"] = "gm", generation = 1)
 function castApi(): CastStudioApi {
   return { listNpcs: vi.fn().mockResolvedValue({ data: npcs, revision: 2 }), listFactions: vi.fn().mockResolvedValue({ data: factions, revision: 2 }), createNpc: vi.fn(), createFaction: vi.fn(), relationship: vi.fn(), reputation: vi.fn(), previewNpcs: shared.projectNpcsForPlayers, previewFactions: shared.projectFactionsForPlayers };
 }
-function worldApi(): WorldExplorerApi { return { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn() }; }
+function worldApi(): WorldExplorerApi { return { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn(), place: vi.fn(), camp: vi.fn() }; }
 
 describe("connected worldbuilding workspace", () => {
   beforeEach(() => {
