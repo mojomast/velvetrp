@@ -1,7 +1,8 @@
 # Plan 5: A living-world Director
 
-Status: in progress. P5.1 ordered beat composition is underway; later
-milestones are planned, not implemented. Researched against current `main` after
+Status: in progress. P5.1 ordered composition, P5.2 bounded read grounding, and
+P5.3 world time and ambient beats are implemented; P5.4-P5.7 are planned, not
+implemented. Researched against current `main` after
 Plan 3 closeout; depends on Plan 4 for NPC knowledge, which is now delivered.
 Follow [the shared execution protocol](playability-execution.md). Small-context
 subagents with exact ownership; milestone commits must remain buildable.
@@ -202,6 +203,28 @@ most a bounded amount per beat. Run world/director contracts, narration
 heuristic, recovery tests and typechecks.
 Commits: `feat(contracts): add world time and ambient beats`, then
 `feat(repo): record world time and ambient presentation`.
+
+Implemented: `campaignDmActionSchema` adds `advance-time` and `ambient-beat`, and
+`dmNarrationTool`/`parseDmScene`/`validDmScene` make the narration `question`
+optional only when the public scene marks `transition: true` (every committed
+receipt is a transition beat); agency/outcome/ending rejections are unchanged.
+The Director advertises the two transition candidates inside `if(!open)` and only
+when the room has no blockers, so they are a pacing fallback rather than a way to
+skip a required public rendering or a withheld GM binding. `advance-time` carries
+a server-fixed, bounded step (`DM_WORLD_TIME_STEP_MINUTES = 30`, enforced max 60)
+inside its binding; execution rechecks the elapsed revision, advances
+`world_expeditions_v60.elapsed_minutes`, and writes an immutable
+`dm_world_time_receipts` row in the same transaction as the run receipt.
+`ambient-beat` writes only a presentation receipt
+(`{kind:'ambient-presentation',stateChanged:false}`) and no domain command, so it
+cannot mutate state or assert an outcome. The `dm_receipts` and
+`dm_composition_receipts` action CHECKs and their authority triggers were
+extended so `advance-time` requires the matching world-time receipt and
+`ambient-beat` requires no domain command. A new exact predecessor upgrade
+rebuilds only those two receipt tables and their triggers, preserving rows. No
+new HTTP operation. Known limitation: the model still chooses when to pace;
+because the step size and elapsed guard are server-authored, a transition can
+never move time by an arbitrary or LLM-invented amount.
 
 ### P5.4: Knowledge-aware narration (Plan 4 dependency)
 

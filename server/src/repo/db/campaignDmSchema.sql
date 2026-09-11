@@ -61,17 +61,25 @@ CREATE TABLE dm_decisions (
 );
 CREATE TABLE dm_receipts (
   run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
-  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue')),
+  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat')),
   domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
   public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000)
 );
 CREATE TABLE dm_composition_receipts (
   run_id TEXT NOT NULL REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
   ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 2),
-  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue')),
+  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue','advance-time','ambient-beat')),
   domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
   public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000),
   PRIMARY KEY(run_id,ordinal)
+);
+CREATE TABLE dm_world_time_receipts (
+  run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
+  command_key TEXT NOT NULL UNIQUE,
+  minutes INTEGER NOT NULL CHECK(typeof(minutes)='integer' AND minutes BETWEEN 1 AND 60),
+  elapsed_before INTEGER NOT NULL CHECK(typeof(elapsed_before)='integer' AND elapsed_before BETWEEN 0 AND 1000000000),
+  elapsed_after INTEGER NOT NULL CHECK(elapsed_after=elapsed_before+minutes AND elapsed_after<=1000000000),
+  occurred_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at) IS NOT NULL AND strftime('%Y-%m-%dT%H:%M:%fZ',occurred_at)=occurred_at AND substr(occurred_at,12,2) BETWEEN '00' AND '23')
 );
 CREATE TABLE dm_public_history (
   run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
@@ -129,6 +137,11 @@ CREATE TRIGGER dm_composition_receipts_update BEFORE UPDATE ON dm_composition_re
 CREATE TRIGGER dm_composition_receipts_delete BEFORE DELETE ON dm_composition_receipts BEGIN SELECT RAISE(ABORT,'DM composition receipt is immutable'); END;
 CREATE TRIGGER dm_composition_receipts_replace BEFORE INSERT ON dm_composition_receipts WHEN EXISTS(SELECT 1 FROM dm_composition_receipts WHERE run_id=NEW.run_id AND ordinal=NEW.ordinal)
 BEGIN SELECT RAISE(ABORT,'DM composition receipts cannot be replaced'); END;
+CREATE TRIGGER dm_world_time_receipts_update BEFORE UPDATE ON dm_world_time_receipts BEGIN SELECT RAISE(ABORT,'DM world time receipt is immutable'); END;
+CREATE TRIGGER dm_world_time_receipts_delete BEFORE DELETE ON dm_world_time_receipts BEGIN SELECT RAISE(ABORT,'DM world time receipt is immutable'); END;
+CREATE TRIGGER dm_world_time_receipts_replace BEFORE INSERT ON dm_world_time_receipts WHEN EXISTS(
+  SELECT 1 FROM dm_world_time_receipts WHERE run_id=NEW.run_id OR command_key=NEW.command_key)
+BEGIN SELECT RAISE(ABORT,'DM world time receipt cannot be replaced'); END;
 CREATE TRIGGER dm_composition_receipts_authority BEFORE INSERT ON dm_composition_receipts WHEN NOT EXISTS(
   SELECT 1 FROM dm_runs run JOIN dm_decisions decision USING(run_id)
   WHERE run.run_id=NEW.run_id AND run.state='awaiting-approval' AND decision.kind IN ('human-approved','ai-policy-v1')
@@ -136,7 +149,10 @@ CREATE TRIGGER dm_composition_receipts_authority BEFORE INSERT ON dm_composition
       WHERE encounter.campaign_id=run.campaign_id AND encounter.session_id=run.session_id AND command.idempotency_key=NEW.command_key
         AND NEW.action IN ('encounter-start','encounter-materialize','encounter-complete','enemy-turn'))
       OR EXISTS(SELECT 1 FROM story_commands_v34 command WHERE command.campaign_id=run.campaign_id
-        AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)))
+        AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)
+      OR (NEW.action='advance-time' AND EXISTS(SELECT 1 FROM dm_world_time_receipts world_time
+        WHERE world_time.run_id=run.run_id AND world_time.command_key=NEW.command_key))
+      OR NEW.action='ambient-beat'))
 BEGIN SELECT RAISE(ABORT,'DM composition receipt requires approved domain command'); END;
 CREATE TRIGGER dm_public_history_replace BEFORE INSERT ON dm_public_history WHEN EXISTS(SELECT 1 FROM dm_public_history WHERE run_id=NEW.run_id)
 BEGIN SELECT RAISE(ABORT,'DM history cannot be replaced'); END;
@@ -168,7 +184,10 @@ CREATE TRIGGER dm_receipts_authority BEFORE INSERT ON dm_receipts WHEN NOT EXIST
       WHERE encounter.campaign_id=run.campaign_id AND encounter.session_id=run.session_id AND command.idempotency_key=NEW.command_key
         AND NEW.action IN ('encounter-start','encounter-materialize','encounter-complete','enemy-turn'))
       OR EXISTS(SELECT 1 FROM story_commands_v34 command WHERE command.campaign_id=run.campaign_id
-        AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)))
+        AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)
+      OR (NEW.action='advance-time' AND EXISTS(SELECT 1 FROM dm_world_time_receipts world_time
+        WHERE world_time.run_id=run.run_id AND world_time.command_key=NEW.command_key))
+      OR NEW.action='ambient-beat'))
 BEGIN SELECT RAISE(ABORT,'DM receipt requires approved domain command'); END;
 CREATE TRIGGER dm_public_history_authority BEFORE INSERT ON dm_public_history WHEN NOT EXISTS(
   SELECT 1 FROM dm_runs run JOIN dm_control control ON control.campaign_id=run.campaign_id AND control.revision=run.mode_revision AND control.mode=run.mode

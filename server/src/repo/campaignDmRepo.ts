@@ -33,6 +33,9 @@ const MAX_KNOWLEDGE_ENTRIES_PER_NPC = 4;
 const MAX_KNOWLEDGE_TEXT_LENGTH = 300;
 /** One bounded provider-call deadline for Director planning and narration. */
 export const DM_PROVIDER_DEADLINE_MS = 120_000;
+/** The server, never the model, fixes how far one transition beat may advance world time. */
+export const DM_WORLD_TIME_STEP_MINUTES = 30;
+const DM_WORLD_TIME_MAX_STEP_MINUTES = 60;
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -353,8 +356,12 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         return { npcId, npcName, entries };
       })
       .filter(({entries})=>entries.length>0);
+    const receipts = receiptsFor(r.run_id);
+    // A beat that only advances recorded time or presents ambiance hands pacing back without requiring a question.
+    const transition = receipts.length > 0
+      && receipts.every((item: any) => item.action === "ambient-beat" || item.action === "advance-time");
     return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,npcKnowledge,
-      receipts:receiptsFor(r.run_id),safety };
+      receipts,transition,safety };
   }
   const narrationGuard = (r:RunRow, context:unknown) => hash({context,
     campaign:db.prepare("SELECT administration_revision,active_timeline_id,lifecycle_status FROM campaigns WHERE id=?").get(r.campaign_id),
@@ -492,6 +499,16 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         if (!clue.revealed && available >= clue.revealThreshold && (available > 0 || evidence))
           add("reveal-clue", `Reveal eligible clue: ${clue.title}`, clue.clueId, story!.revision, { storylineId: clue.storylineId });
       }
+      // Transition beats are a pacing fallback only when nothing is blocked or awaiting a public rendering.
+      // The step is server-fixed and recorded in the binding, so the model only selects it.
+      if (blockers.length === 0) {
+        const expedition = db.prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?")
+          .get(c, s) as { elapsed_minutes: number } | undefined;
+        const elapsed = expedition?.elapsed_minutes ?? 0;
+        add("advance-time", `Let ${DM_WORLD_TIME_STEP_MINUTES} minutes of world time pass`, s, elapsed,
+          { minutes: DM_WORLD_TIME_STEP_MINUTES, elapsedBefore: elapsed });
+        add("ambient-beat", "Hold on an ambient moment with no state change", s, 0, {});
+      }
     }
     const bounded = bindings.slice(0, 24);
     const historicalRecall = services.getCampaignRecall(g, { campaignId: c, sessionId: s, audience: { kind: "dm" }, purpose: "dm-planning",
@@ -534,6 +551,29 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       receipt = result.receipt;
       summary = `The enemy's ${result.resolution.kind} is resolved. ${result.resolution.outcomes.flatMap(outcome => outcome.kind === "damage"
         ? [`${outcome.applied} damage applied; the target has ${outcome.hitPointsAfter} HP.`] : []).join(" ")} Combat is now in round ${result.combat.round}.`;
+    } else if (action === "ambient-beat") {
+      // Presentation only: no domain command and no state change; the receipt records the selected beat.
+      receipt = { kind: "ambient-presentation", stateChanged: false };
+      summary = "An ambient moment passes. No game state changes.";
+    } else if (action === "advance-time") {
+      // The step bound and elapsed revision are server-authored; the model can only select the exact candidate.
+      const minutes = binding.data?.minutes;
+      if (!Number.isSafeInteger(minutes) || minutes < 1 || minutes > DM_WORLD_TIME_MAX_STEP_MINUTES)
+        throw new CampaignDmConflictError("world time step unavailable");
+      const expedition = db.prepare("SELECT elapsed_minutes FROM world_expeditions_v60 WHERE campaign_id=? AND session_id=?")
+        .get(r.campaign_id, r.session_id) as { elapsed_minutes: number } | undefined;
+      const before = expedition?.elapsed_minutes ?? 0;
+      if (before !== binding.revision) throw new CampaignDmConflictError("world time changed");
+      const after = before + minutes;
+      if (!Number.isSafeInteger(after) || after > 1_000_000_000) throw new CampaignDmConflictError("world time exceeds bound");
+      if (expedition) db.prepare("UPDATE world_expeditions_v60 SET elapsed_minutes=? WHERE campaign_id=? AND session_id=?")
+        .run(after, r.campaign_id, r.session_id);
+      else db.prepare("INSERT INTO world_expeditions_v60(campaign_id,session_id,elapsed_minutes,camp_location_id,camp_command_id) VALUES(?,?,?,NULL,NULL)")
+        .run(r.campaign_id, r.session_id, after);
+      db.prepare("INSERT INTO dm_world_time_receipts(run_id,command_key,minutes,elapsed_before,elapsed_after,occurred_at) VALUES(?,?,?,?,?,?)")
+        .run(r.run_id, key, minutes, before, after, now());
+      receipt = { kind: "world-time-advanced", minutes, elapsedBefore: before, elapsedAfter: after };
+      summary = `Time passes: ${minutes} minutes elapse with no other change to the world.`;
     } else {
       if(!publicSource(r.campaign_id,binding.target))throw new CampaignDmConflictError('story requires a reviewed public rendering');
       if(action==='resolve-node'&&r.mode==='ai'&&!binding.data.boundEvidence)throw new CampaignDmConflictError('scene evidence is not bound');

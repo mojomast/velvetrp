@@ -15,6 +15,13 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
   const upgradeNarration = JSON.stringify(actual) === JSON.stringify(expected.filter(object => !object.name.startsWith("dm_narration_")));
   const upgradeComposition = JSON.stringify(actual) === JSON.stringify(expected.filter(object => object.name !== "dm_composition_receipts"));
   const upgradePlanningRounds = JSON.stringify(actual) === JSON.stringify(expected.filter(object => !object.name.startsWith("dm_planning_rounds")));
+  // P5.3 transition beats: the receipt action CHECKs and two authority triggers changed, plus the world-time receipt table.
+  const worldTimeNames = (name: string) => name.startsWith("dm_world_time_receipts");
+  const transitionChanged = new Set(["dm_receipts","dm_composition_receipts","dm_receipts_authority","dm_composition_receipts_authority"]);
+  const normalizeTransition = (objects: SchemaObject[]) => objects.map(object => transitionChanged.has(object.name)
+    ? { ...object, sql: `<transition:${object.name}>` } : object);
+  const upgradeTransition = JSON.stringify(normalizeTransition(actual))
+    === JSON.stringify(normalizeTransition(expected.filter(object => !worldTimeNames(object.name))));
   const additions = expected.filter(object => object.name.startsWith("dm_") && !actual.some(old => old.name===object.name));
   const previous = expected.filter(object => !object.name.startsWith("dm_"));
   const mapNames = new Set(["tactical_map_contexts_v2", "tactical_map_contexts_v2_update", "tactical_map_contexts_v2_delete"]);
@@ -23,7 +30,8 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
       : object.name === "tactical_map_previews_v58" ? object.sql.replace("  actor_location_revision INTEGER,\n", "") : object.sql,
   }));
   const upgradeMap = JSON.stringify(actual) === JSON.stringify(oldMap);
-  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && !upgradePlanningRounds && JSON.stringify(actual) !== JSON.stringify(previous)) return false;
+  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition
+    && JSON.stringify(actual) !== JSON.stringify(previous)) return false;
   if (db.inTransaction) throw new Error("DM upgrade requires an independent transaction");
   const foreignKeys = db.pragma("foreign_keys", { simple: true });
   db.pragma("foreign_keys = OFF");
@@ -52,9 +60,20 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
         }
         for (const object of expected.filter(object => mapNames.has(object.name))) db.exec(object.sql);
       }
+      if (upgradeTransition) {
+        for (const table of ["dm_receipts", "dm_composition_receipts"]) {
+          const definition = expected.find(object => object.type === "table" && object.name === table)!;
+          const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(row => row.name).join(",");
+          db.exec(`CREATE TEMP TABLE dm_upgrade_backup AS SELECT * FROM ${table}`);
+          db.exec(`DROP TABLE ${table}`); db.exec(definition.sql);
+          db.exec(`INSERT INTO ${table}(${columns}) SELECT ${columns} FROM dm_upgrade_backup`);
+          db.exec("DROP TABLE dm_upgrade_backup");
+          for (const object of expected.filter(object => object.tbl_name === table && object.type !== "table")) db.exec(object.sql);
+        }
+      }
       for (const object of additions.filter(object => object.type === "table")) db.exec(object.sql);
       for (const object of additions.filter(object => object.type !== "table")) db.exec(object.sql);
-      if (!upgradeReview && !upgradeNarration && !upgradeComposition && !upgradePlanningRounds) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
+      if (!upgradeReview && !upgradeNarration && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
       validate();
     }).immediate();
     return true;
