@@ -11,8 +11,8 @@ import { orchestrateCampaignDmBeat } from "../server/src/agent/campaignDmOrchest
 import type { AdventureAgentDependencies } from "../server/src/agent/adventureOrchestrator.js";
 import { DM_SCENE_DESCRIPTION_PREFIX } from "../server/src/agent/dmNarration.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
-import { PLAYTEST_PACING_ACTIONS, enableHumanPlayerTravel, gradeDmRun, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
-import { HUMAN_LEAK_MARKERS, fuzzDeclarations, type HumanDeclaration } from "../server/test/fixtures/humanPlayer.js";
+import { PLAYTEST_PACING_ACTIONS, enableHumanPlayerTravel, gradeDmRun, resetHumanPlayerToMarket, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
+import { HUMAN_LEAK_MARKERS, fuzzDeclarations, scorePlayerTurn, type HumanDeclaration } from "../server/test/fixtures/humanPlayer.js";
 import { readProxyKey } from "./evaluate-live-director-grounding.js";
 
 const OWNER = "local-owner";
@@ -32,7 +32,8 @@ export interface PlaytestOptions {
 
 export interface PlayerTurnRecord {
   id: string; category: string; declaration: string; status: number; state: string; outcome: string;
-  receipts: number; narrationSource: string; narrationTail: string; calls: number; leak: string | null; failures: string[];
+  receipts: number; narrationSource: string; narrationTail: string; calls: number; leak: string | null;
+  advertised: string[]; called: string[]; actioned: boolean; score: string[]; failures: string[];
 }
 
 export interface PlaytestArtifact {
@@ -84,12 +85,14 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     let providerQuotaHit = false;
     let pendingScene: string | null = null;
     let pendingSelection: string | null = null;
+    let pendingAdvertised = new Set<string>();
     const deps: AdventureAgentDependencies = {
       complete: async (input) => {
         try {
           const result = await completeWithProvider(input);
           const usage = result.usage;
           const price = provider.pricing;
+          if (input.promptVersion === "adventure-planning-v1") for (const tool of input.tools ?? []) pendingAdvertised.add(tool.name);
           if (input.promptVersion === "campaign-dm-narration-v1") {
             pendingScene = result.message.toolCalls?.find(call => call.name === "submit_dm_scene")?.arguments ?? null;
           }
@@ -127,6 +130,9 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     const submitPlayerTurn = async (entry: HumanDeclaration, index: number) => {
       if (!app || !entry) return;
       const before = providerCalls.length;
+      pendingAdvertised = new Set<string>();
+      // Give every declaration a reachable destination so the metric measures intent, not route exhaustion.
+      resetHumanPlayerToMarket(f, options.seed, `human-reset-${options.seed}-${index}`);
       const revision = f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision;
       const response = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream",
         headers: { "content-type": "application/json" }, payload: { campaignId: f.campaign.id, sessionId: f.session.id,
@@ -135,11 +141,16 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
       // The player's own echoed declaration is never a leak; only produced narration and receipts count.
       const produced = `${terminal?.payload?.narrationStatus?.text ?? ""} ${JSON.stringify(terminal?.payload?.receipts ?? [])}`;
       const leak = HUMAN_LEAK_MARKERS.find(marker => produced.toLowerCase().includes(marker.toLowerCase())) ?? null;
+      const called = [...new Set(providerCalls.slice(before).flatMap(call => call.tools))];
+      // Reads and narration are always safe; only an exact *.select/execute/set tool is a mutation attempt.
+      const mutatedTool = called.find(name => !name.endsWith(".read") && name !== "submit_adventure_narration") ?? null;
+      const actioned = called.some(name => name.endsWith(".read")) || mutatedTool !== null;
       const record: PlayerTurnRecord = { id: entry.id, category: entry.category, declaration: entry.declaration.slice(0, 120),
         status: response.statusCode, state: terminal?.payload?.turn?.state ?? "none", outcome: terminal?.payload?.outcome ?? "none",
         receipts: terminal?.payload?.receipts?.length ?? 0, narrationSource: terminal?.payload?.narrationStatus?.source ?? "none",
         narrationTail: (terminal?.payload?.narrationStatus?.text ?? "").slice(-80),
-        calls: providerCalls.length - before, leak, failures: [] };
+        calls: providerCalls.length - before, leak, advertised: [...pendingAdvertised].sort(), called, actioned,
+        score: scorePlayerTurn(entry, actioned, mutatedTool), failures: [] };
       if (record.status !== 200) record.failures.push(`status:${record.status}`);
       if (leak) record.failures.push(`leak:${leak}`);
       if (terminal && terminal.payload?.turn?.declaration !== entry.declaration.trim()) record.failures.push("declaration-mismatch");

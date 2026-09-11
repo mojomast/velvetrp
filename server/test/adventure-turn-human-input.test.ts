@@ -115,7 +115,7 @@ describe("simulated human player input through the real adventure-turn route", (
     enableHumanPlayerTravel(f, 800);
     const dependencies: AdventureAgentDependencies = { ...dmDependencies(async (input: ProviderCompletionInput) => {
       if (input.promptVersion === "adventure-narration-v1") return narration();
-      const selected = candidateOptions(input).find((candidate) => candidate.toolName === "exact_actor_travel.select" && candidate.label.target === "s800 Docks");
+      const selected = candidateOptions(input).find((candidate) => candidate.toolName === "exact_actor_travel.select" && candidate.label.target === "Docks");
       if (!selected) return noTool();
       return { message: { role: "assistant", content: null, toolCalls: [{ id: "travel", name: selected.toolName, arguments: JSON.stringify(selected.arguments) }] },
         usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 }, model: { requestedModel: "human-fake", responseModel: "human-fake" } };

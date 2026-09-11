@@ -32,9 +32,9 @@ export function seedLivingWorld(f: Fixture, seed: number): void {
   const createLocation = (locationId: string, name: string, description: string) =>
     (f.repo as unknown as { createLocation: (owner: string, input: Record<string, unknown>) => unknown })
       .createLocation("local-owner", { campaignId: f.campaign.id, locationId, name, description, visibility: "public" });
-  createLocation(`${tag}-market`, `${tag} Market`, "A lantern-lit market square.");
-  createLocation(`${tag}-docks`, `${tag} Docks`, "Weathered docks under salt mist.");
-  createLocation(`${tag}-chapel`, `${tag} Chapel`, "A quiet chapel of grey stone.");
+  createLocation(`${tag}-market`, "Market", "A lantern-lit market square.");
+  createLocation(`${tag}-docks`, "Docks", "Weathered docks under salt mist.");
+  createLocation(`${tag}-chapel`, "Chapel", "A quiet chapel of grey stone.");
   const ledger = createAgentObservationRepository(db, { clock: f.options.clock, ids: { nextId: (() => { let n = 0; return () => `${tag}-obs-${++n}`; })() } });
   const freshRead = <T>(source: string, ...params: unknown[]): T | undefined => {
     const connection = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
@@ -42,10 +42,10 @@ export function seedLivingWorld(f: Fixture, seed: number): void {
   };
   const narrativeRevision = () => freshRead<{ revision: number }>("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?", f.campaign.id)?.revision ?? 0;
   const presenceRevision = () => freshRead<{ revision: number }>("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?", f.campaign.id, f.session.id)?.revision ?? 0;
-  [`${tag} Maren`, `${tag} Joss`, `${tag} Quill`].forEach((name, index) => {
+  ["Maren", "Joss", "Quill"].forEach((name, index) => {
     const persona = f.repo.createCharacter({ name, age: 30 + index, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
     const npc = f.repo.createCampaignNpc("local-owner", f.campaign.id, {
-      personaId: persona.id, publicState: { name, description: `The ${name.split(" ")[1]} of the ${tag} quarter.` },
+      personaId: persona.id, publicState: { name, description: `The ${name.toLowerCase()} of the market quarter.` },
       privateState: { goals: "SECRET_GOAL", gmNotes: "SECRET_GM_NOTE", merchantState: null },
       expectedRevision: narrativeRevision(), idempotencyKey: `${tag}-npc-${index}`,
     }).npc;
@@ -53,7 +53,7 @@ export function seedLivingWorld(f: Fixture, seed: number): void {
       idempotencyKey: `${tag}-place-${index}`, mutation: { kind: "place", locationId: `${tag}-market` } });
     ledger.record({ campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, agentKind: "npc", agentId: npc.npcId,
       sourceCommandId: `${tag}-witness-${index}`, observedRevision: 1, channel: "witnessed", hopCount: 0,
-      text: `${name} saw the party arrive at the ${tag} market.`, authority: "verified" });
+      text: `${name} saw the party arrive at the market.`, authority: "verified" });
   });
   const nodes = [0, 1, 2, 3].map(index => ({ nodeId: `${tag}-n${index}`, title: `Scene ${index}`, description: `Public scene ${index} of the ${tag} road.`,
     gmNotes: `SECRET_NODE_${index}`, revealThreshold: index === 0 ? 0 : 1 }));
@@ -84,4 +84,15 @@ export function enableHumanPlayerTravel(f: Fixture, seed: number): void {
       .createLocationConnection("local-owner", { campaignId: f.campaign.id, locationConnectionId, fromLocationId, toLocationId, visibility: "public" });
   connect(`${tag}-c1`, `${tag}-market`, `${tag}-docks`);
   connect(`${tag}-c2`, `${tag}-market`, `${tag}-chapel`);
+  // Return routes keep a destination reachable after the party has moved.
+  connect(`${tag}-c3`, `${tag}-docks`, `${tag}-market`);
+  connect(`${tag}-c4`, `${tag}-chapel`, `${tag}-market`);
+}
+
+/** Relocates the simulated player to the market so each turn has a reachable destination. */
+export function resetHumanPlayerToMarket(f: Fixture, seed: number, key: string): void {
+  const tag = `s${seed}`;
+  f.repo.setActorLocation("local-owner", f.session.id, { type: "set_actor_location", campaignId: f.campaign.id,
+    actorId: f.actorId, locationId: `${tag}-market`, expectedRevision: f.repo.getCampaignWorld("local-owner", f.campaign.id)!.revision,
+    idempotencyKey: key });
 }

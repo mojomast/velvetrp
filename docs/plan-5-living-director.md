@@ -303,6 +303,18 @@ failures; the only remaining provider errors were intermittent upstream HTTP 405
 from the router. The forged-candidate `unknown` fence was kept intact while
 malformed selections still degrade to a safe hold.
 
+Metric correction and improvement: the first "10%" counted every corpus entry, including gibberish,
+injection, and out-of-character text where holding is correct, and treated any read as an action.
+The corpus now labels each declaration `action`/`hold`/`either`; the harness records advertised
+tools, called tools, and the mutating tool, and scores exact-intent commit separately from
+hold-safety. The dominant cause of the low rate was not model refusal: the seeded world's one-way
+routes were exhausted after the first travel, so the destination candidate was often not advertised
+at all — the model faithfully held because it had nothing valid to select. Bidirectional routes plus
+a per-turn relocation, natural location/NPC labels, and one prompt line directing a clear match to
+become a tool call took exact-intent commits from ~50% to **100% (60/60)** with **98% hold-safety**
+and zero hard failures across 32 runs; the residual is a contradictory declaration that is
+defensibly actionable. The lesson: measure candidate availability before blaming the model.
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient
