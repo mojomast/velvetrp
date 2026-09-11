@@ -54,6 +54,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [RPG memory framework evaluation](memory-framework-evaluation.md) - Research comparison of SQLite, LangGraph, Mem0, Graphiti/Zep, and Letta, with proposed evaluation gates rather than implementation claims.
 - [Bounded NPC knowledge and rumors](npc-knowledge-rumors.md) - Research design and evaluation plan for per-agent observation ledgers, rumor propagation, attribution/privacy/false-memory gates; not a shipped contract.
 - [Plan 4: Living knowledge and rumors](plan-4-living-knowledge.md) - Ordered milestone plan wiring the observation ledger across NPC dialogue, factions, gossip, quests/story, and evaluated gates.
+- [Plan 5: A living-world Director](plan-5-living-director.md) - Ordered plan to give the AI Director ordered beat composition, bounded read grounding, world time/ambient beats, knowledge narration, and evaluation.
 - [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
 - [Harness Wars campaign report](harness-wars-campaign-report.md) - Recorded campaign hydration outcomes, canon inventory, and provider probes; not a runtime contract.
