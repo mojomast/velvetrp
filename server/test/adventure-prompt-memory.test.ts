@@ -106,9 +106,9 @@ describe("scene-only DM history instructions", () => {
     const context = { history: ["Scene revealed: The quay."], cast: [] };
     const prompt = dmNarrationMessages(context, "The quay is revealed.");
     const authority = prompt[0]!.content;
-    for (const rule of ["only verified past receipt summaries, never prior model prose", "current public state overrides",
-      "not present state or permission to replay events", "attribution, time, negation", "Do not import old atmospheric prose",
-      "reconstruct past dialogue, or invent recollections", "not proof of its contents or of what an NPC knows",
+    for (const rule of ["History contains only verified past receipt summaries", "current public state overrides",
+      "not present state or permission to replay events", "attribution, time, negation", "priorScenes holds earlier published atmospheric prose for continuity only",
+      "never reconstruct past dialogue as fact or invent recollections", "not proof of its contents or of what an NPC knows",
       "no-match is not proof that an event never happened", "source IDs or retrieval status",
       "including past actions", "server alone preserves committed outcomes"]) expect(authority).toContain(rule);
     expect(JSON.parse(prompt[1]!.content!)).toEqual({ publicScene: context, committedResult: "The quay is revealed." });

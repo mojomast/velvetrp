@@ -124,9 +124,10 @@ test("living director composes ambient/time beats, narrates without a forced que
     await page.unrouteAll({ behavior: "wait" }).catch(() => {});
     await app.close(); f.repo.close(); closeRepo();
     rmSync(dataDir, { recursive: true, force: true });
-    for (const key of Object.keys(previous) as Array<keyof typeof previous>) {
-      const value = previous[key];
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
+    if (previous.VELVET_DATA_DIR === undefined) delete process.env.VELVET_DATA_DIR; else process.env.VELVET_DATA_DIR = previous.VELVET_DATA_DIR;
+    if (previous.NODE_ENV === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.NODE_ENV;
+    if (previous.FEATURE_RPG_CAMPAIGN === undefined) delete process.env.FEATURE_RPG_CAMPAIGN; else process.env.FEATURE_RPG_CAMPAIGN = previous.FEATURE_RPG_CAMPAIGN;
+    if (previous.FEATURE_RPG_MECHANICS === undefined) delete process.env.FEATURE_RPG_MECHANICS; else process.env.FEATURE_RPG_MECHANICS = previous.FEATURE_RPG_MECHANICS;
+    if (previous.FEATURE_RPG_COMBAT === undefined) delete process.env.FEATURE_RPG_COMBAT; else process.env.FEATURE_RPG_COMBAT = previous.FEATURE_RPG_COMBAT;
   }
 });

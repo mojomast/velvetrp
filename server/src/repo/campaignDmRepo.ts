@@ -41,6 +41,8 @@ export const DM_NARRATION_PROMPT_MAX_TOKENS = 12_000;
 /** Completion headroom for reasoning models that emit hidden deliberation before a tool call. */
 export const DM_PLANNING_COMPLETION_MAX_TOKENS = 1024;
 export const DM_NARRATION_COMPLETION_MAX_TOKENS = 1536;
+/** Aggregate planning-plus-narration token envelope for one beat, including grounding and continuity context. */
+export const DM_AGGREGATE_TOKEN_CAP = 32_000;
 /** Blockers that mean the table is deciding; the world may still pace and breathe rather than hard-block. */
 const PACING_BLOCKERS = new Set(["waiting-for-player-combat-action", "scene-resolution-requires-gm-binding-or-human-adjudication"]);
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
@@ -182,7 +184,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     if(usage.total_tokens!==usage.prompt_tokens+usage.completion_tokens
       ||usage.prompt_tokens>(request?.reserved_prompt_tokens??23744)||usage.completion_tokens>(request?.reserved_completion_tokens??DM_PLANNING_COMPLETION_MAX_TOKENS))return false;
     const previous=phase==='narration'?db.prepare("SELECT * FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id) as any:null;
-    if(usage.total_tokens+(previous?.total_tokens??0)>(budget?.maxTotalTokens??24000))return false;
+    if(usage.total_tokens+(previous?.total_tokens??0)>(budget?.maxTotalTokens??DM_AGGREGATE_TOKEN_CAP))return false;
     return budget?.maxCostUsd==null||(usage.cost_usd!==null&&(!previous||previous.cost_usd!==null)&&usage.cost_usd+(previous?.cost_usd??0)<=budget.maxCostUsd);
   }
   const boundedSummary = (value: string): string => {
@@ -834,7 +836,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||promptTokens>23744||completionTokens<1||completionTokens>DM_PLANNING_COMPLETION_MAX_TOKENS)
         throw new CampaignDmConflictError("planning round reservation invalid");
       const aggregate=planningAggregate(id),budget=aggregate.budget;
-      if(aggregate.tokens+promptTokens+completionTokens>Math.min(24000,budget?.maxTotalTokens??24000))return null;
+      if(aggregate.tokens+promptTokens+completionTokens>Math.min(DM_AGGREGATE_TOKEN_CAP,budget?.maxTotalTokens??DM_AGGREGATE_TOKEN_CAP))return null;
       const reservedCost=budget?.costUsd;
       if(budget?.maxCostUsd!=null&&(reservedCost==null||aggregate.cost==null||aggregate.cost+reservedCost>budget.maxCostUsd))return null;
       const claimId=deps.ids.nextId();
@@ -859,7 +861,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         if(usage&&(![usage.promptTokens,usage.completionTokens].every(value=>Number.isSafeInteger(value)&&value>=0)
           ||usage.promptTokens>roundRow.reserved_prompt_tokens||usage.completionTokens>roundRow.reserved_completion_tokens))failed=true;
         const aggregate=planningAggregate(id,claimId);
-        if(usage&&aggregate.tokens+usage.promptTokens+usage.completionTokens>Math.min(24000,budget?.maxTotalTokens??24000))failed=true;
+        if(usage&&aggregate.tokens+usage.promptTokens+usage.completionTokens>Math.min(DM_AGGREGATE_TOKEN_CAP,budget?.maxTotalTokens??DM_AGGREGATE_TOKEN_CAP))failed=true;
         if(usage&&budget?.maxCostUsd!=null&&(cost==null||aggregate.cost==null||aggregate.cost+cost>budget.maxCostUsd))failed=true;
         if(failed||now()>=roundRow.deadline_at){
           db.prepare("UPDATE dm_planning_rounds SET status='unknown',prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
@@ -913,12 +915,12 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       const rounds=db.prepare("SELECT COUNT(*) n,COUNT(cost_usd) priced,COALESCE(SUM(cost_usd),0) cost,COALESCE(SUM(CASE WHEN prompt_tokens IS NOT NULL AND completion_tokens IS NOT NULL THEN prompt_tokens+completion_tokens ELSE reserved_prompt_tokens+reserved_completion_tokens END),0) tokens FROM dm_planning_rounds WHERE run_id=?").get(id) as { n:number;priced:number;cost:number;tokens:number };
       return {context:JSON.parse(job.public_context_json),fallback:job.fallback,planning:{
         tokens:Math.max(reservation?reservation.reserved_prompt_tokens+reservation.reserved_completion_tokens:0,actual?.total_tokens??0)+rounds.tokens,
-        costUsd:(reservation&&budget?.costUsd==null)||rounds.n>rounds.priced?null:Math.max(budget?.costUsd??0,actual?.cost_usd??0)+rounds.cost,maxTotalTokens:budget?.maxTotalTokens??24000,maxCostUsd:budget?.maxCostUsd??null}};
+        costUsd:(reservation&&budget?.costUsd==null)||rounds.n>rounds.priced?null:Math.max(budget?.costUsd??0,actual?.cost_usd??0)+rounds.cost,maxTotalTokens:budget?.maxTotalTokens??DM_AGGREGATE_TOKEN_CAP,maxCostUsd:budget?.maxCostUsd??null}};
     }).immediate();},
     claimDmNarration(p,id,provider,model,request,promptTokens,completionTokens){guard();return db.transaction(()=>{
       const work=api.getDmNarrationWork(p,id);if(!work)return null;
       if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||completionTokens<1||completionTokens>DM_NARRATION_COMPLETION_MAX_TOKENS
-        ||work.planning.tokens+promptTokens+completionTokens>Math.min(24000,work.planning.maxTotalTokens))throw new CampaignDmConflictError("narration budget exceeded");
+        ||work.planning.tokens+promptTokens+completionTokens>Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens))throw new CampaignDmConflictError("narration budget exceeded");
        const claimId=deps.ids.nextId();
        db.prepare("INSERT INTO dm_narration_dispatches VALUES(?,?,?,?,?,?,?,?,'claimed',NULL,NULL,NULL)").run(id,claimId,provider,model,json(request),
          new Date(deps.clock.now().getTime()+DM_PROVIDER_DEADLINE_MS).toISOString(),promptTokens,completionTokens);

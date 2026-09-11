@@ -110,9 +110,14 @@ token caps), reads remain read-only, and no ambiguous paid call is retried
 automatically.
 
 P5.5 raises the per-narration prompt ceiling from 8,000 to 12,000 tokens
-(`DM_NARRATION_PROMPT_MAX_TOKENS`) so labeled continuity context fits; narration
-remains one call, and the 24,000-token aggregate still reserves planning plus
-narration together, so the shared envelope is unchanged.
+(`DM_NARRATION_PROMPT_MAX_TOKENS`) so labeled continuity context fits. P5.7 then
+raises the aggregate planning-plus-narration envelope from 24,000 to 32,000
+tokens (`DM_AGGREGATE_TOKEN_CAP`) and the per-call completion headroom
+(`DM_PLANNING_COMPLETION_MAX_TOKENS = 1024`, `DM_NARRATION_COMPLETION_MAX_TOKENS
+= 1536`) so a reasoning model's hidden deliberation and the richer continuity,
+grounding, and transition prompts fit without forcing deterministic fallbacks.
+Narration remains one call, and the provider's own token and cost budget still
+caps each beat, so the shared envelope remains bounded.
 
 ## Milestones
 

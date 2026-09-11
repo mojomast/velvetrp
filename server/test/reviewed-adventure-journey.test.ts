@@ -551,7 +551,7 @@ describe("reviewed adventure HTTP journey", () => {
       expect(story.json().nodes.filter((node: any) => ["Lens Recovered", "Harbor Finale"].includes(node.title) && node.status === "resolved")).toHaveLength(2);
       expect(story.body).not.toContain(REVIEWED_ADVENTURE_PRIVATE_SENTINEL);
       expect(fixture.providerDispatches).toBe(0);
-      expect(dispatches).toBe(15);
+      expect(dispatches).toBe(18);
     } finally { await app.close(); fixture.repo.close(); }
   });
 
@@ -667,7 +667,7 @@ describe("reviewed adventure HTTP journey", () => {
       }
       expect(dispatches).toBe(dispatchesBeforeReload);
       expect(fixture.providerDispatches).toBe(0);
-      expect(dispatches).toBe(15);
+      expect(dispatches).toBe(18);
     } finally {
       await reloadedApp?.close();
       reloadedRepo?.close();

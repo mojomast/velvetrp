@@ -2,7 +2,7 @@ import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJ
 import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import { DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_TOKENS, DM_PLANNING_COMPLETION_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS,
+import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_TOKENS, DM_PLANNING_COMPLETION_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS,
   type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
@@ -74,7 +74,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     { role: "user", content: canonicalAgentJson({ privateContext: work.context, candidates: work.candidates } as never) },
   ];
   const price = provider.pricing;
-  const tokenCap = Math.min(24_000, provider.adventureTurnBudget.maxTotalTokens);
+  const tokenCap = Math.min(DM_AGGREGATE_TOKEN_CAP, provider.adventureTurnBudget.maxTotalTokens);
   const costCap = provider.adventureTurnBudget.maxEstimatedCostUsd;
   const round0ClaimId = work.claimId;
   let runningTokens = 0;
@@ -185,14 +185,14 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       (promptBound*price.promptPerMillion+completionLimit*price.completionPerMillion)/1_000_000;
     const caps=[provider.adventureTurnBudget.maxEstimatedCostUsd,work.planning.maxCostUsd].filter((cap):cap is number=>cap!==null);
     reserved=usageRecord(null,promptBound,completionLimit,price);
-    if(total>DM_NARRATION_PROMPT_MAX_TOKENS||total+work.planning.tokens>Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
+    if(total>DM_NARRATION_PROMPT_MAX_TOKENS||total+work.planning.tokens>Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
       ||caps.some(cap=>cost===null||work.planning.costUsd===null||cost+work.planning.costUsd>cap)){
       repository.settleDmNarration(principal,runId,null,null,"aggregate-budget-exceeded");
     } else {
       claimId=repository.claimDmNarration(principal,runId,provider.providerType||"openai-compatible",provider.model||"unconfigured",
         {messages:input.messages,tools:input.tools,toolChoice:input.toolChoice,harness,preset:input.preset,model:provider.model,
           samplers:input.provider.samplers,promptVersion:input.promptVersion,schemaVersion:input.schemaVersion,bodyOverrides:DIRECTOR_BODY_OVERRIDES,
-          budget:{pricing:price,maxTotalTokens:Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens),
+          budget:{pricing:price,maxTotalTokens:Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens),
             maxCostUsd:caps.length?Math.min(...caps):null}},promptBound,completionLimit);
       if(!claimId)return;
       const controller=new AbortController();
@@ -203,7 +203,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       if(result.usage&&(![result.usage.promptTokens,result.usage.completionTokens,result.usage.totalTokens].every(value=>Number.isSafeInteger(value)&&value>=0)
         ||result.usage.totalTokens!==result.usage.promptTokens+result.usage.completionTokens
         ||result.usage.promptTokens>promptBound||result.usage.completionTokens>completionLimit||result.usage.totalTokens>total))throw new Error("narration usage exceeds reservation");
-      if(accounting.totalTokens+work.planning.tokens>Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
+      if(accounting.totalTokens+work.planning.tokens>Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
         ||caps.some(cap=>accounting!.costUsd===null||work.planning.costUsd===null||accounting!.costUsd+work.planning.costUsd>cap))throw new Error('narration exceeds aggregate priced budget');
       const calls=result.message.toolCalls;
       if(calls?.length!==1||calls[0]?.name!=="submit_dm_scene")throw new Error("invalid narration call");
