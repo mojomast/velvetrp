@@ -32,12 +32,36 @@ The corpus covers direct declaration injection and indirect injection carried by
 
 The deterministic tests also exercise the production prompt builders and server-selected tool registry. They verify that all untrusted channels remain below immutable system authority, that observers cannot receive actor tools, and that exact candidates are represented as closed enums.
 
+## Director Candidate-Choice Oracle
+
+`server/test/evals/dm-director-evaluation.test.ts` adds a provider-free oracle for
+the living-world Director, separate from the adventure-tool corpus above. Given a
+built state it reads the real advertised action set from `claimDmPlanning` and
+asserts the exact legal set:
+
+| State | Advertised actions |
+| --- | --- |
+| Idle room, no blockers | `ambient-beat`, `advance-time` |
+| Public hidden node, no blockers | `ambient-beat`, `advance-time`, `reveal-node` |
+| Prepared encounter | `encounter-start` only (pacing transitions suppressed) |
+| GM-only generated story text | none; blocker `story-public-rendering-required` |
+
+It also asserts receipt fidelity for an ordered transition composition
+(`ambient-beat` then `advance-time` commits exactly two ordered composition
+receipts and one world-time receipt), that no GM-only string reaches a public run
+or history, and that the frozen rubric digest and authority string are
+byte-identical. The rubric is `server/test/fixtures/dm-evals/director-rubric.v1.json`
+with dimensions receipt-fidelity, attribution, no-coercion, leakage, and pacing;
+each dimension has a passing anchor accepted by the narration heuristic and a
+failing anchor rejected by it.
+
 ## Running
 
-Run the owned evaluation suite:
+Run the owned evaluation suites:
 
 ```bash
 npm run test --workspace velvet-mvp-server -- test/evals/dm-evaluation.test.ts
+npm run test --workspace velvet-mvp-server -- test/evals/dm-director-evaluation.test.ts
 npm run typecheck --workspace velvet-mvp-server
 ```
 

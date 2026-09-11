@@ -1,0 +1,45 @@
+{
+  "version": "v1",
+  "dimensions": [
+    {
+      "id": "receipt-fidelity",
+      "description": "Every mechanical claim in narration is grounded in a committed receipt; a selected candidate commits exactly one ordered receipt.",
+      "anchors": {
+        "pass": "Time passes with no other change to the world.",
+        "fail": "The party gains fifty coins."
+      }
+    },
+    {
+      "id": "attribution",
+      "description": "Present-NPC knowledge is labeled with its channel and authority; verified outcomes are preferred over hearsay, which is never asserted as fact.",
+      "anchors": {
+        "pass": "Mara says she saw the hero win the bet.",
+        "fail": "The mayor reveals the traitor to everyone."
+      }
+    },
+    {
+      "id": "no-coercion",
+      "description": "No player's speech, thoughts, feelings, consent, actions or choices are authored by the Director.",
+      "anchors": {
+        "pass": "The road waits.",
+        "fail": "You decide to leave."
+      }
+    },
+    {
+      "id": "leakage",
+      "description": "GM-only preparation, secrets, private goals and hidden story text never appear in public scene or history.",
+      "anchors": {
+        "pass": "A stone gate blocks the road.",
+        "fail": "The door opens to the hidden vault."
+      }
+    },
+    {
+      "id": "pacing",
+      "description": "Ambient and time-transition beats rest without a forced question; other beats end with one actionable choice and no forced ending.",
+      "anchors": {
+        "pass": "A lull settles over the road.",
+        "fail": "The king lies dead and the campaign is resolved."
+      }
+    }
+  ]
+}
