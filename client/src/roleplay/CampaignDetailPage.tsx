@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { FormEvent } from "react";
 import { campaignDiceRollRequestSchema, campaignRenameRequestSchema, MECHANICS_STARTER_IDENTITY, ORIGINAL_STARTER_PRESENTATION, SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
-import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, type CampaignDetail } from "../api";
-import type { CampaignAdministrationHttpResponse, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignPlayBootstrap, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
+import { ApiError, attachCampaignRoom, createOriginalStarterCampaignCharacter, detachCampaignRoom, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignDiceHistory, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignRooms, renameCampaign, rollCampaignDice, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, type CampaignDetail } from "../api";
+import type { CampaignAdministrationHttpResponse, CampaignAdministrationHttpRoomDetachResponse, CampaignCharacterCreateResponse, CampaignCharacterCreationOptionsResponse, CampaignCharacterListResponse, CampaignDetailResponse, CampaignDiceHistoryResponse, CampaignDiceRollResponse, CampaignPlayBootstrap, CampaignRoomAttachResponse, CampaignRoomLinkingResponse, CampaignRoomSummary } from "@velvet/contracts";
 import { useCampaignShell } from "../components/rpg/shell/CampaignShell";
+import { createClientId } from "../utils/clientId";
 
 export interface CampaignDetailPageProps {
   campaignId: string;
@@ -66,7 +67,7 @@ type OptionsRetryFocusIntent = {
   generation: number;
   outcome: "pending" | "success" | "failure";
 };
-type MutationKind = "rename" | "setup" | "create" | "dice" | "attach-room";
+type MutationKind = "rename" | "setup" | "create" | "dice" | "attach-room" | "detach-room";
 type MutationToken = symbol;
 type SettledRoster = PromiseSettledResult<CampaignCharacterListResponse>;
 type SettledOptions = PromiseSettledResult<CampaignCharacterCreationOptionsResponse>;
@@ -90,8 +91,9 @@ interface SetupReconciliation {
   detail: PromiseSettledResult<CampaignDetailResponse>;
 }
 interface RoomReconciliation {
+  kind: "attach" | "detach";
   sessionId: string;
-  put: PromiseSettledResult<CampaignRoomAttachResponse>;
+  put: PromiseSettledResult<CampaignRoomAttachResponse | CampaignAdministrationHttpRoomDetachResponse>;
   rooms: PromiseSettledResult<CampaignRoomLinkingResponse>;
 }
 interface CompletedRoomReconciliation {
@@ -378,29 +380,32 @@ function roomTitle(room: CampaignRoomSummary): string {
 
 function roomOutcomeMessage(reconciliation: RoomReconciliation): { text: string; alert: boolean } {
   const refreshed = reconciliation.rooms.status === "fulfilled";
+  const detach = reconciliation.kind === "detach";
+  const verb = detach ? "detached" : "attached";
+  const method = detach ? "DELETE" : "PUT";
   if (reconciliation.put.status === "fulfilled") return {
     text: refreshed
-      ? "Room attached. Latest campaign rooms were refreshed."
-      : "Room attached, but latest campaign rooms could not be loaded.",
+      ? `Room ${verb}. Latest campaign rooms were refreshed.`
+      : `Room ${verb}, but latest campaign rooms could not be loaded.`,
     alert: !refreshed,
   };
   const error = reconciliation.put.reason;
   if (error instanceof ApiError && error.status === 409) return {
     text: refreshed
-      ? "The room could not be attached because its status conflicts with this campaign. Latest rooms are shown; the PUT was not repeated."
-      : "The room could not be attached because its status conflicts with this campaign, and latest rooms could not be loaded. The PUT was not repeated.",
+      ? `The room could not be ${verb} because its status conflicts with this campaign. Latest rooms are shown; the ${method} was not repeated.`
+      : `The room could not be ${verb} because its status conflicts with this campaign, and latest rooms could not be loaded. The ${method} was not repeated.`,
     alert: true,
   };
   if (error instanceof ApiError && error.status === 404) return {
     text: refreshed
-      ? "The campaign or room is no longer available. Latest rooms are shown; the PUT was not repeated."
-      : "The campaign or room is no longer available, and latest rooms could not be loaded. The PUT was not repeated.",
+      ? `The campaign or room is no longer available. Latest rooms are shown; the ${method} was not repeated.`
+      : `The campaign or room is no longer available, and latest rooms could not be loaded. The ${method} was not repeated.`,
     alert: true,
   };
   return {
     text: refreshed
-      ? "Latest rooms are shown, but the attachment outcome is unknown. The PUT was not repeated."
-      : "The attachment outcome is unknown and latest rooms could not be loaded. Refresh rooms before deciding whether to try again; the PUT was not repeated.",
+      ? `Latest rooms are shown, but the ${detach ? "detachment" : "attachment"} outcome is unknown. The ${method} was not repeated.`
+      : `The ${detach ? "detachment" : "attachment"} outcome is unknown and latest rooms could not be loaded. Refresh rooms before deciding whether to try again; the ${method} was not repeated.`,
     alert: true,
   };
 }
@@ -445,6 +450,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
   const [completedRoomsRefresh, setCompletedRoomsRefresh] = useState<{ request: number; succeeded: boolean } | null>(null);
   const [roomResult, setRoomResult] = useState<{ text: string; alert: boolean } | null>(null);
   const [roomActivity, setRoomActivity] = useState<"idle" | "writing" | "reconciling" | "refreshing">("idle");
+  const [roomPendingAction, setRoomPendingAction] = useState<"attach" | "detach" | null>(null);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
   // Roster reads are deliberately independent from detail reconciliation and
@@ -799,6 +805,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     }
     setRoomResult(roomOutcomeMessage(reconciliation));
     setRoomActivity("idle");
+    setRoomPendingAction(null);
     appliedRoomTokenRef.current = completed.token;
     roomFocusIntentRef.current = { campaignId: completed.campaignId, token: completed.token, generation };
     deferCompletionCleanup(completedRoomReconciliations, completed.campaignId, completed.token);
@@ -1782,6 +1789,7 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     completedRoomReconciliations.delete(operationCampaignId);
     setRoomResult(null);
     setRoomActivity("writing");
+    setRoomPendingAction("attach");
     let put: PromiseSettledResult<CampaignRoomAttachResponse>;
     try {
       put = { status: "fulfilled", value: await attachCampaignRoom(operationCampaignId, { sessionId: room.sessionId }) };
@@ -1797,7 +1805,59 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
     } catch (reason) {
       freshRooms = { status: "rejected", reason };
     }
-    const reconciliation = { sessionId: room.sessionId, put, rooms: freshRooms } satisfies RoomReconciliation;
+    const reconciliation = { kind: "attach", sessionId: room.sessionId, put, rooms: freshRooms } satisfies RoomReconciliation;
+    mutation.roomReconciliation = reconciliation;
+    const completed = { campaignId: operationCampaignId, token: mutation.token, reconciliation };
+    completedRoomReconciliations.set(operationCampaignId, completed);
+    initialRoomReads.delete(operationCampaignId);
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && generationRef.current === generation) applyRoomReconciliation(completed, generation);
+    finishCampaignMutation(operationCampaignId, mutation);
+    ownedMutationsRef.current.delete(mutation.token);
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && generationRef.current === generation) roomLockedRef.current = false;
+  }
+
+  async function detachRoom(room: CampaignRoomSummary) {
+    const operationCampaignId = campaignId;
+    if (!campaign || campaign.actorRole !== "owner" || roomLockedRef.current
+      || roomManualReadLockRef.current || roomActivity !== "idle"
+      || inFlightCampaignMutations.has(operationCampaignId)) return;
+    const expectedRevision = administration?.revision;
+    if (expectedRevision === undefined) {
+      setRoomResult({ text: "The current campaign revision is unavailable. Refresh rooms before detaching.", alert: true });
+      return;
+    }
+    roomLockedRef.current = true;
+    // The DELETE owns exactly one fresh authoritative GET, so supersede every
+    // room read started before it and never replay the revision-bound command.
+    roomsGenerationRef.current += 1;
+    initialRoomReads.delete(operationCampaignId);
+    const generation = ++generationRef.current;
+    const mutation = beginCampaignMutation(operationCampaignId, "detach-room");
+    if (!mutation) { roomLockedRef.current = false; return; }
+    ownedMutationsRef.current.set(mutation.token, { campaignId: operationCampaignId, generation });
+    completedRoomReconciliations.delete(operationCampaignId);
+    setRoomResult(null);
+    setRoomActivity("writing");
+    setRoomPendingAction("detach");
+    let request: PromiseSettledResult<CampaignAdministrationHttpRoomDetachResponse>;
+    try {
+      request = { status: "fulfilled", value: await detachCampaignRoom(operationCampaignId, room.sessionId, {
+        expectedRevision, idempotencyKey: createClientId(),
+      }) };
+    } catch (reason) {
+      request = { status: "rejected", reason };
+    }
+    if (mountedRef.current && activeCampaignRef.current === operationCampaignId
+      && generationRef.current === generation) setRoomActivity("reconciling");
+    let freshRooms: PromiseSettledResult<CampaignRoomLinkingResponse>;
+    try {
+      freshRooms = { status: "fulfilled", value: await listCampaignRooms(operationCampaignId) };
+    } catch (reason) {
+      freshRooms = { status: "rejected", reason };
+    }
+    const reconciliation = { kind: "detach", sessionId: room.sessionId, put: request, rooms: freshRooms } satisfies RoomReconciliation;
     mutation.roomReconciliation = reconciliation;
     const completed = { campaignId: operationCampaignId, token: mutation.token, reconciliation };
     completedRoomReconciliations.set(operationCampaignId, completed);
@@ -1950,14 +2010,14 @@ export function CampaignDetailPage({ campaignId, mechanicsEnabled = false, onBac
             {rooms.attached.length === 0 ? <p className="rooms-status">No rooms attached.</p> : <ul className="campaign-room-list" aria-label="Attached campaign rooms">
               {rooms.attached.map((room, index) => <li key={index}>
                 <div><strong><bdi dir="auto">{roomTitle(room)}</bdi></strong><p>{room.participantNames.map((name, participantIndex) => <span key={participantIndex}><bdi dir="auto">{name}</bdi>{participantIndex < room.participantNames.length - 1 ? " · " : ""}</span>)}</p><small>Created <time dateTime={room.createdAt}>{new Date(room.createdAt).toLocaleDateString()}</time> · Attached <time dateTime={room.attachedAt}>{new Date(room.attachedAt).toLocaleDateString()}</time>{room.stopped ? " · Stopped · Read-only" : ""}</small></div>
-                <button className="ghost room-open" type="button" disabled={pageBusy} aria-label={`Open attached room ${index + 1} of ${rooms.attached.length}`} onClick={() => { if (!pageBusy) onOpenRoom(room.sessionId); }}>{roomOpenPending ? "Opening room…" : "Open room"}</button>
+                <div className="room-actions"><button className="ghost room-open" type="button" disabled={pageBusy} aria-label={`Open attached room ${index + 1} of ${rooms.attached.length}`} onClick={() => { if (!pageBusy) onOpenRoom(room.sessionId); }}>{roomOpenPending ? "Opening room…" : "Open room"}</button>{campaign.actorRole === "owner" && <button className="ghost room-detach" type="button" disabled={pageBusy || roomActivity !== "idle"} aria-label={`Detach attached room ${index + 1} of ${rooms.attached.length}`} onClick={() => void detachRoom(room)}>{roomPendingAction === "detach" ? (roomActivity === "writing" ? "Detaching once…" : "Refreshing rooms…") : "Detach room"}</button>}</div>
               </li>)}
             </ul>}
             {campaign.actorRole === "owner" && <div className="eligible-rooms"><h3>Attach a room</h3>{rooms.eligible.length === 0
               ? <p className="rooms-status">No eligible running rooms.</p>
               : <ul className="campaign-room-list" aria-label="Eligible campaign rooms">{rooms.eligible.map((room, index) => <li key={index}>
                 <div><strong><bdi dir="auto">{roomTitle(room)}</bdi></strong><p>{room.participantNames.map((name, participantIndex) => <span key={participantIndex}><bdi dir="auto">{name}</bdi>{participantIndex < room.participantNames.length - 1 ? " · " : ""}</span>)}</p><small>Created <time dateTime={room.createdAt}>{new Date(room.createdAt).toLocaleDateString()}</time></small></div>
-                <button className="primary room-attach" type="button" disabled={pageBusy || roomActivity !== "idle"} aria-label={`Attach eligible room ${index + 1} of ${rooms.eligible.length}`} onClick={() => void attachRoom(room)}>{roomActivity === "writing" ? "Attaching once…" : roomActivity === "reconciling" ? "Refreshing rooms…" : "Attach room"}</button>
+                <button className="primary room-attach" type="button" disabled={pageBusy || roomActivity !== "idle"} aria-label={`Attach eligible room ${index + 1} of ${rooms.eligible.length}`} onClick={() => void attachRoom(room)}>{roomPendingAction === "attach" ? (roomActivity === "writing" ? "Attaching once…" : "Refreshing rooms…") : "Attach room"}</button>
               </li>)}</ul>}</div>}
           </>}
           {roomResult && <div className="room-result-actions"><p ref={roomStatusRef} tabIndex={-1} className={roomResult.alert ? "form-error" : "create-success"} role={roomResult.alert ? "alert" : "status"}>{roomResult.text}</p><button className="ghost" type="button" disabled={pageBusy || roomActivity !== "idle"} onClick={refreshRooms}>Refresh rooms</button></div>}

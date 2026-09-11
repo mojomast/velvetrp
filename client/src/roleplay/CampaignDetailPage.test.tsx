@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrictMode } from "react";
-import type { CampaignAdministrationReceipt } from "@velvet/contracts";
-import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, updateCampaignAdministration } from "../api";
+import type { CampaignAdministrationHttpRoomDetachResponse, CampaignAdministrationReceipt } from "@velvet/contracts";
+import { ApiError, ApiInputError, attachCampaignRoom, createOriginalStarterCampaignCharacter, detachCampaignRoom, getCampaignAdministration, getCampaignCharacterCreationOptions, getCampaignDetail, getCampaignPlayBootstrap, listCampaignCharacters, listCampaignCheckpoints, listCampaignMemberships, listCampaignRooms, listCampaignTimelines, renameCampaign, setupMechanicsStarter, setupOriginalStarter, setupSrd51Starter, updateCampaignAdministration } from "../api";
 import { CampaignDetailPage, resetCampaignDetailPageModuleStateForTests } from "./CampaignDetailPage";
 import { CampaignAdministrationPage, resetCampaignAdministrationPageModuleStateForTests } from "../components/rpg/campaign/CampaignAdministrationPage";
 
@@ -13,6 +13,7 @@ vi.mock("../api", async (importOriginal) => ({
   listCampaignCharacters: vi.fn(),
   listCampaignRooms: vi.fn(),
   attachCampaignRoom: vi.fn(),
+  detachCampaignRoom: vi.fn(),
   createOriginalStarterCampaignCharacter: vi.fn(),
   renameCampaign: vi.fn(),
   setupOriginalStarter: vi.fn(),
@@ -142,6 +143,22 @@ describe("CampaignDetailPage", () => {
     expect(html).not.toContain(attached.sessionId);
   });
 
+  it("detaches one attached room once with the verified revision followed by exactly one fresh GET", async () => {
+    const attached = { sessionId: "room-detach", title: "Detach room", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z", attachedAt: "2030-01-04T00:00:00.000Z", stopped: false };
+    vi.mocked(getCampaignDetail).mockResolvedValue({ campaign: ownerUnconfigured });
+    vi.mocked(listCampaignRooms).mockResolvedValueOnce({ attached: [attached], eligible: [] }).mockResolvedValueOnce({ attached: [], eligible: [] });
+    vi.mocked(detachCampaignRoom).mockResolvedValue({ attachment: { sessionId: attached.sessionId, attachedAt: attached.attachedAt }, receipt: {} } as unknown as CampaignAdministrationHttpRoomDetachResponse);
+    render(<CampaignDetailPage campaignId={ownerUnconfigured.id} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const detach = await screen.findByRole("button", { name: "Detach attached room 1 of 1" });
+    fireEvent.click(detach); fireEvent.click(detach);
+    expect(detachCampaignRoom).toHaveBeenCalledOnce();
+    expect(detachCampaignRoom).toHaveBeenCalledWith(ownerUnconfigured.id, attached.sessionId, expect.objectContaining({ expectedRevision: 0 }));
+    await screen.findByText("Room detached. Latest campaign rooms were refreshed.");
+    expect(listCampaignRooms).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("No rooms attached.")).toBeTruthy();
+    expect(document.body.outerHTML).not.toContain(attached.sessionId);
+  });
+
   it("disables attach acquisition while a manual rooms refresh is pending", async () => {
     const eligible = { sessionId: "manual-refresh-room", title: "Refresh race", participantNames: ["Aria"], createdAt: "2030-01-03T00:00:00.000Z" };
     const refresh = deferred<{ attached: []; eligible: [typeof eligible] }>();
@@ -211,6 +228,7 @@ describe("CampaignDetailPage", () => {
     await screen.findByRole("button", { name: "Open attached room 1 of 1" });
     expect(screen.queryByRole("heading", { name: "Attach a room" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Attach room/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Detach room/ })).toBeNull();
     expect(document.body.outerHTML).not.toContain(`private-${actorRole}`);
     view.unmount();
   });
