@@ -183,6 +183,7 @@ describe('public AI DM narration',()=>{
       'The horizon never quite resolves. Do you keep walking?',
       'The ruts have gone the color of old coin, indifferent to which you choose. Do you take the road on?',
       'The moment is holding its breath, waiting to see what you decide to do with it. Do you wait?',
+      'The quiet is complete, unhurried, and entirely indifferent. Do you wait a while, or move on?',
     ])expect(validDmScene(text,normal),text).toBe(true);
     // A declarative completion is still rejected.
     expect(validDmScene('You complete the ritual and close the path. Do you rest?',normal)).toBe(false);
@@ -198,6 +199,9 @@ describe('public AI DM narration',()=>{
     // An echoed transition flag is ignored, but an unknown field is still rejected.
     expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true},transition)).toBe('A lull settles over the road.');
     expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true,scene:'extra'},transition)).toBeNull();
+    // A blank question is treated as absent: allowed on a transition, still rejected when one is required.
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],question:'  '},transition)).toBe('A lull settles over the road.');
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],question:'  '},normal)).toBeNull();
   });
   it('accepts bounded public NPC dialogue but rejects unadvertised speakers, extra fields, and inflected agency/outcome claims',()=>{
     const context={cast:[{name:'Mara',description:'A cautious guide.'}],players:[{name:'Hero'}],scenes:[{title:'The gate',description:'A stone gate blocks the road.'}],receipts:[{action:'reveal-node',summary:'Scene revealed: The gate.'}]};

@@ -3,9 +3,12 @@ import { canonicalAgentJson } from "@velvet/contracts";
 import { z } from "zod";
 
 export const DM_SCENE_DESCRIPTION_PREFIX = "Scene description (non-authoritative):\n";
+// A blank question means "none"; for a non-transition beat it is then correctly rejected as missing.
+const sceneQuestion=z.preprocess(value=>typeof value==='string'&&value.trim()===''?undefined:value,
+  z.string().trim().min(1).max(300).optional());
 const sceneSchema=z.object({atmosphere:z.string().trim().min(1).max(2000),
   dialogue:z.array(z.object({speaker:z.string().min(1).max(200),text:z.string().trim().min(1).max(600)}).strict()).max(4),
-  question:z.string().trim().min(1).max(300).optional(),
+  question:sceneQuestion,
   // A model may echo the supplied transition flag; it carries no authority and is ignored.
   transition:z.boolean().optional()}).strict();
 const names=(context:unknown,key:'cast'|'players'):string[]=>{
@@ -70,8 +73,8 @@ export function validDmScene(text: string, publicContext?:unknown): boolean {
   const asserted=assertedProse(text).replace(figurativeOutcome,'');
   if (/\b(?:\d+|hit points?|hp|damage|heal(?:s|ed|ing)?|initiative|reward|xp|level up|dice|rolled|tool|receipt|provider)\b/i.test(text)) return false;
   if (asserts(/\b(?:reveal(?:s|ed)?|discover(?:s|ed)?|resolv(?:e|es|ed)|defeat(?:s|ed)?|unlock(?:s|ed)?|succeed(?:s|ed)?|fail(?:s|ed)?|gain(?:s|ed)?|obtain(?:s|ed)?)\b/i,asserted)) return false;
-  // "complete" is an outcome verb, but also a common adjective ("a silence so complete").
-  if (asserts(/(?<!\b(?:so|as|a|an|the|more|most|nearly|almost|quite|utterly|entirely|perfectly|less|far|very)\s)\bcomplet(?:e|es|ed|ion)\b/i,asserted)) return false;
+  // Only the outcome forms of "complete" are rejected; the adjective ("the quiet is complete") is atmosphere.
+  if (asserts(/\bcomplet(?:es|ed|ion)\b|\b(?:to\s+complete|complete\s+(?:the|a|an|my|our|their|his|her|its|this|that))\b/i,asserted)) return false;
   const escaped=names(publicContext,'players').map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
   const subject=`(?:you|your character|the party|the players|the group${escaped.length?'|'+escaped.join('|'):''})`;
   // Agency counts only as a main-clause assertion; "which way you walk" or "a hum you feel" is subordinate depiction.
