@@ -9,14 +9,14 @@ import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
 import { dmNarrationMessages, dmNarrationTool, parseDmScene } from "./dmNarration.js";
 import { dmReadToolSchemas, parseDmReadCall, type DmReadToolRequest } from "./dmReadTools.js";
-import { FORCED_TOOL_BODY_OVERRIDES } from "./forcedToolReasoning.js";
+import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
 
 const dependencies: AdventureAgentDependencies = { complete: completeWithProvider, getProvider: getProviderSettings,
   getHarness: getHarnessSettings, now: () => new Date() };
 const DM_GROUNDING_OBSERVATION_MAX_BYTES = 12_000;
 // A reasoning model otherwise spends its small completion budget on hidden reasoning, and some
 // routers reject a forced tool_choice while thinking. Disabling reasoning makes beat selection exact.
-const DIRECTOR_BODY_OVERRIDES = FORCED_TOOL_BODY_OVERRIDES;
+const DIRECTOR_BODY_OVERRIDES = DIRECT_TOOL_BODY_OVERRIDES;
 
 function usageRecord(usage:ProviderCompletionResult['usage'],prompt:number,completion:number,price:ProviderCompletionInput['provider']['pricing']):DmProviderUsage {
   const known=usage&&[usage.promptTokens,usage.completionTokens,usage.totalTokens].every(value=>Number.isSafeInteger(value)&&value>=0);
@@ -143,9 +143,11 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
       const calls = result.message.toolCalls;
       if (!calls?.length) { settleDecision(round, claimId, null, accounting); break; }
       if (calls.length === 1 && calls[0]!.name === "select_dm_beat") {
-        // A paid call that answered with an invalid selection settles as a safe hold; it is never an ambiguous outcome.
-        try { settleDecision(round, claimId, parseSelectCall(calls[0]!), accounting); }
-        catch { settleDecision(round, claimId, null, accounting); }
+        // A malformed selection is a benign model slip and holds; an undeclared/forged candidate still
+        // throws from settleDecision to the unknown fence below rather than being silently accepted.
+        let composition: CampaignDmSelection[] | null = null;
+        try { composition = parseSelectCall(calls[0]!); } catch { composition = null; }
+        settleDecision(round, claimId, composition, accounting);
         break;
       }
       const requests = calls.map(call => parseDmReadCall(call.name, JSON.parse(call.arguments)));

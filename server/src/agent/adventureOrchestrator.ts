@@ -17,6 +17,7 @@ import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArg
 import { adventurePlanningMessages } from "./adventurePrompt.js";
 import { candidateLabels, labeled, type LabeledCandidate } from "./providerCandidateProjection.js";
 import { adventureTurnBudgets, type TurnBudgetPolicy } from "./turnBudget.js";
+import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
 
 const OWNER = "local-owner";
 const digest = (...parts: string[]) => createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 48);
@@ -650,8 +651,8 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     const completionLimit = effectiveAdventureTurnMaxTokens(provider);
     const completionInput: ProviderCompletionInput = { provider: { ...provider, samplers: { ...provider.samplers, maxTokens: completionLimit } },
       harness, preset: getPromptPreset("default"), messages, tools: selected.map((tool) => tool.provider),
-      toolChoice: selected.length ? "auto" : "none", parallelToolCalls: false, promptVersion: "adventure-planning-v1",
-      schemaVersion: AGENT_TOOL_REGISTRY_VERSION };
+      toolChoice: selected.length ? "auto" : "none", parallelToolCalls: false, bodyOverrides: DIRECT_TOOL_BODY_OVERRIDES,
+      promptVersion: "adventure-planning-v1", schemaVersion: AGENT_TOOL_REGISTRY_VERSION };
     const policy = createAdventureTurnBudgetPolicy(provider);
     if (policy) initializeAdventureTurnBudget(turn, policy);
     const budget = policy ? adventureTurnBudgets.reserve(turn.turnId, policy, { id: providerCallId,

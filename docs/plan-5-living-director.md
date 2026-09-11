@@ -287,6 +287,21 @@ overflowed and silently aborted every adventure plan (leaving only narration
 calls); it now uses the fixture clock; (3) the leak detector scanned the player's
 own echoed declaration, flagging refusals of injected phrases. A 12-turn live
 run then completed cleanly with planning, narration, and grading all active.
+Deeper simulation found two more live-only defects behind the silent fallbacks:
+(4) the RPG tool registry names contain dots (`exact_actor_travel.select`,
+`campaign_context.read`), but OpenAI-compatible providers enforce
+`^[a-zA-Z0-9_-]+$`, so every adventure planning call 400'd; the transport now
+encodes names to that alphabet and decodes returned calls so the orchestrator
+still sees the registry names; (5) multi-round adventure planning failed with
+"the `reasoning_content` in the thinking mode must be passed back" because the
+transport does not replay reasoning; the planning call now disables reasoning
+like the Director. The shared constant moved to
+`server/src/agent/directToolReasoning.ts`. A later 12-run/120-player-turn live
+campaign committed mechanics for 10% of messy declarations (including a lowercase
+"i want to go to the docks" that arrived at the docks) with zero player
+failures; the only remaining provider errors were intermittent upstream HTTP 405
+from the router. The forged-candidate `unknown` fence was kept intact while
+malformed selections still degrade to a safe hold.
 
 ### P5.3: World time and ambient beats
 

@@ -179,12 +179,40 @@ function requireName(value: string, label: string): string {
   return value;
 }
 
+/** OpenAI-compatible function names must match `^[a-zA-Z0-9_-]+$`; the RPG tool registry uses dots. */
+interface ToolNameCodec {
+  /** Original registry name to the provider-safe wire name. */
+  encode(name: string): string;
+  /** Provider-safe wire name back to the original registry name. */
+  decode(name: string): string;
+}
+
+/**
+ * Maps tool names to the provider's `^[a-zA-Z0-9_-]+$` alphabet and back. The mapping is per request so
+ * two original names that sanitize to the same string stay distinct, and decoded names always match the
+ * orchestrator's advertised set.
+ */
+function toolNameCodec(tools: readonly CompletionFunctionTool[] | undefined): ToolNameCodec {
+  const encode = new Map<string, string>();
+  const decode = new Map<string, string>();
+  for (const tool of tools ?? []) {
+    if (encode.has(tool.name)) continue;
+    const base = tool.name.replace(/[^a-zA-Z0-9_-]/g, "_");
+    let candidate = base, suffix = 1;
+    while (decode.has(candidate) && decode.get(candidate) !== tool.name) candidate = `${base}_${suffix++}`;
+    encode.set(tool.name, candidate);
+    decode.set(candidate, tool.name);
+  }
+  return { encode: (name) => encode.get(name) ?? name.replace(/[^a-zA-Z0-9_-]/g, "_"),
+    decode: (name) => decode.get(name) ?? name };
+}
+
 interface WiredTranscript {
   messages: Array<Record<string, unknown>>;
   priorCallIds: Set<string>;
 }
 
-function wireMessages(messages: readonly CompletionMessage[]): WiredTranscript {
+function wireMessages(messages: readonly CompletionMessage[], codec: ToolNameCodec): WiredTranscript {
   if (messages.length === 0) throw new ProviderConfigurationError("messages must not be empty");
   const callIds = new Set<string>();
   const resolvedCallIds = new Set<string>();
@@ -216,7 +244,7 @@ function wireMessages(messages: readonly CompletionMessage[]): WiredTranscript {
       callIds.add(call.id);
       pendingCallIds.push(call.id);
       if (typeof call.arguments !== "string") throw new ProviderConfigurationError(`messages[${index}].toolCalls[${callIndex}].arguments is invalid`);
-      return { id: call.id, type: "function", function: { name: call.name, arguments: call.arguments } };
+      return { id: call.id, type: "function", function: { name: codec.encode(call.name), arguments: call.arguments } };
     });
     if (message.content === null && (!toolCalls || toolCalls.length === 0)) {
       throw new ProviderConfigurationError(`messages[${index}] has neither content nor tool calls`);
@@ -227,19 +255,19 @@ function wireMessages(messages: readonly CompletionMessage[]): WiredTranscript {
   return { messages: wired, priorCallIds: callIds };
 }
 
-function applyTools(body: Record<string, unknown>, input: ProviderCompletionInput): Set<string> {
+function applyTools(body: Record<string, unknown>, input: ProviderCompletionInput, codec: ToolNameCodec): Set<string> {
   const tools = input.tools;
   const names = new Set<string>();
   if (tools && tools.length > 0) {
     body.tools = tools.map((tool, index) => {
       requireName(tool.name, `tools[${index}].name`);
-      if (names.has(tool.name)) throw new ProviderConfigurationError(`duplicate tool name: ${tool.name}`);
-      names.add(tool.name);
+      if (names.has(codec.encode(tool.name))) throw new ProviderConfigurationError(`duplicate tool name: ${tool.name}`);
+      names.add(codec.encode(tool.name));
       if (!isObject(tool.parameters)) throw new ProviderConfigurationError(`tools[${index}].parameters must be an object`);
       return {
         type: "function",
         function: {
-          name: tool.name,
+          name: codec.encode(tool.name),
           ...(tool.description !== undefined ? { description: tool.description } : {}),
           parameters: tool.parameters,
         },
@@ -250,7 +278,7 @@ function applyTools(body: Record<string, unknown>, input: ProviderCompletionInpu
     if (typeof input.toolChoice === "object") {
       const name = requireName(input.toolChoice.name, "toolChoice.name");
       if (!tools?.some((tool) => tool.name === name)) throw new ProviderConfigurationError(`toolChoice references unknown tool: ${name}`);
-      body.tool_choice = { type: "function", function: { name } };
+      body.tool_choice = { type: "function", function: { name: codec.encode(name) } };
     } else {
       if (input.toolChoice !== "none" && (!tools || tools.length === 0)) {
         throw new ProviderConfigurationError(`toolChoice ${input.toolChoice} requires at least one tool`);
@@ -288,6 +316,7 @@ function applyBodyOverrides(body: Record<string, unknown>, overrides: ProviderCo
 
 interface ResponseToolPolicy {
   advertisedNames: ReadonlySet<string>;
+  decodeName: (name: string) => string;
   toolChoice: CompletionToolChoice | undefined;
   priorCallIds: ReadonlySet<string>;
 }
@@ -313,7 +342,7 @@ function parseToolCalls(value: unknown, policy: ResponseToolPolicy): CompletionT
     // A named choice is a strong hint, not a hard protocol fact: models sometimes call a different
     // advertised tool. The owning orchestrator enforces exact selection semantics and can degrade
     // a drifted forced round to a deterministic hold instead of an ambiguous paid failure.
-    return { id: candidate.id, name: fn.name, arguments: fn.arguments };
+    return { id: candidate.id, name: policy.decodeName(fn.name), arguments: fn.arguments };
   });
 }
 
@@ -483,11 +512,12 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
   if (input.signal?.aborted) throw new ProviderCallerAbortError("Provider completion aborted by caller");
 
   const body = buildRequestBody(input.provider, input.harness, input.preset, [], false);
-  const transcript = wireMessages(input.messages);
+  const codec = toolNameCodec(input.tools);
+  const transcript = wireMessages(input.messages, codec);
   body.messages = transcript.messages;
   body.stream = false;
   if (input.parallelToolCalls !== undefined) body.parallel_tool_calls = input.parallelToolCalls;
-  const advertisedNames = applyTools(body, input);
+  const advertisedNames = applyTools(body, input, codec);
   applyJsonSchema(body, input.jsonSchema);
   applyBodyOverrides(body, input.bodyOverrides);
   const requestedModel = String(body.model);
@@ -511,6 +541,7 @@ export async function completeWithProvider(input: ProviderCompletionInput): Prom
     const payload=await readBoundedSuccessPayload(response);
     return parseResponse(payload, requestedModel, {
       advertisedNames,
+      decodeName: codec.decode,
       toolChoice: input.toolChoice,
       priorCallIds: transcript.priorCallIds,
     }, input.provider.apiKey, response, Math.max(0, Math.round(performance.now() - startedAt)),

@@ -180,6 +180,20 @@ describe("non-stream provider completion request", () => {
     expect(result.message.toolCalls?.[0]?.arguments).toBe(" {\n  \"room\": \"r2\"\n} ");
   });
 
+  it("encodes dotted registry tool names to the provider alphabet and decodes returned calls", async () => {
+    const fake = await startProvider({ body: { choices: [{ message: { role: "assistant", content: null, tool_calls: [
+      { id: "travel-call", type: "function", function: { name: "exact_actor_travel_select", arguments: "{\"candidateId\":\"c1\"}" } },
+    ] } }] } });
+    const result = await completeWithProvider({ ...input(provider(fake.baseUrl)),
+      tools: [{ name: "exact_actor_travel.select", parameters: { type: "object", properties: {}, additionalProperties: false } }],
+      toolChoice: { name: "exact_actor_travel.select" } });
+    const wire = fake.requests[0]?.body.tools as Array<{ function: { name: string } }>;
+    expect(wire[0]?.function.name).toBe("exact_actor_travel_select");
+    expect(wire[0]?.function.name).toMatch(/^[a-zA-Z0-9_-]+$/);
+    expect(fake.requests[0]?.body.tool_choice).toEqual({ type: "function", function: { name: "exact_actor_travel_select" } });
+    expect(result.message.toolCalls?.[0]?.name).toBe("exact_actor_travel.select");
+  });
+
   it("transports Qwen-like narration as one named schema-bound tool without response_format",async()=>{
     const fake=await startProvider({body:{model:"qwen/qwen3.7-flash",choices:[{finish_reason:"tool_calls",message:{role:"assistant",content:null,tool_calls:[{
       id:"qwen-narration",type:"function",function:{name:"submit_adventure_narration",arguments:'{"narration":"Rain beads on the harbor rail."}'},
