@@ -1,11 +1,13 @@
 # Plan 4: Living knowledge and rumors
 
-Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
-co-presence propagation), P4.3 (trust-gated knowledge reads), P4.4 (Director
-narration knowledge channel), P4.5 (faction knowledge + gated reaction), P4.6
-(town gossip pool), the quest half of P4.7 (knowledge-gated quest offers), and
-P4.8 (knowledge evaluation program) are implemented and committed. P4.7's
-clue-source bridge is deliberately deferred with the blocker recorded below.
+Status: complete with recorded deferrals. P4.1 (observation ledger + write
+path), P4.2 (bounded co-presence propagation), P4.3 (trust-gated knowledge
+reads), P4.4 (Director narration knowledge channel), P4.5 (faction knowledge +
+gated reaction), P4.6 (town gossip pool), the quest half of P4.7
+(knowledge-gated quest offers), P4.8 (knowledge evaluation program), and P4.9
+(integrated evidence record) are implemented and committed. P4.7's clue-source
+bridge, a first-class faction-reaction command type, and a dedicated browser
+knowledge-read E2E are deliberately deferred with blockers recorded below.
 Researched against current `main` after Plan 3 closeout. Design research and
 sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
@@ -228,6 +230,44 @@ call on load/inspect/reload; actor/privacy boundaries; before/after metrics
 and real limitations recorded. Optional live comparison stays inside the
 shared remaining API budget with first attempts.
 Commit: `docs(memory): record living knowledge evidence`.
+
+Delivered as this evidence record plus the ledger-level guarantees the browser
+gate depends on. The observation rows are immutable (BEFORE UPDATE/DELETE and
+replace-guard triggers) and `listAgentKnowledge` is a pure SQL projection of
+stored rows keyed by `(campaign, active timeline, agent, source)`; it never
+reconstructs text and never dispatches a provider call, so load/inspect/reload
+cannot spend tokens. The automated evaluator finishes the campaign entirely
+provider-free. A dedicated Playwright E2E that loads the Director inspection
+surface and reloads it was not added in this milestone: the existing trusted-local
+browser suite does not exercise GM knowledge reads, and adding that flow is a
+larger test-surface change than the plan budgets for a documentation milestone.
+The repo-level evidence below is therefore the substitute, and the browser E2E
+is left as a named follow-up rather than claimed.
+
+### Integrated evidence
+
+| Item | Result |
+| --- | --- |
+| Commits | `98705fe` P4.1, `434cdd0` P4.2, `c27827c` P4.3, `85d9d0d` P4.4, `50923e4` P4.5, `9499fd6` P4.6, `a7c8d51` P4.7, `8ea660c` P4.8 |
+| New schema | `agent_observations` (immutable, campaign-scoped, composed into the exact schema inventory) |
+| Wired levels | NPC witness, co-presence `told`, faction derivation, gated faction reaction, town gossip pool + sampled `told`, Director narration channel, knowledge-gated quest offers |
+| Evaluation | `scripts/evaluate-agent-knowledge.ts`: attribution/privacy/negative/negation/disclosure all `1.0` on development and frozen holdouts; authority invariant `1` |
+| Frozen digests | holdout `e649d916…28844`; authority `c400ac7f…6ad8` |
+| Provider cost | zero; no provider call on any read, propagation, or evaluation path |
+| Authority ordering | `verified` outranks `belief` outranks `rumor`; missing relationship never discloses |
+| Verification | server typecheck/build, contracts build/test, scripts typecheck, and the focused ledger/propagation/read/faction/quest/evaluator tests per milestone |
+
+### Before/after and limitations
+
+Plan 4 adds new capability rather than changing existing recall scoring, so the
+Plan 3 memory metrics are unchanged by construction and were not re-derived;
+the new evidence is the knowledge evaluator above. Real limitations: the ledger
+records what an agent observed, not whether it understood the event; rumor
+spread is capped and co-presence-derived, so believability still depends on the
+narration model; no metric measures NPC honesty; the clue-source bridge and a
+first-class faction-reaction command type require narrowly scoped schema
+migrations and remain deferred; and no browser E2E yet proves the GM knowledge
+read surface.
 
 ## Deferred candidates
 
