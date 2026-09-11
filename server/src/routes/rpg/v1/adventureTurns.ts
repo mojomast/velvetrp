@@ -23,6 +23,7 @@ import { completeWithProvider } from "../../../provider/index.js";
 import { getPromptPreset } from "../../../presets.js";
 import { adventureNarrationMessages } from "../../../agent/adventurePrompt.js";
 import { adventureTurnBudgets } from "../../../agent/turnBudget.js";
+import { FORCED_TOOL_BODY_OVERRIDES } from "../../../agent/forcedToolReasoning.js";
 import type { CompletionFunctionTool, ProviderCompletionInput } from "../../../provider/index.js";
 
 const OWNER = "local-owner";
@@ -238,6 +239,7 @@ async function performNarration(repo: Repo & Repository, turn: PrivateAdventureT
       harness, preset: getPromptPreset("default"), tools: [{ name: NARRATION_TOOL_NAME,
         description: "Submit bounded DM narration grounded by authoritative public context and verified receipts.",
         parameters: NARRATION_TOOL_PARAMETERS }], toolChoice: { name: NARRATION_TOOL_NAME }, signal,
+      bodyOverrides: FORCED_TOOL_BODY_OVERRIDES,
       parallelToolCalls:false,promptVersion: "adventure-narration-v1", schemaVersion: "adventure-narration-v1",
       messages: adventureNarrationMessages({ declaration: turn.declaration, receipts: safeReceipts,
         currentLocation:publicContext.currentLocation,currentActorName:publicContext.currentActorName,publicContext:publicContext.context,harness, history,

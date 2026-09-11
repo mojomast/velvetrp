@@ -9,13 +9,14 @@ import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
 import { dmNarrationMessages, dmNarrationTool, parseDmScene } from "./dmNarration.js";
 import { dmReadToolSchemas, parseDmReadCall, type DmReadToolRequest } from "./dmReadTools.js";
+import { FORCED_TOOL_BODY_OVERRIDES } from "./forcedToolReasoning.js";
 
 const dependencies: AdventureAgentDependencies = { complete: completeWithProvider, getProvider: getProviderSettings,
   getHarness: getHarnessSettings, now: () => new Date() };
 const DM_GROUNDING_OBSERVATION_MAX_BYTES = 12_000;
 // A reasoning model otherwise spends its small completion budget on hidden reasoning, and some
 // routers reject a forced tool_choice while thinking. Disabling reasoning makes beat selection exact.
-const DIRECTOR_BODY_OVERRIDES = { reasoning_effort: "none" };
+const DIRECTOR_BODY_OVERRIDES = FORCED_TOOL_BODY_OVERRIDES;
 
 function usageRecord(usage:ProviderCompletionResult['usage'],prompt:number,completion:number,price:ProviderCompletionInput['provider']['pricing']):DmProviderUsage {
   const known=usage&&[usage.promptTokens,usage.completionTokens,usage.totalTokens].every(value=>Number.isSafeInteger(value)&&value>=0);

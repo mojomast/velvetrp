@@ -267,6 +267,27 @@ length-cap overruns and one malformed tool call. No declarative agency,
 mechanics, death, or opening assertion was weakened: the existing rejection
 tests and the malicious-prose bypass tests still pass.
 
+Human-player simulation: `server/test/fixtures/humanPlayer.ts` supplies a corpus
+of the messy declarations a player types (typos, lowercase, emoji, accents,
+Cyrillic, contradictions, cheats, control characters, HTML/JSON injection,
+out-of-character and meta requests, run-ons). The provider-free
+`server/test/adventure-turn-human-input.test.ts` drives every one through the
+real `/adventure-turns/stream` route and asserts exact echo, no crash, no
+produced-narration leakage, no phantom mechanics, idempotent replay, and that a
+sloppy "i wanna go to teh docks" selects the exact travel candidate and commits
+the move. The live harness gains `--players`, injecting a fuzzed declaration
+before each Director beat and grading each turn. That simulation found three
+real defects: (1) adventure narration forced a named `tool_choice` without
+disabling reasoning, so a reasoning model returned HTTP 400 "Thinking mode does
+not support this tool_choice" and every live adventure turn fell back to
+deterministic narration — the shared `FORCED_TOOL_BODY_OVERRIDES` is now applied
+to both the Director and adventure narration; (2) the harness's provider clock
+returned real time while the fixture clock is 2036, so `AbortSignal.timeout`
+overflowed and silently aborted every adventure plan (leaving only narration
+calls); it now uses the fixture clock; (3) the leak detector scanned the player's
+own echoed declaration, flagging refusals of injected phrases. A 12-turn live
+run then completed cleanly with planning, narration, and grading all active.
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient

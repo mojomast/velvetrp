@@ -69,3 +69,19 @@ export function seedLivingWorld(f: Fixture, seed: number): void {
     expectedRevision: f.repo.listCampaignQuests("local-owner", f.campaign.id)!.revision, idempotencyKey: `${tag}-quest-a-create` });
   db.close();
 }
+
+/**
+ * Gives the seeded world a placed player actor and public routes, so a simulated human declaration
+ * produces real travel/check/quest candidates instead of only narration.
+ */
+export function enableHumanPlayerTravel(f: Fixture, seed: number): void {
+  const tag = `s${seed}`;
+  const worldRevision = () => f.repo.getCampaignWorld("local-owner", f.campaign.id)!.revision;
+  f.repo.placeActor("local-owner", f.actorId, { campaignId: f.campaign.id, locationId: `${tag}-market`,
+    expectedRevision: worldRevision(), idempotencyKey: `${tag}-place-actor` });
+  const connect = (locationConnectionId: string, fromLocationId: string, toLocationId: string) =>
+    (f.repo as unknown as { createLocationConnection: (owner: string, input: Record<string, unknown>) => unknown })
+      .createLocationConnection("local-owner", { campaignId: f.campaign.id, locationConnectionId, fromLocationId, toLocationId, visibility: "public" });
+  connect(`${tag}-c1`, `${tag}-market`, `${tag}-docks`);
+  connect(`${tag}-c2`, `${tag}-market`, `${tag}-chapel`);
+}

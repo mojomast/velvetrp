@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { completeWithProvider, ProviderHttpError } from "../server/src/provider/index.js";
+import { buildApp } from "../server/src/app.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../server/src/defaults.js";
 import type { ProviderSettings } from "../server/src/types.js";
 import { closeRepo } from "../server/src/repo/index.js";
@@ -10,7 +11,8 @@ import { orchestrateCampaignDmBeat } from "../server/src/agent/campaignDmOrchest
 import type { AdventureAgentDependencies } from "../server/src/agent/adventureOrchestrator.js";
 import { DM_SCENE_DESCRIPTION_PREFIX } from "../server/src/agent/dmNarration.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
-import { PLAYTEST_PACING_ACTIONS, gradeDmRun, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
+import { PLAYTEST_PACING_ACTIONS, enableHumanPlayerTravel, gradeDmRun, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
+import { HUMAN_LEAK_MARKERS, fuzzDeclarations, type HumanDeclaration } from "../server/test/fixtures/humanPlayer.js";
 import { readProxyKey } from "./evaluate-live-director-grounding.js";
 
 const OWNER = "local-owner";
@@ -24,6 +26,13 @@ export interface PlaytestOptions {
   maxCalls: number;
   maxTokens: number;
   maxUsd: number;
+  /** Inject one fuzzed human-player declaration through the real adventure-turn route before each Director beat. */
+  players?: boolean;
+}
+
+export interface PlayerTurnRecord {
+  id: string; category: string; declaration: string; status: number; state: string; outcome: string;
+  receipts: number; narrationSource: string; narrationTail: string; calls: number; leak: string | null; failures: string[];
 }
 
 export interface PlaytestArtifact {
@@ -38,8 +47,20 @@ export interface PlaytestArtifact {
   readToolsUsed: string[];
   totals: { calls: number; tokens: number; cost: number };
   narration: { assisted: number; fallback: number };
+  playerTurns: PlayerTurnRecord[];
   caps: { calls: number; tokens: number; costUsd: number };
   capHit: string | null;
+}
+
+/** Reads the terminal SSE frame from an in-process adventure-turn response. */
+function terminalEvent(body: string): { payload?: { outcome?: string; turn?: { state?: string; declaration?: string };
+  narrationStatus?: { text?: string; source?: string }; receipts?: unknown[] } } | null {
+  for (const frame of body.split("\n\n")) {
+    if (!frame.startsWith("event: terminal")) continue;
+    const data = frame.split("\n").find((line) => line.startsWith("data: "));
+    if (data) return JSON.parse(data.slice(6));
+  }
+  return null;
 }
 
 function liveProvider(apiKey: string, maxUsdPerBeat: number): ProviderSettings {
@@ -52,6 +73,8 @@ function liveProvider(apiKey: string, maxUsdPerBeat: number): ProviderSettings {
 export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
   const directory = await mkdtemp(path.join(tmpdir(), "velvet-playtest-"));
   const priorDataDir = process.env.VELVET_DATA_DIR;
+  const priorFlags = { campaign: process.env.FEATURE_RPG_CAMPAIGN, mechanics: process.env.FEATURE_RPG_MECHANICS, combat: process.env.FEATURE_RPG_COMBAT };
+  let app: ReturnType<typeof buildApp> | null = null;
   try {
     process.env.VELVET_DATA_DIR = directory; closeRepo();
     const provider = liveProvider(await readProxyKey(), options.maxUsd / options.beats);
@@ -85,18 +108,52 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
           throw error;
         }
       },
-      getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => new Date(),
+      // The adventure planning deadline is computed against the fixture clock; a real-time clock here
+      // makes AbortSignal.timeout overflow and silently aborts every plan.
+      getProvider: async () => provider, getHarness: async () => defaultHarnessSettings(), now: () => f.options.clock.now(),
     };
     const beats: PlaytestArtifact["beats"] = [];
     const failures: string[] = [];
     let capHit: string | null = null;
     let lastRunId = "";
+    const players = Boolean(options.players);
+    const declarations: HumanDeclaration[] = players ? fuzzDeclarations(options.seed, options.beats) : [];
+    const playerTurns: PlayerTurnRecord[] = [];
+    if (players) {
+      enableHumanPlayerTravel(f, options.seed);
+      process.env.FEATURE_RPG_CAMPAIGN = "true"; process.env.FEATURE_RPG_MECHANICS = "true"; process.env.FEATURE_RPG_COMBAT = "true";
+      app = buildApp({ campaignRepositoryFactory: () => f.repo, adventureAgentDependencies: deps });
+    }
+    const submitPlayerTurn = async (entry: HumanDeclaration, index: number) => {
+      if (!app || !entry) return;
+      const before = providerCalls.length;
+      const revision = f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision;
+      const response = await app.inject({ method: "POST", url: "/api/rpg/v1/adventure-turns/stream",
+        headers: { "content-type": "application/json" }, payload: { campaignId: f.campaign.id, sessionId: f.session.id,
+          actorId: f.actorId, declaration: entry.declaration, expectedRevision: revision, idempotencyKey: `human-${options.seed}-${index}` } });
+      const terminal = terminalEvent(response.body);
+      // The player's own echoed declaration is never a leak; only produced narration and receipts count.
+      const produced = `${terminal?.payload?.narrationStatus?.text ?? ""} ${JSON.stringify(terminal?.payload?.receipts ?? [])}`;
+      const leak = HUMAN_LEAK_MARKERS.find(marker => produced.toLowerCase().includes(marker.toLowerCase())) ?? null;
+      const record: PlayerTurnRecord = { id: entry.id, category: entry.category, declaration: entry.declaration.slice(0, 120),
+        status: response.statusCode, state: terminal?.payload?.turn?.state ?? "none", outcome: terminal?.payload?.outcome ?? "none",
+        receipts: terminal?.payload?.receipts?.length ?? 0, narrationSource: terminal?.payload?.narrationStatus?.source ?? "none",
+        narrationTail: (terminal?.payload?.narrationStatus?.text ?? "").slice(-80),
+        calls: providerCalls.length - before, leak, failures: [] };
+      if (record.status !== 200) record.failures.push(`status:${record.status}`);
+      if (leak) record.failures.push(`leak:${leak}`);
+      if (terminal && terminal.payload?.turn?.declaration !== entry.declaration.trim()) record.failures.push("declaration-mismatch");
+      if (providerQuotaHit) record.failures.push("provider-quota");
+      playerTurns.push(record);
+      failures.push(...record.failures.map(failure => `player${index}(${entry.id}):${failure}`));
+    };
     const initialControl = f.repo.getDmControl(OWNER, f.campaign.id);
     if (options.mode === "ai" && initialControl.mode !== "ai") {
       f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: initialControl.revision, idempotencyKey: `play-${options.seed}-ai` });
     }
     for (let index = 0; index < options.beats; index += 1) {
       pendingScene = null; pendingSelection = null;
+      if (players) { await submitPlayerTurn(declarations[index]!, index); if (providerQuotaHit) { capHit = "provider-quota"; failures.push("provider-quota"); break; } }
       const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, { intent: index === 0 ? "open" : "continue",
         expectedModeRevision: f.repo.getDmControl(OWNER, f.campaign.id).revision, idempotencyKey: `play-${options.seed}-${index}` });
       lastRunId = run.runId;
@@ -138,12 +195,17 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     const artifact: PlaytestArtifact = {
       version: 1, mode: "live", seed: options.seed, engineMode: options.mode, model: provider.model,
       beats, failures, providerCalls, readToolsUsed, totals, narration: { assisted, fallback: beats.length - assisted },
-      caps: { calls: options.maxCalls, tokens: options.maxTokens, costUsd: options.maxUsd }, capHit,
+      playerTurns, caps: { calls: options.maxCalls, tokens: options.maxTokens, costUsd: options.maxUsd }, capHit,
     };
     f.repo.close();
     return { artifact, directory };
   } finally {
+    if (app) await app.close();
     closeRepo();
+    for (const [key, value] of Object.entries(priorFlags)) {
+      const name = { campaign: "FEATURE_RPG_CAMPAIGN", mechanics: "FEATURE_RPG_MECHANICS", combat: "FEATURE_RPG_COMBAT" }[key]!;
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
     if (priorDataDir === undefined) delete process.env.VELVET_DATA_DIR; else process.env.VELVET_DATA_DIR = priorDataDir;
     if (!process.env.PLAYTEST_DEBUG) await rm(directory, { recursive: true, force: true });
     else process.stderr.write(`PLAYTEST_KEEP ${directory}\n`);
@@ -154,15 +216,17 @@ async function main() {
   const seed = Number(process.argv.find(value => value.startsWith("--seed="))?.slice(7) ?? 1);
   const beats = Number(process.argv.find(value => value.startsWith("--beats="))?.slice(8) ?? 12);
   const mode = (process.argv.find(value => value.startsWith("--engine="))?.slice(9) ?? "ai") as "ai" | "human";
+  const players = process.argv.includes("--players");
   const output = process.argv.find(value => value.startsWith("--output="))?.slice(9) ?? `/tmp/opencode/playtest-${seed}-${Date.now()}.json`;
-  const { artifact } = await runLiveDirectorPlaytest({ seed, beats, mode, maxCalls: 80, maxTokens: 500_000, maxUsd: 1.5 });
+  const { artifact } = await runLiveDirectorPlaytest({ seed, beats, mode, players, maxCalls: 120, maxTokens: 800_000, maxUsd: 2 });
   await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
   const completed = artifact.beats.filter(beat => beat.state === "completed").length;
-  process.stdout.write(`${JSON.stringify({ output, seed: artifact.seed, engine: artifact.engineMode, beats: artifact.beats.length,
-    completed, transitions: artifact.beats.filter(beat => beat.transition).length, assisted: artifact.narration.assisted,
-    fallback: artifact.narration.fallback, calls: artifact.totals.calls,
-    tokens: artifact.totals.tokens, costUsd: Number(artifact.totals.cost.toFixed(6)), failures: artifact.failures,
-    readToolsUsed: artifact.readToolsUsed, capHit: artifact.capHit })}\n`);
+  process.stdout.write(`${JSON.stringify({ output, seed: artifact.seed, engine: artifact.engineMode, players,
+    beats: artifact.beats.length, completed, transitions: artifact.beats.filter(beat => beat.transition).length,
+    assisted: artifact.narration.assisted, fallback: artifact.narration.fallback,
+    playerTurns: artifact.playerTurns.length, playerFailures: artifact.playerTurns.flatMap(turn => turn.failures).length,
+    calls: artifact.totals.calls, tokens: artifact.totals.tokens, costUsd: Number(artifact.totals.cost.toFixed(6)),
+    failures: artifact.failures, readToolsUsed: artifact.readToolsUsed, capHit: artifact.capHit })}\n`);
   if (artifact.failures.length > 0) process.exitCode = 1;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) void main();
