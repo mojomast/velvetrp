@@ -122,6 +122,22 @@ planning/execution, recovery tests and typechecks.
 Commits: `feat(contracts): allow ordered beat composition`, then
 `feat(repo): execute ordered beat compositions`.
 
+Implemented: `campaignDmCompositionSchema` carries an ordered, unique 1-3
+candidate composition; the planning tool and prompt request `composition`
+(empty = hold) while the orchestrator still accepts the legacy single
+`selection`. `settleDmPlanning` normalizes single/array, validates every
+candidate is advertised, and stores the ordered composition; `getDmProposal`
+returns the first candidate plus the full `composition`. Execution commits each
+candidate in its own transaction (first keeps the run-level command key, later
+ones add an ordinal) into a new immutable `dm_composition_receipts` table, so a
+later failure blocks with `composition-partial-after-N` and never rolls back an
+earlier receipt; a successful run queues one narration over all summaries.
+Known limitation: the current candidate model advertises only one domain per
+beat, so a second same-domain story candidate is stale and blocks (the required
+partial behavior) rather than fully succeeding; fully successful multi-candidate
+compositions arrive with the P5.3 ambient/world-time domain or an explicit
+revision re-resolution design. No forced ending is introduced.
+
 ### P5.2: Bounded read-only planning grounding
 
 Own: read-tool registry (existing recall limits, quest objective read, public

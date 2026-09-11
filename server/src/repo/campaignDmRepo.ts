@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
 import {
   canonicalAgentJson, campaignDmBeatRequestSchema, campaignDmControlSchema, campaignDmDecisionRequestSchema,
-  campaignDmModeRequestSchema, campaignDmRunSchema, campaignDmSelectionSchema, encounterCreateRequestSchema, enemyTemplateCatalogDefinitionSchema,
+  campaignDmModeRequestSchema, campaignDmRunSchema, campaignDmSelectionSchema, campaignDmCompositionSchema, encounterCreateRequestSchema, enemyTemplateCatalogDefinitionSchema,
   type CampaignDmBeatRequest, type CampaignDmCandidate, type CampaignDmControl, type CampaignDmDecisionRequest,
   type CampaignDmModeRequest, type CampaignDmRun, type CampaignDmSelection,
   campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest,
@@ -50,10 +50,12 @@ export interface CampaignDmRepository {
   openDmBeat(principal: string, campaignId: string, sessionId: string, input: CampaignDmBeatRequest): CampaignDmRun;
   getDmRun(principal: string, campaignId: string, sessionId: string, runId: string): CampaignDmRun;
   getDmHistory(principal: string, campaignId: string, sessionId: string): { control: CampaignDmControl; runs: CampaignDmRun[] };
-  getDmProposal(principal: string, campaignId: string, sessionId: string, runId: string): { run: CampaignDmRun; proposal: CampaignDmCandidate | null };
+  getDmProposal(principal: string, campaignId: string, sessionId: string, runId: string):
+    { run: CampaignDmRun; proposal: CampaignDmCandidate | null; composition: CampaignDmCandidate[] };
   claimDmPlanning(principal: string, runId: string, provider: string, model: string): DmPlanningWork | null;
   bindDmProviderRequest(principal: string, runId: string, claimId: string, request: unknown, promptTokens: number, completionTokens: number): boolean;
-  settleDmPlanning(principal: string, runId: string, claimId: string, selection: CampaignDmSelection | null,
+  settleDmPlanning(principal: string, runId: string, claimId: string,
+    selection: CampaignDmSelection | CampaignDmSelection[] | null,
     usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean): void;
   executeDmBeat(principal: string, runId: string): CampaignDmRun;
   decideDmBeat(principal: string, campaignId: string, sessionId: string, runId: string, input: CampaignDmDecisionRequest): CampaignDmRun;
@@ -80,11 +82,27 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
   const gm = (p: string, c: string) => { if (!privileged(role(p, c))) throw new CampaignDmUnavailableError(); };
   const publicSource = (c:string,id:string) => Boolean(db.prepare(`SELECT 1 WHERE ${publicStoryResourceSql('$campaignId','$resourceId')}`)
     .get({campaignId:c,resourceId:id}));
+  /** Normalizes a stored proposal (legacy single object or ordered array) to a composition. */
+  const compositionOf = (value: unknown): CampaignDmSelection[] => value === null || value === undefined ? []
+    : Array.isArray(value) ? campaignDmCompositionSchema.parse(value) : [campaignDmSelectionSchema.parse(value)];
+  const receiptList = (value: string): any[] => {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  };
+  /** Ordered committed receipts for a run; composition table first, legacy single row as fallback. */
+  const receiptsFor = (runId: string): any[] => {
+    const rows = db.prepare("SELECT public_json FROM dm_composition_receipts WHERE run_id=? ORDER BY ordinal").all(runId) as { public_json: string }[];
+    if (rows.length) return rows.map(row => JSON.parse(row.public_json));
+    const legacy = db.prepare("SELECT public_json FROM dm_receipts WHERE run_id=?").get(runId) as { public_json: string } | undefined;
+    return legacy ? receiptList(legacy.public_json) : [];
+  };
   const safePublicRun = (r:RunRow) => {
     if(!r.proposal_json)return true;
-    const selection=JSON.parse(r.proposal_json);
-    const binding=(JSON.parse(r.candidates_json) as Binding[]).find(item=>item.candidate.candidateId===selection.candidateId);
-    return !binding||!['reveal-node','resolve-node','reveal-clue'].includes(binding.candidate.action)||publicSource(r.campaign_id,binding.target);
+    const bindings=JSON.parse(r.candidates_json) as Binding[];
+    return compositionOf(JSON.parse(r.proposal_json)).every(selection=>{
+      const binding=bindings.find(item=>item.candidate.candidateId===selection.candidateId);
+      return !binding||!['reveal-node','resolve-node','reveal-clue'].includes(binding.candidate.action)||publicSource(r.campaign_id,binding.target);
+    });
   };
   const control = (c: string) => (db.prepare("SELECT mode,revision,delegator FROM dm_control WHERE campaign_id=?").get(c) as
     { mode: "human" | "ai"; revision: number; delegator: string | null } | undefined) ?? { mode: "human" as const, revision: 0, delegator: null };
@@ -107,12 +125,11 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
   const project = (r: RunRow): CampaignDmRun => {
     const safe=safePublicRun(r);
     const history = db.prepare("SELECT narration FROM dm_public_history WHERE run_id=?").get(r.run_id) as { narration: string } | undefined;
-    const receipt = db.prepare("SELECT public_json FROM dm_receipts WHERE run_id=?").get(r.run_id) as { public_json: string } | undefined;
     const narrating = db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(r.run_id);
     return campaignDmRunSchema.parse({ runId: r.run_id, campaignId: r.campaign_id, sessionId: r.session_id,
       mode: r.mode, modeRevision: r.mode_revision, intent: r.intent, revision: r.revision,
       state: !safe ? 'blocked' : narrating && r.state === "awaiting-approval" ? "planning" : r.state,
-      narration: safe ? history?.narration ?? null : null, receipts: safe && receipt ? [JSON.parse(receipt.public_json)] : [],
+      narration: safe ? history?.narration ?? null : null, receipts: safe ? receiptsFor(r.run_id) : [],
       blockers: safe ? JSON.parse(r.blockers_json) : ['story-public-rendering-required'], createdAt: r.created_at });
   };
   const stop = (r: RunRow, state: "blocked" | "cancelled" | "unknown", code: string) => {
@@ -189,16 +206,20 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       WHERE artifact.campaign_id=? AND artifact.visibility='public' AND artifact.artifact_kind IN ('handout','scene-prompt')
       ORDER BY delivery.published_at DESC,artifact.artifact_key LIMIT 2`).all(r.campaign_id);
     // Generated prose is presentation, not canonical memory. Only verified receipt summaries recur.
-    const history = (db.prepare(`SELECT json_extract(receipt.public_json,'$.summary') narration FROM dm_public_history history
-      JOIN dm_runs run USING(run_id) JOIN dm_receipts receipt USING(run_id)
+    const history = (db.prepare(`SELECT COALESCE(
+        (SELECT json_extract(json_group_array(json_extract(composition.public_json,'$.summary')),'$[#-1]')
+          FROM dm_composition_receipts composition WHERE composition.run_id=run.run_id),
+        json_extract(receipt.public_json,'$.summary')) narration
+      FROM dm_public_history history JOIN dm_runs run USING(run_id) JOIN dm_receipts receipt USING(run_id)
       WHERE run.campaign_id=? AND run.session_id=? AND run.timeline_id=? AND run.run_id<>?
       AND NOT EXISTS(SELECT 1 FROM json_each(run.candidates_json) binding
-        WHERE json_extract(binding.value,'$.candidate.candidateId')=json_extract(run.proposal_json,'$.candidateId')
-          AND json_extract(binding.value,'$.candidate.action') IN ('reveal-node','resolve-node','reveal-clue')
+        JOIN json_each(CASE WHEN json_type(run.proposal_json)='array' THEN run.proposal_json ELSE json_array(run.proposal_json) END) selection
+          ON json_extract(selection.value,'$.candidateId')=json_extract(binding.value,'$.candidate.candidateId')
+        WHERE json_extract(binding.value,'$.candidate.action') IN ('reveal-node','resolve-node','reveal-clue')
           AND NOT (${publicStoryResourceSql('run.campaign_id',"json_extract(binding.value,'$.target')")}))
-      ORDER BY history.rowid DESC LIMIT 4`).all(r.campaign_id,r.session_id,r.timeline_id,r.run_id) as {narration:string}[])
+      ORDER BY history.rowid DESC LIMIT 4`).all(r.campaign_id,r.session_id,r.timeline_id,r.run_id) as {narration:string|null}[])
+      .filter((item):item is {narration:string}=>typeof item.narration==="string")
       .reverse().map(item=>item.narration.slice(0,2000));
-    const receipt = db.prepare("SELECT public_json FROM dm_receipts WHERE run_id=?").get(r.run_id) as {public_json:string}|undefined;
     const players=db.prepare(`SELECT DISTINCT persona.name FROM session_characters participant JOIN characters persona ON persona.id=participant.character_id
       JOIN campaign_characters character ON character.character_id=persona.id AND character.campaign_id=?
       JOIN campaign_actors actor ON actor.campaign_character_id=character.id AND actor.campaign_id=character.campaign_id
@@ -241,7 +262,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       })
       .filter(({entries})=>entries.length>0);
     return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,npcKnowledge,
-      receipts:receipt?[JSON.parse(receipt.public_json)]:[],safety };
+      receipts:receiptsFor(r.run_id),safety };
   }
   const narrationGuard = (r:RunRow, context:unknown) => hash({context,
     campaign:db.prepare("SELECT administration_revision,active_timeline_id,lifecycle_status FROM campaigns WHERE id=?").get(r.campaign_id),
@@ -391,21 +412,9 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     if (json(privateContext).length + json(bounded).length > 60000) throw new CampaignDmConflictError("director context exceeds bounded preparation");
     return { context: privateContext, bindings: bounded, blockers: [...new Set(blockers)].slice(0,16), freshness, timelineId: context.timelineId };
   }
-  function execute(r: RunRow) {
-    if(db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(r.run_id))return;
-    if (r.state !== "awaiting-approval" || !r.proposal_json) return;
-    if (!active(r) || now() >= r.expires_at) { stop(r, "cancelled", "authority-safety-or-mode-changed"); return; }
-    const input = JSON.parse(r.request_json) as CampaignDmBeatRequest;
-    const fresh = snapshot(r.gm_principal_id, r.campaign_id, r.session_id, input);
-    if (fresh.freshness !== r.freshness_digest) { stop(r, "blocked", "proposal-stale-request-new-beat"); return; }
-    const proposal = campaignDmSelectionSchema.parse(JSON.parse(r.proposal_json));
-    const binding = (JSON.parse(r.candidates_json) as Binding[]).find(b => b.candidate.candidateId === proposal.candidateId && b.candidate.digest === proposal.digest);
-    if (!binding) throw new CampaignDmConflictError("candidate unavailable");
-    const decision = db.prepare("SELECT kind FROM dm_decisions WHERE run_id=?").get(r.run_id) as { kind: string } | undefined;
-    if (r.mode === "human" && decision?.kind !== "human-approved") return;
-    if (r.mode === "ai" && !decision) db.prepare("INSERT INTO dm_decisions VALUES(?,?,?,?,?)").run(r.run_id, r.gm_principal_id,
-      "ai-policy-v1", json({ modeRevision: r.mode_revision, selection: proposal }), now());
-    const key = `dm-command:${r.run_id}`, command = { expectedRevision: binding.revision, idempotencyKey: key };
+  /** Applies one exact candidate's mechanics. Caller owns the transaction. */
+  function runCandidate(r: RunRow, binding: Binding, key: string): { receipt: unknown; summary: string } {
+    const command = { expectedRevision: binding.revision, idempotencyKey: key };
     const action = binding.candidate.action;
     let receipt: unknown, summary: string;
     if (action === "encounter-start" || action === "encounter-materialize") {
@@ -446,10 +455,53 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if (!visible) throw new CampaignDmConflictError("public story result unavailable");
       summary = `${action === "resolve-node" ? "Scene resolved" : action === "reveal-clue" ? "Clue discovered" : "Scene revealed"}: ${visible.title}. ${visible.text ?? ""}`.slice(0,4000);
     }
+    return { receipt, summary };
+  }
+  /** Writes one committed candidate receipt atomically with its mechanics. Caller owns the transaction. */
+  function writeReceipt(r: RunRow, binding: Binding, receipt: unknown, summary: string, ordinal: number, key: string) {
+    const action = binding.candidate.action, publicJson = json({ action, summary }), domainJson = json(receipt);
+    db.prepare("INSERT INTO dm_composition_receipts VALUES(?,?,?,?,?,?)").run(r.run_id, ordinal, key, action, domainJson, publicJson);
+    // The first candidate also records the run's primary credential receipt required by publication.
+    if (ordinal === 0) db.prepare("INSERT INTO dm_receipts VALUES(?,?,?,?,?)").run(r.run_id, key, action, domainJson, publicJson);
+  }
+  function execute(r: RunRow) {
+    if(db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(r.run_id))return;
+    if (r.state !== "awaiting-approval" || !r.proposal_json) return;
+    if (!active(r) || now() >= r.expires_at) { stop(r, "cancelled", "authority-safety-or-mode-changed"); return; }
+    const input = JSON.parse(r.request_json) as CampaignDmBeatRequest;
+    if (snapshot(r.gm_principal_id, r.campaign_id, r.session_id, input).freshness !== r.freshness_digest) {
+      stop(r, "blocked", "proposal-stale-request-new-beat"); return;
+    }
+    const composition = compositionOf(JSON.parse(r.proposal_json));
+    const bindings = JSON.parse(r.candidates_json) as Binding[];
+    const targets = composition.map(selection => {
+      const binding = bindings.find(b => b.candidate.candidateId === selection.candidateId && b.candidate.digest === selection.digest);
+      if (!binding) throw new CampaignDmConflictError("candidate unavailable");
+      return binding;
+    });
+    const decision = db.prepare("SELECT kind FROM dm_decisions WHERE run_id=?").get(r.run_id) as { kind: string } | undefined;
+    if (r.mode === "human" && decision?.kind !== "human-approved") return;
+    if (r.mode === "ai" && !decision) db.prepare("INSERT INTO dm_decisions VALUES(?,?,?,?,?)").run(r.run_id, r.gm_principal_id,
+      "ai-policy-v1", json({ modeRevision: r.mode_revision, selection: composition }), now());
+    // Each candidate commits independently so a later failure never rolls back an earlier receipt.
+    let executed = 0;
+    for (const [index, binding] of targets.entries()) {
+      // The first candidate keeps the established run-level command key required by the credential trigger.
+      const key = index === 0 ? `dm-command:${r.run_id}` : `dm-command:${r.run_id}:${index}`;
+      try {
+        db.transaction(() => { const { receipt, summary } = runCandidate(r, binding, key); writeReceipt(r, binding, receipt, summary, index, key); }).immediate();
+        executed += 1;
+      } catch {
+        if (executed > 0) stop(r, "blocked", `composition-partial-after-${executed}`);
+        else throw new CampaignDmConflictError("domain-preconditions-changed");
+        return;
+      }
+    }
     if (!active(r)) throw new CampaignDmConflictError("publication authority changed");
-    db.prepare("INSERT INTO dm_receipts VALUES(?,?,?,?,?)").run(r.run_id, key, action, json(receipt), json({ action, summary }));
-    queueNarration(r,summary);
-    db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(r.run_id);
+    db.transaction(() => {
+      queueNarration(r, receiptsFor(r.run_id).map((item: any) => item.summary).join(" ").slice(0, 8000));
+      db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(r.run_id);
+    }).immediate();
   }
   const api: CampaignDmRepository = {
     recordDmProviderUsage(p,id,phase,usage){guard();db.transaction(()=>{
@@ -510,8 +562,12 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     }).immediate(); },
     getDmRun(p,c,s,id){guard();return project(pathRow(p,c,s,id));},
     getDmHistory(p,c,s){guard();room(p,c,s);return {control:api.getDmControl(p,c),runs:(db.prepare("SELECT * FROM dm_runs WHERE campaign_id=? AND session_id=? ORDER BY rowid DESC LIMIT 50").all(c,s) as RunRow[]).reverse().map(project)};},
-    getDmProposal(p,c,s,id){guard();gm(p,c);const r=pathRow(p,c,s,id);const selected=r.proposal_json?JSON.parse(r.proposal_json):null;
-      return {run:project(r),proposal:(JSON.parse(r.candidates_json) as Binding[]).find(b=>b.candidate.candidateId===selected?.candidateId)?.candidate??null};},
+    getDmProposal(p,c,s,id){guard();gm(p,c);const r=pathRow(p,c,s,id);
+      const composition=compositionOf(r.proposal_json?JSON.parse(r.proposal_json):null);
+      const bindings=JSON.parse(r.candidates_json) as Binding[];
+      const candidates=composition.map(selection=>bindings.find(b=>b.candidate.candidateId===selection.candidateId&&b.candidate.digest===selection.digest)?.candidate)
+        .filter((candidate):candidate is CampaignDmCandidate=>candidate!==undefined);
+      return {run:project(r),proposal:candidates[0]??null,composition:candidates};},
     claimDmPlanning(p,id,provider,model){guard();return db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);if(r.state!=="planning")return null;
       if(db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(id))return null;
@@ -545,6 +601,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     settleDmPlanning(p,id,claimId,selection,usage,failed=false){guard();db.transaction(()=>{
       const r=row(id);triggerAuthority(p,r);const dispatch=db.prepare("SELECT * FROM dm_dispatches WHERE run_id=? AND claim_id=?").get(id,claimId) as any;
       if(!dispatch)throw new CampaignDmConflictError("dispatch unavailable");
+      const normalized=selection===null?null:campaignDmCompositionSchema.parse(Array.isArray(selection)?selection:[selection]);
       if(usage&&!db.prepare("SELECT 1 FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id)){
         const request=db.prepare('SELECT request_json FROM dm_provider_requests WHERE run_id=?').get(id) as {request_json:string}|undefined;
         const pricing=request?JSON.parse(request.request_json).budget?.pricing:undefined;
@@ -553,24 +610,23 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       }
       failed ||= !recordedUsageAllowed(id,'planning');
       if(dispatch.status!=="claimed"){
-        if(dispatch.status==="settled" && (dispatch.response_json!==json({selection}) || dispatch.prompt_tokens!==(usage?.promptTokens??null)
+        if(dispatch.status==="settled" && (dispatch.response_json!==json({selection:normalized}) || dispatch.prompt_tokens!==(usage?.promptTokens??null)
           || dispatch.completion_tokens!==(usage?.completionTokens??null)))throw new CampaignDmConflictError("settlement replay changed");
         return;
       }
       if(failed||now()>=dispatch.deadline_at){db.prepare("UPDATE dm_dispatches SET status='unknown',prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(usage?.promptTokens??null,usage?.completionTokens??null,id);stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;}
-      const parsed=selection===null?null:campaignDmSelectionSchema.parse(selection);
-      if(parsed&&!(JSON.parse(r.candidates_json) as Binding[]).some(b=>b.candidate.candidateId===parsed.candidateId&&b.candidate.digest===parsed.digest))throw new CampaignDmConflictError("unadvertised candidate");
-      db.prepare("UPDATE dm_dispatches SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(json({selection:parsed}),usage?.promptTokens??null,usage?.completionTokens??null,id);
+      if(normalized){const bindings=JSON.parse(r.candidates_json) as Binding[];
+        if(!normalized.every(selection=>bindings.some(b=>b.candidate.candidateId===selection.candidateId&&b.candidate.digest===selection.digest)))throw new CampaignDmConflictError("unadvertised candidate");}
+      db.prepare("UPDATE dm_dispatches SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(json({selection:normalized}),usage?.promptTokens??null,usage?.completionTokens??null,id);
       if(r.state!=="planning")return;
       if(!active(r)){stop(r,"cancelled","authority-safety-or-mode-changed");return;}
       if(snapshot(r.gm_principal_id,r.campaign_id,r.session_id,JSON.parse(r.request_json)).freshness!==r.freshness_digest){stop(r,"blocked","proposal-stale-request-new-beat");return;}
-      if(!parsed){queueNarration(r,holdNarration(r));db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return;}
-      db.prepare("UPDATE dm_runs SET state='awaiting-approval',proposal_json=?,revision=revision+1 WHERE run_id=?").run(json(parsed),id);
+      if(!normalized){queueNarration(r,holdNarration(r));db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return;}
+      db.prepare("UPDATE dm_runs SET state='awaiting-approval',proposal_json=?,revision=revision+1 WHERE run_id=?").run(json(normalized),id);
     }).immediate();},
-    executeDmBeat(p,id){guard();return db.transaction(()=>{const r=row(id);triggerAuthority(p,r);
-      try{db.transaction(()=>execute(r)).immediate();}catch{stop(r,"blocked","domain-preconditions-changed-request-new-beat");}
-      return project(row(id));
-    }).immediate();},
+    executeDmBeat(p,id){guard();const r=row(id);triggerAuthority(p,r);
+      try{execute(r);}catch{stop(row(id),"blocked","domain-preconditions-changed-request-new-beat");}
+      return project(row(id));},
     decideDmBeat(p,c,s,id,raw){guard();const input=campaignDmDecisionRequestSchema.parse(raw);return db.transaction(()=>{
       gm(p,c);const r=pathRow(p,c,s,id);const old=db.prepare("SELECT principal_id,request_json FROM dm_decisions WHERE run_id=?").get(id) as any;
       if(old){if(old.principal_id!==p||old.request_json!==json(input))throw new CampaignDmConflictError("decision conflict");return project(r);}

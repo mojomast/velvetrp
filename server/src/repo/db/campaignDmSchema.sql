@@ -65,6 +65,14 @@ CREATE TABLE dm_receipts (
   domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
   public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000)
 );
+CREATE TABLE dm_composition_receipts (
+  run_id TEXT NOT NULL REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
+  ordinal INTEGER NOT NULL CHECK(ordinal BETWEEN 0 AND 2),
+  command_key TEXT NOT NULL UNIQUE, action TEXT NOT NULL CHECK(action IN ('encounter-start','encounter-materialize','enemy-turn','encounter-complete','reveal-node','resolve-node','reveal-clue')),
+  domain_receipt_json TEXT NOT NULL CHECK(json_valid(domain_receipt_json)),
+  public_json TEXT NOT NULL CHECK(json_valid(public_json) AND length(public_json)<=8000),
+  PRIMARY KEY(run_id,ordinal)
+);
 CREATE TABLE dm_public_history (
   run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
   narration TEXT NOT NULL CHECK(length(narration) BETWEEN 1 AND 8000), published_at TEXT NOT NULL
@@ -117,6 +125,19 @@ CREATE TRIGGER dm_decisions_replace BEFORE INSERT ON dm_decisions WHEN EXISTS(SE
 BEGIN SELECT RAISE(ABORT,'DM decisions cannot be replaced'); END;
 CREATE TRIGGER dm_receipts_replace BEFORE INSERT ON dm_receipts WHEN EXISTS(SELECT 1 FROM dm_receipts WHERE run_id=NEW.run_id OR command_key=NEW.command_key)
 BEGIN SELECT RAISE(ABORT,'DM receipts cannot be replaced'); END;
+CREATE TRIGGER dm_composition_receipts_update BEFORE UPDATE ON dm_composition_receipts BEGIN SELECT RAISE(ABORT,'DM composition receipt is immutable'); END;
+CREATE TRIGGER dm_composition_receipts_delete BEFORE DELETE ON dm_composition_receipts BEGIN SELECT RAISE(ABORT,'DM composition receipt is immutable'); END;
+CREATE TRIGGER dm_composition_receipts_replace BEFORE INSERT ON dm_composition_receipts WHEN EXISTS(SELECT 1 FROM dm_composition_receipts WHERE run_id=NEW.run_id AND ordinal=NEW.ordinal)
+BEGIN SELECT RAISE(ABORT,'DM composition receipts cannot be replaced'); END;
+CREATE TRIGGER dm_composition_receipts_authority BEFORE INSERT ON dm_composition_receipts WHEN NOT EXISTS(
+  SELECT 1 FROM dm_runs run JOIN dm_decisions decision USING(run_id)
+  WHERE run.run_id=NEW.run_id AND run.state='awaiting-approval' AND decision.kind IN ('human-approved','ai-policy-v1')
+    AND (EXISTS(SELECT 1 FROM combat_commands_v27 command JOIN encounter ON encounter.encounter_id=command.encounter_id
+      WHERE encounter.campaign_id=run.campaign_id AND encounter.session_id=run.session_id AND command.idempotency_key=NEW.command_key
+        AND NEW.action IN ('encounter-start','encounter-materialize','encounter-complete','enemy-turn'))
+      OR EXISTS(SELECT 1 FROM story_commands_v34 command WHERE command.campaign_id=run.campaign_id
+        AND command.idempotency_key=NEW.command_key AND command.command_type=NEW.action)))
+BEGIN SELECT RAISE(ABORT,'DM composition receipt requires approved domain command'); END;
 CREATE TRIGGER dm_public_history_replace BEFORE INSERT ON dm_public_history WHEN EXISTS(SELECT 1 FROM dm_public_history WHERE run_id=NEW.run_id)
 BEGIN SELECT RAISE(ABORT,'DM history cannot be replaced'); END;
 CREATE TRIGGER dm_control_revision BEFORE UPDATE ON dm_control WHEN NEW.campaign_id<>OLD.campaign_id OR NEW.revision<>OLD.revision+1

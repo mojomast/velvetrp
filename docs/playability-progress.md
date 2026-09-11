@@ -1,13 +1,13 @@
 # Playability progress
 
 ## Current checkpoint
-- Baseline commit: `9e5f1b7`
-- Active plan/milestone: Plan 3 deterministic closeout complete
-- Last accepted milestone and commit: Plan 3 closeout, `cc51436` plus the ledger row below
-- Next small assignment: none; optional matched live reading-quality comparison remains outside deterministic acceptance
+- Baseline commit: `a312fb7`
+- Active plan/milestone: Plan 4 complete (living knowledge); Plan 5 living Director in progress at P5.1
+- Last accepted milestone and commit: Plan 4 P4.1-P4.9 through `7e2bcb8`; Plan 5 P5.1 ordered composition through the contracts commit `a312fb7` plus the repo commit recorded below
+- Next small assignment: P5.2 bounded read-only planning grounding (budget amendment recorded and approved; live provider requests explicitly authorized for Director development)
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
-- Blockers and decision required: none. One RouteTok capability probe passed; full matched live branches remain optional and must fit a fresh reservation.
-- Live budget remaining / audit path / uncertain dispatch IDs: USD 1.99996208, 129 dispatches, 249,504 reserved/settled tokens, under 40 minutes; sanitized audit `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`; no uncertain dispatch IDs.
+- Blockers and decision required: none. `campaign-recall.test.ts` "upgrades the exact pre-recall schema" is a pre-existing failure on `a312fb7` (reproduces with the DM schema changes stashed); `tactical-map-generation.test.ts` also remains a pre-existing failure.
+- Live budget remaining / audit path / uncertain dispatch IDs: USD 1.99996208, 129 dispatches, 249,504 reserved/settled tokens, under 40 minutes; sanitized audit `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`; no uncertain dispatch IDs. Plan 4 and P5.1 used zero provider calls.
 - P3.6 decision gate: apply only the query-bounded `now` -> whole-term `current` lexical match in `velvet_recall_score`. Targets are development `current-beacon-update-v1` and frozen holdout `holdout-current-reversal-v1`, each moving the current source from rank 2 to rank 1 while historical queries still rank explicit old evidence first. Require Recall@3/8, privacy, negative, packing, and hydration rates to remain 1; development MRR >=0.7692307692307693 and nDCG >=0.779302288736651; holdout MRR/nDCG >=0.6666666666666666; packet/source caps unchanged; same-run p95 latency <=20% over the measured pre-change 21.03044ms/334.031198ms at 100/1,000 distractions; zero provider cost, schema, dependency, or persisted-data change. Rollback is a normal revert of the one score predicate; the corpus and holdouts remain frozen.
 
 ## Interface handoffs
@@ -43,6 +43,8 @@
 | P3.5 | accepted | `064fbbf` `71f01b3` `5515227` | contracts 10; server inspection/route/recovery 24; client API/UI 156; workspace typechecks | exact reference selector, two private no-store GETs, GM Director panel | USD 1.99996208; 129 calls; 249,504 tokens |
 | P3.6/P3.7 | accepted | `f0c6238` | evaluator 2; recall/migration 9; isolated evaluator runs | query-bounded `now`/`current` correction met frozen development/holdout gates | USD 1.99996208; 129 calls; 249,504 tokens |
 | P3.8 | accepted | `cc51436` + this ledger | context-inspection E2E 2; E2E typecheck; documentation drift 7; independent review remediation | exact persisted browser evidence, no paid call on inspect/reload; optional matched live comparison not run | USD 1.99996208; 129 calls; 249,504 tokens |
+| Plan 4 | accepted | `98705fe`..`7e2bcb8` | per-milestone focused tests plus server/contracts/scripts typechecks; knowledge evaluator attribution/privacy/negative/negation/disclosure all 1 | plan-4 evidence + README/ROADMAP reconciliation | clue-source bridge and first-class faction-reaction command deferred (closed CHECK migrations); no browser knowledge-read E2E |
+| P5.1 | accepted | `a312fb7` + this ledger | contracts 3; director run/composition/recovery/narration/generated/review/binding/knowledge 59; DM migration/readiness/fixture 10; server typecheck/build | plan-5 budget amendment + P5.1 note; ledger | full multi-candidate success awaits the P5.3 ambient/world-time domain or an explicit revision re-resolution design |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |
