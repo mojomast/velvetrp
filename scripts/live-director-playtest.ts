@@ -2,24 +2,19 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import DatabaseDriver from "better-sqlite3";
 import { completeWithProvider, ProviderHttpError } from "../server/src/provider/index.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../server/src/defaults.js";
 import type { ProviderSettings } from "../server/src/types.js";
 import { closeRepo } from "../server/src/repo/index.js";
 import { orchestrateCampaignDmBeat } from "../server/src/agent/campaignDmOrchestrator.js";
 import type { AdventureAgentDependencies } from "../server/src/agent/adventureOrchestrator.js";
-import { createAgentObservationRepository } from "../server/src/repo/observations/agentObservationRepo.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
+import { PLAYTEST_PACING_ACTIONS, gradeDmRun, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
 import { readProxyKey } from "./evaluate-live-director-grounding.js";
 
 const OWNER = "local-owner";
 const PROXY_BASE_URL = "http://100.72.41.9:8787/v1";
 const PROXY_MODEL = "deepseek-v4-flash";
-const KNOWN_ACTIONS = new Set(["encounter-start", "encounter-materialize", "enemy-turn", "encounter-complete",
-  "reveal-node", "resolve-node", "reveal-clue", "advance-time", "ambient-beat"]);
-const PACING_ACTIONS = new Set(["advance-time", "ambient-beat"]);
-const LEAK_MARKERS = ["SECRET_", "gmNotes", "privateGoals", "candidateId", "proposal", "provider", "dispatch", "tool_call"];
 
 export interface PlaytestOptions {
   seed: number;
@@ -52,63 +47,6 @@ function liveProvider(apiKey: string, maxUsdPerBeat: number): ProviderSettings {
     adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: maxUsdPerBeat } };
 }
 
-/** Deterministic, provider-free world: locations, present NPCs with ledger knowledge, a story chain, and a quest. */
-function seedWorld(f: Awaited<ReturnType<typeof dmFixture>>, seed: number) {
-  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
-  db.pragma("foreign_keys=ON");
-  const tag = `s${seed}`;
-  const createLocation = (locationId: string, name: string, description: string) =>
-    (f.repo as unknown as { createLocation: (owner: string, input: Record<string, unknown>) => unknown })
-      .createLocation(OWNER, { campaignId: f.campaign.id, locationId, name, description, visibility: "public" });
-  createLocation(`${tag}-market`, `${tag} Market`, "A lantern-lit market square.");
-  createLocation(`${tag}-docks`, `${tag} Docks`, "Weathered docks under salt mist.");
-  createLocation(`${tag}-chapel`, `${tag} Chapel`, "A quiet chapel of grey stone.");
-  const ledger = createAgentObservationRepository(db, { clock: f.options.clock, ids: { nextId: (() => { let n = 0; return () => `${tag}-obs-${++n}`; })() } });
-  const freshRead = <T>(source: string, ...params: unknown[]): T | undefined => {
-    const connection = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
-    try { return connection.prepare(source).get(...params) as T | undefined; } finally { connection.close(); }
-  };
-  const narrativeRevision = () => freshRead<{ revision: number }>("SELECT revision FROM world_narrative_revisions_v32 WHERE campaign_id=?", f.campaign.id)?.revision ?? 0;
-  const presenceRevision = () => freshRead<{ revision: number }>("SELECT revision FROM npc_presence_session_revisions_v43 WHERE campaign_id=? AND session_id=?", f.campaign.id, f.session.id)?.revision ?? 0;
-  [`${tag} Maren`, `${tag} Joss`, `${tag} Quill`].forEach((name, index) => {
-    const persona = f.repo.createCharacter({ name, age: 30 + index, archetype: "Guide", boundaries: "", fictionalConfirmed: true });
-    const npc = f.repo.createCampaignNpc(OWNER, f.campaign.id, {
-      personaId: persona.id, publicState: { name, description: `The ${name.split(" ")[1]} of the ${tag} quarter.` },
-      privateState: { goals: "SECRET_GOAL", gmNotes: "SECRET_GM_NOTE", merchantState: null },
-      expectedRevision: narrativeRevision(), idempotencyKey: `${tag}-npc-${index}`,
-    }).npc;
-    f.repo.mutateNpcPresence(OWNER, { campaignId: f.campaign.id, sessionId: f.session.id, npcId: npc.npcId, expectedRevision: presenceRevision(),
-      idempotencyKey: `${tag}-place-${index}`, mutation: { kind: "place", locationId: `${tag}-market` } });
-    ledger.record({ campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, agentKind: "npc", agentId: npc.npcId,
-      sourceCommandId: `${tag}-witness-${index}`, observedRevision: 1, channel: "witnessed", hopCount: 0,
-      text: `${name} saw the party arrive at the ${tag} market.`, authority: "verified" });
-  });
-  const nodes = [0, 1, 2, 3].map(index => ({ nodeId: `${tag}-n${index}`, title: `Scene ${index}`, description: `Public scene ${index} of the ${tag} road.`,
-    gmNotes: `SECRET_NODE_${index}`, revealThreshold: index === 0 ? 0 : 1 }));
-  const edges = [1, 2, 3].map(index => ({ edgeId: `${tag}-e${index}`, kind: "requires" as const, fromNodeId: `${tag}-n${index - 1}`, toNodeId: `${tag}-n${index}` }));
-  f.repo.createCampaignStorylineGraph(OWNER, f.campaign.id, { expectedRevision: f.repo.getCampaignStory(OWNER, f.campaign.id)!.revision,
-    idempotencyKey: `${tag}-story`, storyline: { storylineId: "story", title: `${tag} Journey`, summary: "A public road", nodes, edges, plotPoints: [],
-      clues: [{ clueId: `${tag}-clue`, title: `${tag} Key`, content: "A brass key lies on the stones.", truth: "SECRET_TRUTH", gmNotes: "SECRET_CLUE",
-        revealThreshold: 1, sources: [{ sourceId: `${tag}-clue-src`, kind: "node", targetId: `${tag}-n0` }] }] } });
-  f.repo.createCampaignQuest(OWNER, f.campaign.id, { quest: {
-    questId: `${tag}-quest-a`, storylineId: "story", title: `Guard the ${tag} market`, description: "A public task.",
-    visibility: "public", journalText: "Offered",
-    objectives: [{ objectiveId: `${tag}-obj-a`, description: "Keep watch at the market", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }], rewards: [] },
-    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: `${tag}-quest-a-create` });
-  db.close();
-}
-
-function gradeRun(run: { state: string; receipts: Array<{ action: string }>; narration: string | null }): string[] {
-  const failures: string[] = [];
-  if (run.state !== "completed") failures.push(`state:${run.state}`);
-  if (run.narration === null || run.narration.length === 0) failures.push("missing-narration");
-  for (const marker of LEAK_MARKERS) if ((run.narration ?? "").includes(marker)) failures.push(`leak:${marker}`);
-  const actions = run.receipts.map(receipt => receipt.action);
-  for (const action of actions) if (!KNOWN_ACTIONS.has(action)) failures.push(`unknown-action:${action}`);
-  if (new Set(actions).size !== actions.length) failures.push("duplicate-receipt-action");
-  return failures;
-}
-
 export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
   const directory = await mkdtemp(path.join(tmpdir(), "velvet-playtest-"));
   const priorDataDir = process.env.VELVET_DATA_DIR;
@@ -116,7 +54,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     process.env.VELVET_DATA_DIR = directory; closeRepo();
     const provider = liveProvider(await readProxyKey(), options.maxUsd / options.beats);
     const f = await dmFixture(false, { dataDir: directory });
-    seedWorld(f, options.seed);
+    seedLivingWorld(f, options.seed);
     const providerCalls: PlaytestArtifact["providerCalls"] = [];
     let providerQuotaHit = false;
     const deps: AdventureAgentDependencies = {
@@ -161,8 +99,8 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
         }
       }
       const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
-      const beatFailures = gradeRun(executed);
-      const transition = executed.receipts.length > 0 && executed.receipts.every(receipt => PACING_ACTIONS.has(receipt.action));
+      const beatFailures = gradeDmRun(executed);
+      const transition = executed.receipts.length > 0 && executed.receipts.every(receipt => PLAYTEST_PACING_ACTIONS.has(receipt.action));
       beats.push({ index, intent: run.intent, state: executed.state, receipts: executed.receipts.map(receipt => receipt.action),
         narration: executed.narration !== null, transition, blockers: executed.blockers,
         narrationTail: (executed.narration ?? "").slice(-70), failures: beatFailures });

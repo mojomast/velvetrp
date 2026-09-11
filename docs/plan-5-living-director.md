@@ -236,7 +236,14 @@ spends a provider call. The campaign stopped when the agentrouter account quota
 was exhausted (HTTP 403 `token quota is not enough`); the harness now aborts with
 `provider-quota` rather than burning beats. The guarded
 `scripts/test/live-director-playtest.test.ts` (set `LIVE_DIRECTOR_PLAYTEST=1`)
-runs the harness as a test; the default scripts run keeps CI provider-free.
+runs the harness as a test; the default scripts run keeps CI provider-free. The
+harness world seeding and beat grading live in
+`server/test/fixtures/livingWorld.ts`, so the deterministic
+`server/test/campaign-dm-living-worlds.test.ts` drives generated worlds through
+the production orchestrator with a scripted director in both AI and human modes
+and asserts the same invariants provider-free: completion, narration, exact
+known actions, no duplicate receipt action, no leakage, replay that spends no
+provider call, transition pacing, and 30-minute world-time steps only.
 
 ### P5.3: World time and ambient beats
 
