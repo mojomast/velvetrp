@@ -100,11 +100,25 @@ export const economyHttpTradeCommandRequestSchema = z.object({
   ...commandBase,
 }).strict();
 
-/** The HTTP vocabulary intentionally has one canonical quote, purchase, and trade command each. */
+/** The recipient accepts or either party cancels an open bilateral trade by exact trade ID. */
+export const economyHttpAcceptTradeCommandRequestSchema = z.object({
+  type: z.literal("accept_bilateral_trade"),
+  tradeId: tradeIdSchema,
+  ...commandBase,
+}).strict();
+export const economyHttpCancelTradeCommandRequestSchema = z.object({
+  type: z.literal("cancel_bilateral_trade"),
+  tradeId: tradeIdSchema,
+  ...commandBase,
+}).strict();
+
+/** The HTTP vocabulary has one canonical quote, purchase, propose, accept, and cancel command each. */
 export const economyHttpCommandRequestSchema = z.discriminatedUnion("type", [
   economyHttpQuoteCommandRequestSchema,
   economyHttpPurchaseCommandRequestSchema,
   economyHttpTradeCommandRequestSchema,
+  economyHttpAcceptTradeCommandRequestSchema,
+  economyHttpCancelTradeCommandRequestSchema,
 ]);
 
 export const economyHttpQuoteResultSchema = z.object({
@@ -123,7 +137,8 @@ export const economyHttpPurchaseResultSchema = z.object({
 }).strict();
 export const economyHttpTradeResultSchema = z.object({
   tradeId: tradeIdSchema,
-  status: z.literal("open"),
+  status: z.enum(["open", "settled", "cancelled"]),
+  expired: z.boolean().optional(),
 }).strict();
 
 const receiptBase = {
@@ -136,10 +151,14 @@ const receiptRevision = (receipt: { revisionBefore: number; revisionAfter: numbe
 export const economyHttpQuoteCommandReceiptSchema = z.object({ type: z.literal("request_purchase_quote"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpPurchaseCommandReceiptSchema = z.object({ type: z.literal("purchase_from_shop"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpTradeCommandReceiptSchema = z.object({ type: z.literal("propose_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
+export const economyHttpAcceptTradeCommandReceiptSchema = z.object({ type: z.literal("accept_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
+export const economyHttpCancelTradeCommandReceiptSchema = z.object({ type: z.literal("cancel_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpCommandReceiptSchema = z.discriminatedUnion("type", [
   economyHttpQuoteCommandReceiptSchema,
   economyHttpPurchaseCommandReceiptSchema,
   economyHttpTradeCommandReceiptSchema,
+  economyHttpAcceptTradeCommandReceiptSchema,
+  economyHttpCancelTradeCommandReceiptSchema,
 ]);
 
 /** Each envelope has one canonical result and its matching receipt, never optional result fields. */
@@ -147,6 +166,8 @@ export const economyHttpCommandResponseSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("request_purchase_quote"), quote: economyHttpQuoteResultSchema, receipt: economyHttpQuoteCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("purchase_from_shop"), purchase: economyHttpPurchaseResultSchema, receipt: economyHttpPurchaseCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("propose_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpTradeCommandReceiptSchema }).strict(),
+  z.object({ type: z.literal("accept_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpAcceptTradeCommandReceiptSchema }).strict(),
+  z.object({ type: z.literal("cancel_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpCancelTradeCommandReceiptSchema }).strict(),
 ]);
 
 export type EconomyHttpWalletGetResponse = z.infer<typeof economyHttpWalletGetResponseSchema>;

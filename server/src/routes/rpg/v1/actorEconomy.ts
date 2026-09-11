@@ -146,7 +146,9 @@ export const actorEconomyHttpRoutes: FastifyPluginAsync<ActorEconomyHttpOptions>
           ? { kind: body.data.type, shopId: body.data.shopId, item: body.data.item, quantity: body.data.quantity, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
           : body.data.type === "purchase_from_shop"
             ? { kind: body.data.type, quoteId: body.data.quoteId, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
-            : { kind: body.data.type, trade: { tradeId: body.data.tradeId, acceptedByActorId: body.data.recipientActorId, offeredItems: body.data.offered.items, offeredCurrency: body.data.offered.currency, requestedItems: body.data.requested.items, requestedCurrency: body.data.requested.currency }, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey };
+            : body.data.type === "accept_bilateral_trade" || body.data.type === "cancel_bilateral_trade"
+              ? { kind: body.data.type, tradeId: body.data.tradeId, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
+              : { kind: body.data.type, trade: { tradeId: body.data.tradeId, acceptedByActorId: body.data.recipientActorId, offeredItems: body.data.offered.items, offeredCurrency: body.data.offered.currency, requestedItems: body.data.requested.items, requestedCurrency: body.data.requested.currency }, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey };
         const result = options.economyRepositoryAccessor().mutateEconomyForActor(LOCAL_OWNER, campaignId.data, actorId.data, command);
         const receipt = {
           type: body.data.type,

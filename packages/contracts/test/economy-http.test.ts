@@ -27,6 +27,8 @@ describe("economy HTTP contracts", () => {
       { type: "request_purchase_quote", shopId: "shop", item, quantity: 1, ...base },
       { type: "purchase_from_shop", quoteId: "quote", ...base },
       { type: "propose_bilateral_trade", tradeId: "trade", recipientActorId: "recipient", offered: { items: [{ kind: "stackable", entryId: "potion-stack", item, quantity: 1 }], currency: [] }, requested: { items: [], currency: [{ currency, minorUnits: 2 }] }, ...base },
+      { type: "accept_bilateral_trade", tradeId: "trade", ...base },
+      { type: "cancel_bilateral_trade", tradeId: "trade", ...base },
     ] as const;
     for (const request of requests) expect(economyHttpCommandRequestSchema.parse(request)).toEqual(request);
     expect(economyHttpCommandRequestSchema.safeParse({ ...requests[0], buyerActorId: "private" }).success).toBe(false);
@@ -43,5 +45,12 @@ describe("economy HTTP contracts", () => {
     expect(economyHttpCommandResponseSchema.safeParse({ ...response, quote: {} }).success).toBe(false);
     expect(economyHttpCommandReceiptSchema.safeParse({ ...receipt, actorId: "private" }).success).toBe(false);
     expect(economyHttpCommandReceiptSchema.safeParse({ ...receipt, revisionAfter: 6 }).success).toBe(false);
+    const receiptBase = { idempotencyKey: base.idempotencyKey, revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z" };
+    for (const [type, status] of [["accept_bilateral_trade", "settled"], ["cancel_bilateral_trade", "cancelled"]] as const) {
+      const tradeReceipt = { type, ...receiptBase };
+      const tradeResponse = { type, trade: { tradeId: "trade", status }, receipt: tradeReceipt };
+      expect(economyHttpCommandReceiptSchema.parse(tradeReceipt)).toEqual(tradeReceipt);
+      expect(economyHttpCommandResponseSchema.parse(tradeResponse)).toEqual(tradeResponse);
+    }
   });
 });
