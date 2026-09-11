@@ -13,6 +13,18 @@ export {
   type AgentObservationInput,
   type AgentObservationRepository,
 } from "./observations/agentObservationRepo.js";
+export {
+  MAX_HOP_COUNT,
+  MAX_OBSERVATIONS_PER_AGENT,
+  MAX_TELL_FANOUT,
+  MAX_TELL_PER_ARRIVAL,
+  MAX_WITNESS_FANOUT,
+  propagateToldOnArrival,
+  propagateWitnessObservations,
+  type PropagationDependencies,
+  type ToldOnArrivalInput,
+  type WitnessObservationInput,
+} from "./observations/agentObservationPropagation.js";
 // Preserve the established repository API without exposing domain-internal
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";

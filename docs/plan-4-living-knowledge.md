@@ -1,8 +1,9 @@
 # Plan 4: Living knowledge and rumors
 
-Status: in progress. P4.1 (observation ledger + write path) is implemented and
-committed; later milestones are planned, not implemented. Researched against
-current `main` after Plan 3 closeout. Design research and sources:
+Status: in progress. P4.1 (observation ledger + write path) and P4.2 (bounded
+co-presence propagation) are implemented and committed; later milestones are
+planned, not implemented. Researched against current `main` after Plan 3
+closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -42,8 +43,11 @@ a level cannot meet its gate, record it incomplete rather than overclaiming.
   co-presence; never from narration or LLM extraction.
 - **Writes** run inside the same immediate transaction as the underlying
   receipt (pattern: `campaignContextInspectionProvenanceWrite.ts`).
-- **Propagation** is bounded fan-out at receipt time with a stored per-agent
-  cap (256 rows default) and in-transaction eviction; never a read-time LIMIT.
+- **Propagation** is bounded fan-out at write time: witnesses are recorded when a
+  committed event settles, and `told` rows spread on co-presence arrival with a
+  hop cap. A per-agent cap (default 256) refuses new observations past the cap;
+  immutable rows are never deleted or evicted. Reads use indexed agent/source
+  queries with explicit limits.
 - **Contradiction** uses semi-revision: both claims stored; read-time ranking
   `verified` > newer `committed-outcome` > older outcomes > `rumor`;
   corrections are `refuted` observations.
@@ -74,12 +78,15 @@ Commit: `feat(repo): record agent observations from committed receipts`.
 
 ### P4.2: Bounded propagation
 
-Own: propagation writer with co-presence fan-out, hop cap (<= 2 default),
-stored per-agent cap and in-transaction eviction.
+Own: propagation engine and two wirings — witness fan-out at a committed
+mechanical event (adventure check execution) and `told` fan-out on NPC
+presence arrival — with hop cap (<= 2 default) and a write-time per-agent cap
+(default 256). Immutable rows are never deleted.
 
 Gate: deterministic caps; no cross-session spread by default; no LLM or
-narration parsing; refuted corrections never delete rows. Run propagation +
-eviction tests and server typecheck.
+narration parsing; observation text derived only from public receipt data;
+refuted corrections add rows and never delete; idempotent replay. Run
+propagation + cap tests and server typecheck.
 Commit: `feat(repo): propagate observations along co-presence`.
 
 ### P4.3: Trust-gated NPC reads and recall integration

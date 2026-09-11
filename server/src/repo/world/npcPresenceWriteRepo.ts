@@ -8,6 +8,7 @@ import {
   type NpcPresenceMutationHttpResponse,
 } from "@velvet/contracts";
 import { createCampaignRoomSessionLifecycleRepository } from "../campaign/campaignRoomSessionLifecycleRepo.js";
+import { propagateToldOnArrival } from "../observations/agentObservationPropagation.js";
 import type { WorldDependencies } from "./worldWriteRepo.js";
 import { WorldAuthorizationError, WorldConflictError, WorldStaleError, WorldUnavailableError } from "./worldErrors.js";
 import type { NpcPresenceReadInternals } from "./npcPresenceReadRepo.js";
@@ -117,6 +118,19 @@ export function createNpcPresenceWriteRepository(
             WHERE campaign_id=? AND session_id=? AND npc_id=?`)
             .run(state, locationId, after, at, commandId,
               intent.campaignId, intent.sessionId, intent.npcId);
+        }
+        if (state === "present") {
+          const timeline = db.prepare(`SELECT timeline.id AS timelineId,timeline.revision AS revision
+            FROM campaigns campaign JOIN campaign_timelines timeline
+              ON timeline.campaign_id=campaign.id AND timeline.id=campaign.active_timeline_id
+            WHERE campaign.id=?`).get(intent.campaignId) as { timelineId: string; revision: number } | undefined;
+          if (timeline) propagateToldOnArrival(db, dependencies, {
+            campaignId: intent.campaignId,
+            timelineId: timeline.timelineId,
+            sessionId: intent.sessionId,
+            arrivingNpcId: intent.npcId,
+            observedRevision: timeline.revision,
+          });
         }
         const receipt = { kind: intent.mutation.kind, revisionBefore: before, revisionAfter: after, occurredAt: at };
         return npcPresenceMutationHttpResponseSchema.parse({ receipt });
