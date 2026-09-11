@@ -35,7 +35,7 @@ function authorization(role: StudioAuthorization["role"] = "gm", generation = 1)
   return auth;
 }
 function castApi(): CastStudioApi {
-  return { listNpcs: vi.fn().mockResolvedValue({ data: npcs, revision: 2 }), listFactions: vi.fn().mockResolvedValue({ data: factions, revision: 2 }), createNpc: vi.fn(), createFaction: vi.fn(), relationship: vi.fn(), reputation: vi.fn(), previewNpcs: shared.projectNpcsForPlayers, previewFactions: shared.projectFactionsForPlayers };
+  return { listNpcs: vi.fn().mockResolvedValue({ data: npcs, revision: 2 }), listFactions: vi.fn().mockResolvedValue({ data: factions, revision: 2 }), createNpc: vi.fn(), createFaction: vi.fn(), relationship: vi.fn(), reputation: vi.fn(), previewNpcs: shared.projectNpcsForPlayers, previewFactions: shared.projectFactionsForPlayers, getCompanion: vi.fn(), commandCompanion: vi.fn(), listMemberships: vi.fn(), listRooms: vi.fn() };
 }
 function worldApi(): WorldExplorerApi { return { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn(), place: vi.fn(), camp: vi.fn() }; }
 
