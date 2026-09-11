@@ -41,6 +41,26 @@ describe("durable DM director",()=>{
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);db.close();repo.close();
   });
 
+  it("dedupes a repeated selection instead of stalling the beat",async()=>{
+    const f=await dmFixture();f.graph();
+    f.repo.setDmControl("local-owner",f.campaign.id,{mode:"ai",expectedRevision:0,idempotencyKey:"dup-ai"});
+    const pick=(candidate:{candidateId:string;digest:string})=>({candidateId:candidate.candidateId,digest:candidate.digest});
+    const complete=vi.fn(async(input)=>{
+      if(input.promptVersion==="campaign-dm-narration-v1")return dmCompletion(input);
+      const candidates=(JSON.parse(input.messages[1]!.content as string) as {candidates:Array<{action:string;candidateId:string;digest:string}>}).candidates;
+      const reveal=candidates.find(candidate=>candidate.action==="reveal-node")!,ambient=candidates.find(candidate=>candidate.action==="ambient-beat")!;
+      return {message:{role:"assistant" as const,content:null,toolCalls:[{id:"choice",name:"select_dm_beat",
+        arguments:JSON.stringify({composition:[pick(reveal),pick(ambient),pick(reveal)]})}]},
+        usage:{promptTokens:10,completionTokens:5,totalTokens:15},model:{requestedModel:"fake-dm",responseModel:"fake-dm"}};
+    });
+    const run=f.repo.openDmBeat("local-owner",f.campaign.id,f.session.id,{intent:"open",expectedModeRevision:1,idempotencyKey:"dup-open"});
+    await orchestrateCampaignDmBeat(f.repo,"local-owner",run.runId,dmDependencies(complete));
+    const executed=f.repo.getDmRun("local-owner",f.campaign.id,f.session.id,run.runId);
+    expect(executed.state).toBe("completed");
+    expect(executed.receipts.map(({action})=>action)).toEqual(["reveal-node","ambient-beat"]);
+    f.repo.close();
+  });
+
   it("allows players to request under delegation, never to read GM proposals or set mode",async()=>{
     const f=await dmFixture();f.graph();const db=database();db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('player','Player',0)").run();
     f.advance();f.repo.addCampaignMembership("local-owner",f.campaign.id,{principalId:"player",role:"player"});

@@ -39,7 +39,14 @@ function parseSelectCall(call: CompletionToolCall): CampaignDmSelection[] | null
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 1) throw new Error("invalid DM selection");
   if ("composition" in value) {
     if (!Array.isArray(value.composition)) throw new Error("invalid DM selection");
-    return value.composition.length === 0 ? null : campaignDmCompositionSchema.parse(value.composition);
+    // A repeated candidate is an invalid model slip, not enough to abandon the whole selection; keep the first order.
+    const seen = new Set<string>();
+    const unique = value.composition.filter((item) => {
+      const candidateId = item && typeof item === "object" ? (item as { candidateId?: unknown }).candidateId : undefined;
+      if (typeof candidateId !== "string" || seen.has(candidateId)) return false;
+      seen.add(candidateId); return true;
+    });
+    return unique.length === 0 ? null : campaignDmCompositionSchema.parse(unique);
   }
   if ("selection" in value) return value.selection === null ? null : [campaignDmSelectionSchema.parse(value.selection)];
   throw new Error("invalid DM selection");
@@ -134,7 +141,12 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
       runningCost += accounting.costUsd ?? 0;
       const calls = result.message.toolCalls;
       if (!calls?.length) { settleDecision(round, claimId, null, accounting); break; }
-      if (calls.length === 1 && calls[0]!.name === "select_dm_beat") { settleDecision(round, claimId, parseSelectCall(calls[0]!), accounting); break; }
+      if (calls.length === 1 && calls[0]!.name === "select_dm_beat") {
+        // A paid call that answered with an invalid selection settles as a safe hold; it is never an ambiguous outcome.
+        try { settleDecision(round, claimId, parseSelectCall(calls[0]!), accounting); }
+        catch { settleDecision(round, claimId, null, accounting); }
+        break;
+      }
       const requests = calls.map(call => parseDmReadCall(call.name, JSON.parse(call.arguments)));
       if (forced) { settleDecision(round, claimId, null, accounting); break; }
       const observations = await Promise.all(requests.map(req => repository.readDmPlanningGrounding(principal, runId, req)));
