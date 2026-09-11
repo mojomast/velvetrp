@@ -181,8 +181,14 @@ deadline, so early beats ended `unknown`
 the intended no-retry fence, no ambiguous call was retried, and no beat forced
 an ending. The planning and narration provider-call deadline is now
 `DM_PROVIDER_DEADLINE_MS = 120_000`, applied to both the in-process abort timer
-and the durable dispatch/round deadlines so they stay consistent; later live
-runs are expected to complete.
+and the durable dispatch/round deadlines so they stay consistent. After the
+change a 3-beat run completed every beat (6 calls) but the model chose to skip
+reads, so the planning prompt now requires at least one grounding read before
+deciding. A follow-up run then issued `read_campaign_recall` and
+`read_quest_summary`, but its forced final selection round ended `unknown`, so
+final selection quality remains model-dependent. Live grounding itself is
+proven; raising or removing the forced-read instruction is a P5.6 evaluation
+question.
 
 ### P5.3: World time and ambient beats
 
