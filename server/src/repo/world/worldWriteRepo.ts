@@ -9,6 +9,7 @@ import {
   npcRelationshipCommandHttpRequestSchema,
   npcRelationshipHttpSchema,
   campaignFactionHttpSchema,createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema,factionStandingHttpSchema,
+  factionReactionCommandHttpRequestSchema,
   discoverLocationCommandSchema,
   resourceIdSchema,
   setActorLocationCommandSchema,
@@ -26,6 +27,7 @@ import {
   type NpcRelationshipCommandHttpRequest,
   type NpcRelationshipHttp,
   type CampaignFactionHttp,type CreateCampaignFactionHttpRequest,type FactionReputationCommandHttpRequest,type FactionStandingHttp,
+  type FactionReactionCommandHttpRequest,
 } from "@velvet/contracts";
 import type { Clock, IdGenerator } from "../../runtime.js";
 import { executeActorTravelInTransaction, executeLegacyTravelInTransaction } from "./actorTravelTransaction.js";
@@ -65,6 +67,7 @@ export type CreateNpcResult={campaignId:string;npc:CampaignNpcHttp;receipt:NpcMu
 export type NpcRelationshipResult={campaignId:string;npcId:string;relationship:NpcRelationshipHttp;receipt:NpcMutationReceipt};
 export type CreateFactionResult={campaignId:string;faction:CampaignFactionHttp;receipt:NpcMutationReceipt};
 export type FactionReputationResult={campaignId:string;factionId:string;standing:FactionStandingHttp;receipt:NpcMutationReceipt};
+export type FactionReactionResult=FactionReputationResult&{sourceObservationId:string};
 
 /** Lifecycle and runtime services required by world command handlers. */
 export interface WorldWriteContext extends WorldDependencies {
@@ -95,6 +98,8 @@ export interface WorldWriteRepository {
   changeNpcRelationship(principalId:string,npcId:string,input:NpcRelationshipCommandHttpRequest):NpcRelationshipResult;
   createCampaignFaction(principalId:string,campaignId:string,input:CreateCampaignFactionHttpRequest):CreateFactionResult;
   changeFactionReputation(principalId:string,factionId:string,input:FactionReputationCommandHttpRequest):FactionReputationResult;
+  /** Enacts a faction reaction only when that faction holds a matching observation. */
+  resolveFactionReaction(principalId:string,factionId:string,input:FactionReactionCommandHttpRequest):FactionReactionResult;
 }
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -344,11 +349,28 @@ export function createWorldWriteRepository(
       narrativeRecord(campaignId,factionId,"change_faction_reputation",intent.idempotencyKey,mutation,result,"faction_reputation_changed",{standing,delta:intent.delta,reason:intent.reason});return result;
     }).immediate();
   }
+  function resolveFactionReaction(principalId:string,factionIdInput:string,input:FactionReactionCommandHttpRequest):FactionReactionResult{
+    context.guard();const factionId=resourceIdSchema.parse(factionIdInput),intent=factionReactionCommandHttpRequestSchema.parse(input);
+    return db.transaction(()=>{
+      const faction=db.prepare("SELECT campaign_id FROM campaign_factions_v28 WHERE faction_id=?").get(factionId) as {campaign_id:string}|undefined;
+      if(!faction)throw new WorldUnavailableError("faction is unavailable");const campaignId=faction.campaign_id;
+      if(!gm(principalId,campaignId))throw new WorldAuthorizationError("GM authority is required");
+      const observation=db.prepare(`SELECT observation_id FROM agent_observations
+        WHERE campaign_id=? AND agent_kind='faction' AND agent_id=? AND source_command_id=?
+        ORDER BY hop_count ASC, created_at DESC, observation_id ASC LIMIT 1`)
+        .get(campaignId,factionId,intent.sourceCommandId) as {observation_id:string}|undefined;
+      if(!observation)throw new WorldUnavailableError("faction has no knowledge to react to");
+      const reputationIntent:FactionReputationCommandHttpRequest={subjectActorId:intent.subjectActorId,
+        delta:intent.delta,reason:intent.reason,expectedRevision:intent.expectedRevision,idempotencyKey:intent.idempotencyKey};
+      const result=changeFactionReputation(principalId,factionId,reputationIntent);
+      return {...result,sourceObservationId:observation.observation_id};
+    }).immediate();
+  }
   function createLocation(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); const locationId = input.locationId ?? id(); db.prepare("INSERT INTO campaign_locations_v28(location_id,campaign_id,parent_location_id,public_name,public_description,visibility,created_at) VALUES(?,?,?,?,?,?,?)").run(locationId, campaignId, input.parentLocationId ?? null, String(input.name).trim(), String(input.description ?? ""), input.visibility === "hidden" ? "gm" : "public", now()); return { locationId, campaignId }; }
   function createLocationConnection(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); const locationConnectionId = input.locationConnectionId ?? id(); db.prepare("INSERT INTO campaign_location_connections_v28(connection_id,campaign_id,from_location_id,to_location_id,visibility,route_state,requirement_kind,required_faction_id,minimum_reputation,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").run(locationConnectionId, campaignId, input.fromLocationId, input.toLocationId, input.visibility === "hidden" ? "gm" : "public", input.routeState ?? "open", input.requirementKind ?? "none", input.requiredFactionId ?? null, input.minimumReputation ?? null, now()); return { locationConnectionId, campaignId }; }
   function createNpc(principalId: string, input: any) { context.guard(); const campaignId = String(input.campaignId); requireGm(principalId, campaignId); if (input.speechControl !== undefined && input.speechControl !== "manual") throw new WorldUnavailableError("NPC AI speech is unavailable"); const persona = db.prepare("SELECT fictional_confirmed,is_real_person FROM characters WHERE id=?").get(input.personaId) as any; if (!persona || persona.fictional_confirmed !== 1 || persona.is_real_person !== 0) throw new WorldUnavailableError("NPC persona must be fictional and confirmed"); if (db.prepare("SELECT 1 FROM campaign_actors a JOIN campaign_characters cc ON cc.id=a.campaign_character_id AND cc.campaign_id=a.campaign_id WHERE a.campaign_id=? AND cc.character_id=?").get(campaignId, input.personaId)) throw new WorldConflictError("a campaign character cannot be NPC-controlled"); const npcId = input.npcId ?? id(); db.prepare("INSERT INTO campaign_npcs_v28 VALUES(?,?,?,?,?,?)").run(npcId, campaignId, input.personaId, "manual", String(input.name).trim(), now()); return { npcId, campaignId }; }
   function executeWorldCommand(principalId: string, sessionId: string, input: unknown): WorldReceipt | MutationReceipt { const command = worldCommandSchema.parse(input); switch (command.type) { case "travel": return travel(principalId, sessionId, command); case "establish_camp": return establishCamp(principalId,command.actorId,{campaignId:command.campaignId,expectedRevision:command.expectedRevision,idempotencyKey:command.idempotencyKey}) as any; case "set_actor_location": return setActorLocation(principalId, sessionId, command); case "discover_location": return discoverLocation(principalId, sessionId, command); case "change_reputation": return changeReputation(principalId, sessionId, command); } }
 
   return { executeWorldCommand, travel,travelActor,establishCamp, setActorLocation,placeActor, createLocation, createLocationConnection, createNpc,
-    changeReputation,createCampaignNpc,changeNpcRelationship,createCampaignFaction,changeFactionReputation };
+    changeReputation,createCampaignNpc,changeNpcRelationship,createCampaignFaction,changeFactionReputation,resolveFactionReaction };
 }

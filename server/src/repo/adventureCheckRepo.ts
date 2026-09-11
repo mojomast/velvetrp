@@ -3,7 +3,7 @@ import type DatabaseDriver from "better-sqlite3";
 import { canonicalAgentJson, resourceIdSchema, utcIsoTimestampSchema } from "@velvet/contracts";
 import { z } from "zod";
 import type { M16Dependencies } from "./effectRepo.js";
-import { propagateWitnessObservations } from "./observations/agentObservationPropagation.js";
+import { propagateFactionWitnessObservations, propagateWitnessObservations } from "./observations/agentObservationPropagation.js";
 import { DND_5E_RULESET_DESCRIPTOR, resolveCampaignRuleset } from "../rulesets/index.js";
 import { exactPairParameters, stripCandidateLabels } from "../agent/providerCandidateProjection.js";
 
@@ -204,13 +204,22 @@ export function createAdventureCheckRepository(db: DatabaseDriver.Database, deps
         db.prepare("INSERT INTO adventure_check_executions_v54 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(commandId, candidate.candidate_id,
           current.campaignId, turnId, input.providerCallId, input.providerToolCallId, input.round, selectionJson, sha(selectionJson), response.request_digest,
           response.response_digest, current.checkRevision, current.checkRevision + 1, canonicalAgentJson(rolls as never), resultJson, sha(resultJson), occurredAt);
+        const witnessSummary = `A ${receipt.skill ?? receipt.ability} check ended in ${receipt.outcome}.`;
         propagateWitnessObservations(db, deps, {
           campaignId: current.campaignId,
           timelineId: current.timelineId,
           sessionId: current.sessionId,
           sourceCommandId: commandId,
           observedRevision: current.timelineRevision,
-          summary: `A ${receipt.skill ?? receipt.ability} check ended in ${receipt.outcome}.`,
+          summary: witnessSummary,
+        });
+        propagateFactionWitnessObservations(db, deps, {
+          campaignId: current.campaignId,
+          timelineId: current.timelineId,
+          sessionId: current.sessionId,
+          sourceCommandId: commandId,
+          observedRevision: current.timelineRevision,
+          summary: witnessSummary,
         });
         return { commandId, receipt };
       }).immediate();

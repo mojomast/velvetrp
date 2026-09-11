@@ -7,8 +7,10 @@ import {
   type AgentObservationInput,
 } from "../src/repo/observations/agentObservationRepo.js";
 import {
+  MAX_FACTION_WITNESS_FANOUT,
   MAX_TELL_PER_ARRIVAL,
   MAX_WITNESS_FANOUT,
+  propagateFactionWitnessObservations,
   propagateToldOnArrival,
   propagateWitnessObservations,
   type PropagationDependencies,
@@ -101,6 +103,16 @@ async function fixture(npcCount = 3) {
   const observations = (agentId: string) => db.prepare(`SELECT observation_id,agent_id,source_command_id,channel,hop_count,
     relayer_agent_id,text,authority FROM agent_observations WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?
     ORDER BY observation_id`).all(campaign.id, agentId) as ObservationRow[];
+  const factionObservations = (agentId: string) => db.prepare(`SELECT observation_id,agent_id,source_command_id,channel,hop_count,
+    relayer_agent_id,text,authority FROM agent_observations WHERE campaign_id=? AND agent_kind='faction' AND agent_id=?
+    ORDER BY observation_id`).all(campaign.id, agentId) as ObservationRow[];
+  const addFaction = (factionId: string, memberships: Array<{ npcId: string; role?: string }>) => {
+    db.prepare("INSERT INTO campaign_factions_v28 VALUES(?,?,?,?,?)").run(factionId, campaign.id, factionId, "public", at);
+    for (const { npcId, role } of memberships) {
+      db.prepare("INSERT INTO campaign_npc_faction_memberships_v28 VALUES(?,?,?,?,?)")
+        .run(campaign.id, factionId, npcId, role ?? "member", at);
+    }
+  };
   const allObservations = () => db.prepare(`SELECT observation_id,agent_id,source_command_id,channel,hop_count,
     relayer_agent_id,text,authority FROM agent_observations WHERE campaign_id=? ORDER BY observation_id`)
     .all(campaign.id) as ObservationRow[];
@@ -108,7 +120,8 @@ async function fixture(npcCount = 3) {
     campaignId: campaign.id, timelineId: campaign.activeTimelineId, agentKind: "npc", agentId, sourceCommandId,
     observedRevision, channel: "witnessed", hopCount: 0, text, authority: "verified", ...overrides,
   });
-  return { repo, db, campaign, session, otherSession, npcs, dependencies, place, placeIn, rootRevision, observations, allObservations, row };
+  return { repo, db, campaign, session, otherSession, npcs, dependencies, place, placeIn, rootRevision, observations,
+    factionObservations, addFaction, allObservations, row };
 }
 
 describe("agent observation propagation", () => {
@@ -163,6 +176,72 @@ describe("agent observation propagation", () => {
       sourceCommandId: "check-command:fanout", observedRevision: 1, summary: "A crowd watches.",
     });
     expect(rows).toHaveLength(MAX_WITNESS_FANOUT);
+    f.repo.close();
+  });
+
+  it("derives faction knowledge from a present member NPC witness", async () => {
+    const f = await fixture(2);
+    const [member] = f.npcs as [string, string];
+    f.addFaction("faction-fellowship", [{ npcId: member }]);
+    f.place(member);
+    const summary = "A Perception check ended in failure.";
+    propagateWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:faction", observedRevision: 4, summary,
+    });
+    const rows = propagateFactionWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:faction", observedRevision: 4, summary,
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ agentKind: "faction", agentId: "faction-fellowship", channel: "witnessed",
+      hopCount: 0, relayerAgentId: null, authority: "verified", text: summary, observedRevision: 4 });
+    expect(f.factionObservations("faction-fellowship")).toHaveLength(1);
+    f.repo.close();
+  });
+
+  it("does not leak to a faction when the witness is absent or an enemy", async () => {
+    const f = await fixture(2);
+    const [present, absent] = f.npcs as [string, string];
+    f.addFaction("faction-absent", [{ npcId: absent }]);
+    f.addFaction("faction-enemy", [{ npcId: present, role: "enemy" }]);
+    f.place(present);
+    const rows = propagateFactionWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:secret", observedRevision: 2, summary: "A quiet check.",
+    });
+    expect(rows).toEqual([]);
+    expect(f.factionObservations("faction-absent")).toEqual([]);
+    expect(f.factionObservations("faction-enemy")).toEqual([]);
+    f.repo.close();
+  });
+
+  it("bounds faction fan-out by MAX_FACTION_WITNESS_FANOUT", async () => {
+    const f = await fixture(1);
+    const [npc] = f.npcs as [string];
+    f.place(npc);
+    for (let index = 0; index <= MAX_FACTION_WITNESS_FANOUT; index += 1) {
+      f.addFaction(`faction-${index}`, [{ npcId: npc }]);
+    }
+    const rows = propagateFactionWitnessObservations(f.db, f.dependencies, {
+      campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "check-command:many", observedRevision: 1, summary: "Many factions listen.",
+    });
+    expect(rows).toHaveLength(MAX_FACTION_WITNESS_FANOUT);
+    f.repo.close();
+  });
+
+  it("returns identical faction rows on idempotent replay", async () => {
+    const f = await fixture(1);
+    const [npc] = f.npcs as [string];
+    f.addFaction("faction-replay", [{ npcId: npc }]);
+    f.place(npc);
+    const input = { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId, sessionId: f.session.id,
+      sourceCommandId: "replay-faction", observedRevision: 6, summary: "A repeatable faction fact." };
+    const first = propagateFactionWitnessObservations(f.db, f.dependencies, input);
+    const second = propagateFactionWitnessObservations(f.db, f.dependencies, input);
+    expect(second).toEqual(first);
+    expect(f.factionObservations("faction-replay")).toHaveLength(1);
     f.repo.close();
   });
 

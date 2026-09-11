@@ -23,6 +23,7 @@ export {
   type NpcRelationshipResult,
   type CreateFactionResult,
   type FactionReputationResult,
+  type FactionReactionResult,
 } from "./worldWriteRepo.js";
 export {
   createNpcPresenceRepository,

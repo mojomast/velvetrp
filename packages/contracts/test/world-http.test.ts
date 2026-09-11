@@ -2,7 +2,8 @@ import {describe,expect,it} from "vitest";
 import {actorTravelCommandRequestSchema,actorTravelCommandResponseSchema,campaignNpcsHttpResponseSchema,
   campaignWorldHttpResponseSchema,createCampaignNpcHttpRequestSchema,createCampaignNpcHttpResponseSchema,
   npcRelationshipCommandHttpRequestSchema,npcRelationshipCommandHttpResponseSchema,campaignFactionsHttpResponseSchema,
-  createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema} from "../src/index.js";
+  createCampaignFactionHttpRequestSchema,factionReputationCommandHttpRequestSchema,
+  factionReactionCommandHttpRequestSchema,factionReactionCommandHttpResponseSchema} from "../src/index.js";
 import {gmCampaignNpcsHttpResponseSchema,playerCampaignNpcsHttpResponseSchema,gmCampaignFactionsHttpResponseSchema,playerCampaignFactionsHttpResponseSchema} from "../src/index.js";
 
 const at="2035-01-01T00:00:00.000Z";
@@ -65,5 +66,13 @@ describe("world HTTP contracts",()=>{
     const reputation={subjectActorId:"actor",delta:2,reason:"Helped",expectedRevision:1,idempotencyKey:"standing"};
     expect(factionReputationCommandHttpRequestSchema.parse(reputation)).toEqual(reputation);
     expect(factionReputationCommandHttpRequestSchema.safeParse({...reputation,delta:0}).success).toBe(false);
+    const reaction={subjectActorId:"actor",delta:-2,reason:"Reacted",sourceCommandId:"check-command:1",
+      expectedRevision:1,idempotencyKey:"reaction"};
+    expect(factionReactionCommandHttpRequestSchema.parse(reaction)).toEqual(reaction);
+    expect(factionReactionCommandHttpRequestSchema.safeParse({...reaction,delta:0}).success).toBe(false);
+    expect(factionReactionCommandHttpRequestSchema.safeParse({...reaction,sourceCommandId:""}).success).toBe(false);
+    expect(factionReactionCommandHttpResponseSchema.parse({standing:{factionId:"guild",subjectActorId:"actor",
+      reputation:-2,updatedAt:at},receipt:{idempotencyKey:"reaction",revisionBefore:1,revisionAfter:2,occurredAt:at},
+      sourceObservationId:"observation"})).toBeTruthy();
   });
 });

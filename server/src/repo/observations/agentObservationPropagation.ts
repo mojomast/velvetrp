@@ -6,12 +6,15 @@ import {
 } from "./agentObservationRepo.js";
 
 export const MAX_WITNESS_FANOUT = 12;
+export const MAX_FACTION_WITNESS_FANOUT = 12;
 export const MAX_TELL_FANOUT = 12;
 export const MAX_TELL_PER_ARRIVAL = 8;
 export const MAX_HOP_COUNT = 2;
 export const MAX_OBSERVATIONS_PER_AGENT = 256;
 
 const MAX_KNOWER_OBSERVATIONS = 8;
+/** Membership roles whose NPCs are considered to share observation with their faction. */
+const FACTION_SHARING_ROLES = "('member','leader','ally')";
 
 export interface PropagationDependencies {
   ids: IdGenerator;
@@ -38,6 +41,7 @@ export interface ToldOnArrivalInput {
 }
 
 interface NpcIdRow { npc_id: string }
+interface FactionIdRow { faction_id: string }
 interface CountRow { count: number }
 interface KnowerObservationRow { source_command_id: string; hop_count: number; text: string; observed_revision: number }
 
@@ -71,6 +75,52 @@ export function propagateWitnessObservations(
       timelineId: input.timelineId,
       agentKind: "npc",
       agentId: npcId,
+      sourceCommandId: input.sourceCommandId,
+      observedRevision: input.observedRevision,
+      channel: "witnessed",
+      hopCount: 0,
+      text: input.summary,
+      authority: input.authority ?? "verified",
+    }));
+  }
+  return recorded;
+}
+
+/**
+ * Derives faction-level observations from member NPCs that witnessed a
+ * committed event. An NPC shares with its faction only when its membership role
+ * is member/leader/ally; enemies never leak. Bounded by
+ * MAX_FACTION_WITNESS_FANOUT distinct factions and the per-agent write cap.
+ * Immutable rows are never deleted; the caller owns the transaction.
+ */
+export function propagateFactionWitnessObservations(
+  db: DatabaseDriver.Database,
+  dependencies: PropagationDependencies,
+  input: WitnessObservationInput,
+): AgentObservation[] {
+  const repository = createAgentObservationRepository(db, dependencies);
+  const factions = db.prepare(`SELECT DISTINCT membership.faction_id AS faction_id
+    FROM campaign_npc_faction_memberships_v28 membership
+    JOIN campaign_npc_presence_v43 presence
+      ON presence.campaign_id=membership.campaign_id AND presence.npc_id=membership.npc_id
+    WHERE membership.campaign_id=? AND presence.session_id=? AND presence.state='present'
+      AND membership.membership_role IN ${FACTION_SHARING_ROLES}
+    ORDER BY faction_id LIMIT ?`)
+    .all(input.campaignId, input.sessionId, MAX_FACTION_WITNESS_FANOUT) as FactionIdRow[];
+  const countObservations = db.prepare(`SELECT COUNT(*) AS count FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='faction' AND agent_id=?`);
+  const selectWitnessed = db.prepare(`SELECT ${KNOWS_ROW} FROM agent_observations
+    WHERE campaign_id=? AND agent_kind='faction' AND agent_id=? AND source_command_id=? AND hop_count=0
+      AND relayer_agent_id IS NULL`);
+  const recorded: AgentObservation[] = [];
+  for (const { faction_id: factionId } of factions) {
+    const replayed = selectWitnessed.get(input.campaignId, factionId, input.sourceCommandId) !== undefined;
+    if (!replayed && (countObservations.get(input.campaignId, factionId) as CountRow).count >= MAX_OBSERVATIONS_PER_AGENT) continue;
+    recorded.push(repository.record({
+      campaignId: input.campaignId,
+      timelineId: input.timelineId,
+      agentKind: "faction",
+      agentId: factionId,
       sourceCommandId: input.sourceCommandId,
       observedRevision: input.observedRevision,
       channel: "witnessed",

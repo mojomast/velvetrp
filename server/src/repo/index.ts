@@ -14,11 +14,13 @@ export {
   type AgentObservationRepository,
 } from "./observations/agentObservationRepo.js";
 export {
+  MAX_FACTION_WITNESS_FANOUT,
   MAX_HOP_COUNT,
   MAX_OBSERVATIONS_PER_AGENT,
   MAX_TELL_FANOUT,
   MAX_TELL_PER_ARRIVAL,
   MAX_WITNESS_FANOUT,
+  propagateFactionWitnessObservations,
   propagateToldOnArrival,
   propagateWitnessObservations,
   type PropagationDependencies,

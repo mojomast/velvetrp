@@ -1,10 +1,11 @@
 # Plan 4: Living knowledge and rumors
 
 Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
-co-presence propagation), P4.3 (trust-gated knowledge reads), and P4.4 (Director
-narration knowledge channel) are implemented and committed; later milestones are
-planned, not implemented. Researched against current `main` after Plan 3
-closeout. Design research and sources:
+co-presence propagation), P4.3 (trust-gated knowledge reads), P4.4 (Director
+narration knowledge channel), and P4.5 (faction knowledge + gated reaction) are
+implemented and committed; later milestones are planned, not implemented.
+Researched against current `main` after Plan 3 closeout. Design research and
+sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -129,6 +130,18 @@ Gate: deterministic ledger; reaction requires its own command + receipt;
 travel-policy precedent preserved. Run faction/reputation tests and server
 typecheck.
 Commit: `feat(repo): faction-level knowledge and gated reactions`.
+
+Implemented as `propagateFactionWitnessObservations` (member/leader/ally NPCs
+share a witnessed event with their factions; `enemy` members never leak; bounded
+by `MAX_FACTION_WITNESS_FANOUT` and the per-agent cap) plus
+`resolveFactionReaction`, which authorizes GM, requires a matching faction
+observation for `sourceCommandId`, and only then enacts the reaction through the
+existing `change_faction_reputation` narrative command so every reaction still
+gets its own command id and receipt. Deviation from a first-class
+`resolve_faction_reaction` command type: `world_narrative_commands_v32.command_type`
+is a closed CHECK, so a new type would require a table-rebuild migration with
+several inbound foreign keys; reusing the reputation command keeps the
+precedent and avoids that risk. Travel policy is untouched.
 
 ### P4.6: World gossip pool
 

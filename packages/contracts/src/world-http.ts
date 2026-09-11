@@ -142,6 +142,13 @@ export const factionReputationCommandHttpRequestSchema=z.object({subjectActorId:
   .refine((request)=>request.delta!==0,"reputation delta must not be zero");
 export const factionReputationCommandHttpResponseSchema=z.object({standing:factionStandingHttpSchema,
   receipt:worldCommandReceiptHttpSchema}).strict();
+export const factionReactionCommandHttpRequestSchema=z.object({subjectActorId:actorIdSchema,
+  delta:z.number().int().min(-10_000).max(10_000),reason:z.string().trim().min(1).max(500),
+  sourceCommandId:z.string().trim().min(1).max(200),
+  expectedRevision:expectedRevisionSchema,idempotencyKey:idempotencyKeySchema}).strict()
+  .refine((request)=>request.delta!==0,"reputation delta must not be zero");
+export const factionReactionCommandHttpResponseSchema=z.object({standing:factionStandingHttpSchema,
+  receipt:worldCommandReceiptHttpSchema,sourceObservationId:z.string().min(1).max(256)}).strict();
 export type CampaignFactionHttp=z.infer<typeof campaignFactionHttpSchema>;
 export type GmCampaignFactionHttp=z.infer<typeof gmCampaignFactionHttpSchema>;
 export type PlayerCampaignFactionHttp=z.infer<typeof playerCampaignFactionHttpSchema>;
@@ -150,3 +157,5 @@ export type PlayerCampaignFactionsHttpResponse=z.infer<typeof playerCampaignFact
 export type FactionStandingHttp=z.infer<typeof factionStandingHttpSchema>;
 export type CreateCampaignFactionHttpRequest=z.infer<typeof createCampaignFactionHttpRequestSchema>;
 export type FactionReputationCommandHttpRequest=z.infer<typeof factionReputationCommandHttpRequestSchema>;
+export type FactionReactionCommandHttpRequest=z.infer<typeof factionReactionCommandHttpRequestSchema>;
+export type FactionReactionCommandHttpResponse=z.infer<typeof factionReactionCommandHttpResponseSchema>;

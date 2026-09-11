@@ -26,6 +26,7 @@ export {
   type CampaignFactionsSnapshot,
   type CreateFactionResult,
   type FactionReputationResult,
+  type FactionReactionResult,
 } from "./world/index.js";
 
 /** Public world facade combining commands with principal-filtered projections. */
