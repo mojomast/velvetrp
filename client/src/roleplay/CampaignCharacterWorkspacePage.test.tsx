@@ -190,7 +190,7 @@ describe("RpgCharacterSheetPage", () => {
       economyCommand: vi.fn(async () => { throw new Error("unused"); }), rest: vi.fn(async () => { throw new Error("unused"); }),
       checkCommand: vi.fn(async () => { throw new Error("unused"); }), powerCommand: vi.fn(async () => { throw new Error("unused"); }),
       spellCommand: vi.fn(async () => { throw new Error("unused"); }), effectCommand: vi.fn(async () => { throw new Error("unused"); }),
-      resourceCommand: vi.fn(async () => { throw new Error("unused"); }),
+      resourceCommand: vi.fn(async () => { throw new Error("unused"); }), vendorSaleQuote: vi.fn(async () => { throw new Error("unused"); }),
       getCampaignContent: vi.fn(async () => { throw new Error("catalog unavailable"); }), getCampaignPack: vi.fn(async () => { throw new Error("unused"); }),
       ...overrides,
     };

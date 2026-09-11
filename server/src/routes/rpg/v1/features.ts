@@ -122,6 +122,7 @@ import { actorRestHttpRoutes } from "./actorRest.js";
 import type { RestRepository } from "../../../repo/restRepo.js";
 import { actorEconomyHttpRoutes } from "./actorEconomy.js";
 import type { EconomyRepository } from "../../../repo/economyRepo.js";
+import type { AdventureCommerceRepository } from "../../../repo/adventureCommerceRepo.js";
 import { actorChecksHttpRoutes } from "./actorChecks.js";
 import type { CheckRepository } from "../../../repo/checkRepo.js";
 import { actorPowersHttpRoutes } from "./actorPowers.js";
@@ -169,6 +170,7 @@ export interface CampaignListRepository extends
   Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
   Partial<Pick<RestRepository, "takeRest">>,
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
+  Partial<Pick<AdventureCommerceRepository, "requestVendorSaleQuote">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
   Partial<Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">>,
   Partial<Pick<SpellcastingRepository, "castSpell">>,
@@ -331,7 +333,8 @@ type ActorResourceLaneRepository = Pick<ActorResourceRepository,
 type InventoryLaneRepository = Pick<InventoryRepository,
   "getActorInventorySnapshot" | "mutateInventoryForActor">;
 type RestLaneRepository = Pick<RestRepository, "takeRest">;
-type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
+type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">
+  & Pick<AdventureCommerceRepository, "requestVendorSaleQuote">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
 type PowerLaneRepository = Pick<PowerRepository, "getActorPowerSnapshot" | "useActorPower">;
 type SpellcastingLaneRepository = Pick<SpellcastingRepository, "castSpell">;
@@ -482,7 +485,7 @@ function assertRestRepository(repository: CampaignListRepository): asserts repos
 }
 function assertEconomyRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EconomyLaneRepository {
   if (typeof repository.getActorEconomySnapshot !== "function" || typeof repository.getShop !== "function"
-    || typeof repository.mutateEconomyForActor !== "function") throw new UnsupportedCampaignRepositoryError();
+    || typeof repository.mutateEconomyForActor !== "function" || typeof repository.requestVendorSaleQuote !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertCheckRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & CheckLaneRepository {
   if (typeof repository.resolveActorCheck !== "function") throw new UnsupportedCampaignRepositoryError();

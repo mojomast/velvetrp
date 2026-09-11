@@ -272,6 +272,8 @@ import {
   economyHttpCommandResponseSchema,
   economyHttpShopGetResponseSchema,
   economyHttpWalletGetResponseSchema,
+  vendorSaleQuoteRequestSchema,
+  vendorSaleQuoteResponseSchema,
   inventoryHttpCommandRequestSchema,
   inventoryHttpCommandResponseSchema,
   inventoryHttpGetResponseSchema,
@@ -294,6 +296,8 @@ import type {
   EconomyHttpCommandResponse,
   EconomyHttpShopGetResponse,
   EconomyHttpWalletGetResponse,
+  VendorSaleQuoteRequest,
+  VendorSaleQuoteResponse,
   InventoryHttpCommandRequest,
   InventoryHttpCommandResponse,
   InventoryHttpGetResponse,
@@ -1653,9 +1657,23 @@ export async function commandActorEconomy(campaignId: string, actorId: string, i
     ? response.quote.quantity === body.quantity && JSON.stringify(response.quote.item) === JSON.stringify(body.item)
     : body.type === "purchase_from_shop" && response.type === body.type
       ? response.purchase.quoteId === body.quoteId
-      : body.type === "propose_bilateral_trade" && response.type === body.type && response.trade.tradeId === body.tradeId;
+      : body.type === "sell_to_shop" && response.type === body.type
+        ? response.sale.quoteId === body.quoteId
+        : (body.type === "propose_bilateral_trade" || body.type === "accept_bilateral_trade" || body.type === "cancel_bilateral_trade")
+          && response.type === body.type && response.trade.tradeId === body.tradeId;
   if (!resultMatches || response.receipt.type !== body.type || response.receipt.idempotencyKey !== body.idempotencyKey
     || response.receipt.revisionBefore !== body.expectedRevision) throw new Error("Actor economy receipt did not match the request");
+  return response;
+}
+
+/** Requests one exact vendor sale quote bound to the actor's current inventory revision; no automatic retry. */
+export async function requestVendorSaleQuote(campaignId: string, actorId: string, input: VendorSaleQuoteRequest): Promise<VendorSaleQuoteResponse> {
+  const target = actorLanePath(campaignId, actorId);
+  const body = parseApiInput(() => vendorSaleQuoteRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`${target.path}/vendor-sale-quotes`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Vendor sale quote");
+  const response = vendorSaleQuoteResponseSchema.parse(success.body);
+  if (response.quote.entryId !== body.entryId || response.quote.quantity !== body.quantity) throw new Error("Vendor sale quote did not match the request");
   return response;
 }
 

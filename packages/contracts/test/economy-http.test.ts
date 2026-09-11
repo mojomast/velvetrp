@@ -5,6 +5,8 @@ import {
   economyHttpCommandResponseSchema,
   economyHttpShopGetResponseSchema,
   economyHttpWalletGetResponseSchema,
+  vendorSaleQuoteRequestSchema,
+  vendorSaleQuoteResponseSchema,
 } from "../src/economy-http.js";
 
 const currency = { kind: "currency", packId: "pack", packVersion: "1", definitionId: "gold" } as const;
@@ -52,5 +54,16 @@ describe("economy HTTP contracts", () => {
       expect(economyHttpCommandReceiptSchema.parse(tradeReceipt)).toEqual(tradeReceipt);
       expect(economyHttpCommandResponseSchema.parse(tradeResponse)).toEqual(tradeResponse);
     }
+  });
+
+  it("prices a standalone sell and binds the vendor sale quote projection", () => {
+    const sell = { type: "sell_to_shop", quoteId: "quote", ...base } as const;
+    expect(economyHttpCommandRequestSchema.parse(sell)).toEqual(sell);
+    const saleReceipt = { type: "sell_to_shop" as const, idempotencyKey: base.idempotencyKey, revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z" };
+    const saleResponse = { type: "sell_to_shop" as const, sale: { saleId: "sale", quoteId: "quote", disposition: "sell" as const, quantity: 1, total: { currency, minorUnits: 4 }, soldAt: "2030-01-01T00:00:00.000Z" }, receipt: saleReceipt };
+    expect(economyHttpCommandResponseSchema.parse(saleResponse)).toEqual(saleResponse);
+    const quote = { quote: { quoteId: "quote", shopId: "shop", entryId: "entry", quantity: 1, payout: { currency, minorUnits: 4 }, expiresAt: "2030-01-01T00:00:00.000Z", expectedRevision: 4 } };
+    expect(vendorSaleQuoteRequestSchema.parse({ entryId: "entry", quantity: 1, idempotencyKey: "k" })).toEqual({ entryId: "entry", quantity: 1, idempotencyKey: "k" });
+    expect(vendorSaleQuoteResponseSchema.parse(quote)).toEqual(quote);
   });
 });

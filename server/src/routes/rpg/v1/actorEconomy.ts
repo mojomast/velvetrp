@@ -4,6 +4,8 @@ import {
   economyHttpShopGetResponseSchema,
   economyHttpWalletGetResponseSchema,
   resourceIdSchema,
+  vendorSaleQuoteRequestSchema,
+  vendorSaleQuoteResponseSchema,
 } from "@velvet/contracts";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { readRpgFeatureFlags } from "../../../features.js";
@@ -18,6 +20,7 @@ import {
   QuoteExpiredError,
   ShopStockExhaustedError,
   TradeStaleError,
+  type AdventureCommerceRepository,
   type EconomyRepository,
 } from "../../../repo/index.js";
 
@@ -26,11 +29,18 @@ const APPLICATION_JSON = /^application\/json(?:\s*;\s*charset\s*=\s*(?:[!#$%&'*+
 
 export interface ActorEconomyHttpOptions {
   economyRepositoryAccessor: () => Pick<EconomyRepository,
-    "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">;
+    "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">
+    & Pick<AdventureCommerceRepository, "requestVendorSaleQuote">;
 }
 
 function invalidQuery(request: FastifyRequest): boolean {
   return (request.raw.url ?? request.url).includes("?") || Object.keys(request.query as Record<string, unknown>).length > 0;
+}
+
+/** Projects the repository vendor-sale receipt to the public HTTP sale projection. */
+function projectSale(sale: unknown) {
+  const value = sale as { saleId: string; quoteId: string; disposition: string; quantity: number; total: unknown; soldAt: string };
+  return { saleId: value.saleId, quoteId: value.quoteId, disposition: value.disposition, quantity: value.quantity, total: value.total, soldAt: value.soldAt };
 }
 
 function actorNotFound(request: FastifyRequest, reply: Parameters<typeof sendApiProblem>[1]) {
@@ -146,7 +156,9 @@ export const actorEconomyHttpRoutes: FastifyPluginAsync<ActorEconomyHttpOptions>
           ? { kind: body.data.type, shopId: body.data.shopId, item: body.data.item, quantity: body.data.quantity, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
           : body.data.type === "purchase_from_shop"
             ? { kind: body.data.type, quoteId: body.data.quoteId, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
-            : body.data.type === "accept_bilateral_trade" || body.data.type === "cancel_bilateral_trade"
+            : body.data.type === "sell_to_shop"
+              ? { kind: body.data.type, quoteId: body.data.quoteId, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
+              : body.data.type === "accept_bilateral_trade" || body.data.type === "cancel_bilateral_trade"
               ? { kind: body.data.type, tradeId: body.data.tradeId, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey }
               : { kind: body.data.type, trade: { tradeId: body.data.tradeId, acceptedByActorId: body.data.recipientActorId, offeredItems: body.data.offered.items, offeredCurrency: body.data.offered.currency, requestedItems: body.data.requested.items, requestedCurrency: body.data.requested.currency }, expectedRevision: body.data.expectedRevision, idempotencyKey: body.data.idempotencyKey };
         const result = options.economyRepositoryAccessor().mutateEconomyForActor(LOCAL_OWNER, campaignId.data, actorId.data, command);
@@ -161,8 +173,38 @@ export const actorEconomyHttpRoutes: FastifyPluginAsync<ActorEconomyHttpOptions>
           ? { type: body.data.type, quote: result.quote, receipt }
           : body.data.type === "purchase_from_shop"
             ? { type: body.data.type, purchase: result.purchase, receipt }
-            : { type: body.data.type, trade: result.trade, receipt };
+            : body.data.type === "sell_to_shop"
+              ? { type: body.data.type, sale: projectSale(result.sale), receipt }
+              : { type: body.data.type, trade: result.trade, receipt };
         return reply.code(200).send(economyHttpCommandResponseSchema.parse(response));
+      } catch (error) {
+        return mapActorFailure(request, reply, error);
+      }
+    },
+  );
+
+  // Creates the exact vendor sale quote a player then sells against; the quote binds to the current inventory revision.
+  app.post<{ Params: { campaignId: string; actorId: string }; Querystring: Record<string, unknown>; Body: unknown }>(
+    "/campaigns/:campaignId/actors/:actorId/vendor-sale-quotes", {
+      exposeHeadRoute: false,
+      onRequest: async (request, reply) => {
+        if (!(await guard(request, reply))) return;
+        const contentType = request.headers["content-type"];
+        if (typeof contentType !== "string" || !APPLICATION_JSON.test(contentType)) {
+          await sendApiProblem(request, reply, 415, "RPG_UNSUPPORTED_MEDIA_TYPE", "Vendor sale quote requires application/json");
+        }
+      },
+      errorHandler: (_error, request, reply) => sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Vendor sale quote request is invalid"),
+    }, async (request, reply) => {
+      const campaignId = resourceIdSchema.safeParse(request.params.campaignId);
+      const actorId = resourceIdSchema.safeParse(request.params.actorId);
+      if (!campaignId.success || !actorId.success) return actorNotFound(request, reply);
+      const body = vendorSaleQuoteRequestSchema.safeParse(request.body);
+      if (!body.success) return sendApiProblem(request, reply, 400, "RPG_INVALID_REQUEST", "Vendor sale quote request is invalid");
+      try {
+        const quote = options.economyRepositoryAccessor().requestVendorSaleQuote(LOCAL_OWNER, campaignId.data, actorId.data, { entryId: body.data.entryId, quantity: body.data.quantity });
+        if (!quote) return shopNotFound(request, reply);
+        return reply.code(200).send(vendorSaleQuoteResponseSchema.parse({ quote }));
       } catch (error) {
         return mapActorFailure(request, reply, error);
       }

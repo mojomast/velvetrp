@@ -10,10 +10,12 @@ import {
   shopIdSchema,
   shopStockSchema,
   tradeIdSchema,
+  vendorDispositionSchema,
   walletSchema,
 } from "./economy.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { actorIdSchema } from "./rpg-characters.js";
+import { resourceIdSchema } from "./domain-primitives.js";
 
 /** Actor and campaign identity come from the wallet route. */
 export const economyHttpWalletGetResponseSchema = z.object({
@@ -62,6 +64,13 @@ export const economyHttpQuoteCommandRequestSchema = z.object({
 
 export const economyHttpPurchaseCommandRequestSchema = z.object({
   type: z.literal("purchase_from_shop"),
+  quoteId: quoteIdSchema,
+  ...commandBase,
+}).strict();
+
+/** Selling uses a vendor sale quote created by the vendor-sale-quotes route for this exact inventory revision. */
+export const economyHttpSellCommandRequestSchema = z.object({
+  type: z.literal("sell_to_shop"),
   quoteId: quoteIdSchema,
   ...commandBase,
 }).strict();
@@ -116,6 +125,7 @@ export const economyHttpCancelTradeCommandRequestSchema = z.object({
 export const economyHttpCommandRequestSchema = z.discriminatedUnion("type", [
   economyHttpQuoteCommandRequestSchema,
   economyHttpPurchaseCommandRequestSchema,
+  economyHttpSellCommandRequestSchema,
   economyHttpTradeCommandRequestSchema,
   economyHttpAcceptTradeCommandRequestSchema,
   economyHttpCancelTradeCommandRequestSchema,
@@ -135,6 +145,14 @@ export const economyHttpPurchaseResultSchema = z.object({
   total: currencyAmountSchema,
   purchasedAt: utcIsoTimestampSchema,
 }).strict();
+export const economyHttpSaleResultSchema = z.object({
+  saleId: z.string().min(1).max(128),
+  quoteId: quoteIdSchema,
+  disposition: vendorDispositionSchema,
+  quantity: purchaseQuoteSchema.shape.quantity,
+  total: currencyAmountSchema,
+  soldAt: utcIsoTimestampSchema,
+}).strict();
 export const economyHttpTradeResultSchema = z.object({
   tradeId: tradeIdSchema,
   status: z.enum(["open", "settled", "cancelled"]),
@@ -150,12 +168,14 @@ const receiptBase = {
 const receiptRevision = (receipt: { revisionBefore: number; revisionAfter: number }) => receipt.revisionAfter === receipt.revisionBefore + 1;
 export const economyHttpQuoteCommandReceiptSchema = z.object({ type: z.literal("request_purchase_quote"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpPurchaseCommandReceiptSchema = z.object({ type: z.literal("purchase_from_shop"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
+export const economyHttpSellCommandReceiptSchema = z.object({ type: z.literal("sell_to_shop"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpTradeCommandReceiptSchema = z.object({ type: z.literal("propose_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpAcceptTradeCommandReceiptSchema = z.object({ type: z.literal("accept_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpCancelTradeCommandReceiptSchema = z.object({ type: z.literal("cancel_bilateral_trade"), ...receiptBase }).strict().refine(receiptRevision, "economy command advances exactly one revision");
 export const economyHttpCommandReceiptSchema = z.discriminatedUnion("type", [
   economyHttpQuoteCommandReceiptSchema,
   economyHttpPurchaseCommandReceiptSchema,
+  economyHttpSellCommandReceiptSchema,
   economyHttpTradeCommandReceiptSchema,
   economyHttpAcceptTradeCommandReceiptSchema,
   economyHttpCancelTradeCommandReceiptSchema,
@@ -165,10 +185,31 @@ export const economyHttpCommandReceiptSchema = z.discriminatedUnion("type", [
 export const economyHttpCommandResponseSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("request_purchase_quote"), quote: economyHttpQuoteResultSchema, receipt: economyHttpQuoteCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("purchase_from_shop"), purchase: economyHttpPurchaseResultSchema, receipt: economyHttpPurchaseCommandReceiptSchema }).strict(),
+  z.object({ type: z.literal("sell_to_shop"), sale: economyHttpSaleResultSchema, receipt: economyHttpSellCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("propose_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpTradeCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("accept_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpAcceptTradeCommandReceiptSchema }).strict(),
   z.object({ type: z.literal("cancel_bilateral_trade"), trade: economyHttpTradeResultSchema, receipt: economyHttpCancelTradeCommandReceiptSchema }).strict(),
 ]);
+
+/** Requests one vendor sale quote bound to the actor's current inventory revision; the client then sells with it. */
+export const vendorSaleQuoteRequestSchema = z.object({
+  entryId: resourceIdSchema,
+  quantity: purchaseQuoteSchema.shape.quantity,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
+export const vendorSaleQuoteResponseSchema = z.object({
+  quote: z.object({
+    quoteId: quoteIdSchema,
+    shopId: shopIdSchema,
+    entryId: resourceIdSchema,
+    quantity: purchaseQuoteSchema.shape.quantity,
+    payout: currencyAmountSchema,
+    expiresAt: utcIsoTimestampSchema,
+    expectedRevision: revisionSchema,
+  }).strict(),
+}).strict();
+export type VendorSaleQuoteRequest = z.infer<typeof vendorSaleQuoteRequestSchema>;
+export type VendorSaleQuoteResponse = z.infer<typeof vendorSaleQuoteResponseSchema>;
 
 export type EconomyHttpWalletGetResponse = z.infer<typeof economyHttpWalletGetResponseSchema>;
 export type EconomyHttpShopGetResponse = z.infer<typeof economyHttpShopGetResponseSchema>;

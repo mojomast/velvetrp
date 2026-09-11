@@ -5,6 +5,7 @@ import type {
   ActorResourcesHttpChangeCommandRequest, ActorResourcesHttpChangeCommandResponse, ActorResourcesHttpGetResponse, CharacterSheetHttpResponse,
   CastSpellCommandRequest, CastSpellCommandResponse,
   ContentCatalogHttpCampaignContentGetResponse, ContentCatalogHttpCampaignPackDetailResponse,
+  VendorSaleQuoteRequest, VendorSaleQuoteResponse,
   EconomyHttpCommandRequest, EconomyHttpCommandResponse, EconomyHttpShopGetResponse, EconomyHttpWalletGetResponse,
   InventoryHttpCommandRequest, InventoryHttpCommandResponse, InventoryHttpGetResponse, RestHttpRequest, RestHttpResponse,
 } from "@velvet/contracts";
@@ -19,6 +20,7 @@ import { RestDialog, type RestIntent } from "./RestDialog";
 import { ShopBrowser, catalogReferenceKey, formatMinorUnits, type CurrencyPresentations } from "./ShopBrowser";
 import { TradeReviewDialog, type TradeIntent } from "./TradeReviewDialog";
 import { TradeInboxPanel } from "./TradeInboxPanel";
+import { VendorSellPanel } from "./VendorSellPanel";
 import { createClientId } from "../../../utils/clientId";
 
 export interface RpgCharacterSheetApi {
@@ -37,6 +39,7 @@ export interface RpgCharacterSheetApi {
   spellCommand: (actorId: string, command: CastSpellCommandRequest) => Promise<CastSpellCommandResponse>;
   effectCommand: (actorId: string, command: ActorEffectCommandRequest) => Promise<ActorEffectCommandResponse>;
   resourceCommand: (campaignId: string, actorId: string, command: ActorResourcesHttpChangeCommandRequest) => Promise<ActorResourcesHttpChangeCommandResponse>;
+  vendorSaleQuote: (campaignId: string, actorId: string, command: VendorSaleQuoteRequest) => Promise<VendorSaleQuoteResponse>;
   getCampaignContent: (campaignId: string) => Promise<ContentCatalogHttpCampaignContentGetResponse>;
   getCampaignPack: (campaignId: string, packId: string, packVersion: string) => Promise<ContentCatalogHttpCampaignPackDetailResponse>;
 }
@@ -106,7 +109,7 @@ function ReceiptDetails({ result, currencies }: { result: ConfirmedResult; curre
   }
   const response = result.value;
   const receipt = response.receipt;
-  return <section className="receipt-details"><h3>Economy receipt and server result</h3><dl className="command-detail-list"><div><dt>Command</dt><dd>{receipt.type}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div>{response.type === "request_purchase_quote" && <><div><dt>Quote</dt><dd>{response.quote.quoteId} · expires {response.quote.expiresAt}</dd></div><div><dt>Exact total</dt><dd>{formatMinorUnits(response.quote.total.minorUnits, response.quote.total.currency, currencies.get(catalogReferenceKey(response.quote.total.currency)))}</dd></div></>}{response.type === "purchase_from_shop" && <><div><dt>Purchase</dt><dd>{response.purchase.purchaseId} · quote {response.purchase.quoteId} · {response.purchase.quantity} items</dd></div><div><dt>Exact paid total</dt><dd>{formatMinorUnits(response.purchase.total.minorUnits, response.purchase.total.currency, currencies.get(catalogReferenceKey(response.purchase.total.currency)))}</dd></div><div><dt>Purchased at</dt><dd>{response.purchase.purchasedAt}</dd></div></>}{(response.type === "propose_bilateral_trade" || response.type === "accept_bilateral_trade" || response.type === "cancel_bilateral_trade") && <div><dt>Trade</dt><dd>{response.trade.tradeId} · {response.trade.status}</dd></div>}</dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(response, null, 2)}</pre></details></section>;
+  return <section className="receipt-details"><h3>Economy receipt and server result</h3><dl className="command-detail-list"><div><dt>Command</dt><dd>{receipt.type}</dd></div><div><dt>Revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div><div><dt>Occurred</dt><dd>{receipt.occurredAt}</dd></div>{response.type === "request_purchase_quote" && <><div><dt>Quote</dt><dd>{response.quote.quoteId} · expires {response.quote.expiresAt}</dd></div><div><dt>Exact total</dt><dd>{formatMinorUnits(response.quote.total.minorUnits, response.quote.total.currency, currencies.get(catalogReferenceKey(response.quote.total.currency)))}</dd></div></>}{response.type === "purchase_from_shop" && <><div><dt>Purchase</dt><dd>{response.purchase.purchaseId} · quote {response.purchase.quoteId} · {response.purchase.quantity} items</dd></div><div><dt>Exact paid total</dt><dd>{formatMinorUnits(response.purchase.total.minorUnits, response.purchase.total.currency, currencies.get(catalogReferenceKey(response.purchase.total.currency)))}</dd></div><div><dt>Purchased at</dt><dd>{response.purchase.purchasedAt}</dd></div></>}{response.type === "sell_to_shop" && <><div><dt>Sale</dt><dd>{response.sale.saleId} · {response.sale.disposition} · {response.sale.quantity} items</dd></div><div><dt>Exact received total</dt><dd>{formatMinorUnits(response.sale.total.minorUnits, response.sale.total.currency, currencies.get(catalogReferenceKey(response.sale.total.currency)))}</dd></div><div><dt>Sold at</dt><dd>{response.sale.soldAt}</dd></div></>}{(response.type === "propose_bilateral_trade" || response.type === "accept_bilateral_trade" || response.type === "cancel_bilateral_trade") && <div><dt>Trade</dt><dd>{response.trade.tradeId} · {response.trade.status}</dd></div>}</dl><details><summary>Complete strict server response</summary><pre>{JSON.stringify(response, null, 2)}</pre></details></section>;
 }
 
 export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", api, onBack, onUnavailable, focusHeadingRequest, onOpenCombat, focusCombatRequest, onCombatFocused,
@@ -354,6 +357,12 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
     void runCommand("resource", command, () => api.resourceCommand(campaignId, actorId, command), (value) => ({ kind: "resource", value }), () => refreshAllLanes(actorId));
   }
 
+  async function requestSaleQuote(entryId: string, quantity: number): Promise<VendorSaleQuoteResponse | null> {
+    if (!actorId) return null;
+    try { return await api.vendorSaleQuote(campaignId, actorId, { entryId, quantity, idempotencyKey: commandKey("vendor-sale-quote") }); }
+    catch { if (mountedRef.current) setCommandMessage("A vendor sale quote is unavailable for that item, quantity, or location. Confirm a vendor is present with a buy policy."); return null; }
+  }
+
   async function openShop(id: string) {
     const request = ++shopRequestRef.current; setShop(null); setShopId(id); setQuote(null);
     try { const value = await api.getShop(campaignId, id); if (mountedRef.current && request === shopRequestRef.current) setShop(value); }
@@ -388,6 +397,7 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
       {actorId && <SpellcastingPanel powers={powers} disabled={commandDisabled} result={confirmedResult?.kind === "spell" ? confirmedResult.value : null} onCast={submitSpell} />}
       {effects && <ActorEffectsPanel effects={effects} disabled={commandDisabled} result={confirmedResult?.kind === "effect" ? confirmedResult.value : null} onApply={submitEffect} onRemove={(effectId) => submitEffect({ kind: "remove", effectId })} onAdvance={(effectId, rounds) => submitEffect({ kind: "advance-duration", effectId, rounds })} />}
       {inventory && <InventoryPanel inventory={inventory} disabled={commandDisabled} onReviewChange={setInventoryReview} describeItem={describeItem} onCommand={submitInventory} />}
+      {inventory && <VendorSellPanel inventory={inventory} disabled={commandDisabled} describeItem={describeItem} onRequestQuote={requestSaleQuote} onSell={(quoteId) => submitEconomy({ type: "sell_to_shop", quoteId }, "sell")} />}
       {wallet && <TradeInboxPanel disabled={commandDisabled} onAccept={(tradeId) => submitEconomy({ type: "accept_bilateral_trade", tradeId }, "accept-trade")} onCancel={(tradeId) => submitEconomy({ type: "cancel_bilateral_trade", tradeId }, "cancel-trade")} />}
       {wallet && <ShopBrowser wallet={wallet} shop={shop} shopId={shopId} quote={quote} currencies={currencies} disabled={commandDisabled} itemLabel={(item) => describeItem(item).name} onLoadShop={(id) => void openShop(id)} onQuote={(id, item, quantity) => submitEconomy({ type: "request_purchase_quote", shopId: id, item, quantity }, "purchase quote", (value) => { if (value.type === "request_purchase_quote") setQuote(value.quote); })} onPurchase={(quoteId) => submitEconomy({ type: "purchase_from_shop", quoteId }, "purchase", () => setQuote(null))} />}
       <section className="actor-section actor-actions" aria-labelledby="actor-actions-heading"><div className="actor-section-heading"><h2 id="actor-actions-heading">Recovery & exchange</h2></div><div className="button-row">{resources && <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setRestOpen(true)}>Review rest</button>}{inventory && wallet && <button className="ghost" type="button" disabled={commandDisabled} onClick={() => setTradeOpen(true)}>Review trade</button>}</div></section>
