@@ -5,7 +5,9 @@ import { z } from "zod";
 export const DM_SCENE_DESCRIPTION_PREFIX = "Scene description (non-authoritative):\n";
 const sceneSchema=z.object({atmosphere:z.string().trim().min(1).max(2000),
   dialogue:z.array(z.object({speaker:z.string().min(1).max(200),text:z.string().trim().min(1).max(600)}).strict()).max(4),
-  question:z.string().trim().min(1).max(300).optional()}).strict();
+  question:z.string().trim().min(1).max(300).optional(),
+  // A model may echo the supplied transition flag; it carries no authority and is ignored.
+  transition:z.boolean().optional()}).strict();
 const names=(context:unknown,key:'cast'|'players'):string[]=>{
   const rows=context&&typeof context==='object'?(context as Record<string,unknown>)[key]:null;
   return Array.isArray(rows)?rows.flatMap(row=>row&&typeof row==='object'&&typeof row.name==='string'?[row.name]:[]):[];
@@ -50,19 +52,34 @@ export function dmNarrationMessages(publicContext: unknown, fallback: string): C
   ];
 }
 
+/** Interrogative sentences offer a player choice; only declarative prose can assert an action or outcome. */
+const assertedProse=(text:string):string=>text.split(/(?<=[.!?])\s+/).filter(sentence=>!/\?\s*$/.test(sentence)).join(' ');
+/** Figurative inanimate outcomes ("the wind died", "the light fails", "a horizon that never resolves") are atmosphere. */
+const figurativeOutcome=/\b(?:wind|light|daylight|twilight|sound|noise|music|hum|echo|day|fire|flame|flames|embers|storm|rain|sun|moon|colour|color|voice|voices|thought|memory|hope|silence|conversation|applause|cheer|warmth|interest|energy|momentum|breeze|thunder|tide|waves?|road|tarmac|asphalt|engine|note|track|trail|path|horizon|sky|shadow|shadows)\b[^.!?\n]{0,40}\b(?:dies?|died|dying|is dead|was dead|lies? dead|fail(?:s|ed|ing)?|gain(?:s|ed)?|resolve(?:s|d)?|fades?|faded|fading)\b/gi;
+/** A negated clause does not assert its outcome ("no door has opened", "never resolves", "fails to open"). */
+const negationBefore=/\b(?:no|not|never|none|nothing|nobody|nowhere|without|nor|neither|refus(?:e|es|ed|ing)|cannot|can't|don't|doesn't|didn't|isn't|aren't|wasn't|weren't|won't|wouldn't|hardly|barely|scarcely|fail(?:s|ed|ing)?\s+to|hesitat(?:e|es|ed|ing)\s+to)\b[^.!?\n]{0,40}$/i;
+const asserts=(expression:RegExp,text:string):boolean=>{const scanner=new RegExp(expression.source,expression.flags.includes("g")?expression.flags:`${expression.flags}g`);
+  for(let match=scanner.exec(text);match;match=scanner.exec(text))if(!negationBefore.test(text.slice(Math.max(0,match.index-48),match.index)))return true;return false;};
 /** Heuristic rejection, NOT a proof of factuality. Prose never becomes mechanics or canonical history. */
 export function validDmScene(text: string, publicContext?:unknown): boolean {
-  if (!text.trim() || text.length > 6000 || text.trim().split(/\s+/).length > 180) return false;
+  if (!text.trim() || text.length > 6000 || text.trim().split(/\s+/).length > 200) return false;
   if (!isTransition(publicContext) && !/\?\s*$/.test(text)) return false;
   // The actual public cast constrains structured dialogue; actual player identities constrain agency claims.
   // No receipt authorizes the atmospheric addition to rewrite outcomes: receipts are preserved separately.
-  if (/\b(?:\d+|hit points?|hp|damage|heal(?:s|ed|ing)?|initiative|reward|gold|coins?|xp|level up|dice|rolled|tool|receipt|provider)\b/i.test(text)) return false;
-  if (/\b(?:reveal(?:s|ed)?|discover(?:s|ed)?|resolv(?:e|es|ed)|defeat(?:s|ed)?|unlock(?:s|ed)?|complet(?:e|es|ed)|succeed(?:s|ed)?|fail(?:s|ed)?|gain(?:s|ed)?|obtain(?:s|ed)?)\b/i.test(text)) return false;
+  // Mechanics vocabulary is checked everywhere; asserted-action guards skip questions and figurative/negated prose.
+  const asserted=assertedProse(text).replace(figurativeOutcome,'');
+  if (/\b(?:\d+|hit points?|hp|damage|heal(?:s|ed|ing)?|initiative|reward|xp|level up|dice|rolled|tool|receipt|provider)\b/i.test(text)) return false;
+  if (asserts(/\b(?:reveal(?:s|ed)?|discover(?:s|ed)?|resolv(?:e|es|ed)|defeat(?:s|ed)?|unlock(?:s|ed)?|succeed(?:s|ed)?|fail(?:s|ed)?|gain(?:s|ed)?|obtain(?:s|ed)?)\b/i,asserted)) return false;
+  // "complete" is an outcome verb, but also a common adjective ("a silence so complete").
+  if (asserts(/(?<!\b(?:so|as|a|an|the|more|most|nearly|almost|quite|utterly|entirely|perfectly|less|far|very)\s)\bcomplet(?:e|es|ed|ion)\b/i,asserted)) return false;
   const escaped=names(publicContext,'players').map(name=>name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
   const subject=`(?:you|your character|the party|the players|the group${escaped.length?'|'+escaped.join('|'):''})`;
-  if(new RegExp(`\\b${subject}\\s+(?:(?:have|has|had|already|then|just)\\s+){0,2}(?:decid(?:e|es|ed)|choos(?:e|es)|chose|chosen|agre(?:e|es|ed)|says?|said|repl(?:y|ies|ied)|feel|feels|felt|think|thinks|thought|attack(?:s|ed)?|take|takes|took|taken|pick(?:s|ed)? up|open(?:s|ed)?|accept(?:s|ed)?|follow(?:s|ed)?|leave|leaves|left|enter(?:s|ed)?|mov(?:e|es|ed)|walk(?:s|ed)?|run|runs|ran|hand(?:s|ed)?|give|gives|gave|given|drop(?:s|ped)?|sell|sells|sold|buy|buys|bought|equip(?:s|ped)?|unequip(?:s|ped)?|promis(?:e|es|ed)|pledge(?:s|d)?|swear|swore|sworn)\\b`,'i').test(text))return false;
-  if(/\b(?:hand(?:s|ed)?|gave|given|sold|bought|drop(?:s|ped)?|equip(?:s|ped)?|unequip(?:s|ped)?|acquir(?:e|es|ed)|receiv(?:e|es|ed))\b[^.!?\n]{0,80}\b(?:sword|weapon|shield|armou?r|inventory|item|potion|ring|gold|coins?|money|possessions?)\b/i.test(text))return false;
-  if(/\b(?:dies?|died|dying|kills?|killed|slays?|slain|perishes?|perished|lies? dead|is dead|are dead|was dead|were dead|falls? dead)\b/i.test(text))return false;
-  if(/\b(?:gate|door|portal|barrier|hatch|lock|chest|passage|drawbridge)\b[^.!?\n]{0,60}\b(?:opens?|opened|unlocks?|unlocked|swings?|swung|gapes?|gaped|stands? open|is open|lies? open)\b/i.test(text))return false;
+  // Agency counts only as a main-clause assertion; "which way you walk" or "a hum you feel" is subordinate depiction.
+  const clauseStart=`(?:^|[.;!?]\\s+|[,;:]\\s*|\\b(?:and|but|or|so|then|yet|next|now|finally|suddenly|meanwhile)\\s+)`;
+  if(asserts(new RegExp(`${clauseStart}${subject}\\s+(?:(?:have|has|had|already|then|just)\\s+){0,2}(?:decid(?:e|es|ed)|choos(?:e|es)|chose|chosen|agre(?:e|es|ed)|says?|said|repl(?:y|ies|ied)|feel|feels|felt|think|thinks|thought|attack(?:s|ed)?|take|takes|took|taken|pick(?:s|ed)? up|open(?:s|ed)?|accept(?:s|ed)?|follow(?:s|ed)?|leave|leaves|left|enter(?:s|ed)?|mov(?:e|es|ed)|walk(?:s|ed)?|run|runs|ran|hand(?:s|ed)?|give|gives|gave|given|drop(?:s|ped)?|sell|sells|sold|buy|buys|bought|equip(?:s|ped)?|unequip(?:s|ped)?|promis(?:e|es|ed)|pledge(?:s|d)?|swear|swore|sworn)\\b`,'i'),asserted))return false;
+  // Currency words are omitted here (figurative "a dropped coin"); amounts are caught by the digit guard.
+  if(asserts(/\b(?:hand(?:s|ed)?|gave|given|sold|bought|drop(?:s|ped)?|equip(?:s|ped)?|unequip(?:s|ped)?|acquir(?:e|es|ed)|receiv(?:e|es|ed))\b[^.!?\n]{0,80}\b(?:sword|weapon|shield|armou?r|inventory|item|potion|ring|money|possessions?)\b/i,asserted))return false;
+  if(asserts(/\b(?:dies?|died|dying|kills?|killed|slays?|slain|perishes?|perished|lies? dead|is dead|are dead|was dead|were dead|falls? dead)\b/i,asserted))return false;
+  if(asserts(/\b(?:gate|door|portal|barrier|hatch|lock|chest|passage|drawbridge)\b[^.!?\n]{0,60}\b(?:opens?|opened|unlocks?|unlocked|swings?|swung|gapes?|gaped|stands? open|is open|lies? open)\b/i,asserted))return false;
   return !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text);
 }

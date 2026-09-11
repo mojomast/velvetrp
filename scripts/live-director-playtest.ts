@@ -8,6 +8,7 @@ import type { ProviderSettings } from "../server/src/types.js";
 import { closeRepo } from "../server/src/repo/index.js";
 import { orchestrateCampaignDmBeat } from "../server/src/agent/campaignDmOrchestrator.js";
 import type { AdventureAgentDependencies } from "../server/src/agent/adventureOrchestrator.js";
+import { DM_SCENE_DESCRIPTION_PREFIX } from "../server/src/agent/dmNarration.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
 import { PLAYTEST_PACING_ACTIONS, gradeDmRun, seedLivingWorld } from "../server/test/fixtures/livingWorld.js";
 import { readProxyKey } from "./evaluate-live-director-grounding.js";
@@ -31,11 +32,12 @@ export interface PlaytestArtifact {
   seed: number;
   engineMode: "ai" | "human";
   model: string;
-  beats: Array<{ index: number; intent: string; state: string; receipts: string[]; narration: boolean; transition: boolean; blockers: string[]; narrationTail: string; failures: string[] }>;
+  beats: Array<{ index: number; intent: string; state: string; receipts: string[]; narration: boolean; assisted: boolean; transition: boolean; blockers: string[]; narrationTail: string; scene: string | null; selection: string | null; failures: string[] }>;
   failures: string[];
   providerCalls: Array<{ phase: string; ok: boolean; finishReason: string; detail: string; tools: string[]; completionTokens: number; totalTokens: number; costUsd: number }>;
   readToolsUsed: string[];
   totals: { calls: number; tokens: number; cost: number };
+  narration: { assisted: number; fallback: number };
   caps: { calls: number; tokens: number; costUsd: number };
   capHit: string | null;
 }
@@ -57,12 +59,20 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     seedLivingWorld(f, options.seed);
     const providerCalls: PlaytestArtifact["providerCalls"] = [];
     let providerQuotaHit = false;
+    let pendingScene: string | null = null;
+    let pendingSelection: string | null = null;
     const deps: AdventureAgentDependencies = {
       complete: async (input) => {
         try {
           const result = await completeWithProvider(input);
           const usage = result.usage;
           const price = provider.pricing;
+          if (input.promptVersion === "campaign-dm-narration-v1") {
+            pendingScene = result.message.toolCalls?.find(call => call.name === "submit_dm_scene")?.arguments ?? null;
+          }
+          if (input.promptVersion === "campaign-dm-v1") {
+            pendingSelection = result.message.toolCalls?.find(call => call.name === "select_dm_beat")?.arguments ?? pendingSelection;
+          }
           providerCalls.push({ phase: input.promptVersion ?? "unknown", ok: true, finishReason: result.provenance?.finishReason ?? "unknown", detail: "",
             tools: result.message.toolCalls?.map(call => call.name) ?? [], completionTokens: usage?.completionTokens ?? 0, totalTokens: usage?.totalTokens ?? 0,
             costUsd: usage && price.promptPerMillion !== null && price.completionPerMillion !== null
@@ -86,6 +96,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
       f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: initialControl.revision, idempotencyKey: `play-${options.seed}-ai` });
     }
     for (let index = 0; index < options.beats; index += 1) {
+      pendingScene = null; pendingSelection = null;
       const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, { intent: index === 0 ? "open" : "continue",
         expectedModeRevision: f.repo.getDmControl(OWNER, f.campaign.id).revision, idempotencyKey: `play-${options.seed}-${index}` });
       lastRunId = run.runId;
@@ -101,9 +112,10 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
       const executed = f.repo.getDmRun(OWNER, f.campaign.id, f.session.id, run.runId);
       const beatFailures = gradeDmRun(executed);
       const transition = executed.receipts.length > 0 && executed.receipts.every(receipt => PLAYTEST_PACING_ACTIONS.has(receipt.action));
+      const assisted = (executed.narration ?? "").includes(DM_SCENE_DESCRIPTION_PREFIX);
       beats.push({ index, intent: run.intent, state: executed.state, receipts: executed.receipts.map(receipt => receipt.action),
-        narration: executed.narration !== null, transition, blockers: executed.blockers,
-        narrationTail: (executed.narration ?? "").slice(-70), failures: beatFailures });
+        narration: executed.narration !== null, assisted, transition, blockers: executed.blockers,
+        narrationTail: (executed.narration ?? "").slice(-70), scene: pendingScene, selection: pendingSelection, failures: beatFailures });
       failures.push(...beatFailures.map(failure => `beat${index}:${failure}`));
       const spent = providerCalls.reduce((sum, call) => sum + call.totalTokens, 0);
       const cost = providerCalls.reduce((sum, call) => sum + call.costUsd, 0);
@@ -122,9 +134,10 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     const totals = { calls: providerCalls.length, tokens: providerCalls.reduce((sum, call) => sum + call.totalTokens, 0),
       cost: providerCalls.reduce((sum, call) => sum + call.costUsd, 0) };
     const readToolsUsed = [...new Set(providerCalls.flatMap(call => call.tools).filter(name => name.startsWith("read_")))].sort();
+    const assisted = beats.filter(beat => beat.assisted).length;
     const artifact: PlaytestArtifact = {
       version: 1, mode: "live", seed: options.seed, engineMode: options.mode, model: provider.model,
-      beats, failures, providerCalls, readToolsUsed, totals,
+      beats, failures, providerCalls, readToolsUsed, totals, narration: { assisted, fallback: beats.length - assisted },
       caps: { calls: options.maxCalls, tokens: options.maxTokens, costUsd: options.maxUsd }, capHit,
     };
     f.repo.close();
@@ -146,7 +159,8 @@ async function main() {
   await writeFile(output, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
   const completed = artifact.beats.filter(beat => beat.state === "completed").length;
   process.stdout.write(`${JSON.stringify({ output, seed: artifact.seed, engine: artifact.engineMode, beats: artifact.beats.length,
-    completed, transitions: artifact.beats.filter(beat => beat.transition).length, calls: artifact.totals.calls,
+    completed, transitions: artifact.beats.filter(beat => beat.transition).length, assisted: artifact.narration.assisted,
+    fallback: artifact.narration.fallback, calls: artifact.totals.calls,
     tokens: artifact.totals.tokens, costUsd: Number(artifact.totals.cost.toFixed(6)), failures: artifact.failures,
     readToolsUsed: artifact.readToolsUsed, capHit: artifact.capHit })}\n`);
   if (artifact.failures.length > 0) process.exitCode = 1;

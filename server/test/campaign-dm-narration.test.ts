@@ -168,6 +168,37 @@ describe('public AI DM narration',()=>{
     expect(validDmScene('Rain falls.',normal)).toBe(false);
     for(const text of ['You decide to leave.','You gain 50 gold.','The scene is resolved.','The king lies dead.'])expect(validDmScene(text,transition)).toBe(false);
   });
+  it('accepts required choice questions and figurative live prose without weakening declarative rejection',()=>{
+    const normal={cast:[],players:[]},transition={cast:[],players:[],transition:true};
+    for(const text of [
+      'The road waits, empty in both directions — do you take the cracked shoulder, or the overgrown verge?',
+      'A brass key lies among the stones. Do you pick it up, or leave it where it lies and follow the road on?',
+      'Late light lies long across the tarmac, thin and gold. Do you follow the road onward, or stop here a while?',
+      'Nothing hurries here; the ruts hold their small puddles like coins in a palm. Do you linger here, or press on?',
+      'The wind has died entirely. Do you take the road on, or pause by the verge?',
+      'A silence so complete it seems to have weight settles over the lane. Do you listen on, or keep walking?',
+      'Nothing has shifted, no door has opened, no voice has spoken. Do you wait and watch?',
+      'The light has begun to fail and the tarmac lies dead grey. Do you press on?',
+      'Nothing along the road gains or loses a shadow. Do you move on?',
+      'The horizon never quite resolves. Do you keep walking?',
+      'The ruts have gone the color of old coin, indifferent to which you choose. Do you take the road on?',
+      'The moment is holding its breath, waiting to see what you decide to do with it. Do you wait?',
+    ])expect(validDmScene(text,normal),text).toBe(true);
+    // A declarative completion is still rejected.
+    expect(validDmScene('You complete the ritual and close the path. Do you rest?',normal)).toBe(false);
+    // A later sentence cannot borrow a negation from an earlier one.
+    expect(validDmScene('No wind stirs. The door has opened. Do you enter?',normal)).toBe(false);
+    // Declarative assertions and numeric mechanics remain rejected even beside a choice question.
+    for(const text of [
+      'You take the road and leave the key behind. Do you press on?',
+      'Then you take the road and leave the key behind. Do you press on?',
+      'The king lies dead. Do you approach?',
+      'Do you spend 50 gold?',
+    ])expect(validDmScene(text,normal),text).toBe(false);
+    // An echoed transition flag is ignored, but an unknown field is still rejected.
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true},transition)).toBe('A lull settles over the road.');
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[],transition:true,scene:'extra'},transition)).toBeNull();
+  });
   it('accepts bounded public NPC dialogue but rejects unadvertised speakers, extra fields, and inflected agency/outcome claims',()=>{
     const context={cast:[{name:'Mara',description:'A cautious guide.'}],players:[{name:'Hero'}],scenes:[{title:'The gate',description:'A stone gate blocks the road.'}],receipts:[{action:'reveal-node',summary:'Scene revealed: The gate.'}]};
     const value={atmosphere:'Rain beads on the stone beside the gate.',dialogue:[{speaker:'Mara',text:'A patient eye is worth a hurried step.'}],question:'Would you like to inspect the stonework or speak with Mara?'};

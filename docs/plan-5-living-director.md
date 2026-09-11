@@ -245,6 +245,24 @@ and asserts the same invariants provider-free: completion, narration, exact
 known actions, no duplicate receipt action, no leakage, replay that spends no
 provider call, transition pacing, and 30-minute world-time steps only.
 
+Live narration-quality fix: the harness reports whether each beat used the
+provider scene (`assisted`) or the deterministic receipt summary (`fallback`).
+The first campaigns showed a 17-42% fallback rate because `validDmScene` rejected
+legitimate prose: the required choice questions ("Do you pick it up?") matched
+the player-agency guard, figurative `gold`/`coin` matched the currency tokens,
+"the wind died" matched the death guard, inanimate outcomes ("a horizon that
+never resolves", "the light fails") matched the transition guard, negated clauses
+("no door has opened") read as assertions, and some scenes carried an echoed
+`transition` field rejected by the strict schema. `validDmScene` now exempts
+interrogative sentences, strips figurative inanimate outcomes, ignores negated
+clauses, and counts player agency only as a main-clause assertion; the scene
+schema tolerates and ignores an echoed `transition`, and the word ceiling moved
+from 180 to 200. A fresh 24-run/384-beat campaign completed 384/384 beats with
+zero failures and a 2.3% fallback rate (all four grounding reads in every run);
+the remaining fallbacks are length-cap overruns and subordinate-clause phrasing.
+No declarative agency, mechanics, death, or opening assertion was weakened: the
+existing rejection tests and the malicious-prose bypass tests still pass.
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient
