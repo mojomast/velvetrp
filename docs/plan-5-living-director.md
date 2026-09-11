@@ -257,11 +257,15 @@ never resolves", "the light fails") matched the transition guard, negated clause
 interrogative sentences, strips figurative inanimate outcomes, ignores negated
 clauses, and counts player agency only as a main-clause assertion; the scene
 schema tolerates and ignores an echoed `transition`, and the word ceiling moved
-from 180 to 200. A fresh 24-run/384-beat campaign completed 384/384 beats with
-zero failures and a 2.3% fallback rate (all four grounding reads in every run);
-the remaining fallbacks are length-cap overruns and subordinate-clause phrasing.
-No declarative agency, mechanics, death, or opening assertion was weakened: the
-existing rejection tests and the malicious-prose bypass tests still pass.
+from 180 to 200. Follow-up fixes reject only the outcome forms of "complete"
+(the adjective "the quiet is complete" stays), treat a blank question as absent,
+and settle an invalid `select_dm_beat` (for example a repeated candidate) as a
+safe hold instead of an `unknown` stall. A final 24-run/480-beat campaign
+completed 480/480 beats with zero failures, zero unknown beats, all four
+grounding reads in every run, and a 1.3% fallback rate; the remaining cases are
+length-cap overruns and one malformed tool call. No declarative agency,
+mechanics, death, or opening assertion was weakened: the existing rejection
+tests and the malicious-prose bypass tests still pass.
 
 ### P5.3: World time and ambient beats
 
