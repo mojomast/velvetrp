@@ -51,7 +51,7 @@ CREATE TABLE dm_provider_requests (
   run_id TEXT PRIMARY KEY REFERENCES dm_dispatches(run_id) ON DELETE RESTRICT,
   request_json TEXT NOT NULL CHECK(json_valid(request_json) AND json_type(request_json)='object' AND length(request_json)<=64000),
   reserved_prompt_tokens INTEGER NOT NULL CHECK(reserved_prompt_tokens BETWEEN 1 AND 23744),
-  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 1 AND 256)
+  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 1 AND 1024)
 );
 CREATE TABLE dm_decisions (
   run_id TEXT PRIMARY KEY REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
@@ -221,7 +221,7 @@ CREATE TABLE dm_narration_dispatches (
   request_json TEXT NOT NULL CHECK(json_valid(request_json) AND length(request_json)<=64000),
   deadline_at TEXT NOT NULL,
   reserved_prompt_tokens INTEGER NOT NULL CHECK(reserved_prompt_tokens BETWEEN 0 AND 24000),
-  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 0 AND 768),
+  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 0 AND 1536),
   status TEXT NOT NULL CHECK(status IN ('claimed','settled')),
   source TEXT CHECK(source IN ('provider-assisted','deterministic-fallback')),
   narration TEXT CHECK(length(narration) BETWEEN 1 AND 8000),
@@ -285,7 +285,7 @@ CREATE TABLE dm_planning_rounds (
   request_json TEXT CHECK(request_json IS NULL OR (json_valid(request_json) AND length(request_json)<=64000)),
   response_json TEXT CHECK(response_json IS NULL OR json_valid(response_json)),
   reserved_prompt_tokens INTEGER NOT NULL CHECK(reserved_prompt_tokens BETWEEN 1 AND 23744),
-  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 1 AND 256),
+  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 1 AND 1024),
   prompt_tokens INTEGER,
   completion_tokens INTEGER,
   cost_usd REAL,

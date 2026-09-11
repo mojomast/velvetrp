@@ -210,6 +210,19 @@ keeps pacing instead of dead-locking while the players decide. A 6-beat live run
 then completed 6/6 beats with all four grounding reads and no unknown outcomes
 (~53.6k tokens, ~USD 0.0057).
 
+Live playtest campaign: `scripts/live-director-playtest.ts`
+(`evaluate:director-playtest`) seeds a provider-free world (three locations,
+three present NPCs with ledger knowledge, a four-node story chain with a clue,
+and a quest) and drives N live beats through the real repository and
+orchestrator, grading state, receipt fidelity, narration presence, leak markers,
+and transition pacing. All read/inspection surfaces remain provider-free. The
+raised completion headroom (`DM_PLANNING_COMPLETION_MAX_TOKENS = 1024`,
+`DM_NARRATION_COMPLETION_MAX_TOKENS = 1536`, with an exact predecessor migration)
+and graceful handling of a forced round that returns a grounding tool eliminated
+the remaining `unknown` beats. Evidence: 40/40 beats across five seeds and both
+engine modes completed with zero objective failures and all four grounding reads
+(~76k tokens and ~USD 0.008 per eight-beat run).
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient

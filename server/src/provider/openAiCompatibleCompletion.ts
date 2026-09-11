@@ -310,9 +310,9 @@ function parseToolCalls(value: unknown, policy: ResponseToolPolicy): CompletionT
       throw new ProviderProtocolError("Provider returned tool calls when tools were not enabled");
     }
     if (!policy.advertisedNames.has(fn.name)) throw new ProviderProtocolError("Provider returned an undeclared tool");
-    if (typeof policy.toolChoice === "object" && fn.name !== policy.toolChoice.name) {
-      throw new ProviderProtocolError("Provider returned a tool other than the named tool choice");
-    }
+    // A named choice is a strong hint, not a hard protocol fact: models sometimes call a different
+    // advertised tool. The owning orchestrator enforces exact selection semantics and can degrade
+    // a drifted forced round to a deterministic hold instead of an ambiguous paid failure.
     return { id: candidate.id, name: fn.name, arguments: fn.arguments };
   });
 }

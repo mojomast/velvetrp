@@ -89,6 +89,24 @@ describe("exact DM schema upgrade",()=>{
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name='dm_world_time_receipts'").get()).toEqual({name:'dm_world_time_receipts'});
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
   });
+  it('raises director completion headroom on the exact prior-cap predecessor',()=>{
+    const repo=createRepository(),campaign=repo.createCampaign('local-owner',{name:'Cap'});repo.close();
+    const filename=path.join(process.env.VELVET_DATA_DIR!,'velvet.sqlite'),db=new DatabaseDriver(filename);
+    const expected=objects(db);db.pragma('foreign_keys=OFF');
+    for(const table of ['dm_provider_requests','dm_planning_rounds','dm_narration_dispatches']){
+      const definition=expected.find(o=>o.name===table)!;
+      const old=definition.sql.replace('BETWEEN 1 AND 1024','BETWEEN 1 AND 256').replace('BETWEEN 0 AND 1536','BETWEEN 0 AND 768');
+      db.exec(`CREATE TEMP TABLE saved AS SELECT * FROM ${table}`);db.exec(`DROP TABLE ${table}`);db.exec(old);
+      db.exec(`INSERT INTO ${table} SELECT * FROM saved`);db.exec('DROP TABLE saved');
+      for(const object of expected.filter(o=>o.tbl_name===table&&o.type!=='table'))db.exec(object.sql);
+    }
+    db.pragma('foreign_keys=ON');const before=objects(db),control=db.prepare('SELECT * FROM dm_control').all();
+    expect(()=>upgradeCampaignDmSchema(db,before,expected,()=>{throw new Error('rollback');})).toThrow('rollback');
+    expect(objects(db)).toEqual(before);
+    ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
+    expect(db.prepare("SELECT sql FROM sqlite_master WHERE name='dm_planning_rounds'").get()).toMatchObject({sql:expect.stringContaining('BETWEEN 1 AND 1024')});
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
+  });
   it.each([false,true])("preserves existing campaign and prior tactical-map chain (old map=%s)",(oldMap)=>{
     const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Preserved"});repo.close();
     const filename=path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),db=new DatabaseDriver(filename);

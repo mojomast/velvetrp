@@ -2,7 +2,8 @@ import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJ
 import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import { DM_NARRATION_PROMPT_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS, type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
+import { DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_TOKENS, DM_PLANNING_COMPLETION_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS,
+  type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
@@ -65,7 +66,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
   catch { repository.blockDmBeat(principal, runId, "provider-settings-unavailable"); return; }
   const work = repository.claimDmPlanning(principal, runId, provider.providerType || "openai-compatible", provider.model || "unconfigured");
   if (!work) { repository.executeDmBeat(principal, runId); return; }
-  const completionLimit = Math.min(256, provider.samplers.maxTokens ?? 256);
+  const completionLimit = Math.min(DM_PLANNING_COMPLETION_MAX_TOKENS, provider.samplers.maxTokens ?? DM_PLANNING_COMPLETION_MAX_TOKENS);
   const selectionPairs = work.candidates.map(({ candidateId, digest }) => ({ candidateId, digest }));
   const tools: CompletionFunctionTool[] = [selectDmBeatTool(selectionPairs), ...(dmReadToolSchemas() as unknown as CompletionFunctionTool[])];
   const messages: CompletionMessage[] = [
@@ -172,7 +173,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
     const provider=await deps.getProvider();
     // User-editable private harness strings must not cross into the public narrator.
     const harness=defaultHarnessSettings();
-    const completionLimit=Math.min(768,provider.samplers.maxTokens??768);
+    const completionLimit=Math.min(DM_NARRATION_COMPLETION_MAX_TOKENS,provider.samplers.maxTokens??DM_NARRATION_COMPLETION_MAX_TOKENS);
     const input:ProviderCompletionInput={provider:{...provider,samplers:{...provider.samplers,maxTokens:completionLimit}},
       harness,preset:getPromptPreset("default"),promptVersion:"campaign-dm-narration-v1",schemaVersion:"campaign-dm-narration-v1",
       messages:dmNarrationMessages(work.context,work.fallback),parallelToolCalls:false,toolChoice:{name:"submit_dm_scene"},

@@ -22,6 +22,11 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
     ? { ...object, sql: `<transition:${object.name}>` } : object);
   const upgradeTransition = JSON.stringify(normalizeTransition(actual))
     === JSON.stringify(normalizeTransition(expected.filter(object => !worldTimeNames(object.name))));
+  // P5.7 completion headroom: reasoning models need more than 256/768 completion tokens, so three tables' CHECKs changed.
+  const completionChanged = new Set(["dm_provider_requests", "dm_planning_rounds", "dm_narration_dispatches"]);
+  const normalizeCompletion = (objects: SchemaObject[]) => objects.map(object => completionChanged.has(object.name)
+    ? { ...object, sql: `<completion:${object.name}>` } : object);
+  const upgradeCompletion = JSON.stringify(normalizeCompletion(actual)) === JSON.stringify(normalizeCompletion(expected));
   const additions = expected.filter(object => object.name.startsWith("dm_") && !actual.some(old => old.name===object.name));
   const previous = expected.filter(object => !object.name.startsWith("dm_"));
   const mapNames = new Set(["tactical_map_contexts_v2", "tactical_map_contexts_v2_update", "tactical_map_contexts_v2_delete"]);
@@ -30,7 +35,7 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
       : object.name === "tactical_map_previews_v58" ? object.sql.replace("  actor_location_revision INTEGER,\n", "") : object.sql,
   }));
   const upgradeMap = JSON.stringify(actual) === JSON.stringify(oldMap);
-  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition
+  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition && !upgradeCompletion
     && JSON.stringify(actual) !== JSON.stringify(previous)) return false;
   if (db.inTransaction) throw new Error("DM upgrade requires an independent transaction");
   const foreignKeys = db.pragma("foreign_keys", { simple: true });
@@ -71,9 +76,20 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
           for (const object of expected.filter(object => object.tbl_name === table && object.type !== "table")) db.exec(object.sql);
         }
       }
+      if (upgradeCompletion) {
+        for (const table of ["dm_provider_requests", "dm_planning_rounds", "dm_narration_dispatches"]) {
+          const definition = expected.find(object => object.type === "table" && object.name === table)!;
+          const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(row => row.name).join(",");
+          db.exec(`CREATE TEMP TABLE dm_upgrade_backup AS SELECT * FROM ${table}`);
+          db.exec(`DROP TABLE ${table}`); db.exec(definition.sql);
+          db.exec(`INSERT INTO ${table}(${columns}) SELECT ${columns} FROM dm_upgrade_backup`);
+          db.exec("DROP TABLE dm_upgrade_backup");
+          for (const object of expected.filter(object => object.tbl_name === table && object.type !== "table")) db.exec(object.sql);
+        }
+      }
       for (const object of additions.filter(object => object.type === "table")) db.exec(object.sql);
       for (const object of additions.filter(object => object.type !== "table")) db.exec(object.sql);
-      if (!upgradeReview && !upgradeNarration && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
+      if (!upgradeReview && !upgradeNarration && !upgradeComposition && !upgradePlanningRounds && !upgradeTransition && !upgradeCompletion) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
       validate();
     }).immediate();
     return true;

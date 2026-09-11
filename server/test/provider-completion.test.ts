@@ -357,7 +357,6 @@ describe("provider completion parsing and metadata", () => {
     ["without advertised tools", undefined, undefined, "act"],
     ["when choice is none", ["act"], "none", "act"],
     ["for an undeclared function", ["act"], "auto", "other"],
-    ["instead of the named function", ["act", "other"], { name: "act" }, "other"],
   ] as const)("rejects provider tool calls %s", async (_label, toolNames, toolChoice, responseName) => {
     const fake = await startProvider({ body: { choices: [{ message: { content: null, tool_calls: [
       { id: "call", type: "function", function: { name: responseName, arguments: "{}" } },
@@ -367,6 +366,16 @@ describe("provider completion parsing and metadata", () => {
       ...(toolNames ? { tools: toolNames.map((name) => ({ name, parameters: { type: "object" } })) } : {}),
       ...(toolChoice !== undefined ? { toolChoice } : {}),
     })).rejects.toBeInstanceOf(ProviderProtocolError);
+  });
+
+  it("accepts an advertised tool other than the named choice so callers can degrade gracefully", async () => {
+    const fake = await startProvider({ body: { choices: [{ message: { content: null, tool_calls: [
+      { id: "call", type: "function", function: { name: "other", arguments: "{}" } },
+    ] } }] } });
+    const result = await completeWithProvider({ ...input(provider(fake.baseUrl)),
+      tools: [{ name: "act", parameters: { type: "object" } }, { name: "other", parameters: { type: "object" } }],
+      toolChoice: { name: "act" } });
+    expect(result.message.toolCalls?.[0]?.name).toBe("other");
   });
 
   it("rejects missing required calls and IDs colliding with transcript calls", async () => {

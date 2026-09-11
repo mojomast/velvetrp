@@ -24,7 +24,7 @@ const PROXY_ENV_PATH = "/home/mojo/projects/agentrouterrouter/.env";
 const PROXY_BASE_URL = "http://100.72.41.9:8787/v1";
 const PROXY_MODEL = "deepseek-v4-flash";
 
-async function readProxyKey(): Promise<string> {
+export async function readProxyKey(): Promise<string> {
   const content = await readFile(PROXY_ENV_PATH, "utf8").catch(() => "");
   const line = content.split(/\r?\n/).find(value => value.startsWith("PROXY_API_KEY="));
   const key = (line?.slice("PROXY_API_KEY=".length) ?? "").replace(/^["']|["']$/g, "").trim();
@@ -32,7 +32,7 @@ async function readProxyKey(): Promise<string> {
   return key;
 }
 
-function liveProvider(apiKey: string): ProviderSettings {
+export function liveProvider(apiKey: string): ProviderSettings {
   const provider = defaultProviderSettings();
   // Conservative per-million pricing so the USD sub-cap cannot be under-estimated.
   return { ...provider, providerType: "openai-compatible", baseUrl: PROXY_BASE_URL, model: PROXY_MODEL, apiKey,
@@ -40,7 +40,7 @@ function liveProvider(apiKey: string): ProviderSettings {
     adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: MAX_USD / MAX_BEATS } };
 }
 
-function usageTotals(db: DatabaseDriver.Database, campaignId: string) {
+export function usageTotals(db: DatabaseDriver.Database, campaignId: string) {
   const review = db.prepare(`SELECT COALESCE(SUM(total_tokens),0) tokens, COALESCE(SUM(cost_usd),0) cost, COUNT(*) calls
     FROM dm_review_provider_usage usage JOIN dm_runs run USING(run_id) WHERE run.campaign_id=?`).get(campaignId) as { tokens: number; cost: number; calls: number };
   const rounds = db.prepare(`SELECT COALESCE(SUM(CASE WHEN prompt_tokens IS NOT NULL AND completion_tokens IS NOT NULL
@@ -50,7 +50,7 @@ function usageTotals(db: DatabaseDriver.Database, campaignId: string) {
   return { calls: review.calls + rounds.calls, tokens: review.tokens + rounds.tokens, cost: review.cost + rounds.cost };
 }
 
-function readToolsUsed(db: DatabaseDriver.Database, campaignId: string): string[] {
+export function readToolsUsed(db: DatabaseDriver.Database, campaignId: string): string[] {
   const rows = db.prepare(`SELECT response_json FROM dm_planning_rounds round JOIN dm_runs run USING(run_id)
     WHERE run.campaign_id=? AND response_json IS NOT NULL`).all(campaignId) as { response_json: string }[];
   const legacy = db.prepare(`SELECT response_json FROM dm_dispatches dispatch JOIN dm_runs run USING(run_id)

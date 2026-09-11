@@ -99,20 +99,21 @@ describe('reproduced director review findings',()=>{
     const reopened=createRepository(f.options);expect(reopened.getDmRun('local-owner',f.campaign.id,f.session.id,run.runId).state).toBe('cancelled');reopened.close();
   });
 
-  it.each(['planning','narration'] as const)('rejects %s over-reservation usage and retains the actual 2000-token bill',async(phase)=>{
+  it.each(['planning','narration'] as const)('rejects %s over-reservation usage and retains the actual 4000-token bill',async(phase)=>{
     const f=await dmFixture();f.graph();delegate(f);const db=database();
     const run=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'open',expectedModeRevision:1,idempotencyKey:'over-budget'});
     const complete=vi.fn(async input=>{const result=dmCompletion(input);return (input.promptVersion==='campaign-dm-narration-v1')===(phase==='narration')?
-      {...result,usage:{promptTokens:10,completionTokens:2000,totalTokens:2010}}:result;});
+      {...result,usage:{promptTokens:10,completionTokens:4000,totalTokens:4010}}:result;});
+    // Cap sits above the raised per-call completion reservations plus continuity prompt, but below the actual bill.
     const deps=dmDependencies(complete),provider=await deps.getProvider();deps.getProvider=async()=>({...provider,pricing:{promptPerMillion:0,completionPerMillion:100},
-      adventureTurnBudget:{maxTotalTokens:24000,maxEstimatedCostUsd:phase==='planning'?0.03:0.11}});
+      adventureTurnBudget:{maxTotalTokens:24000,maxEstimatedCostUsd:0.3}});
     await orchestrateCampaignDmBeat(f.repo,'local-owner',run.runId,deps);
     const result=f.repo.getDmRun('local-owner',f.campaign.id,f.session.id,run.runId);
     if(phase==='planning')expect(result).toMatchObject({state:'unknown',receipts:[],narration:null});
     else {expect(result.state).toBe('completed');expect(result.narration).toBe(result.receipts[0]!.summary);}
     expect(db.prepare('SELECT source,prompt_tokens,completion_tokens,total_tokens,cost_usd FROM dm_review_provider_usage WHERE run_id=? AND phase=?').get(run.runId,phase))
-      .toEqual({source:'provider',prompt_tokens:10,completion_tokens:2000,total_tokens:2010,cost_usd:0.2});
-    if(phase==='planning')expect(db.prepare('SELECT completion_tokens FROM dm_dispatches WHERE run_id=?').get(run.runId)).toEqual({completion_tokens:2000});
+      .toEqual({source:'provider',prompt_tokens:10,completion_tokens:4000,total_tokens:4010,cost_usd:0.4});
+    if(phase==='planning')expect(db.prepare('SELECT completion_tokens FROM dm_dispatches WHERE run_id=?').get(run.runId)).toEqual({completion_tokens:4000});
     const calls=complete.mock.calls.length;await orchestrateCampaignDmBeat(f.repo,'local-owner',run.runId,deps);expect(complete).toHaveBeenCalledTimes(calls);db.close();f.repo.close();
   });
 });

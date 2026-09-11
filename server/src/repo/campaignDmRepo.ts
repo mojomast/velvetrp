@@ -38,6 +38,9 @@ export const DM_WORLD_TIME_STEP_MINUTES = 30;
 const DM_WORLD_TIME_MAX_STEP_MINUTES = 60;
 /** Narration prompt ceiling, raised for continuity context; the 24k aggregate still reserves planning plus narration. */
 export const DM_NARRATION_PROMPT_MAX_TOKENS = 12_000;
+/** Completion headroom for reasoning models that emit hidden deliberation before a tool call. */
+export const DM_PLANNING_COMPLETION_MAX_TOKENS = 1024;
+export const DM_NARRATION_COMPLETION_MAX_TOKENS = 1536;
 /** Blockers that mean the table is deciding; the world may still pace and breathe rather than hard-block. */
 const PACING_BLOCKERS = new Set(["waiting-for-player-combat-action", "scene-resolution-requires-gm-binding-or-human-adjudication"]);
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
@@ -177,7 +180,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const request=db.prepare(phase==='planning'?'SELECT * FROM dm_provider_requests WHERE run_id=?':'SELECT * FROM dm_narration_dispatches WHERE run_id=?').get(id) as any;
     const budget=request?JSON.parse(request.request_json).budget:undefined;
     if(usage.total_tokens!==usage.prompt_tokens+usage.completion_tokens
-      ||usage.prompt_tokens>(request?.reserved_prompt_tokens??23744)||usage.completion_tokens>(request?.reserved_completion_tokens??256))return false;
+      ||usage.prompt_tokens>(request?.reserved_prompt_tokens??23744)||usage.completion_tokens>(request?.reserved_completion_tokens??DM_PLANNING_COMPLETION_MAX_TOKENS))return false;
     const previous=phase==='narration'?db.prepare("SELECT * FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id) as any:null;
     if(usage.total_tokens+(previous?.total_tokens??0)>(budget?.maxTotalTokens??24000))return false;
     return budget?.maxCostUsd==null||(usage.cost_usd!==null&&(!previous||previous.cost_usd!==null)&&usage.cost_usd+(previous?.cost_usd??0)<=budget.maxCostUsd);
@@ -738,8 +741,8 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return null;
       }
       const claimId=deps.ids.nextId(),context=JSON.parse(r.context_json),candidates=bindings.map(b=>b.candidate);
-       db.prepare("INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,23744,256)").run(id,claimId,
-         json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:256,durationMs:DM_PROVIDER_DEADLINE_MS}}),provider,model,
+       db.prepare(`INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,23744,${DM_PLANNING_COMPLETION_MAX_TOKENS})`).run(id,claimId,
+         json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:DM_PLANNING_COMPLETION_MAX_TOKENS,durationMs:DM_PROVIDER_DEADLINE_MS}}),provider,model,
          new Date(deps.clock.now().getTime()+DM_PROVIDER_DEADLINE_MS).toISOString());
        recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
        return {runId:id,claimId,context,candidates};
@@ -828,7 +831,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(id))return null;
       if(db.prepare("SELECT 1 FROM dm_planning_rounds WHERE run_id=? AND round=?").get(id,round))return null;
       if(!active(r)||now()>=r.expires_at){stop(r,"cancelled","authority-safety-or-mode-changed");return null;}
-      if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||promptTokens>23744||completionTokens<1||completionTokens>256)
+      if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||promptTokens>23744||completionTokens<1||completionTokens>DM_PLANNING_COMPLETION_MAX_TOKENS)
         throw new CampaignDmConflictError("planning round reservation invalid");
       const aggregate=planningAggregate(id),budget=aggregate.budget;
       if(aggregate.tokens+promptTokens+completionTokens>Math.min(24000,budget?.maxTotalTokens??24000))return null;
@@ -914,7 +917,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     }).immediate();},
     claimDmNarration(p,id,provider,model,request,promptTokens,completionTokens){guard();return db.transaction(()=>{
       const work=api.getDmNarrationWork(p,id);if(!work)return null;
-      if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||completionTokens<1||completionTokens>768
+      if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||completionTokens<1||completionTokens>DM_NARRATION_COMPLETION_MAX_TOKENS
         ||work.planning.tokens+promptTokens+completionTokens>Math.min(24000,work.planning.maxTotalTokens))throw new CampaignDmConflictError("narration budget exceeded");
        const claimId=deps.ids.nextId();
        db.prepare("INSERT INTO dm_narration_dispatches VALUES(?,?,?,?,?,?,?,?,'claimed',NULL,NULL,NULL)").run(id,claimId,provider,model,json(request),
