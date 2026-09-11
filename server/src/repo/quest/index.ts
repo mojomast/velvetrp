@@ -35,4 +35,7 @@ export {
   type QuestDomainRepository,
   type QuestMutationResult,
   type QuestCreateMutationResult,
+  type KnowledgeGatedQuestOfferInput,
+  type KnowledgeGatedQuestOfferResult,
+  type QuestOfferKnowledgeSource,
 } from "./questDomainRepo.js";

@@ -2,10 +2,11 @@
 
 Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
 co-presence propagation), P4.3 (trust-gated knowledge reads), P4.4 (Director
-narration knowledge channel), P4.5 (faction knowledge + gated reaction), and
-P4.6 (town gossip pool) are implemented and committed; later milestones are
-planned, not implemented. Researched against current `main` after Plan 3
-closeout. Design research and sources:
+narration knowledge channel), P4.5 (faction knowledge + gated reaction), P4.6
+(town gossip pool), and the quest half of P4.7 (knowledge-gated quest offers)
+are implemented and committed. P4.7's clue-source bridge is deliberately
+deferred with the blocker recorded below. Researched against current `main`
+after Plan 3 closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -174,6 +175,21 @@ Gate: existing reveal thresholds and visibility triggers preserved; quest
 offers are GM-authored and name their knowledge source; no automatic quest
 invention. Run story/quest tests and server typecheck.
 Commit: `feat(repo): gate clue disclosure and quest offers on knowledge`.
+
+Implemented (quest half): `createKnowledgeGatedQuestOffer` on the quest domain
+repository requires GM authority, verifies the named `agent_observations` row
+exists on the campaign's active timeline before any quest is written, and only
+then runs the existing quest-creation path unchanged. The knowledge source is
+persisted inside the quest `create` command's canonical request JSON, so the
+offer durably names its source; plain `createCampaignQuest` requests remain
+byte-identical, so existing idempotency digests and replays are preserved and no
+quest is ever auto-invented.
+Deferred (clue half): `story_clue_sources_v34.source_kind` is a closed CHECK
+(`node` | `plot-point`), so a first-class observation-backed clue source needs a
+table-rebuild migration threaded through `ensureCurrentSchema`'s upgrade
+machinery. That is out of scope for this milestone and is recorded here rather
+than shipped as a hollow read helper. Existing reveal thresholds, visibility
+triggers, and story projections are untouched by this milestone.
 
 ### P4.8: Evaluation program
 

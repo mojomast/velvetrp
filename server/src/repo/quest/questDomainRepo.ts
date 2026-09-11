@@ -51,9 +51,25 @@ export interface QuestCreateMutationResult extends QuestMutationResult {
   revision: number;
 }
 
+/** A persisted observation an authored quest offer is allowed to reference. */
+export interface QuestOfferKnowledgeSource {
+  agentKind: "npc" | "faction" | "companion" | "town";
+  agentId: string;
+  sourceCommandId: string;
+}
+export interface KnowledgeGatedQuestOfferInput {
+  offer: CreateCampaignQuestHttpRequest;
+  knowledgeSource: QuestOfferKnowledgeSource;
+}
+export interface KnowledgeGatedQuestOfferResult extends QuestCreateMutationResult {
+  knowledgeSource: QuestOfferKnowledgeSource;
+}
+
 export interface QuestDomainRepository {
   listCampaignQuests(principalId: string, campaignId: string): CampaignQuestSnapshot | null;
   createCampaignQuest(principalId: string, campaignId: string, input: CreateCampaignQuestHttpRequest): QuestCreateMutationResult;
+  /** Creates a GM-authored offer only when the referenced observation already exists. */
+  createKnowledgeGatedQuestOffer(principalId: string, campaignId: string, input: KnowledgeGatedQuestOfferInput): KnowledgeGatedQuestOfferResult;
   executeQuestCommand(principalId: string, questId: string, input: QuestCommandHttpRequest): QuestMutationResult;
   listAdventureQuestObjectiveCandidates(principalId: string, turnId: string): AdventureQuestObjectiveCandidate[];
   executeAdventureQuestObjectiveCandidate(principalId: string, input: { turnId: string; providerCallId: string; candidateId: string; digest: string }): QuestMutationResult;
@@ -320,14 +336,20 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
       questId:command.quest_id,objectiveId:request.objectiveId,questRevision:command.expected_revision};
   }
 
-  const repository: QuestDomainRepository = {
-    listCampaignQuests(principalId, campaignId) { context.guard(); return snapshot(principalId, campaignId); },
-    createCampaignQuest(principalId, campaignIdInput, raw) {
+  const createQuest = (principalId: string, campaignIdInput: string, raw: CreateCampaignQuestHttpRequest,
+    knowledgeSource?: QuestOfferKnowledgeSource): QuestCreateMutationResult => {
       context.guard();
       const campaignId = resourceIdSchema.parse(campaignIdInput), input = createCampaignQuestHttpRequestSchema.parse(raw);
       const member = membership(principalId, campaignId); if (!member || !isGm(member.role)) throw new QuestAuthorizationError("GM authority is required");
       return db.transaction(() => {
-        const requestValue = { type: "create", campaignId, ...input };
+        const requestValue = knowledgeSource ? { type: "create", campaignId, ...input, knowledgeSource } : { type: "create", campaignId, ...input };
+        if (knowledgeSource) {
+          const known = db.prepare(`SELECT 1 FROM agent_observations
+            WHERE campaign_id=? AND timeline_id=(SELECT active_timeline_id FROM campaigns WHERE id=?)
+              AND agent_kind=? AND agent_id=? AND source_command_id=? LIMIT 1`)
+            .get(campaignId, campaignId, knowledgeSource.agentKind, knowledgeSource.agentId, knowledgeSource.sourceCommandId);
+          if (!known) throw new QuestDomainUnavailableError("quest offer knowledge source is unavailable");
+        }
         assertAcyclic(input.quest.objectives); assertVisibilityDependencies(input.quest.objectives);
         if (!db.prepare("SELECT 1 FROM quest_storylines WHERE campaign_id=? AND id=?").get(campaignId, input.quest.storylineId))
           throw new QuestDomainUnavailableError("storyline is unavailable");
@@ -368,7 +390,16 @@ export function createQuestDomainRepository(db: Database, context: QuestDomainCo
         db.prepare("INSERT INTO quest_domain_receipts_v33 VALUES(?,?,?,?,?,?)").run(campaignId, mutation.commandId, mutation.after, canonical(result), digest(result), mutation.at);
         return result;
       }).immediate();
-    },
+  };
+  const createKnowledgeGatedQuestOffer = (principalId: string, campaignId: string,
+    input: KnowledgeGatedQuestOfferInput): KnowledgeGatedQuestOfferResult => ({
+    ...createQuest(principalId, campaignId, input.offer, input.knowledgeSource),
+    knowledgeSource: input.knowledgeSource,
+  });
+  const repository: QuestDomainRepository = {
+    listCampaignQuests(principalId, campaignId) { context.guard(); return snapshot(principalId, campaignId); },
+    createCampaignQuest: createQuest,
+    createKnowledgeGatedQuestOffer,
     executeQuestCommand(principalId, questIdInput, raw) {
       context.guard();
       const questId = resourceIdSchema.parse(questIdInput), input = questCommandHttpRequestSchema.parse(raw);

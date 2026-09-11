@@ -32,6 +32,7 @@ export {
   QuestAuthorizationError, QuestConflictError, QuestDomainUnavailableError, QuestStaleError,
    type AdventureQuestNarrationReceipt, type AdventureQuestObjectiveCandidate, type AdventureQuestPublicReceipt,
    type CampaignQuestSnapshot, type QuestMutationResult, type QuestCreateMutationResult,
+   type KnowledgeGatedQuestOfferInput, type KnowledgeGatedQuestOfferResult, type QuestOfferKnowledgeSource,
 } from "./quest/index.js";
 type Database = DatabaseDriver.Database;
 
