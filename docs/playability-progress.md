@@ -2,9 +2,9 @@
 
 ## Current checkpoint
 - Baseline commit: `a312fb7`
-- Active plan/milestone: Plan 4 complete (living knowledge); Plan 5 living Director in progress at P5.6 evaluation (P5.1-P5.5 implemented; P5.4 delivered under Plan 4)
-- Last accepted milestone and commit: Plan 4 P4.1-P4.9 through `7e2bcb8` (P5.4 = P4.4 `85d9d0d`); Plan 5 P5.2 grounded planning through `1ba06d9` `7e4774f` `8346e20`; P5.3 and P5.5 committed below
-- Next small assignment: Plan 5 P5.6 Director evaluation program, then P5.7 integrated report (budget amendment recorded and approved; live provider requests explicitly authorized for Director development)
+- Active plan/milestone: Plan 4 (living knowledge) and Plan 5 (living Director P5.1-P5.7) complete; playtesting-readiness hardening in progress
+- Last accepted milestone and commit: Plan 4 P4.1-P4.9 through `7e2bcb8` (P5.4 = P4.4 `85d9d0d`); Plan 5 P5.1-P5.7 through the commits recorded below
+- Next small assignment: top up the agentrouter account quota, then run the capped live playtest harness across more seeds and both engine modes; no deterministic work is outstanding
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none. `campaign-recall.test.ts` "upgrades the exact pre-recall schema" is a pre-existing failure on `a312fb7` (reproduces with the DM schema changes stashed); `tactical-map-generation.test.ts` also remains a pre-existing failure.
 - Live budget / audit path / quota state: the agentrouter account quota was exhausted during the P5.Play campaign (HTTP 403 `token quota is not enough`, remaining ~USD 0.0053), so further live runs need a top-up. This session spent roughly 1.7M tokens / ~USD 0.24 on grounding plus playtest runs, leaving the recorded shared envelope near USD 1.75; the exact split is conservative and some early failed-seeding playtests are not fully metered. Sanitized audits: `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`, `/tmp/opencode/director-live-*.json`, and `/tmp/opencode/playtest-*.json`. Plan 4, P5.1, P5.3, P5.5, P5.6, and all deterministic suites used zero provider calls.
@@ -52,6 +52,7 @@
 | P5.6 | accepted | `197be16` | dm-director-evaluation 5; server typecheck | dm-evaluation Director oracle + rubric; ledger | rubric judge layer is fixtures only, no live judge yet |
 | P5.Live | accepted | `b06945e` | provider-completion 56; DM generated/review/composition/run/narration/ambient-time 34; live 6/6 beats completed | plan-5 reliability note; ledger | reasoning control is unconditional; other providers must accept `reasoning_effort` |
 | P5.Play | accepted | this ledger | provider-completion 57; DM migration/review/narration/recovery/ambient/grounding/composition/run 109; live playtest 40/40 beats across 5 seeds, zero failures | plan-5 playtest-campaign note; ledger | live objective grading uses the repository projection; DB-reader independence unexplained in tsx scripts |
+| P5.7 | accepted | this ledger | campaign-dm-living 1; campaign-dm/memory/readiness 3; e2e typecheck; server/contracts typechecks | plan-5 P5.7 note; ai-dungeon-master; ROADMAP; ledger | live quality evidence capped and currently quota-limited; no authenticated multi-user browser coverage |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |

@@ -330,6 +330,19 @@ load/reload, map/conversation retained; before/after quality and cost recorded;
 optional capped live rubric with first attempts within the shared budget.
 Commit: `docs(director): record living-world director evidence`.
 
+Implemented: `e2e/tests/campaign-dm-living.spec.ts` drives the real client against
+an isolated in-process server and disposable SQLite with an injected
+deterministic provider. It proves an ordered `ambient-beat` + `advance-time`
+composition renders in the DM chronicle, the transition scene is accepted
+without a question, the narrator input is a transition carrying the present
+NPC's ledger knowledge, the database holds two ordered composition receipts and
+30 advanced minutes, and a reload reads state without spending a provider call.
+The existing DM, memory, and readiness browser specs still pass. `ai-dungeon-master.md`
+and `ROADMAP.md` were reconciled to the composition, transition, grounding,
+continuity, and completion-headroom behavior. Live quality evidence is the
+capped playtest campaign above; no browser path spends a paid call on load,
+inspection, focus, or reload.
+
 ## Deferred candidates
 
 - Enemy/faction tactical adaptation to party behavior (inherits Plan 4's
