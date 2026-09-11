@@ -64,6 +64,18 @@ describe("exact DM schema upgrade",()=>{
     ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(mode);
     expect(db.prepare('SELECT * FROM dm_mode_commands').all()).toEqual(commands);expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
   });
+  it('adds planning rounds to the exact composition predecessor without changing control',()=>{
+    const repo=createRepository(),campaign=repo.createCampaign('local-owner',{name:'Existing composition'});repo.close();
+    const filename=path.join(process.env.VELVET_DATA_DIR!,'velvet.sqlite'),db=new DatabaseDriver(filename);
+    const expected=objects(db);db.pragma('foreign_keys=OFF');
+    db.exec('DROP TABLE dm_planning_rounds');
+    db.pragma('foreign_keys=ON');const before=objects(db),control=db.prepare('SELECT * FROM dm_control').all();
+    expect(()=>upgradeCampaignDmSchema(db,before,expected,()=>{throw new Error('rollback');})).toThrow('rollback');
+    expect(objects(db)).toEqual(before);
+    ensureCurrentSchema(db,filename);expect(db.prepare('SELECT * FROM dm_control').all()).toEqual(control);
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE name='dm_planning_rounds'").get()).toEqual({name:'dm_planning_rounds'});
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);db.close();
+  });
   it.each([false,true])("preserves existing campaign and prior tactical-map chain (old map=%s)",(oldMap)=>{
     const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Preserved"});repo.close();
     const filename=path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),db=new DatabaseDriver(filename);

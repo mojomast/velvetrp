@@ -144,11 +144,28 @@ Own: read-tool registry (existing recall limits, quest objective read, public
 world/NPC read, recent outcomes for a thread), parallel read execution, one
 serial write, per-round cap and stop condition, provider request binding.
 
-Gate: reads are server-authorized and read-only; no free-form queries; recalled
-byte/hit limits preserved; mutations serialized with receipts; budget
+Gate: reads are server-authorized and read-only; no free-form queries;
+recalled byte/hit limits preserved; mutations serialized with receipts; budget
 amendment enforced; no provider call on inspection or page load. Run director
 orchestrator, recall, budget guard tests and typecheck.
 Commit: `feat(agent): ground director planning in bounded reads`.
+
+Implemented: `server/src/agent/dmReadTools.ts` exposes exactly four closed,
+strict read tools (`read_campaign_recall` with a topic enum, `read_quest_summary`,
+`read_public_world`, `read_present_npcs`) and a strict parser that rejects
+unknown tools, extra fields, bad topics, and any free-form text.
+`readDmPlanningGrounding` authorizes the caller, requires the run to be
+planning, runs read-only SQL/recall with byte bounds (summary <=6000 B; recall
+hits <=8 within `CAMPAIGN_RECALL_MAX_BYTES`; quests/world <=16; present NPCs
+<=12 using the exact `publicScene` public-cast predicate), and writes nothing.
+The orchestrator runs the amendment loop: round 0 keeps the durable dispatch
+path, reads execute in parallel via `Promise.all`, rounds 1-2 persist to the new
+immutable `dm_planning_rounds` table, and the third call is forced to
+`select_dm_beat`; total planning calls <=3 and narration stays 1. Aggregate
+planning tokens/cost across rounds are enforced against
+`min(24000, adventureTurnBudget.maxTotalTokens)` and the priced cap, and no
+ambiguous paid call is retried. Added an exact predecessor upgrade recognizing
+databases missing only `dm_planning_rounds`.
 
 ### P5.3: World time and ambient beats
 

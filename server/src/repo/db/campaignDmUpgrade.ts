@@ -14,6 +14,7 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
     || JSON.stringify(actual) === JSON.stringify(reviewPredecessor.filter(object => !object.name.startsWith("dm_narration_")));
   const upgradeNarration = JSON.stringify(actual) === JSON.stringify(expected.filter(object => !object.name.startsWith("dm_narration_")));
   const upgradeComposition = JSON.stringify(actual) === JSON.stringify(expected.filter(object => object.name !== "dm_composition_receipts"));
+  const upgradePlanningRounds = JSON.stringify(actual) === JSON.stringify(expected.filter(object => !object.name.startsWith("dm_planning_rounds")));
   const additions = expected.filter(object => object.name.startsWith("dm_") && !actual.some(old => old.name===object.name));
   const previous = expected.filter(object => !object.name.startsWith("dm_"));
   const mapNames = new Set(["tactical_map_contexts_v2", "tactical_map_contexts_v2_update", "tactical_map_contexts_v2_delete"]);
@@ -22,7 +23,7 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
       : object.name === "tactical_map_previews_v58" ? object.sql.replace("  actor_location_revision INTEGER,\n", "") : object.sql,
   }));
   const upgradeMap = JSON.stringify(actual) === JSON.stringify(oldMap);
-  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && JSON.stringify(actual) !== JSON.stringify(previous)) return false;
+  if (!upgradeReview && !upgradeNarration && !upgradeMap && !upgradeComposition && !upgradePlanningRounds && JSON.stringify(actual) !== JSON.stringify(previous)) return false;
   if (db.inTransaction) throw new Error("DM upgrade requires an independent transaction");
   const foreignKeys = db.pragma("foreign_keys", { simple: true });
   db.pragma("foreign_keys = OFF");
@@ -53,7 +54,7 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
       }
       for (const object of additions.filter(object => object.type === "table")) db.exec(object.sql);
       for (const object of additions.filter(object => object.type !== "table")) db.exec(object.sql);
-      if (!upgradeReview && !upgradeNarration && !upgradeComposition) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
+      if (!upgradeReview && !upgradeNarration && !upgradeComposition && !upgradePlanningRounds) db.prepare("INSERT INTO dm_control(campaign_id,mode,revision,delegator) SELECT id,'human',0,NULL FROM campaigns").run();
       validate();
     }).immediate();
     return true;

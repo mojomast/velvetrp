@@ -4,7 +4,7 @@
 - Baseline commit: `a312fb7`
 - Active plan/milestone: Plan 4 complete (living knowledge); Plan 5 living Director in progress at P5.1
 - Last accepted milestone and commit: Plan 4 P4.1-P4.9 through `7e2bcb8`; Plan 5 P5.1 ordered composition through the contracts commit `a312fb7` plus the repo commit recorded below
-- Next small assignment: P5.2 bounded read-only planning grounding (budget amendment recorded and approved; live provider requests explicitly authorized for Director development)
+- Next small assignment: run capped live Director grounding rounds for P5.2 evidence, then P5.3 world time and ambient beats (budget amendment recorded and approved; live provider requests explicitly authorized for Director development)
 - Uncommitted file owners: coordinator owns plan/protocol/docs index/ledger; excluded paths remain untouched
 - Blockers and decision required: none. `campaign-recall.test.ts` "upgrades the exact pre-recall schema" is a pre-existing failure on `a312fb7` (reproduces with the DM schema changes stashed); `tactical-map-generation.test.ts` also remains a pre-existing failure.
 - Live budget remaining / audit path / uncertain dispatch IDs: USD 1.99996208, 129 dispatches, 249,504 reserved/settled tokens, under 40 minutes; sanitized audit `/tmp/opencode/reviewed-routetok-live-1789009948-ledger.json`; no uncertain dispatch IDs. Plan 4 and P5.1 used zero provider calls.
@@ -45,6 +45,7 @@
 | P3.8 | accepted | `cc51436` + this ledger | context-inspection E2E 2; E2E typecheck; documentation drift 7; independent review remediation | exact persisted browser evidence, no paid call on inspect/reload; optional matched live comparison not run | USD 1.99996208; 129 calls; 249,504 tokens |
 | Plan 4 | accepted | `98705fe`..`7e2bcb8` | per-milestone focused tests plus server/contracts/scripts typechecks; knowledge evaluator attribution/privacy/negative/negation/disclosure all 1 | plan-4 evidence + README/ROADMAP reconciliation | clue-source bridge and first-class faction-reaction command deferred (closed CHECK migrations); no browser knowledge-read E2E |
 | P5.1 | accepted | `a312fb7` + this ledger | contracts 3; director run/composition/recovery/narration/generated/review/binding/knowledge 59; DM migration/readiness/fixture 10; server typecheck/build | plan-5 budget amendment + P5.1 note; ledger | full multi-candidate success awaits the P5.3 ambient/world-time domain or an explicit revision re-resolution design |
+| P5.2 | accepted | `941c3af` + this ledger | grounding/run/composition/recovery/migration/narration/generated/review/binding/knowledge 51; server typecheck/build | plan-5 P5.2 note; ledger | live grounding rounds next; mid-loop crash recovery not exercised (no paid retry by design) |
 | P2.F map | accepted | `5d65d98` | CampaignPlayPage 25; client typecheck; independent review accepted | map boundary fix committed | full shared live envelope unused |
 | P2.F Travel | accepted | `dc203ee` | App 91; client typecheck; independent review accepted | existing world service composition committed | full shared live envelope unused |
 | P2.F UI | accepted | `ffecbc5` | completion UI 20; client typecheck; independent review accepted | normal preparation control committed | full shared live envelope unused |

@@ -18,7 +18,8 @@ import type { AdventureCheckRepository } from "./adventureCheckRepo.js";
 import { boundAdventureQuestReceipts } from "./quest/adventureQuestBinding.js";
 import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.js";
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
-import type { CampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
+import { CAMPAIGN_RECALL_MAX_BYTES, type CampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
+import type { DmReadToolRequest, DmReadToolTopic } from "../agent/dmReadTools.js";
 import { recordContextInspectionProvenance, type ContextInspectionProvenanceMode } from "./campaign/campaignContextInspectionProvenanceWrite.js";
 import { NPC_DISCLOSURE_TRUST_THRESHOLD } from "./observations/agentObservationReadRepo.js";
 
@@ -56,6 +57,11 @@ export interface CampaignDmRepository {
   bindDmProviderRequest(principal: string, runId: string, claimId: string, request: unknown, promptTokens: number, completionTokens: number): boolean;
   settleDmPlanning(principal: string, runId: string, claimId: string,
     selection: CampaignDmSelection | CampaignDmSelection[] | null,
+    usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean): void;
+  readDmPlanningGrounding(principal: string, runId: string, request: DmReadToolRequest): { tool: string; summary: string; data: unknown };
+  claimDmPlanningRound(principal: string, runId: string, round: 1 | 2, provider: string, model: string, request: unknown,
+    promptTokens: number, completionTokens: number): { claimId: string } | null;
+  settleDmPlanningRound(principal: string, runId: string, claimId: string, response: unknown,
     usage: { promptTokens: number; completionTokens: number } | null, failed?: boolean): void;
   executeDmBeat(principal: string, runId: string): CampaignDmRun;
   decideDmBeat(principal: string, campaignId: string, sessionId: string, runId: string, input: CampaignDmDecisionRequest): CampaignDmRun;
@@ -166,6 +172,90 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const previous=phase==='narration'?db.prepare("SELECT * FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id) as any:null;
     if(usage.total_tokens+(previous?.total_tokens??0)>(budget?.maxTotalTokens??24000))return false;
     return budget?.maxCostUsd==null||(usage.cost_usd!==null&&(!previous||previous.cost_usd!==null)&&usage.cost_usd+(previous?.cost_usd??0)<=budget.maxCostUsd);
+  }
+  const boundedSummary = (value: string): string => {
+    let text = value;
+    while (Buffer.byteLength(text, "utf8") > 6000) text = text.slice(0, Math.max(0, text.length - 256));
+    return text;
+  };
+  const requestBudget = (value: string | null | undefined): any => {
+    try { return JSON.parse(value ?? "{}").budget; } catch { return undefined; }
+  };
+  const roundTokens = (row: any) => row.prompt_tokens !== null && row.completion_tokens !== null
+    ? row.prompt_tokens + row.completion_tokens : row.reserved_prompt_tokens + row.reserved_completion_tokens;
+  const roundCost = (row: any): number | null => row.cost_usd ?? (requestBudget(row.request_json)?.costUsd ?? null);
+  /** Aggregate round-0 usage plus every stored planning round; excludes one claim when settling it. */
+  const planningAggregate = (id: string, excludeClaim?: string) => {
+    const usage = db.prepare("SELECT * FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id) as any;
+    const request = db.prepare("SELECT reserved_prompt_tokens,reserved_completion_tokens,request_json FROM dm_provider_requests WHERE run_id=?").get(id) as any;
+    const budget = request ? requestBudget(request.request_json) : undefined;
+    const reservedTokens = request ? request.reserved_prompt_tokens + request.reserved_completion_tokens : 0;
+    const reservedCost = request ? (budget?.costUsd ?? null) : null;
+    // Known actual usage is charged as-is; an unknown or in-flight round charges its full reservation.
+    let tokens = usage?.total_tokens ?? reservedTokens;
+    let cost: number | null = usage ? (usage.cost_usd ?? null) : reservedCost;
+    for (const row of db.prepare("SELECT * FROM dm_planning_rounds WHERE run_id=? ORDER BY round").all(id) as any[]) {
+      if (excludeClaim && row.claim_id === excludeClaim) continue;
+      tokens += roundTokens(row);
+      const value = roundCost(row);
+      if (value === null) cost = null; else if (cost !== null) cost += value;
+    }
+    return { tokens, cost, budget };
+  };
+  /** A server-fixed query per closed recall topic; model text never enters this string. */
+  const recallTopicQuery = (r: RunRow, topic: DmReadToolTopic): string => {
+    if (topic === "recent-outcomes") return "recent committed outcomes";
+    if (topic === "public-locations") return (db.prepare(`SELECT DISTINCT location.public_name name FROM campaign_actor_locations_v28 current
+      JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
+      WHERE current.campaign_id=? AND current.session_id=? AND location.visibility='public'
+      ORDER BY location.public_name LIMIT 12`).all(r.campaign_id, r.session_id) as { name: string }[]).map(row => row.name).join(" ");
+    if (topic === "present-cast") return (db.prepare(`SELECT npc.public_name name FROM campaign_npc_presence_v43 presence JOIN campaign_npcs_v28 npc USING(campaign_id,npc_id)
+      WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+        AND NOT EXISTS(SELECT 1 FROM campaign_generation_accepted_artifacts_v52 hidden WHERE hidden.campaign_id=npc.campaign_id
+          AND hidden.server_resource_id=npc.npc_id AND hidden.visibility='gm')
+        AND (presence.location_id IS NULL OR EXISTS(SELECT 1 FROM campaign_actor_locations_v28 current
+          JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
+          WHERE current.campaign_id=presence.campaign_id AND current.session_id=presence.session_id
+            AND current.location_id=presence.location_id AND location.visibility='public'))
+      ORDER BY npc.npc_id LIMIT 12`).all(r.campaign_id, r.session_id) as { name: string }[]).map(row => row.name).join(" ");
+    const context = JSON.parse(r.context_json) as { context?: { visibleWorld?: unknown } } | null;
+    const visible = Array.isArray(context?.context?.visibleWorld) ? context!.context!.visibleWorld.filter((value): value is string => typeof value === "string") : [];
+    const titles = (db.prepare(`SELECT node.title FROM story_nodes_v34 node JOIN story_node_state_v34 state USING(campaign_id,storyline_id,node_id)
+      WHERE node.campaign_id=? AND state.status='revealed' AND ${publicStorySourceSql("node","node_id")}
+      ORDER BY state.updated_at DESC,node.node_id LIMIT 8`).all(r.campaign_id) as { title: string }[]).map(row => row.title);
+    return [...titles, ...visible].join(" ").slice(0, 512);
+  };
+  const boundRecall = (hits: { sourceKind: string; text: string }[], incomplete: boolean, query: string) => {
+    const payload: { query: string; hits: { sourceKind: string; text: string }[]; incomplete: boolean } = { query, hits: [], incomplete };
+    for (const hit of hits.slice(0, 8)) {
+      const entry = { sourceKind: hit.sourceKind, text: hit.text.slice(0, 2048) };
+      payload.hits.push(entry);
+      while (Buffer.byteLength(json(payload), "utf8") > CAMPAIGN_RECALL_MAX_BYTES && entry.text.length) {
+        entry.text = entry.text.slice(0, Math.max(0, entry.text.length - 128));
+      }
+      if (Buffer.byteLength(json(payload), "utf8") > CAMPAIGN_RECALL_MAX_BYTES) payload.hits.pop();
+    }
+    return payload;
+  };
+  const decisionSelection = (response: unknown): CampaignDmSelection[] | null | undefined => {
+    if (response === null || typeof response !== "object" || Array.isArray(response) || !("selection" in response)) return undefined;
+    const selection = (response as { selection?: unknown }).selection;
+    return selection === null || selection === undefined ? null : campaignDmCompositionSchema.parse(selection);
+  };
+  /** Run-level planning settlement shared by grounded rounds; round 0 keeps its own dispatch path. */
+  function finalizePlanning(r: RunRow, normalized: CampaignDmSelection[] | null): void {
+    if (r.state !== "planning") return;
+    if (!active(r)) { stop(r, "cancelled", "authority-safety-or-mode-changed"); return; }
+    if (snapshot(r.gm_principal_id, r.campaign_id, r.session_id, JSON.parse(r.request_json)).freshness !== r.freshness_digest) {
+      stop(r, "blocked", "proposal-stale-request-new-beat"); return;
+    }
+    if (normalized) {
+      const bindings = JSON.parse(r.candidates_json) as Binding[];
+      if (!normalized.every(selection => bindings.some(b => b.candidate.candidateId === selection.candidateId && b.candidate.digest === selection.digest)))
+        throw new CampaignDmConflictError("unadvertised candidate");
+    }
+    if (!normalized) { queueNarration(r, holdNarration(r)); db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(r.run_id); return; }
+    db.prepare("UPDATE dm_runs SET state='awaiting-approval',proposal_json=?,revision=revision+1 WHERE run_id=?").run(json(normalized), r.run_id);
   }
   function publicScene(r: RunRow) {
     // Explicit public columns only. Never load a DM snapshot or an artifact's full JSON here.
@@ -624,6 +714,104 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(!normalized){queueNarration(r,holdNarration(r));db.prepare("UPDATE dm_runs SET revision=revision+1 WHERE run_id=?").run(id);return;}
       db.prepare("UPDATE dm_runs SET state='awaiting-approval',proposal_json=?,revision=revision+1 WHERE run_id=?").run(json(normalized),id);
     }).immediate();},
+    readDmPlanningGrounding(p,id,request){guard();return db.transaction(()=>{
+      const r=row(id);triggerAuthority(p,r);
+      if(r.state!=="planning")throw new CampaignDmUnavailableError();
+      if(request.tool==="read_campaign_recall"){
+        const query=recallTopicQuery(r,request.topic);
+        const recall=services.getCampaignRecall(r.gm_principal_id,{campaignId:r.campaign_id,sessionId:r.session_id,
+          audience:{kind:"dm"},purpose:"dm-planning",query});
+        if(!recall)throw new CampaignDmConflictError("planning recall authority unavailable");
+        const data=boundRecall(recall.hits.map(hit=>({sourceKind:hit.sourceKind,text:typeof hit.text==="string"?hit.text:""})),recall.incomplete,recall.query);
+        return {tool:request.tool,summary:boundedSummary(`Campaign recall (${request.topic}): ${data.hits.length} hit(s).${recall.incomplete?" More history exists.":""}`),data};
+      }
+      if(request.tool==="read_quest_summary"){
+        const rows=db.prepare(`SELECT quest.title title,objective.description description,objective.target_progress target,COALESCE(progress.progress,0) progress
+          FROM quest_definitions_v33 definition JOIN quests quest ON quest.campaign_id=definition.campaign_id AND quest.id=definition.quest_id
+          JOIN quest_objectives_v33 objective ON objective.campaign_id=definition.campaign_id AND objective.quest_id=definition.quest_id
+          LEFT JOIN quest_objective_progress_v33 progress ON progress.campaign_id=objective.campaign_id AND progress.quest_id=objective.quest_id AND progress.objective_id=objective.objective_id
+          WHERE definition.campaign_id=? AND definition.visibility='public' AND objective.visibility='public'
+          ORDER BY quest.sort_order,quest.id,objective.sort_order,objective.objective_id LIMIT 16`).all(r.campaign_id) as { title:string;description:string;target:number;progress:number }[];
+        const data=rows.map(row=>({title:row.title.slice(0,300),description:row.description.slice(0,1000),progress:row.progress,target:row.target}));
+        return {tool:request.tool,summary:boundedSummary(`Public quest objectives: ${data.length} row(s).`),data};
+      }
+      if(request.tool==="read_public_world"){
+        const locations=db.prepare(`SELECT location_id locationId,public_name name,public_description description FROM campaign_locations_v28
+          WHERE campaign_id=? AND visibility='public' ORDER BY public_name LIMIT 16`).all(r.campaign_id) as { locationId:string;name:string;description:string }[];
+        const connections=db.prepare(`SELECT connection_id connectionId,from_location_id fromLocationId,to_location_id toLocationId,route_state routeState
+          FROM campaign_location_connections_v28 WHERE campaign_id=? AND visibility='public' ORDER BY connection_id LIMIT 16`).all(r.campaign_id) as { connectionId:string;fromLocationId:string;toLocationId:string;routeState:string }[];
+        const data={locations:locations.map(row=>({locationId:row.locationId,name:row.name.slice(0,200),description:(row.description??"").slice(0,1000)})),
+          connections:connections.map(row=>({connectionId:row.connectionId,fromLocationId:row.fromLocationId,toLocationId:row.toLocationId,routeState:row.routeState}))};
+        return {tool:request.tool,summary:boundedSummary(`Public world: ${data.locations.length} location(s), ${data.connections.length} connection(s).`),data};
+      }
+      const npcs=db.prepare(`SELECT npc.npc_id npcId,npc.public_name name,json_extract(metadata.public_state_json,'$.description') description
+        FROM campaign_npc_presence_v43 presence JOIN campaign_npcs_v28 npc USING(campaign_id,npc_id)
+        LEFT JOIN campaign_npc_metadata_v32 metadata ON metadata.campaign_id=npc.campaign_id AND metadata.npc_id=npc.npc_id
+        WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+          AND NOT EXISTS(SELECT 1 FROM campaign_generation_accepted_artifacts_v52 hidden WHERE hidden.campaign_id=npc.campaign_id
+            AND hidden.server_resource_id=npc.npc_id AND hidden.visibility='gm')
+          AND (presence.location_id IS NULL OR EXISTS(SELECT 1 FROM campaign_actor_locations_v28 current
+            JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
+            WHERE current.campaign_id=presence.campaign_id AND current.session_id=presence.session_id
+              AND current.location_id=presence.location_id AND location.visibility='public'))
+        ORDER BY npc.npc_id LIMIT 12`).all(r.campaign_id,r.session_id) as { npcId:string;name:string;description:string|null }[];
+      const data=npcs.map(row=>({npcId:row.npcId,name:row.name.slice(0,200),description:row.description===null?null:row.description.slice(0,1000)}));
+      return {tool:request.tool,summary:boundedSummary(`Present public NPCs: ${data.length}.`),data};
+    }).deferred();},
+    claimDmPlanningRound(p,id,round,provider,model,request,promptTokens,completionTokens){guard();return db.transaction(()=>{
+      const r=row(id);triggerAuthority(p,r);
+      if(r.state!=="planning")return null;
+      if(db.prepare("SELECT 1 FROM dm_narration_jobs WHERE run_id=?").get(id))return null;
+      if(db.prepare("SELECT 1 FROM dm_planning_rounds WHERE run_id=? AND round=?").get(id,round))return null;
+      if(!active(r)||now()>=r.expires_at){stop(r,"cancelled","authority-safety-or-mode-changed");return null;}
+      if(!Number.isSafeInteger(promptTokens)||!Number.isSafeInteger(completionTokens)||promptTokens<1||promptTokens>23744||completionTokens<1||completionTokens>256)
+        throw new CampaignDmConflictError("planning round reservation invalid");
+      const aggregate=planningAggregate(id),budget=aggregate.budget;
+      if(aggregate.tokens+promptTokens+completionTokens>Math.min(24000,budget?.maxTotalTokens??24000))return null;
+      const reservedCost=budget?.costUsd;
+      if(budget?.maxCostUsd!=null&&(reservedCost==null||aggregate.cost==null||aggregate.cost+reservedCost>budget.maxCostUsd))return null;
+      const claimId=deps.ids.nextId();
+      db.prepare("INSERT INTO dm_planning_rounds(run_id,round,claim_id,status,request_json,response_json,reserved_prompt_tokens,reserved_completion_tokens,prompt_tokens,completion_tokens,cost_usd,deadline_at) VALUES(?,?,?,'claimed',?,NULL,?,?,NULL,NULL,NULL,?)")
+        .run(id,round,claimId,json(request),promptTokens,completionTokens,new Date(deps.clock.now().getTime()+30_000).toISOString());
+      recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
+      return {claimId};
+    }).immediate();},
+    settleDmPlanningRound(p,id,claimId,response,usage,failed=false){guard();db.transaction(()=>{
+      const r=row(id);triggerAuthority(p,r);
+      const responseJson=json(response);
+      if(responseJson.length>64000)throw new CampaignDmConflictError("planning round response exceeds bound");
+      const roundRow=db.prepare("SELECT * FROM dm_planning_rounds WHERE run_id=? AND claim_id=?").get(id,claimId) as any;
+      if(roundRow){
+        if(roundRow.status!=="claimed"){
+          if(roundRow.status==="settled"&&roundRow.response_json!==responseJson)throw new CampaignDmConflictError("planning round settlement replay changed");
+          return;
+        }
+        const budget=requestBudget(roundRow.request_json),pricing=budget?.pricing;
+        const cost=usage&&pricing?.promptPerMillion!=null&&pricing?.completionPerMillion!=null
+          ?(usage.promptTokens*pricing.promptPerMillion+usage.completionTokens*pricing.completionPerMillion)/1_000_000:null;
+        if(usage&&(![usage.promptTokens,usage.completionTokens].every(value=>Number.isSafeInteger(value)&&value>=0)
+          ||usage.promptTokens>roundRow.reserved_prompt_tokens||usage.completionTokens>roundRow.reserved_completion_tokens))failed=true;
+        const aggregate=planningAggregate(id,claimId);
+        if(usage&&aggregate.tokens+usage.promptTokens+usage.completionTokens>Math.min(24000,budget?.maxTotalTokens??24000))failed=true;
+        if(usage&&budget?.maxCostUsd!=null&&(cost==null||aggregate.cost==null||aggregate.cost+cost>budget.maxCostUsd))failed=true;
+        if(failed||now()>=roundRow.deadline_at){
+          db.prepare("UPDATE dm_planning_rounds SET status='unknown',prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
+            .run(usage?.promptTokens??null,usage?.completionTokens??null,cost,id,claimId);
+          stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;
+        }
+        db.prepare("UPDATE dm_planning_rounds SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=?,cost_usd=? WHERE run_id=? AND claim_id=?")
+          .run(responseJson,usage?.promptTokens??null,usage?.completionTokens??null,cost,id,claimId);
+        const normalized=decisionSelection(response);
+        if(normalized!==undefined)finalizePlanning(r,normalized);
+        return;
+      }
+      const dispatch=db.prepare("SELECT * FROM dm_dispatches WHERE run_id=? AND claim_id=?").get(id,claimId) as any;
+      if(!dispatch)throw new CampaignDmConflictError("planning round unavailable");
+      if(dispatch.status!=="claimed")return;
+      if(usage&&!recordedUsageAllowed(id,'planning'))failed=true;
+      if(failed||now()>=dispatch.deadline_at){db.prepare("UPDATE dm_dispatches SET status='unknown',prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(usage?.promptTokens??null,usage?.completionTokens??null,id);stop(r,"unknown","provider-outcome-unknown-no-automatic-retry");return;}
+      db.prepare("UPDATE dm_dispatches SET status='settled',response_json=?,prompt_tokens=?,completion_tokens=? WHERE run_id=?").run(responseJson,usage?.promptTokens??null,usage?.completionTokens??null,id);
+    }).immediate();},
     executeDmBeat(p,id){guard();const r=row(id);triggerAuthority(p,r);
       try{execute(r);}catch{stop(row(id),"blocked","domain-preconditions-changed-request-new-beat");}
       return project(row(id));},
@@ -655,9 +843,10 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       const reservation=db.prepare("SELECT reserved_prompt_tokens,reserved_completion_tokens,request_json FROM dm_provider_requests WHERE run_id=?").get(id) as any;
       const budget=reservation?JSON.parse(reservation.request_json).budget:undefined;
       const actual=db.prepare("SELECT * FROM dm_review_provider_usage WHERE run_id=? AND phase='planning'").get(id) as any;
+      const rounds=db.prepare("SELECT COUNT(*) n,COUNT(cost_usd) priced,COALESCE(SUM(cost_usd),0) cost,COALESCE(SUM(CASE WHEN prompt_tokens IS NOT NULL AND completion_tokens IS NOT NULL THEN prompt_tokens+completion_tokens ELSE reserved_prompt_tokens+reserved_completion_tokens END),0) tokens FROM dm_planning_rounds WHERE run_id=?").get(id) as { n:number;priced:number;cost:number;tokens:number };
       return {context:JSON.parse(job.public_context_json),fallback:job.fallback,planning:{
-        tokens:Math.max(reservation?reservation.reserved_prompt_tokens+reservation.reserved_completion_tokens:0,actual?.total_tokens??0),
-        costUsd:reservation&&budget?.costUsd==null?null:Math.max(budget?.costUsd??0,actual?.cost_usd??0),maxTotalTokens:budget?.maxTotalTokens??24000,maxCostUsd:budget?.maxCostUsd??null}};
+        tokens:Math.max(reservation?reservation.reserved_prompt_tokens+reservation.reserved_completion_tokens:0,actual?.total_tokens??0)+rounds.tokens,
+        costUsd:(reservation&&budget?.costUsd==null)||rounds.n>rounds.priced?null:Math.max(budget?.costUsd??0,actual?.cost_usd??0)+rounds.cost,maxTotalTokens:budget?.maxTotalTokens??24000,maxCostUsd:budget?.maxCostUsd??null}};
     }).immediate();},
     claimDmNarration(p,id,provider,model,request,promptTokens,completionTokens){guard();return db.transaction(()=>{
       const work=api.getDmNarrationWork(p,id);if(!work)return null;

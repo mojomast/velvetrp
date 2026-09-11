@@ -258,3 +258,28 @@ CREATE TRIGGER dm_review_membership_demoted AFTER UPDATE OF role ON campaign_mem
     WHERE campaign_id=OLD.campaign_id AND gm_principal_id=OLD.principal_id AND state IN ('planning','awaiting-approval');
   UPDATE dm_control SET mode='human',revision=revision+1,delegator=NULL WHERE campaign_id=OLD.campaign_id AND delegator=OLD.principal_id;
 END;
+CREATE TABLE dm_planning_rounds (
+  run_id TEXT NOT NULL REFERENCES dm_runs(run_id) ON DELETE RESTRICT,
+  round INTEGER NOT NULL CHECK(round BETWEEN 1 AND 2),
+  claim_id TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL CHECK(status IN ('claimed','settled','unknown')),
+  request_json TEXT CHECK(request_json IS NULL OR (json_valid(request_json) AND length(request_json)<=64000)),
+  response_json TEXT CHECK(response_json IS NULL OR json_valid(response_json)),
+  reserved_prompt_tokens INTEGER NOT NULL CHECK(reserved_prompt_tokens BETWEEN 1 AND 23744),
+  reserved_completion_tokens INTEGER NOT NULL CHECK(reserved_completion_tokens BETWEEN 1 AND 256),
+  prompt_tokens INTEGER,
+  completion_tokens INTEGER,
+  cost_usd REAL,
+  deadline_at TEXT NOT NULL,
+  PRIMARY KEY(run_id,round)
+);
+CREATE TRIGGER dm_planning_rounds_update BEFORE UPDATE ON dm_planning_rounds WHEN
+  OLD.status<>'claimed' OR NEW.status='claimed'
+  OR NEW.run_id<>OLD.run_id OR NEW.round<>OLD.round OR NEW.claim_id<>OLD.claim_id
+  OR NEW.reserved_prompt_tokens<>OLD.reserved_prompt_tokens OR NEW.reserved_completion_tokens<>OLD.reserved_completion_tokens
+  OR NEW.request_json IS NOT OLD.request_json OR NEW.deadline_at<>OLD.deadline_at
+BEGIN SELECT RAISE(ABORT,'DM planning round identity and outcome are immutable'); END;
+CREATE TRIGGER dm_planning_rounds_delete BEFORE DELETE ON dm_planning_rounds BEGIN SELECT RAISE(ABORT,'DM planning rounds are durable'); END;
+CREATE TRIGGER dm_planning_rounds_replace BEFORE INSERT ON dm_planning_rounds WHEN EXISTS(
+  SELECT 1 FROM dm_planning_rounds WHERE (run_id=NEW.run_id AND round=NEW.round) OR claim_id=NEW.claim_id)
+BEGIN SELECT RAISE(ABORT,'DM planning rounds cannot be replaced'); END;
