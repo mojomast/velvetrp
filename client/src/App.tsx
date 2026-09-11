@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import {
   ApiError, Character, CharacterSpec, ChatMessage, FeatureFlags, HarnessSettings, ProviderSettings, SessionContextBasket, UsageSummary,
   Session, SiblingsResponse, StreamHandle, activateMessage, branchMessage, continueSession,
-  applyCampaignImport, claimCombatReward, commandActorEconomy, commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession,
+  applyCampaignImport, castActorSpell, changeActorResource, claimCombatReward, commandActorCheck, commandActorEconomy, commandActorEffect,
+  commandActorInventory, commandActorPower, commandActorRest, commandCombatConsumable, commandFactionReputation, commandNpcRelationship, commandQuest, commandStoryline, confirmAdventureTurn, createCampaignFaction, createCampaignNpc, createCampaignQuest, createCampaignRecap, createCampaignStoryline, createCharacter, createCharacterDraft, deleteCharacter, deleteSession, dryRunCampaignImport, exportCharacter, finalizeCharacterDraft, getActorEffects, getActorInventory, getActorPowers, getActorResources, getActorWallet, getAdventureTurn, getCampaignAdministration, getCampaignCommandReceipt, getCampaignContent, getCampaignContentPack, getCampaignDetail, getCampaignExport, getCampaignPlayBootstrap, getCampaignShop, getCampaignStory, getCampaignWorld, getCharacterDraft, getCharacterSheet, getCombatCommandResult, getCombatConsumableActions, getCombatConsumableResult, getCombatLog, getCombatState, getContentPackPublication, getFeatures, getHarness, getProvider, getRpgFeatures, getSession, grantCharacterXp,
    getSessionContext, getSiblings, getUsage, getAdventureTurnTranscript, getCampaignDiceHistory, rollCampaignDice, importCharacter, listCharacters, listSessions, openSoloSession, sendMessage, startSession, stopSession, getDirectCombatPowerActions, commandDirectCombatPower, getDirectCombatPowerResult, getCampaignContextInspectionReferences, getCampaignContextInspection,
   endCombat, generateTacticalMap, getTacticalMap, listAllContentPackPublications, listCampaignCheckpoints, listCampaignEncounters, listCampaignEvents, listCampaignFactions, listCampaignNpcs, listCampaignQuests, listCampaignRecaps, listCampaignTimelines, listCombatRewards, moveTacticalMapToken, previewTacticalMapMove, projectFactionsForPlayers, projectNpcsForPlayers, projectQuestsForPlayers, projectStoryForPlayers, publishContentPack, reconcileInitialAdventureTurn, rerollCharacterDraft, resolveCombatAction, startEncounter, streamAdventureTurn, streamMessage, streamRoomContinuation, streamRoomMessage, streamSwipe, swipeMessage, travelActor, updateCharacter, updateCharacterDraft, updateHarness, updateProvider, updateSessionContext, validateContentPackDraft,
 } from "./api";
@@ -67,10 +68,16 @@ const rpgCharacterSheetApi: RpgCharacterSheetApi = {
   getInventory: getActorInventory,
   getWallet: getActorWallet,
   getEffects: getActorEffects,
+  getPowers: getActorPowers,
   getShop: getCampaignShop,
   inventoryCommand: commandActorInventory,
   economyCommand: commandActorEconomy,
   rest: commandActorRest,
+  checkCommand: commandActorCheck,
+  powerCommand: commandActorPower,
+  spellCommand: castActorSpell,
+  effectCommand: commandActorEffect,
+  resourceCommand: changeActorResource,
   getCampaignContent,
   getCampaignPack: getCampaignContentPack,
 };
@@ -83,7 +90,7 @@ const combatTrackerApi: CombatTrackerApi = {
   listRewards:listCombatRewards,claimReward:claimCombatReward,getRewardClaimResult:getCombatRewardClaimResult,getWallet:getActorWallet,startEncounter,endCombat,
 };
 const worldExplorerApi:WorldExplorerApi={getWorld:getCampaignWorld,travel:travelActor};
-const atlasAdvancementApi: AtlasAdvancementApi = { listCharacters: listCampaignCharacters, getProgression: getCharacterProgression, preview: previewCharacterProgression, apply: applyCharacterProgression, getSheet: getCharacterSheet };
+const atlasAdvancementApi: AtlasAdvancementApi = { listCharacters: listCampaignCharacters, getProgression: getCharacterProgression, preview: previewCharacterProgression, apply: applyCharacterProgression, getSheet: getCharacterSheet, grantXp: grantCharacterXp };
 const castStudioApi:CastStudioApi={listNpcs:listCampaignNpcs,listFactions:listCampaignFactions,createNpc:createCampaignNpc,relationship:commandNpcRelationship,createFaction:createCampaignFaction,reputation:commandFactionReputation,previewNpcs:projectNpcsForPlayers,previewFactions:projectFactionsForPlayers};
 const questJournalApi:QuestJournalApi={list:listCampaignQuests,create:createCampaignQuest,command:commandQuest,preview:projectQuestsForPlayers};
 const storyStudioApi:StoryStudioApi={get:getCampaignStory,create:createCampaignStoryline,command:commandStoryline,preview:projectStoryForPlayers};

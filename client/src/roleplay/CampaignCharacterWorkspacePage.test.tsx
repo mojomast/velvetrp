@@ -184,16 +184,20 @@ describe("RpgCharacterSheetPage", () => {
     return {
       getSheet: vi.fn(async () => sheet as any),
       getResources: vi.fn(async () => resources), getInventory: vi.fn(async () => inventory), getWallet: vi.fn(async () => wallet), getEffects: vi.fn(async () => effects),
+      getPowers: vi.fn(async () => ({ known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 4 })),
       getShop: vi.fn(async () => ({ shop: { name: "Known" }, stock: [], currencies: [] })),
       inventoryCommand: vi.fn(async (_campaign, _actor, command) => ({ inventory: { ...inventory, revision: 5 }, receipt: { ...command, revisionBefore: 4, revisionAfter: 5, occurredAt: at } } as any)),
       economyCommand: vi.fn(async () => { throw new Error("unused"); }), rest: vi.fn(async () => { throw new Error("unused"); }),
+      checkCommand: vi.fn(async () => { throw new Error("unused"); }), powerCommand: vi.fn(async () => { throw new Error("unused"); }),
+      spellCommand: vi.fn(async () => { throw new Error("unused"); }), effectCommand: vi.fn(async () => { throw new Error("unused"); }),
+      resourceCommand: vi.fn(async () => { throw new Error("unused"); }),
       getCampaignContent: vi.fn(async () => { throw new Error("catalog unavailable"); }), getCampaignPack: vi.fn(async () => { throw new Error("unused"); }),
       ...overrides,
     };
   }
 
   it("focuses the heading, composes server values, and structurally omits unavailable actor lanes", async () => {
-    const api = actorApi({ getResources: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getInventory: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getWallet: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getEffects: vi.fn(async () => { throw new ApiError(404, "hidden"); }) });
+    const api = actorApi({ getResources: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getInventory: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getWallet: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getEffects: vi.fn(async () => { throw new ApiError(404, "hidden"); }), getPowers: vi.fn(async () => { throw new ApiError(404, "hidden"); }) });
     localStorage.setItem(actorStorage, "actor");
     render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} focusHeadingRequest={9} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: response.character.name });
@@ -212,6 +216,7 @@ describe("RpgCharacterSheetPage", () => {
       getInventory: vi.fn().mockResolvedValueOnce(inventory).mockImplementation(unavailable),
       getWallet: vi.fn().mockResolvedValueOnce(wallet).mockImplementation(unavailable),
       getEffects: vi.fn().mockResolvedValueOnce(effects).mockImplementation(unavailable),
+      getPowers: vi.fn().mockResolvedValueOnce({ known: [], prepared: [], slots: [], uses: [], legalNow: [], legalCommands: [], revision: 4 }).mockImplementation(unavailable),
     });
     render(<RpgCharacterSheetPage campaignId="campaign" campaignCharacterId="character" api={api} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Inventory" });

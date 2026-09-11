@@ -263,6 +263,8 @@ import {
   actorPowerCommandRequestSchema,
   actorPowerCommandResponseSchema,
   actorPowersResponseSchema,
+  castSpellCommandRequestSchema,
+  castSpellCommandResponseSchema,
   actorResourcesHttpChangeCommandRequestSchema,
   actorResourcesHttpChangeCommandResponseSchema,
   actorResourcesHttpGetResponseSchema,
@@ -283,6 +285,8 @@ import type {
   ActorPowerCommandRequest,
   ActorPowerCommandResponse,
   ActorPowersResponse,
+  CastSpellCommandRequest,
+  CastSpellCommandResponse,
   ActorResourcesHttpChangeCommandRequest,
   ActorResourcesHttpChangeCommandResponse,
   ActorResourcesHttpGetResponse,
@@ -1733,6 +1737,26 @@ export async function commandActorPower(actorId: string, input: ActorPowerComman
     || response.receipt.revisionBefore !== body.expectedRevision
     || response.receipt.revisionAfter !== body.expectedRevision + 1) {
     throw new Error("Actor power response did not match the request");
+  }
+  return response;
+}
+
+/** Casts one exact spell through the dedicated lane and binds its receipt; no automatic retry. */
+export async function castActorSpell(actorId: string, input: CastSpellCommandRequest): Promise<CastSpellCommandResponse> {
+  const validActorId = parseApiInput(() => resourceIdSchema.parse(actorId));
+  const body = parseApiInput(() => castSpellCommandRequestSchema.parse(input));
+  const success = await requestResponse<unknown>(`/rpg/v1/actors/${encodeURIComponent(validActorId)}/spell-commands`, { method: "POST", cache: "no-store", body: JSON.stringify(body) });
+  requireStatus(success, 200, "Actor spell command");
+  const response = castSpellCommandResponseSchema.parse(success.body);
+  const targetsMatch = JSON.stringify(response.resolution.targetIds) === JSON.stringify(body.targetIds)
+    || (body.targetIds.length === 0 && response.resolution.targetIds.length === 1 && response.resolution.targetIds[0] === validActorId);
+  if (response.actorStates[0]?.actorId !== validActorId
+    || JSON.stringify(response.resolution.powerRef) !== JSON.stringify(body.powerRef)
+    || !targetsMatch
+    || response.receipt.idempotencyKey !== body.idempotencyKey
+    || response.receipt.revisionBefore !== body.expectedRevision
+    || response.receipt.revisionAfter !== body.expectedRevision + 1) {
+    throw new Error("Actor spell response did not match the request");
   }
   return response;
 }
