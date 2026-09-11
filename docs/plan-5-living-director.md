@@ -1,9 +1,11 @@
 # Plan 5: A living-world Director
 
-Status: in progress. P5.1 ordered composition, P5.2 bounded read grounding, P5.3
-world time and ambient beats, and P5.5 continuity and cast dialogue are
-implemented; P5.4 was delivered under Plan 4 (P4.4); P5.6-P5.7 are planned, not
-implemented. Researched against current `main` after
+Status: complete. P5.1 ordered composition, P5.2 bounded read grounding, P5.3
+world time and ambient beats, P5.5 continuity and cast dialogue, P5.6 the
+Director evaluation program, and P5.7 the integrated report and browser/E2E
+evidence are implemented; P5.4 was delivered under Plan 4 (P4.4). Live evidence
+and the remaining quota blocker are recorded in the P5.2/P5.7 notes and the
+playability ledger. Researched against current `main` after
 Plan 3 closeout; depends on Plan 4 for NPC knowledge, which is now delivered.
 Follow [the shared execution protocol](playability-execution.md). Small-context
 subagents with exact ownership; milestone commits must remain buildable.
@@ -326,6 +328,17 @@ Gate: deterministic pass rates predeclared; frozen corpus digest; authority
 strings byte-identical; no live gate required. Run DM evaluation suite and
 server typecheck.
 Commit: `feat(eval): measure director orchestration quality`.
+
+Implemented: `server/test/evals/dm-director-evaluation.test.ts` asserts the legal
+exact action set per state with a candidate-choice oracle, commits an ordered
+transition composition with exact receipt fidelity, proves GM-only story text
+never reaches a public surface while the authority string stays byte-identical,
+freezes the rubric digest, and requires every rubric dimension to pass at
+baseline with a discriminating fail anchor. The frozen corpus lives at
+`server/test/fixtures/dm-evals/director-rubric.v1.json` (digest
+`7044aeb5e6fd11a0010f97a4bc1ad77fc32653f7407559b15c894a8b8af2c274`).
+`campaign-dm-ambient-time.test.ts` additionally locks the transition-pacing
+oracle while a revealed scene waits on the table. No live gate is required.
 
 ### P5.7: Integrated report
 
