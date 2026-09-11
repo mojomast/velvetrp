@@ -18,6 +18,7 @@
     "run:reviewed-adventure": "tsx scripts/run-reviewed-adventure.ts",
     "evaluate:campaign-memory": "tsx scripts/evaluate-campaign-memory.ts",
     "evaluate:agent-knowledge": "tsx scripts/evaluate-agent-knowledge.ts",
+    "evaluate:director-live": "tsx scripts/evaluate-live-director-grounding.ts",
     "test:hydration-cli": "tsx --test scripts/test/*.test.ts",
     "typecheck:hydration-cli": "tsc --noEmit -p scripts/tsconfig.json",
     "test:planning-board": "node --test planning-board/test/*.test.js",

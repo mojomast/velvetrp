@@ -167,6 +167,21 @@ planning tokens/cost across rounds are enforced against
 ambiguous paid call is retried. Added an exact predecessor upgrade recognizing
 databases missing only `dm_planning_rounds`.
 
+Live evidence (owner-authorized): two capped runs through the RouteTok proxy
+(`projects/agentrouterrouter`, the already-authorized endpoint
+`http://100.72.41.9:8787/v1`) using AgentRouter `deepseek-v4-flash` issued real
+grounding reads in both runs — `read_campaign_recall`, `read_present_npcs`, and
+`read_quest_summary`. The runner is `scripts/evaluate-live-director-grounding.ts`
+(3 beats / 15 calls / 60k tokens / USD 0.05 hard sub-cap, sanitized audit; key
+read at runtime, never printed). Combined spend: 8 dispatched
+planning/narration calls, 38,596 tokens, ~USD 0.0043 at conservative pricing.
+The reasoning model plus proxy latency frequently exceeded the 30s per-call DM
+deadline, so beats ended `unknown`
+(`provider-outcome-unknown-no-automatic-retry`) rather than completing; that is
+the intended no-retry fence, no ambiguous call was retried, and no beat forced
+an ending. Raising the DM deadline is out of scope here and remains a recorded
+limitation.
+
 ### P5.3: World time and ambient beats
 
 Own: receipt-recorded world time (deterministic advancement command), ambient
