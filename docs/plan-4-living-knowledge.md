@@ -3,10 +3,11 @@
 Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
 co-presence propagation), P4.3 (trust-gated knowledge reads), P4.4 (Director
 narration knowledge channel), P4.5 (faction knowledge + gated reaction), P4.6
-(town gossip pool), and the quest half of P4.7 (knowledge-gated quest offers)
-are implemented and committed. P4.7's clue-source bridge is deliberately
-deferred with the blocker recorded below. Researched against current `main`
-after Plan 3 closeout. Design research and sources:
+(town gossip pool), the quest half of P4.7 (knowledge-gated quest offers), and
+P4.8 (knowledge evaluation program) are implemented and committed. P4.7's
+clue-source bridge is deliberately deferred with the blocker recorded below.
+Researched against current `main` after Plan 3 closeout. Design research and
+sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -199,6 +200,23 @@ Own: corpus/holdouts extension, evaluator additions (`attributionPrecision`,
 Gate: privacyPassRate = 1; negativePassRate = 1; frozen holdout digest pinned;
 authority invariants byte-identical. Run evaluator tests, scripts typecheck.
 Commit: `feat(eval): measure NPC knowledge attribution and privacy`.
+
+Implemented as a separate deterministic program rather than extending
+`evaluate-campaign-memory.ts`, so recall metrics stay byte-stable:
+`scripts/evaluate-agent-knowledge.ts` plus frozen fixtures under
+`server/test/fixtures/knowledge-evals/`. It seeds one provider-free campaign and
+exercises the real propagation write paths (witness, co-presence `told`,
+faction derivation, town gossip sampling) and the trust-gated read repo, then
+scores `attributionPrecision`, `privacyPassRate`, `negativePassRate`,
+`negationTermPass`, `disclosurePassRate`, and an authority-ranking invariant
+(`verified` before `rumor` for the same source), with corpus/holdout/policy and
+authority digests. `scripts/test/evaluate-agent-knowledge.test.ts` pins the
+holdout digest and authority digest and asserts every rate is `1`. Measured:
+development and holdouts both `1.0` across all rates; holdout digest
+`e649d9161a9ac551da9f5aaa6de44cca8d5909ef5d268ebe1b274a4cbee28844`; authority
+digest `c400ac7f44744e3deb8be7b94d72eac8b137c6baf27f93ed5885b4d58fa06ad8`.
+Layer-2 belief projection is still not claimed; the evaluator measures ledger
+attribution, disclosure classification, negation retrieval, and privacy.
 
 ### P4.9: Integrated report
 
