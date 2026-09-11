@@ -1,6 +1,6 @@
-import type { CombatEndCommandResponse, CombatReadResponse, EncounterCreateRequest, EncounterPublic, EncounterSetupCandidatesResponse } from "@velvet/contracts";
+import type { CombatEndCommandResponse, CombatReadResponse, EncounterCreateRequest, EncounterPublic, EncounterSetupCandidatesResponse, GenerationDraftGetResponse } from "@velvet/contracts";
 import { useEffect, useRef, useState } from "react";
-import { createCampaignEncounter, getEncounterSetupCandidates } from "../../../api";
+import { applyEncounterGenerationDraft, createCampaignEncounter, createEncounterGenerationDraft, getEncounterSetupCandidates } from "../../../api";
 import { createClientId } from "../../../utils/clientId";
 
 export interface EncounterLifecycleApi {
@@ -35,6 +35,15 @@ export function EncounterLifecyclePanel({ campaignId, api, onCombatReady, onRewa
   const [name, setName] = useState("New encounter");
   const [pending, setPending] = useState<Pending | null>(() => readPending(campaignId));
   const [status, setStatus] = useState("");
+  const [brief, setBrief] = useState("");
+  const [visibleLocation, setVisibleLocation] = useState("");
+  const [tone, setTone] = useState("");
+  const [difficulty, setDifficulty] = useState<"easy" | "standard" | "hard">("standard");
+  const [exclusions, setExclusions] = useState("");
+  const [pinnedEnemies, setPinnedEnemies] = useState<string[]>([]);
+  const [draft, setDraft] = useState<GenerationDraftGetResponse | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState("");
   const mounted = useRef(true);
   const refresh = async (explicit = false) => {
     try {
@@ -94,12 +103,40 @@ export function EncounterLifecyclePanel({ campaignId, api, onCombatReady, onRewa
       begin(lock); setStatus("Completion submitted once. It will not be replayed automatically.");
       const result = await api.endCombat(encounter.combatId, { expectedRevision: combat.revision, idempotencyKey: commandId() }); if (!mounted.current) return;
       writePending(campaignId, null); setPending(null); setStatus("Encounter completed. Reward bundles are ready for explicit settlement."); onRewards(result); void refresh();
-    } catch { if (mounted.current) setStatus("Completion outcome is unresolved. Refresh authoritative encounter state; no POST will be replayed."); }
+    }     catch { if (mounted.current) setStatus("Completion outcome is unresolved. Refresh authoritative encounter state; no POST will be replayed."); }
+  }
+  async function generateDraft() {
+    if (generating || !candidates || !selectedSessionId || selectedActorIds.length === 0 || pinnedEnemies.length === 0
+      || !brief.trim() || !visibleLocation.trim() || !tone.trim()) return;
+    const pinned = pinnedEnemies.flatMap((key) => { const found = candidates.enemies.find((enemy) => enemyKey(enemy) === key); return found ? [found.template] : []; });
+    setGenerating(true); setDraft(null); setGenerationStatus("Generating one reviewed draft. It is not replayed automatically.");
+    try {
+      const response = await createEncounterGenerationDraft({
+        campaignId, sessionId: selectedSessionId, brief: brief.trim(), visibleLocation: visibleLocation.trim(), tone: tone.trim(), difficulty,
+        partyActorIds: selectedActorIds, pinnedEnemyTemplates: pinned,
+        exclusions: exclusions.split(",").map((value) => value.trim()).filter((value) => value.length > 0),
+        idempotencyKey: commandId(),
+      });
+      if (!mounted.current) return;
+      setDraft(response); setGenerationStatus("Draft staged for review. Applying it commits one encounter at the named session.");
+    } catch { if (mounted.current) setGenerationStatus("Draft generation outcome is unknown. Refresh authoritative state; no retry was made."); }
+    finally { if (mounted.current) setGenerating(false); }
+  }
+  async function applyDraft() {
+    if (generating || !draft) return;
+    setGenerating(true); setGenerationStatus("Applying the exact reviewed draft once. It is not replayed automatically.");
+    try {
+      const result = await applyEncounterGenerationDraft(draft.draft.draftId, { expectedRevision: draft.draft.revision, idempotencyKey: commandId() });
+      if (!mounted.current) return;
+      setDraft(null); setGenerationStatus(`Encounter applied at ${result.application.encounterId}.`); void refresh();
+    } catch { if (mounted.current) setGenerationStatus("Apply outcome is unknown. Refresh authoritative state; no retry was made."); }
+    finally { if (mounted.current) setGenerating(false); }
   }
   return <section className="combat-panel encounter-lifecycle" aria-labelledby="encounter-lifecycle-heading">
     <div className="combat-panel-heading"><h2 id="encounter-lifecycle-heading">Encounter lifecycle</h2><button type="button" className="ghost" onClick={() => void refresh(true)}>Refresh encounters</button></div>
     <p className="combat-authority-note">Choose only server-authorized sessions, actors, and pinned enemy templates. Teams are fixed by the candidate projection.</p>
     {candidates && <form className="encounter-setup" onSubmit={(event) => { event.preventDefault(); void create(); }}><h3>Prepare encounter</h3>{candidates.sessions.length === 0 || candidates.actors.length === 0 || candidates.enemies.length === 0 ? <p className="combat-empty">No safe encounter setup candidates are available.</p> : <><label>Name<input value={name} onChange={(event) => setName(event.target.value)} maxLength={200} /></label><label>Session<select value={selectedSessionId} onChange={(event) => setSelectedSessionId(event.target.value)}>{candidates.sessions.map((session) => <option key={session.sessionId} value={session.sessionId}>{session.sessionId}</option>)}</select></label><fieldset><legend>Allies</legend>{candidates.actors.map((actor) => <label key={actor.actorId}><input type="checkbox" checked={selectedActorIds.includes(actor.actorId)} onChange={() => setSelectedActorIds((current) => current.includes(actor.actorId) ? current.filter((id) => id !== actor.actorId) : [...current, actor.actorId])} />{actor.label}</label>)}</fieldset><label>Enemy template<select value={selectedEnemy} onChange={(event) => setSelectedEnemy(event.target.value)}>{candidates.enemies.map((enemy) => <option key={enemyKey(enemy)} value={enemyKey(enemy)}>{enemy.label}</option>)}</select></label><button type="submit" disabled={Boolean(pending) || selectedActorIds.length === 0}>Create preparing encounter</button></>}</form>}
+{candidates && candidates.enemies.length > 0 && <section className="encounter-generation" aria-labelledby="encounter-generation-heading"><h3 id="encounter-generation-heading">Generate an encounter draft</h3><p className="field-help">Generation stages strict, reviewable content at the selected session and party. Applying is the only step that commits an encounter; neither step is retried automatically.</p><form className="encounter-generation-form" onSubmit={(event) => { event.preventDefault(); void generateDraft(); }}><label>Brief<textarea required value={brief} maxLength={2000} onChange={(event) => setBrief(event.target.value)} /></label><label>Visible location<input required value={visibleLocation} maxLength={500} onChange={(event) => setVisibleLocation(event.target.value)} /></label><label>Tone<input required value={tone} maxLength={200} onChange={(event) => setTone(event.target.value)} /></label><label>Difficulty<select value={difficulty} onChange={(event) => setDifficulty(event.target.value as typeof difficulty)}><option value="easy">Easy</option><option value="standard">Standard</option><option value="hard">Hard</option></select></label><label>Exclusions (comma separated)<input value={exclusions} maxLength={2000} onChange={(event) => setExclusions(event.target.value)} /></label><fieldset><legend>Pinned enemy templates</legend>{candidates.enemies.map((enemy) => <label className="checkbox" key={enemyKey(enemy)}><input type="checkbox" checked={pinnedEnemies.includes(enemyKey(enemy))} onChange={() => setPinnedEnemies((current) => current.includes(enemyKey(enemy)) ? current.filter((key) => key !== enemyKey(enemy)) : [...current, enemyKey(enemy)])} />{enemy.label}</label>)}</fieldset><button type="submit" disabled={generating || !selectedSessionId || selectedActorIds.length === 0 || pinnedEnemies.length === 0 || !brief.trim() || !visibleLocation.trim() || !tone.trim()}>Generate reviewed draft</button></form>{draft && <div className="encounter-generation-review"><h4>Review draft {draft.draft.draftId} · revision {draft.draft.revision}</h4><dl className="command-detail-list"><div><dt>Name</dt><dd>{draft.encounter.name}</dd></div><div><dt>Enemies</dt><dd>{draft.encounter.enemyCount}</dd></div><div><dt>Terrain</dt><dd>{draft.encounter.terrain}</dd></div><div><dt>Motives</dt><dd>{draft.encounter.motives}</dd></div><div><dt>Reward narrative</dt><dd>{draft.encounter.rewardNarrative}</dd></div></dl>{draft.validationIssues.length > 0 && <ul className="combat-empty">{draft.validationIssues.map((issue, index) => <li key={index}>{issue.severity}: {issue.message}</li>)}</ul>}<div className="button-row"><button type="button" disabled={generating} onClick={() => void applyDraft()}>Apply exact draft</button><button type="button" className="ghost" onClick={() => setDraft(null)}>Discard review</button></div></div>}{generationStatus && <p className="combat-command-status" role="status">{generationStatus}</p>}</section>}
     {pending && <p className="combat-lock is-warning" role="alert">{pending.operation === "create" ? "Creation" : pending.operation === "start" ? "Start" : "Completion"} was issued once at {pending.startedAt}. <button type="button" className="ghost" onClick={() => void refresh(true)}>Reconcile from authoritative reads</button></p>}
     {status && <p className="combat-command-status" role="status">{status}</p>}
     {encounters.length === 0 ? <p className="combat-empty">No authorized encounters are available.</p> : <ul className="encounter-lifecycle-list">{encounters.map((encounter) => <li key={encounter.encounterId}><div><strong>{encounter.name}</strong><span>{encounter.status} · revision {encounter.revision}</span></div>{encounter.status === "preparing" ? <button type="button" disabled={Boolean(pending)} onClick={() => void start(encounter)}>Start encounter</button> : encounter.status === "active" && encounter.combatId ? <div className="button-row"><button type="button" className="ghost" onClick={() => onCombatReady(encounter.combatId!)}>Open combat</button><button type="button" disabled={Boolean(pending)} onClick={() => void complete(encounter)}>Complete encounter</button></div> : <span>Completed</span>}</li>)}</ul>}

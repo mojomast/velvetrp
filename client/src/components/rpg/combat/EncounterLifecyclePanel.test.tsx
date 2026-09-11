@@ -1,6 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { applyEncounterGenerationDraft, createEncounterGenerationDraft } from "../../../api";
 import { EncounterLifecyclePanel, type EncounterLifecycleApi } from "./EncounterLifecyclePanel";
+
+vi.mock("../../../api", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../api")>(),
+  createEncounterGenerationDraft: vi.fn(),
+  applyEncounterGenerationDraft: vi.fn(),
+}));
 
 const at = "2030-01-01T00:00:00.000Z";
 const preparing = { encounterId: "encounter", sessionId: "session", name: "Bridge ambush", status: "preparing" as const, combatId: null, combatants: [], revision: 4, createdAt: at, updatedAt: at };
@@ -51,6 +58,23 @@ describe("EncounterLifecyclePanel", () => {
     expect(service.createEncounter).not.toHaveBeenCalled();
     expect(localStorage.getItem("velvet.encounter-lifecycle.v1:campaign")).not.toBeNull();
   });
+  it("generates a reviewed draft and applies only the exact reviewed revision", async () => {
+    const projection = { draftId: "draft-1", campaignId: "campaign", kind: "encounter" as const, state: "staged" as const, revision: 2, createdAt: at, updatedAt: at };
+    vi.mocked(createEncounterGenerationDraft).mockResolvedValue({ draft: projection, encounter: { name: "Bridge ambush", enemyCount: 2, terrain: "Fog", motives: "Hold the line", rewardNarrative: "Spoils" }, validationIssues: [] });
+    vi.mocked(applyEncounterGenerationDraft).mockResolvedValue({ draft: { ...projection, state: "applied" }, application: { scope: "encounter", campaignDomainMutated: true, encounterId: "encounter-new" }, receipts: [{ receiptId: "receipt", reviewDecisionId: "decision", scope: "encounter", encounterId: "encounter-new", appliedAt: at }] });
+    const service = api(); render(<EncounterLifecyclePanel campaignId="campaign" api={service} onCombatReady={vi.fn()} onRewards={vi.fn()} />);
+    fireEvent.click(await screen.findByLabelText("Aria"));
+    fireEvent.click(screen.getByLabelText("Wolf"));
+    fireEvent.change(screen.getByLabelText("Brief"), { target: { value: "Guard the bridge" } });
+    fireEvent.change(screen.getByLabelText("Visible location"), { target: { value: "Bridge" } });
+    fireEvent.change(screen.getByLabelText("Tone"), { target: { value: "tense" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate reviewed draft" }));
+    await screen.findByText(/Review draft draft-1/);
+    expect(createEncounterGenerationDraft).toHaveBeenCalledWith(expect.objectContaining({ campaignId: "campaign", sessionId: "session", partyActorIds: ["actor"], pinnedEnemyTemplates: [candidates.enemies[0].template], difficulty: "standard" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply exact draft" }));
+    await waitFor(() => expect(applyEncounterGenerationDraft).toHaveBeenCalledWith("draft-1", expect.objectContaining({ expectedRevision: 2 })));
+  });
+
   it("rejects a selection removed by the authoritative candidate refresh", async () => {
     const service = api({ getSetupCandidates: vi.fn().mockResolvedValueOnce(candidates).mockResolvedValue({ ...candidates, actors: [] }) }); render(<EncounterLifecyclePanel campaignId="campaign" api={service} onCombatReady={vi.fn()} onRewards={vi.fn()} />);
     fireEvent.click(await screen.findByLabelText("Aria"));
