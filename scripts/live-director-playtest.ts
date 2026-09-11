@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import DatabaseDriver from "better-sqlite3";
-import { completeWithProvider } from "../server/src/provider/index.js";
+import { completeWithProvider, ProviderHttpError } from "../server/src/provider/index.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../server/src/defaults.js";
 import type { ProviderSettings } from "../server/src/types.js";
 import { closeRepo } from "../server/src/repo/index.js";
@@ -36,7 +36,7 @@ export interface PlaytestArtifact {
   seed: number;
   engineMode: "ai" | "human";
   model: string;
-  beats: Array<{ index: number; intent: string; state: string; receipts: string[]; narration: boolean; transition: boolean; failures: string[] }>;
+  beats: Array<{ index: number; intent: string; state: string; receipts: string[]; narration: boolean; transition: boolean; blockers: string[]; narrationTail: string; failures: string[] }>;
   failures: string[];
   providerCalls: Array<{ phase: string; ok: boolean; finishReason: string; detail: string; tools: string[]; completionTokens: number; totalTokens: number; costUsd: number }>;
   readToolsUsed: string[];
@@ -118,6 +118,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     const f = await dmFixture(false, { dataDir: directory });
     seedWorld(f, options.seed);
     const providerCalls: PlaytestArtifact["providerCalls"] = [];
+    let providerQuotaHit = false;
     const deps: AdventureAgentDependencies = {
       complete: async (input) => {
         try {
@@ -130,6 +131,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
               ? (usage.promptTokens * price.promptPerMillion + usage.completionTokens * price.completionPerMillion) / 1_000_000 : 0 });
           return result;
         } catch (error) {
+          if (error instanceof ProviderHttpError && (error.status === 401 || error.status === 402 || error.status === 403)) providerQuotaHit = true;
           providerCalls.push({ phase: input.promptVersion ?? "unknown", ok: false, finishReason: (error as Error).name, detail: (error as Error).message.slice(0, 140),
             tools: [], completionTokens: 0, totalTokens: 0, costUsd: 0 });
           throw error;
@@ -140,6 +142,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     const beats: PlaytestArtifact["beats"] = [];
     const failures: string[] = [];
     let capHit: string | null = null;
+    let lastRunId = "";
     const initialControl = f.repo.getDmControl(OWNER, f.campaign.id);
     if (options.mode === "ai" && initialControl.mode !== "ai") {
       f.repo.setDmControl(OWNER, f.campaign.id, { mode: "ai", expectedRevision: initialControl.revision, idempotencyKey: `play-${options.seed}-ai` });
@@ -147,6 +150,7 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
     for (let index = 0; index < options.beats; index += 1) {
       const run = f.repo.openDmBeat(OWNER, f.campaign.id, f.session.id, { intent: index === 0 ? "open" : "continue",
         expectedModeRevision: f.repo.getDmControl(OWNER, f.campaign.id).revision, idempotencyKey: `play-${options.seed}-${index}` });
+      lastRunId = run.runId;
       await orchestrateCampaignDmBeat(f.repo, OWNER, run.runId, deps);
       if (options.mode === "human") {
         const proposal = f.repo.getDmProposal(OWNER, f.campaign.id, f.session.id, run.runId);
@@ -160,13 +164,22 @@ export async function runLiveDirectorPlaytest(options: PlaytestOptions) {
       const beatFailures = gradeRun(executed);
       const transition = executed.receipts.length > 0 && executed.receipts.every(receipt => PACING_ACTIONS.has(receipt.action));
       beats.push({ index, intent: run.intent, state: executed.state, receipts: executed.receipts.map(receipt => receipt.action),
-        narration: executed.narration !== null, transition, failures: beatFailures });
+        narration: executed.narration !== null, transition, blockers: executed.blockers,
+        narrationTail: (executed.narration ?? "").slice(-70), failures: beatFailures });
       failures.push(...beatFailures.map(failure => `beat${index}:${failure}`));
       const spent = providerCalls.reduce((sum, call) => sum + call.totalTokens, 0);
       const cost = providerCalls.reduce((sum, call) => sum + call.costUsd, 0);
+      if (providerQuotaHit) { capHit = "provider-quota"; failures.push("provider-quota"); break; }
       if (providerCalls.length >= options.maxCalls) { capHit = "max-calls"; break; }
       if (spent >= options.maxTokens) { capHit = "max-tokens"; break; }
       if (cost >= options.maxUsd) { capHit = "max-usd"; break; }
+    }
+    // Recovery and reads must never spend a provider call: re-orchestrating a completed run is a no-op.
+    if (lastRunId) {
+      const beforeReplay = providerCalls.length;
+      await orchestrateCampaignDmBeat(f.repo, OWNER, lastRunId, deps);
+      f.repo.getDmHistory(OWNER, f.campaign.id, f.session.id);
+      if (providerCalls.length !== beforeReplay) failures.push("replay-called-provider");
     }
     const totals = { calls: providerCalls.length, tokens: providerCalls.reduce((sum, call) => sum + call.totalTokens, 0),
       cost: providerCalls.reduce((sum, call) => sum + call.costUsd, 0) };

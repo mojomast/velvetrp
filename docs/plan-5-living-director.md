@@ -221,7 +221,13 @@ raised completion headroom (`DM_PLANNING_COMPLETION_MAX_TOKENS = 1024`,
 and graceful handling of a forced round that returns a grounding tool eliminated
 the remaining `unknown` beats. Evidence: 40/40 beats across five seeds and both
 engine modes completed with zero objective failures and all four grounding reads
-(~76k tokens and ~USD 0.008 per eight-beat run).
+(~76k tokens and ~USD 0.008 per eight-beat run). A pacing prompt tune (prefer an
+advertised transition beat when no mechanical candidate can advance) raised
+transition selection on stalled beats from about a quarter to about three
+quarters, and a recovery check proves re-orchestrating a completed run never
+spends a provider call. The campaign stopped when the agentrouter account quota
+was exhausted (HTTP 403 `token quota is not enough`); the harness now aborts with
+`provider-quota` rather than burning beats.
 
 ### P5.3: World time and ambient beats
 
