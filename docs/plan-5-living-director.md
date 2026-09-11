@@ -1,9 +1,10 @@
 # Plan 5: A living-world Director
 
-Status: planned, not implemented. Researched against current `main` after
-Plan 3 closeout; depends on Plan 4 for NPC knowledge. Follow [the shared
-execution protocol](playability-execution.md). Small-context subagents with
-exact ownership; milestone commits must remain buildable.
+Status: in progress. P5.1 ordered beat composition is underway; later
+milestones are planned, not implemented. Researched against current `main` after
+Plan 3 closeout; depends on Plan 4 for NPC knowledge, which is now delivered.
+Follow [the shared execution protocol](playability-execution.md). Small-context
+subagents with exact ownership; milestone commits must remain buildable.
 
 ## Outcome
 
@@ -98,8 +99,13 @@ gate, record it incomplete rather than forcing it.
 The current "two provider calls per beat" invariant becomes: planning may make
 up to three bounded provider calls including read-only grounding rounds;
 narration remains one call; no more than four per beat, all reserved inside the
-existing aggregate envelope, with an explicit stop condition. This amendment
-must be recorded and approved before P5.2 ships.
+existing aggregate envelope, with an explicit stop condition.
+
+Recorded and approved: the project owner explicitly authorized live provider
+requests for living-Director development, which approves this amendment. It
+still applies only inside the shared aggregate live envelope (USD, dispatch, and
+token caps), reads remain read-only, and no ambiguous paid call is retried
+automatically.
 
 ## Milestones
 

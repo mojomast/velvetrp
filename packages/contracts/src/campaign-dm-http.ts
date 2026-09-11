@@ -15,6 +15,10 @@ export const campaignDmBeatRequestSchema = z.object({
 export const campaignDmSelectionSchema = z.object({
   candidateId: resourceIdSchema, digest: z.string().regex(/^[0-9a-f]{64}$/),
 }).strict();
+/** Ordered beat composition. Candidates are exact and unique; order is the execution order. */
+export const campaignDmCompositionSchema = z.array(campaignDmSelectionSchema).min(1).max(3)
+  .refine(items => new Set(items.map(item => item.candidateId)).size === items.length, { message: "composition candidates must be unique" })
+  .refine(items => new Set(items.map(item => item.digest)).size === items.length, { message: "composition digests must be unique" });
 export const campaignDmDecisionRequestSchema = z.object({
   decision: z.enum(["approved", "rejected"]), expectedRevision: revisionSchema,
   idempotencyKey: idempotencyKeySchema,
@@ -40,13 +44,14 @@ export const campaignDmRunSchema = z.object({
   revision: revisionSchema,
   state: z.enum(["planning", "awaiting-approval", "completed", "blocked", "cancelled", "unknown"]),
   narration: z.string().max(8000).nullable(),
-  receipts: z.array(z.object({ action: campaignDmActionSchema, summary: z.string().max(4000) }).strict()).max(1),
+  receipts: z.array(z.object({ action: campaignDmActionSchema, summary: z.string().max(4000) }).strict()).max(3),
   blockers: z.array(z.string().max(200)).max(16),
   createdAt: utcIsoTimestampSchema,
 }).strict();
 // Only the GM endpoint returns this schema; player history never contains proposals.
 export const campaignDmPrivateRunSchema = z.object({
   run: campaignDmRunSchema, proposal: campaignDmCandidateSchema.nullable(),
+  composition: z.array(campaignDmCandidateSchema).max(3).default([]),
 }).strict();
 export const campaignDmHistorySchema = z.object({
   control: campaignDmControlSchema, runs: z.array(campaignDmRunSchema).max(50),
@@ -56,6 +61,7 @@ export type CampaignDmModeRequest = z.infer<typeof campaignDmModeRequestSchema>;
 export type CampaignDmBeatRequest = z.infer<typeof campaignDmBeatRequestSchema>;
 export type CampaignDmDecisionRequest = z.infer<typeof campaignDmDecisionRequestSchema>;
 export type CampaignDmSelection = z.infer<typeof campaignDmSelectionSchema>;
+export type CampaignDmComposition = z.infer<typeof campaignDmCompositionSchema>;
 export type CampaignDmCandidate = z.infer<typeof campaignDmCandidateSchema>;
 export type CampaignDmRun = z.infer<typeof campaignDmRunSchema>;
 export type CampaignDmHistory = z.infer<typeof campaignDmHistorySchema>;
