@@ -2,6 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createRepository } from "../src/repo/index.js";
+import { DM_PROVIDER_DEADLINE_MS } from "../src/repo/campaignDmRepo.js";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
 import { orchestrateAdventureTurn } from "../src/agent/adventureOrchestrator.js";
 import { dmCompletion, dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
@@ -61,7 +62,7 @@ describe("DM recovery and execution fences",()=>{
   it("marks expired dispatch unknown after restart and never accepts late success or automatically retries",async()=>{
     const f=await dmFixture();f.graph();const request={intent:"open" as const,expectedModeRevision:0,idempotencyKey:"open"};
     const run=f.repo.openDmBeat("local-owner",f.campaign.id,f.session.id,request),work=f.repo.claimDmPlanning("local-owner",run.runId,"fake","fake")!;
-    f.repo.close();f.advance(31_000);const repo=createRepository(f.options),complete=vi.fn(async input=>dmCompletion(input));
+    f.repo.close();f.advance(DM_PROVIDER_DEADLINE_MS+1_000);const repo=createRepository(f.options),complete=vi.fn(async input=>dmCompletion(input));
     await orchestrateCampaignDmBeat(repo,"local-owner",run.runId,dmDependencies(complete));
     expect(repo.getDmRun("local-owner",f.campaign.id,f.session.id,run.runId).state).toBe("unknown");
     repo.settleDmPlanning("local-owner",run.runId,work.claimId,{candidateId:work.candidates[0]!.candidateId,digest:work.candidates[0]!.digest},null);

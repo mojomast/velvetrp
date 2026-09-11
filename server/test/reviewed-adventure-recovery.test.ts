@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { orchestrateAdventureTurn, type AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
+import { DM_PROVIDER_DEADLINE_MS } from "../src/repo/campaignDmRepo.js";
 import { defaultHarnessSettings, defaultProviderSettings } from "../src/defaults.js";
 import { cleanupTmpDataDirs, makeTmpDataDir } from "./helpers.js";
 import { createReviewedAdventure, REVIEWED_ADVENTURE_PRIVATE_SENTINEL } from "./fixtures/reviewedAdventure.js";
@@ -202,7 +203,7 @@ describe("reviewed adventure interruption and recovery boundaries", () => {
       fixture.repo.setDmControl(owner, fixture.campaignId, { mode: "ai", expectedRevision: 0, idempotencyKey: "delegate" });
       const run = fixture.repo.openDmBeat(owner, fixture.campaignId, fixture.sessionId, { intent: "open", expectedModeRevision: 1, idempotencyKey: "unknown" });
       const claimed = fixture.repo.claimDmPlanning(owner, run.runId, "fake", "fake")!;
-      now += 31_000;
+      now += DM_PROVIDER_DEADLINE_MS + 1_000;
       let calls = 0; await orchestrateCampaignDmBeat(fixture.repo, owner, run.runId, deps(async () => { calls += 1; throw new Error("must not retry"); }, () => new Date(now)));
       expect(calls).toBe(0); expect(fixture.repo.getDmRun(owner, fixture.campaignId, fixture.sessionId, run.runId)).toMatchObject({ state: "unknown", receipts: [] });
       const late = claimed.candidates[0]!;

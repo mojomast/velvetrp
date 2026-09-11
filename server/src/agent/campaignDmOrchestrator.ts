@@ -2,7 +2,7 @@ import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJ
 import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import type { CampaignDmRepository, DmProviderUsage } from "../repo/campaignDmRepo.js";
+import { DM_PROVIDER_DEADLINE_MS, type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
@@ -116,7 +116,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
     let timer: ReturnType<typeof setTimeout> | undefined;
     let accounting: DmProviderUsage | null = null;
     try {
-      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("DM deadline")); }, 30_000); });
+      const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("DM deadline")); }, DM_PROVIDER_DEADLINE_MS); });
       const result = await Promise.race([deps.complete({ ...input, signal: controller.signal }), timeout]);
       accounting = usageRecord(result.usage, promptBound, completionLimit, price);
       if (round === 0) repository.recordDmProviderUsage(principal, runId, 'planning', accounting);
@@ -191,7 +191,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
             maxCostUsd:caps.length?Math.min(...caps):null}},promptBound,completionLimit);
       if(!claimId)return;
       const controller=new AbortController();
-      const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new Error("narration deadline"));},30000);});
+      const timeout=new Promise<never>((_,reject)=>{timer=setTimeout(()=>{controller.abort();reject(new Error("narration deadline"));},DM_PROVIDER_DEADLINE_MS);});
       const result=await Promise.race([deps.complete({...input,signal:controller.signal}),timeout]);
       accounting=usageRecord(result.usage,promptBound,completionLimit,price);
       repository.recordDmProviderUsage(principal,runId,'narration',accounting);

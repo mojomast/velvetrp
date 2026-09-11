@@ -175,12 +175,14 @@ grounding reads in both runs — `read_campaign_recall`, `read_present_npcs`, an
 (3 beats / 15 calls / 60k tokens / USD 0.05 hard sub-cap, sanitized audit; key
 read at runtime, never printed). Combined spend: 8 dispatched
 planning/narration calls, 38,596 tokens, ~USD 0.0043 at conservative pricing.
-The reasoning model plus proxy latency frequently exceeded the 30s per-call DM
-deadline, so beats ended `unknown`
+The reasoning model plus proxy latency exceeded the then-30s per-call DM
+deadline, so early beats ended `unknown`
 (`provider-outcome-unknown-no-automatic-retry`) rather than completing; that is
 the intended no-retry fence, no ambiguous call was retried, and no beat forced
-an ending. Raising the DM deadline is out of scope here and remains a recorded
-limitation.
+an ending. The planning and narration provider-call deadline is now
+`DM_PROVIDER_DEADLINE_MS = 120_000`, applied to both the in-process abort timer
+and the durable dispatch/round deadlines so they stay consistent; later live
+runs are expected to complete.
 
 ### P5.3: World time and ambient beats
 

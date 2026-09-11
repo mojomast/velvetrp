@@ -31,6 +31,8 @@ const privileged = (role: string | undefined) => role === "owner" || role === "g
 const MAX_KNOWLEDGE_NPCS = 4;
 const MAX_KNOWLEDGE_ENTRIES_PER_NPC = 4;
 const MAX_KNOWLEDGE_TEXT_LENGTH = 300;
+/** One bounded provider-call deadline for Director planning and narration. */
+export const DM_PROVIDER_DEADLINE_MS = 120_000;
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -675,8 +677,8 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       }
       const claimId=deps.ids.nextId(),context=JSON.parse(r.context_json),candidates=bindings.map(b=>b.candidate);
        db.prepare("INSERT INTO dm_dispatches VALUES(?,?,?,?,?,?,'claimed',NULL,23744,256)").run(id,claimId,
-         json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:256,durationMs:30000}}),provider,model,
-         new Date(deps.clock.now().getTime()+30_000).toISOString());
+         json({version:"campaign-dm-v1",context,candidates,budget:{providerCalls:1,maxPromptTokens:23744,maxCompletionTokens:256,durationMs:DM_PROVIDER_DEADLINE_MS}}),provider,model,
+         new Date(deps.clock.now().getTime()+DM_PROVIDER_DEADLINE_MS).toISOString());
        recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
        return {runId:id,claimId,context,candidates};
     }).immediate();},
@@ -772,7 +774,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       if(budget?.maxCostUsd!=null&&(reservedCost==null||aggregate.cost==null||aggregate.cost+reservedCost>budget.maxCostUsd))return null;
       const claimId=deps.ids.nextId();
       db.prepare("INSERT INTO dm_planning_rounds(run_id,round,claim_id,status,request_json,response_json,reserved_prompt_tokens,reserved_completion_tokens,prompt_tokens,completion_tokens,cost_usd,deadline_at) VALUES(?,?,?,'claimed',?,NULL,?,?,NULL,NULL,NULL,?)")
-        .run(id,round,claimId,json(request),promptTokens,completionTokens,new Date(deps.clock.now().getTime()+30_000).toISOString());
+        .run(id,round,claimId,json(request),promptTokens,completionTokens,new Date(deps.clock.now().getTime()+DM_PROVIDER_DEADLINE_MS).toISOString());
       recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-planning",recordedPhase:"planned",createdAt:now()},deps.contextInspectionProvenance);
       return {claimId};
     }).immediate();},
@@ -854,7 +856,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
         ||work.planning.tokens+promptTokens+completionTokens>Math.min(24000,work.planning.maxTotalTokens))throw new CampaignDmConflictError("narration budget exceeded");
        const claimId=deps.ids.nextId();
        db.prepare("INSERT INTO dm_narration_dispatches VALUES(?,?,?,?,?,?,?,?,'claimed',NULL,NULL,NULL)").run(id,claimId,provider,model,json(request),
-         new Date(deps.clock.now().getTime()+30_000).toISOString(),promptTokens,completionTokens);
+         new Date(deps.clock.now().getTime()+DM_PROVIDER_DEADLINE_MS).toISOString(),promptTokens,completionTokens);
        const r=row(id);recordContextInspectionProvenance(db,{dispatchId:claimId,campaignId:r.campaign_id,sessionId:r.session_id,lane:"director-narration",recordedPhase:"narrated",createdAt:now()},deps.contextInspectionProvenance);
        return claimId;
     }).immediate();},

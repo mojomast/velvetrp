@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { generatedCampaignContentProviderSchema } from "@velvet/contracts";
 import { createRepository } from "../src/repo/index.js";
+import { DM_PROVIDER_DEADLINE_MS } from "../src/repo/campaignDmRepo.js";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
 import { dmNarrationMessages, validDmScene, parseDmScene, dmNarrationTool } from "../src/agent/dmNarration.js";
 import type { ProviderCompletionResult } from "../src/provider/index.js";
@@ -100,7 +101,7 @@ describe('public AI DM narration',()=>{
     const claim=f.repo.claimDmNarration('local-owner',f.run.runId,'fake','fake',{messages:dmNarrationMessages(work.context,work.fallback)},100,100)!;
     expect(f.repo.claimDmNarration('local-owner',f.run.runId,'fake','fake',{},100,100)).toBeNull();
     if(phase==='settled')f.repo.settleDmNarration('local-owner',f.run.runId,claim,scene,'ok');
-    f.repo.close();f.advance(31_000);const repo=createRepository(f.options),complete=vi.fn(async()=>{throw new Error('must not call');});
+    f.repo.close();f.advance(DM_PROVIDER_DEADLINE_MS+1_000);const repo=createRepository(f.options),complete=vi.fn(async()=>{throw new Error('must not call');});
     await orchestrateCampaignDmBeat(repo,'local-owner',f.run.runId,dmDependencies(complete));expect(complete).not.toHaveBeenCalled();
     const result=repo.getDmRun('local-owner',f.campaign.id,f.session.id,f.run.runId);expect(result.state).toBe('completed');
     if(phase==='settled')expect(result.narration).toContain(scene);else expect(result.narration).toBe(result.receipts[0]!.summary);
