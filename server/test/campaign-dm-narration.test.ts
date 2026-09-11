@@ -61,7 +61,11 @@ describe('public AI DM narration',()=>{
       expect(prompt).toContain('Rain patters');expect(prompt).toContain('Patient lantern keeper');
       expect(prompt).toContain('stone gate');
       expect((db.prepare("SELECT status FROM story_node_state_v34 WHERE node_id='gate'").get() as any).status).toBe('revealed');
-      if(publicCalls===2){expect(prompt).not.toContain('Mara tilts her lantern');expect(JSON.parse(input.messages[1]!.content as string).publicScene.history).toContain('Scene revealed: The gate. A stone gate blocks the road.');}
+      if(publicCalls===2){const publicScene=JSON.parse(input.messages[1]!.content as string).publicScene;
+        expect(publicScene.history).toContain('Scene revealed: The gate. A stone gate blocks the road.');
+        // Prior prose now flows only through the labeled non-authoritative continuity channel, never canonical history.
+        expect(publicScene.priorScenes.join(' ')).toContain('Mara tilts her lantern');
+        expect(publicScene.history.join(' ')).not.toContain('Mara tilts her lantern');}
       return response();
     });
     const deps=dmDependencies(complete),harness=await deps.getHarness();deps.getHarness=async()=>({...harness,systemPrompt:'SECRET_HARNESS'});
@@ -142,6 +146,17 @@ describe('public AI DM narration',()=>{
   it('requires an actionable question and rejects player control and mechanical inventions',()=>{
     expect(validDmScene(scene)).toBe(true);
     for(const text of ['You decide to leave. What next?','You gain 50 gold. What next?','The scene is resolved. What next?','You feel afraid. What next?','Rain falls.'])expect(validDmScene(text)).toBe(false);
+  });
+  it('allows up to four lines including NPC-to-NPC exchange, but never an unadvertised or player speaker',()=>{
+    const context={cast:[{name:'Mara'},{name:'Joss'}],players:[{name:'Hero'}]};
+    const four={atmosphere:'The two keepers trade a glance in the lamplight.',dialogue:[
+      {speaker:'Mara',text:'Mind the step.'},{speaker:'Joss',text:'Aye, and the draft.'},
+      {speaker:'Mara',text:'Hold the lamp higher.'},{speaker:'Joss',text:'Right away.'}],question:'What do you do?'};
+    expect(parseDmScene(four,context)).toContain('Joss: "Right away."');
+    expect(parseDmScene({...four,dialogue:[...four.dialogue,{speaker:'Mara',text:'One more.'}]},context)).toBeNull();
+    expect(parseDmScene({...four,dialogue:[...four.dialogue.slice(0,3),{speaker:'Hero',text:'I will.'}]},context)).toBeNull();
+    expect(dmNarrationMessages({priorScenes:['Rain on the road.']},'fallback')[0]!.content)
+      .toContain('priorScenes holds earlier published atmospheric prose');
   });
   it('makes the question optional only for transition beats while keeping every other rejection',()=>{
     const transition={cast:[],players:[],transition:true},normal={cast:[],players:[]};

@@ -1,7 +1,8 @@
 # Plan 5: A living-world Director
 
-Status: in progress. P5.1 ordered composition, P5.2 bounded read grounding, and
-P5.3 world time and ambient beats are implemented; P5.4-P5.7 are planned, not
+Status: in progress. P5.1 ordered composition, P5.2 bounded read grounding, P5.3
+world time and ambient beats, and P5.5 continuity and cast dialogue are
+implemented; P5.4 was delivered under Plan 4 (P4.4); P5.6-P5.7 are planned, not
 implemented. Researched against current `main` after
 Plan 3 closeout; depends on Plan 4 for NPC knowledge, which is now delivered.
 Follow [the shared execution protocol](playability-execution.md). Small-context
@@ -107,6 +108,11 @@ requests for living-Director development, which approves this amendment. It
 still applies only inside the shared aggregate live envelope (USD, dispatch, and
 token caps), reads remain read-only, and no ambiguous paid call is retried
 automatically.
+
+P5.5 raises the per-narration prompt ceiling from 8,000 to 12,000 tokens
+(`DM_NARRATION_PROMPT_MAX_TOKENS`) so labeled continuity context fits; narration
+remains one call, and the 24,000-token aggregate still reserves planning plus
+narration together, so the shared envelope is unchanged.
 
 ## Milestones
 
@@ -238,6 +244,13 @@ P4.3/P4.4 gates pass. Run knowledge/attribution, DM narration tests and
 typechecks.
 Commit: `feat(agent): narrate with labeled NPC knowledge`.
 
+Delivered under Plan 4 as `85d9d0d`: the `npcKnowledge` channel in
+`publicScene` lists only present public NPCs that have ledger rows, trust-gates
+hearsay on an explicit relationship, and the narration prompt requires
+attribution. `campaign-dm-knowledge.test.ts` covers present labeling, absent
+exclusion, trust gating, bounds, and the attribution rule, so P5.4 needs no
+separate commit.
+
 ### P5.5: Continuity and richer cast dialogue
 
 Own: labeled non-authoritative prior-scene flavor in public context; up to four
@@ -249,6 +262,19 @@ speaker enum still constrained; mechanics/agency/ending rejection unchanged;
 scene does not reset location identity. Run narration contract, heuristic,
 prompt-injection tests and typechecks.
 Commit: `feat(agent): preserve scene continuity and cast dialogue`.
+
+Implemented: `publicScene` carries `priorScenes`, the last two published
+atmospheric prose tails under the same public-source guard as `history`, so a
+run that revealed non-public story text cannot leak through it. The narration
+contract now allows up to four dialogue lines, including NPC-to-NPC exchange,
+while `parseDmScene` still rejects any speaker outside the advertised present
+public cast and never accepts a player line. `validDmScene` is unchanged for
+mechanics/agency/ending rejection; continuity prose is labeled non-authoritative
+and never enters canonical `history` or receipts. The prompt pins the supplied
+place identity so a scene cannot relocate the party. Raising the continuity
+context required the narration prompt ceiling amendment above. Known
+limitation: prior prose influences mood and place only; it is not memory and
+cannot be cited as fact by an NPC.
 
 ### P5.6: Director evaluation program
 

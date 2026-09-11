@@ -36,6 +36,8 @@ export const DM_PROVIDER_DEADLINE_MS = 120_000;
 /** The server, never the model, fixes how far one transition beat may advance world time. */
 export const DM_WORLD_TIME_STEP_MINUTES = 30;
 const DM_WORLD_TIME_MAX_STEP_MINUTES = 60;
+/** Narration prompt ceiling, raised for continuity context; the 24k aggregate still reserves planning plus narration. */
+export const DM_NARRATION_PROMPT_MAX_TOKENS = 12_000;
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -315,6 +317,23 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       ORDER BY history.rowid DESC LIMIT 4`).all(r.campaign_id,r.session_id,r.timeline_id,r.run_id) as {narration:string|null}[])
       .filter((item):item is {narration:string}=>typeof item.narration==="string")
       .reverse().map(item=>item.narration.slice(0,2000));
+    // Prior published atmospheric prose, labeled non-authoritative, for continuity. The same public-source
+    // guard as history keeps any run that revealed non-public story text out of this channel.
+    const priorScenes = (db.prepare(`SELECT history.narration FROM dm_public_history history
+      JOIN dm_runs run USING(run_id) JOIN dm_receipts receipt USING(run_id)
+      WHERE run.campaign_id=? AND run.session_id=? AND run.timeline_id=? AND run.run_id<>?
+      AND NOT EXISTS(SELECT 1 FROM json_each(run.candidates_json) binding
+        JOIN json_each(CASE WHEN json_type(run.proposal_json)='array' THEN run.proposal_json ELSE json_array(run.proposal_json) END) selection
+          ON json_extract(selection.value,'$.candidateId')=json_extract(binding.value,'$.candidate.candidateId')
+        WHERE json_extract(binding.value,'$.candidate.action') IN ('reveal-node','resolve-node','reveal-clue')
+          AND NOT (${publicStoryResourceSql('run.campaign_id',"json_extract(binding.value,'$.target')")}))
+      ORDER BY history.rowid DESC LIMIT 2`).all(r.campaign_id,r.session_id,r.timeline_id,r.run_id) as {narration:string}[])
+      .map(item=>{
+        const marker=item.narration.indexOf(DM_SCENE_DESCRIPTION_PREFIX);
+        return marker<0?'':item.narration.slice(marker+DM_SCENE_DESCRIPTION_PREFIX.length).trim().slice(0,1500);
+      })
+      .filter(text=>text.length>0)
+      .reverse();
     const players=db.prepare(`SELECT DISTINCT persona.name FROM session_characters participant JOIN characters persona ON persona.id=participant.character_id
       JOIN campaign_characters character ON character.character_id=persona.id AND character.campaign_id=?
       JOIN campaign_actors actor ON actor.campaign_character_id=character.id AND actor.campaign_id=character.campaign_id
@@ -360,7 +379,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     // A beat that only advances recorded time or presents ambiance hands pacing back without requiring a question.
     const transition = receipts.length > 0
       && receipts.every((item: any) => item.action === "ambient-beat" || item.action === "advance-time");
-    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,npcKnowledge,
+    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,priorScenes,npcKnowledge,
       receipts,transition,safety };
   }
   const narrationGuard = (r:RunRow, context:unknown) => hash({context,

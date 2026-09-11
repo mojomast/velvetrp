@@ -2,7 +2,7 @@ import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJ
 import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import { DM_PROVIDER_DEADLINE_MS, type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
+import { DM_NARRATION_PROMPT_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS, type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
@@ -180,7 +180,7 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       (promptBound*price.promptPerMillion+completionLimit*price.completionPerMillion)/1_000_000;
     const caps=[provider.adventureTurnBudget.maxEstimatedCostUsd,work.planning.maxCostUsd].filter((cap):cap is number=>cap!==null);
     reserved=usageRecord(null,promptBound,completionLimit,price);
-    if(total>8000||total+work.planning.tokens>Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
+    if(total>DM_NARRATION_PROMPT_MAX_TOKENS||total+work.planning.tokens>Math.min(24000,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
       ||caps.some(cap=>cost===null||work.planning.costUsd===null||cost+work.planning.costUsd>cap)){
       repository.settleDmNarration(principal,runId,null,null,"aggregate-budget-exceeded");
     } else {
