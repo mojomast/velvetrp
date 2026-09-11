@@ -5,6 +5,9 @@ let exactTravelSelections = 0;
 let actorSheetReads = 0;
 let narrationResponses = 0;
 
+// The server maps dotted registry tool names to the provider `^[a-zA-Z0-9_-]+$` wire alphabet.
+const wireName = (name) => name.replace(/[^a-zA-Z0-9_-]/g, "_");
+
 function completion(message) {
   return JSON.stringify({
     model: "velvet-e2e-model",
@@ -73,22 +76,22 @@ const server = createServer((request, response) => {
         response.end(completion({content:JSON.stringify({narration:replyText})}));return;
       }
       const intent=currentIntent(parsed.messages);
-      const actorSheetTool=parsed.tools?.find((tool)=>tool?.function?.name==="actor_sheet.read")??null;
-      if(actorSheetTool&&/\b(character sheet|inventory|power|spell|attribute)\b/i.test(intent)&&!hasToolResult(parsed.messages,"actor_sheet.read")){
+      const actorSheetTool=parsed.tools?.find((tool)=>tool?.function?.name===wireName("actor_sheet.read"))??null;
+      if(actorSheetTool&&/\b(character sheet|inventory|power|spell|attribute)\b/i.test(intent)&&!hasToolResult(parsed.messages,wireName("actor_sheet.read"))){
         const parameters=actorSheetTool.function?.parameters;
         if(parameters?.additionalProperties!==false||Object.keys(parameters?.properties??{}).length!==0){
           response.writeHead(400).end();return;
         }
         actorSheetReads+=1;
         response.end(completion({content:null,tool_calls:[{id:`e2e-actor-sheet-read-${actorSheetReads}`,type:"function",
-          function:{name:"actor_sheet.read",arguments:"{}"}}]}));return;
+          function:{name:wireName("actor_sheet.read"),arguments:"{}"}}]}));return;
       }
-      const exactTravelTool=parsed.tools?.find((tool)=>tool?.function?.name==="exact_actor_travel.select")??null;
+      const exactTravelTool=parsed.tools?.find((tool)=>tool?.function?.name===wireName("exact_actor_travel.select"))??null;
       if(exactTravelTool&&/^travel\s+to\b/i.test(intent)){const parameters=exactTravelTool.function?.parameters,candidateId=parameters?.properties?.candidateId?.enum?.[0];
         if(typeof candidateId!=="string"||parameters?.additionalProperties!==false||parameters?.properties?.kind?.enum?.[0]!=="actor.travel"
           ||parameters?.properties?.version?.enum?.[0]!=="v1"||parameters?.properties?.choices?.maxItems!==0){response.writeHead(400).end();return;}
         exactTravelSelections+=1;response.end(completion({content:null,tool_calls:[{id:`e2e-exact-travel-${exactTravelSelections}`,type:"function",
-          function:{name:"exact_actor_travel.select",arguments:JSON.stringify({candidateId,kind:"actor.travel",version:"v1",choices:[]})}}]}));return;}
+          function:{name:wireName("exact_actor_travel.select"),arguments:JSON.stringify({candidateId,kind:"actor.travel",version:"v1",choices:[]})}}]}));return;}
       response.end(completion({ content: replyText }));
       return;
     }

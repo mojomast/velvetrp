@@ -8,7 +8,6 @@ import { AdventureActionComposer } from "./AdventureActionComposer";
 import { CampaignContextDrawer, type CampaignContextDrawerApi } from "./CampaignContextDrawer";
 import { ConfirmationBanner } from "./ConfirmationBanner";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
-import type { CampaignQuickPanelApi } from "./CampaignQuickPanel";
 import { CampaignConversation } from "./CampaignConversation";
 import { GameplaySheetDrawer } from "./GameplaySheetDrawer";
 import { CampaignDicePanel } from "./CampaignDicePanel";
@@ -38,7 +37,7 @@ type PlayStreamRequest =
     expectedRevision: number; idempotencyKey: string };
 
 /** Narrow API required by the durable campaign play shell. */
-export interface CampaignPlayApi extends CampaignContextDrawerApi, CampaignQuickPanelApi, MechanicReceiptApi, SessionCommandApi {
+export interface CampaignPlayApi extends CampaignContextDrawerApi, MechanicReceiptApi, SessionCommandApi {
   dm: CampaignDmApi;
   getCampaignPlayBootstrap: (campaignId: string, sessionId: string) => Promise<CampaignPlayBootstrap>;
   streamAdventureTurn: (request: PlayStreamRequest, onEvent: (event: AdventureTurnStreamEvent) => void) => AdventureTurnStreamHandle;

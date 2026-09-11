@@ -1506,8 +1506,9 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   await expect(page.getByText(/Preview: 5 feet/)).toBeVisible();
   await page.getByRole("button", { name: "Confirm move" }).click();
   await expect(page.getByText("Token moved and exploration refreshed from the server.")).toBeVisible();
+  await page.getByText("Movement allowance and map revisions", { exact: true }).click();
   await expect(page.getByText(/token revision 1/)).toBeVisible();
-  await page.getByRole("button", { name: "Context", exact: true }).click();
+  await page.getByRole("button", { name: "Field journal", exact: true }).click();
   await expect(page.getByRole("heading", { name: "NPCs present now" })).toBeVisible();
   await expect(page.getByText("No NPCs marked present.")).toBeVisible();
 
@@ -1539,7 +1540,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   };
   await assertNoPrivateClientState();
   await page.reload();
-  await page.getByRole("button", { name: "Context", exact: true }).click();
+  await page.getByRole("button", { name: "Field journal", exact: true }).click();
   await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
   await assertNoPrivateClientState();
 
@@ -1624,7 +1625,7 @@ test("M5.1 CampaignPlay manages authoritative NPC presence and stopped history",
   );
   expect(stoppedAfter).toEqual(stoppedBefore);
   await page.reload();
-  await page.getByRole("button", { name: "Context", exact: true }).click();
+  await page.getByRole("button", { name: "Field journal", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Present at stop/history" })).toBeVisible();
   await expect(page.getByText(`${npcName} - ${locationName}`, { exact: true })).toBeVisible();
   await expect(page.getByText(/stopped and is read-only/)).toBeVisible();
@@ -1666,7 +1667,7 @@ test("M5.4 CampaignPlay shows one provider-committed travel receipt across reloa
   await page.getByRole("button",{name:"Open attached room 1 of 1"}).click();
   await page.setViewportSize({width:1366,height:768});await expect(page.getByLabel("What do you do?")).toBeVisible();
   await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-desktop-1366x768.png"});
-  await page.setViewportSize({width:390,height:844});await page.getByRole("button",{name:"Conversation",exact:true}).click();await expect(page.getByLabel("What do you do?")).toBeVisible();
+  await page.setViewportSize({width:390,height:844});await expect(page.getByLabel("What do you do?")).toBeVisible();
   await page.screenshot({path:"test-results/campaign-command-center-after/e2e-playable-mobile-390x844.png",fullPage:true});
   await page.setViewportSize({width:1366,height:768});
   const travelStream=page.waitForRequest(browserRequest=>new URL(browserRequest.url()).pathname==="/api/rpg/v1/adventure-turns/stream");
@@ -1797,7 +1798,6 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   const composer = page.getByLabel("What do you do?");
   await composer.fill("Consult my character sheet before I investigate: ");
   await page.getByRole("button", { name: "Character", exact: true }).click();
-  await page.getByRole("button", { name: "Open character sheet" }).click();
   const sheet = page.getByRole("dialog", { name: `${playerName}'s character sheet` });
   await expect(sheet).toBeVisible();
   await sheet.getByRole("button", { name: "Waylamp", exact: true }).click();
@@ -1808,7 +1808,6 @@ test("CampaignPlay sheet references remain draft-only until one explicit declara
   await sheet.getByRole("button", { name: "Close character sheet" }).click();
 
   const declaration = await composer.inputValue();
-  await page.getByRole("button", { name: "Conversation", exact: true }).click();
   await page.getByRole("button", { name: "Declare action" }).click();
   await expect.poll(() => adventureRequests.length).toBe(1);
   await expect(page.getByText(deterministicAdventureNarration, { exact: true })).toBeVisible({ timeout: 15_000 });

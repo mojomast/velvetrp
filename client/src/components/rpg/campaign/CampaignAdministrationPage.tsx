@@ -412,8 +412,8 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
 
       {integrations && <GenerationRecoveryPanel actorRole={integrations.actorRole === "observer" ? "player" : integrations.actorRole}
         drafts={integrations.generation.drafts.map((draft) => ({ ...draft, jobId: draft.jobId ?? "unlinked" }))} jobs={integrations.generation.jobs}
-        retrySupported={integrations.generation.retrySupported} disabled={mutationLocked || refreshing}
-        api={{ openDraft: setOpenDraftId, reconcileJob: () => void load(true, true), retryFailedJob: () => undefined }} />}
+        disabled={mutationLocked || refreshing}
+        api={{ openDraft: setOpenDraftId, reconcileJob: () => void load(true, true) }} />}
 
       {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <CampaignGeneratorPanel campaignId={campaignId} openDraftId={openDraftId} disabled={mutationLocked || refreshing} />}
 
