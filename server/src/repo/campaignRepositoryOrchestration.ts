@@ -99,6 +99,7 @@ import { createAdventureTurnRepository } from "./adventureTurnRepo.js";
 import { createCampaignDmRepository } from "./campaignDmRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
+import { AgentObservationUnavailableError, createAgentObservationRepository } from "./observations/agentObservationRepo.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
@@ -820,7 +821,9 @@ function createRepositoryComposition<T>(
       return receipt ? receipt.events.map(event => ({ type: event.type, data: event.data })) : null;
     },
   });
+  const agentObservationRepository = createAgentObservationRepository(db, dependencies);
   const repository: Repository = {
+    ...agentObservationRepository,
     ...recallRepository,
     ...campaignDmReadinessRepository,
     ...campaignContextInspectionRepository,
@@ -1159,6 +1162,22 @@ function createRepositoryComposition<T>(
         throw new Error("original starter campaign character creation cannot run inside a repository transaction");
       }
       return campaignCharacterWriteRepository.createOriginalStarterCampaignCharacter(actorPrincipalId, input);
+    },
+    recordAgentObservation: (principalId, input) => {
+      assertOpen();
+      const authorize = () => {
+        const membership = db.prepare(`SELECT 1 FROM campaign_memberships
+          WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')`).get(input.campaignId, principalId);
+        if (!membership) throw new AgentObservationUnavailableError();
+      };
+      if (transactionDepth > 0) {
+        authorize();
+        return agentObservationRepository.record(input);
+      }
+      return db.transaction(() => {
+        authorize();
+        return agentObservationRepository.record(input);
+      }).immediate();
     },
     executeSetActorAttribute: (actorPrincipalId, envelope) => {
       assertOpen();

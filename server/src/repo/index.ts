@@ -5,6 +5,14 @@ export {
   createCampaignContextInspectionReadRepository,
   type CampaignContextInspectionReadRepository,
 } from "./campaign/campaignContextInspectionReadRepo.js";
+export {
+  AgentObservationConflictError,
+  AgentObservationUnavailableError,
+  createAgentObservationRepository,
+  type AgentObservation,
+  type AgentObservationInput,
+  type AgentObservationRepository,
+} from "./observations/agentObservationRepo.js";
 // Preserve the established repository API without exposing domain-internal
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";

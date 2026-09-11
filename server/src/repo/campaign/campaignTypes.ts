@@ -83,6 +83,7 @@ import type { CampaignDmReadinessRepository } from "../campaignDmReadinessRepo.j
 import type { TacticalMapRepository } from "../tacticalMapRepo.js";
 import type { CampaignAdministrationIntegrationRepository } from "../campaignAdministrationIntegrationRepo.js";
 import type { CampaignContextInspectionReadRepository } from "./campaignContextInspectionReadRepo.js";
+import type { AgentObservation, AgentObservationInput } from "../observations/agentObservationRepo.js";
 
 export interface RepositoryDependencies {
   clock: Clock;
@@ -221,6 +222,7 @@ export interface Repository extends RepositoryUnitOfWork, CampaignDmRepository, 
   /** Factory-only fixed-content creation; never exposed on a unit of work or legacy wrapper. */
   createOriginalStarterCampaignCharacter(actorPrincipalId: string, input: CreateCampaignCharacterInput): OriginalStarterCampaignCharacterCreationResult;
   executeInitializeActorResource(actorPrincipalId: string, envelope: CommandEnvelope): CommandReceipt;
+  recordAgentObservation(principalId: string, input: AgentObservationInput): AgentObservation;
   executeRollActorDice(actorPrincipalId: string, envelope: CommandEnvelope): CommandReceipt;
   /** Factory-only locked revalidation for the ID-free campaign-dice boundary. */
   executeRollActorDiceForVisibleCharacter(actorPrincipalId: string, envelope: CommandEnvelope, binding: CampaignDiceVisibleCharacterBinding): CommandReceipt;

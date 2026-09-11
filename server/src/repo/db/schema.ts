@@ -6,7 +6,8 @@ import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8");
+  + "\n" + readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -131,10 +132,11 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       })();
       return;
     }
-    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts") && !object.name.startsWith("campaign_context_inspection_"));
+    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts") && !object.name.startsWith("campaign_context_inspection_") && !object.name.startsWith("agent_observations"));
     const finishRecallUpgrade = () => {
       db.exec(readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8"));
       db.exec(readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8"));
+      db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8"));
       assertCurrentDatabase(db, databasePath);
     };
     if (mismatchReason(schemaObjects(db), prior) === null) {
@@ -143,10 +145,21 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     }
     const missingRecall = !schemaObjects(db).some(object => object.name === "adventure_narration_contexts");
     const missingInspection = !schemaObjects(db).some(object => object.name === "campaign_context_inspection_headers_v61");
-    const expected = missingRecall ? prior : missingInspection ? expectedObjects().filter(object => !object.name.startsWith("campaign_context_inspection_")) : expectedObjects();
+    const missingKnowledge = !schemaObjects(db).some(object => object.name.startsWith("agent_observations"));
+    const expected = missingRecall ? prior : expectedObjects().filter(object =>
+      (missingInspection ? !object.name.startsWith("campaign_context_inspection_") : true)
+      && (missingKnowledge ? !object.name.startsWith("agent_observations") : true));
     const validate = missingRecall ? finishRecallUpgrade : () => assertCurrentDatabase(db, databasePath);
     if (!missingRecall && missingInspection && mismatchReason(schemaObjects(db), expected) === null) {
-      db.transaction(() => { db.exec(readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8")); assertCurrentDatabase(db, databasePath); }).immediate();
+      db.transaction(() => {
+        db.exec(readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8"));
+        if (missingKnowledge) db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8"));
+        assertCurrentDatabase(db, databasePath);
+      }).immediate();
+      return;
+    }
+    if (!missingRecall && !missingInspection && missingKnowledge && mismatchReason(schemaObjects(db), expected) === null) {
+      db.transaction(() => { db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8")); assertCurrentDatabase(db, databasePath); }).immediate();
       return;
     }
     if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)

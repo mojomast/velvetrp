@@ -1,7 +1,8 @@
 # Plan 4: Living knowledge and rumors
 
-Status: planned, not implemented. Researched against current `main` after
-Plan 3 closeout. Design research and sources:
+Status: in progress. P4.1 (observation ledger + write path) is implemented and
+committed; later milestones are planned, not implemented. Researched against
+current `main` after Plan 3 closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
