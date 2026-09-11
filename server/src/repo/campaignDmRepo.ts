@@ -20,12 +20,16 @@ import { validDmScene, DM_SCENE_DESCRIPTION_PREFIX } from "../agent/dmNarration.
 import { publicStorySourceSql, publicStoryResourceSql } from "./storyDisclosure.js";
 import type { CampaignRecallReadRepository } from "./campaign/campaignRecallReadRepo.js";
 import { recordContextInspectionProvenance, type ContextInspectionProvenanceMode } from "./campaign/campaignContextInspectionProvenanceWrite.js";
+import { NPC_DISCLOSURE_TRUST_THRESHOLD } from "./observations/agentObservationReadRepo.js";
 
 export class CampaignDmUnavailableError extends Error {}
 export class CampaignDmConflictError extends Error {}
 const json = (value: unknown) => canonicalAgentJson(value as never);
 const hash = (value: unknown) => createHash("sha256").update(json(value)).digest("hex");
 const privileged = (role: string | undefined) => role === "owner" || role === "gm";
+const MAX_KNOWLEDGE_NPCS = 4;
+const MAX_KNOWLEDGE_ENTRIES_PER_NPC = 4;
+const MAX_KNOWLEDGE_TEXT_LENGTH = 300;
 type Binding = { candidate: CampaignDmCandidate; target: string; revision: number; data?: any };
 type RunRow = {
   run_id: string; campaign_id: string; session_id: string; timeline_id: string;
@@ -205,7 +209,38 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const historicalRecall = services.getCampaignRecall(r.gm_principal_id, { campaignId: r.campaign_id, sessionId: r.session_id,
       audience: { kind: "dm" }, purpose: "dm-narration", query: JSON.stringify({ scenes, locations }).slice(0, 512) });
     if (!historicalRecall) throw new CampaignDmConflictError("public recall authority unavailable");
-    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,
+    // Same present public cast source as above: present, public location-gated, and not GM-hidden.
+    const npcKnowledge = (db.prepare(`SELECT npc.npc_id npcId,npc.public_name npcName
+      FROM campaign_npc_presence_v43 presence JOIN campaign_npcs_v28 npc USING(campaign_id,npc_id)
+      WHERE presence.campaign_id=? AND presence.session_id=? AND presence.state='present'
+        AND NOT EXISTS(SELECT 1 FROM campaign_generation_accepted_artifacts_v52 hidden WHERE hidden.campaign_id=npc.campaign_id
+          AND hidden.server_resource_id=npc.npc_id AND hidden.visibility='gm')
+        AND (presence.location_id IS NULL OR EXISTS(SELECT 1 FROM campaign_actor_locations_v28 current
+          JOIN campaign_locations_v28 location ON location.campaign_id=current.campaign_id AND location.location_id=current.location_id
+          WHERE current.campaign_id=presence.campaign_id AND current.session_id=presence.session_id
+            AND current.location_id=presence.location_id AND location.visibility='public'))
+      ORDER BY npc.npc_id LIMIT ?`).all(r.campaign_id,r.session_id,MAX_KNOWLEDGE_NPCS) as {npcId:string;npcName:string}[])
+      .map(({npcId,npcName})=>{
+        // A missing relationship row never qualifies; any session-participating actor at or
+        // above the disclosure threshold authorizes this NPC's hearsay for the narrator.
+        const trusted = Boolean(db.prepare(`SELECT 1 FROM campaign_npc_relationships_v32 relationship
+          WHERE relationship.campaign_id=? AND relationship.npc_id=? AND relationship.trust>=?
+            AND relationship.actor_id IN (SELECT actor.id FROM session_characters participant
+              JOIN campaign_characters character ON character.character_id=participant.character_id AND character.campaign_id=?
+              JOIN campaign_actors actor ON actor.campaign_character_id=character.id AND actor.campaign_id=character.campaign_id
+              WHERE participant.session_id=?) LIMIT 1`).get(r.campaign_id,npcId,NPC_DISCLOSURE_TRUST_THRESHOLD,r.campaign_id,r.session_id));
+        const entries = (db.prepare(`SELECT text,channel,authority,relayer_agent_id relayerNpcId FROM agent_observations
+          WHERE campaign_id=? AND agent_kind='npc' AND agent_id=?
+            AND timeline_id=(SELECT active_timeline_id FROM campaigns WHERE id=?)
+          ORDER BY created_at DESC, observation_id ASC`).all(r.campaign_id,npcId,r.campaign_id) as
+          {text:string;channel:string;authority:string;relayerNpcId:string|null}[])
+          .filter(entry=>entry.authority==='verified'||trusted)
+          .slice(0,MAX_KNOWLEDGE_ENTRIES_PER_NPC)
+          .map(entry=>({...entry,text:entry.text.slice(0,MAX_KNOWLEDGE_TEXT_LENGTH)}));
+        return { npcId, npcName, entries };
+      })
+      .filter(({entries})=>entries.length>0);
+    return { locations:facts(locations),cast:facts(cast),players:facts(players),scenes:facts(scenes),clues:facts(clues),materials:facts(materials),history,historicalRecall,npcKnowledge,
       receipts:receipt?[JSON.parse(receipt.public_json)]:[],safety };
   }
   const narrationGuard = (r:RunRow, context:unknown) => hash({context,

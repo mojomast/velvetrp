@@ -1,9 +1,10 @@
 # Plan 4: Living knowledge and rumors
 
 Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
-co-presence propagation), and P4.3 (trust-gated knowledge reads) are implemented
-and committed; later milestones are planned, not implemented. Researched against
-current `main` after Plan 3 closeout. Design research and sources:
+co-presence propagation), P4.3 (trust-gated knowledge reads), and P4.4 (Director
+narration knowledge channel) are implemented and committed; later milestones are
+planned, not implemented. Researched against current `main` after Plan 3
+closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -104,19 +105,19 @@ discloses); private material never ranked. Run read-repo + privacy tests and
 server typecheck.
 Commit: `feat(repo): read per-NPC knowledge with disclosure gates`.
 
-### P4.4: Director prompt integration
+### P4.4: Director narration knowledge channel
 
-Own: `CampaignAgentContextSnapshot` npc-knowledge field plus
-`campaignAgentContextReadRepo` population for the DM audience; `context.ts`
-budget/layer; `dmNarration.ts` labeled entries; present-NPC dialogue offered
-only when that NPC has a relevant observation; `MEMORY_AUTHORITY` amendment.
-Recall integration uses the snapshot, not a new central recall CTE family, so
-player/public recall stays byte-stable.
+Own: `campaignDmRepo.ts` `publicScene` adds a bounded, labeled `npcKnowledge`
+array for present public NPCs (verified outcomes and trust-disclosed rumors
+only, using the P4.3 disclosure rules); `dmNarration.ts` system-prompt rules
+for attribution and hearsay; focused tests. Deferred: generic
+`CampaignAgentContextSnapshot` budget/layer integration and any central recall
+CTE change, so player/public recall stays byte-stable.
 
-Gate: authority strings byte-asserted; present-speaker constraint retained;
-no outcome assertion; labeled hearsay only; public narration cannot see
-`npcKnowledge`. Blocked until P4.3 passes. Run prompt tests, DM narration
-tests, campaign-context tests, server typecheck.
+Gate: only present public NPCs; disclosure-gated; bounded entry count and text
+bytes; prompt requires attribution and forbids asserting hearsay as fact or
+revealing private facts; existing director narration/recovery tests preserved.
+Run DM narration/recovery tests and server typecheck.
 Commit: `feat(agent): narrate with labeled NPC knowledge`.
 
 ### P4.5: Faction knowledge and reactions
