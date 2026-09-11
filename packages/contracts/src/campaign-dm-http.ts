@@ -34,6 +34,8 @@ export type CampaignDmSceneBindingRequest = z.infer<typeof campaignDmSceneBindin
 export const campaignDmActionSchema = z.enum([
   "encounter-start", "encounter-materialize", "enemy-turn", "encounter-complete",
   "reveal-node", "resolve-node", "reveal-clue",
+  // Transition beats: server-authored time advance (a receipt, never LLM-authored) and pure ambiance (no state change).
+  "advance-time", "ambient-beat",
 ]);
 export const campaignDmCandidateSchema = campaignDmSelectionSchema.extend({
   action: campaignDmActionSchema, label: z.string().min(1).max(500),

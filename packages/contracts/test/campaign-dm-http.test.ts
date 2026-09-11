@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { campaignDmBeatRequestSchema, campaignDmCompositionSchema, campaignDmControlSchema, campaignDmDecisionRequestSchema,
+import { campaignDmActionSchema, campaignDmBeatRequestSchema, campaignDmCompositionSchema, campaignDmControlSchema, campaignDmDecisionRequestSchema,
   campaignDmPrivateRunSchema, campaignDmRunSchema, campaignDmSelectionSchema } from "../src/campaign-dm-http.js";
 describe("campaign DM HTTP contracts",()=>{
   it("accepts explicit mode and strict bounded intent, never authority or mechanics",()=>{
@@ -34,5 +34,13 @@ describe("campaign DM HTTP contracts",()=>{
     const candidate={candidateId:"a",digest:"a".repeat(64),action:"reveal-node",label:"Reveal"};
     expect(campaignDmPrivateRunSchema.parse({run,proposal:candidate}).composition).toEqual([]);
     expect(campaignDmPrivateRunSchema.parse({run,proposal:candidate,composition:[candidate]}).composition).toEqual([candidate]);
+  });
+  it("accepts transition beats as exact actions and receipts",()=>{
+    for(const action of ["advance-time","ambient-beat"] as const)expect(campaignDmActionSchema.safeParse(action).success).toBe(true);
+    expect(campaignDmActionSchema.safeParse("advance-time-arbitrary").success).toBe(false);
+    const run={runId:"run",campaignId:"campaign",sessionId:"room",intent:"open",mode:"ai",modeRevision:1,revision:1,state:"completed",
+      narration:"A lull settles over the road.",receipts:[{action:"advance-time",summary:"Time passes."},{action:"ambient-beat",summary:"A lull."}],
+      blockers:[],createdAt:"2036-01-01T00:00:00.000Z"};
+    expect(campaignDmRunSchema.safeParse(run).success).toBe(true);
   });
 });

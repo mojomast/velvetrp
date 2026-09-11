@@ -143,6 +143,16 @@ describe('public AI DM narration',()=>{
     expect(validDmScene(scene)).toBe(true);
     for(const text of ['You decide to leave. What next?','You gain 50 gold. What next?','The scene is resolved. What next?','You feel afraid. What next?','Rain falls.'])expect(validDmScene(text)).toBe(false);
   });
+  it('makes the question optional only for transition beats while keeping every other rejection',()=>{
+    const transition={cast:[],players:[],transition:true},normal={cast:[],players:[]};
+    expect(dmNarrationTool(transition).parameters.required).toEqual(['atmosphere','dialogue']);
+    expect(dmNarrationTool(normal).parameters.required).toEqual(['atmosphere','dialogue','question']);
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[]},transition)).toBe('A lull settles over the road.');
+    expect(parseDmScene({atmosphere:'A lull settles over the road.',dialogue:[]},normal)).toBeNull();
+    expect(validDmScene('A lull settles over the road.',transition)).toBe(true);
+    expect(validDmScene('Rain falls.',normal)).toBe(false);
+    for(const text of ['You decide to leave.','You gain 50 gold.','The scene is resolved.','The king lies dead.'])expect(validDmScene(text,transition)).toBe(false);
+  });
   it('accepts bounded public NPC dialogue but rejects unadvertised speakers, extra fields, and inflected agency/outcome claims',()=>{
     const context={cast:[{name:'Mara',description:'A cautious guide.'}],players:[{name:'Hero'}],scenes:[{title:'The gate',description:'A stone gate blocks the road.'}],receipts:[{action:'reveal-node',summary:'Scene revealed: The gate.'}]};
     const value={atmosphere:'Rain beads on the stone beside the gate.',dialogue:[{speaker:'Mara',text:'A patient eye is worth a hurried step.'}],question:'Would you like to inspect the stonework or speak with Mara?'};
