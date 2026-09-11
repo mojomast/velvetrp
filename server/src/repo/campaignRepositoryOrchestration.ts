@@ -100,6 +100,7 @@ import { createCampaignDmRepository } from "./campaignDmRepo.js";
 import { createExactCandidateProviderBridgeRepository, createExactCandidateRepository } from "./candidateRepo/index.js";
 import { AdventureTurnConflictError } from "./adventureTurn/errors.js";
 import { AgentObservationUnavailableError, createAgentObservationRepository } from "./observations/agentObservationRepo.js";
+import { createAgentObservationReadRepository } from "./observations/agentObservationReadRepo.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
@@ -822,8 +823,10 @@ function createRepositoryComposition<T>(
     },
   });
   const agentObservationRepository = createAgentObservationRepository(db, dependencies);
+  const agentObservationReadRepository = createAgentObservationReadRepository(db);
   const repository: Repository = {
     ...agentObservationRepository,
+    ...agentObservationReadRepository,
     ...recallRepository,
     ...campaignDmReadinessRepository,
     ...campaignContextInspectionRepository,

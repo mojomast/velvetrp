@@ -25,6 +25,16 @@ export {
   type ToldOnArrivalInput,
   type WitnessObservationInput,
 } from "./observations/agentObservationPropagation.js";
+export {
+  DEFAULT_AGENT_KNOWLEDGE_LIMIT,
+  MAX_AGENT_KNOWLEDGE_LIMIT,
+  MAX_KNOWLEDGE_QUERY_TERMS,
+  NPC_DISCLOSURE_TRUST_THRESHOLD,
+  createAgentObservationReadRepository,
+  type AgentKnowledgeEntry,
+  type AgentKnowledgeQuery,
+  type AgentObservationReadRepository,
+} from "./observations/agentObservationReadRepo.js";
 // Preserve the established repository API without exposing domain-internal
 // helpers from the split implementation modules.
 export { closeRepo } from "./db.js";

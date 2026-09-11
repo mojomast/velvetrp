@@ -1,9 +1,9 @@
 # Plan 4: Living knowledge and rumors
 
-Status: in progress. P4.1 (observation ledger + write path) and P4.2 (bounded
-co-presence propagation) are implemented and committed; later milestones are
-planned, not implemented. Researched against current `main` after Plan 3
-closeout. Design research and sources:
+Status: in progress. P4.1 (observation ledger + write path), P4.2 (bounded
+co-presence propagation), and P4.3 (trust-gated knowledge reads) are implemented
+and committed; later milestones are planned, not implemented. Researched against
+current `main` after Plan 3 closeout. Design research and sources:
 [docs/npc-knowledge-rumors.md](npc-knowledge-rumors.md). Follow [the shared
 execution protocol](playability-execution.md); small-context subagents with
 exact ownership; milestone commits must remain buildable.
@@ -89,26 +89,35 @@ refuted corrections add rows and never delete; idempotent replay. Run
 propagation + cap tests and server typecheck.
 Commit: `feat(repo): propagate observations along co-presence`.
 
-### P4.3: Trust-gated NPC reads and recall integration
+### P4.3: Trust-gated NPC knowledge reads
 
-Own: observation read repo, NPC audience construction in
-`campaignAgentContextReadRepo.ts`, new recall source family
-`npc-observation`.
+Own: new `server/src/repo/observations/agentObservationReadRepo.ts` and its
+tests.
 
-Gate: authorization before ranking; actor/location/campaign scope; trust-gated
-disclosure; attribution precision on fixture oracles; private material never
-ranked. Run recall + privacy tests and server typecheck.
-Commit: `feat(repo): expose per-NPC knowledge with disclosure gates`.
+Gate: authorize the caller (owner/GM) before reading any observation;
+campaign + active-timeline + agent scope; lexical ranking mirrors recall's
+normalization/whole-term rules with explicit read bounds; trust-gated
+`disclosable` classification (`verified` always disclosable; `rumor`/`belief`
+only when the observing NPC has an explicit relationship with the listener
+whose trust is at or above the threshold; a missing relationship never
+discloses); private material never ranked. Run read-repo + privacy tests and
+server typecheck.
+Commit: `feat(repo): read per-NPC knowledge with disclosure gates`.
 
 ### P4.4: Director prompt integration
 
-Own: `server/src/context.ts` budget/layer, `server/src/agent/dmNarration.ts`
-labeled entries, `adventurePrompt.ts` authority wording.
+Own: `CampaignAgentContextSnapshot` npc-knowledge field plus
+`campaignAgentContextReadRepo` population for the DM audience; `context.ts`
+budget/layer; `dmNarration.ts` labeled entries; present-NPC dialogue offered
+only when that NPC has a relevant observation; `MEMORY_AUTHORITY` amendment.
+Recall integration uses the snapshot, not a new central recall CTE family, so
+player/public recall stays byte-stable.
 
 Gate: authority strings byte-asserted; present-speaker constraint retained;
-no outcome assertion; labeled hearsay only. Run prompt tests, DM narration
-tests, server typecheck.
-Commit: `feat(agent): feed labeled NPC knowledge to narration`.
+no outcome assertion; labeled hearsay only; public narration cannot see
+`npcKnowledge`. Blocked until P4.3 passes. Run prompt tests, DM narration
+tests, campaign-context tests, server typecheck.
+Commit: `feat(agent): narrate with labeled NPC knowledge`.
 
 ### P4.5: Faction knowledge and reactions
 
