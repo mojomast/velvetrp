@@ -19,6 +19,7 @@ import { CommandCenter } from "./CommandCenter";
 import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import { useCampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
 import { PlayHelp } from "./PlayHelp";
+import { CampaignSecurityPanels } from "../administration/CampaignSecurityPanels";
 import { CombatTrackerPage, type CombatTrackerApi } from "../combat/CombatTrackerPage";
 import { WorldExplorerPage, type WorldExplorerApi } from "../world/WorldExplorerPage";
 import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../actor/RpgCharacterSheetPage";
@@ -459,7 +460,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }
 
   const role = bootstrap.principal.role === "observer" || !authorizationCanAct ? "Spectator" : audience === "gm" ? "Game master" : "Player";
-  const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const] : []), "help"];
+  const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const, "security" as const] : []), "help"];
   const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
   function applyPrefill(value: string, mode: "replace" | "append") {
     if (!referenceReady) return;
@@ -548,6 +549,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {audience === "gm" && authorizationCanAct && <AtlasDrawer tool="gm" open={activeTool === "gm"} onClose={closeTool}><section aria-label="DM scene controls"><SessionControls key={`session:${campaignId}:${sessionId}:${authorizationGeneration}`} bootstrap={bootstrap} api={api}
       blocked={roomToolsLocked || (phase !== "idle" && phase !== "terminal")} onLockChange={setSessionLocked}
       onRefresh={async () => { await refreshBootstrap(); await refreshTranscript(); setReconciliationRevision((value) => value + 1); }} onCombat={() => openTool("combat")} /></section></AtlasDrawer>}
+    {audience === "gm" && authorizationCanAct && <AtlasDrawer tool="security" open={activeTool === "security"} onClose={closeTool}>{visitedTools.includes("security") && <CampaignSecurityPanels campaignId={campaignId} onMutated={refreshAfterTool} />}</AtlasDrawer>}
     <AtlasDrawer tool="help" open={activeTool === "help"} onClose={closeTool}>{visitedTools.includes("help") && <PlayHelp />}</AtlasDrawer>
   </>;
   return <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
