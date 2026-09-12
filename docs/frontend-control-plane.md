@@ -152,6 +152,14 @@ GET-only saved-run recovery, no load/focus POST, preserved map/draft and room lo
 and absence of seeded secrets from public output and narrator inputs. It uses the
 normal root Playwright configuration; no live database or paid endpoint is used.
 
+`character-surfaces.spec.ts` drives the deterministic mechanics through the real
+client and HTTP layer: a server-resolved check plus effect apply/remove and resource
+adjustment, a present-vendor sale from a server-issued quote, bilateral trade accept
+and cancel across two controlled actors, expedition actor placement and camp,
+companion create/grant/revoke, and reviewed encounter generation and application.
+It also uses disposable SQLite and the in-process fake provider, so no paid call is
+charged.
+
 The final Living Atlas focused browser gate passes 12 director, desktop/mobile
 control-plane, combat-map, and session-recovery tests, including camera retention through refresh,
 movement, and drawer interaction. Additional fixture browser checks cover 320px
@@ -168,8 +176,9 @@ code splitting remains follow-up work.
   workflows. Starting-location preparation still uses World.
 - Add server-side idempotency or exact receipt discovery for persona and room
   creation. Browser-side recovery locks are not cross-device guarantees.
-- Add multi-controlled-actor browser coverage and remove the remaining map-generation
-  concurrency gap with server-side create-only or expected-map/roster preconditions.
+- Broaden multi-controlled-actor browser coverage beyond the two-actor bilateral-trade
+  flow and remove the remaining map-generation concurrency gap with server-side
+  create-only or expected-map/roster preconditions.
 - Add non-mutating terrain/layout preview and supported enemy-token repositioning.
 - Embed remaining campaign authoring, quest editing, and new encounter roster
   creation where appropriate. Advancement requires explicit roster selection because

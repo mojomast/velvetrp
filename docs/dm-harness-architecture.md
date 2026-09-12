@@ -33,7 +33,7 @@ The full gameplay-sheet drawer exposes **Reference** controls for these sections
 
 ## Implemented tools
 
-The server advertises a role- and state-dependent subset of these reads: `campaign_context.read`, `actor_sheet.read`, `actor_resources.read`, `actor_inventory.read`, `actor_powers.read`, `combat_state.read`, `world_state.read`, and `quest_state.read`.
+The server advertises a role- and state-dependent subset of these reads: `campaign_context.read`, `actor_sheet.read`, `actor_resources.read`, `actor_inventory.read`, `actor_powers.read`, `combat_state.read` (during combat), `world_state.read`, and `quest_state.read`.
 
 The complete current mutation-tool vocabulary is:
 
@@ -43,18 +43,27 @@ The complete current mutation-tool vocabulary is:
 | `actor_dice.roll` | Rolls a bounded expression outside combat. It establishes a total only, not a DC, check identity, success, or task completion. |
 | `combat_action.execute` | Selects one exact advertised `attack`, `flee`, or `end-turn` action by ID and digest. Player actions require confirmation; an authoritative enemy turn does not. |
 | `exact_actor_travel.select` | Selects one server-issued travel candidate outside combat. The provider cannot supply destination, party, or revision. |
-| `exact_quest_objective.select` | Advances one exact advertised, visible, dependency-ready objective by one point outside combat. |
+| `exact_quest_objective.select` | Advances one exact advertised, visible, dependency-ready objective by one point outside combat; confirmation-never. |
+| `exact_srd_check.select` | Selects one advertised SRD 5.1 ability or skill check. The server owns actor identity, scores, modifiers, DC, mode, revision, roll, and outcome. |
+| `exact_inventory_action.select` | Selects one exact advertised equip, unequip, drop, gift, or consume candidate outside combat. Equip/unequip execute without confirmation; drop/gift/consume require controller confirmation. Adventure consume is inventory removal only and applies no catalog effect. |
+| `exact_vendor_commerce.select` | Selects one exact advertised present-vendor purchase, sale, or free transfer outside combat; controller confirmation is required. |
+| `exact_power_use.select` | Selects one advertised out-of-combat power and target set; controller confirmation is required. |
+| `exact_rest.select` | Selects one advertised short- or long-rest recovery preview outside combat; controller confirmation is required. |
+| `exact_combat_consumable.select` | Selects one exact advertised combat consumable use on the controlled actor's turn; controller confirmation is required. |
+| `exact_combat_power.select` | Selects one exact advertised single-target combat power on the controlled actor's turn; controller confirmation is required. |
+| `exact_quest_lifecycle.select` | Selects one exact advertised quest accept, abandon, or reward claim; controller confirmation is required. |
+| `exact_progression_apply.select` | Selects the exact complete authoritative progression preview; controller confirmation is required. |
 
 One provider decision may contain reads or exactly one isolated mutation, never a mutation mixed with other calls. Tool arguments are parsed locally, candidate IDs/digests and current authority are rechecked, writes use server-owned revisions and deterministic idempotency identities, and narration is grounded in the resulting receipt.
 
 Current limitations are deliberate:
 
-- Sheet references do not bridge to inventory or power commands. The adventure agent cannot equip, unequip, consume, drop, gift, transfer, buy, sell, or initialize resources.
-- The adventure agent can read known powers and availability but has no power-use mutation tool. It cannot cast a sheet spell outside the separate exact combat action vocabulary.
-- Combat supports only advertised `attack`, `flee`, and `end-turn`; there is no general combat spell tool, area spell targeting, arbitrary damage/effect input, or provider-authored action.
-- Vendors and purchases have no adventure tool. NPC `merchantState` is private GM data, not an executable shop bridge.
-- Direct inventory and power HTTP routes exist for their documented closed commands, and the separate combat consumable lane supports only its exact quantity-one damage/healing/resource subset. Those APIs are not implied provider capabilities.
-- Rest, encounter start, rewards, story/world authoring, companion administration, settings, import, deletion, memory approval, arbitrary dispatch, SQL, filesystem, and network access are not adventure tools.
+- Resource initialization is unavailable because provider-supplied current/max totals are forbidden.
+- Sheet references are player intent and grant no mutation authority; unsupported item or power state changes remain uncommitted without exact authoritative candidates.
+- Combat powers are limited to exact single-target damage, healing, and deterministic self/ally persistent effects; area targets, summons, movement, arbitrary modifiers, and unimplemented mechanics are unavailable.
+- Vendor commerce exists only through present, visible, associated vendors and exact server-priced candidates; unsupported transfers, combat start, story changes, and GM override remain unavailable.
+- Companion mutation is unavailable in the adventure lane because the persisted companion authority model is not exposed to it; generated world changes remain unavailable pending candidate generation.
+- Deletion, import, settings, prompts, authentication, policy, memory approval, arbitrary dispatch, SQL, filesystem, and network tools do not exist.
 
 Do not promise an exact-candidate bridge unless the current request actually advertises it.
 

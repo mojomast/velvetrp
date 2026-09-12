@@ -26,9 +26,37 @@ AI-generated campaign content is staged as bounded candidates. A GM selects a de
 
 Rules modules are pure deterministic code. Content is published as immutable, validated packs and campaigns bind to exact `(packId, packVersion)` identities. The current development SRD starter is `srd-5.1:starter@1.2.0+7f94bb928392`; changing content means publishing a new exact version rather than rewriting history.
 
+### The world keeps a bounded memory
+
+The campaign remembers through direct, query-derived SQLite recall rather than a vector database or a hidden summarizer. Deterministic candidate selection ranks source-attributed material under strict query, whole-hit, and byte caps; the AI Director may also inspect its own immutable dispatch provenance, and a missing or expired recall never becomes story truth. Separately, an immutable observation ledger records who witnessed, was told, or gossiped what, so present NPCs can speak from recorded knowledge instead of omniscient invention.
+
+### The Director leads without owning the truth
+
+An optional AI Director composes an ordered beat from one to three server-issued candidates, may advance recorded world time or present an ambient transition, and narrates present-NPC ledger knowledge with explicit attribution. Each candidate commits with its own receipt, a later failure records a partial-completion blocker instead of rolling back earlier receipts, and the Director can only select supported candidates. It never invents mechanics, chooses a player character's action, or turns earlier prose into canonical history.
+
 ### Local-first is an operational boundary
 
 The default server binds to loopback and uses a fixed trusted-local principal. A provider is optional: without one, roleplay has a clearly marked deterministic local stub and RPG recovery remains deterministic. Local-first does not mean that configured provider traffic stays on-device, and Velvet is not currently a remote multi-user service.
+
+## Screenshots
+
+These views are captured from the deterministic browser harness (disposable SQLite and an in-process fake provider) and use illustrative names and content.
+
+| Campaign library | Living Atlas table |
+| --- | --- |
+| ![Campaigns with preparation status](docs/images/campaign-library.png) | ![Authoritative map and conversation composer](docs/images/living-atlas-table.png) |
+
+| Character sheet actions | World expedition |
+| --- | --- |
+| ![Server-owned checks, powers, effects, resources, and equipment](docs/images/character-sheet.png) | ![Owner/GM actor placement and camp](docs/images/world-expedition.png) |
+
+| Director | Combat tracker |
+| --- | --- |
+| ![Human/AI delegation, Open and Continue scene, and private review](docs/images/director.png) | ![Encounter lifecycle and reviewed generation](docs/images/combat-tracker.png) |
+
+**Cast and companion administration** — create a companion and author exact grants.
+
+![Companion administration with an exact grant](docs/images/cast-companion.png)
 
 ## What Is Shipped
 
@@ -46,7 +74,18 @@ The default server binds to loopback and uses a fixed trusted-local principal. A
 - Server-resolved checks, powers, effects, legal combat actions, encounters, rewards, quests, world state, NPC presence, factions, reputation, and story graphs.
 - Reviewed campaign generation and explicit publication of player-safe handouts and scene prompts.
 - Authoritative tactical maps with role-safe projections, movement previews, line-of-effect, cover, ranged weapons, thrown weapons, and opportunity reactions.
+- Browser-playable character actions: server-resolved checks, power and spell use, conditions and effects, resource tracks, rests, equipment, vendor sale, and bilateral trade accept/cancel, each bound to the current revision and reconciled from authoritative reads.
+- Client workflows for owner/GM room detach, actor placement and camp, companion administration, and reviewed encounter drafts.
 - A bounded SRD 5.1 development subset with seven starter ancestries, level progression, equipment, selected spells, Magic Missile, Healing Word, Rage resistance, Lay on Hands, and server-authoritative combat state.
+
+### The AI Director, memory, and knowledge
+
+- A persisted campaign-wide human/AI Director, separate from the player adventure agent, with explicit delegation and takeover, Open scene and Continue scene, a bounded private planning lane, and a separate public narrator.
+- Ordered one-to-three-candidate beats where each candidate commits in its own transaction with a receipt; a later failure records a partial-completion blocker rather than rolling back earlier receipts.
+- Bounded read-only grounding rounds, receipt-recorded world-time advancement, ambient transition beats that hand pacing back without requiring a narrative question, and prior-scene continuity that is explicitly labeled and never treated as evidence.
+- Public narration that carries present-NPC ledger knowledge with explicit attribution, plus a provider-free Director candidate-choice oracle and rubric and a capped live playtest harness.
+- Direct source-attributed SQLite recall with strict query, hit, and packet limits, immutable narration dispatch provenance, GM-only no-replay inspection, and provider-free readiness diagnostics.
+- An immutable NPC observation ledger for witnessed, told, and gossiped knowledge with trust-gated reads and a provider-free attribution, privacy, negation, and disclosure evaluator.
 
 The SRD module is deliberately partial. Guiding Bolt, most cantrips, broad spell saves and attack rolls, subclasses, feats, multiclassing, and many ancestry traits remain fail-closed or metadata-only. See the [SRD coverage matrix](docs/srd-5.1-coverage.md) for the exact boundary.
 
@@ -84,7 +123,7 @@ The following inventory is intentionally more concrete than the product overview
 - Exact-once starter inventory/wallet materialization, GM actor placement, and recipient-safe combat reward claim/reconciliation
 - World travel, NPCs, factions, reputation, quests, clues, story graphs, and role-filtered projections
 - Authoritative room-scoped NPC place, move, and remove commands with role-safe running-cast and stopped-history projections
-- Fixed-local-owner companion management GET and closed receipt-only command POST for owner/GM creation and bounded grant creation/revocation, plus client transport only; there is no companion UI, grant exercise, dismissal, proposal/decision administration, or public member HTTP projection
+- Owner/GM companion administration through an authoritative management GET, a closed receipt-only create-companion/grant-create/grant-revoke command POST, and a Cast studio panel; delegated grant exercise, dismissal, proposal/decision administration, and public member HTTP projection remain undelivered
 - Exact pinned consumable action GET, command POST, and exact-result GET settle the supported quantity-one damage, healing, and health/guard/focus subset atomically; the combat UI uses only the server target and action cost, persists ambiguity before POST, never retries automatically, and reconciles exact result plus combat/log/actions, while instant modifiers remain fail-closed
 - Client studios for administration, content, characters, sheets, combat, world, cast, journals, history, and transfer
 - Durable adventure turns, reconciliation, confirmations, mechanic receipts, narration swipes, and reviewed encounter and campaign-content drafts with authoritative application
@@ -92,12 +131,16 @@ The following inventory is intentionally more concrete than the product overview
 - Server-internal campaign context assembly with role-derived audience visibility, exact precedence, independent UTF-16 whole-line budgets, and session/speaker-persona binding
 - A role-selected, bounded provider tool loop with deterministic command bridging, durable resume, and receipt-aware narration and recovery
 - One authoritative durable DM conversation per campaign room, with a bounded transcript that collapses narration derivatives; legacy room messages remain read-only pre-campaign history
-- A full read-only gameplay-sheet drawer and `actor_sheet.read`; reference controls and the topological, not-to-scale route map only prefill declarations and never execute actions
+- A full gameplay sheet with authoritative action panels for checks, powers and spells, conditions and effects, resources, rests, equipment, vendor sale, and trade accept/cancel, plus the read-only `actor_sheet.read` projection used inside the provider loop; sheet references and the topological, not-to-scale route map only prefill declarations and never execute actions
+- The persisted human/AI Director with delegation and takeover, Open and Continue scene, ordered candidate beats, bounded read-only grounding, receipt-recorded world time and ambient transition beats, knowledge-attributed narration, and partial-completion blockers
+- Owner/GM room detach, actor placement and camp, and reviewed encounter generation/application, all reachable from the client
+- Direct source-attributed SQLite recall with immutable narration dispatch provenance and GM-only no-replay context inspection; no FTS, vector store, automatic summary, or alias expansion is implemented
+- An immutable NPC observation ledger for witnessed, told, and gossiped knowledge with trust-gated reads and a provider-free attribution, privacy, negation, and disclosure evaluator
 - Foundation, Full narrative campaign, and Custom / granular reviewed generation over 11 supported narrative sections, with explicit artifact selection/apply and separate player-material publication
 
 The registered `dnd-5e@1.0.0` rules module is a tested development subset adapted from the 2014 SRD 5.1, not full D&D support or full SRD conformance. It provides pure deterministic helpers for the mechanics listed in the [coverage matrix](docs/srd-5.1-coverage.md); many rules and feature interactions remain partial or unsupported. This work includes material from Wizards of the Coast LLC's [official SRD source page](https://www.dndbeyond.com/srd) and the exact [System Reference Document 5.1 CC PDF](https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). VelvetRP adapts and modifies that material into deterministic software mechanics; Wizards of the Coast LLC has not endorsed these modifications.
 
-The full operation contract is in the [API reference](docs/api.md): 147 counted explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases. The implementation intentionally does not duplicate the route and schema tree here.
+The full operation contract is in the [API reference](docs/api.md): 148 counted explicit trusted-local RPG operations plus feature discovery, excluding implicit HEAD aliases. The implementation intentionally does not duplicate the route and schema tree here.
 
 ## Requirements
 
@@ -226,7 +269,7 @@ A missing or empty database is initialized atomically from `server/src/repo/db/c
 ## Limitations
 
 - Campaign context excludes full catalogs, full inventories, story graph dumps, unrelated private state, hidden routes, and controller identities. NPC/enemy target-private planning is non-disclosable. Legacy character prompting accepts only exact session- and persona-bound player/NPC baskets; DM/enemy legacy prompts fail closed, while the composed adventure orchestrator selects role-authorized player or enemy context.
-- Adventure tools do not provide general inventory use, purchases/vendors, general power use, combat spells/area targeting, resource initialization, encounter start, or arbitrary effects. Sheet/map references never auto-execute. Direct HTTP mechanics remain separate and only their documented closed commands are supported.
+- Adventure tools are a closed, role- and state-selected vocabulary of exact candidates and bounded commands: context and state reads, attribute and dice, legal combat actions, travel, quest objective and lifecycle, SRD checks, inventory actions, present-vendor commerce, power use, rests, pinned combat consumables and powers, and progression. They do not provide arbitrary inventory or power use, area or multi-target targeting, resource initialization, encounter start, or arbitrary effects, and they fail closed when no supported candidate exists. Sheet/map references never auto-execute. Direct HTTP mechanics remain separate and only their documented closed commands are supported.
 - Campaign generation supports outline, arcs, locations/connections, factions, NPCs, quests, encounter concepts, clues, story nodes/relationships, handouts, and scene prompts. It does not mechanically generate items, executable monsters/stat blocks, or campaign-native lore.
 - The campaign-visible NPC roster is the set of available campaign NPCs; persisted room presence is separate explicit M5.1 state. The context drawer uses the roster for GM placement choices and the authoritative present-cast read for running presence or stopped history. Existing exclusions remain: unrelated roster entries are not treated as present, and hidden locations, controller identities, and role-private NPC state are not added to player projections.
 - Published content-pack versions are immutable. Create a new exact version to change one.
@@ -237,6 +280,8 @@ A missing or empty database is initialized atomically from `server/src/repo/db/c
 ## Testing
 
 For local development, run the owning workspace typecheck and only the test file(s) affected by the change, for example `npm run test --workspace velvet-mvp-server -- test/repo.test.ts`. Run `npm test` for broad or cross-workspace changes, or before merging when CI is unavailable. CI is the normal full validation gate and runs all unit tests plus deterministic E2E. Run `npm run test:e2e` locally when behavior crosses browser, API, streaming, or persistence boundaries. Run live E2E only when intentionally validating a configured provider. Test totals are intentionally omitted because they change frequently.
+
+The deterministic browser suite uses disposable SQLite and an in-process fake provider, so it charges nothing. It exercises character-sheet actions, vendor sale, bilateral trade accept/cancel, expedition placement and camp, companion administration, reviewed encounter generation, tactical movement, session recovery, the Director lifecycle, campaign memory recall, and GM context inspection through the real client, HTTP layer, and persistence boundary.
 
 ## Policy Status
 
@@ -252,6 +297,12 @@ The current policy layer is limited, not a comprehensive content-moderation syst
 | [Operations](docs/operations.md) | Setup, environment, disposable development storage, and release gates |
 | [Campaign generation](docs/campaign-generation.md) | Reviewed generation, selective application, planning, and material delivery |
 | [DM harness architecture](docs/dm-harness-architecture.md) | Authoritative conversation, trust boundaries, sheet references, tools, limitations, ruleset scope, and agent best practices |
+| [AI dungeon master](docs/ai-dungeon-master.md) | Director controls, bounded planning, narration, research, authority boundaries, and limitations |
+| [Frontend control plane](docs/frontend-control-plane.md) | Living Atlas workspace, preparation, session recovery, and browser acceptance coverage |
+| [Vendor commerce](docs/vendor-commerce.md) | Exact visible-vendor candidates, confirmation, authoritative prices, and replay |
+| [Exact combat sheet actions](docs/combat-sheet-actions.md) | Exact combat consumable and power candidates, settlement, and exclusions |
+| [Bounded campaign memory](docs/campaign-memory.md) | Direct SQLite recall, source and authority scope, packing limits, and migration behavior |
+| [NPC knowledge and rumors](docs/npc-knowledge-rumors.md) | Observation ledger, rumors, attribution, privacy, and evaluation gates |
 | [Gameplay agent instructions](docs/interactive-gameplay-agent-instructions.md) | Trusted-local API workflow and reconciliation guidance |
 | [RPG integration plan](docs/rpg-integration-plan.md) | Product and mechanics integration design |
 | [Roleplay architecture](docs/roleplay-architecture-2026.md) | Roleplay context and generation architecture, including historical notes |

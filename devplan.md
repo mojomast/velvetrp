@@ -2,7 +2,7 @@
 
 Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2 and the other narrowly recognized exact predecessor upgrades documented in Operations.
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 147 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 148 counted operations plus feature discovery.
 
 ## Delivered
 
@@ -15,7 +15,7 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 - [x] M4.1-M4.6: campaign context, bounded provider/tool execution, recovery, and reviewed generation application.
 - [x] H0.1-H0.4: migration-support foundation, deterministic E2E repairs, documentation reconciliation, and canonical health gate.
 - [x] M5.1: authoritative room-scoped NPC presence.
-- [x] M5.2 partial: companion repository administration and fixed-local-owner HTTP/client transport.
+- [x] M5.2 partial: companion repository administration, fixed-local-owner HTTP/client transport, and the Cast studio companion-administration panel (create companion, create/revoke exact grant) with deterministic browser coverage; delegated grant exercise and dismissal remain.
 - [x] M5.3 partial: authoritative combat-health composition and bounded consumable runtime/UI with modifiers excluded.
 - [x] M5.4 delivered slices: exact travel candidate issuance, atomic execution, provider binding/recovery, receipt display, and deterministic E2E; no live selection API/UI.
 - [x] M5.5 protocol checkpoint: exact commit-reveal framing, platform cryptography, lifecycle, and proof vectors; no persistence/product integration.
@@ -24,10 +24,12 @@ This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns curr
 - [x] v51: exact starter materialization, actor placement, combat reward projection/claim, wallet settlement, and exact claim reconciliation.
 - [x] v53: generated story materialization and explicit player-safe handout/scene-prompt publication.
 - [x] Drift remediation: v53 migration policy/evidence, current API/docs/configuration reconciliation, and executable drift guards.
+- [x] Playability program (Plans 1-5): readiness diagnostics, the reviewed human/AI adventure, measured campaign memory, the living knowledge ledger, and the living Director.
+- [x] Browser-playable client surfaces: character-sheet actions (checks, powers/spells, effects, resources, rests, equipment), vendor sale, bilateral trade accept/cancel, room detach, actor placement and camp, companion administration, and reviewed encounter generation, each covered by the deterministic E2E gate.
 
 ## Remaining
 
-- [ ] M5.2 optional companion management UI and future delegated grant exercise.
+- [ ] M5.2 delegated companion grant exercise and dismissal.
 - [ ] M5.3 remaining milestone scope outside the deliberately bounded consumable lane.
 - [ ] M5.5 persistence, command, and client integration if separately promoted.
 - [ ] Live exact-candidate generation/selection HTTP and client UI if separately promoted.
