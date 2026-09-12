@@ -241,7 +241,7 @@ for (const device of [
       expect(activationPosts).toBe(0);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("VELVET / LIVING ATLAS", { exact: true })).toBeVisible();
+      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
       await page.getByRole("navigation", { name: "In-room tools", exact: true }).locator('[data-atlas-tool="gm"]').click();
       const controls = page.getByRole("region", { name: "Run this scene", exact: true });
       await expect(controls).toBeVisible();

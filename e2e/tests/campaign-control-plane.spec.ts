@@ -142,7 +142,7 @@ for (const device of [
   test.describe(device.name, () => {
     test.use({ viewport: device.viewport, isMobile: device.isMobile, hasTouch: device.hasTouch });
 
-    tabletopTest("successful activation opens Living Atlas and confirms one tactical move", async ({ page, tabletop }, testInfo) => {
+    tabletopTest("successful activation opens Campaign Command Center and confirms one tactical move", async ({ page, tabletop }, testInfo) => {
       const { request, campaignId, campaignName, roomId, actorId } = tabletop;
       const roomPath = `/api/rpg/v1/campaigns/${campaignId}/rooms/${roomId}`;
       const activationMethods: string[] = [];
@@ -191,7 +191,7 @@ for (const device of [
       expect(map.status(), await map.text()).toBe(200);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("VELVET / LIVING ATLAS", { exact: true })).toBeVisible();
+      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
       const tools = page.getByRole("navigation", { name: "In-room tools", exact: true });
       await expect(tools).toBeVisible();
       const livingMap = page.getByRole("region", { name: "Living map", exact: true });

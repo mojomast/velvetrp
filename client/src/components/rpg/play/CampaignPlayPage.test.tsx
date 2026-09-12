@@ -112,8 +112,8 @@ describe("CampaignPlayPage", () => {
   it("keeps a new atlas map and conversation mounted while nonmodal tools open", async () => {
     render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={api()} onBack={vi.fn()} onUnavailable={vi.fn()} />);
     await screen.findByRole("heading", { name: "Adventure room" });
-    expect(document.querySelector(".living-atlas")).toBeTruthy();
-    expect(document.querySelector(".campaign-play-page, .campaign-tabletop, .tabletop-stage")).toBeNull();
+    expect(document.querySelector(".campaign-play-page")).toBeTruthy();
+    expect(document.querySelector(".living-atlas")).toBeNull();
     const map = screen.getByRole("region", { name: "Campaign maps" });
     const log = screen.getByRole("log");
     expect(screen.getByLabelText("Map actor")).toBeTruthy();

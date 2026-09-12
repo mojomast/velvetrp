@@ -145,7 +145,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
       expect(activationPosts).toBe(0);
       await page.getByRole("button", { name: "Enter adventure", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Adventure room", exact: true })).toBeVisible();
-      await expect(page.getByText("VELVET / LIVING ATLAS", { exact: true })).toBeVisible();
+      await expect(page.getByText("CAMPAIGN COMMAND CENTER", { exact: true })).toBeVisible();
       await expect(page.getByLabel("Map actor")).toHaveValue(actorId);
       await page.getByRole("button", { name: "Combat grid", exact: true }).click();
       await page.getByText("Combat readiness", { exact: true }).click();
