@@ -146,7 +146,7 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
     }
     if (value.event.type === "actor_dice_rolled") {
       const data = value.event.data as { total: number };
-      return `The roll totals ${data.total}. No success or failure is established, and the attempted task remains unresolved.`;
+      return `The dice come up ${data.total}. The attempt is made and the moment is still open; no success or failure is recorded yet.`;
     }
     if (value.event.type === "actor_attribute_set") {
       const data = value.event.data as { valueBefore: number; valueAfter: number };
@@ -208,7 +208,8 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
     if(value.kind==="rest")return includesFact(text,value.restName)&&value.recovery.every(delta=>includesFact(text,delta.label)&&includesNumber(text,delta.after));
     if(value.kind==="combat-consumable"||value.kind==="combat-power")return includesFact(text,value.kind==="combat-consumable"?value.itemName:value.powerName)&&includesFact(text,value.target)&&value.outcomes.every(outcome=>outcome.kind==="effect"?includesFact(text,outcome.effect):includesNumber(text,outcome.applied)&&(outcome.after===null?outcome.kind==="resource"&&includesFact(text,outcome.resource):includesNumber(text,outcome.after)));
     if(value.kind==="combat")return includesFact(text,value.action)&&(value.outcome.kind==="damage"?includesNumber(text,value.outcome.applied)&&includesNumber(text,value.outcome.hitPointsAfter)&&includesFact(text,value.outcome.statusAfter):value.outcome.kind==="status"?includesFact(text,value.outcome.statusAfter):includesAny(text,["no damage","ends","ended","attack","flee"]));
-    if(value.event.type==="actor_dice_rolled")return includesNumber(text,(value.event.data as {total:number}).total)&&includesAny(text,["roll","rolled","total"]);
+    if(value.event.type==="actor_dice_rolled")return includesNumber(text,(value.event.data as {total:number}).total)
+      &&includesAny(text,["roll","rolled","rolls","total","die","dice","shows","comes up","lands","result"]);
     if(value.event.type==="actor_attribute_set"){const data=value.event.data as {valueBefore:number;valueAfter:number};return includesNumber(text,data.valueBefore)&&includesNumber(text,data.valueAfter)&&includesAny(text,["attribute","change","changes","changed"]);}
     const data=value.event.data as {current:number;max:number};return includesNumber(text,data.current)&&includesNumber(text,data.max)&&includesAny(text,["resource","current","maximum"]);
   });

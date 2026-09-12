@@ -746,7 +746,7 @@ describe("M2.11 adventure turn routes", () => {
     expect(after.prepare("SELECT count(*) count FROM turn_mechanics_links_v36 WHERE turn_id=?").get(turn.turnId)).toEqual({ count: 1 });
     expect(after.prepare("SELECT count(*) count FROM campaign_commands WHERE source_turn_id=?").get(turn.turnId)).toEqual({ count: 1 }); after.close();
     const rollNarration=events(resumed.body).find((event)=>event.type==="narration_delta");
-    expect(rollNarration).toMatchObject({type:"narration_delta",payload:{text:expect.stringMatching(/^The authoritative result is clear\. The roll totals \d+\. No success or failure is established, and the attempted task remains unresolved\.$/)}});
+    expect(rollNarration).toMatchObject({type:"narration_delta",payload:{text:expect.stringMatching(/^The authoritative result is clear\. The dice come up \d+\. The attempt is made and the moment is still open; no success or failure is recorded yet\.$/)}});
 
     let priorTurnId = turn.turnId;
     for (const [variant, key] of [["narration-retry", "retry-one"], ["narration-retry", "retry-two"], ["narration-swipe", "swipe"]] as const) {

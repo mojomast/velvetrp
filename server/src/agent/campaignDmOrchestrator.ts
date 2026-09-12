@@ -2,7 +2,8 @@ import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJ
 import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
 import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_TOKENS, DM_PLANNING_COMPLETION_MAX_TOKENS, DM_PROVIDER_DEADLINE_MS,
+import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_BYTES, DM_PLANNING_COMPLETION_MAX_TOKENS,
+  DM_PLANNING_PROMPT_MAX_BYTES, DM_PROVIDER_DEADLINE_MS, estimatePromptTokens,
   type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
@@ -102,12 +103,14 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
       promptVersion: "campaign-dm-v1", schemaVersion: "campaign-dm-v1", parallelToolCalls: false,
       toolChoice: forced ? { name: "select_dm_beat" } : "auto", tools, messages, bodyOverrides: DIRECTOR_BODY_OVERRIDES,
     };
-    // UTF-8 bytes are a conservative token upper bound; charge the full reservation on unknown outcome.
-    const promptBound = 1024 + Buffer.byteLength(JSON.stringify(input.messages) + JSON.stringify(input.tools) + JSON.stringify(harness));
+    // Bytes gate the request size; a conservative token estimate (bytes/3) drives the durable
+    // token reservations, because the reserved-token columns are schema-capped at 23,744.
+    const promptBytes = 1024 + Buffer.byteLength(JSON.stringify(input.messages) + JSON.stringify(input.tools) + JSON.stringify(harness));
+    const promptBound = estimatePromptTokens(promptBytes);
     const totalBound = promptBound + completionLimit;
     const cost = price.promptPerMillion === null || price.completionPerMillion === null ? null
       : (promptBound * price.promptPerMillion + completionLimit * price.completionPerMillion) / 1_000_000;
-    if (promptBound > 23_744 || runningTokens + totalBound > tokenCap || (costCap !== null && (cost === null || runningCost + cost > costCap))) {
+    if (promptBytes > DM_PLANNING_PROMPT_MAX_BYTES || runningTokens + totalBound > tokenCap || (costCap !== null && (cost === null || runningCost + cost > costCap))) {
       repository.blockDmBeat(principal, runId, "director-budget-exceeded-before-dispatch");
       return;
     }
@@ -135,7 +138,7 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
       if (round === 0) repository.recordDmProviderUsage(principal, runId, 'planning', accounting);
       if (result.usage && (![result.usage.promptTokens, result.usage.completionTokens, result.usage.totalTokens].every(value => Number.isSafeInteger(value) && value >= 0)
         || result.usage.totalTokens !== result.usage.promptTokens + result.usage.completionTokens
-        || result.usage.promptTokens > promptBound || result.usage.completionTokens > completionLimit
+        || result.usage.promptTokens > promptBytes || result.usage.completionTokens > completionLimit
         || result.usage.totalTokens > tokenCap)) throw new Error("DM provider exceeded token budget");
       if (costCap !== null && (accounting.costUsd === null || accounting.costUsd > costCap)) throw new Error('DM provider exceeded priced budget');
       runningTokens += accounting.totalTokens;
@@ -193,14 +196,15 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       harness,preset:getPromptPreset("default"),promptVersion:"campaign-dm-narration-v1",schemaVersion:"campaign-dm-narration-v1",
       messages:dmNarrationMessages(work.context,work.fallback),parallelToolCalls:false,toolChoice:{name:"submit_dm_scene"},
       tools:[dmNarrationTool(work.context)],bodyOverrides:DIRECTOR_BODY_OVERRIDES};
-    const promptBound=1024+Buffer.byteLength(JSON.stringify(input.messages)+JSON.stringify(input.tools)+JSON.stringify(harness));
-    const total=promptBound+completionLimit;
+    const promptBytes=1024+Buffer.byteLength(JSON.stringify(input.messages)+JSON.stringify(input.tools)+JSON.stringify(harness));
+    const promptBound=estimatePromptTokens(promptBytes);
+    const total=promptBytes+completionLimit;
     const price=provider.pricing;
     const cost=price.promptPerMillion===null||price.completionPerMillion===null?null:
       (promptBound*price.promptPerMillion+completionLimit*price.completionPerMillion)/1_000_000;
     const caps=[provider.adventureTurnBudget.maxEstimatedCostUsd,work.planning.maxCostUsd].filter((cap):cap is number=>cap!==null);
     reserved=usageRecord(null,promptBound,completionLimit,price);
-    if(total>DM_NARRATION_PROMPT_MAX_TOKENS||total+work.planning.tokens>Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
+    if(promptBytes>DM_NARRATION_PROMPT_MAX_BYTES||promptBound+completionLimit+work.planning.tokens>Math.min(DM_AGGREGATE_TOKEN_CAP,work.planning.maxTotalTokens,provider.adventureTurnBudget.maxTotalTokens)
       ||caps.some(cap=>cost===null||work.planning.costUsd===null||cost+work.planning.costUsd>cap)){
       repository.settleDmNarration(principal,runId,null,null,"aggregate-budget-exceeded");
     } else {

@@ -24,6 +24,25 @@ describe("DM recovery and execution fences",()=>{
     expect(f.repo.getDmRun("local-owner",f.campaign.id,f.session.id,next.runId)).toMatchObject({state:"blocked",blockers:["director-budget-exceeded-before-dispatch"]});
     f.repo.close();
   });
+  it("dispatches a rich planning context beyond the old 23,744-byte prompt cap",async()=>{
+    const f=await dmFixture();f.graph();
+    // A large private story graph previously produced a >23,744-byte planning prompt and blocked before any provider call.
+    f.repo.createCampaignStorylineGraph("local-owner",f.campaign.id,{expectedRevision:f.repo.getCampaignStory("local-owner",f.campaign.id)!.revision,
+      idempotencyKey:"big-story",storyline:{storylineId:"big",title:"Big story",summary:"A long public storyline",plotPoints:[],clues:[],edges:[],
+        nodes:Array.from({length:30},(_,i)=>({nodeId:`big-${i}`,title:`Long scene ${i}`,description:"y".repeat(700),gmNotes:"",revealThreshold:0}))}});
+    const run=f.repo.openDmBeat("local-owner",f.campaign.id,f.session.id,{intent:"open",expectedModeRevision:0,idempotencyKey:"rich-context"});
+    const db=database();
+    const size=(db.prepare("SELECT length(context_json) n FROM dm_runs WHERE run_id=?").get(run.runId) as {n:number}).n;
+    expect(size).toBeGreaterThan(23_744);
+    const complete=vi.fn(async()=>{throw new Error("stop after dispatch");});
+    await orchestrateCampaignDmBeat(f.repo,"local-owner",run.runId,dmDependencies(complete));
+    expect(complete).toHaveBeenCalledTimes(1);
+    expect(f.repo.getDmRun("local-owner",f.campaign.id,f.session.id,run.runId).blockers).not.toContain("director-budget-exceeded-before-dispatch");
+    // The durable reservation must be a token estimate, never a byte count.
+    const reserved=db.prepare('SELECT reserved_prompt_tokens tokens FROM dm_provider_requests WHERE run_id=?').get(run.runId) as {tokens:number}|undefined;
+    if(reserved)expect(reserved.tokens).toBeLessThanOrEqual(23_744);
+    db.close();f.repo.close();
+  });
   it.each(["mode","safety","delegation"] as const)("fences %s changes during provider dispatch before mutation or publication",async(kind)=>{
     const f=await dmFixture();f.graph();f.advance();
     const db=database();db.prepare("INSERT INTO principals(id,display_name,is_local) VALUES('gm','GM',0)").run();
