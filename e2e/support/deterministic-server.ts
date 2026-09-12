@@ -145,25 +145,7 @@ app.post("/api/__e2e/materialize-pinned-power-execution", async (request, reply)
   if (!body.success) {
     return reply.code(400).send({ error: "invalid E2E pinned power execution request" });
   }
-  return materialize(reply, () => {
-    const fixtureDb = new DatabaseDriver(path.join(dataDir, "velvet.sqlite"));
-    try {
-      const { campaignId, power } = body.data;
-      const available = fixtureDb.prepare(`SELECT 1 FROM campaigns campaign
-        JOIN campaign_catalog_current_pins pin ON pin.campaign_id=campaign.id
-        JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id
-          AND definition.pack_version=pin.pack_version
-        WHERE campaign.id=? AND campaign.owner_principal_id='local-owner'
-          AND pin.pack_id=? AND pin.pack_version=? AND definition.kind=? AND definition.definition_id=?`)
-        .get(campaignId, power.packId, power.packVersion, power.kind, power.definitionId);
-      if (!available) throw new DeterministicE2EFixtureAuthorizationError();
-      fixtureDb.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25
-        (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)`)
-        .run(campaignId, power.packId, power.packVersion, power.kind, power.definitionId);
-    } finally {
-      fixtureDb.close();
-    }
-  });
+  return materialize(reply, () => fixtures.materializePinnedPower({ principalId: "local-owner", ...body.data }));
 });
 
 const pinnedEnemyExecutionBodySchema = z.object({
@@ -181,25 +163,7 @@ const pinnedEnemyExecutionBodySchema = z.object({
 app.post("/api/__e2e/materialize-pinned-enemy", async (request, reply) => {
   const body = pinnedEnemyExecutionBodySchema.safeParse(request.body);
   if (!body.success) return reply.code(400).send({ error: "invalid E2E pinned enemy request" });
-  return materialize(reply, () => {
-    const fixtureDb = new DatabaseDriver(path.join(dataDir, "velvet.sqlite"));
-    try {
-      const { campaignId, enemy } = body.data;
-      const available = fixtureDb.prepare(`SELECT 1 FROM campaigns campaign
-        JOIN campaign_catalog_current_pins pin ON pin.campaign_id=campaign.id
-        JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id
-          AND definition.pack_version=pin.pack_version
-        WHERE campaign.id=? AND campaign.owner_principal_id='local-owner'
-          AND pin.pack_id=? AND pin.pack_version=? AND definition.kind=? AND definition.definition_id=?`)
-        .get(campaignId, enemy.packId, enemy.packVersion, enemy.kind, enemy.definitionId);
-      if (!available) throw new DeterministicE2EFixtureAuthorizationError();
-      fixtureDb.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25
-        (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)`)
-        .run(campaignId, enemy.packId, enemy.packVersion, enemy.kind, enemy.definitionId);
-    } finally {
-      fixtureDb.close();
-    }
-  });
+  return materialize(reply, () => fixtures.materializePinnedEnemy({ principalId: "local-owner", ...body.data }));
 });
 
 app.post("/api/__e2e/materialize-consumable-entry", async (request, reply) => {

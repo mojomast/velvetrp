@@ -60,6 +60,29 @@ async function setupMechanicsCampaign(request: APIRequestContext, label: string)
   return { campaignName, campaignId, actorId: actor.actorId, sessionId: session.id, personaId: persona.id, characterId: finalized.character.id };
 }
 
+/** Finalizes one additional durable mechanics character into an already-configured campaign. */
+async function addMechanicsCharacter(request: APIRequestContext, campaignId: string, label: string): Promise<{ actorId: string }> {
+  const fixture = MECHANICS_STARTER_CATALOG;
+  const persona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-${label}-Actor`, age: 29, archetype: "Deterministic trader",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
+  const draft = await json<{ draft: { id: string; revision: number } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts`, {
+    personaId: persona.id, durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${runId}-${label}-draft`,
+  });
+  const reference = (kind: "race" | "background" | "class") => fixture.definitions.find((definition) => definition.reference.kind === kind)!.reference;
+  const selected = await json<{ draft: { revision: number } }>(request, "PATCH", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}`, {
+    expectedRevision: draft.draft.revision, idempotencyKey: `${runId}-${label}-select`,
+    selections: { race: reference("race"), background: reference("background"), class: reference("class"), starterGrant: "kit" },
+  });
+  const finalized = await json<{ character: { id: string } }>(request, "POST", `/rpg/v1/campaigns/${campaignId}/character-drafts/${draft.draft.id}/finalize`, {
+    expectedRevision: selected.draft.revision, idempotencyKey: `${runId}-${label}-finalize`,
+  }, 201);
+  const actor = await json<{ actorId: string }>(request, "GET", `/__e2e/campaigns/${campaignId}/characters/${finalized.character.id}/actor`);
+  return { actorId: actor.actorId };
+}
+
 async function openRoom(page: Page, campaignName: string): Promise<void> {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
@@ -115,6 +138,148 @@ test("character sheet resolves a check, applies/removes an effect, and adjusts a
   expect(resources.resources).toContainEqual(expect.objectContaining({ name: "focus", current: 2, max: 4 }));
   const effects = await json<{ effects: unknown[]; revision: number }>(request, "GET", `/rpg/v1/actors/${fixture.actorId}/effects`);
   expect(effects.effects).toEqual([]);
+});
+
+test("character sheet sells an exact item to a present vendor once", async ({ page, request }) => {
+  const fixture = await setupMechanicsCampaign(request, "Vendor");
+  const economy = await request.post("/api/__e2e/materialize-economy-fixture", {
+    data: { campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0 },
+  });
+  expect(economy.status()).toBe(204);
+  const shopId = `${fixture.campaignId}-waylamp-shop`, stockId = `${fixture.campaignId}-waylamp-stock`;
+  const locationId = `${runId}-market`;
+  const location = await request.post("/api/__e2e/materialize-campaign-location", {
+    data: { campaignId: fixture.campaignId, locationId, parentLocationId: null, name: "Waylamp Market", description: "Open stalls." },
+  });
+  expect(location.status()).toBe(204);
+  const npcPersona = await json<{ id: string }>(request, "POST", "/characters", {
+    name: `${runId}-Vendor-Persona`, age: 44, archetype: "Merchant",
+    boundaries: "Fictional deterministic test only", fictionalConfirmed: true,
+  });
+  const npc = await json<{ npc: { npcId: string } }>(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/npcs`, {
+    personaId: npcPersona.id, publicState: { name: `${runId}-Vendor` },
+    privateState: { goals: "Trade", gmNotes: "E2E only", merchantState: null },
+    expectedRevision: 0, idempotencyKey: `${runId}-vendor-npc`,
+  }, 201);
+  await json(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/rooms/${fixture.sessionId}/npcs/${npc.npc.npcId}/presence-commands`, {
+    expectedRevision: 0, idempotencyKey: `${runId}-vendor-presence`, mutation: { kind: "place", locationId },
+  }, 200);
+  await json(request, "POST", `/rpg/v1/actors/${fixture.actorId}/placement-commands`, {
+    campaignId: fixture.campaignId, locationId, expectedRevision: 0, idempotencyKey: `${runId}-vendor-place`,
+  }, 200);
+  let administration = await json<{ campaign: { revision: number } }>(request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/administration`);
+  await json(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/vendor-association-commands`, {
+    expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-vendor-associate`,
+    npcId: npc.npc.npcId, shopId,
+  }, 200);
+  administration = await json<{ campaign: { revision: number } }>(request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/administration`);
+  await json(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/buy-policy-commands`, {
+    expectedRevision: administration.campaign.revision, idempotencyKey: `${runId}-vendor-policy`,
+    shopId, stockId, payoutUnitMinor: 4,
+  }, 200);
+  const entryId = `${runId}-vendor-waylamp`;
+  const waylamp = await request.post("/api/__e2e/materialize-waylamp", {
+    data: { campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0, entryId },
+  });
+  expect(waylamp.status()).toBe(204);
+
+  await openRoom(page, fixture.campaignName);
+  await openCharacterTools(page);
+  const sell = page.getByRole("region", { name: "Sell to a vendor" });
+  await sell.getByLabel("Item").selectOption(entryId);
+  await sell.getByLabel("Quantity").fill("1");
+  await sell.getByRole("button", { name: "Request sale quote" }).click();
+  await expect(sell.getByText("Payout")).toBeVisible();
+  await sell.getByRole("button", { name: "Sell once" }).click();
+  await expect(page.getByRole("heading", { name: "Economy receipt and server result" })).toBeVisible();
+  await expect(page.getByText(/Exact received total/)).toBeVisible();
+
+  const wallet = await json<{ wallet: { balances: Array<{ minorUnits: number }> } }>(
+    request, "GET", `/__e2e/economy/campaigns/${fixture.campaignId}/actors/${fixture.actorId}/wallet`,
+  );
+  expect(wallet.wallet.balances[0]!.minorUnits).toBe(24);
+  const inventory = await json<{ entries: Array<{ entryId: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/actors/${fixture.actorId}/inventory`,
+  );
+  expect(inventory.entries.map((entry) => entry.entryId)).not.toContain(entryId);
+});
+
+test("character sheet accepts a bilateral trade for the exact instance", async ({ page, request }) => {
+  const fixture = await setupMechanicsCampaign(request, "Trade");
+  const other = await addMechanicsCharacter(request, fixture.campaignId, "Trade-Other");
+  const economy = await request.post("/api/__e2e/materialize-economy-fixture", {
+    data: { campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0 },
+  });
+  expect(economy.status()).toBe(204);
+  const waylamp = { kind: "item" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId,
+    packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:item:waylamp" };
+  const offeredEntry = `${runId}-trade-offered`, requestedEntry = `${runId}-trade-requested`;
+  for (const [actorId, entryId] of [[fixture.actorId, requestedEntry], [other.actorId, offeredEntry]] as const) {
+    const seeded = await request.post("/api/__e2e/materialize-waylamp", {
+      data: { campaignId: fixture.campaignId, actorId, expectedRevision: 0, entryId },
+    });
+    expect(seeded.status()).toBe(204);
+  }
+  const tradeId = `${runId}-trade`;
+  await json(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/actors/${other.actorId}/economy-commands`, {
+    type: "propose_bilateral_trade", tradeId, recipientActorId: fixture.actorId,
+    offered: { items: [{ kind: "instanced", entryId: offeredEntry, item: waylamp }], currency: [] },
+    requested: { items: [{ kind: "instanced", entryId: requestedEntry, item: waylamp }], currency: [] },
+    expectedRevision: 0, idempotencyKey: `${runId}-trade-propose`,
+  }, 200);
+
+  await openRoom(page, fixture.campaignName);
+  await openCharacterTools(page);
+  const trades = page.getByRole("region", { name: "Bilateral trades" });
+  await trades.getByLabel("Trade ID").fill(tradeId);
+  await trades.getByRole("button", { name: "Accept trade" }).click();
+  await expect(page.getByRole("heading", { name: "Economy receipt and server result" })).toBeVisible();
+  await expect(page.getByText(`${tradeId} · settled`)).toBeVisible();
+
+  const inventory = await json<{ entries: Array<{ entryId: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/actors/${fixture.actorId}/inventory`,
+  );
+  expect(inventory.entries.map((entry) => entry.entryId)).toEqual(expect.arrayContaining([offeredEntry]));
+  expect(inventory.entries.map((entry) => entry.entryId)).not.toContain(requestedEntry);
+});
+
+test("character sheet cancels an open bilateral trade without settling", async ({ page, request }) => {
+  const fixture = await setupMechanicsCampaign(request, "TradeCancel");
+  const other = await addMechanicsCharacter(request, fixture.campaignId, "TradeCancel-Other");
+  const economy = await request.post("/api/__e2e/materialize-economy-fixture", {
+    data: { campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0 },
+  });
+  expect(economy.status()).toBe(204);
+  const waylamp = { kind: "item" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId,
+    packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:item:waylamp" };
+  const aEntry = `${runId}-cancel-a`, bEntry = `${runId}-cancel-b`;
+  for (const [actorId, entryId] of [[fixture.actorId, aEntry], [other.actorId, bEntry]] as const) {
+    const seeded = await request.post("/api/__e2e/materialize-waylamp", {
+      data: { campaignId: fixture.campaignId, actorId, expectedRevision: 0, entryId },
+    });
+    expect(seeded.status()).toBe(204);
+  }
+  const tradeId = `${runId}-cancel-trade`;
+  await json(request, "POST", `/rpg/v1/campaigns/${fixture.campaignId}/actors/${other.actorId}/economy-commands`, {
+    type: "propose_bilateral_trade", tradeId, recipientActorId: fixture.actorId,
+    offered: { items: [{ kind: "instanced", entryId: bEntry, item: waylamp }], currency: [] },
+    requested: { items: [{ kind: "instanced", entryId: aEntry, item: waylamp }], currency: [] },
+    expectedRevision: 0, idempotencyKey: `${runId}-cancel-propose`,
+  }, 200);
+
+  await openRoom(page, fixture.campaignName);
+  await openCharacterTools(page);
+  const trades = page.getByRole("region", { name: "Bilateral trades" });
+  await trades.getByLabel("Trade ID").fill(tradeId);
+  await trades.getByRole("button", { name: "Cancel trade" }).click();
+  await expect(page.getByRole("heading", { name: "Economy receipt and server result" })).toBeVisible();
+  await expect(page.getByText(`${tradeId} · cancelled`)).toBeVisible();
+
+  const inventory = await json<{ entries: Array<{ entryId: string }> }>(
+    request, "GET", `/rpg/v1/campaigns/${fixture.campaignId}/actors/${fixture.actorId}/inventory`,
+  );
+  expect(inventory.entries.map((entry) => entry.entryId)).toContain(aEntry);
+  expect(inventory.entries.map((entry) => entry.entryId)).not.toContain(bEntry);
 });
 
 test("world expedition places an unplaced actor and camps once from the browser", async ({ page, request }) => {

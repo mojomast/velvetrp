@@ -454,10 +454,11 @@ test("M2.7 economy quotes, replays, purchases, and reconciles authoritative stat
   });
   expect(materialized.status()).toBe(204);
   const walletPath = `${base}/actors/${actorId}/wallet`;
-  const shopPath = `${base}/shops/e2e-waylamp-shop`;
+  const shopId = `${campaign.campaign.id}-waylamp-shop`;
+  const shopPath = `${base}/shops/${shopId}`;
   expect(await json<{ wallet: { balances: Array<{ currency: typeof glimmer; minorUnits: number }> } }>(request, "GET", walletPath)).toEqual({ wallet: { balances: [{ currency: glimmer, minorUnits: 20 }] } });
-  expect(await json<{ shop: { name: string; stock: Array<{ item: typeof waylamp; quantity: number; unitPrice: { currency: typeof glimmer; minorUnits: number } }> } }>(request, "GET", shopPath)).toEqual({ shop: { shopId: "e2e-waylamp-shop", campaignId: campaign.campaign.id, name: "E2E Waylamp Shop", stock: [{ item: waylamp, quantity: 2, unitPrice: { currency: glimmer, minorUnits: 8 } }] } });
-  const quoteCommand = { type: "request_purchase_quote" as const, campaignId: campaign.campaign.id, buyerActorId: actorId, shopId: "e2e-waylamp-shop", item: waylamp, quantity: 1, expectedRevision: initialResources.revision, idempotencyKey: `${runId}-m2.7-economy-quote` };
+  expect(await json<{ shop: { name: string; stock: Array<{ item: typeof waylamp; quantity: number; unitPrice: { currency: typeof glimmer; minorUnits: number } }> } }>(request, "GET", shopPath)).toEqual({ shop: { shopId, campaignId: campaign.campaign.id, name: "E2E Waylamp Shop", stock: [{ item: waylamp, quantity: 2, unitPrice: { currency: glimmer, minorUnits: 8 } }] } });
+  const quoteCommand = { type: "request_purchase_quote" as const, campaignId: campaign.campaign.id, buyerActorId: actorId, shopId, item: waylamp, quantity: 1, expectedRevision: initialResources.revision, idempotencyKey: `${runId}-m2.7-economy-quote` };
   const quoted = await json<{ quote: { quoteId: string; total: { currency: typeof glimmer; minorUnits: number } }; receipt: { revisionBefore: number; revisionAfter: number } }>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200);
   expect(quoted).toMatchObject({ quote: { campaignId: campaign.campaign.id, shopId: quoteCommand.shopId, buyerActorId: actorId, item: waylamp, quantity: 1, total: { currency: glimmer, minorUnits: 8 } }, receipt: { revisionBefore: initialResources.revision, revisionAfter: initialResources.revision + 1 } });
   expect(await json<typeof quoted>(request, "POST", "/__e2e/economy/commands", quoteCommand, 200)).toEqual(quoted);
@@ -483,11 +484,11 @@ test("critical browser and public API workflows", async ({ page, request }) => {
       fictionalConfirmed: true,
     });
     await page.goto("/");
-    // The Vite dev server compiles the app bundle on first navigation; allow
-    // extra time so a cold start cannot fail this first assertion.
-    await expect(page.getByRole("heading", { name: "Velvet" })).toBeVisible({ timeout: 15_000 });
+    // The SPA briefly renders the character library ("Velvet") before feature
+    // discovery routes the shell to the campaign library. Wait for the settled
+    // view instead of the transient loading heading, and allow cold-start time.
+    await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible({ timeout: 15_000 });
     expect(await json<{ ok: boolean }>(request, "GET", "/health")).toEqual({ ok: true });
-    await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
     const campaignName = `${runId}-Campaign`;
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Create campaign" }).click();

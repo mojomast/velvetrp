@@ -27,7 +27,7 @@ describe("exact adventure vendor commerce",()=>{
     const entry=db.prepare("SELECT entry_id FROM rpg_inventory_entries_v25 WHERE campaign_id=? AND actor_id=? AND item_definition_id=? AND equipped=0").get(f.campaign.id,f.actorId,"velvet:mechanics:item:waylamp")as{entry_id:string}|undefined;
     db.close();expect(entry).toBeDefined();
     const quote=f.repo.requestVendorSaleQuote("local-owner",f.campaign.id,f.actorId,{entryId:entry!.entry_id,quantity:1});
-    expect(quote).toMatchObject({shopId:"shop",entryId:entry!.entry_id,quantity:1,payout:{minorUnits:4,currency:{definitionId:"velvet:mechanics:currency:glimmer"}}});
+    expect(quote).toMatchObject({shopId:"shop",entryId:entry!.entry_id,quantity:1,payout:{minorUnits:4,currency:{kind:"currency",definitionId:"velvet:mechanics:currency:glimmer"}}});
     const result=f.repo.mutateEconomyForActor("local-owner",f.campaign.id,f.actorId,{kind:"sell_to_shop",quoteId:quote!.quoteId,expectedRevision:quote!.expectedRevision,idempotencyKey:"standalone-sell-once"});
     expect((result as unknown as {sale:{disposition:string;quantity:number;total:{minorUnits:number}}}).sale).toMatchObject({disposition:"sell",quantity:1,total:{minorUnits:4}});
     expect(f.repo.requestVendorSaleQuote("local-owner",f.campaign.id,f.actorId,{entryId:entry!.entry_id,quantity:9})).toBeNull();

@@ -15,7 +15,7 @@ export type VendorShopAssociation={campaignId:string;npcId:string;vendorLabel:st
 /** An exact vendor sale quote bound to one inventory revision and one visible vendor's buy policy. */
 export interface VendorSaleQuote {
   quoteId:string;shopId:string;entryId:string;quantity:number;
-  payout:{currency:{packId:string;packVersion:string;definitionId:string};minorUnits:number};
+  payout:{currency:{kind:"currency";packId:string;packVersion:string;definitionId:string};minorUnits:number};
   expiresAt:string;expectedRevision:number;
 }
 export interface AdventureCommerceRepository {
@@ -103,7 +103,7 @@ export function createAdventureCommerceRepository(db:DatabaseDriver.Database,dep
         const quoteId=`vendor-sale-quote:${sha(`${campaignId}\0${actorId}\0${input.entryId}\0${sessionId}\0${stock.stock_id}\0${input.quantity}`).slice(0,48)}`;
         db.prepare("INSERT OR REPLACE INTO rpg_vendor_sale_quotes_v57 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").run(quoteId,campaignId,vendor.shop_id,stock.stock_id,actorId,input.entryId,input.quantity,"sell",stock.payout_unit_minor,stock.currency_code,revision,at,expiresAt);
         return {quoteId,shopId:vendor.shop_id,entryId:input.entryId,quantity:input.quantity,
-          payout:{currency:{packId:currency.pack_id,packVersion:currency.pack_version,definitionId:currency.definition_id},minorUnits:stock.payout_unit_minor*input.quantity},
+          payout:{currency:{kind:"currency",packId:currency.pack_id,packVersion:currency.pack_version,definitionId:currency.definition_id},minorUnits:stock.payout_unit_minor*input.quantity},
           expiresAt,expectedRevision:revision};
       }
       return null;},

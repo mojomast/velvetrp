@@ -62,7 +62,7 @@ function mapActorFailure(request: FastifyRequest, reply: Parameters<typeof sendA
     || error instanceof EconomyConflictError || error instanceof QuoteExpiredError || error instanceof ShopStockExhaustedError) {
     return sendApiProblem(request, reply, 409, "RPG_ACTOR_ECONOMY_CONFLICT", "Actor economy command conflicts with current state");
   }
-  request.log.error({ operation: "actor-economy", method: request.method, route: request.routeOptions.url }, "RPG actor economy operation failed");
+  request.log.error({ operation: "actor-economy", method: request.method, route: request.routeOptions.url, err: error }, "RPG actor economy operation failed");
   return sendApiProblem(request, reply, 500, "RPG_INTERNAL_ERROR", "Actor economy could not be loaded");
 }
 

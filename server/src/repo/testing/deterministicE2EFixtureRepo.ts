@@ -31,8 +31,6 @@ const GLIMMER = {
 };
 const ECONOMY = {
   currencyCode: "GLM",
-  shopId: "e2e-waylamp-shop",
-  stockId: "e2e-waylamp-stock",
   shopName: "E2E Waylamp Shop",
   balance: 20,
   quantity: 2,
@@ -58,6 +56,8 @@ export class DeterministicE2EFixtureConflictError extends Error {
 export interface DeterministicE2EFixtures {
   materializeWaylamp(input: FixtureTarget & { entryId: string }): void;
   materializePinnedItemExecution(input: { principalId: string; campaignId: string; item: ItemReference }): void;
+  materializePinnedPower(input: { principalId: string; campaignId: string; power: { kind: "ability" | "spell"; packId: string; packVersion: string; definitionId: string } }): void;
+  materializePinnedEnemy(input: { principalId: string; campaignId: string; enemy: { kind: "enemy-template"; packId: string; packVersion: string; definitionId: string } }): void;
   materializeConsumableEntry(input: FixtureTarget & { entryId: string; item: ItemReference }): void;
   materializeShortRestFocus(input: FixtureTarget): void;
   materializeEconomyGraph(input: FixtureTarget): void;
@@ -95,6 +95,30 @@ interface FixtureTarget {
 interface DeterministicE2ERepository {
   repository: Repository;
   fixtures: DeterministicE2EFixtures;
+}
+
+/** Pins one exact public catalog definition into a campaign using the owned repository connection. */
+function pinPublicCampaignDefinition(
+  db: DeterministicE2EFixtureDatabase,
+  principalInput: string,
+  campaignInput: string,
+  reference: { kind: string; packId: string; packVersion: string; definitionId: string },
+): void {
+  const principalId = resourceIdSchema.parse(principalInput);
+  const campaignId = resourceIdSchema.parse(campaignInput);
+  const available = db.prepare(`SELECT 1 FROM campaigns campaign
+    JOIN campaign_catalog_current_pins pin ON pin.campaign_id=campaign.id
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+    WHERE campaign.id=? AND campaign.owner_principal_id=? AND pin.pack_id=? AND pin.pack_version=?
+      AND definition.kind=? AND definition.definition_id=?`)
+    .get(campaignId, principalId, reference.packId, reference.packVersion, reference.kind, reference.definitionId);
+  if (!available) throw new DeterministicE2EFixtureAuthorizationError("deterministic pinned definition is unavailable");
+  const existing = db.prepare(`SELECT 1 FROM rpg_campaign_catalog_definitions_v25 WHERE campaign_id=?
+    AND pack_id=? AND pack_version=? AND kind=? AND definition_id=?`)
+    .get(campaignId, reference.packId, reference.packVersion, reference.kind, reference.definitionId);
+  if (!existing) db.prepare(`INSERT INTO rpg_campaign_catalog_definitions_v25
+    (campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)`)
+    .run(campaignId, reference.packId, reference.packVersion, reference.kind, reference.definitionId);
 }
 
 /** @internal Passed only to the owned repository's testing composition hook. */
@@ -194,6 +218,12 @@ export function createDeterministicE2EFixturesForOwnedRepository(
           .run(campaignId, item.packId, item.packVersion, item.definitionId);
       });
     },
+    materializePinnedPower(input) {
+      immediate(() => pinPublicCampaignDefinition(db, input.principalId, input.campaignId, input.power));
+    },
+    materializePinnedEnemy(input) {
+      immediate(() => pinPublicCampaignDefinition(db, input.principalId, input.campaignId, input.enemy));
+    },
     materializeConsumableEntry(input) {
       immediate(() => {
         const target = authorizeAndCheckRevision(input);
@@ -263,22 +293,25 @@ export function createDeterministicE2EFixturesForOwnedRepository(
     materializeEconomyGraph(input) {
       immediate(() => {
         const target = authorizeAndCheckRevision(input);
+        // Shop and stock IDs are global primary keys, so scope them to the
+        // campaign to keep the fixture reusable across campaigns.
+        const shopId = `${target.campaignId}-waylamp-shop`, stockId = `${target.campaignId}-waylamp-stock`;
         const currency = db.prepare("SELECT campaign_id campaignId,currency_code currencyCode,pack_id packId,pack_version packVersion,kind,definition_id definitionId FROM rpg_currency_references_v25 WHERE campaign_id=? AND currency_code=?")
           .get(target.campaignId, ECONOMY.currencyCode) as Record<string, unknown> | undefined;
         const wallet = db.prepare("SELECT campaign_id campaignId,actor_id actorId,currency_code currencyCode,balance_minor balance,updated_at updatedAt FROM rpg_wallets_v25 WHERE campaign_id=? AND actor_id=? AND currency_code=?")
           .get(target.campaignId, target.actorId, ECONOMY.currencyCode) as Record<string, unknown> | undefined;
         const shop = db.prepare("SELECT shop_id shopId,campaign_id campaignId,name,created_at createdAt FROM rpg_shop_definitions_v25 WHERE shop_id=?")
-          .get(ECONOMY.shopId) as Record<string, unknown> | undefined;
+          .get(shopId) as Record<string, unknown> | undefined;
         const stock = db.prepare(`SELECT stock_id stockId,campaign_id campaignId,shop_id shopId,item_pack_id packId,
           item_pack_version packVersion,item_kind kind,item_definition_id definitionId,available_quantity quantity,
           unit_price_minor unitPrice,currency_code currencyCode FROM rpg_shop_stock_v25 WHERE stock_id=?`)
-          .get(ECONOMY.stockId) as Record<string, unknown> | undefined;
+          .get(stockId) as Record<string, unknown> | undefined;
         const rows = [currency, wallet, shop, stock];
         if (rows.some(Boolean)) {
           const exact = same(currency, { campaignId: target.campaignId, currencyCode: ECONOMY.currencyCode, packId: GLIMMER.packId, packVersion: GLIMMER.packVersion, kind: GLIMMER.kind, definitionId: GLIMMER.definitionId })
             && same(wallet, { campaignId: target.campaignId, actorId: target.actorId, currencyCode: ECONOMY.currencyCode, balance: ECONOMY.balance, updatedAt: FIXTURE_TIME })
-            && same(shop, { shopId: ECONOMY.shopId, campaignId: target.campaignId, name: ECONOMY.shopName, createdAt: FIXTURE_TIME })
-            && same(stock, { stockId: ECONOMY.stockId, campaignId: target.campaignId, shopId: ECONOMY.shopId, packId: WAYLAMP.packId, packVersion: WAYLAMP.packVersion, kind: WAYLAMP.kind, definitionId: WAYLAMP.definitionId, quantity: ECONOMY.quantity, unitPrice: ECONOMY.unitPrice, currencyCode: ECONOMY.currencyCode });
+            && same(shop, { shopId, campaignId: target.campaignId, name: ECONOMY.shopName, createdAt: FIXTURE_TIME })
+            && same(stock, { stockId, campaignId: target.campaignId, shopId, packId: WAYLAMP.packId, packVersion: WAYLAMP.packVersion, kind: WAYLAMP.kind, definitionId: WAYLAMP.definitionId, quantity: ECONOMY.quantity, unitPrice: ECONOMY.unitPrice, currencyCode: ECONOMY.currencyCode });
           if (!exact) conflict("economy fixture has partial or different state");
           return;
         }
@@ -289,10 +322,10 @@ export function createDeterministicE2EFixturesForOwnedRepository(
         db.prepare("INSERT INTO rpg_wallets_v25(campaign_id,actor_id,currency_code,balance_minor,updated_at) VALUES(?,?,?,?,?)")
           .run(target.campaignId, target.actorId, ECONOMY.currencyCode, ECONOMY.balance, FIXTURE_TIME);
         db.prepare("INSERT INTO rpg_shop_definitions_v25(shop_id,campaign_id,name,created_at) VALUES(?,?,?,?)")
-          .run(ECONOMY.shopId, target.campaignId, ECONOMY.shopName, FIXTURE_TIME);
+          .run(shopId, target.campaignId, ECONOMY.shopName, FIXTURE_TIME);
         db.prepare(`INSERT INTO rpg_shop_stock_v25(stock_id,campaign_id,shop_id,item_pack_id,item_pack_version,item_kind,
           item_definition_id,available_quantity,unit_price_minor,currency_code) VALUES(?,?,?,?,?,?,?,?,?,?)`)
-          .run(ECONOMY.stockId, target.campaignId, ECONOMY.shopId, WAYLAMP.packId, WAYLAMP.packVersion,
+          .run(stockId, target.campaignId, shopId, WAYLAMP.packId, WAYLAMP.packVersion,
             WAYLAMP.kind, WAYLAMP.definitionId, ECONOMY.quantity, ECONOMY.unitPrice, ECONOMY.currencyCode);
       });
     },

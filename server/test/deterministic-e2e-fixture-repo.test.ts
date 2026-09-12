@@ -270,7 +270,7 @@ describe("deterministic E2E fixture repository", () => {
       .toEqual(expect.arrayContaining([expect.objectContaining({ entryId: "command-waylamp", item: WAYLAMP })]));
     expect(fixture.repository.getActorResourceSnapshot(OWNER, fixture.campaignId, fixture.actorId)?.resources)
       .toContainEqual({ resourceId: "focus", current: 1, capacity: 4 });
-    expect(fixture.repository.getShop(OWNER, fixture.campaignId, "e2e-waylamp-shop")?.stock[0]?.quantity).toBe(2);
+    expect(fixture.repository.getShop(OWNER, fixture.campaignId, `${fixture.campaignId}-waylamp-shop`)?.stock[0]?.quantity).toBe(2);
     expect(fixture.repository.mutateInventoryForActor(OWNER, fixture.campaignId, fixture.actorId, {
       kind: "equip", entryId: "command-waylamp", slot: "hand", expectedRevision: 0, idempotencyKey: "normal-equip",
     }).receipt.revisionAfter).toBe(1);
