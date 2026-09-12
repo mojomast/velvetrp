@@ -107,6 +107,7 @@ import type { AdventureTurnRepository } from "../../../repo/adventureTurnRepo.js
 import { adventureTurnsHttpRoutes } from "./adventureTurns.js";
 import { campaignPlayHttpRoutes } from "./campaignPlay.js";
 import { campaignRoomActivationHttpRoutes } from "./campaignRoomActivation.js";
+import { campaignRoomParticipantHttpRoutes } from "./campaignRoomParticipant.js";
 import { campaignDmHttpRoutes } from "./campaignDm.js";
 import { campaignStartingLocationHttpRoutes } from "./campaignStartingLocation.js";
 import type { CampaignStartingLocationRepository } from "../../../repo/campaignStartingLocationRepo.js";
@@ -195,6 +196,7 @@ export interface CampaignListRepository extends
   getCampaignPlayBootstrap?: Repository["getCampaignPlayBootstrap"];
   activateCampaignRoom?: Repository["activateCampaignRoom"];
   getCampaignRoomActivationReadiness?: Repository["getCampaignRoomActivationReadiness"];
+  addCampaignRoomParticipant?: Repository["addCampaignRoomParticipant"];
   inspectCampaignContext?: CampaignContextInspectionReadRepository["inspectCampaignContext"];
   resolveCampaignContextInspectionDispatchReferences?: CampaignContextInspectionReadRepository["resolveCampaignContextInspectionDispatchReferences"];
   getAdventureTurnNarration?: AdventureTurnRepository["getAdventureTurnNarration"];
@@ -792,6 +794,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     if (!repository.activateCampaignRoom || !repository.getCampaignRoomActivationReadiness) throw new Error("room activation repository is unavailable");
     return { activateCampaignRoom: repository.activateCampaignRoom.bind(repository),
       getCampaignRoomActivationReadiness: repository.getCampaignRoomActivationReadiness.bind(repository) };
+  } });
+  await app.register(campaignRoomParticipantHttpRoutes, { participantRepositoryAccessor: () => {
+    const repository = getCampaignRepository();
+    if (!repository.addCampaignRoomParticipant) throw new Error("room participant repository is unavailable");
+    return { addCampaignRoomParticipant: repository.addCampaignRoomParticipant.bind(repository) };
   } });
   await app.register(generationDraftsHttpRoutes, { generationDraftRepositoryAccessor,
     ...(options.encounterGeneration ? { generateEncounter: options.encounterGeneration } : {}) });

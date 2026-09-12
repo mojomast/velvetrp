@@ -103,6 +103,7 @@ import { AgentObservationUnavailableError, createAgentObservationRepository } fr
 import { createAgentObservationReadRepository } from "./observations/agentObservationReadRepo.js";
 import { createCampaignGenerationRepository } from "./campaignGenerationRepo.js";
 import { createCampaignRoomActivationReadinessInspector, createCampaignRoomActivationRepository } from "./campaignRoomActivationRepo.js";
+import { createCampaignRoomParticipantRepository } from "./campaignRoomParticipantRepo.js";
 import { createCampaignDmReadinessRepository } from "./campaignDmReadinessRepo.js";
 import { createCampaignStartingLocationRepository } from "./campaignStartingLocationRepo.js";
 import { createTacticalMapRepository } from "./tacticalMapRepo.js";
@@ -843,6 +844,9 @@ function createRepositoryComposition<T>(
     ...createCampaignRoomActivationRepository(db, dependencies, () => {
       assertOpen(); if (transactionDepth > 0) throw new Error("room activation cannot run inside a repository transaction");
     }, (principalId, campaignId) => contentCatalogRepository.resolveCampaignCatalog(principalId, campaignId)),
+    ...createCampaignRoomParticipantRepository(db, dependencies, () => {
+      assertOpen(); if (transactionDepth > 0) throw new Error("room participant operation cannot run inside a repository transaction");
+    }),
     ...administrationRepository,
     ...contentCatalogRepository,
     ...characterBuilderRepository,

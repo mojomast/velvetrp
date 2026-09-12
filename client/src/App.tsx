@@ -740,7 +740,7 @@ export default function App() {
         authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
         onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading={combatReturnView !== "campaign-play"} combatAvailable={combatAvailable} combatApi={combatTrackerApi}
         authorization={authorization} worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}
-        onNavigate={navigateCampaign} onBack={returnToCampaign} onUnavailable={returnToCampaign} legacyMessages={messages} legacyParticipants={session.participants} />}
+        characterBuilderApi={characterBuilderApi} onNavigate={navigateCampaign} onBack={returnToCampaign} onUnavailable={returnToCampaign} legacyMessages={messages} legacyParticipants={session.participants} />}
     </CampaignAuthorizationGate>;
   }
   if (view === "chat" && session) {

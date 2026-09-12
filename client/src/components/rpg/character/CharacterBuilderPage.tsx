@@ -32,6 +32,8 @@ export interface CharacterBuilderPageProps {
   onEditPersona: (personaId: string) => void;
   onOpenCharacter: (campaignCharacterId: string) => void;
   focusHeadingRequest?: number;
+  /** Renders inside an existing page region instead of owning the main landmark. */
+  embedded?: boolean;
 }
 
 type SaveState = "idle" | "saving" | "saved" | "stale" | "failed";
@@ -75,7 +77,7 @@ function markerLock(): DraftLock { return { token: Symbol("persisted-create"), p
 export function resetCharacterBuilderPageModuleStateForTests(): void { draftLocks.clear(); draftListeners.clear(); }
 
 /** Draft-to-play orchestration with revision-bound autosave and no automatic write retry. */
-export function CharacterBuilderPage({ campaignId, personas: suppliedPersonas, initialDraftId, api, onBack, onUnavailable, onDraftIdentity = () => undefined, onReviewCampaignRoster = onBack, onEditPersona, onOpenCharacter, focusHeadingRequest }: CharacterBuilderPageProps) {
+export function CharacterBuilderPage({ campaignId, personas: suppliedPersonas, initialDraftId, api, onBack, onUnavailable, onDraftIdentity = () => undefined, onReviewCampaignRoster = onBack, onEditPersona, onOpenCharacter, focusHeadingRequest, embedded = false }: CharacterBuilderPageProps) {
   const [localPersonas, setLocalPersonas] = useState<Array<{ id: string; name: string }>>([]);
   const personas = [...suppliedPersonas, ...localPersonas.filter((local) => !suppliedPersonas.some((persona) => persona.id === local.id))];
   const [newPersona, setNewPersona] = useState(suppliedPersonas.length === 0);
@@ -280,7 +282,8 @@ export function CharacterBuilderPage({ campaignId, personas: suppliedPersonas, i
     if (busy || (next === 2 && !canReview)) return;
     setStage(next); setConfirmed(false); focus(generationRef.current, "heading");
   }
-  return <main className="page library-page campaign-page character-builder-page"><section className="character-builder-shell" aria-labelledby="character-builder-heading">
+  const Container = embedded ? "section" : "main";
+  return <Container className="page library-page campaign-page character-builder-page"><section className="character-builder-shell" aria-labelledby="character-builder-heading">
     <header className="library-header"><div><button className="back-link" type="button" disabled={busy} onClick={onBack}>← Back to campaign</button><p className="eyebrow">PLAYABLE MECHANICS · PERSONA SEPARATE</p><h1 ref={headingRef} tabIndex={-1} className="title" id="character-builder-heading">Character builder</h1><p className="subtitle">Build a server-validated sheet without changing the persona.</p></div>{draft && <span className="status-pill">Revision {draft.revision}</span>}</header>
     <section className="character-journey" aria-label="Character building stages">
       <ol>{["Concept / persona", "Rules choices", "Review", "Ready"].map((label, index) => {
@@ -318,5 +321,5 @@ export function CharacterBuilderPage({ campaignId, personas: suppliedPersonas, i
     {draft && currentStage === 2 && <div className="character-builder-layout"><section className="builder-section"><h2>Review saved character</h2><p>Persona: {personas.find((persona) => persona.id === draft.personaId)?.name ?? draft.personaId}. Saved revision {draft.revision}.</p><p>Allocation: {draft.allocation.method}. {Object.entries(draft.allocation.scores).map(([name, score]) => `${name}: ${score}`).join(", ")}.</p><dl>{draft.choiceGroups.map((group) => <div key={group.id}><dt>{group.id}</dt><dd>{group.id === "starter-grant" ? draft.selections.starterGrant : group.options.filter((option) => { const selected = group.id === "prepared-spells" ? draft.selections.preparedSpells : [draft.selections[group.id]]; return selected.some((reference) => reference && reference.definitionId === option.reference.definitionId && reference.packId === option.reference.packId && reference.packVersion === option.reference.packVersion); }).map((option) => option.name).join(", ") || "None"}</dd></div>)}</dl></section>{draft.derivedPreview && <DerivedStatsReview derived={draft.derivedPreview} startingGrants={draft.startingGrants} />}<section className="builder-section finalization-review"><h2>Explicit finalization confirmation</h2><p>Review every server-derived value and exact grant above. Finalization creates the playable sheet once.</p><label className="builder-confirm"><input type="checkbox" checked={confirmed} disabled={!canReview} onChange={(event) => setConfirmed(event.target.checked)} /> I reviewed the server preview and exact starter grants and want to finalize once.</label><div className="button-row"><button className="ghost" type="button" disabled={busy} onClick={() => goToStage(1)}>Back: Rules choices</button><button className="primary" disabled={!confirmed || !canReview} onClick={() => void finalize()}>Finalize playable character once</button></div></section></div>}
     {draft?.status === "finalized" && !finalResult && <section className="builder-section finalized-character"><h2>Draft already finalized</h2><p>This saved draft cannot be changed or finalized again. Find the playable character in the campaign roster.</p><button className="primary" onClick={onReviewCampaignRoster}>Review authoritative campaign roster</button><button className="ghost" onClick={startNewDraft}>Start a new draft</button></section>}
     {finalResult && <section className="builder-section finalized-character"><h2>Playable character finalized</h2><p className="builder-receipt">Receipt revision {finalResult.receipt.revisionBefore} → {finalResult.receipt.revisionAfter} at {new Date(finalResult.receipt.occurredAt).toLocaleString()}.</p><p>Created character <code>{finalResult.character.id}</code>. Finalization is confirmed and will not be repeated.</p>{finalSheet ? <p>Authoritative sheet: level {finalSheet.progression.level}, maximum health {finalSheet.derived.maxHp}.</p> : <p>The public finalization response preserved the created sheet and health grant while the display sheet refresh is pending or unavailable.</p>}<div className="button-row"><button className="primary" onClick={() => onOpenCharacter(finalResult.character.id)}>Open created character</button>{!finalSheet && <button className="ghost" onClick={() => void retryFinalSheet()}>Retry authoritative sheet GET</button>}<button className="ghost" onClick={startNewDraft}>Build another character</button></div></section>}
-  </section></main>;
+  </section></Container>;
 }

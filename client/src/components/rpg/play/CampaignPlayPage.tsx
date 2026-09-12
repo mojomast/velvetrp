@@ -20,6 +20,8 @@ import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import { useCampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
 import { PlayHelp } from "./PlayHelp";
 import { CampaignSecurityPanels } from "../administration/CampaignSecurityPanels";
+import { CampaignCharacterCreator } from "./CampaignCharacterCreator";
+import type { CharacterBuilderApi } from "../character/CharacterBuilderPage";
 import { CombatTrackerPage, type CombatTrackerApi } from "../combat/CombatTrackerPage";
 import { WorldExplorerPage, type WorldExplorerApi } from "../world/WorldExplorerPage";
 import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../actor/RpgCharacterSheetPage";
@@ -77,6 +79,7 @@ export interface CampaignPlayPageProps {
   worldApi?: WorldExplorerApi;
   actorToolsApi?: RpgCharacterSheetApi;
   advancementApi?: AtlasAdvancementApi;
+  characterBuilderApi?: CharacterBuilderApi;
   authorization?: StudioAuthorization;
   studioAvailable?: boolean;
   onOpenCombat?: () => void;
@@ -119,7 +122,7 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 /** Coordinates durable play independently of the atlas presentation and tool drawers. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, legacyMessages = [], legacyParticipants = [], onBack, onUnavailable,
   onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
-  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, authorization, onNavigate }: CampaignPlayPageProps) {
+  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, characterBuilderApi, authorization, onNavigate }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
     try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
       if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
@@ -460,7 +463,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   }
 
   const role = bootstrap.principal.role === "observer" || !authorizationCanAct ? "Spectator" : audience === "gm" ? "Game master" : "Player";
-  const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const, "security" as const] : []), "help"];
+  const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const, "security" as const, "create" as const] : []), "help"];
   const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
   function applyPrefill(value: string, mode: "replace" | "append") {
     if (!referenceReady) return;
@@ -550,6 +553,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       blocked={roomToolsLocked || (phase !== "idle" && phase !== "terminal")} onLockChange={setSessionLocked}
       onRefresh={async () => { await refreshBootstrap(); await refreshTranscript(); setReconciliationRevision((value) => value + 1); }} onCombat={() => openTool("combat")} /></section></AtlasDrawer>}
     {audience === "gm" && authorizationCanAct && <AtlasDrawer tool="security" open={activeTool === "security"} onClose={closeTool}>{visitedTools.includes("security") && <CampaignSecurityPanels campaignId={campaignId} onMutated={refreshAfterTool} />}</AtlasDrawer>}
+    {audience === "gm" && authorizationCanAct && characterBuilderApi && <AtlasDrawer tool="create" open={activeTool === "create"} onClose={closeTool}>{visitedTools.includes("create") && <CampaignCharacterCreator campaignId={campaignId} sessionId={sessionId} builderApi={characterBuilderApi} expectedRevision={async () => (await refreshBootstrap()).expectedRevision} onJoined={() => refreshAfterTool()} onExit={closeTool} />}</AtlasDrawer>}
     <AtlasDrawer tool="help" open={activeTool === "help"} onClose={closeTool}>{visitedTools.includes("help") && <PlayHelp />}</AtlasDrawer>
   </>;
   return <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
