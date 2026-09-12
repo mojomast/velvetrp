@@ -40,21 +40,33 @@ The default server binds to loopback and uses a fixed trusted-local principal. A
 
 ## Screenshots
 
-These views are captured from the deterministic browser harness (disposable SQLite and an in-process fake provider) and use illustrative names and content.
+These views are captured from the seeded, provider-free Baie-Comeau campaign at 1920x1200 (2x) and use illustrative, fictional names and content.
 
-| Campaign library | Living Atlas table |
-| --- | --- |
-| ![Campaigns with preparation status](docs/images/campaign-library.png) | ![Authoritative map and conversation composer](docs/images/living-atlas-table.png) |
+**Campaign library** — prepare, attach rooms, and start a table from one place.
 
-| Character sheet actions | World expedition |
-| --- | --- |
-| ![Server-owned checks, powers, effects, resources, and equipment](docs/images/character-sheet.png) | ![Owner/GM actor placement and camp](docs/images/world-expedition.png) |
+![Campaign library with preparation status](docs/images/campaign-library.png)
 
-| Director | Combat tracker |
-| --- | --- |
-| ![Human/AI delegation, Open and Continue scene, and private review](docs/images/director.png) | ![Encounter lifecycle and reviewed generation](docs/images/combat-tracker.png) |
+**Living Atlas table** — the authoritative map and conversation composer.
 
-**Cast and companion administration** — create a companion and author exact grants.
+![Living Atlas with authoritative map and conversation composer](docs/images/living-atlas-table.png)
+
+**Director** — human/AI delegation, Open and Continue scene, and private review.
+
+![Director with human/AI delegation, Open and Continue scene, and private review](docs/images/director.png)
+
+**Character sheet** — server-owned checks, powers, effects, resources, and equipment.
+
+![Character sheet with server-owned checks, powers, effects, resources, and equipment](docs/images/character-sheet.png)
+
+**World expedition** — owner/GM bootstrap placement and camp.
+
+![Owner/GM actor placement and camp](docs/images/world-expedition.png)
+
+**Combat tracker** — encounter lifecycle and reviewed generation.
+
+![Encounter lifecycle and reviewed generation](docs/images/combat-tracker.png)
+
+**Cast and companion administration** — create a companion and author an exact grant.
 
 ![Companion administration with an exact grant](docs/images/cast-companion.png)
 
