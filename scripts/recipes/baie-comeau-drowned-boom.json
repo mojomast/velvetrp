@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "name": "Baie-Comeau: The Drowned Boom",
+  "tone": "Grounded North Shore industrial mystery with humane stakes, dry wit, and quiet dread; contemporary Québécois Côte-Nord, winter, salt air, old machinery.",
+  "exclusions": [
+    "sexual violence",
+    "graphic torture",
+    "harm to children",
+    "real living people as characters",
+    "appropriating Indigenous ceremony, sacred objects, or spirit beings",
+    "pan-Indigenous mysticism or speaking for real communities",
+    "sensational dam-break or industrial-disaster spectacle",
+    "poverty caricature or accent mockery"
+  ],
+  "stages": [
+    {
+      "id": "local-powers",
+      "jobs": [
+        {
+          "id": "local-powers",
+          "sections": ["factions"],
+          "brief": "In a fictional North Shore mill town, create three public factions: (1) a municipal-industrial coalition tied to a struggling paper mill, deep-water port, and aluminum smelter; (2) a civic and health coalition anchored by a hospital, a Cégep, and a merged western sector that still resents a 1982 amalgamation; (3) a transport and marine-services faction built on the ferry crossing, Route 138, and the northern highway depot. Give each concrete leverage, a public grievance, and one credible path to compromise. Ground them in real Côte-Nord geography but invent all organizations and people.",
+          "desiredCounts": { "factions": 3 }
+        }
+      ]
+    },
+    {
+      "id": "regional-powers",
+      "jobs": [
+        {
+          "id": "regional-powers",
+          "sections": ["factions"],
+          "brief": "Create two regional factions for the same fictional North Shore setting: (1) a contemporary First Nations governance council upstream on the river, portrayed as a modern political decision-maker with internal debate over energy revenue, forestry, caribou, and consultation; it is a fictional nation, not a real community, and must never be shown with ceremony, shamans, spirit animals, or generic mysticism; (2) a provincial hydroelectric authority that owns upstream dams and a transmission corridor. Give each a specific negotiating position and a reason they cannot simply impose their will.",
+          "desiredCounts": { "factions": 2 }
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "dependsOn": ["local-powers", "regional-powers"],
+      "jobs": [
+        {
+          "id": "town-foundation",
+          "sections": ["outline", "locations"],
+          "brief": "Open the campaign in the fictional mill town during a winter curtailment. Create one public outline as a premise, then three public locations: the flooded Vieux-Poste shoreline where an 1889 mission and 1898 sawmill were lost; the working-class east-sector main street with the mill gate and union hall; and the deep-water port with grain silos and the ferry dock. Add two public connections naming the routes between them, and set the outline startLocationKey to the main-street location. Use real Côte-Nord geography and weather; invent all names.",
+          "expandFrom": [
+            { "jobId": "local-powers", "fields": ["factions"], "limit": 3 },
+            { "jobId": "regional-powers", "fields": ["factions"], "limit": 2 }
+          ],
+          "desiredCounts": { "outlines": 1, "locations": 3, "connections": 2 }
+        }
+      ]
+    },
+    {
+      "id": "wider",
+      "dependsOn": ["foundation"],
+      "jobs": [
+        {
+          "id": "wider-locations",
+          "sections": ["locations"],
+          "brief": "Add two public locations away from the town centre: a boreal lake and outfitter camp reachable only in winter, and the northern highway depot where trucks stage for the long road inland. Add two public connections linking them to the accepted town locations. Keep the geography plausible for the North Shore: spruce, rock, ice, long dark, snowmobile trails, and a highway that closes.",
+          "expandFrom": [
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 3 }
+          ],
+          "desiredCounts": { "locations": 2, "connections": 2 }
+        }
+      ]
+    },
+    {
+      "id": "cast",
+      "dependsOn": ["wider"],
+      "jobs": [
+        {
+          "id": "town-cast",
+          "sections": ["npcs"],
+          "brief": "Create three public NPCs rooted in the accepted factions and locations: a mill shift lead and union steward who remembers better decades; a municipal or hospital administrator trying to hold services together after the merger; and a young field researcher documenting the drowned shoreline. Give each a public description, an archetype, and a private goal in privateGoals. Invent all names; make them ordinary, competent, and morally mixed rather than heroic or villainous.",
+          "expandFrom": [
+            { "jobId": "local-powers", "fields": ["factions"], "limit": 3 },
+            { "jobId": "wider-locations", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "npcs": 3 }
+        }
+      ]
+    },
+    {
+      "id": "story",
+      "dependsOn": ["cast"],
+      "jobs": [
+        {
+          "id": "opening-story",
+          "sections": ["arcs", "story", "clues"],
+          "brief": "Build a first playable movement: one public arc about a winter curtailment announcement that could become a closure; two public story nodes (the announcement and a discovery at the drowned shoreline); one public relationship linking them; and two public clues that point to old company records and a suspicious river-flow change. Make clues fair and actionable, never a single bottleneck. Avoid real historical crimes and real people.",
+          "expandFrom": [
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "town-cast", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "arcs": 1, "storyNodes": 2, "storyRelationships": 1, "clues": 2 }
+        }
+      ]
+    },
+    {
+      "id": "quests",
+      "dependsOn": ["story"],
+      "jobs": [
+        {
+          "id": "opening-quests",
+          "sections": ["quests"],
+          "brief": "Create two public, table-ready quests: one investigative quest to recover the drowned sawmill records before a demolition, and one social quest to broker a meeting between the municipal coalition and the upstream nation council about river flow. Each needs two or three actionable objectives and one modest reward. Prefer investigation, negotiation, and repair over violence.",
+          "expandFrom": [
+            { "jobId": "opening-story", "fields": ["storyNodes"], "limit": 2 },
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "quests": 2 }
+        }
+      ]
+    },
+    {
+      "id": "hazards",
+      "dependsOn": ["quests"],
+      "jobs": [
+        {
+          "id": "grounded-hazards",
+          "sections": ["monster-concepts"],
+          "brief": "Create two public hazard concepts grounded in the North Shore rather than fantasy monsters: a flooded-forest and ice hazard at the reservoir shoreline, and a fog-and-current marine hazard at the estuary. Each needs a role, a short tactics list, and inert mechanics (state inert with a short reason) because no catalog enemy binds them. Frame them as environmental and social dangers, not creatures to kill.",
+          "expandFrom": [
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "monsterConcepts": 2 }
+        }
+      ]
+    },
+    {
+      "id": "items",
+      "dependsOn": ["hazards"],
+      "jobs": [
+        {
+          "id": "quest-items",
+          "sections": ["quest-items"],
+          "brief": "Create two public narrative quest items: a waterlogged company ledger from the drowned boom, and a brass ferry or dam-engineering token tied to the river-flow negotiation. Both must use inert mechanics with a short reason, and each should link to one accepted quest or location. They are leads and leverage, not magical artifacts.",
+          "expandFrom": [
+            { "jobId": "opening-quests", "fields": ["quests"], "limit": 2 }
+          ],
+          "desiredCounts": { "questItems": 2 }
+        }
+      ]
+    },
+    {
+      "id": "encounters",
+      "dependsOn": ["items"],
+      "jobs": [
+        {
+          "id": "town-encounters",
+          "sections": ["encounters"],
+          "brief": "Create two public encounter plans that reward investigation or de-escalation: a tense union-hall meeting during the curtailment, and a cold riverbank search at the drowned shoreline as weather closes in. Each needs objectives, terrain, escalation, and a resolution. Strongly prefer social or environmental complications over combat, and keep any violence brief and consequential.",
+          "expandFrom": [
+            { "jobId": "grounded-hazards", "fields": ["monsterConcepts"], "limit": 2 },
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "encounters": 2 }
+        }
+      ]
+    },
+    {
+      "id": "lore",
+      "dependsOn": ["encounters"],
+      "jobs": [
+        {
+          "id": "town-lore",
+          "sections": ["lore"],
+          "brief": "Create three public lore entries: the lost 1907 log boom and the drowned sawmill; the 1982 forced amalgamation of the two towns and the grudge that outlived it; and the day in 1991 when forest-fire smoke turned the sky black at midday. Each needs a title, summary, and two to four details. Treat the merger and the fire as real regional memory adapted into this fictional town; do not invent real crimes or put words in real people's mouths.",
+          "expandFrom": [
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "opening-story", "fields": ["storyNodes"], "limit": 2 }
+          ],
+          "desiredCounts": { "lore": 3 }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "dependsOn": ["lore"],
+      "jobs": [
+        {
+          "id": "table-materials",
+          "sections": ["handouts", "scene-prompts"],
+          "brief": "Create two public player handouts (a curtailment notice and a page of the waterlogged ledger) and two public GM scene prompts: a shift-change at the mill gate during a snow squall, and a negotiation table where the upstream council and the town weigh river-flow terms. Ground every prompt in accepted people and places. Handouts must not spoil the clues.",
+          "expandFrom": [
+            { "jobId": "town-lore", "fields": ["lore"], "limit": 2 },
+            { "jobId": "town-cast", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "town-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "handouts": 2, "scenePrompts": 2 }
+        }
+      ]
+    }
+  ]
+}
