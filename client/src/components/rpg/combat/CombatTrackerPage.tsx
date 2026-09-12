@@ -3,7 +3,7 @@ import type {
   ActorEffectsResponse, ActorPowerCommandRequest, ActorPowerCommandResponse, ActorPowersResponse, ActorResourcesHttpGetResponse,
   CampaignRole,
   CombatActionCommandRequest, CombatActionCommandResponse, CombatCommandResultResponse, CombatEnemyTurnCommandRequest, CombatRewardClaimRequest, CombatRewardClaimResponse, CombatRewardClaimResultResponse, CombatRewardGrantPublic, EconomyHttpWalletGetResponse,
-  CombatEndCommandResponse, CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterPublic,
+  CombatEndCommandResponse, CombatLegalAction, CombatLogEntryPublic, CombatLogResponse, CombatReadResponse, EncounterCreateRequest, EncounterPublic, EncounterSetupCandidatesResponse,
   UseConsumableCommandRequest,UseConsumableCommandResult,UseConsumableLegalAction,DirectCombatPowerCandidate,DirectCombatPowerCommandRequest,DirectCombatPowerCommandResponse,
 } from "@velvet/contracts";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +41,8 @@ export interface CombatTrackerApi extends Partial<TacticalMapPanelApi> {
   getWallet:(campaignId:string,actorId:string)=>Promise<EconomyHttpWalletGetResponse>;
   startEncounter:(encounterId:string,input:{expectedRevision:number;idempotencyKey:string})=>Promise<{combat:CombatReadResponse&{combatId:string}}>;
   endCombat:(combatId:string,input:{expectedRevision:number;idempotencyKey:string})=>Promise<CombatEndCommandResponse>;
+  getSetupCandidates?:(campaignId:string)=>Promise<EncounterSetupCandidatesResponse>;
+  createEncounter?:(campaignId:string,input:EncounterCreateRequest)=>Promise<EncounterPublic>;
 }
 
 export interface CombatTrackerPageProps {
@@ -529,10 +531,10 @@ export function CombatTrackerPage({ api, campaignId, sessionId, actorRole = "gm"
 
   return <Container disabled={embedded ? blocked : undefined} className={embedded ? "atlas-combat-embedded" : "combat-page"} aria-labelledby="combat-heading"><div className="combat-shell">
     <header className="combat-header"><div>{!embedded && <button type="button" className="back-link" onClick={onReturnToRoom??onBack}>← {onReturnToRoom?"Return to room":"Back"}</button>}<p className="eyebrow">LIVE SERVER COMBAT</p><Heading ref={headingRef} tabIndex={-1} id="combat-heading">Combat tracker</Heading></div>{combat && <div className="combat-round"><span>Round</span><strong>{combat.round}</strong><small>Revision {combat.revision}</small></div>}</header>
-    {embedded && <p>{blocked ? "Combat controls are locked while the room is read-only or another operation needs completion." : "Actions and rewards stay at the table. Use the main map's Combat grid for movement; GM tools start and complete prepared encounters."}</p>}
+    {embedded && <p>{blocked ? "Combat controls are locked while the room is read-only or another operation needs completion." : "Actions and rewards stay in this room. Use the main map's Combat grid for movement; the lifecycle panel prepares, starts, and completes encounters without leaving the table."}</p>}
     {embedded && <button type="button" onClick={() => void refreshRoomEncounters()}>Refresh room encounters</button>}
     {(embedded||gmWorkspace)&&(!initialCombatId||!combatId)&&<form className="combat-binding" onSubmit={connectCombat}><label>Campaign encounter<select value={combatDraft} onChange={(event) => setCombatDraft(event.target.value)}><option value="">Choose a combat</option>{encounters.map((encounter)=><option key={encounter.encounterId} value={encounter.combatId??""}>{encounter.name} · {encounter.status}</option>)}</select></label><button type="submit" className="ghost" disabled={!encounters.some((encounter)=>encounter.combatId===combatDraft) || commandLocked}>Load combat</button><p>Combat identity comes only from this {embedded ? "room's" : "campaign's"} authorized encounter list.</p></form>}
-    {!embedded&&gmWorkspace&&!enemyTurnMarker&&<EncounterLifecyclePanel campaignId={campaignId} api={api} onCombatReady={openLifecycleCombat} onRewards={(result) => { if (result.encounter.combatId) openLifecycleCombat(result.encounter.combatId); setRewards(result.rewards); }} />}
+    {gmWorkspace&&!enemyTurnMarker&&<EncounterLifecyclePanel campaignId={campaignId} sessionId={embedded ? sessionId : undefined} api={api} onCombatReady={openLifecycleCombat} onRewards={(result) => { if (result.encounter.combatId) openLifecycleCombat(result.encounter.combatId); setRewards(result.rewards); }} />}
     {!observerWorkspace&&marker && <section className={`combat-lock ${marker.phase === "ambiguous" ? "is-warning" : ""}`} role="alert"><p><strong>{marker.phase === "confirmed" ? "Confirmed action awaiting complete refresh" : "Action outcome unresolved"}.</strong> {marker.actionKind} was issued once at {marker.startedAt}. Controls remain locked and no automatic replay is allowed.</p><button type="button" className="ghost" onClick={() => void reconcile()}>Refresh authoritative state & log</button></section>}
     {!observerWorkspace&&commandStatus && <p className="combat-command-status" role="status">{commandStatus}</p>}
     {!observerWorkspace&&confirmed && <OutcomeReceipt result={confirmed} />}

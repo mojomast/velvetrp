@@ -66,6 +66,8 @@ function api(overrides: Partial<CombatTrackerApi> = {}): CombatTrackerApi {
     getWallet:vi.fn().mockResolvedValue({wallet:{balances:[]},revision:0}),
     startEncounter:vi.fn(),
     endCombat:vi.fn(),
+    getSetupCandidates:vi.fn().mockResolvedValue({ sessions:[{ sessionId:"session" }], actors:[{ actorId:"actor-one", label:"Ally 1" }], enemies:[{ template:{ kind:"enemy-template", packId:"pack", packVersion:"1", definitionId:"goblin" }, label:"Goblin" }], teams:{ actor:"allies", enemy:"enemies" } }),
+    createEncounter:vi.fn(),
     ...overrides,
   };
 }
@@ -107,6 +109,18 @@ describe("M3.5 server-authoritative combat controls", () => {
     fireEvent.click(attack);
     expect(client.resolveAction).not.toHaveBeenCalled();
     expect(client.getCombat).not.toHaveBeenCalledWith("other");
+  });
+
+  it("offers an embedded GM the room-scoped encounter lifecycle without leaving the table", async () => {
+    const client = api();
+    vi.mocked(client.listEncounters).mockResolvedValue({ encounters: [
+      { encounterId: "combat-one", sessionId: "session", name: "Ambush", status: "active", combatId: "combat-one", combatants: [], revision: 4, createdAt: at, updatedAt: at },
+      { encounterId: "other", sessionId: "other-room", name: "Private battle", status: "preparing", combatId: null, combatants: [], revision: 4, createdAt: at, updatedAt: at },
+    ] });
+    render(<CombatTrackerPage embedded campaignId="campaign" sessionId="session" api={client} actorRole="gm" audience="gm" controlledActorId="actor-one" onBack={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Encounter lifecycle" })).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText(/Private battle/)).toBeNull());
+    expect(screen.getByRole("button", { name: "Create preparing encounter" })).toBeTruthy();
   });
 
   it("renders only resolution-supported legal actions and exact server targets", () => {
