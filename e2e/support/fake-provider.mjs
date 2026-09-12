@@ -75,6 +75,11 @@ const server = createServer((request, response) => {
         }
         response.end(completion({content:JSON.stringify({narration:replyText})}));return;
       }
+      const encounterDraft=(parsed.messages??[]).some((message)=>message?.role==="system"&&typeof message.content==="string"&&/bounded RPG encounter draft/i.test(message.content));
+      if(encounterDraft){
+        response.end(completion({content:JSON.stringify({name:"Generated Bridge Ambush",combatants:[{pinnedEnemyIndex:0,count:1}],terrain:"Fogbound bridge",motives:"Hold the crossing",rewardNarrative:"A satchel of supplies"})}));
+        return;
+      }
       const intent=currentIntent(parsed.messages);
       const actorSheetTool=parsed.tools?.find((tool)=>tool?.function?.name===wireName("actor_sheet.read"))??null;
       if(actorSheetTool&&/\b(character sheet|inventory|power|spell|attribute)\b/i.test(intent)&&!hasToolResult(parsed.messages,wireName("actor_sheet.read"))){

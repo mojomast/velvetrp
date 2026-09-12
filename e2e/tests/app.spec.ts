@@ -483,7 +483,9 @@ test("critical browser and public API workflows", async ({ page, request }) => {
       fictionalConfirmed: true,
     });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Velvet" })).toBeVisible();
+    // The Vite dev server compiles the app bundle on first navigation; allow
+    // extra time so a cold start cannot fail this first assertion.
+    await expect(page.getByRole("heading", { name: "Velvet" })).toBeVisible({ timeout: 15_000 });
     expect(await json<{ ok: boolean }>(request, "GET", "/health")).toEqual({ ok: true });
     await expect(page.getByRole("heading", { name: "Campaigns", exact: true })).toBeVisible();
     const campaignName = `${runId}-Campaign`;

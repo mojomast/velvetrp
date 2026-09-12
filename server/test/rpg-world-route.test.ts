@@ -46,6 +46,12 @@ describe("M2.10 world routes",()=>{
     expect(overlong.statusCode).toBe(404);expect(overlong.json()).toMatchObject({code:"RPG_ACTOR_WORLD_NOT_FOUND",
       instance:"/api/rpg/v1/actors/:actorId/travel-commands"});expect(calls).toBe(0);await app.close();
   });
+  it("returns the camp projection with only the route-safe receipt",async()=>{
+    enable();const app=buildApp({campaignRepositoryFactory:()=>repository({establishCamp:(...args:any[])=>({campaignId:"campaign",sessionId:"session",locationId:"origin",elapsedMinutes:12,receipt:{...travel.receipt,idempotencyKey:"camp",revisionBefore:2,revisionAfter:3}})})});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/camp-commands",headers:{"content-type":"application/json"},payload:{campaignId:"campaign",expectedRevision:2,idempotencyKey:"camp"}});
+    expect(response.statusCode).toBe(200);expect(response.body).not.toContain("commandId");expect(response.body).not.toContain("private");
+    expect(response.json()).toEqual({locationId:"origin",elapsedMinutes:12,receipt:{idempotencyKey:"camp",revisionBefore:2,revisionAfter:3,occurredAt:at}});await app.close();
+  });
   it("treats a mismatched placement projection as commit-ambiguous",async()=>{
     enable();const app=buildApp({campaignRepositoryFactory:()=>repository({placeActor:()=>({campaignId:"other-campaign",sessionId:"session",location:world.currentLocations[0],receipt:{...travel.receipt,idempotencyKey:"place",revisionBefore:2,revisionAfter:3}})})});
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/actors/actor/placement-commands",headers:{"content-type":"application/json"},payload:{campaignId:"campaign",locationId:"origin",expectedRevision:2,idempotencyKey:"place"}});

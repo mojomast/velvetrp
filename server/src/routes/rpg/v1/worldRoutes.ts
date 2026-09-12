@@ -102,7 +102,9 @@ export const worldHttpRoutes:FastifyPluginAsync<WorldHttpOptions>=async(app,opti
       if(!body.success)return sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Actor camp request is invalid");
       try{const result=options.worldRepositoryAccessor().establishCamp(LOCAL_OWNER,actorId.data,body.data);
         if(result.campaignId!==body.data.campaignId||result.receipt.idempotencyKey!==body.data.idempotencyKey||result.receipt.revisionBefore!==body.data.expectedRevision||result.receipt.revisionAfter!==body.data.expectedRevision+1)throw new Error("actor camp result binding is invalid");
-        return reply.code(200).send(actorCampCommandResponseSchema.parse({locationId:result.locationId,elapsedMinutes:result.elapsedMinutes,receipt:result.receipt}));
+        return reply.code(200).send(actorCampCommandResponseSchema.parse({locationId:result.locationId,elapsedMinutes:result.elapsedMinutes,
+          receipt:{idempotencyKey:result.receipt.idempotencyKey,revisionBefore:result.receipt.revisionBefore,
+            revisionAfter:result.receipt.revisionAfter,occurredAt:result.receipt.occurredAt}}));
       }catch(error){if(error instanceof WorldAuthorizationError||error instanceof WorldUnavailableError)return actorNotFound(request,reply);
         if(error instanceof WorldStaleError)return sendApiProblem(request,reply,409,"RPG_WORLD_STALE","World state is stale; refresh before trying again");
         if(error instanceof WorldConflictError)return sendApiProblem(request,reply,409,"RPG_CAMP_CONFLICT","Camp conflicts with current world state");
