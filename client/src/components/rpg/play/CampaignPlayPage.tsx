@@ -14,6 +14,7 @@ import { CampaignDicePanel } from "./CampaignDicePanel";
 import { SessionControls, type SessionCommandApi } from "../session/SessionControls";
 import { createClientId } from "../../../utils/clientId";
 import { AtlasDrawer, type AtlasTool } from "./PlaySurface";
+import { campaignDestinations, type CampaignDestination } from "../shell/CampaignShell";
 import { CommandCenter } from "./CommandCenter";
 import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import { useCampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
@@ -69,7 +70,7 @@ export interface CampaignPlayPageProps {
   initialTurnId?: string;
   authorizationCanAct?: boolean;
   focusHeading?: boolean;
-  onNavigate?: (destination: "campaign" | "combat" | "world" | "cast" | "quests" | "story" | "history" | "administration") => void;
+  onNavigate?: (destination: CampaignDestination) => void;
   combatAvailable?: boolean;
   combatApi?: CombatTrackerApi;
   worldApi?: WorldExplorerApi;
@@ -117,7 +118,7 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 /** Coordinates durable play independently of the atlas presentation and tool drawers. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, legacyMessages = [], legacyParticipants = [], onBack, onUnavailable,
   onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
-  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, authorization }: CampaignPlayPageProps) {
+  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, authorization, onNavigate }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
     try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
       if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
@@ -459,6 +460,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
 
   const role = bootstrap.principal.role === "observer" || !authorizationCanAct ? "Spectator" : audience === "gm" ? "Game master" : "Player";
   const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const] : []), "help"];
+  const campaignNav = onNavigate ? <label className="campaign-nav-select"><select aria-label="Open a campaign destination" value="" onChange={(event) => { const destination = event.target.value as CampaignDestination; if (destination) onNavigate(destination); }}><option value="">Campaign views…</option>{campaignDestinations(bootstrap.principal.role, Boolean(worldApi), combatAvailable).filter((item) => item.id !== "play").map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.label}</option>)}</select></label> : null;
   function applyPrefill(value: string, mode: "replace" | "append") {
     if (!referenceReady) return;
     setDeclaration((current) => mode === "replace" || current.length === 0 ? value : `${current}${/\s$/.test(current) ? "" : " "}${value}`);
@@ -550,5 +552,5 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   </>;
   return <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
     tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
-    context={contextNode} center={centerNode} tool={<>{activeTool === null && quickNode}{drawersNode}</>} preferences={preferences} onPreferences={onPreferences} />;
+    context={contextNode} center={centerNode} tool={<>{activeTool === null && quickNode}{drawersNode}</>} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />;
 }

@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../../api";
 import { CampaignPlayPage, type CampaignPlayApi } from "./CampaignPlayPage";
@@ -92,6 +92,17 @@ describe("CampaignPlayPage", () => {
     await waitFor(() => expect(composer.disabled).toBe(false));
     expect(screen.getByRole("region", { name: "Living map" })).toBe(map); expect(screen.getByRole("log")).toBe(log);
     expect(navigate).not.toHaveBeenCalled(); expect(worldApi.travel).not.toHaveBeenCalled(); expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+  });
+  it("reaches campaign destinations from the Command Center without changing the in-room tools", async () => {
+    const client = api(), navigate = vi.fn();
+    vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, principal: { role: "owner", control: "all" } });
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} onNavigate={navigate} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    const menu = screen.getByRole("combobox", { name: "Open a campaign destination" });
+    expect(within(menu).getByRole("option", { name: "Overview" })).toBeTruthy();
+    expect(within(menu).queryByRole("option", { name: "Play" })).toBeNull();
+    fireEvent.change(menu, { target: { value: "overview" } });
+    expect(navigate).toHaveBeenCalledWith("overview");
   });
   it("opens mechanical possessions from Character and preserves a hidden review lock", async () => {
     const client = api();

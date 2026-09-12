@@ -23,6 +23,7 @@ export interface CommandCenterProps {
   context: ReactNode;
   center: ReactNode;
   tool: ReactNode;
+  campaignNav?: ReactNode;
   preferences: CampaignWorkbenchPreferences;
   onPreferences: (value: CampaignWorkbenchPreferences) => void;
 }
@@ -79,7 +80,7 @@ function ShortcutDialog({ dialogRef }: { dialogRef: RefObject<HTMLDialogElement>
 
 /** The one-screen Command Center: context + map, narration and composer, and tools/character summary. */
 export function CommandCenter({ headingRef, title, role, phase, actor, tools, activeTool, onTool, onBack, exitDisabled,
-  context, center, tool, preferences, onPreferences }: CommandCenterProps) {
+  context, center, tool, campaignNav, preferences, onPreferences }: CommandCenterProps) {
   const rootRef = useRef<HTMLElement>(null);
   const centerRef = useRef<HTMLElement>(null);
   const preferencesDialogRef = useRef<HTMLDialogElement>(null);
@@ -126,6 +127,7 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
           aria-expanded={expanded} aria-controls={`atlas-${tool === "character" && (activeTool === "inventory" || activeTool === "advancement") ? activeTool : tool}`}
           onClick={() => onTool(tool)}>{atlasToolLabels[tool]}</button>;
       })}
+      {campaignNav}
       <span className="campaign-nav-spacer" />
       <button type="button" className="ghost" onClick={() => preferencesDialogRef.current?.showModal()}>Display</button>
       <button type="button" className="ghost" onClick={() => shortcutDialogRef.current?.showModal()}>Shortcuts</button>
