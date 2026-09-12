@@ -46,9 +46,9 @@ These views are captured from the seeded, provider-free Baie-Comeau campaign at 
 
 ![Campaign library with preparation status](docs/images/campaign-library.png)
 
-**Living Atlas table** — the authoritative map and conversation composer.
+**Campaign Command Center** — the authoritative map, narration, and character summary on one screen.
 
-![Living Atlas with authoritative map and conversation composer](docs/images/living-atlas-table.png)
+![Campaign Command Center with authoritative map, narration, and character summary](docs/images/command-center.png)
 
 **Director** — human/AI delegation, Open and Continue scene, and private review.
 
@@ -310,7 +310,7 @@ The current policy layer is limited, not a comprehensive content-moderation syst
 | [Campaign generation](docs/campaign-generation.md) | Reviewed generation, selective application, planning, and material delivery |
 | [DM harness architecture](docs/dm-harness-architecture.md) | Authoritative conversation, trust boundaries, sheet references, tools, limitations, ruleset scope, and agent best practices |
 | [AI dungeon master](docs/ai-dungeon-master.md) | Director controls, bounded planning, narration, research, authority boundaries, and limitations |
-| [Frontend control plane](docs/frontend-control-plane.md) | Living Atlas workspace, preparation, session recovery, and browser acceptance coverage |
+| [Frontend control plane](docs/frontend-control-plane.md) | Campaign Command Center workspace, preparation, session recovery, and browser acceptance coverage |
 | [Vendor commerce](docs/vendor-commerce.md) | Exact visible-vendor candidates, confirmation, authoritative prices, and replay |
 | [Exact combat sheet actions](docs/combat-sheet-actions.md) | Exact combat consumable and power candidates, settlement, and exclusions |
 | [Bounded campaign memory](docs/campaign-memory.md) | Direct SQLite recall, source and authority scope, packing limits, and migration behavior |

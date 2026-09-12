@@ -31,7 +31,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
 - [Provider hardening](provider-hardening.md) - Provider failure classification, privacy, and retry boundaries.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
-- [Frontend control plane](frontend-control-plane.md) - Living Atlas campaign workspace, preparation, session recovery, and browser acceptance coverage.
+- [Frontend control plane](frontend-control-plane.md) - Campaign Command Center workspace, preparation, session recovery, and browser acceptance coverage.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.
 - [DM evaluation](dm-evaluation.md) - Deterministic and live DM behavior evaluation guidance.
 - [Campaign generation and expansion](campaign-generation.md) - Reviewed generation, dependency-aware apply, planning projections, provider attempt handling, and explicit material delivery; subordinate to the API reference for HTTP contracts.

@@ -105,6 +105,23 @@ async function shotRange(name, startSelector, endSelector) {
   }
 }
 
+/** Captures a region of the page capped to a readable height (top-anchored). */
+async function shotRegion(name, selector, maxHeight = 1080) {
+  try {
+    const locator = page.locator(selector).first();
+    await locator.waitFor({ state: "visible", timeout: 20000 });
+    const box = await locator.boundingBox();
+    if (!box) throw new Error("region bounds unavailable");
+    const height = Math.max(200, Math.min(box.height, maxHeight, 1188 - box.y));
+    const clip = { x: box.x, y: box.y, width: box.width, height };
+    await page.screenshot({ path: path.join(args.out, `${name}.png`), clip, fullPage: true, animations: "disabled" });
+    console.log(`captured ${name}.png (${Math.round(clip.width)}x${Math.round(clip.height)} css px)`);
+  } catch (error) {
+    failures.push(name);
+    console.error(`FAILED ${name}: ${error.message}`);
+  }
+}
+
 async function goto(route, ready) {
   await page.goto(url(route), { waitUntil: "domcontentloaded" });
   if (ready) await page.locator(ready).first().waitFor({ state: "visible", timeout: 25000 });
@@ -115,15 +132,22 @@ async function goto(route, ready) {
 await goto("/campaigns", "text=Campaigns");
 await shot("campaign-library", page.locator(".library-page .campaign-shell").first());
 
-// 2. Living Atlas table (map + conversation), no tool drawer open
-await goto(`/campaign/${args.campaign}/play/${args.room}`, ".living-atlas");
+// Widen the tools pane so in-room tool content stays legible in the crops below.
+await page.evaluate(() => {
+  const preferences = { theme: "system", density: "comfortable", contextVisible: true, quickToolsVisible: true,
+    contextWidth: 300, quickToolsWidth: 520, widgets: ["location", "cast", "objectives", "resources", "encounter"] };
+  localStorage.setItem("velvet.campaign-workbench.v1", JSON.stringify(preferences));
+});
+
+// 2. Command Center table (context + map, narration, character summary), no tool open
+await goto(`/campaign/${args.campaign}/play/${args.room}`, '[data-command-center="true"] .campaign-play-grid');
 await page.waitForTimeout(2500);
-await shot("living-atlas-table", page.locator(".atlas-table").first());
+await shot("command-center", page.locator(".campaign-play-grid").first());
 
 // 3. Director drawer
 await page.locator('[data-atlas-tool="director"]').click();
 await page.waitForTimeout(900);
-await shot("director", page.locator('.atlas-drawer-slot:not([hidden]) .atlas-drawer').first());
+await shotRegion("director", ".campaign-play-grid");
 await page.getByRole("button", { name: /^Close Director$/ }).click().catch(() => undefined);
 await page.waitForTimeout(400);
 
@@ -131,14 +155,14 @@ await page.waitForTimeout(400);
 await page.locator('[data-atlas-tool="character"]').click();
 await page.locator(".gameplay-sheet-drawer").filter({ hasText: "Inventory and equipment" }).first().waitFor({ state: "visible", timeout: 20000 }).catch(() => undefined);
 await page.waitForTimeout(900);
-await shot("character-sheet", page.locator(".gameplay-sheet-drawer").filter({ hasText: "Inventory and equipment" }).first());
+await shotRegion("character-sheet", ".campaign-play-grid");
 await page.getByRole("button", { name: /^Close character sheet$/ }).click().catch(() => undefined);
 await page.waitForTimeout(400);
 
 // 5. World expedition (Travel drawer: route plan plus bootstrap placement and camp)
 await page.locator('[data-atlas-tool="travel"]').click();
 await page.waitForTimeout(1500);
-await shotUnion("world-expedition", [page.locator(".atlas-travel-plan"), page.locator(".world-expedition")]);
+await shotRegion("world-expedition", ".campaign-play-grid");
 
 // 6. Combat tracker (encounter lifecycle plus reviewed generation)
 await goto(`/campaign/${args.campaign}/combat`, ".combat-shell");
