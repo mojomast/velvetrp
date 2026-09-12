@@ -1300,6 +1300,10 @@ button:disabled {
 .control-rail-note p { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .control-rail-note > small { display: block; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .control-stage, .control-workspace { min-width: 0; }
+/* The atlas play surface owns its viewport; size it to the workspace that remains below the shell toolbar instead of adding a second 100dvh. */
+.control-stage { display: flex; flex-direction: column; min-height: 100dvh; }
+.control-workspace { flex: 1 1 auto; min-height: 0; }
+.control-workspace .living-atlas { height: 100%; min-height: 0; }
 .control-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 62px; padding: 12px 24px; border-bottom: 1px solid var(--border); }
 .control-toolbar > span { color: var(--muted); font: 11px/1.5 ui-monospace, monospace; }
 .control-toolbar nav { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1356,3 +1360,4 @@ button:disabled {
   .control-nav button[aria-current="page"] { outline: 2px solid Highlight; }
   .campaign-launch-actions article, .control-role { border-color: CanvasText; }
 }
+.jump-to-latest { position: sticky; bottom: .5rem; align-self: center; z-index: 3; }

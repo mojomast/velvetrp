@@ -20,6 +20,6 @@ describe("AdventureActionComposer", () => {
       role={state === "observer" ? "observer" : "player"} eligible inactive={state === "inactive"}
       phase={state === "ambiguous" ? "ambiguous" : "ready"} declaration="" onDeclarationChange={vi.fn()} onActorChange={vi.fn()} onSubmit={vi.fn()} />);
     expect((screen.getByLabelText("What do you do?") as HTMLTextAreaElement).disabled).toBe(true);
-    expect(screen.getByRole("status").textContent).toMatch(state === "observer" ? /read-only/ : state === "inactive" ? /inactive/ : /uncertain/);
+    expect(screen.getByRole("status").textContent).toMatch(state === "observer" ? /read-only/ : state === "inactive" ? /inactive/ : /unconfirmed/);
   });
 });

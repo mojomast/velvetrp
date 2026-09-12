@@ -513,7 +513,7 @@ export function CombatTrackerPage({ api, campaignId, sessionId, actorRole = "gm"
     catch{if(mountedRef.current)setPowerStatus("Power outcome is ambiguous. Authoritative actor lanes may be refreshed, but this persistent lock cannot be cleared by generic reads.");}
   }
 
-  const labels = useMemo(() => new Map(combat?.combatants.map((entry,index) => [entry.combatantId, entry.kind === "actor" ? `Ally ${index + 1}` : `Enemy ${index + 1}`]) ?? []), [combat]);
+  const labels = useMemo(() => new Map(combat?.combatants.map((entry,index) => [entry.combatantId, entry.displayName ?? (entry.kind === "actor" ? `Ally ${index + 1}` : `Enemy ${index + 1}`)]) ?? []), [combat]);
   const inspectedCombatant = combat?.combatants.find((entry) => entry.combatantId === inspected) ?? null;
   const currentEnemy=combat?.combatants.find((entry)=>entry.combatantId===combat.currentCombatant)?.kind==="enemy";
   const controlledCombatant=combat?.combatants.find((entry)=>entry.kind==="actor"&&entry.actorId===controlledActorId)??null;

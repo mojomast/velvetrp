@@ -46,6 +46,25 @@ export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, e
     setSelected(new Set(proposalIds)); setPhase("ready"); setMessage(""); setFailed(false);
   }, [pendingBatch]);
 
+  async function checkStatus() {
+    if (phase === "sending") return;
+    const decisionBatch = pendingBatch;
+    setPhase("ambiguous"); setMessage("Checking the durable turn without resubmitting your decision…"); setFailed(false);
+    try {
+      const reconciled = await api.getAdventureTurn(turnId, binding);
+      if (activeBatchRef.current !== decisionBatch) return;
+      try { localStorage.removeItem(storageKey(turnId)); } catch { /* optional */ }
+      if (reconciled.confirmation.state === "pending") {
+        setPhase("ready"); setMessage("The decision was not committed. Review the current suggestions and submit again if appropriate."); return;
+      }
+      onReconciled(reconciled, reconciled.resumeToken); restoreFocusRef?.current?.focus();
+    } catch {
+      if (activeBatchRef.current !== decisionBatch) return;
+      setPhase("ambiguous"); setFailed(true);
+      setMessage("Decision status could not be read. Your decision will not be replayed automatically; try again when the connection returns.");
+    }
+  }
+
   async function decide(decision: "approve" | "reject") {
     const exactIds = proposalIds.filter((id) => selected.has(id));
     if (phase !== "ready" || exactIds.length === 0) return;
@@ -111,7 +130,7 @@ export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, e
   return <section ref={bannerRef} tabIndex={-1} className="confirmation-banner" aria-labelledby="confirmation-heading">
     <div className="confirmation-labels"><strong>AI suggestion</strong><strong>Confirmation required</strong></div>
     <h2 id="confirmation-heading">Review suggested mechanics</h2>
-    <p>These suggestions contain no recorded execution binding or arguments. The server remains authoritative.</p>
+    <p>Nothing runs until you approve it. The server applies the mechanics and remains authoritative.</p>
     <p>Expires <time dateTime={expiresAt}>{new Date(expiresAt).toLocaleString()}</time></p>
     <fieldset disabled={phase !== "ready"}><legend>Select the exact suggestions to decide</legend>
       {pending.map((proposal) => <label key={proposal.proposalId}><input type="checkbox" checked={selected.has(proposal.proposalId)} onChange={(event) => {
@@ -122,6 +141,7 @@ export function ConfirmationBanner({ turnId, revision, proposals, proposalIds, e
     </fieldset>
     <div className="button-row"><button className="primary" disabled={phase !== "ready" || selected.size === 0} onClick={() => void decide("approve")}>Approve selected batch</button>
       <button className="danger subtle" disabled={phase !== "ready" || selected.size === 0} onClick={() => void decide("reject")}>Reject selected batch</button></div>
+    {phase === "ambiguous" && <div className="button-row"><button type="button" onClick={() => void checkStatus()}>Check decision status</button></div>}
     {message && <p role={phase === "ambiguous" || failed ? "alert" : "status"}>{message}</p>}
   </section>;
 }

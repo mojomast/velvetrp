@@ -144,6 +144,8 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     kind: z.literal("actor"),
     team: combatTeamSchema,
     actorId: actorIdSchema,
+    /** Audience-authorized display name projected by the server; absent when not publishable. */
+    displayName: encounterNameSchema.optional(),
     hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
     temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),
@@ -156,6 +158,8 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     kind: z.literal("enemy"),
     team: combatTeamSchema,
     template: enemyTemplateCatalogReferenceSchema.nullable(),
+    /** Audience-authorized display name projected by the server; absent when not publishable. */
+    displayName: encounterNameSchema.optional(),
     hitPoints: z.number().int().min(-1_000_000).max(1_000_000),
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
     temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),

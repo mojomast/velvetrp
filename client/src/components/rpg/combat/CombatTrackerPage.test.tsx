@@ -148,6 +148,17 @@ describe("M3.5 server-authoritative combat controls", () => {
     expect(buttons[0]!.getAttribute("aria-current")).toBe("step");
   });
 
+  it("prefers server-projected display names over neutral position labels", () => {
+    render(<InitiativeRail combatants={[
+      { ...combat.combatants[0]!, displayName: "Aria of the Quay" },
+      { ...combat.combatants[1]!, displayName: "Gloam Mite" },
+    ]} currentCombatant="combatant-one" onInspect={() => undefined} />);
+    expect(screen.getByRole("button", { name: /Aria of the Quay/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Gloam Mite/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Ally 1/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Enemy 2/ })).toBeNull();
+  });
+
   it.each([1280,390])("renders explicit unclaimed and claimed reward state at %ipx",(width)=>{
     Object.defineProperty(window,"innerWidth",{configurable:true,value:width});
     render(<CombatRewards rewards={[reward,claimedReward]} claimableActorId="actor-one" onClaim={()=>undefined}/>);
@@ -400,7 +411,7 @@ describe("M3.5 server-authoritative combat controls", () => {
   it("persists an uncertain combat-power request and recovers its exact result after remount without replay",async()=>{
     const use=vi.fn().mockRejectedValue(new Error("offline")),exact=vi.fn().mockImplementation((_combatId,command)=>Promise.resolve({...combatPowerResponse,request:command}));
     const service=api({getCombatPowerActions:vi.fn().mockResolvedValue([combatPower]),useCombatPower:use,getCombatPowerResult:exact});
-    const first=render(<CombatTrackerPage api={service} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:"Use Arc bolt"}));await screen.findByText(/Combat power outcome is uncertain/i);
+    const first=render(<CombatTrackerPage api={service} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);await combatReady();fireEvent.click(screen.getByRole("button",{name:"Use Arc bolt on Enemy 2"}));fireEvent.click(screen.getByRole("button",{name:"Confirm power"}));await screen.findByText(/Combat power outcome is uncertain/i);
     expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-power.v1:campaign:combat-one")).toContain('"phase":"ambiguous"');first.unmount();
     render(<CombatTrackerPage api={service} campaignId="campaign" actorRole="player" audience="player" controlledActorId="actor-one" initialCombatId="combat-one" onBack={()=>undefined}/>);await screen.findByText(/Combat power outcome unresolved/i);expect(use).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button",{name:/Read exact combat-power result/}));await screen.findByText(/Exact combat-power result confirmed/i);expect(exact).toHaveBeenCalledTimes(1);expect(use).toHaveBeenCalledTimes(1);expect(localStorage.getItem("velvet.combat-power.v1:campaign:combat-one")).toBeNull();

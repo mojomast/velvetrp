@@ -62,3 +62,5 @@
   .campaign-create-flow .campaign-starting-location-choice, .campaign-create-flow .campaign-starting-location-recovery { display: grid; }
   .campaign-create-flow .campaign-starting-location-choice button, .campaign-create-flow .campaign-starting-location-recovery button { min-height: 44px; width: 100%; }
 }
+.campaign-create-inline-settings { margin-top: .75rem; padding: .9rem; border: 1px solid var(--border, #675a48); border-left: 4px solid var(--accent, #d3b478); border-radius: .6rem; }
+.campaign-create-inline-settings .prompt-settings { max-height: 70vh; overflow: auto; }

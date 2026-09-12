@@ -113,6 +113,29 @@ export function createEncounterReadRepository(
               definitionId: row.provenance_definition_id,
             },
       };
+  // Display names are joined from authorized sources only: campaign persona
+  // names for actors, and publicly reachable enemy-template definitions for
+  // enemies. Missing or private names stay absent so the client falls back to
+  // neutral position labels instead of inferring hidden identities.
+  const actorDisplayName = (campaignId: string, actorId: string): string | null => {
+    const row = db.prepare(`SELECT persona.name
+      FROM campaign_actors actor
+      JOIN campaign_characters character ON character.campaign_id=actor.campaign_id AND character.id=actor.campaign_character_id
+      JOIN characters persona ON persona.id=character.character_id
+      WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId, actorId) as { name: string } | undefined;
+    return row?.name?.trim() ? row.name : null;
+  };
+  const enemyDisplayName = (template: { packId: string; packVersion: string; definitionId: string } | null): string | null => {
+    if (!template) return null;
+    const row = db.prepare(`SELECT public_definition_json FROM rpg_catalog_definition_visibility
+      WHERE pack_id=? AND pack_version=? AND kind='enemy-template' AND definition_id=? AND publicly_reachable=1`)
+      .get(template.packId, template.packVersion, template.definitionId) as { public_definition_json: string } | undefined;
+    if (!row) return null;
+    try {
+      const parsed = JSON.parse(row.public_definition_json) as { name?: unknown };
+      return typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : null;
+    } catch { return null; }
+  };
   const combatConditions = (encounterId: string, combatantId: string, round: number) => db.prepare(`SELECT condition,expires_at_round
     FROM combat_conditions_v62 WHERE encounter_id=? AND combatant_id=? AND (expires_at_round IS NULL OR expires_at_round>=?)
     ORDER BY condition,source_combatant_id`).all(encounterId, combatantId, round).map((row: any) => ({
@@ -205,14 +228,20 @@ export function createEncounterReadRepository(
       combatId,
       round: encounter.round_number,
       currentCombatant: encounter.current_turn_combatant_id,
-      combatants: rows.map((row) => ({
-        ...publicCombatant(row),
-        hitPoints: row.hit_points,
-        maximumHitPoints: row.maximum_hit_points,
-         ...(dndCombat ? { temporaryHitPoints: row.temporary_hit_points, conditions: combatConditions(combatId, row.combatant_id, encounter.round_number) } : {}),
-        status: row.status,
-        ...(row.actor_id !== null && row.survival_successes !== null ? { deathSaves: { successes: row.survival_successes, failures: row.survival_failures } } : {}),
-      })),
+      combatants: rows.map((row) => {
+        const identity = publicCombatant(row);
+        const displayName = identity.kind === "actor" ? actorDisplayName(encounter.campaign_id, identity.actorId)
+          : enemyDisplayName(identity.template);
+        return {
+          ...identity,
+          ...(displayName ? { displayName } : {}),
+          hitPoints: row.hit_points,
+          maximumHitPoints: row.maximum_hit_points,
+          ...(dndCombat ? { temporaryHitPoints: row.temporary_hit_points, conditions: combatConditions(combatId, row.combatant_id, encounter.round_number) } : {}),
+          status: row.status,
+          ...(row.actor_id !== null && row.survival_successes !== null ? { deathSaves: { successes: row.survival_successes, failures: row.survival_failures } } : {}),
+        };
+      }),
       legalActions,
        ...(isDndCombat(db,encounter.campaign_id)?{turnEconomy}:{}),
        ...(isDndCombat(db,encounter.campaign_id)?{reactionAvailability:readReactionAvailability(db,combatId,encounter.round_number)}:{}),

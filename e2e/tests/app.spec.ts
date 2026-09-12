@@ -2008,7 +2008,7 @@ test("M5.3 browser reconciles one committed consumable POST without replay", asy
   await page.getByRole("button", { name: "Load combat" }).click();
   await expect(page.getByRole("heading", { name: "Consumables" })).toBeVisible();
   await expect(page.getByText("Quantity 1 · Cost: action.")).toBeVisible();
-  const use = page.getByRole("button", { name: `Use ${consumableItem.definitionId} on Ally 1` });
+  const use = page.getByRole("button", { name: `Use ${consumableItem.definitionId} on ${runId}-M5.3-Actor` });
   await expect(use).toBeVisible();
 
   const commandPath = `${actionsPath}/commands`;

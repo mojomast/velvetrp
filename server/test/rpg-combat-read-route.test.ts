@@ -35,6 +35,17 @@ describe("M2.9 combat read routes",()=>{
     expect(calls).toEqual([["combat","local-owner","combat"],["log","local-owner","combat",2,1]]);await app.close();
   });
 
+  it("forwards server-projected display names without exposing private identity",async()=>{
+    enable();
+    const named={...combat,combatants:[{...combat.combatants[0],displayName:"Aria of the Quay"}]};
+    const app=buildApp({campaignRepositoryFactory:()=>repository({getCombatState:()=>named})});
+    const state=await app.inject({method:"GET",url:"/api/rpg/v1/combats/combat"});
+    expect(state.statusCode).toBe(200);
+    expect(state.json().combatants[0]).toMatchObject({combatantId:"combatant",displayName:"Aria of the Quay"});
+    expect(state.body).not.toContain("campaignId");expect(state.body).not.toContain("encounterId");
+    await app.close();
+  });
+
   it("gates features and normalizes query, paths, methods, absence, and corrupt projections",async()=>{
     let accesses=0;const gated=buildApp({campaignRepositoryFactory:()=>{accesses++;return repository();}});
     expect((await gated.inject({method:"GET",url:"/api/rpg/v1/combats/combat"})).statusCode).toBe(404);expect(accesses).toBe(0);enable();

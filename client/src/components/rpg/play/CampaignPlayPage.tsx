@@ -142,10 +142,12 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const [pendingInitial, setPendingInitial] = useState<PendingInitial | null>(() => readPendingInitial(campaignId, sessionId));
   const [pendingTurnReconciliation, setPendingTurnReconciliation] = useState<PendingTurnReconciliation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<AdventureTurnTranscriptEntry[]>([]);
   const [transcriptState, setTranscriptState] = useState<"loading" | "ready" | "error">("loading");
   const [liveEvents, setLiveEvents] = useState<AdventureTurnStreamEvent[]>([]);
   const [declaration, setDeclaration] = useState("");
+  const [pendingPrefill, setPendingPrefill] = useState<string | null>(null);
   const [reconciliationRevision, setReconciliationRevision] = useState(0);
   const [liveRefreshRevision, setLiveRefreshRevision] = useState(0);
   const streamRef = useRef<AdventureTurnStreamHandle | null>(null);
@@ -235,16 +237,28 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     catch { setPhase("ambiguous"); setError("The turn could not be reconciled authoritatively. Try again before continuing."); }
   }, [reconcile]);
 
+  const loadBootstrap = useCallback(async () => {
+    setBootstrapError(null);
+    try { await refreshBootstrap(); }
+    catch (failure) {
+      const aborted = typeof failure === "object" && failure !== null && "name" in failure && (failure as { name?: unknown }).name === "AbortError";
+      if (!activeRef.current || aborted) return;
+      // A transient read failure keeps the recovery locator so the user can reconnect or check what happened.
+      if ((failure instanceof ApiError && failure.status >= 500) || failure instanceof TypeError) {
+        setBootstrapError("Couldn't reach the adventure room. Your place and any unresolved action are preserved; retry when the connection returns.");
+        return;
+      }
+      clearAdventureState(); unavailableRef.current();
+    }
+  }, [clearAdventureState, refreshBootstrap]);
+
   useEffect(() => {
-    activeRef.current = true; setBootstrap(null); setTurn(null); setResumeToken(undefined); setError(null); setLiveEvents([]); setTranscript([]); setTranscriptState("loading");
+    activeRef.current = true; setBootstrap(null); setTurn(null); setResumeToken(undefined); setError(null); setBootstrapError(null); setLiveEvents([]); setTranscript([]); setTranscriptState("loading");
     streamRef.current?.cancelDelivery(); streamRef.current = null;
-    void refreshBootstrap().catch((failure: unknown) => {
-      const aborted = typeof failure === "object" && failure !== null && "name" in failure && failure.name === "AbortError";
-      if (activeRef.current && !aborted) { clearAdventureState(); unavailableRef.current(); }
-    });
+    void loadBootstrap();
     void refreshTranscript();
     return () => { activeRef.current = false; bootstrapReadRef.current += 1; transcriptReadRef.current += 1; streamRef.current?.cancelDelivery(); streamRef.current = null; };
-  }, [authorizationGeneration, clearAdventureState, refreshBootstrap, refreshTranscript]);
+  }, [authorizationGeneration, clearAdventureState, loadBootstrap, refreshBootstrap, refreshTranscript]);
   useEffect(() => {
     let timer: number | undefined;
     const refreshReads = async () => {
@@ -395,7 +409,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const pending = turn?.confirmation.state === "pending" ? turn.confirmation : null;
   const confirmationApi = useMemo(() => ({ confirmAdventureTurn: api.confirmAdventureTurn, getAdventureTurn: api.getAdventureTurn }), [api]);
   const activeBinding = turn ? { campaignId, sessionId, actorId: turn.turn.actorId, turnId: turn.turn.turnId, priorTurnId: turn.turn.priorTurnId } : null;
-  if (!bootstrap) return <main className="living-atlas atlas-loading"><p className="atlas-kicker">VELVET / LIVING ATLAS</p><p role="status">Opening campaign play...</p></main>;
+  if (!bootstrap) return <main className="living-atlas atlas-loading"><p className="atlas-kicker">VELVET / LIVING ATLAS</p>
+    {bootstrapError ? <><p role="alert">{bootstrapError}</p><div className="button-row"><button type="button" onClick={() => void loadBootstrap()}>Retry connection</button><button type="button" onClick={onBack}>Leave room</button></div></> : <p role="status">Opening campaign play...</p>}
+  </main>;
   const actionable = authorizationCanAct && bootstrap.session.adventureEligible && bootstrap.session.active
     && bootstrap.principal.role !== "observer" && bootstrap.playableActors.length > 0;
   const referenceReady = actionable && !sessionLocked && !roomToolsLocked && (phase === "idle" || phase === "terminal") && Boolean(selectedActorId);
@@ -439,7 +455,17 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
 
   const role = bootstrap.principal.role === "observer" || !authorizationCanAct ? "Spectator" : audience === "gm" ? "Game master" : "Player";
   const tools: AtlasTool[] = ["director", "character", "dice", "travel", "context", "combat", ...(audience === "gm" && authorizationCanAct ? ["gm" as const] : []), "help"];
-  const prefill = (value: string) => { if (!referenceReady) return; setDeclaration(value); requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true })); };
+  function applyPrefill(value: string, mode: "replace" | "append") {
+    if (!referenceReady) return;
+    setDeclaration((current) => mode === "replace" || current.length === 0 ? value : `${current}${/\s$/.test(current) ? "" : " "}${value}`);
+    setPendingPrefill(null);
+    requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true }));
+  }
+  const prefill = (value: string) => {
+    if (!referenceReady) return;
+    if (declaration.trim().length === 0) { applyPrefill(value, "replace"); return; }
+    setPendingPrefill(value);
+  };
   return <PlaySurface headingRef={headingRef} title="Adventure room" role={role} phase={phase.replaceAll("-", " ")}
     tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
     actor={bootstrap.principal.role !== "observer" && authorizationCanAct && bootstrap.playableActors.length > 0
@@ -458,6 +484,10 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       {playBlocker && <p className="atlas-notice" role="status">{playBlocker}</p>}
       {dmLocked && <p className="atlas-notice" role="status">Director work needs review or recovery. Open Director; takeover remains available to the GM.</p>}
       {(sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked) && <p className="atlas-notice" role="status">{sessionLocked ? "A GM session operation needs review or recovery. Open GM tools to continue." : travelLocked ? "Travel needs review or recovery. Open Travel to continue." : inventoryLocked || advancementLocked ? "A character operation needs review or recovery. Open Character tools to continue." : "A combat operation needs completion or recovery. Open Combat & rewards to continue."}</p>}
+      {pendingPrefill && <div className="atlas-reconcile" role="group" aria-label="Insert suggested action"><p>You already have a declaration. Append the suggestion or replace what you wrote?</p><div className="button-row">
+        <button type="button" onClick={() => applyPrefill(pendingPrefill, "append")}>Append suggestion</button>
+        <button type="button" onClick={() => applyPrefill(pendingPrefill, "replace")}>Replace declaration</button>
+        <button type="button" onClick={() => setPendingPrefill(null)}>Cancel</button></div></div>}
       {pendingInitial && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button type="button" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
       {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A known turn needs authoritative reconciliation.</p><button type="button" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
       {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}

@@ -34,19 +34,21 @@ export function CampaignDicePanel({ campaignId, api, canView, canRoll, actorName
     ? history.characters.filter((character) => actorNames.includes(character.name))
     : history.characters;
 
-  async function refresh(showLoading: boolean) {
-    if (!canView || !api.getCampaignDiceHistory) return;
+  async function refresh(showLoading: boolean): Promise<boolean> {
+    if (!canView || !api.getCampaignDiceHistory) return false;
     const request = ++generation.current;
     if (showLoading) setLoad((current) => ({ state: "loading", history: current.history }));
     try {
       const history = await api.getCampaignDiceHistory(campaignId);
-      if (!mounted.current || request !== generation.current) return;
+      if (!mounted.current || request !== generation.current) return false;
       const characters = permittedCharacters(history);
       setLoad({ state: "idle", history });
       setPosition((current) => characters.some((character) => character.position === current) ? current
         : characters.find((character) => character.name === selectedActorName)?.position ?? characters[0]?.position ?? null);
+      return true;
     } catch {
       if (mounted.current && request === generation.current) setLoad((current) => ({ state: "error", history: current.history }));
+      return false;
     }
   }
 
@@ -72,16 +74,22 @@ export function CampaignDicePanel({ campaignId, api, canView, canRoll, actorName
     writeLock.current = true;
     setBusy(true);
     setMessage("");
+    let writeConfirmed = false;
     try {
       await api.rollCampaignDice(campaignId, parsed.data);
-      setMessage("Roll committed. Authoritative history refreshed.");
+      writeConfirmed = true;
+      setMessage("Roll confirmed; refreshing results…");
     } catch {
-      setMessage("Roll status was reconciled from history. The roll was not repeated.");
-    } finally {
-      await refresh(false);
-      if (mounted.current) setBusy(false);
-      writeLock.current = false;
+      setMessage("Roll outcome unknown; checking history…");
     }
+    const readConfirmed = await refresh(false);
+    if (mounted.current) {
+      setMessage(writeConfirmed
+        ? readConfirmed ? "Roll confirmed; results refreshed." : "Roll confirmed, but results could not be refreshed."
+        : readConfirmed ? "History loaded; this roll could not be identified conclusively. No roll was repeated." : "Roll outcome unknown and history could not be loaded. No roll was repeated.");
+      setBusy(false);
+    }
+    writeLock.current = false;
   }
 
   if (!canView || !api.getCampaignDiceHistory) return <section className="table-dice table-dice-receipts-only" aria-labelledby="table-dice-heading">
@@ -102,7 +110,7 @@ export function CampaignDicePanel({ campaignId, api, canView, canRoll, actorName
       <button type="submit" className="primary" disabled={busy || characters.length === 0}>{busy ? "Rolling once..." : "Roll dice"}</button>
     </form>}
     {!canRoll && <p className="table-dice-permission">Results are visible, but this role cannot roll table dice.</p>}
-    {message && <p role={message.startsWith("Roll committed") ? "status" : "alert"}>{message}</p>}
+    {message && <p role={message.startsWith("Roll confirmed") ? "status" : "alert"}>{message}</p>}
     {load.state === "loading" && !load.history && <p role="status">Loading roll history...</p>}
     {load.state === "error" && <p role="alert">Roll history could not be refreshed. Existing results are unchanged.</p>}
     {load.history && <div className="table-dice-history"><h3>Recent rolls</h3>

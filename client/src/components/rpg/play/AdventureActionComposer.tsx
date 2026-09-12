@@ -32,7 +32,7 @@ export function AdventureActionComposer({ actors, selectedActorId, role, eligibl
       : !eligible ? "Adventure turns are unavailable for this room."
         : !actorAvailable ? "Select an available actor to declare an action."
           : phase === "inflight" ? "Action delivery is in progress."
-            : phase === "ambiguous" ? "Outcome is uncertain. Reconcile the durable turn before acting again."
+            : phase === "ambiguous" ? "Your last action is still unconfirmed. Check what happened before acting again."
               : "Ready for an in-fiction declaration. Mechanics are resolved by the server.";
 
   function submit(event: FormEvent) {

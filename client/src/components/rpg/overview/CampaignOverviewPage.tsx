@@ -18,14 +18,19 @@ export function CampaignOverviewPage({ campaignId, destination, mechanics, onAdv
   const [preparing, setPreparing] = useState(false);
   useEffect(() => {
     let current = true, generation = 0;
-    const refresh = () => {
-      const request = ++generation; setData(null); setError(false); report(null);
+    // A focus refresh keeps the current snapshot and any open preparation drafts mounted.
+    // Only the first read may show the loading surface or clear the shell identity.
+    const refresh = (background = false) => {
+      const request = ++generation;
+      if (!background) { setData(null); setError(false); report(null); }
       void Promise.all([getCampaignDetail(campaignId), listCampaignCharacters(campaignId), listCampaignRooms(campaignId)])
         .then(([detail, party, rooms]) => { if (current && request === generation) { setData({ campaign: detail.campaign, party: party.characters, rooms: rooms.attached }); report(detail.campaign); } })
-        .catch(() => { if (current && request === generation) setError(true); });
+        .catch(() => { if (current && request === generation && !background) setError(true); });
     };
-    refresh(); window.addEventListener("focus", refresh);
-    return () => { current = false; window.removeEventListener("focus", refresh); };
+    refresh();
+    const onFocus = () => refresh(true);
+    window.addEventListener("focus", onFocus);
+    return () => { current = false; window.removeEventListener("focus", onFocus); };
   }, [campaignId, report, revision, refreshRequest]);
   const heading = destination === "overview" ? "Campaign overview" : destination === "rooms" ? "Rooms" : "Party";
   if (!data) return <main className="campaign-entry"><h1>{heading}</h1>{error ? <div role="alert"><p>Campaign workspace could not be read. No readiness is assumed.</p><button onClick={() => setRevision(value => value + 1)}>Retry workspace read</button></div> : <p role="status">Reading campaign, party and sessions...</p>}<button onClick={onAdvanced}>Open advanced setup</button></main>;

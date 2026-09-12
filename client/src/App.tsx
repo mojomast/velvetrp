@@ -37,6 +37,7 @@ import { sanitizeCampaignNarrativeMutations } from "./components/rpg/narrativeMu
 import { CampaignPlayPage, type CampaignPlayApi } from "./components/rpg/play/CampaignPlayPage";
 import { campaignDmApi } from "./components/rpg/play/CampaignDmPanel";
 import { readNavigation, writeNavigation, type StoredNavigation, type View } from "./roleplay/navigation";
+import { navigationFromRoute, routeFromNavigation } from "./roleplay/route";
 import { CampaignShell, useCampaignShell, type CampaignDestination } from "./components/rpg/shell/CampaignShell";
 import { CampaignOverviewPage } from "./components/rpg/overview/CampaignOverviewPage";
 import { CampaignCreatePage } from "./components/rpg/generation/CampaignCreatePage";
@@ -127,7 +128,14 @@ function clearCampaignPlayPersistence(campaignId: string, sessionId?: string, tu
 
 export default function App() {
   const freshNavigation = useRef((() => { try { return localStorage.getItem("velvet.navigation.v1") === null; } catch { return true; } })()).current;
-  const stored = useRef(readNavigation()).current;
+  // A non-empty campaign route is a deliberate deep link. It wins only on a
+  // fresh install or over the default home surface so an already-open workspace
+  // is never silently replaced by a stale hash. Empty hashes keep local restore.
+  const stored = useRef<StoredNavigation>((() => {
+    const local = readNavigation();
+    const fromHash = window.location.hash ? navigationFromRoute(window.location.hash) : null;
+    return fromHash && (freshNavigation || local.view === "home") ? fromHash : local;
+  })()).current;
   const campaignEntryRef = useRef(stored.campaignEntry === "overview");
   const [shellSelection, setShellSelection] = useState<{ destination: CampaignDestination; view: View; request: number } | null>(null);
   const [view, setView] = useState<View>(stored.view ?? "home");
@@ -385,17 +393,81 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const routeSyncStartedRef = useRef(false);
+  const syncRoute = useCallback((navigation: StoredNavigation) => {
+    const route = routeFromNavigation(navigation);
+    if (route === null) return;
+    const url = `${window.location.pathname}${window.location.search}${route}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (url === current) { routeSyncStartedRef.current = true; return; }
+    try {
+      // The first sync adopts the existing URL; later destination changes are real history entries.
+      if (!routeSyncStartedRef.current) window.history.replaceState(null, "", url);
+      else window.history.pushState(null, "", url);
+    } catch { /* URL sync is a convenience and must never block navigation */ }
+    routeSyncStartedRef.current = true;
+  }, []);
+
   useEffect(() => {
     const entry = campaignEntryRef.current ? { campaignEntry: "overview" as const } : {};
-    if (view === "campaign-play") writeNavigation({ ...entry, view, campaignId: activeCampaignId || undefined, sessionId: session?.id,
-      adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined } satisfies StoredNavigation);
-    else writeNavigation({ ...entry, view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined,
-      combatActorRole: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatActorRole : undefined,
-      combatControlledActorId: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined,
-      combatId: view === "campaign-combat" && combatReturnView === "campaign-play" ? initialCombatId || undefined : undefined,
-      combatReturnPane: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.pane : undefined,
-      combatReturnFocus: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.focus : undefined } satisfies StoredNavigation);
-  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, combatActorRole, combatControlledActorId, initialCombatId, playCombatReturnFocus, playSelectedActorId, playTurnId]);
+    const navigation: StoredNavigation = view === "campaign-play"
+      ? { ...entry, view, campaignId: activeCampaignId || undefined, sessionId: session?.id,
+        adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined }
+      : { ...entry, view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined,
+        combatActorRole: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatActorRole : undefined,
+        combatControlledActorId: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined,
+        combatId: view === "campaign-combat" && combatReturnView === "campaign-play" ? initialCombatId || undefined : undefined,
+        combatReturnPane: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.pane : undefined,
+        combatReturnFocus: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.focus : undefined } satisfies StoredNavigation;
+    writeNavigation(navigation);
+    syncRoute(navigation);
+  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, combatActorRole, combatControlledActorId, initialCombatId, playCombatReturnFocus, playSelectedActorId, playTurnId, syncRoute]);
+
+  const applyRoute = useCallback((navigation: StoredNavigation) => {
+    cancelRoomOpenForNavigation();
+    const epoch = navigationEpochRef.current;
+    const request = ++transitionRequestRef.current;
+    campaignDetailEntryRef.current = request;
+    campaignAdministrationEntryRef.current = request;
+    studioEntryRef.current = request;
+    combatEntryRef.current = request;
+    setChatReturnCampaignId(navigation.view === "chat" ? navigation.chatReturnCampaignId ?? navigation.campaignId ?? "" : "");
+    setActiveCampaignCharacterId(navigation.campaignCharacterId ?? "");
+    setCombatReturnView("campaign-detail");
+    setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId(""); setPlayCombatReturnFocus(null);
+    if ((navigation.view === "campaign-play" || navigation.view === "chat") && navigation.campaignId && navigation.sessionId) {
+      const campaignId = navigation.campaignId, sessionId = navigation.sessionId, destination = navigation.view;
+      setBusy(true);
+      void getSession(sessionId).then((data) => {
+        if (epoch !== navigationEpochRef.current || data.session.id !== sessionId) return;
+        chatEntryRef.current += 1; currentSessionRef.current = data.session;
+        setActiveCampaignId(campaignId);
+        currentNavigationRef.current = { view: destination, campaignId, chatReturnCampaignId: destination === "chat" ? campaignId : "" };
+        setSession(data.session); setMessages(data.messages); setView(destination);
+      }).catch(() => {
+        if (epoch !== navigationEpochRef.current) return;
+        setActiveCampaignId(campaignId);
+        currentNavigationRef.current = { view: "campaign-overview", campaignId, chatReturnCampaignId: "" };
+        setSession(null); setMessages([]); setView("campaign-overview");
+      }).finally(() => { if (epoch === navigationEpochRef.current) setBusy(false); });
+      return;
+    }
+    setActiveCampaignId(navigation.campaignId ?? "");
+    setSession(null); setMessages([]);
+    currentNavigationRef.current = { view: navigation.view, campaignId: navigation.campaignId ?? "", chatReturnCampaignId: "" };
+    setView(navigation.view);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const navigation = navigationFromRoute(window.location.hash);
+      if (!navigation) return;
+      routeSyncStartedRef.current = true;
+      applyRoute(navigation);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [applyRoute]);
 
   function goHome() { cancelRoomOpenForNavigation(); currentNavigationRef.current = { view: "home", campaignId: "", chatReturnCampaignId: "" }; setChatReturnCampaignId(""); setView("home"); setSession(null); setMessages([]); setError(null); }
   async function openSession(id: string) {
@@ -658,7 +730,7 @@ export default function App() {
     return <CharacterBuilderPage campaignId={activeCampaignId} personas={characters.map((character) => ({ id: character.id, name: character.name }))} initialDraftId={characterDraftIds[activeCampaignId]} api={characterBuilderApi} focusHeadingRequest={characterBuilderEntryRef.current || undefined} onDraftIdentity={setDraftIdentity} onBack={returnToCampaign} onReviewCampaignRoster={returnToCampaign} onUnavailable={returnToCampaign} onEditPersona={(personaId) => { cancelRoomOpenForNavigation(); setActiveCharacterId(personaId); setError(null); setView("edit"); }} onOpenCharacter={(campaignCharacterId) => { cancelRoomOpenForNavigation(); setActiveCampaignCharacterId(campaignCharacterId); currentNavigationRef.current = { view: "campaign-character", campaignId: activeCampaignId, chatReturnCampaignId: "" }; setView("campaign-character"); }} />;
   }
   if (view === "campaign-play" && campaignLibraryAvailable && campaignMechanicsAvailable && activeCampaignId && session) {
-    const returnToCampaign = () => { clearCampaignPlayPersistence(activeCampaignId, session.id, playTurnId); cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
+    const returnToCampaign = () => { cancelRoomOpenForNavigation(); const request = ++transitionRequestRef.current;
       setRoomsRefreshRequest({ campaignId: activeCampaignId, request }); setPlayTurnId(""); setPlaySelectedActorId("");
       if (campaignEntryRef.current) { setSession(null); setMessages([]); navigateCampaign("play"); return; }
       currentNavigationRef.current = { view: "campaign-detail", campaignId: activeCampaignId, chatReturnCampaignId: "" };
@@ -707,10 +779,11 @@ interface ChatProps { embedded?: boolean; session: Session; initialMessages: Cha
 function Chat({ embedded = false, session, initialMessages, provider, harness, features, externalError, navigationBusy, onSessionChange, onProviderChange, onHarnessChange, onOpenPrivate, backLabel, onBack }: ChatProps) {
   const [messages, setMessages] = useState(initialMessages); const [draft, setDraft] = useState(""); const [targetId, setTargetId] = useState(session.primaryCharacterId); const [sending, setSending] = useState(false); const [roomSending, setRoomSending] = useState(false); const [error, setError] = useState<string | null>(null); const [streamText, setStreamText] = useState(""); const [streamSpeakerId, setStreamSpeakerId] = useState(session.primaryCharacterId); const [swipeInfo, setSwipeInfo] = useState<SiblingsResponse | null>(null); const [settingsOpen, setSettingsOpen] = useState(false);
   const handleRef = useRef<StreamHandle | null>(null); const streamRef = useRef(""); const scrollRef = useRef<HTMLDivElement>(null); const settingsTriggerRef = useRef<HTMLButtonElement>(null); const mobileSettingsDialogRef = useRef<HTMLDialogElement>(null);
-  const [settingsWidth, setSettingsWidth] = useState(() => { const saved = Number(localStorage.getItem("velvet.settings.width")); return Number.isFinite(saved) && saved >= 320 ? saved : 440; });
+  const followLatestRef = useRef(true); const [showJumpLatest, setShowJumpLatest] = useState(false);
+  const [settingsWidth, setSettingsWidth] = useState(() => { try { const saved = Number(localStorage.getItem("velvet.settings.width")); return Number.isFinite(saved) && saved >= 320 ? saved : 440; } catch { return 440; } });
   const [mobileSettings, setMobileSettings] = useState(() => typeof window.matchMedia === "function" && window.matchMedia("(max-width: 800px)").matches);
   const [roomMaxSpeakers, setRoomMaxSpeakers] = useState(() => Math.min(4, session.participants.length));
-  const [autoRoomRounds, setAutoRoomRounds] = useState(() => { const saved = Number(localStorage.getItem("velvet.room.autoRounds") ?? 1); return Number.isFinite(saved) ? Math.max(0, Math.min(3, saved)) : 1; });
+  const [autoRoomRounds, setAutoRoomRounds] = useState(() => { try { const saved = Number(localStorage.getItem("velvet.room.autoRounds") ?? 1); return Number.isFinite(saved) ? Math.max(0, Math.min(3, saved)) : 1; } catch { return 1; } });
   const [autoRunning, setAutoRunning] = useState(false);
   const stopAutoRef = useRef(false);
   const [contextBasket, setContextBasket] = useState<SessionContextBasket | null>(null);
@@ -720,7 +793,7 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
   const closed = session.state === "closed" || Boolean(session.stoppedAt);
   useEffect(() => { setMessages(initialMessages); }, [initialMessages]);
   useEffect(() => { if (!session.participants.some((item) => item.id === targetId)) setTargetId(session.primaryCharacterId); }, [session, targetId]);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }); }, [messages, streamText]);
+  useEffect(() => { const el = scrollRef.current; if (el && followLatestRef.current) el.scrollTo({ top: el.scrollHeight }); }, [messages, streamText]);
   useEffect(() => { try { localStorage.setItem("velvet.settings.width", String(settingsWidth)); } catch { /* optional UI preference */ } }, [settingsWidth]);
   useEffect(() => { try { localStorage.setItem("velvet.room.autoRounds", String(autoRoomRounds)); } catch { /* optional UI preference */ } }, [autoRoomRounds]);
   useEffect(() => {
@@ -787,15 +860,15 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
         await runAutomaticRounds(autoRoomRounds);
       } catch (err) {
         setError(messageFor(err, "Failed to send message to the room."));
-        if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id));
+        if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content);
       } finally { setRoomSending(false); setSending(false); }
       return;
     }
     if (provider?.streaming) {
-      let receivedUser = false; const handle = streamMessage(session.id, content, targetId, { onUserMessage: (message) => { receivedUser = true; setMessages((current) => current.map((item) => item.id === optimistic.id ? message : item)); }, onDelta: (_seq, text) => { streamRef.current += text; setStreamText(streamRef.current); }, onState: (next) => { if (next) onSessionChange(next); }, onDone: (payload) => applyResult(payload), onBoundary: (payload) => { setStreamText(""); applyResult(payload); setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead."); }, onError: (text, violations) => { setError(violations.length ? `${text}: ${violations.join("; ")}` : text); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); } });
-      handleRef.current = handle; try { await handle.done; } catch (err) { if (!(err instanceof Error && err.name === "AbortError")) { setError(messageFor(err, "Failed to send message.")); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); } } finally { finish(); } return;
+      let receivedUser = false; const handle = streamMessage(session.id, content, targetId, { onUserMessage: (message) => { receivedUser = true; setMessages((current) => current.map((item) => item.id === optimistic.id ? message : item)); }, onDelta: (_seq, text) => { streamRef.current += text; setStreamText(streamRef.current); }, onState: (next) => { if (next) onSessionChange(next); }, onDone: (payload) => applyResult(payload), onBoundary: (payload) => { setStreamText(""); applyResult(payload); setError("The reply crossed the agreed boundaries, so a boundary-safe reply was saved instead."); }, onError: (text, violations) => { setError(violations.length ? `${text}: ${violations.join("; ")}` : text); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } });
+      handleRef.current = handle; try { await handle.done; } catch (err) { if (!(err instanceof Error && err.name === "AbortError")) { setError(messageFor(err, "Failed to send message.")); if (!receivedUser) setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } } finally { finish(); } return;
     }
-    try { applyResult(await sendMessage(session.id, content, targetId)); } catch (err) { setError(messageFor(err, "Failed to send message.")); setMessages((current) => current.filter((item) => item.id !== optimistic.id)); } finally { setSending(false); }
+    try { applyResult(await sendMessage(session.id, content, targetId)); } catch (err) { setError(messageFor(err, "Failed to send message.")); setMessages((current) => current.filter((item) => item.id !== optimistic.id)); setDraft((current) => current || content); } finally { setSending(false); }
   }
   async function continueAs() { if (sending || navigationBusy || closed) return; setSending(true); setStreamSpeakerId(targetId); setError(null); try { applyResult(await continueSession(session.id, targetId)); } catch (err) { setError(messageFor(err, "Could not continue the scene.")); } finally { setSending(false); } }
   async function continueRoomTurn() { if (sending || navigationBusy || closed || session.participants.length < 2 || !latestCharacter) return; setSending(true); setRoomSending(true); setError(null); setSwipeInfo(null); try { await streamRoomContinuation(session.id, roomHandlers(), Math.min(roomMaxSpeakers, session.participants.length)); } catch (err) { setError(messageFor(err, "Could not give the room another turn.")); } finally { setRoomSending(false); setSending(false); } }
@@ -809,12 +882,13 @@ function Chat({ embedded = false, session, initialMessages, provider, harness, f
       {closed && <p className="closed-banner">This session is closed{session.stopReason ? ` (${session.stopReason})` : ""}. You can read its history, but it is no longer writable.</p>}
       {contextBasket && <details className="context-basket" open><summary>Shared context basket <span>{contextBasket.recentEvents.length + contextBasket.rememberedFacts.length + contextBasket.activeLore.length} elements</span></summary><div className="source-truth"><div><span className="eyebrow">AUTHORITATIVE SCENE · LIVE</span><p>{contextBasket.sourceOfTruth}</p><div className="source-timestamps">{contextBasket.sourceUpdatedAt && <small>Manual canon updated {new Date(contextBasket.sourceUpdatedAt).toLocaleString()}</small>}{contextBasket.synthesizedUpdatedAt && <small>Scene facts synthesized {new Date(contextBasket.synthesizedUpdatedAt).toLocaleString()}</small>}</div></div><button className="primary small" disabled={navigationBusy} onClick={() => { if (!navigationBusy) { setSourceDraft(contextBasket.editableSource); sourceDialogRef.current?.showModal(); } }}>Edit manual canon</button></div><div className="context-grid"><section><h3>Participants</h3>{contextBasket.participants.map((participant) => <p key={participant.id}><strong>{participant.name}</strong> · {participant.archetype}</p>)}</section><section><h3>Recent events</h3>{contextBasket.recentEvents.length ? contextBasket.recentEvents.map((event, index) => <p key={index}>{event}</p>) : <p className="meta-text">No events yet.</p>}</section><section><h3>Remembered facts</h3>{contextBasket.rememberedFacts.length ? contextBasket.rememberedFacts.map((fact, index) => <p key={index}>{fact}</p>) : <p className="meta-text">No approved shared memories.</p>}</section><section><h3>Active lore & threads</h3>{contextBasket.activeLore.map((entry, index) => <p key={`lore-${index}`}>{entry}</p>)}{contextBasket.openThreads.map((thread, index) => <p key={`thread-${index}`}>Open: {thread}</p>)}{!contextBasket.activeLore.length && !contextBasket.openThreads.length && <p className="meta-text">Nothing active.</p>}</section></div></details>}
       <dialog className="scene-dialog" ref={sourceDialogRef} onClose={() => setSourceDraft(contextBasket?.editableSource ?? "")}><form method="dialog" onSubmit={(event) => { event.preventDefault(); void saveSourceOfTruth(); }}><fieldset disabled={navigationBusy}><div className="dialog-heading"><div><p className="eyebrow">SOURCE OF TRUTH</p><h2>Current situation and scene</h2></div><button type="button" className="ghost small" onClick={() => sourceDialogRef.current?.close()}>Close</button></div><p className="meta-text">Edit the highest-priority manual canon. A factual scene synthesizer separately updates locations, conditions, objects, relationships, knowledge, goals, and tensions after completed turns.</p><label className="field"><span>Manual scene canon</span><textarea autoFocus rows={12} maxLength={8000} value={sourceDraft} onChange={(event) => setSourceDraft(event.target.value)} placeholder="Example: It is late evening in the observatory. Mara stands beside the western window, still holding the brass key. Jules knows the door is locked but does not know why…" /></label><div className="dialog-actions"><span className="meta-text">{sourceDraft.length.toLocaleString()} / 8,000</span><button type="submit" className="primary" disabled={savingSource}>{savingSource ? "Saving…" : "Save manual canon"}</button></div></fieldset></form></dialog>
-      <div className="messages" ref={scrollRef} role="log" aria-live="polite" aria-busy={sending}>{messages.length === 0 && <p className="empty-state">The scene is ready. Write the opening message or choose “Continue as…” for a character-led opening.</p>}{messages.map((item) => <div className={`message message-${item.role}`} style={item.role === "character" ? speakerBubbleStyle(item.speakerCharacterId) : undefined} key={item.id}><span className="message-role">{item.role === "user" ? "You" : item.role === "system" ? "System" : speakerName(item.speakerCharacterId)}</span><p>{item.content}</p>{item.usage && <span className="message-usage">{item.usage.source === "estimated" ? "≈" : ""}{item.usage.totalTokens.toLocaleString()} tokens · {item.usage.promptTokens.toLocaleString()} in / {item.usage.completionTokens.toLocaleString()} out</span>}</div>)}{sending && !roomSending && <div className="message message-character message-streaming" style={speakerBubbleStyle(streamSpeakerId)}><span className="message-role">{speakerName(streamSpeakerId)}</span><p>{streamText || "…"}</p></div>}{roomSending && <div className="message message-system room-thinking"><span className="message-role">Room</span><p>Choosing the next speaker…</p></div>}</div>
+      <div className="messages" ref={scrollRef} role="log" aria-live="polite" aria-busy={sending} onScroll={(event) => { const el = event.currentTarget; const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48; followLatestRef.current = atBottom; setShowJumpLatest(!atBottom); }}>{messages.length === 0 && <p className="empty-state">The scene is ready. Write the opening message or choose “Continue as…” for a character-led opening.</p>}{messages.map((item) => <div className={`message message-${item.role}`} style={item.role === "character" ? speakerBubbleStyle(item.speakerCharacterId) : undefined} key={item.id}><span className="message-role">{item.role === "user" ? "You" : item.role === "system" ? "System" : speakerName(item.speakerCharacterId)}</span><p>{item.content}</p>{item.usage && <span className="message-usage">{item.usage.source === "estimated" ? "≈" : ""}{item.usage.totalTokens.toLocaleString()} tokens · {item.usage.promptTokens.toLocaleString()} in / {item.usage.completionTokens.toLocaleString()} out</span>}</div>)}{sending && !roomSending && <div className="message message-character message-streaming" style={speakerBubbleStyle(streamSpeakerId)}><span className="message-role">{speakerName(streamSpeakerId)}</span><p>{streamText || "…"}</p></div>}{roomSending && <div className="message message-system room-thinking"><span className="message-role">Room</span><p>Choosing the next speaker…</p></div>}</div>
       {latestCharacter && latestUserParent && <div className="swipe-controls">{sortedSwipes.length > 0 && <><button className="ghost" aria-label="Previous reply" disabled={sending || navigationBusy || activeSwipe <= 0} onClick={() => void navigateSwipe(-1)}>‹ Prev</button><span className="swipe-position">{activeSwipe + 1}/{sortedSwipes.length}</span><button className="ghost" aria-label="Next reply" disabled={sending || navigationBusy || activeSwipe >= sortedSwipes.length - 1} onClick={() => void navigateSwipe(1)}>Next ›</button></>}<button className="ghost" aria-label="Regenerate reply" disabled={sending || navigationBusy || closed} onClick={() => void regenerate()}>Regenerate</button><button className="ghost" aria-label="Retry last turn" disabled={sending || navigationBusy || closed} onClick={() => void retry()}>Retry</button></div>}
       {(error || externalError) && <p className="error" role="alert">{error || externalError}</p>}
       <div className="speaker-controls"><label className="field"><span>Target speaker</span><select value={targetId} onChange={(e) => setTargetId(e.target.value)} disabled={closed || sending || navigationBusy}>{session.participants.map((item) => <option value={item.id} key={item.id}>{item.name}{item.id === session.primaryCharacterId ? " · primary" : ""}</option>)}</select></label>{session.participants.length > 1 && <><label className="field compact-control"><span>Max room responders</span><select aria-label="Max room responders" value={roomMaxSpeakers} disabled={sending || navigationBusy} onChange={(event) => setRoomMaxSpeakers(Number(event.target.value))}>{Array.from({ length: Math.min(6, session.participants.length) }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count}</option>)}</select></label><label className="field compact-control"><span>Auto follow-up rounds</span><select aria-label="Auto follow-up rounds" value={autoRoomRounds} disabled={sending || navigationBusy} onChange={(event) => setAutoRoomRounds(Number(event.target.value))}><option value={0}>Off</option><option value={1}>1 round</option><option value={2}>2 rounds</option><option value={3}>3 rounds</option></select></label></>}{session.participants.length > 1 && <button className="ghost continue-button" disabled={sending || savingSource || settingsOpen || navigationBusy} onClick={() => void onOpenPrivate(targetId)}>Private chat with {speakerName(targetId)}</button>}{session.participants.length > 1 && <button className="ghost continue-button" disabled={closed || sending || navigationBusy || !latestCharacter} onClick={() => void continueRoomTurn()}>Give room another turn</button>}<button className="ghost continue-button" disabled={closed || sending || navigationBusy} onClick={() => void continueAs()}>Continue as {speakerName(targetId)}</button></div>
       {session.participants.length > 1 && <p className="room-cost">Current room automation limit: up to {(2 + roomMaxSpeakers) * (1 + autoRoomRounds)} provider calls per room message ({roomMaxSpeakers} replies, routing, and one scene-state update per round).</p>}
       {autoRunning && <div className="auto-room-status"><span>Automatic room conversation is running. It will stop after this bounded turn.</span><button className="danger subtle small" disabled={navigationBusy} onClick={() => { if (!navigationBusy) stopAutoRef.current = true; }}>Stop auto chat</button></div>}
+      {showJumpLatest && <button type="button" className="ghost jump-to-latest" onClick={() => { followLatestRef.current = true; setShowJumpLatest(false); scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }}>Jump to latest</button>}
       <form className="composer" onSubmit={send}><label className="sr-only" htmlFor="chat-message">Message for {speakerName(targetId)}</label><input id="chat-message" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={closed ? "Session ended" : "Write a message…"} disabled={closed || sending || navigationBusy} maxLength={1000} />{session.participants.length > 1 && <button type="submit" value="room" className="ghost" disabled={closed || sending || navigationBusy || !draft.trim()} title="Let the room choose up to six pertinent speakers">Send to room</button>}<button type="submit" value="target" className="primary" disabled={closed || sending || navigationBusy || !draft.trim()}>Send to {speakerName(targetId)}</button></form>
     </div>
     <div className="settings-separator" role="separator" aria-label="Resize settings pane" aria-orientation="vertical" aria-valuemin={320} aria-valuemax={Math.round(window.innerWidth * .6)} aria-valuenow={Math.round(settingsWidth)} onPointerDown={(event) => { if (!navigationBusy) resizeSettings(event); }} onKeyDown={(event) => { if (navigationBusy) return; if (event.key === "ArrowLeft") setSettingsWidth((width) => Math.min(window.innerWidth * .6, width + (event.shiftKey ? 64 : 16))); if (event.key === "ArrowRight") setSettingsWidth((width) => Math.max(320, width - (event.shiftKey ? 64 : 16))); }} tabIndex={settingsOpen && !navigationBusy ? 0 : -1} />

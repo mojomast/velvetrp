@@ -15,8 +15,14 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
   composer: ReactNode; drawers: ReactNode;
 }) {
   const mapRef = useRef<HTMLElement>(null);
+  const mapRegionRef = useRef<HTMLDivElement>(null);
   const conversationRef = useRef<HTMLElement>(null);
   const rootRef = useRef<HTMLElement>(null);
+  const drawerOpen = activeTool !== null;
+  useEffect(() => {
+    const region = mapRegionRef.current as (HTMLElement & { inert?: boolean }) | null;
+    if (region) region.inert = drawerOpen;
+  }, [drawerOpen]);
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       const editing = event.target instanceof Element && Boolean(event.target.closest("input,textarea,select,[contenteditable=true]"));
@@ -26,14 +32,15 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
       }
       if (event.key !== "F6") return;
       const drawer = rootRef.current?.querySelector<HTMLElement>(".atlas-drawer-slot:not([hidden]) [role=dialog]");
-      const regions = [mapRef.current, conversationRef.current, drawer].filter((node): node is HTMLElement => Boolean(node));
+      // While a drawer overlays the map, the obscured map controls are not a valid region.
+      const regions = [drawerOpen ? null : mapRef.current, conversationRef.current, drawer].filter((node): node is HTMLElement => Boolean(node));
       const current = regions.findIndex((node) => node.contains(document.activeElement));
       const next = current < 0 ? (event.shiftKey ? regions.length - 1 : 0) : (current + (event.shiftKey ? regions.length - 1 : 1)) % regions.length;
       event.preventDefault(); regions[next]?.focus({ preventScroll: true });
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [onTool]);
+  }, [drawerOpen, onTool]);
 
   return <main ref={rootRef} className="living-atlas" aria-labelledby="atlas-title">
     <header className="atlas-masthead">
@@ -45,9 +52,11 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
       data-atlas-tool={tool} aria-expanded={activeTool === tool || (tool === "character" && (activeTool === "inventory" || activeTool === "advancement"))} aria-controls={`atlas-${tool === "character" && (activeTool === "inventory" || activeTool === "advancement") ? activeTool : tool}`} onClick={() => onTool(tool)}>{atlasToolLabels[tool]}</button>)}</nav>
     <div className="atlas-table">
       <section className="atlas-stage" aria-label="Living map" ref={mapRef} tabIndex={-1}>
-        <header className="atlas-scene-heading"><div><span className="atlas-kicker">THE WORLD BEFORE YOU</span><h2>Here be stories.</h2></div>{actor}</header>
-        <div className="atlas-map-scroll">{map}</div>
-        <div className="atlas-map-caption"><span>Explore. Choose. Leave a trace.</span><span>Only what your character may know.</span></div>
+        <div className="atlas-map-region" ref={mapRegionRef}>
+          <header className="atlas-scene-heading"><div><span className="atlas-kicker">THE WORLD BEFORE YOU</span><h2>Here be stories.</h2></div>{actor}</header>
+          <div className="atlas-map-scroll">{map}</div>
+          <div className="atlas-map-caption"><span>Explore. Choose. Leave a trace.</span><span>Only what your character may know.</span></div>
+        </div>
         {drawers}
       </section>
       <section className="atlas-conversation-dock" aria-label="Campaign narration and actions" ref={conversationRef} tabIndex={-1}>

@@ -193,7 +193,8 @@ export function CharacterBuilderPage({ campaignId, personas: suppliedPersonas, i
       const result = await api.update(campaignId, draft.id, { expectedRevision, selections, idempotencyKey: idempotency("draft-save") });
       if (draftLocks.get(key)?.token !== token) return; publish(key, null);
       if (!mountedRef.current || generationRef.current !== generation) return;
-      setDraft(result.draft); setSaveState("saved"); setNotice(`Saved revision ${result.draft.revision}.`); setConfirmed(false); focus(generation, "status");
+      // Routine choice autosaves must not pull focus from the control the user is editing.
+      setDraft(result.draft); setSaveState("saved"); setNotice(`Saved revision ${result.draft.revision}.`); setConfirmed(false);
     } catch (saveError) {
       if (draftLocks.get(key)?.token !== token) return;
       const stale = saveError instanceof ApiError && saveError.status === 409;

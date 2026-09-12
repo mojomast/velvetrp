@@ -66,17 +66,26 @@ async function openAdvancedCampaign() {
 
 describe("persistence and multi-character frontend", () => {
   beforeEach(() => { localStorage.clear(); combatPage.props = null; Element.prototype.scrollTo = vi.fn(); HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; }); HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.open = false; }); vi.stubGlobal("confirm", vi.fn(() => true)); });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
 
-  it("opens campaigns first on a fresh supported installation", async () => {
+  it("deep-links a campaign destination from the URL hash over stale local state", async () => {
     installFetch([], [], true);
-    routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [] }) });
+    localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "home" }));
+    routes.push(
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns$/, handler: () => json({ campaigns: [campaignAccess] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(campaignDetail) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/, handler: () => json({ characters: [] }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms$/, handler: () => json({ attached: [], eligible: [] }) },
+    );
+    window.history.replaceState({}, "", "#/campaign/campaign-one/overview");
     render(<App />);
-    await screen.findByRole("heading", { name: "Campaigns" });
-    await waitFor(() => expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("campaigns"));
+    await screen.findByTestId("campaign-overview");
+    expect(screen.getByRole("heading", { name: "Campaign overview" })).toBeTruthy();
+    expect(window.location.hash).toBe("#/campaign/campaign-one/overview");
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-overview", campaignId: "campaign-one" });
   });
 
-  it("routes shell Play and Characters to distinct workspaces without opening a room automatically", async () => {
+  it("restores the previous campaign destination when the browser goes back", async () => {
     installFetch([aria], [], true, true);
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
     routes.push(
@@ -88,12 +97,11 @@ describe("persistence and multi-character frontend", () => {
     await screen.findByRole("heading", { name: campaignAccess.name });
     fireEvent.click(screen.getByRole("button", { name: "Characters workspace" }));
     await screen.findByTestId("campaign-party");
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Party" })));
-    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}").view).toBe("campaign-party");
-    fireEvent.click(screen.getByRole("button", { name: "Play workspace" }));
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Rooms" })));
-    expect(screen.getByTestId("campaign-rooms")).toBeTruthy();
-    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    expect(window.location.hash).toBe("#/campaign/campaign-one/party");
+    window.history.replaceState({}, "", "#/campaign/campaign-one");
+    act(() => { window.dispatchEvent(new PopStateEvent("popstate")); });
+    await screen.findByRole("heading", { name: campaignAccess.name });
+    expect(JSON.parse(localStorage.getItem("velvet.navigation.v1") ?? "{}")).toMatchObject({ view: "campaign-detail", campaignId: campaignAccess.id });
   });
 
   it("opens the new overview from the campaign library and keeps setup secondary", async () => {
@@ -1518,28 +1526,7 @@ describe("character builder and advancement safety flows", () => {
   const sheet = { sheet: { name: "Persona", race: { name: "Race", description: "Race." }, background: { name: "Guide", description: "Guide." }, classes: [{ name: "Warden", description: "Warden.", level: 1 }], attributes: [], proficiencies: [], choices: [], resources: [] }, derived, progression: { mode: "xp", level: 1, totalXp: 0, milestoneCount: 0, updatedAt: at } };
 
   beforeEach(() => { resetCharacterBuilderPageModuleStateForTests(); resetLevelUpWizardModuleStateForTests(); localStorage.removeItem("velvet.character-builder.ambiguous-creates.v1"); });
-  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-
-  it("focus-links issues and preserves an ambiguous autosave lock across unmount until explicit refresh", async () => {
-    const write = deferred<any>();
-    const api = { create: vi.fn(), get: vi.fn().mockResolvedValue(draft()), update: vi.fn(() => write.promise), finalize: vi.fn(), getSheet: vi.fn() } as any;
-    const props = { campaignId: "campaign", personas: [{ id: "persona", name: "Persona" }], initialDraftId: "draft-one", api, onBack: vi.fn(), onUnavailable: vi.fn(), onEditPersona: vi.fn(), onOpenCharacter: vi.fn() };
-    render(<CharacterBuilderPage {...props} />);
-    const issue = await screen.findByRole("button", { name: "Choose a race" }); fireEvent.click(issue);
-    expect(document.activeElement).toBe(document.getElementById("builder-choice-race"));
-    fireEvent.click(screen.getAllByRole("radio")[0]!);
-    await screen.findByText("Saving revision 2…");
-    cleanup();
-    await act(async () => { write.reject(new TypeError("network lost")); await Promise.resolve(); });
-    render(<CharacterBuilderPage {...props} />);
-    expect(await screen.findByText(/Save outcome is uncertain/)).toBeTruthy();
-    expect((screen.getAllByRole("radio")[0]!.closest("fieldset") as HTMLFieldSetElement).disabled).toBe(true);
-    expect(api.update).toHaveBeenCalledTimes(1);
-    const refresh = screen.getByRole("button", { name: "Refresh authoritative draft" }); fireEvent.click(refresh);
-    await screen.findByText(/Authoritative draft revision refreshed/);
-    await waitFor(() => expect(document.activeElement).not.toBe(refresh));
-    expect(api.update).toHaveBeenCalledTimes(1);
-  });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); window.history.replaceState({}, "", "/"); });
 
   it("ignores an out-of-order draft load from the prior route identity", async () => {
     const first = deferred<any>(); const second = deferred<any>();

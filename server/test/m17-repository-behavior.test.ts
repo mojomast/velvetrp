@@ -96,7 +96,7 @@ describe("M1.7 encounter repository",()=>{
     const started=repo.startEncounter("local-owner",created.encounter.encounterId,
       {expectedRevision:1,idempotencyKey:"start-enemy"});
     expect(started.combat.combatants).toEqual([{combatantId:created.encounter.combatants[0]!.combatantId,
-      kind:"enemy",team:"enemies",template:enemy,hitPoints:8,maximumHitPoints:8,status:"active"}]);
+      kind:"enemy",team:"enemies",template:enemy,displayName:"Gloam Mite",hitPoints:8,maximumHitPoints:8,status:"active"}]);
     repo.close();
   });
 });

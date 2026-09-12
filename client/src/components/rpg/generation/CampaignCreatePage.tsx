@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { getCampaignAdministration, getProvider, preflightProviderCapabilities, type ProviderSettings, type ProviderCapabilityPreflightResult } from "../../../api";
+import { getCampaignAdministration, getFeatures, getHarness, getProvider, preflightProviderCapabilities, type FeatureFlags, type HarnessSettings, type ProviderSettings, type ProviderCapabilityPreflightResult } from "../../../api";
 import { CampaignGeneratorPanel } from "../campaign/CampaignGeneratorPanel";
+import { PromptSettings } from "../../PromptSettings";
 import "./campaign-create.css";
 
 export function CampaignCreatePage({ campaignId, onBack }: { campaignId: string; onBack: () => void }) {
@@ -10,6 +11,9 @@ export function CampaignCreatePage({ campaignId, onBack }: { campaignId: string;
 function CampaignCreateWorkspace({ campaignId, onBack }: { campaignId: string; onBack: () => void }) {
   const [access, setAccess] = useState<"loading" | "allowed" | "denied" | "error">("loading");
   const [provider, setProvider] = useState<ProviderSettings | null>(null);
+  const [harness, setHarness] = useState<HarnessSettings | null>(null);
+  const [features, setFeatures] = useState<FeatureFlags>({ voice: false, images: false });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [setupError, setSetupError] = useState("");
   const [checking, setChecking] = useState(false);
   const [capabilities, setCapabilities] = useState<ProviderCapabilityPreflightResult | null>(null);
@@ -26,6 +30,16 @@ function CampaignCreateWorkspace({ campaignId, onBack }: { campaignId: string; o
         if (current) { setProvider(settings); setSetupError(""); setCapabilities(null); }
       } catch { if (current) { setProvider(null); setSetupError("Provider settings could not be read. Ask the server operator to verify configuration, then refresh setup."); } }
     }).catch(() => { if (current) setAccess("error"); });
+    return () => { current = false; };
+  }, [campaignId, refresh]);
+
+  useEffect(() => {
+    let current = true;
+    void Promise.all([getFeatures().catch(() => null), getHarness().catch(() => null)]).then(([nextFeatures, nextHarness]) => {
+      if (!current) return;
+      if (nextFeatures) setFeatures(nextFeatures);
+      if (nextHarness) setHarness(nextHarness);
+    });
     return () => { current = false; };
   }, [campaignId, refresh]);
 
@@ -51,7 +65,9 @@ function CampaignCreateWorkspace({ campaignId, onBack }: { campaignId: string; o
         <p>Capability checks contact the provider and may incur cost. Opening this workspace only reads settings; it never generates or probes automatically.</p>
         {capabilities && <p role="status">{capabilities.campaignGenerationCompatible ? "Campaign generation capability confirmed. Candidate quality and playable readiness still require review." : "Campaign generation capability was not confirmed. Select a model supporting strict JSON schema, then refresh setup and check again."}</p>}
         {setupError && <p role="alert">{setupError}</p>}
-        <div className="campaign-create-actions"><button type="button" disabled={checking} onClick={() => setRefresh((value) => value + 1)}>Refresh setup</button><button type="button" disabled={!configured || checking} onClick={() => void checkProvider()}>{checking ? "Checking provider..." : "Check provider capability (may incur cost)"}</button></div>
+        <div className="campaign-create-actions"><button type="button" disabled={checking} onClick={() => setRefresh((value) => value + 1)}>Refresh setup</button><button type="button" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen}>Open provider settings</button><button type="button" disabled={!configured || checking} onClick={() => void checkProvider()}>{checking ? "Checking provider..." : "Check provider capability (may incur cost)"}</button></div>
+        {settingsOpen && <div className="campaign-create-inline-settings"><p>Provider settings are available here so you do not need to leave campaign creation. Save, then refresh setup or check capability.</p>
+          <PromptSettings provider={provider} harness={harness} features={features} onProviderChange={(value) => { setProvider(value); setSetupError(""); }} onHarnessChange={setHarness} onClose={() => setSettingsOpen(false)} /></div>}
       </details>
       <CampaignGeneratorPanel campaignId={campaignId} disabled={!configured || checking || capabilities?.campaignGenerationCompatible === false} onBack={onBack} />
     </>}
