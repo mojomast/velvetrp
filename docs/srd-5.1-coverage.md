@@ -53,6 +53,8 @@ The module does not claim full SRD conformance. Unsupported areas include subcla
 
 Repositories resolve through the exact `(rulesetId, rulesetVersion)` registry key and `campaign_ruleset_bindings_v60`, verify profile/publication agreement, verify the required descriptor capability, and invoke the optional typed `module.mechanics` surface. The repository remains responsible for authorization, current-state lookup, RNG, idempotency, transaction boundaries, durable receipts, and applying a legal plan atomically. Modules without `mechanics` support only the retained legacy API.
 
+Reviewed campaign setup configures the exact publication and pins every publicly reachable ability and spell of that publication for execution in `rpg_campaign_catalog_definitions_v25`. Only pinned definitions may be planned or executed; the pin set is idempotent and campaign-scoped.
+
 1. Build inputs from authoritative state and caller intent.
 2. Obtain random die faces outside the ruleset and pass them as `rolls` arrays.
 3. Call a pure resolver or planner exported by `server/src/rulesets/index.ts`.

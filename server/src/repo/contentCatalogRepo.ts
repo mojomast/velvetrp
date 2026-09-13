@@ -54,6 +54,7 @@ export interface ContentCatalogRepository {
   getContentCatalogForOwner(actorPrincipalId: string, packId: string, packVersion: string): OwnerCatalogProjection | null;
   getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string): GmCatalogProjection | PlayerCatalogProjection | ObserverCatalogProjection | null;
   configureCampaignCatalog(actorPrincipalId: string, campaignId: string, input: ConfigureCampaignCatalogInput): CampaignCatalogConfigurationResult;
+  pinCampaignExecutableDefinitions(actorPrincipalId: string, campaignId: string): number;
   resolveCampaignCatalog(actorPrincipalId: string, campaignId: string): CampaignCatalogResolutionReport | null;
   getCampaignCatalogReceipt(actorPrincipalId: string, campaignId: string, commandId: string): CampaignCatalogReceipt | null;
 }
@@ -85,6 +86,7 @@ export function createContentCatalogRepository(
     getContentCatalogForOwner: reads.getContentCatalogForOwner,
     getCampaignContentCatalog: reads.getCampaignContentCatalog,
     configureCampaignCatalog: (actor, campaignId, input) => { mutationGuard(); return writes.configureCampaignCatalog(actor, campaignId, input); },
+    pinCampaignExecutableDefinitions: (actor, campaignId) => { mutationGuard(); return writes.pinCampaignExecutableDefinitions(actor, campaignId); },
     resolveCampaignCatalog: reads.resolveCampaignCatalog,
     getCampaignCatalogReceipt: reads.getCampaignCatalogReceipt,
   };

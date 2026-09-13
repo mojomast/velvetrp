@@ -172,5 +172,26 @@ export function createCatalogWriteRepository(db: DatabaseDriver.Database, deps: 
       return campaignCatalogConfigurationResultSchema.parse({ content, receipt });
     }).immediate();
   };
-  return { publishContentCatalog, configureCampaignCatalog };
+  /**
+   * Pins every publicly reachable ability and spell of the campaign's current
+   * catalog for execution. This is the reviewed-setup allowlist: it is the
+   * campaign-scoped set of reviewed definitions a trusted principal may run.
+   */
+  const pinCampaignExecutableDefinitions = (actor: string, campaignIdValue: string): number => {
+    const campaignId = resourceIdSchema.parse(campaignIdValue);
+    const role = reads.campaignAuthority(actor, campaignId);
+    if (role !== "owner" && role !== "gm") throw new ContentCatalogAuthorizationError("campaign executable pinning requires the campaign owner or GM");
+    return db.transaction(() => {
+      const currentRole = reads.campaignAuthority(actor, campaignId);
+      if (currentRole !== "owner" && currentRole !== "gm") throw new ContentCatalogAuthorizationError("campaign executable pinning requires the campaign owner or GM");
+      const result = db.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id)
+        SELECT pin.campaign_id,visibility.pack_id,visibility.pack_version,visibility.kind,visibility.definition_id
+        FROM campaign_catalog_current_pins pin
+        JOIN rpg_catalog_definition_visibility visibility
+          ON visibility.pack_id=pin.pack_id AND visibility.pack_version=pin.pack_version
+        WHERE pin.campaign_id=? AND visibility.kind IN('ability','spell') AND visibility.publicly_reachable=1`).run(campaignId);
+      return result.changes;
+    }).immediate();
+  };
+  return { publishContentCatalog, configureCampaignCatalog, pinCampaignExecutableDefinitions };
 }

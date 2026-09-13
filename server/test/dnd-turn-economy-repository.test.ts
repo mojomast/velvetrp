@@ -41,7 +41,8 @@ describe("persisted D&D turn economy",()=>{
     expect(combat.currentCombatant).toBe(first.combatantId);expect(combat.turnEconomy).toMatchObject({turnId:first.turnId,action:{available:false,used:true}});
     expect(combat.legalActions.some(a=>a.kind==="attack")).toBe(false);
     const runtimeDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
-    expect(buildCombatPowerLegalActions(runtimeDb,"local-owner",combat.combatId)).toEqual([]);runtimeDb.close();
+    // Reviewed setup pins the Fighter's abilities, so Second Wind is now an available bonus action.
+    expect(buildCombatPowerLegalActions(runtimeDb,"local-owner",combat.combatId).map(action=>action.definition.name)).toContain("Second Wind");runtimeDb.close();
     expect(()=>repo.resolveCombatAction("local-owner",combat.combatId,{...request,expectedRevision:combat.revision,idempotencyKey:"twice"})).toThrow();
     const usedRolls=rolls;repo.close();repo=createRepository(options);
     expect(repo.resolveCombatAction("local-owner",combat.combatId,request)).toEqual(result);expect(rolls).toBe(usedRolls);
@@ -68,7 +69,8 @@ describe("persisted D&D turn economy",()=>{
     const powerDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));
     const ability=definitions.find(d=>d.reference.kind==="ability")!.reference;
     powerDb.prepare("INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id) VALUES(?,?,?,?,?)").run(campaign.id,ability.packId,ability.packVersion,ability.kind,ability.definitionId);
-    expect(buildCombatPowerLegalActions(powerDb,"local-owner",combat.combatId)).toEqual([]);
+    // Reviewed setup already pins abilities; a forged legal action id is still never listed.
+    expect(buildCombatPowerLegalActions(powerDb,"local-owner",combat.combatId).some(action=>action.legalActionId==="combat-power:forged")).toBe(false);
     powerDb.close();
     const beforeBypass=rolls;
     expect(()=>repo.useCombatPower("local-owner",{legalActionId:"combat-power:forged",powerRef:ability as any,targetCombatantId:target.combatantId,

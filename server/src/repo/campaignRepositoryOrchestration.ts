@@ -917,8 +917,8 @@ function createRepositoryComposition<T>(
     // reviewed public world records and conservative, catalog-free NPC baselines.
     installMechanicsStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, MECHANICS_STARTER_CATALOG),
-    configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) =>
-      contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
+    configureMechanicsStarterCatalog: (actorPrincipalId, campaignId, input) => {
+      const result = contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
         rulesProfileId: MECHANICS_STARTER_RULES_PROFILE_ID,
         contentPacks: [{
           packId: MECHANICS_STARTER_CATALOG.manifest.packId,
@@ -926,17 +926,23 @@ function createRepositoryComposition<T>(
         }],
         expectedRevision: input.expectedRevision,
         idempotencyKey: input.idempotencyKey,
-      }),
+      });
+      contentCatalogRepository.pinCampaignExecutableDefinitions(actorPrincipalId, campaignId);
+      return result;
+    },
     installSrdStarterCatalog: (actorPrincipalId) =>
       contentCatalogRepository.publishContentCatalog(actorPrincipalId, SRD_5_1_STARTER_CATALOG),
-    configureSrdStarterCatalog: (actorPrincipalId, campaignId, input) =>
-      contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
+    configureSrdStarterCatalog: (actorPrincipalId, campaignId, input) => {
+      const result = contentCatalogRepository.configureCampaignCatalog(actorPrincipalId, campaignId, {
         rulesProfileId: SRD_5_1_STARTER_RULES_PROFILE_ID,
         contentPacks: [{ packId: SRD_5_1_STARTER_CATALOG.manifest.packId,
           packVersion: SRD_5_1_STARTER_CATALOG.manifest.packVersion }],
         expectedRevision: input.expectedRevision,
         idempotencyKey: input.idempotencyKey,
-      }),
+      });
+      contentCatalogRepository.pinCampaignExecutableDefinitions(actorPrincipalId, campaignId);
+      return result;
+    },
     inspectOriginalStarterSetup: (actorPrincipalId, campaignId) => {
       assertOpen();
       // One SQLite read transaction owns authority, campaign and content state.

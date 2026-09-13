@@ -29,11 +29,6 @@ function fixture(integer: (min: number, max: number) => number) {
   db.prepare("INSERT INTO campaign_sessions VALUES(?,?,?)").run("spellatk-session", campaign.id, "2037-03-01T00:00:00.000Z");
   db.prepare("INSERT OR IGNORE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,'health',12,12)").run(campaign.id, actorId);
   db.prepare("INSERT OR IGNORE INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,'slot-1',2,2)").run(campaign.id, actorId);
-  // Pin every publicly reachable ability and spell for execution, as the reviewed setup does.
-  db.prepare(`INSERT OR IGNORE INTO rpg_campaign_catalog_definitions_v25(campaign_id,pack_id,pack_version,kind,definition_id)
-    SELECT pin.campaign_id,visibility.pack_id,visibility.pack_version,visibility.kind,visibility.definition_id FROM campaign_catalog_current_pins pin
-    JOIN rpg_catalog_definition_visibility visibility ON visibility.pack_id=pin.pack_id AND visibility.pack_version=pin.pack_version
-    WHERE pin.campaign_id=? AND visibility.kind IN('ability','spell') AND visibility.publicly_reachable=1`).run(campaign.id);
   db.close();
   return { repo, campaign, actorId };
 }
