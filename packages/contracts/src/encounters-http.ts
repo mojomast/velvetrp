@@ -334,6 +334,7 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
     damageType: z.enum(["physical", "bludgeoning", "piercing", "slashing"]),
     requested: z.number().int().min(0).max(1_000_000),
     applied: z.number().int().min(0).max(1_000_000),
+    adjustment: z.enum(["none", "resistance", "vulnerability", "immunity"]).optional(),
     temporaryHitPointsAbsorbed: z.number().int().min(0).max(1_000_000).optional(),
     temporaryHitPointsAfter: z.number().int().min(0).max(1_000_000).optional(),
     concentrationCheck: z.object({ dc: z.number().int().min(10).max(1_000_000), roll: z.number().int().min(1).max(20), total: z.number().int(), maintained: z.boolean() }).strict().optional(),

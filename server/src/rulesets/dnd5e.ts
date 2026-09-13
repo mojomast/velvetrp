@@ -330,7 +330,7 @@ const difficultyClasses = Object.freeze([
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
 const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0" });
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0", damage: "1.1.0" });
 const capabilities = Object.freeze([
   "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));

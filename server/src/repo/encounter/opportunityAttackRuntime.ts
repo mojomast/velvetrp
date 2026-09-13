@@ -5,6 +5,7 @@ import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, conditionsFor } from "./combatConditionRuntime.js";
+import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 
 export type OpportunityAttackDeps = { ids: IdGenerator; rng: RandomNumberGenerator };
@@ -59,10 +60,11 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
     const used = db.prepare(`INSERT INTO combat_reaction_usage_v63(encounter_id,combatant_id,round_number,used,used_at) VALUES(?,?,?,1,?)
       ON CONFLICT(encounter_id,combatant_id,round_number) DO UPDATE SET used=1,used_at=excluded.used_at WHERE combat_reaction_usage_v63.used=0`).run(input.encounterId, reactor.combatant_id, input.round, input.occurredAt);
     if (used.changes !== 1) continue;
-    let attackBonus = 0, damageModifier = 0, proficiencyBonus = 2, die = { count: 1, sides: 6, modifier: 0 }, attackAbility = 10;
+    let attackBonus = 0, damageModifier = 0, proficiencyBonus = 2, die = { count: 1, sides: 6, modifier: 0 }, attackAbility = 10, damageType = "physical";
     if (reactor.actor_id) {
       const equipment = resolveSrdEquipment(db, input.campaignId, reactor.actor_id);
       if (!equipment.weapon) throw new EncounterConflictError("opportunity attack weapon is unavailable");
+      damageType = equipment.weapon.damage.type;
       die = { ...equipment.weapon.damage.die, modifier: 0 }; const ability = db.prepare("SELECT value FROM rpg_character_attributes a JOIN campaign_actors c ON c.sheet_id=a.sheet_id WHERE c.campaign_id=? AND c.id=? AND a.attribute_id=?").get(input.campaignId, reactor.actor_id, equipment.weapon.attackAbility) as {value:number}|undefined;
       if (!ability) throw new EncounterConflictError("opportunity attack ability is unavailable"); attackAbility = ability.value; damageModifier = binding.module.abilityModifier(ability.value);
       const sheet = db.prepare("SELECT progression.level FROM campaign_actors actor JOIN character_progression_v23 progression ON progression.actor_id=actor.id WHERE actor.campaign_id=? AND actor.id=?").get(input.campaignId, reactor.actor_id) as {level:number}|undefined;
@@ -71,7 +73,7 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
       const definition = JSON.parse((db.prepare(`SELECT definition.definition_json FROM encounter_enemy_provenance_v31 provenance JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id AND definition.pack_version=provenance.pack_version AND definition.kind=provenance.kind AND definition.definition_id=provenance.definition_id WHERE provenance.combatant_id=?`).get(reactor.combatant_id) as any).definition_json);
       const profile = definition.mechanics.combatProfile, effect = definition.mechanics.effects?.[0];
       if (!profile || !effect?.dice) throw new EncounterConflictError("opportunity attack profile is unavailable");
-      attackBonus = profile.attack.attackBonus; die = { ...effect.dice, modifier: effect.dice.modifier ?? 0 }; damageModifier = die.modifier;
+      attackBonus = profile.attack.attackBonus; damageType = effect.damageType; die = { ...effect.dice, modifier: effect.dice.modifier ?? 0 }; damageModifier = die.modifier;
     }
     const attackPlan = planDnd5eAttackConditions({
       attacker: [...conditionsFor(db, input.encounterId, reactor.combatant_id, input.round)] as ConditionId[],
@@ -84,7 +86,8 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
     const critical = attack.critical || (attackPlan.autoCritical && attack.hit);
     const rolls = attack.hit ? Array.from({length: die.count * (critical ? 2 : 1)}, () => deps.rng.integer(1, die.sides + 1)) : [];
     const damage = attack.hit ? binding.module.mechanics!.resolveDamageRoll({ dice: [die], rolls: [rolls], modifier: damageModifier, critical }).total : 0;
-    const absorbed = absorbDamage(db, input.encounterId, mover.combatant_id, damage, input.occurredAt); const hp = Math.max(0, mover.hit_points - absorbed.hitPointDamage);
+    const adjustedDamage = adjustedCombatDamage(damage, resolveCombatDamageAdjustment(db, input.campaignId, mover, damageType, input.occurredAt));
+    const absorbed = absorbDamage(db, input.encounterId, mover.combatant_id, adjustedDamage, input.occurredAt); const hp = Math.max(0, mover.hit_points - absorbed.hitPointDamage);
     const status = mover.actor_id ? (mover.hit_points > 0 && hp === 0 ? "unconscious" : mover.status) : (hp === 0 ? "defeated" : mover.status);
     db.prepare("UPDATE combatant SET hit_points=?,status=CASE WHEN ?='unconscious' THEN 'unconscious' ELSE status END,state_revision=state_revision+1,updated_at=? WHERE encounter_id=? AND combatant_id=? AND hit_points=?").run(hp,status,input.occurredAt,input.encounterId,mover.combatant_id,mover.hit_points);
     if (mover.actor_id) db.prepare("UPDATE rpg_actor_resources SET current=? WHERE campaign_id=? AND actor_id=? AND name='health' AND current=?").run(hp,input.campaignId,mover.actor_id,mover.hit_points);

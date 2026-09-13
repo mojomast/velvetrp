@@ -46,6 +46,7 @@ import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
+import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
 import { readReactionAvailability } from "./opportunityAttackRuntime.js";
 
@@ -313,6 +314,9 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
           const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
             modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical}).total:0;
+          const damageType=unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type;
+          const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,damageType,at);
+          const adjustedDamage=adjustedCombatDamage(damage,adjustment);
             let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
            if (rangedCandidate?.ammunitionResourceId) {
              const ammo=db.prepare("SELECT current_ammunition FROM rpg_actor_resource_ammunition_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?")
@@ -334,9 +338,9 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
                 : db.prepare("UPDATE rpg_inventory_entries_v25 SET quantity=quantity-1 WHERE entry_id=? AND campaign_id=? AND actor_id=? AND equipped=0 AND quantity=?").run(thrownCandidate.throwableItemEntryId, encounter.campaign_id, current.actor_id, thrownItemBefore);
               if (changed.changes !== 1) throw new EncounterConflictError("throwable item changed before attack");
             }
-           const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
-          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type,requested:damage,
-            applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
+           const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
+          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage,adjustment,
+            applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,
              critical,damageRolls,...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
@@ -473,9 +477,10 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
            const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
            const die=effect.dice,damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
            if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
-           const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical}).total:0;
-            const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);legalActionId=plan.legalActionId;targetIds=[target.combatant_id];
-           outcome={kind:"damage",targetId:target.combatant_id,damageType:effect.damageType,requested:damage,applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
+            const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical}).total:0;
+             const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,effect.damageType,at),adjustedDamage=adjustedCombatDamage(damage,adjustment);
+             const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);legalActionId=plan.legalActionId;targetIds=[target.combatant_id];
+            outcome={kind:"damage",targetId:target.combatant_id,damageType:effect.damageType,requested:damage,adjustment,applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
              hitPointsBefore:target.hit_points,hitPointsAfter,statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion,
              attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,critical,damageRolls};
            const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,target.combatant_id,
