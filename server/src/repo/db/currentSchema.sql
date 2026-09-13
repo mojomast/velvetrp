@@ -2669,9 +2669,9 @@ CREATE TRIGGER combat_turn_economy_v60_guard BEFORE UPDATE ON combat_turn_econom
       WHEN NEW.turn_id<>OLD.turn_id OR NEW.encounter_id<>OLD.encounter_id OR NEW.combatant_id<>OLD.combatant_id
         OR NEW.round_number<>OLD.round_number OR NEW.started_at<>OLD.started_at
         OR NEW.action_used<OLD.action_used OR NEW.bonus_action_used<OLD.bonus_action_used
-        OR NEW.reaction_used<OLD.reaction_used OR NEW.movement_allowance_feet<>OLD.movement_allowance_feet
+        OR NEW.reaction_used<OLD.reaction_used OR NEW.movement_allowance_feet<OLD.movement_allowance_feet
         OR NEW.movement_used_feet<OLD.movement_used_feet OR OLD.ended_at IS NOT NULL
-      BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END;
+      BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources, extend movement, or end'); END;
 CREATE TRIGGER combat_turn_economy_v60_retain BEFORE DELETE ON combat_turn_economy_v60
       BEGIN SELECT RAISE(ABORT,'combat turn economies are retained'); END;
 CREATE TABLE combat_reaction_usage_v63 (

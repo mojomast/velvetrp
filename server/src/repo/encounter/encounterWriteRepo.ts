@@ -397,6 +397,14 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
          if(spent.changes!==1)throw new EncounterConflictError("stand up movement changed before commit");
          removeCombatCondition(db,combatId,current.combatant_id,"prone");
          outcome={kind:"stand-up",targetId:current.combatant_id,movementCostFeet:cost};
+        }else if(plan.kind==="dash"){
+         const economy=readCombatTurnEconomy(db,combatId);
+         if(!economy||economy.combatantId!==current.combatant_id)throw new EncounterConflictError("dash requires the current turn economy");
+         const bonus=economy.movement.allowanceFeet;
+         const extended=db.prepare(`UPDATE combat_turn_economy_v60 SET movement_allowance_feet=movement_allowance_feet+?
+           WHERE encounter_id=? AND combatant_id=? AND ended_at IS NULL AND movement_allowance_feet=?`)
+           .run(bonus,combatId,current.combatant_id,economy.movement.allowanceFeet);
+         if(extended.changes!==1)throw new EncounterConflictError("dash allowance changed before commit");
         }else if(plan.kind==="death-save"){
         const roll=deps.rng.integer(1,21);if(!Number.isInteger(roll)||roll<1||roll>20)throw new Error("combat RNG returned an out-of-range d20");
         const prior=survival(db,combatId,current.combatant_id),failures=Math.min(3,prior.failures+(roll===1?2:roll<10?1:0)),successes=Math.min(3,prior.successes+(roll>=10&&roll!==20?1:0));

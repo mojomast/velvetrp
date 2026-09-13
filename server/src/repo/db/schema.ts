@@ -3,6 +3,19 @@ import { readFileSync } from "node:fs";
 import { upgradeTacticalMapSchema } from "../../map/schemaUpgrade.js";
 import { upgradeCampaignDmSchema } from "./campaignDmUpgrade.js";
 
+/**
+ * The exact turn-economy update guard published before Dash could extend the
+ * persisted movement allowance. A database carrying this trigger is upgraded
+ * in place to the guard that permits allowance increases.
+ */
+export const TURN_ECONOMY_GUARD_PREDECESSOR_SQL = `CREATE TRIGGER combat_turn_economy_v60_guard BEFORE UPDATE ON combat_turn_economy_v60
+      WHEN NEW.turn_id<>OLD.turn_id OR NEW.encounter_id<>OLD.encounter_id OR NEW.combatant_id<>OLD.combatant_id
+        OR NEW.round_number<>OLD.round_number OR NEW.started_at<>OLD.started_at
+        OR NEW.action_used<OLD.action_used OR NEW.bonus_action_used<OLD.bonus_action_used
+        OR NEW.reaction_used<OLD.reaction_used OR NEW.movement_allowance_feet<>OLD.movement_allowance_feet
+        OR NEW.movement_used_feet<OLD.movement_used_feet OR OLD.ended_at IS NOT NULL
+      BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END`;
+
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
@@ -150,6 +163,15 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
         assertCurrentDatabase(db, databasePath);
       })();
       return;
+    }
+    // Exact-predecessor trigger upgrade: only the known pre-Dash guard is replaced.
+    const guardSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='combat_turn_economy_v60_guard'").get() as { sql: string } | undefined)?.sql;
+    if (guardSql === TURN_ECONOMY_GUARD_PREDECESSOR_SQL) {
+      const upgraded = expectedObjects().find((object) => object.name === "combat_turn_economy_v60_guard");
+      if (upgraded) db.transaction(() => {
+        db.exec("DROP TRIGGER combat_turn_economy_v60_guard");
+        db.exec(upgraded.sql);
+      }).immediate();
     }
     const recallSql = readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8");
     const inspectionSql = readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8");
