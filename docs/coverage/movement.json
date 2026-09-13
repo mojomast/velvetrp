@@ -16,7 +16,7 @@
   "capabilityEvidence": [
     {
       "id": "movement",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "descriptorStatus": "partial"
     },
     {
@@ -28,6 +28,10 @@
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e.ts#planDnd5eMovement",
     "server/src/rulesets/dnd5e.ts#planDnd5eEncumbrance",
+    "server/src/rulesets/dnd5e.ts#planDnd5eLongJump",
+    "server/src/rulesets/dnd5e.ts#planDnd5eHighJump",
+    "server/src/rulesets/dnd5e.ts#resolveDnd5eFalling",
+    "server/src/rulesets/dnd5e.ts#planDnd5eSpecialMovement",
     "server/src/repo/srdEquipmentRuntime.ts",
     "server/src/repo/tacticalMapRepo.ts",
     "server/src/repo/encounter/combatMarkerRuntime.ts",
@@ -40,6 +44,7 @@
     "server/test/dnd5e-help-hide.test.ts",
     "server/test/dnd5e-prone-standup.test.ts",
     "server/test/dnd5e-dash.test.ts",
+    "server/test/dnd5e-jumping-falling.test.ts",
     "server/test/dnd5e-turn-economy-migration.test.ts"
   ],
   "apiEvidence": [

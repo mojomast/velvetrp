@@ -16,8 +16,11 @@ export {
   planDnd5eCondition,
   planDnd5eDamageAdjustment,
   planDnd5eEncumbrance,
+  planDnd5eHighJump,
+  planDnd5eLongJump,
   planDnd5eMovement,
   planDnd5eResourceCosts,
+  planDnd5eSpecialMovement,
   planDnd5eRest,
   planDnd5eSpellCost,
   resolveDnd5eAbilityTest,
@@ -25,8 +28,18 @@ export {
   resolveDnd5eCheck,
   resolveDnd5eD20Test,
   resolveDnd5eDamageRoll,
+  resolveDnd5eFalling,
   resolveDnd5eInitiative,
   resolveDnd5eSkillTest,
+} from "./dnd5e.js";
+export type {
+  FallingInput,
+  FallingResolution,
+  JumpInput,
+  JumpPlan,
+  SpecialMovementInput,
+  SpecialMovementMode,
+  SpecialMovementPlan,
 } from "./dnd5e.js";
 export {
   DEFAULT_RULESET,

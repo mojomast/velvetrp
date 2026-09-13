@@ -110,6 +110,111 @@ export const starterEffectSchema = z.discriminatedUnion("type", [
 ]);
 export const starterEffectsSchema = z.array(starterEffectSchema).max(16);
 
+/**
+ * Additive SRD 5.1 effect vocabulary v2. It is a strict superset of the frozen
+ * `starterEffectSchema` union above, which remains unchanged for all existing
+ * consumers. New variants are recursive and every collection and string is
+ * bounded so the executable surface stays closed.
+ */
+export const EFFECT_VOCABULARY_VERSION = "2.0.0" as const;
+const srdSaveAbilitySchema = srdSpellSaveSchema.exclude(["none"]);
+const effectAreaShapeSchema = z.enum(["sphere", "cube", "cone", "line", "cylinder"]);
+const effectAreaOriginSchema = z.enum(["self", "point", "target"]);
+const effectDistanceFeetSchema = z.number().int().min(5).max(600);
+const effectSaveDcSchema = z.number().int().min(1).max(40);
+const ongoingEffectDurationRoundsSchema = z.number().int().min(1).max(100);
+const ongoingEffectTimingSchema = z.enum(["start-of-turn", "end-of-turn"]);
+const forcedMovementModeSchema = z.enum(["push", "pull", "teleport"]);
+const effectSaveSchema = z.object({ ability: srdSaveAbilitySchema, dc: effectSaveDcSchema }).strict();
+
+const areaTargetingEffectSchema = z.object({
+  type: z.literal("area-targeting"),
+  shape: effectAreaShapeSchema,
+  sizeFeet: effectDistanceFeetSchema,
+  origin: effectAreaOriginSchema,
+  effects: z.array(z.lazy(() => starterEffectV2Schema)).min(1).max(16),
+}).strict();
+const saveWithRiderEffectSchema = z.object({
+  type: z.literal("save-with-rider"),
+  ability: srdSaveAbilitySchema,
+  dc: effectSaveDcSchema,
+  onFail: z.array(z.lazy(() => starterEffectV2Schema)).min(1).max(16),
+  onSuccess: z.array(z.lazy(() => starterEffectV2Schema)).max(16).optional(),
+}).strict();
+const ongoingEffectSchema = z.object({
+  type: z.literal("ongoing-effect"),
+  effect: z.lazy(() => starterEffectV2Schema),
+  durationRounds: ongoingEffectDurationRoundsSchema,
+  timing: ongoingEffectTimingSchema,
+  repeatSave: effectSaveSchema.optional(),
+}).strict();
+const forcedMovementEffectSchema = z.object({
+  type: z.literal("forced-movement"),
+  mode: forcedMovementModeSchema,
+  distanceFeet: effectDistanceFeetSchema,
+}).strict();
+const utilityEffectSchema = z.object({
+  type: z.literal("utility"),
+  effectId: resourceIdSchema,
+  label: rpgContentNameSchema,
+}).strict();
+
+export interface StarterAreaTargetingEffect {
+  type: "area-targeting";
+  shape: "sphere" | "cube" | "cone" | "line" | "cylinder";
+  sizeFeet: number;
+  origin: "self" | "point" | "target";
+  effects: StarterEffectV2[];
+}
+export interface StarterSaveWithRiderEffect {
+  type: "save-with-rider";
+  ability: "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
+  dc: number;
+  onFail: StarterEffectV2[];
+  onSuccess?: StarterEffectV2[] | undefined;
+}
+export interface StarterOngoingEffect {
+  type: "ongoing-effect";
+  effect: StarterEffectV2;
+  durationRounds: number;
+  timing: "start-of-turn" | "end-of-turn";
+  repeatSave?: {
+    ability: "strength" | "dexterity" | "constitution" | "intelligence" | "wisdom" | "charisma";
+    dc: number;
+  } | undefined;
+}
+export interface StarterForcedMovementEffect {
+  type: "forced-movement";
+  mode: "push" | "pull" | "teleport";
+  distanceFeet: number;
+}
+export interface StarterUtilityEffect {
+  type: "utility";
+  effectId: string;
+  label: string;
+}
+
+/** The v2 union keeps every v1 variant exactly and adds the new effect kinds. */
+export type StarterEffectV2 =
+  | z.infer<typeof modifierEffectSchema>
+  | z.infer<typeof damageEffectSchema>
+  | z.infer<typeof healingEffectSchema>
+  | z.infer<typeof temporaryHitPointsEffectSchema>
+  | z.infer<typeof resourceEffectSchema>
+  | z.infer<typeof conditionEffectSchema>
+  | StarterAreaTargetingEffect
+  | StarterSaveWithRiderEffect
+  | StarterOngoingEffect
+  | StarterForcedMovementEffect
+  | StarterUtilityEffect;
+export type StarterEffectsV2 = StarterEffectV2[];
+
+export const starterEffectV2Schema: z.ZodType<StarterEffectV2> = z.lazy(() => z.discriminatedUnion("type", [
+  modifierEffectSchema, damageEffectSchema, healingEffectSchema, temporaryHitPointsEffectSchema, resourceEffectSchema, conditionEffectSchema,
+  areaTargetingEffectSchema, saveWithRiderEffectSchema, ongoingEffectSchema, forcedMovementEffectSchema, utilityEffectSchema,
+]));
+export const starterEffectsV2Schema = z.array(starterEffectV2Schema).max(16);
+
 const definitionBaseShape = {
   reference: catalogDefinitionReferenceSchema,
   name: rpgContentNameSchema,
