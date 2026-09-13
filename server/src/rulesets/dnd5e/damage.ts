@@ -1,10 +1,11 @@
 import type {
-  DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, RulesetCapability,
+  DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, DiceTerm,
+  DiceTermEvidence, RulesetCapability,
 } from "../types.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
 
 export const DND_5E_DAMAGE_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
-  Object.freeze({ id: "damage", version: "1.2.0", status: "partial" as const }),
+  Object.freeze({ id: "damage", version: "1.3.0", status: "partial" as const }),
 ]);
 
 export function resolveDnd5eDamageRoll(input: DamageRollInput): DamageRollResolution {
@@ -26,6 +27,29 @@ export function resolveDnd5eDamageRoll(input: DamageRollInput): DamageRollResolu
   const modifier = input.modifier ?? 0;
   requireInteger(modifier, "damage modifier");
   return Object.freeze({ critical, evidence: frozenList(evidence), modifier, total: Math.max(0, evidence.reduce((sum, term) => sum + term.subtotal, 0) + modifier) });
+}
+
+export type OnHitRiderDamageInput = Readonly<{
+  dice: readonly DiceTerm[];
+  rolls: readonly (readonly number[])[];
+  damageType: string;
+  critical?: boolean;
+}>;
+export type OnHitRiderDamageResolution = Readonly<{
+  critical: boolean;
+  damageType: string;
+  evidence: readonly DiceTermEvidence[];
+  total: number;
+}>;
+
+/**
+ * SRD 5.1 on-hit rider damage (Sneak Attack, Divine Smite, and similar
+ * features). The shared damage-roll rule doubles each rider die on a critical
+ * hit; an on-hit rider never adds an ability modifier of its own.
+ */
+export function resolveDnd5eOnHitRiderDamage(input: OnHitRiderDamageInput): OnHitRiderDamageResolution {
+  const resolution = resolveDnd5eDamageRoll({ dice: input.dice, rolls: input.rolls, critical: input.critical ?? false });
+  return Object.freeze({ critical: resolution.critical, damageType: input.damageType, evidence: resolution.evidence, total: resolution.total });
 }
 
 export function planDnd5eDamageAdjustment(incoming: number, adjustment: DamageAdjustment): DamageAdjustmentPlan {

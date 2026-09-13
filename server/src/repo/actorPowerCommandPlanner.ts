@@ -113,6 +113,10 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
     if (!row.public_definition_json) continue;
     const definition: Definition = executableSpellDefinition(row.kind === "ability" ? abilityCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json)) : spellCatalogDefinitionSchema.parse(JSON.parse(row.public_definition_json)));
     if (key(definition.reference) !== key(reference)) continue;
+    // The v2 vocabulary (area/save/ongoing/forced-movement/utility) executes only
+    // through the combat effect engine; this out-of-combat lane stays v1-closed.
+    const v2Kinds = ["area-targeting", "save-with-rider", "ongoing-effect", "forced-movement", "utility"];
+    if (definition.mechanics.effects.some((effect: any) => v2Kinds.includes(effect.type))) continue;
     // Temporary hit points are a combat-only pool; the out-of-combat power runtime has no storage for them.
     if (definition.mechanics.effects.some((effect: any) => effect.type === "temporary-hit-points")) continue;
     // Reactions have no trigger outside an encounter and their round timers never advance.

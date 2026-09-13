@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   EFFECT_VOCABULARY_VERSION,
+  abilityCatalogDefinitionSchema,
+  spellCatalogDefinitionSchema,
   starterEffectSchema,
   starterEffectV2Schema,
   starterEffectsV2Schema,
@@ -86,5 +88,30 @@ describe("SRD 5.1 effect vocabulary v2", () => {
     expect(starterEffectV2Schema.safeParse({ ...utility, effectId: "bad id" }).success).toBe(false);
     expect(starterEffectV2Schema.safeParse({ ...utility, label: "  " }).success).toBe(false);
     expect(starterEffectsV2Schema.safeParse(Array.from({ length: 17 }, () => fireDamage)).success).toBe(false);
+  });
+
+  it("accepts v2 effect arrays on ability and spell definitions while v1 arrays stay valid", () => {
+    const reference = { packId: "velvet:test", packVersion: "1.0.0", definitionId: "velvet:test:ability:wave", kind: "ability" as const };
+    const ability = {
+      reference, name: "Wave", description: "A bounded v2 wave.", tags: [],
+      mechanics: { actionCost: "action", recovery: "none", uses: 0, target: "enemy", effects: [area, save] },
+    } as const;
+    expect(abilityCatalogDefinitionSchema.parse(ability)).toEqual(ability);
+
+    const spellReference = { ...reference, kind: "spell" as const, definitionId: "velvet:test:spell:wave" };
+    const spell = {
+      reference: spellReference, name: "Wave", description: "A bounded v2 spell.", tags: [],
+      mechanics: { level: 1, actionCost: "action", range: 60, target: "enemy", concentration: false, effects: [ongoing, forced, utility] },
+    } as const;
+    expect(spellCatalogDefinitionSchema.parse(spell)).toEqual(spell);
+
+    const v1Ability = {
+      reference, name: "Wave", description: "A v1 array stays valid.", tags: [],
+      mechanics: { actionCost: "action", recovery: "none", uses: 0, target: "enemy", effects: v1Effects },
+    } as const;
+    expect(abilityCatalogDefinitionSchema.parse(v1Ability)).toEqual(v1Ability);
+
+    expect(abilityCatalogDefinitionSchema.safeParse({ ...ability, mechanics: { ...ability.mechanics, effects: [{ type: "telekinesis" }] } }).success).toBe(false);
+    expect(spellCatalogDefinitionSchema.safeParse({ ...spell, mechanics: { ...spell.mechanics, effects: [{ type: "telekinesis" }] } }).success).toBe(false);
   });
 });

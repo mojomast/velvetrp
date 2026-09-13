@@ -11,6 +11,7 @@ import { resolveSrdEquipment } from "../../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition, resolveCombatArmorClassBonus } from "../combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "../combatMarkerRuntime.js";
+import { applyAttackRiderConditions, buildAttackRiderPlans, readRiderUsageThisTurn, resolveAttackRiders, type AttackRiderResolution } from "../riders/index.js";
 import { advanceRevision, beginProtocol, canonical, controls, gm, id, member, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
 import { contestScore, dndDamageStatus, setSurvival, survival } from "./survival.js";
 import { persistTurnAdvance, planTurnAdvance } from "./turn.js";
@@ -57,7 +58,7 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
          throw new EncounterConflictError("combat action targets are not legal");
 
        const at=now(deps);
-      let outcome:any=null,helpTarget:string|null=null,hideSucceeded=false;
+      let outcome:any=null,helpTarget:string|null=null,hideSucceeded=false,riderResolutions:readonly AttackRiderResolution[]=Object.freeze([]);
       if(plan.kind==="attack"){
         const target=db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status ${dnd?"IN ('active','unconscious','stable')":"='active'"}`)
           .get(combatId,command.targetIds[0]!) as any;
@@ -120,6 +121,17 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
           const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
             modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical}).total:0;
           const damageType=unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type;
+          riderResolutions=resolveAttackRiders(current.actor_id?buildAttackRiderPlans(db,encounter.campaign_id,current.actor_id):[],
+            {hit:attack.hit,critical,advantage:attackPlan.mode==="advantage",
+              usedThisTurn:readRiderUsageThisTurn(db,combatId,current.combatant_id),usedThisAttack:new Set()},deps.rng);
+          const riderAdjustment=(type:string):ReturnType<typeof resolveCombatDamageAdjustment>=>{
+            const value=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,type,at);
+            return targetConditions.has("petrified")&&value==="none"?"resistance":value;
+          };
+          const riderRawDamage=riderResolutions.reduce((sum,rider)=>sum+(rider.damage?.damage??0),0);
+          const riderDamage=riderResolutions.reduce((sum,rider)=>
+            rider.damage?sum+adjustedCombatDamage(rider.damage.damage,riderAdjustment(rider.damage.damageType)):sum,0);
+          const riderRolls=riderResolutions.flatMap((rider)=>rider.damage?[...rider.damage.rolls]:[]);
           const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,damageType,at);
           // SRD 5.1 petrified: resistance to all damage.
           const conditionedAdjustment=targetConditions.has("petrified")&&adjustment==="none"?"resistance":adjustment;
@@ -145,12 +157,13 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
                 : db.prepare("UPDATE rpg_inventory_entries_v25 SET quantity=quantity-1 WHERE entry_id=? AND campaign_id=? AND actor_id=? AND equipped=0 AND quantity=?").run(thrownCandidate.throwableItemEntryId, encounter.campaign_id, current.actor_id, thrownItemBefore);
               if (changed.changes !== 1) throw new EncounterConflictError("throwable item changed before attack");
             }
-           const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
-          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage,adjustment:conditionedAdjustment,
-            applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
+           const totalAdjustedDamage=adjustedDamage+riderDamage;
+           const absorbed=absorbDamage(db,combatId,target.combatant_id,totalAdjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
+          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage+riderRawDamage,adjustment:conditionedAdjustment,
+            applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:totalAdjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,
-             critical,damageRolls,...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
+             critical,damageRolls:[...damageRolls,...riderRolls],...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
                  rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
                  ...(candidate.targetEvidence ? { targetEvidence: candidate.targetEvidence } : {}),
                  disadvantage:attackPlan.mode==="disadvantage", ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
@@ -252,6 +265,8 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
          applyCombatCondition(db,combatId,outcome.targetId,"prone",current.combatant_id,commandId,null,at);
        if(plan.kind==="escape-grapple"&&outcome?.success)
          removeCombatCondition(db,combatId,current.combatant_id,"grappled");
+       if(riderResolutions.length&&outcome?.kind==="damage")
+         applyAttackRiderConditions(db,combatId,outcome.targetId,current.combatant_id,commandId,at,riderResolutions);
       if(outcome?.kind==="damage"||outcome?.kind==="survival")recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
       else if(outcome?.kind==="status")recordStateEvent(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
       executeCombatCompositionPlan(db,compositionPlan);
@@ -270,7 +285,8 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
       combatActionCommandResponseSchema.parse({resolution,combat:{combatId:combat.combatId,round:combat.round,
         currentCombatant:combat.currentCombatant,combatants:combat.combatants,legalActions:combat.legalActions,revision:combat.revision},
         receipt:{idempotencyKey:receipt.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at}});
-      const result={campaignId:encounter.campaign_id,encounterId:combatId,resolution,combat,receipt};
+      const result={campaignId:encounter.campaign_id,encounterId:combatId,resolution,combat,receipt,
+        ...(riderResolutions.length?{riders:riderResolutions}:{})};
       if(canonical(result).length>32_768)throw new EncounterConflictError("combat action result exceeds receipt bounds");
       sealReceipt(db,combatId,commandId,after,at,result);
       return result;

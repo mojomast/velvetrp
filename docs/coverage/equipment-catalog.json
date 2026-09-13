@@ -13,8 +13,10 @@
   "runtimeEvidence": [
     "server/src/content/srdStarterCatalog.ts",
     "server/src/repo/srdEquipmentRuntime.ts",
+    "server/src/repo/encounter/magicItem/index.ts",
     "server/test/srd-equipment-runtime.test.ts",
     "server/test/srd-equipment-catalog.test.ts",
+    "server/test/dnd5e-magic-items.test.ts",
     "docs/srd-5.1-coverage.md#coverage-matrix"
   ],
   "apiEvidence": [

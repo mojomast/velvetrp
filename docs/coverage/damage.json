@@ -12,17 +12,22 @@
   "capabilityEvidence": [
     {
       "id": "damage",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "descriptorStatus": "partial"
     }
   ],
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e.ts#resolveDnd5eDamageRoll",
     "server/src/rulesets/dnd5e.ts#planDnd5eDamageAdjustment",
+    "server/src/rulesets/dnd5e/damage.ts#resolveDnd5eOnHitRiderDamage",
+    "server/src/repo/encounter/riders/pipeline.ts",
+    "server/src/repo/encounter/riders/catalog.ts",
+    "server/src/repo/encounter/actionExecution/attack.ts",
     "server/src/repo/encounter/damageAdjustment.ts",
     "server/src/repo/encounter/combatConditionRuntime.ts",
     "server/src/repo/encounter/combatPowerRuntime.ts",
     "server/test/dnd5e-combat.test.ts",
+    "server/test/dnd5e-riders.test.ts",
     "server/test/combat-damage-adjustment.test.ts",
     "server/test/dnd5e-temporary-hit-points.test.ts"
   ],

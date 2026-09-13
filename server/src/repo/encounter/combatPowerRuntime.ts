@@ -9,7 +9,7 @@ import { mayActForConsumable } from "./useConsumableRuntime.js";
 import { isDndCombat, readCombatTurnEconomy, consumeDndTurnCost, endDndCombatTurn } from "./combatActionPlan.js";
 import { grantTemporaryHitPoints, interruptConcentrationAfterDamage } from "./combatConditionRuntime.js";
 import { canonical, sha, nextId, exactlyOne, revision, feature, RAGE, LAY_ON_HANDS } from "./effectHandlers/util.js";
-import { applyEffectKind, getEffectHandler } from "./effectHandlers/index.js";
+import { applyEffectKind, getEffectHandler, isV2EffectKind, resolveEffect } from "./effectHandlers/index.js";
 import type { CombatPowerLegalAction, CombatPowerRequest, CombatPowerResult, CombatPowerBoundary, Row, Definition, EffectContext } from "./effectHandlers/types.js";
 export type { CombatPowerLegalAction, CombatPowerRequest, CombatPowerResult, CombatPowerBoundary } from "./effectHandlers/types.js";
 
@@ -26,11 +26,14 @@ function usedCount(db:DatabaseDriver.Database,campaignId:string,actorId:string,r
   else if(recovery==="encounter")recovered=(db.prepare(`SELECT max(encounter.updated_at) at FROM encounter JOIN combatant USING(encounter_id) WHERE encounter.campaign_id=? AND combatant.actor_id=? AND encounter.status='completed'`).get(campaignId,actorId)as any).at;
   return(db.prepare(`SELECT count(*) count FROM rpg_power_uses_v26 power JOIN rpg_m16_receipts_v26 receipt ON receipt.campaign_id=power.campaign_id AND receipt.actor_id=power.actor_id AND receipt.command_id=power.command_id
     WHERE power.campaign_id=? AND power.actor_id=? AND power.power_kind=? AND power.power_pack_id=? AND power.power_pack_version=? AND power.power_definition_id=? AND (? IS NULL OR receipt.occurred_at>?)`).get(campaignId,actorId,ref.kind,ref.packId,ref.packVersion,ref.definitionId,recovered,recovered)as any).count;}
-function supported(definition:Definition):"damage"|"healing"|"temporary-hit-points"|"effect"|null{
+function supported(definition:Definition):"damage"|"healing"|"temporary-hit-points"|"effect"|"v2"|null{
   const id=feature(definition);
   if(id===RAGE)return"effect";
   if(id===LAY_ON_HANDS)return"healing";
-  if(!["action","bonus-action","reaction"].includes(definition.mechanics.actionCost)||definition.mechanics.target==="area"||definition.mechanics.target==="single"||definition.mechanics.effects.length===0)return null;
+  if(!["action","bonus-action","reaction"].includes(definition.mechanics.actionCost)||definition.mechanics.effects.length===0)return null;
+  // The v2 vocabulary composes recursively; any declared v2 kind executes through the engine.
+  if(definition.mechanics.effects.some(effect=>isV2EffectKind(effect.type)))return"v2";
+  if(definition.mechanics.target==="area"||definition.mechanics.target==="single")return null;
   const kinds=new Set(definition.mechanics.effects.map(effect=>effect.type));
   if(kinds.size!==1)return null;if(kinds.has("damage"))return"damage";if(kinds.has("healing"))return"healing";
   if(kinds.has("temporary-hit-points"))return"temporary-hit-points";
@@ -73,9 +76,11 @@ export function buildCombatPowerLegalActions(db:DatabaseDriver.Database,principa
      else if(ref.kind==="ability"&&ref.definitionId===LAY_ON_HANDS){const resource=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='lay-on-hands'").get(encounter.campaign_id,acting.actor_id)as any;if(!resource||resource.current<1)continue;cost={kind:"resource",id:"lay-on-hands",amount:1};}
      else if(ref.kind==="ability"&&mechanics.uses>0){if(usedCount(db,encounter.campaign_id,acting.actor_id!,ref,mechanics.recovery)>=mechanics.uses)continue;cost={kind:"ability-use",id:ref.definitionId};}
     for(const target of combatants){const relation=target.combatant_id===acting.combatant_id?"self":target.team===acting.team?"ally":"enemy";
-      const legal=kind==="damage"?definition.mechanics.target==="enemy"&&relation==="enemy"
-        :definition.mechanics.target==="self"?relation==="self":definition.mechanics.target==="ally"&&(relation==="self"||relation==="ally");if(!legal)continue;
-       if((kind==="healing"||kind==="effect"||kind==="temporary-hit-points")&&target.actor_id===null)continue;
+      const targeting=definition.mechanics.target;
+      const legal=kind==="v2"?(targeting==="self"?relation==="self":targeting==="ally"?relation==="self"||relation==="ally":targeting==="enemy"?relation==="enemy":true)
+        :kind==="damage"?targeting==="enemy"&&relation==="enemy"
+        :targeting==="self"?relation==="self":targeting==="ally"&&(relation==="self"||relation==="ally");if(!legal)continue;
+       if(kind!=="v2"&&(kind==="healing"||kind==="effect"||kind==="temporary-hit-points")&&target.actor_id===null)continue;
        if(ref.definitionId===LAY_ON_HANDS&&target.hit_points>=target.maximum_hit_points)continue;
       const identity={encounterId,actingCombatantId:acting.combatant_id,powerRef:ref,targetCombatantId:target.combatant_id};
       output.push({legalActionId:`combat-power:${sha(canonical(identity)).slice(0,48)}`,encounterId,campaignId:encounter.campaign_id,actingCombatantId:acting.combatant_id,sourceActorId:acting.actor_id!,targetCombatantId:target.combatant_id,targetActorId:target.actor_id,powerRef:ref,definition,cost});
@@ -108,7 +113,11 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
     const dnd=isDndCombat(db,action.campaignId);
     const effects:any[]=rage?[{type:"modifier",statistic:"physical",amount:0,duration:"round",durationRounds:10}]:layOnHands?[{type:"healing",dice:{count:1,sides:1,modifier:0}}]:action.definition.mechanics.effects;
     const effectContext:EffectContext={db,deps,action,target,dnd,at,hp,outcomes,tempHitPointGrants,effects,rage,layOnHands};
-    for(const effect of effects){const handler=getEffectHandler(effect.type);if(handler)handler(effectContext,effect);}
+    const commandId=nextId(deps),powerUseId=nextId(deps),actionId=nextId(deps),eventId=nextId(deps),actionLogId=nextId(deps),stateEventId=nextId(deps),stateLogId=nextId(deps),combatantEventId=nextId(deps),combatantLogId=nextId(deps);
+    for(const effect of effects){
+      if(isV2EffectKind(effect.type)){resolveEffect(effectContext,effect,powerUseId,[target]);continue;}
+      const handler=getEffectHandler(effect.type);if(handler)handler(effectContext,effect);
+    }
     hp=effectContext.hp;
     let statusAfter=dnd&&target.actor_id&&target.hit_points===0&&hp>0?"active":hp===0?"defeated":target.status;
   const hitPointDamage=target.hit_points-hp;
@@ -138,7 +147,6 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
   const targetChanges=target.actor_id&&hp!==target.hit_points?[{name:"health",before:target.hit_points,after:hp}]:[];
   if(target.actor_id===action.sourceActorId)sourceChanges.push(...targetChanges);else if(target.actor_id&&targetChanges.length)persistM15(db,deps,action.campaignId,target.actor_id,targetM15!,at,`combat-power-target:${sha(input.idempotencyKey).slice(0,48)}`,targetChanges);
   persistM15(db,deps,action.campaignId,action.sourceActorId,sourceM15,at,`combat-power-source:${sha(input.idempotencyKey).slice(0,48)}`,sourceChanges);failpoint?.("costs");
-  const commandId=nextId(deps),powerUseId=nextId(deps),actionId=nextId(deps),eventId=nextId(deps),actionLogId=nextId(deps),stateEventId=nextId(deps),stateLogId=nextId(deps),combatantEventId=nextId(deps),combatantLogId=nextId(deps);
   // Temporary hit points never stack: each grant keeps the larger pool and defers its FK to this command.
   for(const grant of tempHitPointGrants){grant.outcome.after=grantTemporaryHitPoints(db,action.encounterId,target.combatant_id,grant.amount,commandId,at);grant.outcome.granted=grant.outcome.after-grant.outcome.before;}
   db.prepare("INSERT INTO combat_commands_v27 VALUES(?,?,?,?,?,?,?,?,?,?)").run(action.encounterId,commandId,action.sourceActorId,"resolve_action",input.idempotencyKey,envelope,sha(envelope),encounter.revision,combatAfter,at);db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(eventId,action.encounterId,commandId,combatAfter,"combat_action_resolved",canonical({kind:"action_resolved",actionId,action:"combat-power"}),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(actionLogId,action.encounterId,target.combatant_id,eventId,0,"action",canonical({kind:"combat-power",actionId}),at);

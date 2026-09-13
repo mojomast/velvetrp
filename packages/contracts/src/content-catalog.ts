@@ -286,11 +286,11 @@ export const skillCatalogDefinitionSchema = z.object({
   ...typedBase("skill"), mechanics: z.object({ attribute: attributeIdSchema }).strict(),
 }).strict();
 export const abilityCatalogDefinitionSchema = z.object({
-  ...typedBase("ability"), mechanics: z.object({ actionCost: actionCostSchema, recovery: recoverySchema, uses: z.number().int().min(0).max(100), target: targetSchema, effects: starterEffectsSchema }).strict(),
+  ...typedBase("ability"), mechanics: z.object({ actionCost: actionCostSchema, recovery: recoverySchema, uses: z.number().int().min(0).max(100), target: targetSchema, effects: starterEffectsV2Schema }).strict(),
 }).strict();
 export const spellCatalogDefinitionSchema = z.object({
   ...typedBase("spell"), mechanics: z.object({ level: z.number().int().min(0).max(9), school: srdSpellSchoolSchema.optional(), castingTime: srdSpellCastingTimeSchema.optional(), actionCost: actionCostSchema, range: z.number().int().min(0).max(10_000), target: targetSchema, duration: srdSpellDurationSchema.optional(), attackType: srdSpellAttackSchema.optional(), saveType: srdSpellSaveSchema.optional(), concentration: z.boolean(), ritual: z.boolean().optional(),
-    components: z.object({ verbal: z.boolean(), somatic: z.boolean(), material: z.boolean(), materialDescription: z.string().trim().min(1).max(256).optional() }).strict().optional(), ammunition: z.string().trim().min(1).max(128).optional(), effects: starterEffectsSchema }).strict(),
+    components: z.object({ verbal: z.boolean(), somatic: z.boolean(), material: z.boolean(), materialDescription: z.string().trim().min(1).max(256).optional() }).strict().optional(), ammunition: z.string().trim().min(1).max(128).optional(), effects: starterEffectsV2Schema }).strict(),
 }).strict();
 
 export const srdDamageTypeSchema = z.enum([

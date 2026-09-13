@@ -5,7 +5,7 @@ import {
   DND_5E_ATTACKED_WITH_ADVANTAGE_CONDITIONS, DND_5E_ATTACK_DISADVANTAGE_CONDITIONS, deriveDnd5eExhaustionEffects,
 } from "./conditions.js";
 import { dnd5eRollMode, resolveDnd5eD20Test } from "./d20.js";
-import { requireInteger } from "./internal.js";
+import { frozenList, requireInteger } from "./internal.js";
 
 export const DND_5E_ATTACK_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
   Object.freeze({ id: "attacks", version: "1.5.0", status: "supported" as const }),
@@ -48,4 +48,33 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   const autoCritical = input.kind === "melee"
     && (target.has("unconscious") || target.has("paralyzed") || target.has("petrified"));
   return Object.freeze({ mode: dnd5eRollMode(advantageSources, disadvantageSources), autoCritical });
+}
+
+/** One declarative on-hit rider requirement evaluated after the hit/miss step. */
+export type OnHitRiderPlan = Readonly<{
+  riderId: string;
+  requiresAdvantage?: boolean;
+  limit?: "once-per-turn" | "once-per-attack";
+}>;
+export type OnHitRiderContext = Readonly<{
+  hit: boolean;
+  advantage: boolean;
+  usedThisTurn: readonly string[];
+  usedThisAttack: readonly string[];
+}>;
+
+/**
+ * Selects the on-hit riders that resolve for one attack. Riders never resolve
+ * on a miss; an advantage requirement and once-per-turn/once-per-attack limits
+ * are enforced deterministically in declaration order.
+ */
+export function selectDnd5eOnHitRiders<T extends OnHitRiderPlan>(riders: readonly T[], context: OnHitRiderContext): readonly T[] {
+  if (!context.hit) return frozenList([]);
+  const usedTurn = new Set(context.usedThisTurn), usedAttack = new Set(context.usedThisAttack);
+  return frozenList(riders.filter((rider) => {
+    if (rider.requiresAdvantage && !context.advantage) return false;
+    if (rider.limit === "once-per-turn" && usedTurn.has(rider.riderId)) return false;
+    if (rider.limit === "once-per-attack" && usedAttack.has(rider.riderId)) return false;
+    return true;
+  }));
 }

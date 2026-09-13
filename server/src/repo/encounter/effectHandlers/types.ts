@@ -1,5 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import { abilityCatalogDefinitionSchema, spellCatalogDefinitionSchema, type PowerReference } from "@velvet/contracts";
+import { abilityCatalogDefinitionSchema, spellCatalogDefinitionSchema, type PowerReference, type StarterEffectV2 } from "@velvet/contracts";
 import type { EncounterDependencies } from "../encounterWriteRepo.js";
 
 export type Row={combatant_id:string;actor_id:string|null;team:string;hit_points:number;maximum_hit_points:number;status:string;state_revision:number};
@@ -26,3 +26,6 @@ export interface EffectContext {
   rage:boolean;
   layOnHands:boolean;
 }
+
+/** Recursive v2 composition point. Implemented by the effect engine. */
+export type EffectApplier=(ctx:EffectContext,effect:StarterEffectV2,powerUseId:string,targets:Row[])=>void;
