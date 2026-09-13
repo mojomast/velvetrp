@@ -16,10 +16,13 @@ export function applyCombatCondition(
     throw new Error("combat condition is invalid");
   if (!db.prepare("SELECT 1 FROM combat_commands_v27 WHERE encounter_id=? AND command_id=?").get(encounterId, sourceCommandId))
     throw new Error("combat condition source command is unavailable");
+  // The column CHECK rejects SQL NULL, so a no-expiry condition uses the
+  // bounded persist sentinel; the reader treats any round at or below it as active.
+  const expiry = expiresAtRound ?? 1_000_000;
   db.prepare(`INSERT INTO combat_conditions_v62(encounter_id,combatant_id,condition,source_combatant_id,source_command_id,expires_at_round,applied_at)
     VALUES(?,?,?,?,?,?,?) ON CONFLICT(encounter_id,combatant_id,condition,source_combatant_id) DO UPDATE SET
       source_command_id=excluded.source_command_id,expires_at_round=excluded.expires_at_round,applied_at=excluded.applied_at`)
-    .run(encounterId, combatantId, condition, sourceCombatantId, sourceCommandId, expiresAtRound, at);
+    .run(encounterId, combatantId, condition, sourceCombatantId, sourceCommandId, expiry, at);
 }
 
 export function removeCombatCondition(

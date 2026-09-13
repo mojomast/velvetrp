@@ -170,7 +170,7 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
 
 export const combatLegalActionSchema = z.object({
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
   targetIds: z.array(resourceIdSchema).max(128),
   cost: z.enum(["action", "bonus-action", "reaction"]).nullable().optional(),
   targetEvidence: z.array(z.object({ targetCombatantId: resourceIdSchema, lineOfEffect: z.enum(["clear", "blocked"]),
@@ -383,18 +383,18 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("contest"),
     targetId: resourceIdSchema,
-    contest: z.enum(["grapple", "escape-grapple"]),
+    contest: z.enum(["grapple", "escape-grapple", "shove"]),
     attackerRoll: z.number().int().min(1).max(20),
     defenderRoll: z.number().int().min(1).max(20),
     success: z.boolean(),
-    condition: z.literal("grappled").optional(),
+    condition: z.enum(["grappled", "prone"]).optional(),
   }).strict(),
 ]);
 
 export const combatActionResolutionSchema = z.object({
   actionId: resourceIdSchema,
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
   outcomes: z.array(combatActionOutcomeSchema).max(1),
@@ -439,6 +439,12 @@ export const combatActionResolutionSchema = z.object({
     if (resolution.targetIds.length !== 1 || outcome?.kind !== "contest" || outcome.targetId !== resolution.actingCombatantId
         || outcome.contest !== "escape-grapple") {
       context.addIssue({ code: "custom", message: "grapple escape resolution must contain one exact contest outcome" });
+    }
+  } else if (resolution.kind === "shove") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || outcome?.kind !== "contest" || outcome.targetId !== resolution.targetIds[0]
+        || outcome.contest !== "shove" || (outcome.success && outcome.condition !== "prone")) {
+      context.addIssue({ code: "custom", message: "shove resolution must contain one exact prone contest outcome" });
     }
   } else if (resolution.kind === "help") {
     if (resolution.targetIds.length !== 1 || resolution.outcomes.length !== 0) {

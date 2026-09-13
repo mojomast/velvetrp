@@ -9,9 +9,9 @@ describe("LegalActionTray utility actions", () => {
   afterEach(cleanup);
 
   it("renders the server-supported utility actions", () => {
-    const actions = [action("grapple", ["enemy"]), action("escape-grapple", ["actor"]), action("help", ["ally"]), action("hide"), action("dash"), action("disengage")];
+    const actions = [action("grapple", ["enemy"]), action("escape-grapple", ["actor"]), action("shove", ["enemy"]), action("help", ["ally"]), action("hide"), action("dash"), action("disengage")];
     render(<LegalActionTray legalActions={actions} combatantLabels={new Map([["enemy", "Goblin"], ["ally", "Aria"], ["actor", "Hero"]])} onSubmit={vi.fn()} />);
-    for (const label of ["Grapple", "Escape grapple", "Help", "Hide", "Dash", "Disengage"]) {
+    for (const label of ["Grapple", "Escape grapple", "Shove", "Help", "Hide", "Dash", "Disengage"]) {
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     }
   });

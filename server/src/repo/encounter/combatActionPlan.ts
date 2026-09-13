@@ -12,7 +12,7 @@ import { pointKey } from "../../map/types.js";
 
 export type CombatActionPlan = {
   legalActionId: string;
-  kind: "attack" | "grapple" | "escape-grapple" | "dash" | "disengage" | "help" | "hide" | "flee" | "end-turn" | "stabilize" | "death-save";
+  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "dash" | "disengage" | "help" | "hide" | "flee" | "end-turn" | "stabilize" | "death-save";
   actingCombatantId: string;
   targetIds: string[];
   cost: "action" | null;
@@ -321,6 +321,8 @@ export function buildCombatActionPlans(
     ...(stabilizeTargets.length && (economy === null || economy.action.available) ? [{ legalActionId: "stabilize", kind: "stabilize" as const,
       actingCombatantId: current.combatant_id, targetIds: stabilizeTargets, cost: "action" as const }] : []),
     ...grappleTargets.map((targetId) => ({ legalActionId: `grapple:${targetId}`, kind: "grapple" as const,
+      actingCombatantId: current.combatant_id, targetIds: [targetId], cost: "action" as const })),
+    ...grappleTargets.map((targetId) => ({ legalActionId: `shove:${targetId}`, kind: "shove" as const,
       actingCombatantId: current.combatant_id, targetIds: [targetId], cost: "action" as const })),
     ...(grappled && (economy === null || economy.action.available) ? [{ legalActionId: "escape-grapple", kind: "escape-grapple" as const,
       actingCombatantId: current.combatant_id, targetIds: [current.combatant_id], cost: "action" as const }] : []),

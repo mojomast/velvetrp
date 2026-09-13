@@ -48,7 +48,7 @@ const hasQuery = (request: FastifyRequest) => (request.raw.url ?? request.url).i
 const key = (prefix: string, ...parts: string[]) => `${prefix}:${createHash("sha256").update(parts.join("\0")).digest("hex").slice(0, 48)}`;
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
- type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn"|"dash"|"grapple"|"escape-grapple"|"disengage"|"help"|"hide"|"stabilize"|"death-save";
+ type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn"|"dash"|"grapple"|"escape-grapple"|"shove"|"disengage"|"help"|"hide"|"stabilize"|"death-save";
   outcome:{kind:"damage";damageType:"physical"|"bludgeoning"|"piercing"|"slashing";requested:number;applied:number;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"unconscious"|"stable"|"defeated"|"dead"}
     |{kind:"status";statusAfter:"fled"}|{kind:"none"};roundBefore: number; roundAfter: number }
   | {kind:"travel";destination:string}

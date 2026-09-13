@@ -64,8 +64,8 @@ const member=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare(
 const gm=(db:DatabaseDriver.Database,p:string,c:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_memberships WHERE campaign_id=? AND principal_id=? AND role IN ('owner','gm')").get(c,p));
 const controls=(db:DatabaseDriver.Database,p:string,c:string,a:string)=>Boolean(db.prepare("SELECT 1 FROM campaign_actor_private_state WHERE campaign_id=? AND actor_id=? AND controller_principal_id=?").get(c,a,p));
 const commandType=(t:string)=>t==="create_encounter"||t==="start_encounter"||t==="resolve_initiative"||t==="join_combatant"?"start":t==="advance_turn"||t==="advance_round"?"advance_turn":t==="flee"?"flee":t==="claim_reward_bundle"||t==="end_combat"?"grant_rewards":"resolve_action";
-const actionTypes=new Set(["attack","power","item","defend","flee","end-turn","dash","disengage","help","hide"]);
-const dndCommandTypes=new Set(["attack","dash","disengage","help","hide","flee","end-turn"]);
+const actionTypes=new Set(["attack","power","item","defend","flee","end-turn","dash","disengage","help","hide","grapple","escape-grapple","shove"]);
+const dndCommandTypes=new Set(["attack","dash","disengage","help","hide","grapple","escape-grapple","shove","flee","end-turn"]);
 
 /** Dependencies required by transactional encounter commands. */
 export interface EncounterWriteDependencies extends EncounterDependencies {
@@ -253,9 +253,9 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
         .find((candidate)=>candidate.legalActionId===command.legalActionId
           ||(legacyRequest!==undefined&&dnd&&command.legalActionId==="attack:basic"&&candidate.kind==="attack"));
       if(!plan)throw new EncounterConflictError("combat action is not legal");
-       if(((plan.kind==="attack"||plan.kind==="stabilize"||plan.kind==="grapple"||plan.kind==="escape-grapple"||plan.kind==="help")
+       if(((plan.kind==="attack"||plan.kind==="stabilize"||plan.kind==="grapple"||plan.kind==="escape-grapple"||plan.kind==="shove"||plan.kind==="help")
               &&(command.targetIds.length!==1||!plan.targetIds.includes(command.targetIds[0]!)))
-            ||(plan.kind!=="attack"&&plan.kind!=="stabilize"&&plan.kind!=="grapple"&&plan.kind!=="escape-grapple"&&plan.kind!=="help"&&command.targetIds.length!==0))
+            ||(plan.kind!=="attack"&&plan.kind!=="stabilize"&&plan.kind!=="grapple"&&plan.kind!=="escape-grapple"&&plan.kind!=="shove"&&plan.kind!=="help"&&command.targetIds.length!==0))
          throw new EncounterConflictError("combat action targets are not legal");
 
        const at=now(deps);
@@ -364,22 +364,24 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
         if(!target)throw new EncounterConflictError("combatant cannot be stabilized");
         setSurvival(db,combatId,target.combatant_id,0,0,true);
         outcome={kind:"survival",targetId:target.combatant_id,successes:0,failures:0,statusAfter:"stable",hitPointsBefore:target.hit_points,hitPointsAfter:target.hit_points,statusBefore:target.status};
-       }else if(plan.kind==="grapple"||plan.kind==="escape-grapple"){
+       }else if(plan.kind==="grapple"||plan.kind==="escape-grapple"||plan.kind==="shove"){
          const targetId=command.targetIds[0]!;
-         const target=plan.kind==="grapple" ? db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'`)
-           .get(combatId,targetId) as any : db.prepare(`SELECT source_combatant_id combatant_id FROM combat_conditions_v62
-             WHERE encounter_id=? AND combatant_id=? AND condition='grappled' LIMIT 1`).get(combatId,current.combatant_id) as any;
+         const target=plan.kind==="escape-grapple" ? db.prepare(`SELECT source_combatant_id combatant_id FROM combat_conditions_v62
+             WHERE encounter_id=? AND combatant_id=? AND condition='grappled' LIMIT 1`).get(combatId,current.combatant_id) as any
+           : db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'`).get(combatId,targetId) as any;
          if(!target)throw new EncounterConflictError("grapple target is unavailable");
          if(plan.kind==="escape-grapple" && !conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has("grappled"))
            throw new EncounterConflictError("combatant is not grappled");
-         const grappling=plan.kind==="grapple";
-         const attackerScore=contestScore(db,encounter.campaign_id,current,grappling?"athletics":"best");
-         const defenderScore=contestScore(db,encounter.campaign_id,target,grappling?"best":"athletics");
+         const contesting=plan.kind==="grapple"||plan.kind==="shove";
+         const attackerScore=contestScore(db,encounter.campaign_id,current,contesting?"athletics":"best");
+         const defenderScore=contestScore(db,encounter.campaign_id,target,contesting?"best":"athletics");
          const attackerRoll=deps.rng.integer(1,21),defenderRoll=deps.rng.integer(1,21);
          if(!Number.isInteger(attackerRoll)||attackerRoll<1||attackerRoll>20||!Number.isInteger(defenderRoll)||defenderRoll<1||defenderRoll>20)
            throw new Error("combat RNG returned an out-of-range contest d20");
          const success=attackerRoll+attackerScore>=defenderRoll+defenderScore;
          if(plan.kind==="grapple"&&success) outcome={kind:"contest",targetId,contest:"grapple",attackerRoll,defenderRoll,success,condition:"grappled"};
+         else if(plan.kind==="shove"&&success) outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success,condition:"prone"};
+         else if(plan.kind==="shove") outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success};
          else outcome={kind:"contest",targetId:current.combatant_id,contest:"escape-grapple",attackerRoll,defenderRoll,success};
        }else if(plan.kind==="death-save"){
         const roll=deps.rng.integer(1,21);if(!Number.isInteger(roll)||roll<1||roll>20)throw new Error("combat RNG returned an out-of-range d20");
@@ -403,7 +405,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(outcome?.kind==="damage"||outcome?.kind==="survival")stateOverrides.set(outcome.targetId,outcome.statusAfter);
       else if(outcome?.kind==="status")stateOverrides.set(current.combatant_id,"fled");
       const plannedAdvance=planTurnAdvance(db,combatId,encounter,current.combatant_id,stateOverrides);
-       const keepsTurn=["attack","dash","disengage","help","hide"].includes(plan.kind) && dnd;
+       const keepsTurn=["attack","dash","disengage","help","hide","grapple","escape-grapple","shove"].includes(plan.kind) && dnd;
        const advancesTurn=!keepsTurn||plannedAdvance.nextId===null;
       const turnPlan=advancesTurn?plannedAdvance:{event:null,nextId:current.combatant_id,round:encounter.round_number};
       const combatantChanges:CombatantStateChange[]=(outcome?.kind==="damage"||outcome?.kind==="survival")?[{combatantId:outcome.targetId,
@@ -423,6 +425,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
        if(plan.kind==="hide"&&hideSucceeded)grantCombatMarker(db,combatId,current.combatant_id,"hidden",current.combatant_id,commandId,encounter.round_number,at);
        if(plan.kind==="grapple"&&outcome?.success)
          applyCombatCondition(db,combatId,outcome.targetId,"grappled",current.combatant_id,commandId,null,at);
+       if(plan.kind==="shove"&&outcome?.success)
+         applyCombatCondition(db,combatId,outcome.targetId,"prone",current.combatant_id,commandId,null,at);
        if(plan.kind==="escape-grapple"&&outcome?.success)
          removeCombatCondition(db,combatId,current.combatant_id,"grappled");
       if(outcome?.kind==="damage"||outcome?.kind==="survival")recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
