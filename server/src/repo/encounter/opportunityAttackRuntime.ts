@@ -2,8 +2,9 @@ import type DatabaseDriver from "better-sqlite3";
 import { opportunityAttackReactionSchema, resourceIdSchema, type MapPoint } from "@velvet/contracts";
 import type { IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
+import { planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage } from "./combatConditionRuntime.js";
+import { absorbDamage, conditionsFor } from "./combatConditionRuntime.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 
 export type OpportunityAttackDeps = { ids: IdGenerator; rng: RandomNumberGenerator };
@@ -72,10 +73,17 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
       if (!profile || !effect?.dice) throw new EncounterConflictError("opportunity attack profile is unavailable");
       attackBonus = profile.attack.attackBonus; die = { ...effect.dice, modifier: effect.dice.modifier ?? 0 }; damageModifier = die.modifier;
     }
-    const roll = deps.rng.integer(1, 21); if (roll < 1 || roll > 20) throw new Error("combat RNG returned an out-of-range d20");
+    const attackPlan = planDnd5eAttackConditions({
+      attacker: [...conditionsFor(db, input.encounterId, reactor.combatant_id, input.round)] as ConditionId[],
+      target: [...conditionsFor(db, input.encounterId, mover.combatant_id, input.round)] as ConditionId[],
+      kind: "melee",
+    });
+    const first = deps.rng.integer(1, 21); if (first < 1 || first > 20) throw new Error("combat RNG returned an out-of-range d20");
+    const roll = attackPlan.mode === "normal" ? first : attackPlan.mode === "advantage" ? Math.max(first, deps.rng.integer(1, 21)) : Math.min(first, deps.rng.integer(1, 21));
     const attack = binding.module.mechanics!.resolveAttack({ rolls: [roll], abilityScore: attackAbility, proficiencyBonus, flatBonus: attackBonus - proficiencyBonus, armorClass: armorClass(db, input.encounterId, input.campaignId, mover) });
-    const rolls = attack.hit ? Array.from({length: die.count * (attack.critical ? 2 : 1)}, () => deps.rng.integer(1, die.sides + 1)) : [];
-    const damage = attack.hit ? binding.module.mechanics!.resolveDamageRoll({ dice: [die], rolls: [rolls], modifier: damageModifier, critical: attack.critical }).total : 0;
+    const critical = attack.critical || (attackPlan.autoCritical && attack.hit);
+    const rolls = attack.hit ? Array.from({length: die.count * (critical ? 2 : 1)}, () => deps.rng.integer(1, die.sides + 1)) : [];
+    const damage = attack.hit ? binding.module.mechanics!.resolveDamageRoll({ dice: [die], rolls: [rolls], modifier: damageModifier, critical }).total : 0;
     const absorbed = absorbDamage(db, input.encounterId, mover.combatant_id, damage, input.occurredAt); const hp = Math.max(0, mover.hit_points - absorbed.hitPointDamage);
     const status = mover.actor_id ? (mover.hit_points > 0 && hp === 0 ? "unconscious" : mover.status) : (hp === 0 ? "defeated" : mover.status);
     db.prepare("UPDATE combatant SET hit_points=?,status=CASE WHEN ?='unconscious' THEN 'unconscious' ELSE status END,state_revision=state_revision+1,updated_at=? WHERE encounter_id=? AND combatant_id=? AND hit_points=?").run(hp,status,input.occurredAt,input.encounterId,mover.combatant_id,mover.hit_points);

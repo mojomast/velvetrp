@@ -9,6 +9,7 @@ export {
   dnd5eProficiencyBonus,
   dnd5eRollMode,
   planDnd5eAction,
+  planDnd5eAttackConditions,
   planDnd5eConcentrationDamage,
   planDnd5eConcentrationReplacement,
   planDnd5eCondition,
@@ -35,6 +36,8 @@ export { VELVET_LEGACY_RULESET, VELVET_LEGACY_RULESET_DESCRIPTOR } from "./velve
 export type {
   AbilityDescriptor,
   AbilityId,
+  AttackConditionInput,
+  AttackConditionPlan,
   AttackInput,
   AttackResolution,
   CharacterDerivedInput,

@@ -1,5 +1,5 @@
 import type {
-  AbilityId, AttackInput, AttackResolution, CharacterDerivedInput, CharacterDerivedValues, CheckInput,
+  AbilityId, AttackConditionInput, AttackConditionPlan, AttackInput, AttackResolution, CharacterDerivedInput, CharacterDerivedValues, CheckInput,
   CheckResolution, ConcentrationPlan, ConditionId, ConditionStatePlan, D20RollEvidence, D20TestInput,
   D20TestResolution, DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution,
   InitiativeEntry, InitiativeResult, LegalActionPlan, MovementInput, MovementPlan, RecoveryPlan,
@@ -124,6 +124,25 @@ export function resolveDnd5eAttack(input: AttackInput): AttackResolution {
   const critical = natural !== 1 && natural >= criticalThreshold;
   const hit = !automaticMiss && (critical || resolution.success);
   return Object.freeze({ ...resolution, armorClass: input.armorClass, hit, critical, automaticMiss });
+}
+
+/**
+ * SRD 5.1 condition effects on one attack roll. Attacker hindrances produce
+ * disadvantage; a blinded, restrained, stunned, or unconscious target (and a
+ * prone target in melee) produces advantage. Advantage and disadvantage from
+ * any source cancel. A melee attack against an unconscious, paralyzed, or
+ * petrified target is a critical hit when it hits.
+ */
+export function planDnd5eAttackConditions(input: AttackConditionInput): AttackConditionPlan {
+  const attacker = new Set(input.attacker), target = new Set(input.target);
+  let advantageSources = 0, disadvantageSources = 0;
+  for (const condition of ["blinded", "poisoned", "prone", "restrained"] as const) if (attacker.has(condition)) disadvantageSources += 1;
+  if (input.longRange) disadvantageSources += 1;
+  for (const condition of ["blinded", "restrained", "stunned", "unconscious"] as const) if (target.has(condition)) advantageSources += 1;
+  if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }
+  const autoCritical = input.kind === "melee"
+    && (target.has("unconscious") || target.has("paralyzed") || target.has("petrified"));
+  return Object.freeze({ mode: dnd5eRollMode(advantageSources, disadvantageSources), autoCritical });
 }
 
 export function resolveDnd5eDamageRoll(input: DamageRollInput): DamageRollResolution {
@@ -311,7 +330,7 @@ const difficultyClasses = Object.freeze([
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
 const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0" });
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0" });
 const capabilities = Object.freeze([
   "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));

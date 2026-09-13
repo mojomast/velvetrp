@@ -179,6 +179,15 @@ export type ConditionStatePlan = Readonly<{
   changed: boolean;
 }>;
 
+/** Pure input for the SRD condition effects that modify an attack roll. */
+export type AttackConditionInput = Readonly<{
+  attacker: readonly ConditionId[];
+  target: readonly ConditionId[];
+  kind: "melee" | "ranged" | "thrown";
+  longRange?: boolean;
+}>;
+export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
+
 export type ResourcePool = Readonly<{ id: string; current: number; maximum: number }>;
 export type ResourceCost = Readonly<{ resourceId: string; amount: number }>;
 export type ResourceCostPlan = Readonly<{

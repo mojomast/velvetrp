@@ -43,9 +43,9 @@ import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
 import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
-import { DND_5E_UNARMED_STRIKE } from "../../rulesets/index.js";
+import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, applyCombatCondition, attackDisadvantageConditions, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
+import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
 import { readReactionAvailability } from "./opportunityAttackRuntime.js";
 
@@ -298,17 +298,21 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
              const rangeFeet=candidate?.rangeFeetByTarget[target.combatant_id];
              const cover = candidate?.targetEvidence.find((evidence) => evidence.targetCombatantId === target.combatant_id)?.cover;
              const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
+             const attackPlan=planDnd5eAttackConditions({
+               attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
+               target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
+               kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
+               longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0)});
              const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
-            const disadvantage=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
-              || (rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0));
-           const attackRoll=disadvantage ? Math.min(firstRoll,deps.rng.integer(1,21)) : firstRoll;
+             const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
              proficiencyBonus:(unarmed?DND_5E_UNARMED_STRIKE.proficient:weapon.proficient)?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
+          const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
           const die=unarmed?DND_5E_UNARMED_STRIKE.damageDie:weapon.damage.die;
-          const damageRolls=attack.hit?Array.from({length:die.count*(attack.critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
+          const damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
           const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
-            modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical:attack.critical}).total:0;
+            modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical}).total:0;
             let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
            if (rangedCandidate?.ammunitionResourceId) {
              const ammo=db.prepare("SELECT current_ammunition FROM rpg_actor_resource_ammunition_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?")
@@ -335,10 +339,10 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,
-             critical:attack.critical,damageRolls,...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
+             critical,damageRolls,...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
                  rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
                  ...(candidate.targetEvidence ? { targetEvidence: candidate.targetEvidence } : {}),
-                 disadvantage, ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
+                 disadvantage:attackPlan.mode==="disadvantage", ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
                 ...(thrownCandidate ? { thrownItemEntryId: thrownCandidate.throwableItemEntryId, thrownItemBefore, thrownItemAfter, targetEvidence: thrownCandidate.targetEvidence } : {}) } : {})};
           const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,target.combatant_id,
             target.hit_points-hitPointsAfter,outcome.statusAfter,at);if(concentrationCheck)outcome.concentrationCheck=concentrationCheck;
@@ -455,20 +459,25 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(target){
         let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}catch{armorClass=NaN;}
         if(Number.isInteger(armorClass)){
-            const rolls=Array.from({length:plan.attackRollCount},()=>deps.rng.integer(1,21));
-            if(rolls.some((value)=>!Number.isInteger(value)||value<1||value>20))throw new Error("combat RNG returned an out-of-range d20");
-            const attackRoll=[...attackDisadvantageConditions].some((condition)=>conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has(condition))
-              ?Math.min(...rolls):Math.max(...rolls);
-           const profile=plan.enemy.mechanics.combatProfile!;
-           const binding=resolveCampaignRuleset(db,encounter.campaign_id),attack=binding.module.mechanics!.resolveAttack({rolls:[attackRoll],abilityScore:10,
-              proficiencyBonus:profile.proficiencyBonus,flatBonus:profile.attack.attackBonus-profile.proficiencyBonus,armorClass});
-          const die=effect.dice,damageRolls=attack.hit?Array.from({length:die.count*(attack.critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
-          if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
-          const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical:attack.critical}).total:0;
+             const attackPlan=planDnd5eAttackConditions({
+               attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
+               target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
+               kind:"melee"});
+             const diceCount=attackPlan.mode==="normal"?plan.attackRollCount:Math.max(2,plan.attackRollCount);
+             const rolls=Array.from({length:diceCount},()=>deps.rng.integer(1,21));
+             if(rolls.some((value)=>!Number.isInteger(value)||value<1||value>20))throw new Error("combat RNG returned an out-of-range d20");
+             const attackRoll=attackPlan.mode==="disadvantage"?Math.min(...rolls):Math.max(...rolls);
+            const profile=plan.enemy.mechanics.combatProfile!;
+            const binding=resolveCampaignRuleset(db,encounter.campaign_id),attack=binding.module.mechanics!.resolveAttack({rolls:[attackRoll],abilityScore:10,
+               proficiencyBonus:profile.proficiencyBonus,flatBonus:profile.attack.attackBonus-profile.proficiencyBonus,armorClass});
+           const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
+           const die=effect.dice,damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
+           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
+           const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical}).total:0;
             const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);legalActionId=plan.legalActionId;targetIds=[target.combatant_id];
            outcome={kind:"damage",targetId:target.combatant_id,damageType:effect.damageType,requested:damage,applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
              hitPointsBefore:target.hit_points,hitPointsAfter,statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion,
-             attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,critical:attack.critical,damageRolls};
+             attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,critical,damageRolls};
            const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,target.combatant_id,
              target.hit_points-hitPointsAfter,outcome.statusAfter,at);if(concentrationCheck)outcome.concentrationCheck=concentrationCheck;
         }
