@@ -9,11 +9,21 @@ describe("LegalActionTray utility actions", () => {
   afterEach(cleanup);
 
   it("renders the server-supported utility actions", () => {
-    const actions = [action("grapple", ["enemy"]), action("escape-grapple", ["actor"]), action("shove", ["enemy"]), action("help", ["ally"]), action("hide"), action("dash"), action("disengage")];
+    const actions = [action("grapple", ["enemy"]), action("escape-grapple", ["actor"]), action("shove", ["enemy"]), action("stand-up", ["actor"]), action("help", ["ally"]), action("hide"), action("dash"), action("disengage")];
     render(<LegalActionTray legalActions={actions} combatantLabels={new Map([["enemy", "Goblin"], ["ally", "Aria"], ["actor", "Hero"]])} onSubmit={vi.fn()} />);
-    for (const label of ["Grapple", "Escape grapple", "Shove", "Help", "Hide", "Dash", "Disengage"]) {
+    for (const label of ["Grapple", "Escape grapple", "Shove", "Stand up", "Help", "Hide", "Dash", "Disengage"]) {
       expect(screen.getByRole("button", { name: label })).toBeTruthy();
     }
+  });
+
+  it("submits stand up against the acting combatant", () => {
+    const onSubmit = vi.fn();
+    render(<LegalActionTray legalActions={[action("stand-up", ["actor"])]} combatantLabels={new Map([["actor", "Hero"]])} onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: "Stand up" }));
+    fireEvent.click(screen.getByRole("radio"));
+    fireEvent.click(screen.getByRole("button", { name: "Review action" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit once" }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kind: "stand-up" }), ["actor"]);
   });
 
   it("requires and submits the exact target for grapple", () => {

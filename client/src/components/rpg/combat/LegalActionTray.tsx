@@ -13,12 +13,12 @@ export interface LegalActionTrayProps {
   onUsePower?:(action:DirectCombatPowerCandidate)=>void;
 }
 
-const supportedKinds = ["attack", "flee", "end-turn", "stabilize", "death-save", "grapple", "escape-grapple", "shove", "dash", "disengage", "help", "hide"] as const;
+const supportedKinds = ["attack", "flee", "end-turn", "stabilize", "death-save", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide"] as const;
 type SupportedKind = typeof supportedKinds[number];
 const supported = (action: CombatLegalAction): action is CombatLegalAction & { kind: SupportedKind } =>
   (supportedKinds as readonly string[]).includes(action.kind);
 const actionLabel = (kind: SupportedKind) => ({ attack: "Attack", flee: "Flee", "end-turn": "End turn", stabilize: "Stabilize", "death-save": "Make death save",
-  grapple: "Grapple", "escape-grapple": "Escape grapple", shove: "Shove", dash: "Dash", disengage: "Disengage", help: "Help", hide: "Hide" })[kind];
+  grapple: "Grapple", "escape-grapple": "Escape grapple", shove: "Shove", "stand-up": "Stand up", dash: "Dash", disengage: "Disengage", help: "Help", hide: "Hide" })[kind];
 const actionExplanation = (kind: SupportedKind) => ({
   attack: "The server resolves the attack and its outcome.",
   flee: "The server decides whether leaving combat succeeds.",
@@ -28,6 +28,7 @@ const actionExplanation = (kind: SupportedKind) => ({
   grapple: "Contest Strength (Athletics) against the target. On success the server applies grappled.",
   "escape-grapple": "Contest your Athletics or Acrobatics against the grappler to end grappled.",
   shove: "Contest Strength (Athletics) to knock the target prone on success.",
+  "stand-up": "Spends half your speed to end the prone condition without using your action.",
   dash: "Adds one speed of movement to this turn's allowance.",
   disengage: "Prevents opportunity attacks as you leave reach this turn.",
   help: "Grants an ally advantage on its next attack until the start of your next turn.",
@@ -56,7 +57,7 @@ export function LegalActionTray({ legalActions, consumableActions=[],powerAction
   }, [powerActions, reviewingPower]);
   const powerTargetLabel = (action: DirectCombatPowerCandidate) => combatantLabels.get(action.targetCombatantId) ?? action.target ?? action.targetCombatantId;
 
-   const requiresTarget = selected?.kind === "attack" || selected?.kind === "stabilize" || selected?.kind === "grapple" || selected?.kind === "escape-grapple" || selected?.kind === "shove" || selected?.kind === "help";
+   const requiresTarget = selected?.kind === "attack" || selected?.kind === "stabilize" || selected?.kind === "grapple" || selected?.kind === "escape-grapple" || selected?.kind === "shove" || selected?.kind === "stand-up" || selected?.kind === "help";
   const validSelection = Boolean(selected) && (!requiresTarget || (targetId !== null && selected.targetIds.includes(targetId)));
   function choose(action: typeof actions[number]) {
     setSelectedId(action.legalActionId); setTargetId(null); setReviewing(false);

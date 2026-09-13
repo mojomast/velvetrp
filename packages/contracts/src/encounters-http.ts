@@ -172,7 +172,7 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
 
 export const combatLegalActionSchema = z.object({
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
   targetIds: z.array(resourceIdSchema).max(128),
   cost: z.enum(["action", "bonus-action", "reaction"]).nullable().optional(),
   targetEvidence: z.array(z.object({ targetCombatantId: resourceIdSchema, lineOfEffect: z.enum(["clear", "blocked"]),
@@ -391,12 +391,17 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
     success: z.boolean(),
     condition: z.enum(["grappled", "prone"]).optional(),
   }).strict(),
+  z.object({
+    kind: z.literal("stand-up"),
+    targetId: resourceIdSchema,
+    movementCostFeet: z.number().int().min(0).max(1_000_000),
+  }).strict(),
 ]);
 
 export const combatActionResolutionSchema = z.object({
   actionId: resourceIdSchema,
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
   outcomes: z.array(combatActionOutcomeSchema).max(1),
@@ -451,6 +456,12 @@ export const combatActionResolutionSchema = z.object({
   } else if (resolution.kind === "help") {
     if (resolution.targetIds.length !== 1 || resolution.outcomes.length !== 0) {
       context.addIssue({ code: "custom", message: "help resolution must contain one ally target and no client-authored outcome" });
+    }
+  } else if (resolution.kind === "stand-up") {
+    const outcome = resolution.outcomes[0];
+    if (resolution.targetIds.length !== 1 || resolution.targetIds[0] !== resolution.actingCombatantId
+        || outcome?.kind !== "stand-up" || outcome.targetId !== resolution.actingCombatantId) {
+      context.addIssue({ code: "custom", message: "stand up resolution must target the acting combatant with one stand-up outcome" });
     }
   } else if (["dash", "disengage", "hide"].includes(resolution.kind)
       && (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0)) {

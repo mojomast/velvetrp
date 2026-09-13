@@ -12,7 +12,7 @@ import { pointKey } from "../../map/types.js";
 
 export type CombatActionPlan = {
   legalActionId: string;
-  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "dash" | "disengage" | "help" | "hide" | "flee" | "end-turn" | "stabilize" | "death-save";
+  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "stand-up" | "dash" | "disengage" | "help" | "hide" | "flee" | "end-turn" | "stabilize" | "death-save";
   actingCombatantId: string;
   targetIds: string[];
   cost: "action" | null;
@@ -321,6 +321,10 @@ export function buildCombatActionPlans(
     ? targets.filter((targetId) => mayAttackTarget(db, encounterId, current.combatant_id, targetId, economy.round)
       && ![...actionBlockingConditions].some(condition => conditionsFor(db, encounterId, targetId, economy.round).has(condition))) : [];
   const grappled = conditions.has("grappled");
+  // SRD 5.1: standing up from prone costs half your speed but no action.
+  const standUpCost = economy === null ? 0 : Math.floor(economy.movement.allowanceFeet / 2);
+  const canStand = ruleset.rulesetId === "dnd-5e" && current.actor_id && economy !== null && conditions.has("prone")
+    && standUpCost >= 1 && economy.movement.remainingFeet >= standUpCost;
   const utility = ruleset.rulesetId === "dnd-5e" && current.actor_id && economy?.action.available;
   const helpTargets = utility ? (db.prepare(`SELECT combatant_id FROM combatant WHERE encounter_id=? AND team=? AND combatant_kind='actor'
     AND status='active' AND combatant_id<>? ORDER BY combatant_id`).all(encounterId, current.team, current.combatant_id) as Array<{ combatant_id: string }>).map(row => row.combatant_id) : [];
@@ -338,6 +342,8 @@ export function buildCombatActionPlans(
       actingCombatantId: current.combatant_id, targetIds: [targetId], cost: "action" as const })),
     ...(grappled && (economy === null || economy.action.available) ? [{ legalActionId: "escape-grapple", kind: "escape-grapple" as const,
       actingCombatantId: current.combatant_id, targetIds: [current.combatant_id], cost: "action" as const }] : []),
+    ...(canStand ? [{ legalActionId: "stand-up", kind: "stand-up" as const,
+      actingCombatantId: current.combatant_id, targetIds: [current.combatant_id], cost: null }] : []),
     ...(utility ? [{ legalActionId: "dash", kind: "dash" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const },
       { legalActionId: "disengage", kind: "disengage" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const },
       ...helpTargets.map(targetId => ({ legalActionId: `help:${targetId}`, kind: "help" as const, actingCombatantId: current.combatant_id, targetIds: [targetId], cost: "action" as const })),
