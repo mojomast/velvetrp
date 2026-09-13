@@ -13,16 +13,24 @@ export interface LegalActionTrayProps {
   onUsePower?:(action:DirectCombatPowerCandidate)=>void;
 }
 
-type SupportedKind = "attack" | "flee" | "end-turn" | "stabilize" | "death-save";
+const supportedKinds = ["attack", "flee", "end-turn", "stabilize", "death-save", "grapple", "escape-grapple", "dash", "disengage", "help", "hide"] as const;
+type SupportedKind = typeof supportedKinds[number];
 const supported = (action: CombatLegalAction): action is CombatLegalAction & { kind: SupportedKind } =>
-  action.kind === "attack" || action.kind === "flee" || action.kind === "end-turn" || action.kind === "stabilize" || action.kind === "death-save";
-const actionLabel = (kind: SupportedKind) => ({ attack: "Attack", flee: "Flee", "end-turn": "End turn", stabilize: "Stabilize", "death-save": "Make death save" })[kind];
+  (supportedKinds as readonly string[]).includes(action.kind);
+const actionLabel = (kind: SupportedKind) => ({ attack: "Attack", flee: "Flee", "end-turn": "End turn", stabilize: "Stabilize", "death-save": "Make death save",
+  grapple: "Grapple", "escape-grapple": "Escape grapple", dash: "Dash", disengage: "Disengage", help: "Help", hide: "Hide" })[kind];
 const actionExplanation = (kind: SupportedKind) => ({
   attack: "The server resolves the attack and its outcome.",
   flee: "The server decides whether leaving combat succeeds.",
   "end-turn": "Ends this turn without a client-side outcome.",
   stabilize: "Choose one unconscious ally from the server's allowlist. The server determines the stable outcome.",
   "death-save": "The server rolls and records this death save. No roll is made in the client.",
+  grapple: "Contest Strength (Athletics) against the target. On success the server applies grappled.",
+  "escape-grapple": "Contest your Athletics or Acrobatics against the grappler to end grappled.",
+  dash: "Adds one speed of movement to this turn's allowance.",
+  disengage: "Prevents opportunity attacks as you leave reach this turn.",
+  help: "Grants an ally advantage on its next attack until the start of your next turn.",
+  hide: "The server rolls Dexterity (Stealth) against opposing passive Perception and may hide you.",
 })[kind];
 
 /**
@@ -47,7 +55,7 @@ export function LegalActionTray({ legalActions, consumableActions=[],powerAction
   }, [powerActions, reviewingPower]);
   const powerTargetLabel = (action: DirectCombatPowerCandidate) => combatantLabels.get(action.targetCombatantId) ?? action.target ?? action.targetCombatantId;
 
-   const requiresTarget = selected?.kind === "attack" || selected?.kind === "stabilize";
+   const requiresTarget = selected?.kind === "attack" || selected?.kind === "stabilize" || selected?.kind === "grapple" || selected?.kind === "escape-grapple" || selected?.kind === "help";
   const validSelection = Boolean(selected) && (!requiresTarget || (targetId !== null && selected.targetIds.includes(targetId)));
   function choose(action: typeof actions[number]) {
     setSelectedId(action.legalActionId); setTargetId(null); setReviewing(false);
