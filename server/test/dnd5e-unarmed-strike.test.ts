@@ -29,6 +29,6 @@ describe("SRD 5.1 unarmed strike", () => {
 
   it("advertises the unarmed extension through the attacks capability", () => {
     const attacks = DND_5E_RULESET_DESCRIPTOR.capabilities?.find(capability => capability.id === "attacks");
-    expect(attacks).toEqual({ id: "attacks", version: "1.1.0", status: "supported" });
+    expect(attacks).toEqual({ id: "attacks", version: "1.5.0", status: "supported" });
   });
 });

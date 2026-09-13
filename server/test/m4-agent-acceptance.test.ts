@@ -135,10 +135,12 @@ function dependencies(baseUrl: string, now = () => new Date(AT)): AdventureAgent
     model: "acceptance-fake", requestTimeoutSeconds: 2 }), getHarness: async () => defaultHarnessSettings(), now };
 }
 
+const wireTool = (name: string) => name.replace(/[^a-zA-Z0-9_-]/g, "_");
+
 function attributeSelector(value: number): ProviderSelector {
   return (request) => {
-    const tool = request.tools.find((candidate: any) => candidate.function.name === "actor_attribute.set").function;
-    return { name: "actor_attribute.set", arguments: {
+    const tool = request.tools.find((candidate: any) => candidate.function.name === wireTool("actor_attribute.set")).function;
+    return { name: wireTool("actor_attribute.set"), arguments: {
       attributeCandidateId: tool.parameters.properties.attributeCandidateId.enum[0],
       attributeCandidateDigest: tool.parameters.properties.attributeCandidateDigest.enum[0], value,
     }};
@@ -189,7 +191,9 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(narrationData).toEqual({
       mandatorySessionZeroSafetyPolicy: { hardLimits: [], veils: [], pvpPolicy: "explicit-consent",
         romancePolicy: "fade-to-black", lethalityPolicy: "consent-required", paused: false, revision: 1 },
-      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [], acceptedPublicPreparation: [] },
+      publicCampaignContext: { summary: [], recap: [], cast: [], world: [], quests: [], canon: [], acceptedPublicPreparation: [],
+        historicalRecall: { version: "recall-v1", coverage: "bounded-records-active-timeline", scan: "direct-sql-unbounded",
+          incomplete: false, query: "set my might precisely", hits: [], scopeDigest: expect.any(String) } },
       verifiedReceiptFacts: [{ kind: "mechanic", event: { type: "actor_attribute_set", data: { valueBefore: expect.any(Number), valueAfter: 16 } } }],
     });
     await restarted.close();
@@ -217,7 +221,7 @@ describe("M4.2/M4.3 socket-to-restart acceptance", () => {
     expect(attacks).toHaveLength(2);
     const selected = attacks[1]!;
     snapshotRepo.close();
-    const provider = await fakeToolProvider(() => ({ name: "combat_action.execute", arguments: {
+    const provider = await fakeToolProvider(() => ({ name: wireTool("combat_action.execute"), arguments: {
       legalActionId: selected.legalActionId, legalActionDigest: selected.digest,
     }}));
     let app = buildApp({ campaignRepositoryFactory: () => createRepository({ clock: { now: () => new Date(AT) } }),

@@ -2,7 +2,7 @@
 
 Development persistence uses one current disposable schema with only the exact pre-grounding tactical-map upgrade to map v2 and the other narrowly recognized exact predecessor upgrades documented in Operations.
 
-This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 148 counted operations plus feature discovery.
+This is a compact delivery ledger. [ROADMAP.md](docs/ROADMAP.md) alone owns current milestone status and remaining scope; [handoff.md](handoff.md) owns the immediate next task. Development persistence uses one current disposable schema with narrowly recognized exact predecessor upgrades described in [Operations](docs/operations.md#data-directory-and-current-schema); validation failure rolls back, and all other unknown schemas reject without repair. The checked trusted-local RPG inventory has 149 counted operations plus feature discovery.
 
 ## Delivered
 

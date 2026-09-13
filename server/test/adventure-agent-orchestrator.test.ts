@@ -689,7 +689,7 @@ describe("bounded adventure orchestrator", () => {
      let wire:Record<string,unknown>|null=null;const providerServer=createServer((request,response)=>{let body="";request.on("data",chunk=>body+=String(chunk));request.on("end",()=>{
         const parsed=JSON.parse(body),narration=parsed.tools?.find((tool:any)=>tool.function.name==="submit_adventure_narration");if(!narration)wire=parsed;
         const call=narration?{id:"narration-call",type:"function",function:{name:"submit_adventure_narration",arguments:'{"narration":"The authoritative result is recorded."}'}}
-          :{id:"private-call",type:"function",function:{name:"actor_dice.roll",arguments:'{"expression":"1d20"}'}};response.writeHead(200,{"content-type":"application/json"});response.end(JSON.stringify({model:"fake",choices:[{message:{role:"assistant",content:null,tool_calls:[call]}}],usage:{prompt_tokens:2,completion_tokens:1,total_tokens:3}}));});});
+          :{id:"private-call",type:"function",function:{name:"actor_dice_roll",arguments:'{"expression":"1d20"}'}};response.writeHead(200,{"content-type":"application/json"});response.end(JSON.stringify({model:"fake",choices:[{message:{role:"assistant",content:null,tool_calls:[call]}}],usage:{prompt_tokens:2,completion_tokens:1,total_tokens:3}}));});});
     await new Promise<void>((resolve)=>providerServer.listen(0,"127.0.0.1",resolve));const port=(providerServer.address() as AddressInfo).port;
     const realDependencies:AdventureAgentDependencies={complete:completeWithProvider,getProvider:async()=>({...defaultProviderSettings(),baseUrl:`http://127.0.0.1:${port}/v1`,model:"fake",requestTimeoutSeconds:2}),getHarness:async()=>defaultHarnessSettings(),now:()=>new Date()};
     const app = buildApp({ campaignRepositoryFactory: () => createRepository(), adventureAgentDependencies: realDependencies });
@@ -706,7 +706,7 @@ describe("bounded adventure orchestrator", () => {
     for(const event of events)expect(JSON.stringify(event)).not.toMatch(/private-call|promptTokens|providerCalls|argumentsJson|executionBinding|local-owner/);
     expect(events.some((event)=>JSON.stringify(event).includes('"expression":"1d20"'))).toBe(false);
     expect((wire as any).parallel_tool_calls).toBe(false);
-    const planningTool=(wire as any).tools.find((tool:any)=>tool.function.name==="actor_dice.roll").function;
+    const planningTool=(wire as any).tools.find((tool:any)=>tool.function.name==="actor_dice_roll").function;
     expect(planningTool).toMatchObject({parameters:{additionalProperties:false}});expect(planningTool).not.toHaveProperty("strict");
     await app.close();await new Promise<void>((resolve)=>providerServer.close(()=>resolve()));
     const audit=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});

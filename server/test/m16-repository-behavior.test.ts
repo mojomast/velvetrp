@@ -12,6 +12,7 @@ const scores: CharacterBuilderAttributeScores = Object.fromEntries(
   ["might", "agility", "resolve", "insight", "presence", "craft"].map((key, index) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[index]]),
 ) as CharacterBuilderAttributeScores;
 const ability = { kind: "ability" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId, packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:ability:steady-strike" };
+const mend = { kind: "ability" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId, packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:ability:mending-light" };
 const spell = { kind: "spell" as const, packId: MECHANICS_STARTER_CATALOG.manifest.packId, packVersion: MECHANICS_STARTER_CATALOG.manifest.packVersion, definitionId: "velvet:mechanics:spell:sheltering-glow" };
 
 /** Use real finalized actors; only mutable combat state is seeded directly. */
@@ -76,8 +77,11 @@ describe("M1.6 repository behavior", () => {
     expect(initial!.slots).toContainEqual({slotId:"slot-1",level:1,current:1,max:1});
     expect(initial!.uses.every((state) => state.current>=0&&state.current<=state.max)).toBe(true);
     expect(initial!.legalNow).toHaveLength(initial!.known.length);
-    expect(initial!.legalCommands).toEqual([expect.objectContaining({powerRef:spell,targeting:"single",maxTargets:1,
-      validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"slot",slotId:"slot-1",amount:1}],concentration:true})]);
+    expect(initial!.legalCommands).toEqual([
+      expect.objectContaining({powerRef:mend,targeting:"single",maxTargets:1,
+        validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"ability-use",amount:1}],concentration:false,effectKinds:["healing"]}),
+      expect.objectContaining({powerRef:spell,targeting:"single",maxTargets:1,
+        validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"slot",slotId:"slot-1",amount:1}],concentration:true})]);
     const accessDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     for(const [principal,label] of [["powers-gm","GM"],["powers-controller","Controller"],["powers-observer","Observer"],["powers-unrelated","Unrelated"]])
       accessDb.prepare("INSERT INTO principals(id,display_name,is_local) VALUES(?,?,0)").run(principal,label);
@@ -183,7 +187,8 @@ describe("M1.6 repository behavior", () => {
     const used=f.repo.useActorPower("local-owner",f.source,{powerRef:spell,targetIds:[f.opponent],choices:[],expectedRevision:before.revision,idempotencyKey:"ally"});
     expect(used.resolution).toMatchObject({powerRef:spell,targetIds:[f.opponent],costs:[{kind:"slot",slotId:"slot-1",amount:1}]});
     expect(used.resolution.stateDeltas).toContainEqual(expect.objectContaining({kind:"effect-applied",actorId:f.opponent}));
-    const after=f.repo.getActorPowerSnapshot("local-owner",f.source)!;expect(after.revision).toBe(before.revision+1);expect(after.slots[0]!.current).toBe(0);expect(after.legalCommands).toEqual([]);f.repo.close();
+    const after=f.repo.getActorPowerSnapshot("local-owner",f.source)!;expect(after.revision).toBe(before.revision+1);expect(after.slots[0]!.current).toBe(0);expect(after.legalCommands).toEqual([expect.objectContaining({powerRef:mend,targeting:"single",maxTargets:1,
+      validTargets:[expect.objectContaining({actorId:f.opponent,label:"Briar"})],costs:[{kind:"ability-use",amount:1}],concentration:false,effectKinds:["healing"]})]);f.repo.close();
   });
 
   it("keeps instant modifier powers receipt-only without an active effect or state delta",()=>{

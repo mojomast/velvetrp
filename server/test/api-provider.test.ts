@@ -141,7 +141,7 @@ describe("provider api compatibility", () => {
     expect(insecure.statusCode).toBe(400);
     expect(insecure.json()).toEqual({
       error: "invalid baseUrl",
-      reason: "baseUrl must use https, or http only for loopback hosts (localhost, 127.x, ::1)",
+      reason: "baseUrl must use https, http loopback, or the exact authorized live-validation endpoint",
     });
 
     const referer = await app.inject({

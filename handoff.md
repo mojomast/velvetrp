@@ -4,7 +4,7 @@
 
 - Commit `2896613` is the pushed `main`/`origin/main` baseline. The committed tree contains the completed playability program plus the browser-playable client surfaces described below.
 - Persistence: one current disposable development schema; schema changes require deleting/recreating `velvet.sqlite` except for narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessors. Director upgrades also recognize exact review-authority/narration predecessors, preserving historical rows and cancelling pending planning/approval runs during the review-authority upgrade. The third SQL asset adds immutable adventure narration dispatch context; exact older director/map upgrades install it within their validated transaction when absent. Complete startup validation precedes commit and failure rolls back; every other unknown or partially upgraded schema rejects without repair.
-- HTTP: 148 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
+- HTTP: 149 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
 - Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
 
