@@ -150,6 +150,7 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
     temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),
     conditions: z.array(combatConditionPublicSchema).max(10).optional(),
+    markers: z.array(z.enum(["helped", "hidden"])).max(2).optional(),
     status: z.enum(["active", "unconscious", "stable", "dead", "defeated", "fled", "removed"]),
     deathSaves: z.object({ successes: z.number().int().min(0).max(3), failures: z.number().int().min(0).max(3) }).strict().optional(),
   }).strict(),
@@ -164,6 +165,7 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
     maximumHitPoints: z.number().int().min(1).max(1_000_000),
     temporaryHitPoints: z.number().int().min(0).max(1_000_000).optional(),
     conditions: z.array(combatConditionPublicSchema).max(10).optional(),
+    markers: z.array(z.enum(["helped", "hidden"])).max(2).optional(),
     status: z.enum(["active", "unconscious", "stable", "dead", "defeated", "fled", "removed"]),
   }).strict(),
 ]);

@@ -63,6 +63,7 @@ describe("SRD 5.1 help and hide markers", () => {
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
     expect(db.prepare("SELECT source_combatant_id FROM combat_markers_v64 WHERE encounter_id=? AND combatant_id=? AND marker='helped'").get(current.combatId, allyCombatant)).toEqual({ source_combatant_id: helperCombatant });
     db.close();
+    expect(repo.getCombatState(OWNER, current.combatId)!.combatants.find((entry: any) => entry.combatantId === allyCombatant)).toMatchObject({ markers: ["helped"] });
     current = advanceTo(repo, current, allyCombatant);
     const attack = current.legalActions.find((action: any) => action.kind === "attack")!;
     current = repo.resolveCombatAction(OWNER, current.combatId, { legalActionId: attack.legalActionId, targetIds: [enemyCombatant], choices: [] as [], expectedRevision: current.revision, idempotencyKey: "helped-attack" }).combat;

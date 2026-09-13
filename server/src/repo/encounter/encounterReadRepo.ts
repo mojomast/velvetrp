@@ -141,6 +141,8 @@ export function createEncounterReadRepository(
     ORDER BY condition,source_combatant_id`).all(encounterId, combatantId, round).map((row: any) => ({
       condition: row.condition, expiresAtRound: row.expires_at_round,
     }));
+  const combatMarkers = (encounterId: string, combatantId: string): Array<"helped" | "hidden"> => db.prepare(`SELECT marker
+    FROM combat_markers_v64 WHERE encounter_id=? AND combatant_id=? ORDER BY marker`).all(encounterId, combatantId).map((row: any) => row.marker);
 
   const listEncounters = (principal: string, campaignId: string): EncounterLifecycleSnapshot[] | null => {
     if (!member(principal, campaignId)) return null;
@@ -232,12 +234,14 @@ export function createEncounterReadRepository(
         const identity = publicCombatant(row);
         const displayName = identity.kind === "actor" ? actorDisplayName(encounter.campaign_id, identity.actorId)
           : enemyDisplayName(identity.template);
+        const markers = dndCombat ? combatMarkers(combatId, row.combatant_id) : [];
         return {
           ...identity,
           ...(displayName ? { displayName } : {}),
           hitPoints: row.hit_points,
           maximumHitPoints: row.maximum_hit_points,
           ...(dndCombat ? { temporaryHitPoints: row.temporary_hit_points, conditions: combatConditions(combatId, row.combatant_id, encounter.round_number) } : {}),
+          ...(markers.length ? { markers } : {}),
           status: row.status,
           ...(row.actor_id !== null && row.survival_successes !== null ? { deathSaves: { successes: row.survival_successes, failures: row.survival_failures } } : {}),
         };
