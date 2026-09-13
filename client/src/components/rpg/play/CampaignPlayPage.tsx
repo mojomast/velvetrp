@@ -16,6 +16,7 @@ import { createClientId } from "../../../utils/clientId";
 import { AtlasDrawer, type AtlasTool } from "./PlaySurface";
 import { campaignDestinations, type CampaignDestination } from "../shell/CampaignShell";
 import { CommandCenter } from "./CommandCenter";
+import { VoiceControls } from "../../../voice/VoiceControls";
 import { CampaignQuickPanel } from "./CampaignQuickPanel";
 import { useCampaignWorkbenchPreferences } from "./campaignWorkbenchPreferences";
 import { PlayHelp } from "./PlayHelp";
@@ -512,6 +513,8 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
     {actionable && streamRef.current && <div className="atlas-turn-tools"><button type="button" onClick={cancelLiveDelivery}>Stop receiving live updates</button></div>}
+    <VoiceControls campaignId={campaignId} contextKey={JSON.stringify([sessionId, authorizationGeneration, authorizationCanAct, phase,
+      sessionLocked, roomToolsLocked, bootstrap.session.active, turn?.turn.turnId ?? "", turn?.turn.state ?? ""])} />
     <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
       declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />

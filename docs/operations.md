@@ -68,6 +68,11 @@ Velvet does not auto-load `.env`. Export variables in the shell or configure the
 | `OPENAI_MODEL` | server-runtime | `gpt-4o-mini` | Model fallback. |
 | `OPENAI_API_KEY` | server-runtime | Blank | Key fallback. Keep empty in examples. |
 | `FEATURE_VOICE` | server-runtime | Disabled | Voice discovery flag; exact lowercase `true` only. |
+| `VELVET_VOICE_ENABLED` | server-runtime | Disabled | Exact `true` opts into optional campaign narration playback; separate from discovery-only `FEATURE_VOICE`. Requires campaign/mechanics and configured voices. |
+| `OMNIVOICE_BASE_URL` | server-runtime | Unset | Operator-configured Studio HTTP(S) root origin, directly reachable or through a private tunnel; server-side only. |
+| `VELVET_VOICE_DEFINITIONS` | server-runtime | `[]` | JSON array of approved synthetic or locked-profile voice definitions; see [voice deployment](omnivoice-support-plan.md). Empty/invalid configuration leaves voice disabled. |
+| `VELVET_VOICE_TIMEOUT_MS` | server-runtime | `300000` | Per-utterance synthesis deadline, bounded to 1000–600000 ms; never retries game commands. |
+| `VELVET_VOICE_ALLOWED_ORIGINS` | server-runtime | Unset | Optional comma-separated trusted browser origins for a Host-rewriting development proxy; no wildcard or added Studio CORS. |
 | `FEATURE_IMAGES` | server-runtime | Disabled | Image discovery flag; exact lowercase `true` only. |
 | `FEATURE_RPG_CAMPAIGN` | server-runtime | Disabled | Base RPG campaign/API rollout flag. |
 | `FEATURE_RPG_MECHANICS` | server-runtime | Disabled | Mechanics routes require this and campaign. |

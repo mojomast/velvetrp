@@ -386,3 +386,17 @@ describe("CampaignPlayPage", () => {
     expect(unavailable).not.toHaveBeenCalled();
   });
 });
+
+it("keeps optional voice beside the composer without submitting gameplay", async () => {
+  const client = api();
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response(JSON.stringify({ enabled: true, voices: [], speakers: [], assignments: [], sources: [] })))));
+  try {
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    const voice = await screen.findByRole("region", { name: "Voice playback" });
+    expect(voice.closest(".campaign-play-center")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cast & Voices" }));
+    expect(screen.getByLabelText("What do you do?")).toBeTruthy();
+    expect(client.streamAdventureTurn).not.toHaveBeenCalled();
+    expect(client.dm.commandCampaignDmBeat).not.toHaveBeenCalled();
+  } finally { cleanup(); vi.unstubAllGlobals(); }
+});
