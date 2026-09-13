@@ -1,7 +1,12 @@
 import type {
-  ResourceCost, ResourceCostPlan, ResourcePool, SpellCostInput, SpellCostPlan,
+  ResourceCost, ResourceCostPlan, ResourcePool, RulesetCapability, SpellCostInput, SpellCostPlan,
 } from "../types.js";
 import { frozenList, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_RESOURCE_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "resources", version: "1.0.0", status: "supported" as const }),
+  Object.freeze({ id: "spell-costs", version: "1.2.0", status: "partial" as const }),
+]);
 
 export function planDnd5eResourceCosts(pools: readonly ResourcePool[], costs: readonly ResourceCost[]): ResourceCostPlan {
   const reasons: string[] = [];

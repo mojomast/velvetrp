@@ -1,8 +1,13 @@
 import type {
   AbilityId, CheckInput, CheckResolution, D20RollEvidence, D20TestInput,
-  D20TestResolution, RollMode, SkillId, TestKind, TestResolution,
+  D20TestResolution, RollMode, RulesetCapability, SkillId, TestKind, TestResolution,
 } from "../types.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_D20_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "checks", version: "1.0.0", status: "supported" as const }),
+  Object.freeze({ id: "passive-checks", version: "1.0.0", status: "supported" as const }),
+]);
 
 export function dnd5eAbilityModifier(score: number): number {
   requireInteger(score, "ability score");

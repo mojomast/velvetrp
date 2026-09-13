@@ -1,7 +1,11 @@
 import type {
-  DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution,
+  DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, RulesetCapability,
 } from "../types.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_DAMAGE_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "damage", version: "1.2.0", status: "partial" as const }),
+]);
 
 export function resolveDnd5eDamageRoll(input: DamageRollInput): DamageRollResolution {
   if (input.rolls.length !== input.dice.length) throw new RangeError("damage roll groups must match dice terms");

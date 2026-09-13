@@ -1,8 +1,15 @@
 import type {
-  ConcentrationPlan, ConditionId, ConditionStatePlan, D20TestInput, ExhaustionEffects, LegalActionPlan,
+  ConcentrationPlan, ConditionId, ConditionStatePlan, D20TestInput, ExhaustionEffects, LegalActionPlan, RulesetCapability,
 } from "../types.js";
 import { resolveDnd5eAbilityTest } from "./d20.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_CONDITION_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "concentration", version: "1.0.0", status: "partial" as const }),
+  Object.freeze({ id: "conditions", version: "1.1.0", status: "partial" as const }),
+  Object.freeze({ id: "exhaustion", version: "1.0.0", status: "partial" as const }),
+  Object.freeze({ id: "combat-markers", version: "1.0.0", status: "partial" as const }),
+]);
 
 /**
  * SRD 5.1 exhaustion: level 1 disadvantage on ability checks; level 2 speed

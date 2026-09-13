@@ -1,6 +1,10 @@
-import type { RecoveryPlan, RestInput } from "../types.js";
+import type { RecoveryPlan, RestInput, RulesetCapability } from "../types.js";
 import { dnd5eProficiencyBonus } from "./d20.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_REST_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "rests", version: "1.1.0", status: "partial" as const }),
+]);
 
 export function planDnd5eRest(input: RestInput): RecoveryPlan {
   requireNonNegativeInteger(input.currentHitPoints, "current hit points");

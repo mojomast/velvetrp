@@ -1,5 +1,6 @@
 import type { RulesetDescriptor, RulesetMechanics, RulesetModule } from "../types.js";
 import { resolveDnd5eAttack } from "./attack.js";
+import { DND_5E_RULESET_CAPABILITIES } from "./capabilities.js";
 import { planDnd5eConcentrationDamage, planDnd5eCondition } from "./conditions.js";
 import { planDnd5eDamageAdjustment, resolveDnd5eDamageRoll } from "./damage.js";
 import {
@@ -21,18 +22,13 @@ const difficultyClasses = Object.freeze([
   Object.freeze({ id: "very-hard", name: "Very Hard", value: 25 }), Object.freeze({ id: "nearly-impossible", name: "Nearly Impossible", value: 30 }),
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
-const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values", "exhaustion", "combat-markers"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.5.0", conditions: "1.1.0", damage: "1.2.0", movement: "1.4.0", rests: "1.1.0", "spell-costs": "1.2.0" });
-const capabilities = Object.freeze([
-  "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "exhaustion", "combat-markers", "resources", "spell-costs", "derived-values", "legal-action-plans",
-].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
 
 export const DND_5E_RULESET_DESCRIPTOR: RulesetDescriptor = Object.freeze({
   id: "dnd-5e", version: "1.0.0", name: "SRD 5.1 (2014 Fifth Edition) Development Module",
   scope: "Pure deterministic core mechanics with explicit evidence and state-change plans; not complete D&D rules support.",
   source: Object.freeze({ title: "System Reference Document 5.1", publisher: "Wizards of the Coast LLC", edition: "2014 fifth edition", url: "https://dnd.wizards.com/resources/systems-reference-document" }),
   license: Object.freeze({ name: "Creative Commons Attribution 4.0 International", identifier: "CC-BY-4.0", url: "https://creativecommons.org/licenses/by/4.0/legalcode", attribution: "This work includes material taken from the System Reference Document 5.1 (SRD 5.1) by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under CC-BY-4.0, available at https://creativecommons.org/licenses/by/4.0/legalcode." }),
-  supportedMechanics, capabilities, abilities, difficultyClasses,
+  supportedMechanics, capabilities: DND_5E_RULESET_CAPABILITIES, abilities, difficultyClasses,
 });
 
 const DND_5E_MECHANICS: RulesetMechanics = Object.freeze({

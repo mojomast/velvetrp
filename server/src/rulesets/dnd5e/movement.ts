@@ -1,8 +1,13 @@
 import type {
-  EncumbranceInput, EncumbrancePlan, InitiativeEntry, InitiativeResult, MovementInput, MovementPlan,
+  EncumbranceInput, EncumbrancePlan, InitiativeEntry, InitiativeResult, MovementInput, MovementPlan, RulesetCapability,
 } from "../types.js";
 import { dnd5eAbilityModifier } from "./d20.js";
 import { frozenList, requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_MOVEMENT_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "initiative", version: "1.0.0", status: "supported" as const }),
+  Object.freeze({ id: "movement", version: "1.4.0", status: "partial" as const }),
+]);
 
 export function resolveDnd5eInitiative(entries: readonly InitiativeEntry[]): readonly InitiativeResult[] {
   const seen = new Set<string>();

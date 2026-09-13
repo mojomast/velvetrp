@@ -1,6 +1,10 @@
-import type { AbilityId, CharacterDerivedInput, CharacterDerivedValues } from "../types.js";
+import type { AbilityId, CharacterDerivedInput, CharacterDerivedValues, RulesetCapability } from "../types.js";
 import { dnd5eAbilityModifier, dnd5eProficiencyBonus } from "./d20.js";
 import { requireInteger, requireNonNegativeInteger } from "./internal.js";
+
+export const DND_5E_DERIVED_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "derived-values", version: "1.0.0", status: "partial" as const }),
+]);
 
 export function deriveDnd5eCharacter(input: CharacterDerivedInput): CharacterDerivedValues {
   const proficiencyBonus = dnd5eProficiencyBonus(input.level);

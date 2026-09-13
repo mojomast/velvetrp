@@ -1,9 +1,13 @@
 import type {
-  AttackConditionInput, AttackConditionPlan, AttackInput, AttackResolution,
+  AttackConditionInput, AttackConditionPlan, AttackInput, AttackResolution, RulesetCapability,
 } from "../types.js";
 import { deriveDnd5eExhaustionEffects } from "./conditions.js";
 import { dnd5eRollMode, resolveDnd5eD20Test } from "./d20.js";
 import { requireInteger } from "./internal.js";
+
+export const DND_5E_ATTACK_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
+  Object.freeze({ id: "attacks", version: "1.5.0", status: "supported" as const }),
+]);
 
 export function resolveDnd5eAttack(input: AttackInput): AttackResolution {
   requireInteger(input.armorClass, "armor class");
