@@ -43,6 +43,7 @@ import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
 import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
+import { DND_5E_UNARMED_STRIKE } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, attackDisadvantageConditions, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
@@ -270,11 +271,12 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             .get(encounter.campaign_id,current.actor_id) as {sheet_id:string;level:number;derived_json:string}|undefined;
           if(!sheet)throw new EncounterConflictError("SRD attacker sheet is incomplete");
           let equipment:ReturnType<typeof resolveSrdEquipment>;
-          try{equipment=resolveSrdEquipment(db,encounter.campaign_id,current.actor_id);}catch{throw new EncounterConflictError("SRD weapon is unavailable");}
+          try{equipment=resolveSrdEquipment(db,encounter.campaign_id,current.actor_id);}catch{throw new EncounterConflictError("SRD equipment is unavailable");}
           const weapon=equipment.weapon;
-          if(!weapon)throw new EncounterConflictError("SRD equipped weapon is unavailable");
-           const thrown = weapon.properties.some((value) => value.property === "thrown");
-           const ranged = !thrown && weapon.properties.some((value) => value.property === "ammunition");
+          // SRD 5.1: every creature is proficient with unarmed strikes and always has one.
+          const unarmed=weapon===null;
+           const thrown = !unarmed && weapon.properties.some((value) => value.property === "thrown");
+           const ranged = !unarmed && !thrown && weapon.properties.some((value) => value.property === "ammunition");
            const thrownCandidate = thrown ? buildThrownCombatCandidate(db, encounter.campaign_id, combatId, current.actor_id, [target.combatant_id]) : null;
            const rangedCandidate = ranged ? buildRangedCombatCandidate(db, encounter.campaign_id, combatId, current.actor_id, [target.combatant_id]) : null;
            if (thrown && (!thrownCandidate || !thrownCandidate.targetIds.includes(target.combatant_id)))
@@ -282,7 +284,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
            if (ranged && (!rangedCandidate || !rangedCandidate.targetIds.includes(target.combatant_id)))
              throw new EncounterConflictError("ranged attack is unavailable at this position");
           const ability=db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
-            .get(encounter.campaign_id,sheet.sheet_id,weapon.attackAbility) as {value:number}|undefined;
+            .get(encounter.campaign_id,sheet.sheet_id,unarmed?DND_5E_UNARMED_STRIKE.attackAbility:weapon.attackAbility) as {value:number}|undefined;
           if(!ability)throw new EncounterConflictError("SRD attacker sheet is incomplete");
           let armorClass:number;
           if(target.actor_id){try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}
@@ -301,12 +303,12 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
               || (rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0));
            const attackRoll=disadvantage ? Math.min(firstRoll,deps.rng.integer(1,21)) : firstRoll;
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
-             proficiencyBonus:weapon.proficient?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
-          const die=weapon.damage.die;
+             proficiencyBonus:(unarmed?DND_5E_UNARMED_STRIKE.proficient:weapon.proficient)?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
+          const die=unarmed?DND_5E_UNARMED_STRIKE.damageDie:weapon.damage.die;
           const damageRolls=attack.hit?Array.from({length:die.count*(attack.critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
           const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
-            modifier:binding.module.abilityModifier(ability.value),critical:attack.critical}).total:0;
+            modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical:attack.critical}).total:0;
             let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
            if (rangedCandidate?.ammunitionResourceId) {
              const ammo=db.prepare("SELECT current_ammunition FROM rpg_actor_resource_ammunition_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?")
@@ -329,7 +331,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
               if (changed.changes !== 1) throw new EncounterConflictError("throwable item changed before attack");
             }
            const absorbed=absorbDamage(db,combatId,target.combatant_id,damage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
-          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:weapon.damage.type,requested:damage,
+          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType:unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type,requested:damage,
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:damage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,

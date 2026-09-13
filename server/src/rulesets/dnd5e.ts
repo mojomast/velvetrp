@@ -75,6 +75,21 @@ export function resolveDnd5eD20Test(input: D20TestInput): D20TestResolution {
   return Object.freeze({ evidence, abilityModifier, proficiencyBonus, proficiencyMultiplier, appliedProficiency, flatBonus, total, dc: input.dc, success: total >= input.dc });
 }
 
+/**
+ * SRD 5.1 unarmed strike: a melee attack with which every creature is
+ * proficient, dealing 1 + Strength modifier bludgeoning damage. A zero-count
+ * die keeps the damage an explicit flat bonus while reusing the shared roll
+ * and critical-hit machinery.
+ */
+export const DND_5E_UNARMED_STRIKE = Object.freeze({
+  attackAbility: "strength" as const,
+  attackType: "melee" as const,
+  damageType: "bludgeoning" as const,
+  damageDie: Object.freeze({ count: 0, sides: 4 }),
+  flatDamageBonus: 1,
+  proficient: true as const,
+});
+
 export const DND_5E_SKILL_ABILITIES: Readonly<Record<SkillId, AbilityId>> = Object.freeze({
   acrobatics: "dexterity", "animal-handling": "wisdom", arcana: "intelligence", athletics: "strength",
   deception: "charisma", history: "intelligence", insight: "wisdom", intimidation: "charisma",
@@ -296,9 +311,10 @@ const difficultyClasses = Object.freeze([
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
 const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values"]);
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0" });
 const capabilities = Object.freeze([
   "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "resources", "spell-costs", "derived-values", "legal-action-plans",
-].map((id) => Object.freeze({ id, version: "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
+].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
 
 export const DND_5E_RULESET_DESCRIPTOR: RulesetDescriptor = Object.freeze({
   id: "dnd-5e", version: "1.0.0", name: "SRD 5.1 (2014 Fifth Edition) Development Module",

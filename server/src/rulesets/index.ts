@@ -2,6 +2,7 @@ export {
   DND_5E_RULESET,
   DND_5E_RULESET_DESCRIPTOR,
   DND_5E_SKILL_ABILITIES,
+  DND_5E_UNARMED_STRIKE,
   deriveDnd5eCharacter,
   dnd5eAbilityModifier,
   dnd5ePassiveCheck,

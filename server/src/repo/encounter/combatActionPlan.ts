@@ -273,18 +273,22 @@ export function buildCombatActionPlans(
   if (ruleset.rulesetId === "dnd-5e" && current.actor_id) {
     try {
       const equipment = resolveSrdEquipment(db, campaignId, current.actor_id);
-      attackSupported = equipment.weapon !== null;
-      if (equipment.weapon?.properties.some((value) => value.property === "thrown")) {
+      const weapon = equipment.weapon;
+      // SRD 5.1: every creature is proficient with unarmed strikes and always
+      // has one, so a missing equipped weapon no longer removes the attack.
+      attackSupported = true;
+      if (weapon?.properties.some((value) => value.property === "thrown")) {
         const thrown = buildThrownCombatCandidate(db, campaignId, encounterId, current.actor_id, targets);
         attackSupported = thrown !== null;
         if (thrown) { attackId = thrown.attackId; attackType = "thrown"; targetEvidence = thrown.targetEvidence; }
-      } else if (equipment.weapon?.properties.some((value) => value.property === "ammunition")) {
+      } else if (weapon?.properties.some((value) => value.property === "ammunition")) {
         const ranged = buildRangedCombatCandidate(db, campaignId, encounterId, current.actor_id, targets);
         attackSupported = ranged !== null;
         if (ranged) { attackId = ranged.attackId; attackType = "ranged"; targetEvidence = ranged.targetEvidence; }
       }
-      if (attackType === "melee") attackId = `attack:basic:${createHash("sha256").update(JSON.stringify({ actorId: current.actor_id,
-        revision: equipment.revision, weapon: equipment.weapon })).digest("hex").slice(0, 48)}`;
+      if (attackType === "melee") attackId = weapon
+        ? `attack:basic:${createHash("sha256").update(JSON.stringify({ actorId: current.actor_id, revision: equipment.revision, weapon })).digest("hex").slice(0, 48)}`
+        : "attack:unarmed";
     } catch { attackSupported = false; }
   }
   const attackTargets = !attackSupported ? [] : (current.combatant_kind === "enemy" ? targets.slice(0, 1) : targets)
