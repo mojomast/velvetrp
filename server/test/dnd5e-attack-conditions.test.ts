@@ -52,8 +52,8 @@ describe("SRD 5.1 condition attack effects", () => {
     expect(plan([], ["restrained"], "melee")).toMatchObject({ autoCritical: false });
   });
 
-  it("advertises the expanded condition effects as conditions@1.1.0", () => {
+  it("advertises the expanded condition effects as conditions@1.2.0", () => {
     const conditions = DND_5E_RULESET_DESCRIPTOR.capabilities?.find(capability => capability.id === "conditions");
-    expect(conditions).toEqual({ id: "conditions", version: "1.1.0", status: "partial" });
+    expect(conditions).toEqual({ id: "conditions", version: "1.2.0", status: "partial" });
   });
 });

@@ -3,7 +3,7 @@ import { deriveDnd5eExhaustionEffects, planDnd5eEncumbrance } from "../../../rul
 import { resolveSrdEquipment, srdEncumbrance } from "../../srdEquipmentRuntime.js";
 import { resolveCampaignRuleset } from "../../../rulesets/campaignBinding.js";
 import { EncounterConflictError } from "../encounterErrors.js";
-import { conditionsFor, readActorExhaustion } from "../combatConditionRuntime.js";
+import { conditionsFor, movementDenialConditions, readActorExhaustion } from "../combatConditionRuntime.js";
 import { clearHelpedFromSource } from "../combatMarkerRuntime.js";
 import type { PersistedCombatTurnEconomy } from "./types.js";
 
@@ -48,7 +48,7 @@ function movementAllowance(db: DatabaseDriver.Database, campaignId: string, comb
     }
     const encounter = db.prepare("SELECT encounter_id,round_number FROM encounter WHERE current_turn_combatant_id=? AND campaign_id=? AND status='active'")
       .get(combatantId, campaignId) as { encounter_id: string; round_number: number } | undefined;
-    return encounter && (["grappled", "restrained", "stunned", "unconscious"].some((condition) =>
+    return encounter && (Array.from(movementDenialConditions).some((condition) =>
       conditionsFor(db, encounter.encounter_id, combatantId, encounter.round_number).has(condition))) ? 0 : allowance;
   } catch { return 0; }
 }

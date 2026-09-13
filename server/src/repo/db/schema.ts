@@ -17,6 +17,15 @@ export const TURN_ECONOMY_GUARD_PREDECESSOR_SQL = `CREATE TRIGGER combat_turn_ec
       BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END`;
 
 /**
+ * The current combat-condition CHECK widened to the full fifteen-name SRD 5.1
+ * vocabulary, and the exact predecessor that predates the four added names.
+ */
+export const COMBAT_CONDITIONS_CHECK =
+  "CHECK(condition IN ('blinded','charmed','deafened','frightened','grappled','incapacitated','invisible','paralyzed','petrified','poisoned','prone','restrained','stunned','unconscious'))";
+export const COMBAT_CONDITIONS_PREDECESSOR_CHECK =
+  "CHECK(condition IN ('blinded','charmed','frightened','grappled','incapacitated','poisoned','prone','restrained','stunned','unconscious'))";
+
+/**
  * The exact campaign-deletion cleanup trigger published before it also released
  * the pinned catalog definitions that restrict deletion. A database carrying
  * this trigger is upgraded in place.
@@ -182,6 +191,32 @@ export function upgradeCombatMarkerSchema(
   return true;
 }
 
+/** Upgrades only the complete schema whose combat condition CHECK predates the four added SRD conditions. */
+export function upgradeCombatConditionsSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const conditionsTable = "combat_conditions_v62";
+  const predecessor = expected.map((object) => object.name === conditionsTable && object.type === "table"
+    ? { ...object, sql: object.sql.replace(COMBAT_CONDITIONS_CHECK, COMBAT_CONDITIONS_PREDECESSOR_CHECK) }
+    : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("combat conditions upgrade requires an independent transaction");
+
+  const definition = expected.find((object) => object.type === "table" && object.name === conditionsTable)!;
+  db.transaction(() => {
+    db.exec(`CREATE TEMP TABLE ${conditionsTable}_upgrade AS SELECT * FROM ${conditionsTable}`);
+    db.exec(`DROP TABLE ${conditionsTable}`);
+    db.exec(definition.sql);
+    db.exec(`INSERT INTO ${conditionsTable} SELECT * FROM ${conditionsTable}_upgrade`);
+    db.exec(`DROP TABLE ${conditionsTable}_upgrade`);
+    validate();
+  }).immediate();
+  return true;
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -242,7 +277,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

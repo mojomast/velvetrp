@@ -3,9 +3,14 @@ import { createHash } from "node:crypto";
 import { resourceIdSchema } from "@velvet/contracts";
 import type { IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 
-export const actionBlockingConditions = new Set(["incapacitated", "stunned", "unconscious"]);
-export const attackDisadvantageConditions = new Set(["blinded", "poisoned", "prone", "restrained"]);
-const conditionNames = new Set(["blinded", "charmed", "frightened", "grappled", "incapacitated", "poisoned", "prone", "restrained", "stunned", "unconscious"]);
+export const actionBlockingConditions = new Set(["incapacitated", "paralyzed", "petrified", "stunned", "unconscious"]);
+/** Paralyzed, petrified, stunned, and unconscious creatures cannot move; grappled and restrained creatures have speed 0. */
+export const movementDenialConditions = new Set(["grappled", "paralyzed", "petrified", "restrained", "stunned", "unconscious"]);
+export const attackDisadvantageConditions = new Set(["blinded", "frightened", "poisoned", "prone", "restrained"]);
+export const saveAutoFailConditions = new Set(["paralyzed", "petrified"]);
+const conditionNames = new Set(["blinded", "charmed", "deafened", "frightened", "grappled", "incapacitated", "invisible", "paralyzed", "petrified", "poisoned", "prone", "restrained", "stunned", "unconscious"]);
+/** The SRD 5.1 condition vocabulary persisted in combat_conditions_v62. */
+export const combatConditionNames: ReadonlySet<string> = conditionNames;
 
 /** This internal-only primitive requires the already-created encounter command that caused the condition. */
 export function applyCombatCondition(

@@ -100,9 +100,10 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
              const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
              const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
              const attackerInMelee=(ranged||thrown)&&hostileWithinFiveFeet(db,combatId,current.combatant_id,current.team);
+             const targetConditions=conditionsFor(db,combatId,target.combatant_id,encounter.round_number);
              const attackPlan=planDnd5eAttackConditions({
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
-               target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
+               target:[...targetConditions] as ConditionId[],
                kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
                longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
                attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0,
@@ -120,7 +121,9 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
             modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical}).total:0;
           const damageType=unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type;
           const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,damageType,at);
-          const adjustedDamage=adjustedCombatDamage(damage,adjustment);
+          // SRD 5.1 petrified: resistance to all damage.
+          const conditionedAdjustment=targetConditions.has("petrified")&&adjustment==="none"?"resistance":adjustment;
+          const adjustedDamage=adjustedCombatDamage(damage,conditionedAdjustment);
             let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
            if (rangedCandidate?.ammunitionResourceId) {
              const ammo=db.prepare("SELECT current_ammunition FROM rpg_actor_resource_ammunition_v25 WHERE campaign_id=? AND actor_id=? AND resource_name=?")
@@ -143,7 +146,7 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
               if (changed.changes !== 1) throw new EncounterConflictError("throwable item changed before attack");
             }
            const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
-          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage,adjustment,
+          outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage,adjustment:conditionedAdjustment,
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,

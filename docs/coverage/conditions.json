@@ -12,7 +12,7 @@
   "capabilityEvidence": [
     {
       "id": "conditions",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "descriptorStatus": "partial"
     },
     {
@@ -24,10 +24,14 @@
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e.ts#planDnd5eCondition",
     "server/src/rulesets/dnd5e.ts#planDnd5eAttackConditions",
+    "server/src/rulesets/dnd5e.ts#deriveDnd5eConditionEffects",
+    "server/src/rulesets/dnd5e.ts#deriveDnd5eFrightenedEffects",
     "server/src/rulesets/dnd5e.ts#deriveDnd5eExhaustionEffects",
+    "server/src/repo/encounter/combatConditionRuntime.ts",
     "server/test/dnd5e-plans.test.ts",
     "server/test/dnd5e-attack-conditions.test.ts",
-    "server/test/dnd5e-exhaustion.test.ts"
+    "server/test/dnd5e-exhaustion.test.ts",
+    "server/test/dnd5e-condition-engine.test.ts"
   ],
   "apiEvidence": [
     "POST /api/rpg/v1/actors/:actorId/effect-commands"

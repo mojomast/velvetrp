@@ -12,9 +12,13 @@
   "capabilityEvidence": [],
   "runtimeEvidence": [
     "server/src/content/srdStarterCatalog.ts",
+    "server/src/rulesets/dnd5e/monsters.ts",
     "server/src/repo/encounter/monsterTurnPlanner.ts",
+    "server/src/repo/encounter/monster/content.ts",
+    "server/src/repo/encounter/monster/execute.ts",
     "server/src/repo/encounter/encounterWriteRepo.ts",
     "server/test/monster-turn-planner.test.ts",
+    "server/test/dnd5e-monster-actions.test.ts",
     "server/test/dnd-turn-economy-repository.test.ts",
     "docs/srd-5.1-coverage.md#unsupported-srd-areas"
   ],

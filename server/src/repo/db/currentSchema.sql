@@ -2642,7 +2642,7 @@ CREATE TABLE combat_temporary_hit_points_v62 (
       FOREIGN KEY(encounter_id,source_command_id) REFERENCES combat_commands_v27(encounter_id,command_id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
     );
 CREATE TABLE combat_conditions_v62 (
-      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL, condition TEXT NOT NULL CHECK(condition IN ('blinded','charmed','frightened','grappled','incapacitated','poisoned','prone','restrained','stunned','unconscious')),
+      encounter_id TEXT NOT NULL, combatant_id TEXT NOT NULL, condition TEXT NOT NULL CHECK(condition IN ('blinded','charmed','deafened','frightened','grappled','incapacitated','invisible','paralyzed','petrified','poisoned','prone','restrained','stunned','unconscious')),
       source_combatant_id TEXT NOT NULL, source_command_id TEXT NOT NULL,
       expires_at_round INTEGER CHECK(typeof(expires_at_round)='integer' AND expires_at_round BETWEEN 1 AND 1000000),
       applied_at TEXT NOT NULL CHECK(strftime('%Y-%m-%dT%H:%M:%fZ',applied_at)=applied_at),

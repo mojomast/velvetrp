@@ -1,7 +1,7 @@
 {
   "id": "adventuring-environment",
   "title": "Travel, environment, hazards, and downtime",
-  "status": "unsupported",
+  "status": "partial",
   "complete": false,
   "sourceSections": [
     {
@@ -11,7 +11,19 @@
   ],
   "capabilityEvidence": [],
   "runtimeEvidence": [
-    "docs/srd-5.1-coverage.md#unsupported-srd-areas"
+    "server/src/rulesets/dnd5e/adventuring.ts",
+    "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eTravel",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eForcedMarch",
+    "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eSuffocation",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eAdventuringFall",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eHazardExposure",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eFoodAndWater",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5ePoisonExposure",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eDiseaseInterval",
+    "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eLifestyleExpense",
+    "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eDowntime",
+    "server/src/repo/adventure/adventuringDayRuntime.ts#planDnd5eAdventureDay",
+    "server/test/dnd5e-adventuring.test.ts"
   ],
   "apiEvidence": []
 }
