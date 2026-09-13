@@ -1,0 +1,32 @@
+{
+  "id": "damage",
+  "title": "Damage rolls and damage adjustments",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Combat:Damage and Healing",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=96"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "damage",
+      "version": "1.2.0",
+      "descriptorStatus": "partial"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#resolveDnd5eDamageRoll",
+    "server/src/rulesets/dnd5e.ts#planDnd5eDamageAdjustment",
+    "server/src/repo/encounter/damageAdjustment.ts",
+    "server/src/repo/encounter/combatConditionRuntime.ts",
+    "server/src/repo/encounter/combatPowerRuntime.ts",
+    "server/test/dnd5e-combat.test.ts",
+    "server/test/combat-damage-adjustment.test.ts",
+    "server/test/dnd5e-temporary-hit-points.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/combats/:combatId/action-commands"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "inventoryVersion": "1.0.9",
+  "ruleset": {
+    "id": "dnd-5e",
+    "version": "1.0.0"
+  },
+  "officialSource": {
+    "id": "SRD-5.1-CC",
+    "title": "System Reference Document 5.1",
+    "publisher": "Wizards of the Coast LLC",
+    "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf"
+  },
+  "license": {
+    "id": "CC-BY-4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "attributionFile": "NOTICE.md",
+    "modified": true
+  },
+  "statusDefinitions": {
+    "implemented": "The bounded behavior named by this inventory domain exists and has executable evidence.",
+    "partial": "Some bounded behavior exists, but the SRD domain is not complete.",
+    "unsupported": "No supported implementation is claimed for this SRD domain.",
+    "not-applicable": "The domain is Velvet-specific and is not an SRD coverage claim."
+  }
+}

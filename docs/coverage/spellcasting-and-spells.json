@@ -1,0 +1,26 @@
+{
+  "id": "spellcasting-and-spells",
+  "title": "Complete spellcasting rules and spell catalog",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Spellcasting",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101"
+    },
+    {
+      "id": "SRD5.1:Spells",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=104"
+    }
+  ],
+  "capabilityEvidence": [],
+  "runtimeEvidence": [
+    "server/src/repo/spellcastingRepo.ts",
+    "server/src/repo/actorPowerCommandPlanner.ts",
+    "server/src/repo/actorPowerUseRepo.ts",
+    "server/test/spellcasting.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/actors/:actorId/spell-commands"
+  ]
+}

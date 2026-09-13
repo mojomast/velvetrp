@@ -1,0 +1,27 @@
+{
+  "id": "concentration",
+  "title": "Concentration checks and replacement",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Spellcasting:Concentration",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=102"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "concentration",
+      "version": "1.0.0",
+      "descriptorStatus": "partial"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationDamage",
+    "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationReplacement",
+    "server/test/dnd5e-combat.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/actors/:actorId/effect-commands"
+  ]
+}

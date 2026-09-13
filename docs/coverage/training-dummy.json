@@ -1,0 +1,13 @@
+{
+  "id": "training-dummy",
+  "title": "Training Dummy integration fixture",
+  "status": "not-applicable",
+  "complete": false,
+  "sourceSections": [],
+  "capabilityEvidence": [],
+  "runtimeEvidence": [
+    "server/src/content/srdStarterCatalog.ts",
+    "NOTICE.md#srd-51"
+  ],
+  "apiEvidence": []
+}

@@ -1,0 +1,17 @@
+{
+  "id": "adventuring-environment",
+  "title": "Travel, environment, hazards, and downtime",
+  "status": "unsupported",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Adventuring",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=79"
+    }
+  ],
+  "capabilityEvidence": [],
+  "runtimeEvidence": [
+    "docs/srd-5.1-coverage.md#unsupported-srd-areas"
+  ],
+  "apiEvidence": []
+}

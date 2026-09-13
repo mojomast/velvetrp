@@ -1,0 +1,21 @@
+{
+  "id": "generic-resource-plans",
+  "title": "Generic atomic resource plans",
+  "status": "not-applicable",
+  "complete": false,
+  "sourceSections": [],
+  "capabilityEvidence": [
+    {
+      "id": "resources",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#planDnd5eResourceCosts",
+    "server/test/dnd5e-plans.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/campaigns/:campaignId/actors/:actorId/resource-commands"
+  ]
+}

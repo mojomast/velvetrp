@@ -1,0 +1,19 @@
+{
+  "id": "legal-action-envelope",
+  "title": "Velvet legal-action plan envelope",
+  "status": "not-applicable",
+  "complete": false,
+  "sourceSections": [],
+  "capabilityEvidence": [
+    {
+      "id": "legal-action-plans",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#planDnd5eAction",
+    "server/test/dnd5e-plans.test.ts"
+  ],
+  "apiEvidence": []
+}

@@ -1,0 +1,23 @@
+{
+  "id": "equipment-catalog",
+  "title": "Equipment, armor, and adventuring gear catalog",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Equipment",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=65"
+    }
+  ],
+  "capabilityEvidence": [],
+  "runtimeEvidence": [
+    "server/src/content/srdStarterCatalog.ts",
+    "server/src/repo/srdEquipmentRuntime.ts",
+    "server/test/srd-equipment-runtime.test.ts",
+    "server/test/srd-equipment-catalog.test.ts",
+    "docs/srd-5.1-coverage.md#coverage-matrix"
+  ],
+  "apiEvidence": [
+    "GET /api/rpg/v1/content-packs/:packId/versions/:packVersion"
+  ]
+}

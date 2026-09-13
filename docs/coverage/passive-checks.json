@@ -1,0 +1,24 @@
+{
+  "id": "passive-checks",
+  "title": "Passive checks",
+  "status": "implemented",
+  "complete": true,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Using Ability Scores:Passive Checks",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=77"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "passive-checks",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#dnd5ePassiveCheck",
+    "server/test/dnd5e-checks.test.ts"
+  ],
+  "apiEvidence": []
+}

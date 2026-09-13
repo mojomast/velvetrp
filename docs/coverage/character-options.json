@@ -1,0 +1,33 @@
+{
+  "id": "character-options",
+  "title": "Character creation options",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Races",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=3"
+    },
+    {
+      "id": "SRD5.1:Classes",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=8"
+    },
+    {
+      "id": "SRD5.1:Backgrounds",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=60"
+    }
+  ],
+  "capabilityEvidence": [],
+  "runtimeEvidence": [
+    "server/src/content/srdStarterCatalog.ts",
+    "server/src/repo/characterBuilder/characterBuilderReadRepo.ts",
+    "server/src/repo/characterProgressionPersistence.ts",
+    "server/test/character-builder.test.ts",
+    "server/test/character-progression.test.ts",
+    "server/test/srd-ruleset-integration.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/campaigns/:campaignId/character-drafts",
+    "POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"
+  ]
+}

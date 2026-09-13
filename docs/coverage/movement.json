@@ -1,0 +1,48 @@
+{
+  "id": "movement",
+  "title": "Speed and movement",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Adventuring:Movement",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=79"
+    },
+    {
+      "id": "SRD5.1:Combat:Movement and Position",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=91"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "movement",
+      "version": "1.4.0",
+      "descriptorStatus": "partial"
+    },
+    {
+      "id": "combat-markers",
+      "version": "1.0.0",
+      "descriptorStatus": "partial"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e.ts#planDnd5eMovement",
+    "server/src/rulesets/dnd5e.ts#planDnd5eEncumbrance",
+    "server/src/repo/srdEquipmentRuntime.ts",
+    "server/src/repo/tacticalMapRepo.ts",
+    "server/src/repo/encounter/combatMarkerRuntime.ts",
+    "server/src/repo/encounter/combatActionPlan.ts",
+    "server/src/repo/encounter/encounterWriteRepo.ts",
+    "server/src/repo/db/schema.ts#TURN_ECONOMY_GUARD_PREDECESSOR_SQL",
+    "server/test/dnd5e-plans.test.ts",
+    "server/test/tactical-map-repo.test.ts",
+    "server/test/rpg-tactical-map-route.test.ts",
+    "server/test/dnd5e-help-hide.test.ts",
+    "server/test/dnd5e-prone-standup.test.ts",
+    "server/test/dnd5e-dash.test.ts",
+    "server/test/dnd5e-turn-economy-migration.test.ts"
+  ],
+  "apiEvidence": [
+    "POST /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps/:mode/move-commands"
+  ]
+}
