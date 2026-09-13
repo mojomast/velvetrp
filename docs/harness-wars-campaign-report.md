@@ -5,7 +5,7 @@
 - Campaign ID: `c1ac03bf-0525-4509-958a-020fdb130ef2`
 - Lifecycle: published
 - Rules: `srd-5.1:rules:starter-v1`
-- Content: `srd-5.1:starter@1.3.0+e58091f23117`
+- Content: `srd-5.1:starter@1.4.0+dc8659693163`
 - Opening location: The Whisper Relay
 - Generation model: `deepseek/deepseek-v4-flash`
 - Accepted canon: 84 artifacts from 19 applied drafts

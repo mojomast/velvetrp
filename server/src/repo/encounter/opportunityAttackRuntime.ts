@@ -4,7 +4,7 @@ import type { IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, conditionsFor, readActorExhaustion } from "./combatConditionRuntime.js";
+import { absorbDamage, conditionsFor, readActorExhaustion, resolveCombatArmorClassBonus } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { consumeCombatMarker, hasCombatMarker } from "./combatMarkerRuntime.js";
 import { EncounterConflictError } from "./encounterErrors.js";
@@ -20,8 +20,8 @@ export function readReactionAvailability(db: DatabaseDriver.Database, encounterI
     .map((row) => ({ combatantId: row.combatant_id, round, available: row.used !== 1, used: row.used === 1 }));
 }
 
-function armorClass(db: DatabaseDriver.Database, encounterId: string, campaignId: string, target: any): number {
-  if (target.actor_id) return resolveSrdEquipment(db, campaignId, target.actor_id).armorClass;
+function armorClass(db: DatabaseDriver.Database, encounterId: string, campaignId: string, target: any, at: string): number {
+  if (target.actor_id) return resolveSrdEquipment(db, campaignId, target.actor_id).armorClass + resolveCombatArmorClassBonus(db, campaignId, target.actor_id, at);
   const row = db.prepare(`SELECT definition.definition_json FROM encounter_enemy_provenance_v31 provenance
     JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id AND definition.pack_version=provenance.pack_version
     AND definition.kind=provenance.kind AND definition.definition_id=provenance.definition_id
@@ -86,7 +86,7 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
     });
     const first = deps.rng.integer(1, 21); if (first < 1 || first > 20) throw new Error("combat RNG returned an out-of-range d20");
     const roll = attackPlan.mode === "normal" ? first : attackPlan.mode === "advantage" ? Math.max(first, deps.rng.integer(1, 21)) : Math.min(first, deps.rng.integer(1, 21));
-    const attack = binding.module.mechanics!.resolveAttack({ rolls: [roll], abilityScore: attackAbility, proficiencyBonus, flatBonus: attackBonus - proficiencyBonus, armorClass: armorClass(db, input.encounterId, input.campaignId, mover) });
+    const attack = binding.module.mechanics!.resolveAttack({ rolls: [roll], abilityScore: attackAbility, proficiencyBonus, flatBonus: attackBonus - proficiencyBonus, armorClass: armorClass(db, input.encounterId, input.campaignId, mover, input.occurredAt) });
     const critical = attack.critical || (attackPlan.autoCritical && attack.hit);
     if (attackerBenefit) { consumeCombatMarker(db, input.encounterId, reactor.combatant_id, "helped"); consumeCombatMarker(db, input.encounterId, reactor.combatant_id, "hidden"); }
     const rolls = attack.hit ? Array.from({length: die.count * (critical ? 2 : 1)}, () => deps.rng.integer(1, die.sides + 1)) : [];

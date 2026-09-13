@@ -82,6 +82,20 @@ export function absorbDamage(db: DatabaseDriver.Database, encounterId: string, c
   return { hitPointDamage: Math.max(0, damage - temporaryHitPointsBefore), temporaryHitPointsBefore, temporaryHitPointsAfter };
 }
 
+/** Sums active flat defense modifiers (Shield and similar) for an actor-backed combatant. */
+export function resolveCombatArmorClassBonus(
+  db: DatabaseDriver.Database, campaignId: string, actorId: string, at: string,
+): number {
+  const row = db.prepare(`SELECT COALESCE(SUM(modifier.amount),0) bonus
+    FROM rpg_active_effects_v26 effect JOIN rpg_effect_modifiers_v26 modifier USING(effect_id)
+    WHERE effect.campaign_id=? AND effect.actor_id=? AND effect.status='active'
+      AND (effect.duration_kind<>'rounds' OR effect.remaining_rounds>0)
+      AND (effect.duration_kind<>'until_timestamp' OR effect.expires_at>?)
+      AND modifier.modifier_kind='flat' AND modifier.applies_to_id IN ('defense','all')`)
+    .get(campaignId, actorId, at) as { bonus: number } | undefined;
+  return Number.isInteger(row?.bonus) ? row!.bonus : 0;
+}
+
 /** Ends only the exact, active concentration effect after a server-owned Constitution save. */
 export function interruptConcentrationAfterDamage(
   db: DatabaseDriver.Database, ids: IdGenerator, rng: RandomNumberGenerator, campaignId: string, encounterId: string,

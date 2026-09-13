@@ -45,7 +45,7 @@ import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultB
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { DND_5E_UNARMED_STRIKE, dnd5eProficiencyBonus, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition } from "./combatConditionRuntime.js";
+import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition, resolveCombatArmorClassBonus } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "./combatMarkerRuntime.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
@@ -289,7 +289,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             .get(encounter.campaign_id,sheet.sheet_id,unarmed?DND_5E_UNARMED_STRIKE.attackAbility:weapon.attackAbility) as {value:number}|undefined;
           if(!ability)throw new EncounterConflictError("SRD attacker sheet is incomplete");
           let armorClass:number;
-          if(target.actor_id){try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}
+          if(target.actor_id){try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass+resolveCombatArmorClassBonus(db,encounter.campaign_id,target.actor_id,at);}
             catch{throw new EncounterConflictError("SRD target equipment is unavailable");}}
           else{const definition=db.prepare(`SELECT definition.definition_json FROM encounter_enemy_provenance_v31 provenance
             JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id AND definition.pack_version=provenance.pack_version
@@ -481,7 +481,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
        const at=now(deps);
        let outcome:any=null,legalActionId="end-turn",targetIds:string[]=[];
       if(target){
-        let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}catch{armorClass=NaN;}
+        let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass+resolveCombatArmorClassBonus(db,encounter.campaign_id,target.actor_id,at);}catch{armorClass=NaN;}
         if(Number.isInteger(armorClass)){
              const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
              const attackPlan=planDnd5eAttackConditions({

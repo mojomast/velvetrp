@@ -9,7 +9,7 @@ import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatC
 import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { mayActForConsumable } from "./useConsumableRuntime.js";
 import { isDndCombat, readCombatTurnEconomy, consumeDndTurnCost, endDndCombatTurn } from "./combatActionPlan.js";
-import { absorbDamage, grantTemporaryHitPoints, interruptConcentrationAfterDamage } from "./combatConditionRuntime.js";
+import { absorbDamage, grantTemporaryHitPoints, interruptConcentrationAfterDamage, resolveCombatArmorClassBonus } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { dnd5eProficiencyBonus } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
@@ -48,7 +48,7 @@ function supported(definition:Definition):"damage"|"healing"|"temporary-hit-poin
   const id=feature(definition);
   if(id===RAGE)return"effect";
   if(id===LAY_ON_HANDS)return"healing";
-  if(!["action","bonus-action"].includes(definition.mechanics.actionCost)||definition.mechanics.target==="area"||definition.mechanics.target==="single"||definition.mechanics.effects.length===0)return null;
+  if(!["action","bonus-action","reaction"].includes(definition.mechanics.actionCost)||definition.mechanics.target==="area"||definition.mechanics.target==="single"||definition.mechanics.effects.length===0)return null;
   const kinds=new Set(definition.mechanics.effects.map(effect=>effect.type));
   if(kinds.size!==1)return null;if(kinds.has("damage"))return"damage";if(kinds.has("healing"))return"healing";
   if(kinds.has("temporary-hit-points"))return"temporary-hit-points";
@@ -71,9 +71,9 @@ function spellCasterStats(db:DatabaseDriver.Database,campaignId:string,actorId:s
   const modifier=Number.isInteger(value?.value)?Math.floor(((value as {value:number}).value-10)/2):0,proficiency=dnd5eProficiencyBonus(Number.isInteger(row.level)?row.level:1);
   return {attackBonus:proficiency+modifier,saveDc:8+proficiency+modifier};
 }
-/** Target armor class from equipped armor (actor) or the pinned enemy definition. */
-function targetArmorClass(db:DatabaseDriver.Database,campaignId:string,target:Row):number|null{
-  if(target.actor_id){try{return resolveSrdEquipment(db,campaignId,target.actor_id).armorClass;}catch{return null;}}
+/** Target armor class from equipped armor (actor) or the pinned enemy definition, including active defense modifiers. */
+function targetArmorClass(db:DatabaseDriver.Database,campaignId:string,target:Row,at:string):number|null{
+  if(target.actor_id){try{return resolveSrdEquipment(db,campaignId,target.actor_id).armorClass+resolveCombatArmorClassBonus(db,campaignId,target.actor_id,at);}catch{return null;}}
   const raw=db.prepare(`SELECT definition.definition_json FROM encounter_enemy_provenance_v31 provenance
     JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id AND definition.pack_version=provenance.pack_version
       AND definition.kind=provenance.kind AND definition.definition_id=provenance.definition_id
@@ -121,7 +121,8 @@ export function buildCombatPowerLegalActions(db:DatabaseDriver.Database,principa
     definition=resolveFeatureDefinition(db,definition,encounter.campaign_id,acting.actor_id!);const kind=supported(definition);if(!kind)continue;const ref=definition.reference as PowerReference;
     // SRD spell damage powers resolve an attack roll or save; generic non-spell damage abilities stay unavailable.
     if(dnd&&kind==="damage"&&definition.reference.kind!=="spell")continue;
-    if(dnd?!economy![definition.mechanics.actionCost==="bonus-action"?"bonusAction":"action"].available:definition.mechanics.actionCost!=="action")continue;
+    if(dnd){const cost=definition.mechanics.actionCost;if(cost==="reaction"?!economy!.reaction.available:!economy![cost==="bonus-action"?"bonusAction":"action"].available)continue;}
+    else if(definition.mechanics.actionCost!=="action")continue;
     const mechanics:any=definition.mechanics;let cost:CombatPowerLegalAction["cost"]=null;if(ref.kind==="spell"&&mechanics.level>0){const id=`slot-${mechanics.level}`,slot=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?").get(encounter.campaign_id,acting.actor_id,id)as any;if(!slot||slot.current<1)continue;cost={kind:"slot",id};}
      if(ref.kind==="ability"&&ref.definitionId===RAGE){const resource=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='rage'").get(encounter.campaign_id,acting.actor_id)as any;if(!resource||resource.current<1)continue;cost={kind:"resource",id:"rage",amount:1};}
      else if(ref.kind==="ability"&&ref.definitionId===LAY_ON_HANDS){const resource=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='lay-on-hands'").get(encounter.campaign_id,acting.actor_id)as any;if(!resource||resource.current<1)continue;cost={kind:"resource",id:"lay-on-hands",amount:1};}
@@ -169,7 +170,7 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
        if(!caster)throw new EncounterConflictError("spellcasting ability is unavailable");
        const natural=deps.rng.integer(1,21);if(!Number.isInteger(natural)||natural<1||natural>20)throw new Error("combat RNG returned an out-of-range d20");
        if(attackType!=="none"){
-         const armorClass=targetArmorClass(db,action.campaignId,target);if(armorClass===null)throw new EncounterConflictError("spell target armor class is unavailable");
+         const armorClass=targetArmorClass(db,action.campaignId,target,at);if(armorClass===null)throw new EncounterConflictError("spell target armor class is unavailable");
          const automaticMiss=natural===1,critical=natural===20,total=natural+caster.attackBonus,hit=!automaticMiss&&(critical||total>=armorClass);
          gate={attackRoll:natural,attackTotal:total,armorClass,hit,critical};blocked=!hit;
        }else{
@@ -228,7 +229,7 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
   db.prepare("INSERT INTO rpg_m16_commands_v26 VALUES(?,?,?,'power','use_power',?,?,?,?,?,?)").run(action.campaignId,action.sourceActorId,commandId,input.idempotencyKey,m16Request,sha(m16Request),sourcePowerBefore,sourceAfter,at);db.prepare("INSERT INTO rpg_m16_receipts_v26 VALUES(?,?,?,?,?,?,?)").run(action.campaignId,action.sourceActorId,commandId,sourceAfter,resultJson,sha(resultJson),at);
    db.prepare("INSERT INTO rpg_power_uses_v26 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(powerUseId,action.campaignId,action.sourceActorId,commandId,sourceAfter,action.powerRef.packId,action.powerRef.packVersion,action.powerRef.kind,action.powerRef.definitionId,"slot",action.powerRef.kind==="spell"?(action.definition as any).mechanics.level||1:1,target.actor_id,envelope,at);if(action.cost)db.prepare("INSERT INTO rpg_power_use_costs_v26 VALUES(?,?,?,?,?)").run(powerUseId,0,action.cost.kind==="slot"?"slot":action.cost.kind==="resource"?"resource":"charge",action.cost.id,action.cost.kind==="resource"?cost!.before-cost!.after:1);db.prepare("INSERT INTO rpg_m16_events_v26 VALUES(?,?,?,?,?,?,?,?)").run(nextId(deps),action.campaignId,action.sourceActorId,commandId,sourceAfter,"power_used",resultJson,at);db.prepare("UPDATE rpg_m16_mutation_revisions_v26 SET revision=?,updated_at=? WHERE campaign_id=? AND actor_id=? AND revision=?").run(sourceAfter,at,action.campaignId,action.sourceActorId,sourcePowerBefore);
   failpoint?.("combatant");
-  if(dnd){consumeDndTurnCost(db,action.encounterId,source.combatant_id,action.definition.mechanics.actionCost==="bonus-action"?"bonus-action":"action");if(turnPlan.next===null)endDndCombatTurn(db,action.encounterId,at);}
+  if(dnd){const turnCost=action.definition.mechanics.actionCost==="bonus-action"?"bonus-action":action.definition.mechanics.actionCost==="reaction"?"reaction":"action";consumeDndTurnCost(db,action.encounterId,source.combatant_id,turnCost);if(turnPlan.next===null)endDndCombatTurn(db,action.encounterId,at);}
   db.prepare("INSERT INTO combat_events_v27 VALUES(?,?,?,?,?,?,?)").run(stateEventId,action.encounterId,commandId,combatAfter,"encounter_state_changed",canonical(turnPlan.event),at);db.prepare("INSERT INTO combat_log VALUES(?,?,?,?,?,?,?,?)").run(stateLogId,action.encounterId,null,stateEventId,2,"encounter_state",canonical(turnPlan.event),at);failpoint?.("log");
   exactlyOne(db.prepare("UPDATE encounter SET current_turn_combatant_id=?,round_number=?,state_revision=state_revision+1,updated_at=? WHERE encounter_id=? AND state_revision=?").run(turnPlan.next,turnPlan.round,at,action.encounterId,encounter.state_revision),"encounter state changed");exactlyOne(db.prepare("UPDATE combat_mutation_revisions_v27 SET revision=?,updated_at=? WHERE encounter_id=? AND revision=?").run(combatAfter,at,action.encounterId,encounter.revision),"combat revision changed");failpoint?.("combat");db.prepare("INSERT INTO combat_receipts_v27 VALUES(?,?,?,?,?,?)").run(action.encounterId,commandId,combatAfter,resultJson,sha(resultJson),at);failpoint?.("receipt");return result;
 }).immediate();}

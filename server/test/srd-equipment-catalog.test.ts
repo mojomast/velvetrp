@@ -67,10 +67,14 @@ describe("SRD equipment catalog", () => {
     expect(definitions.filter((entry) => entry.reference.kind === "item").length).toBeGreaterThanOrEqual(25);
     expect(definitions.filter((entry) => entry.reference.kind === "class-level").map((entry) => entry.name))
       .toEqual(expect.arrayContaining(["Cleric Level 2", "Cleric Level 3", "Wizard Level 2", "Wizard Level 3"]));
-     for (const name of ["Shield", "Guiding Bolt", "Mage Hand", "Sacred Flame"]) {
+     for (const name of ["Guiding Bolt", "Mage Hand", "Sacred Flame"]) {
        const spell = definitions.find((entry) => entry.reference.kind === "spell" && entry.name === name);
        expect(spell).toMatchObject({ tags: expect.arrayContaining(["metadata-only"]), mechanics: { school: expect.any(String), castingTime: expect.any(String), duration: expect.any(String), attackType: expect.any(String), saveType: expect.any(String), ritual: expect.any(Boolean), components: expect.any(Object) } });
      }
+     expect(definitions.find((entry) => entry.name === "Shield")).toMatchObject({
+       tags: expect.arrayContaining(["spellcasting"]),
+       mechanics: { actionCost: "reaction", target: "self", effects: [{ type: "modifier", statistic: "defense", amount: 5, duration: "round" }] },
+     });
      expect(definitions.find((entry) => entry.name === "Magic Missile")).toMatchObject({ tags: expect.arrayContaining(["spellcasting"]) });
      expect(definitions.find((entry) => entry.name === "Healing Word")).toMatchObject({ tags: expect.arrayContaining(["spellcasting"]) });
     expect(Object.isFrozen(definitions)).toBe(true);

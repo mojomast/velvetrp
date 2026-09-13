@@ -115,6 +115,8 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
     if (key(definition.reference) !== key(reference)) continue;
     // Temporary hit points are a combat-only pool; the out-of-combat power runtime has no storage for them.
     if (definition.mechanics.effects.some((effect: any) => effect.type === "temporary-hit-points")) continue;
+    // Reactions have no trigger outside an encounter and their round timers never advance.
+    if (definition.mechanics.actionCost === "reaction") continue;
     const persistent = definition.mechanics.effects.filter((effect: any) => effect.type === "condition" || (effect.type === "modifier" && effect.duration !== "instant")).length;
     if (persistent > 1) continue;
     const costs: Array<{ kind: "ability-use"; amount: 1 } | { kind: "slot"; slotId: string; amount: 1 }> = [];
