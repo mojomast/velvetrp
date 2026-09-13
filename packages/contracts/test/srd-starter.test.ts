@@ -9,7 +9,7 @@ import {
 
 describe("SRD 5.1 starter identity", () => {
   it("exports the exact immutable corrected publication identity", () => {
-    expect(SRD_5_1_STARTER_PACK_VERSION).toMatch(/^1\.2\.0\+[0-9a-f]{12}$/);
+    expect(SRD_5_1_STARTER_PACK_VERSION).toMatch(/^1\.3\.0\+[0-9a-f]{12}$/);
     expect(SRD_5_1_STARTER_ID).toBe(`srd-5.1:starter@${SRD_5_1_STARTER_PACK_VERSION}`);
     expect(Object.isFrozen(SRD_5_1_STARTER_IDENTITY)).toBe(true);
     expect(srdStarterIdentitySchema.parse(SRD_5_1_STARTER_IDENTITY)).toEqual(SRD_5_1_STARTER_IDENTITY);

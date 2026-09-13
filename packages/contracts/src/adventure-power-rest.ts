@@ -63,6 +63,8 @@ const combatPowerOutcomeSchema=z.discriminatedUnion("kind",[
     before:z.number().int().min(0),after:z.number().int().min(0)}).strict(),
   z.object({kind:z.literal("healing"),roll:diceRollResultSchema,requested:z.number().int().min(0),applied:z.number().int().min(0),
     before:z.number().int().min(0),after:z.number().int().min(0)}).strict(),
+  z.object({kind:z.literal("temporary-hit-points"),roll:diceRollResultSchema,requested:z.number().int().min(0),granted:z.number().int().min(0),
+    before:z.number().int().min(0),after:z.number().int().min(0)}).strict(),
   z.object({kind:z.literal("effect"),effect:displayTextSchema,replacedConcentration:z.boolean()}).strict(),
 ]);
 export const adventureCombatPowerPublicReceiptSchema=z.object({powerName:displayTextSchema,target:displayTextSchema,

@@ -24,7 +24,7 @@ AI-generated campaign content is staged as bounded candidates. A GM selects a de
 
 ### Rules and content are swappable and pinned
 
-Rules modules are pure deterministic code. Content is published as immutable, validated packs and campaigns bind to exact `(packId, packVersion)` identities. The current development SRD starter is `srd-5.1:starter@1.2.0+7f94bb928392`; changing content means publishing a new exact version rather than rewriting history.
+Rules modules are pure deterministic code. Content is published as immutable, validated packs and campaigns bind to exact `(packId, packVersion)` identities. The current development SRD starter is `srd-5.1:starter@1.3.0+e58091f23117`; changing content means publishing a new exact version rather than rewriting history.
 
 ### The world keeps a bounded memory
 

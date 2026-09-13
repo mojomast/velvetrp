@@ -67,7 +67,7 @@ function ReceiptBody({ receipt }: { receipt: Receipt }) {
   if(receipt.kind==="combat-power")return <dl>
     <div><dt>Combat power</dt><dd>{receipt.powerName}</dd></div><div><dt>Target</dt><dd>{receipt.target}</dd></div><div><dt>Cost</dt><dd>One {receipt.actionCost}</dd></div>
     {receipt.costs.map((cost,index)=><div key={`cost-${index}`}><dt>{cost.label}</dt><dd>{cost.before} → {cost.after}</dd></div>)}
-    {receipt.outcomes.map((outcome,index)=><div key={index}><dt>{outcome.kind}</dt><dd>{outcome.kind==="damage"?`${outcome.roll.total} rolled, ${outcome.applied} ${outcome.damageType} damage (${outcome.adjustment})`:outcome.kind==="healing"?`${outcome.roll.total} rolled, ${outcome.applied} healing`:`${outcome.effect}${outcome.replacedConcentration?"; concentration replaced":""}`}</dd></div>)}
+    {receipt.outcomes.map((outcome,index)=><div key={index}><dt>{outcome.kind}</dt><dd>{outcome.kind==="damage"?`${outcome.roll.total} rolled, ${outcome.applied} ${outcome.damageType} damage (${outcome.adjustment})`:outcome.kind==="healing"?`${outcome.roll.total} rolled, ${outcome.applied} healing`:outcome.kind==="temporary-hit-points"?`${outcome.roll.total} rolled, ${outcome.granted} temporary hit points`:`${outcome.effect}${outcome.replacedConcentration?"; concentration replaced":""}`}</dd></div>)}
     {receipt.concentration&&<div><dt>Concentration</dt><dd>Active</dd></div>}<div><dt>Round</dt><dd>{receipt.roundBefore} → {receipt.roundAfter}</dd></div><div><dt>Combat revision</dt><dd>{receipt.revisionBefore} → {receipt.revisionAfter}</dd></div>
     <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
   </dl>;

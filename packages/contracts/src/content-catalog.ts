@@ -93,6 +93,10 @@ const healingEffectSchema = z.object({
   type: z.literal("healing"),
   dice: z.object({ count: z.number().int().min(1).max(20), sides: recoveryDieSidesSchema, modifier: z.number().int().min(0).max(100) }).strict(),
 }).strict();
+const temporaryHitPointsEffectSchema = z.object({
+  type: z.literal("temporary-hit-points"),
+  dice: z.object({ count: z.number().int().min(1).max(20), sides: recoveryDieSidesSchema, modifier: z.number().int().min(0).max(100) }).strict(),
+}).strict();
 const resourceEffectSchema = z.object({
   type: z.literal("resource"), resource: z.enum(["health", "guard", "focus", "spell-slot"]),
   amount: boundedMechanicIntegerSchema,
@@ -102,7 +106,7 @@ const conditionEffectSchema = z.object({
   durationRounds: z.number().int().min(1).max(20),
 }).strict();
 export const starterEffectSchema = z.discriminatedUnion("type", [
-  modifierEffectSchema, damageEffectSchema, healingEffectSchema, resourceEffectSchema, conditionEffectSchema,
+  modifierEffectSchema, damageEffectSchema, healingEffectSchema, temporaryHitPointsEffectSchema, resourceEffectSchema, conditionEffectSchema,
 ]);
 export const starterEffectsSchema = z.array(starterEffectSchema).max(16);
 

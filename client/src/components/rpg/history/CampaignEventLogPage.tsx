@@ -27,7 +27,7 @@ function eventSummary(event: CampaignHistoryHttpEvent): { text: string; technica
 }
 function receiptDetail(receipt: CampaignHistoryHttpPublicReceipt): string {
   if(receipt.kind==="combat-consumable")return `${receipt.itemName} used on ${receipt.target}; ${receipt.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.applied} ${outcome.damageType} damage`:outcome.kind==="healing"?`${outcome.applied} healing`:`${outcome.resource} ${outcome.applied>=0?"+":""}${outcome.applied}`).join(", ")}.`;
-  if(receipt.kind==="combat-power")return `${receipt.powerName} used on ${receipt.target}; ${receipt.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.applied} ${outcome.damageType} damage`:outcome.kind==="healing"?`${outcome.applied} healing`:outcome.effect).join(", ")}.`;
+  if(receipt.kind==="combat-power")return `${receipt.powerName} used on ${receipt.target}; ${receipt.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.applied} ${outcome.damageType} damage`:outcome.kind==="healing"?`${outcome.applied} healing`:outcome.kind==="temporary-hit-points"?`${outcome.granted} temporary hit points`:outcome.effect).join(", ")}.`;
   if (receipt.kind === "administration") return `${receipt.type.replaceAll("_", " ")} committed revision ${receipt.revisionAfter}.`;
   if(receipt.kind==="combat")return `Combat advanced from round ${receipt.roundBefore} to ${receipt.roundAfter}.`;
   if(receipt.kind==="travel")return `Travel completed to ${receipt.destination}.`;
