@@ -1,0 +1,60 @@
+import { test,expect } from '@playwright/test';
+import Fastify from 'fastify';
+import { Readable } from 'node:stream';
+import { mkdtempSync,rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildApp } from '../../server/src/app.js';
+import { closeRepo } from '../../server/src/repo/index.js';
+import { dmFixture } from '../../server/test/fixtures/dmCampaign.js';
+import { generatedCampaignContentProviderSchema } from '../../packages/contracts/src/index.js';
+function tone(){
+ const frames=24000*2,b=Buffer.alloc(44+frames*2);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(48000,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(frames*2,40);
+ for(let i=0;i<frames;i++)b.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*220/24000)*300),44+i*2);return b;
+}
+test('voice crosses browser, HTTP, durable casting, progressive audio and restart without game mutations',async({page})=>{
+ test.setTimeout(90000);const dir=mkdtempSync(join(tmpdir(),'velvet-voice-e2e-'));
+ const previous={...process.env};Object.assign(process.env,{VELVET_DATA_DIR:dir,NODE_ENV:'test',FEATURE_RPG_CAMPAIGN:'true',FEATURE_RPG_MECHANICS:'true',FEATURE_RPG_COMBAT:'true',VELVET_VOICE_ENABLED:'true',VELVET_VOICE_ALLOWED_ORIGINS:'http://127.0.0.1:18889',OMNIVOICE_BASE_URL:'http://127.0.0.1:18888',VELVET_VOICE_DEFINITIONS:JSON.stringify([{id:'synthetic',label:'Synthetic narrator',language:'en',seed:42,instruct:'Fictional synthetic narrator',revision:'v1',model:'test-tone'}])});
+ closeRepo();const f=await dmFixture();let generated=0;const received:string[]=[];
+ const backend=Fastify();backend.addContentTypeParser(/^multipart\/form-data/,{parseAs:'string'},(_req,body,done)=>done(null,body));
+ backend.post('/generate',async(req,reply)=>{generated++;received.push(String(req.body));await new Promise(r=>setTimeout(r,100));return reply.type('audio/wav').send(Readable.from([tone()]));});
+ await backend.listen({host:'127.0.0.1',port:18888});let app=buildApp({campaignRepositoryFactory:()=>f.repo});
+ try{
+  const content=generatedCampaignContentProviderSchema.parse({outlines:[{key:'opening',opening:'A quiet gate.',premise:'Explore the road.',startLocationKey:'gate',visibility:'public'}],locations:[{key:'gate',name:'Gate',description:'A stone gate.',visibility:'public',discoveries:[],hazards:[],hooks:[],factionKeys:[]}]});
+  const context=f.repo.getCampaignGenerationContext('local-owner',f.campaign.id,[])!;
+  const draft=f.repo.createGenerationDraft('local-owner',{campaignId:f.campaign.id,timelineId:f.campaign.activeTimelineId,kind:'content-pack',stagedContent:{kind:'campaign-content',requestDigest:'a'.repeat(64),baseContentRevision:context.revision,dependencyDigests:{},...content},validation:{valid:true,issues:[],validatedAt:f.options.clock.now().toISOString()},expectedCampaignRevision:f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision,idempotencyKey:'voice-canon'});
+  f.repo.recordCampaignGenerationCandidate(draft.draftId,content,[]);f.repo.applyCampaignContentGenerationDraftAtomically('local-owner',{draftId:draft.draftId,expectedDraftRevision:0,expectedCampaignRevision:draft.campaignRevision,idempotencyKey:'voice-apply',selectedArtifactKeys:['opening','gate']});
+  f.repo.updateCampaignAdministration('local-owner',f.campaign.id,{expectedRevision:f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision,status:'published',idempotencyKey:'voice-publish'});
+  const readiness=f.repo.getCampaignRoomActivationReadiness('local-owner',f.campaign.id,f.session.id);f.repo.activateCampaignRoom('local-owner',f.campaign.id,f.session.id,{expectedRevision:readiness.expectedRevision,idempotencyKey:'voice-activate'});
+  f.repo.setDmControl('local-owner',f.campaign.id,{mode:'ai',expectedRevision:0,idempotencyKey:'voice-ai'});
+  const run=f.repo.openDmBeat('local-owner',f.campaign.id,f.session.id,{intent:'open',expectedModeRevision:1,idempotencyKey:'voice-beat'});
+  const work=f.repo.claimDmPlanning('local-owner',run.runId,'fake','fake')!,candidate=work.candidates.find(c=>c.action==='ambient-beat')!;
+  f.repo.settleDmPlanning('local-owner',run.runId,work.claimId,{candidateId:candidate.candidateId,digest:candidate.digest},null);f.repo.executeDmBeat('local-owner',run.runId);
+  const claim=f.repo.claimDmNarration('local-owner',run.runId,'fake','fake',{messages:[]},100,100)!;
+  f.repo.settleDmNarration('local-owner',run.runId,claim,'The lantern shines on the quiet road. '.repeat(18),'ok');f.repo.getDmNarrationWork('local-owner',run.runId);
+  const before=f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision;
+  await app.listen({host:'127.0.0.1',port:18887});
+  const enter=async()=>{await page.goto('/');await page.getByRole('button',{name:`Open campaign ${f.campaign.name}`,exact:true}).click();await page.getByRole('navigation',{name:'Campaign destinations',exact:true}).getByRole('button',{name:'Play workspace',exact:true}).click();await page.getByRole('button',{name:'Check room readiness',exact:true}).click();await page.getByRole('button',{name:'Enter adventure',exact:true}).click();};
+  await enter();const controls=page.getByRole('region',{name:'Voice playback'});await expect(controls).toBeVisible();
+  expect(generated).toBe(0);await controls.getByRole('button',{name:'Cast & Voices',exact:true}).click();await controls.getByLabel('Voice for Narrator (narrator)',{exact:true}).selectOption('synthetic');
+  await expect(controls.getByLabel('Voice for Narrator (narrator)',{exact:true})).toHaveValue('synthetic');
+  await controls.getByLabel('Published voice source').selectOption(JSON.stringify(['dm',run.runId]));
+  const audioRequests:string[]=[];page.on('response',r=>{if(r.url().includes('/audio/'))audioRequests.push(r.url());});
+  await controls.getByRole('button',{name:'Play voice',exact:true}).click();await expect(controls.getByLabel('Voice caption')).toContainText('lantern');
+  await controls.getByRole('button',{name:'Pause voice',exact:true}).click();await expect(controls.getByRole('button',{name:'Resume voice',exact:true})).toBeVisible();
+  await controls.getByRole('button',{name:'Resume voice',exact:true}).click();await expect.poll(()=>audioRequests.length).toBeGreaterThan(1);
+  await controls.getByRole('button',{name:'Stop listening',exact:true}).click();await expect(controls.getByRole('status')).toHaveText('idle');
+  expect(received.every(body=>!body.includes('SECRET')&&!body.includes('profile_id'))).toBe(true);expect(f.repo.getCampaignAdministration('local-owner',f.campaign.id)!.revision).toBe(before);
+  await app.close();closeRepo();app=buildApp();await app.listen({host:'127.0.0.1',port:18887});await page.reload();await expect(controls).toBeVisible();await controls.getByRole('button',{name:'Cast & Voices',exact:true}).click();await expect(controls.getByLabel('Voice for Narrator (narrator)',{exact:true})).toHaveValue('synthetic');
+  await controls.getByLabel('Published voice source').selectOption(JSON.stringify(['dm',run.runId]));await controls.getByRole('button',{name:'Replay voice',exact:true}).click();await expect(controls.getByLabel('Voice caption')).toContainText('lantern');await controls.getByRole('button',{name:'Stop listening',exact:true}).click();
+ }finally{await app.close();await backend.close();closeRepo();if(previous.VELVET_DATA_DIR===undefined)delete process.env.VELVET_DATA_DIR;
+   if(previous.NODE_ENV===undefined)delete process.env.NODE_ENV;
+   if(previous.FEATURE_RPG_CAMPAIGN===undefined)delete process.env.FEATURE_RPG_CAMPAIGN;
+   if(previous.FEATURE_RPG_MECHANICS===undefined)delete process.env.FEATURE_RPG_MECHANICS;
+   if(previous.FEATURE_RPG_COMBAT===undefined)delete process.env.FEATURE_RPG_COMBAT;
+   if(previous.VELVET_VOICE_ENABLED===undefined)delete process.env.VELVET_VOICE_ENABLED;
+   if(previous.VELVET_VOICE_ALLOWED_ORIGINS===undefined)delete process.env.VELVET_VOICE_ALLOWED_ORIGINS;
+   if(previous.OMNIVOICE_BASE_URL===undefined)delete process.env.OMNIVOICE_BASE_URL;
+   if(previous.VELVET_VOICE_DEFINITIONS===undefined)delete process.env.VELVET_VOICE_DEFINITIONS;
+   Object.assign(process.env,previous);rmSync(dir,{recursive:true,force:true});}
+});

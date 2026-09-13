@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { voiceRoutes } from "./voice/routes.js";
 import type { Writable } from "node:stream";
 import { campaignSessionAttachmentSchema, npcIdSchema, requestIdSchema, resourceIdSchema } from "@velvet/contracts";
 import Fastify from "fastify";
@@ -877,6 +878,7 @@ export function buildApp(options: {
     });
   });
 
+  void app.register(voiceRoutes);
   void app.register(roleplaySystemRoutes, { prefix: "/api" });
   void app.register(roleplayCharacterRoutes, { prefix: "/api" });
   void app.register(roleplayLoreRoutes, { prefix: "/api" });

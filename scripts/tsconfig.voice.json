@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["smoke-omnivoice.ts", "inspect-omnivoice-profile.ts"]
+}
