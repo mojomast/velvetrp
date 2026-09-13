@@ -43,7 +43,7 @@ import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
 import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultByKey, type CombatPowerRequest, type CombatPowerResult } from "./combatPowerRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
-import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
+import { DND_5E_UNARMED_STRIKE, dnd5eProficiencyBonus, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
@@ -368,7 +368,9 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
          if(!target)throw new EncounterConflictError("grapple target is unavailable");
          if(plan.kind==="escape-grapple" && !conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has("grappled"))
            throw new EncounterConflictError("combatant is not grappled");
-         const attackerScore=contestScore(db,encounter.campaign_id,current),defenderScore=contestScore(db,encounter.campaign_id,target);
+         const grappling=plan.kind==="grapple";
+         const attackerScore=contestScore(db,encounter.campaign_id,current,grappling?"athletics":"best");
+         const defenderScore=contestScore(db,encounter.campaign_id,target,grappling?"best":"athletics");
          const attackerRoll=deps.rng.integer(1,21),defenderRoll=deps.rng.integer(1,21);
          if(!Number.isInteger(attackerRoll)||attackerRoll<1||attackerRoll>20||!Number.isInteger(defenderRoll)||defenderRoll<1||defenderRoll>20)
            throw new Error("combat RNG returned an out-of-range contest d20");
@@ -809,19 +811,25 @@ function dndDamageStatus(db:DatabaseDriver.Database,target:any,hitPointsAfter:nu
 }
 
 /** Bounded contest scores use the actor's raw ability modifier; enemy templates have no ability-score schema. */
-function contestScore(db:DatabaseDriver.Database,campaignId:string,combatant:any):number{
+export function contestScore(db:DatabaseDriver.Database,campaignId:string,combatant:any,mode:"athletics"|"best"):number{
   if(!combatant.actor_id)return 0;
-  const rows=db.prepare(`SELECT attributes.attribute_id,attributes.value FROM campaign_actors actor
-    JOIN rpg_character_attributes attributes ON attributes.campaign_id=actor.campaign_id
-      AND attributes.sheet_id=actor.sheet_id AND attributes.attribute_id='strength'
-    WHERE actor.campaign_id=? AND actor.id=?`).all(campaignId,combatant.actor_id) as Array<{attribute_id:string;value:number}>;
-  const dexterity=(db.prepare(`SELECT attributes.value FROM campaign_actors actor
-    JOIN rpg_character_attributes attributes ON attributes.campaign_id=actor.campaign_id
-      AND attributes.sheet_id=actor.sheet_id AND attributes.attribute_id='dexterity'
-    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId,combatant.actor_id) as {value:number}|undefined)?.value;
-  const strength=rows[0]?.value;
-  return [strength,dexterity].filter((value): value is number => Number.isInteger(value))
-    .map(value=>Math.floor((value-10)/2)).sort((a,b)=>b-a)[0]??0;
+  const row=db.prepare(`SELECT actor.sheet_id,progression.level,
+      strength.value strength,dexterity.value dexterity FROM campaign_actors actor
+    JOIN character_progression_v23 progression ON progression.campaign_id=actor.campaign_id AND progression.actor_id=actor.id
+    JOIN rpg_character_attributes strength ON strength.campaign_id=actor.campaign_id
+      AND strength.sheet_id=actor.sheet_id AND strength.attribute_id='strength'
+    LEFT JOIN rpg_character_attributes dexterity ON dexterity.campaign_id=actor.campaign_id
+      AND dexterity.sheet_id=actor.sheet_id AND dexterity.attribute_id='dexterity'
+    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId,combatant.actor_id) as
+    {sheet_id:string;level:number;strength:number;dexterity:number|null}|undefined;
+  if(!row)return 0;
+  const proficient=(skill:string)=>Boolean(db.prepare(`SELECT 1 FROM rpg_character_proficiencies
+    WHERE campaign_id=? AND sheet_id=? AND category='skill' AND proficiency_id=?`).get(campaignId,row.sheet_id,skill));
+  const bonus=dnd5eProficiencyBonus(Number.isInteger(row.level)?row.level:1);
+  const athletics=Math.floor((row.strength-10)/2)+(proficient("athletics")?bonus:0);
+  if(mode==="athletics")return athletics;
+  const acrobatics=Number.isInteger(row.dexterity)?Math.floor(((row.dexterity as number)-10)/2)+(proficient("acrobatics")?bonus:0):null;
+  return acrobatics===null?athletics:Math.max(athletics,acrobatics);
 }
 
 type TurnAdvancePlan={event:any;nextId:string|null;round:number};

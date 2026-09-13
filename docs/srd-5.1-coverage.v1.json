@@ -49,8 +49,8 @@
       "status": "implemented",
       "complete": true,
       "sourceSections": [{ "id": "SRD5.1:Combat:Making an Attack", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=94" }],
-      "capabilityEvidence": [{ "id": "attacks", "version": "1.1.0", "descriptorStatus": "supported" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/src/map/geometry.ts#lineOfEffectBetween", "server/test/dnd5e-combat.test.ts", "server/test/dnd5e-unarmed-strike.test.ts", "server/test/srd-ruleset-integration.test.ts", "server/test/tactical-map-projection.test.ts"],
+      "capabilityEvidence": [{ "id": "attacks", "version": "1.2.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/src/map/geometry.ts#lineOfEffectBetween", "server/src/repo/encounter/encounterWriteRepo.ts#contestScore", "server/test/dnd5e-combat.test.ts", "server/test/dnd5e-unarmed-strike.test.ts", "server/test/dnd5e-grapple-contest.test.ts", "server/test/srd-ruleset-integration.test.ts", "server/test/tactical-map-projection.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
     },
     {
