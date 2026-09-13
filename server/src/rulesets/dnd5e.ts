@@ -158,6 +158,7 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   if (input.longRange) disadvantageSources += 1;
   if (deriveDnd5eExhaustionEffects(input.attackerExhaustion ?? 0).attackDisadvantage) disadvantageSources += 1;
   if (input.attackerBenefit) advantageSources += 1;
+  if (input.attackerInMelee && input.kind !== "melee") disadvantageSources += 1;
   for (const condition of ["blinded", "restrained", "stunned", "unconscious"] as const) if (target.has(condition)) advantageSources += 1;
   if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }
   const autoCritical = input.kind === "melee"
@@ -370,7 +371,7 @@ const difficultyClasses = Object.freeze([
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
 const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values", "exhaustion", "combat-markers"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.3.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.2.0", "spell-costs": "1.1.0" });
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.4.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.2.0", "spell-costs": "1.1.0" });
 const capabilities = Object.freeze([
   "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "exhaustion", "combat-markers", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));

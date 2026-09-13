@@ -37,7 +37,7 @@ import {
   EncounterUnavailableError,
 } from "./encounterErrors.js";
 import type { EncounterCombatSnapshot, EncounterLifecycleSnapshot, EncounterReadRepository } from "./encounterReadRepo.js";
-import { beginDndCombatTurn, buildCombatActionPlans, buildRangedCombatCandidate, buildThrownCombatCandidate, consumeDndTurnCost, coverArmorClassBonus, endDndCombatTurn, isDndCombat } from "./combatActionPlan.js";
+import { beginDndCombatTurn, buildCombatActionPlans, buildRangedCombatCandidate, buildThrownCombatCandidate, consumeDndTurnCost, coverArmorClassBonus, endDndCombatTurn, hostileWithinFiveFeet, isDndCombat } from "./combatActionPlan.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "./combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { executeUseConsumable } from "./useConsumableRuntime.js";
@@ -301,13 +301,14 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
              const cover = candidate?.targetEvidence.find((evidence) => evidence.targetCombatantId === target.combatant_id)?.cover;
              const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
              const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
+             const attackerInMelee=(ranged||thrown)&&hostileWithinFiveFeet(db,combatId,current.combatant_id,current.team);
              const attackPlan=planDnd5eAttackConditions({
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
                kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
                longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
                attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0,
-               attackerBenefit});
+               attackerBenefit,attackerInMelee});
              const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
              const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,

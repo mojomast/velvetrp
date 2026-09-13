@@ -33,6 +33,12 @@ describe("SRD 5.1 condition attack effects", () => {
     expect(planDnd5eAttackConditions({ attacker: ["prone"], target: [], kind: "melee", attackerBenefit: true })).toMatchObject({ mode: "normal" });
   });
 
+  it("imposes disadvantage on a ranged attack made within five feet of a hostile", () => {
+    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "ranged", attackerInMelee: true })).toMatchObject({ mode: "disadvantage" });
+    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerInMelee: true })).toMatchObject({ mode: "normal" });
+    expect(planDnd5eAttackConditions({ attacker: [], target: ["restrained"], kind: "thrown", attackerInMelee: true })).toMatchObject({ mode: "normal" });
+  });
+
   it("cancels advantage and disadvantage from any source", () => {
     expect(plan(["blinded"], ["restrained"])).toEqual({ mode: "normal", autoCritical: false });
     expect(plan(["prone"], ["prone"], "melee")).toEqual({ mode: "normal", autoCritical: false });

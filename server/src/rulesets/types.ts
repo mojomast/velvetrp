@@ -189,6 +189,8 @@ export type AttackConditionInput = Readonly<{
   attackerExhaustion?: number;
   /** Help or hidden grants advantage on the next attack roll. */
   attackerBenefit?: boolean;
+  /** A ranged attack made while a hostile is within 5 feet has disadvantage. */
+  attackerInMelee?: boolean;
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
 
