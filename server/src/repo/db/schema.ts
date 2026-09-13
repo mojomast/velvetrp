@@ -16,6 +16,33 @@ export const TURN_ECONOMY_GUARD_PREDECESSOR_SQL = `CREATE TRIGGER combat_turn_ec
         OR NEW.movement_used_feet<OLD.movement_used_feet OR OLD.ended_at IS NOT NULL
       BEGIN SELECT RAISE(ABORT,'combat turn economy may only consume resources or end'); END`;
 
+/**
+ * The exact campaign-deletion cleanup trigger published before it also released
+ * the pinned catalog definitions that restrict deletion. A database carrying
+ * this trigger is upgraded in place.
+ */
+export const CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL = `CREATE TRIGGER campaigns_delete_character_drafts_v20 BEFORE DELETE ON campaigns
+      BEGIN
+        INSERT INTO character_draft_campaign_deletions_v20(campaign_id) VALUES (OLD.id);
+        DELETE FROM character_starting_grants_v19 WHERE draft_id IN (SELECT id FROM character_drafts_v19 WHERE campaign_id=OLD.id);
+        DELETE FROM character_derived_snapshots_v19 WHERE campaign_id=OLD.id;
+        DELETE FROM character_draft_revisions_v19 WHERE draft_id IN (SELECT id FROM character_drafts_v19 WHERE campaign_id=OLD.id);
+        DELETE FROM character_draft_receipts_v19 WHERE draft_id IN (SELECT id FROM character_drafts_v19 WHERE campaign_id=OLD.id);
+        DELETE FROM character_draft_events_v19 WHERE draft_id IN (SELECT id FROM character_drafts_v19 WHERE campaign_id=OLD.id);
+        DELETE FROM character_draft_command_provenance_v20 WHERE campaign_id=OLD.id;
+        DELETE FROM character_draft_commands_v19 WHERE campaign_id=OLD.id;
+        DELETE FROM character_draft_pins_v19 WHERE draft_id IN (SELECT id FROM character_drafts_v19 WHERE campaign_id=OLD.id);
+        DELETE FROM character_drafts_v19 WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_receipts WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_events WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_command_provenance_v18 WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_commands WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_current_pins WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_catalog_current_selections WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_content_catalog_pins WHERE campaign_id=OLD.id;
+        DELETE FROM campaign_content_catalog_selections WHERE campaign_id=OLD.id;
+      END`;
+
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
@@ -173,54 +200,45 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
         db.exec(upgraded.sql);
       }).immediate();
     }
+    // Exact-predecessor trigger upgrade: only the known campaign-deletion cleanup trigger is replaced.
+    const deleteTriggerSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type='trigger' AND name='campaigns_delete_character_drafts_v20'").get() as { sql: string } | undefined)?.sql;
+    if (deleteTriggerSql === CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL) {
+      const upgraded = expectedObjects().find((object) => object.name === "campaigns_delete_character_drafts_v20");
+      if (upgraded) db.transaction(() => {
+        db.exec("DROP TRIGGER campaigns_delete_character_drafts_v20");
+        db.exec(upgraded.sql);
+      }).immediate();
+    }
     const recallSql = readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8");
     const inspectionSql = readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8");
     const knowledgeSql = readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8");
     const markerSql = readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8");
-    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts")
-      && !object.name.startsWith("campaign_context_inspection_") && !object.name.startsWith("agent_observations")
-      && !object.name.startsWith("combat_markers_"));
-    const finishRecallUpgrade = () => {
-      db.exec(recallSql);
-      db.exec(inspectionSql);
-      db.exec(knowledgeSql);
-      db.exec(markerSql);
-      assertCurrentDatabase(db, databasePath);
-    };
-    if (mismatchReason(schemaObjects(db), prior) === null) {
-      db.transaction(finishRecallUpgrade).immediate();
-      return;
-    }
-    const missingRecall = !schemaObjects(db).some(object => object.name === "adventure_narration_contexts");
-    const missingInspection = !schemaObjects(db).some(object => object.name === "campaign_context_inspection_headers_v61");
-    const missingKnowledge = !schemaObjects(db).some(object => object.name.startsWith("agent_observations"));
-    const missingMarkers = !schemaObjects(db).some(object => object.name.startsWith("combat_markers_"));
-    const expected = missingRecall ? prior : expectedObjects().filter(object =>
-      (missingInspection ? !object.name.startsWith("campaign_context_inspection_") : true)
-      && (missingKnowledge ? !object.name.startsWith("agent_observations") : true)
-      && (missingMarkers ? !object.name.startsWith("combat_markers_") : true));
-    const validate = missingRecall ? finishRecallUpgrade : () => assertCurrentDatabase(db, databasePath);
-    if (!missingRecall && missingInspection && mismatchReason(schemaObjects(db), expected) === null) {
+    const actual = schemaObjects(db);
+    const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
+    const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
+    const missingKnowledge = !actual.some(object => object.name.startsWith("agent_observations"));
+    const missingMarkers = !actual.some(object => object.name.startsWith("combat_markers_"));
+    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers;
+    const expected = expectedObjects().filter(object =>
+      !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
+      && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
+      && !(missingKnowledge && object.name.startsWith("agent_observations"))
+      && !(missingMarkers && object.name.startsWith("combat_markers_")));
+    if (mismatchReason(actual, expected) === null) {
+      if (!missingLateSchema) {
+        assertCurrentDatabase(db, databasePath);
+        return;
+      }
       db.transaction(() => {
-        db.exec(inspectionSql);
+        if (missingRecall) db.exec(recallSql);
+        if (missingInspection) db.exec(inspectionSql);
         if (missingKnowledge) db.exec(knowledgeSql);
         if (missingMarkers) db.exec(markerSql);
         assertCurrentDatabase(db, databasePath);
       }).immediate();
       return;
     }
-    if (!missingRecall && !missingInspection && missingKnowledge && mismatchReason(schemaObjects(db), expected) === null) {
-      db.transaction(() => {
-        db.exec(knowledgeSql);
-        if (missingMarkers) db.exec(markerSql);
-        assertCurrentDatabase(db, databasePath);
-      }).immediate();
-      return;
-    }
-    if (!missingRecall && !missingInspection && !missingKnowledge && missingMarkers && mismatchReason(schemaObjects(db), expected) === null) {
-      db.transaction(() => { db.exec(markerSql); assertCurrentDatabase(db, databasePath); }).immediate();
-      return;
-    }
+    const validate = () => assertCurrentDatabase(db, databasePath);
     if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)

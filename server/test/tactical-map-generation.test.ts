@@ -8,6 +8,12 @@ import { findPath } from "../src/map/pathfinding.js";
 describe("tactical map generation", () => {
   const context = { campaignId: "campaign", sessionId: "session", actorId: "actor", locationId: "location", actorLocationRevision: 0,
     spawns: [{ position: { x: 1, y: 1 }, footprint: { width: 2, height: 2 } }] };
+  const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
+    "npcKnowledgeSchema.sql", "combatMarkerSchema.sql"]
+    .map((name) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8")).join("\n");
+  const rollBackTacticalMap = (sql: string) => sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "")
+    .replace("  actor_location_revision INTEGER,\n", "")
+    .replace(/CREATE TABLE tactical_map_contexts_v2 \([\s\S]*?CREATE TRIGGER tactical_map_contexts_v2_delete[^\n]*\n/, "");
 
   it.each(["dungeon", "cave", "arena"] as const)("connects bounded v2 %s terrain and reserves footprints over varied seeds", (kind) => {
     for (let seed = 0; seed < 24; seed += 1) {
@@ -38,9 +44,7 @@ describe("tactical map generation", () => {
   });
 
   it("upgrades only the exact previous schema without losing persisted v1 content", () => {
-    const current = readFileSync(new URL("../src/repo/db/currentSchema.sql", import.meta.url), "utf8");
-    const legacy = current.replace(",'dungeon-v2','cave-v2','arena-v2'", "").replace("  actor_location_revision INTEGER,\n", "")
-      .replace(/CREATE TABLE tactical_map_contexts_v2 \([\s\S]*?CREATE TRIGGER tactical_map_contexts_v2_delete[^\n]*\n/, "");
+    const legacy = rollBackTacticalMap(currentSql());
     const db = new DatabaseDriver(":memory:");
     try {
       db.exec(legacy);
@@ -63,9 +67,7 @@ describe("tactical map generation", () => {
   });
 
   it.each(["ownership", "local principal", "vocabulary"] as const)("leaves an exact legacy database unchanged when %s validation fails", (invalid) => {
-    const current = readFileSync(new URL("../src/repo/db/currentSchema.sql", import.meta.url), "utf8");
-    let legacy = current.replace(",'dungeon-v2','cave-v2','arena-v2'", "").replace("  actor_location_revision INTEGER,\n", "")
-      .replace(/CREATE TABLE tactical_map_contexts_v2 \([\s\S]*?CREATE TRIGGER tactical_map_contexts_v2_delete[^\n]*\n/, "");
+    let legacy = rollBackTacticalMap(currentSql());
     // Omit fixture data without changing the exact historical schema or disabling its guards.
     if (invalid === "ownership") legacy = legacy.replace(/INSERT INTO "application_owner"[^\n]*\n/, "");
     const db = new DatabaseDriver(":memory:");

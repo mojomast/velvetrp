@@ -1894,6 +1894,7 @@ CREATE TRIGGER campaigns_delete_character_drafts_v20 BEFORE DELETE ON campaigns
         DELETE FROM campaign_catalog_events WHERE campaign_id=OLD.id;
         DELETE FROM campaign_catalog_command_provenance_v18 WHERE campaign_id=OLD.id;
         DELETE FROM campaign_catalog_commands WHERE campaign_id=OLD.id;
+        DELETE FROM rpg_campaign_catalog_definitions_v25 WHERE campaign_id=OLD.id;
         DELETE FROM campaign_catalog_current_pins WHERE campaign_id=OLD.id;
         DELETE FROM campaign_catalog_current_selections WHERE campaign_id=OLD.id;
         DELETE FROM campaign_content_catalog_pins WHERE campaign_id=OLD.id;

@@ -58,12 +58,14 @@ export function authorizeCampaignDeletionForTest(db: import("better-sqlite3").Da
 export function deleteCampaignForCorruptionTest(db: import("better-sqlite3").Database, campaignId: string): void {
   authorizeCampaignDeletionForTest(db, campaignId);
   const names = ["campaigns_prevent_physical_delete_v22", "character_draft_campaign_deletions_v22_inert_insert",
-    "character_draft_campaign_deletions_v22_inert_update", "character_draft_campaign_deletions_v22_inert_delete"];
+    "character_draft_campaign_deletions_v22_inert_update", "character_draft_campaign_deletions_v22_inert_delete",
+    "dm_control_delete"];
   const rows = db.prepare(`SELECT name,sql FROM sqlite_master WHERE type='trigger' AND name IN (${names.map(() => "?").join(",")})`)
     .all(...names) as Array<{ name: string; sql: string }>;
   if (rows.length !== 0 && rows.length !== names.length) throw new Error("campaign deletion guards are incomplete in the corruption fixture");
   try {
     for (const row of rows) db.exec(`DROP TRIGGER ${row.name}`);
+    db.prepare("DELETE FROM dm_control WHERE campaign_id=?").run(campaignId);
     db.prepare("DELETE FROM campaigns WHERE id=?").run(campaignId);
   } finally {
     for (const row of rows) db.exec(row.sql);

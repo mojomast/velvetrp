@@ -1,7 +1,7 @@
 import DatabaseDriver from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ensureCurrentSchema, TURN_ECONOMY_GUARD_PREDECESSOR_SQL } from "../src/repo/db/schema.js";
+import { ensureCurrentSchema, TURN_ECONOMY_GUARD_PREDECESSOR_SQL, CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL } from "../src/repo/db/schema.js";
 
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
 const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
@@ -18,9 +18,11 @@ function predecessorStore(): DatabaseDriver.Database {
     db.prepare("INSERT INTO campaign_memberships(campaign_id,principal_id,role,created_at) VALUES(?,?,?,?)")
       .run("durable-campaign", "local-owner", "owner", "2036-01-01T00:00:00.000Z");
   })();
-  // Regress exactly the update guard to its pre-Dash form.
+  // Regress exactly the update guard and campaign-deletion trigger to their pre-fix form.
   db.exec("DROP TRIGGER combat_turn_economy_v60_guard");
   db.exec(`${TURN_ECONOMY_GUARD_PREDECESSOR_SQL};`);
+  db.exec("DROP TRIGGER campaigns_delete_character_drafts_v20");
+  db.exec(`${CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL};`);
   return db;
 }
 
