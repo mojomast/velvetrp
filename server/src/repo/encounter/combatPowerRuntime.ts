@@ -11,6 +11,8 @@ import { mayActForConsumable } from "./useConsumableRuntime.js";
 import { isDndCombat, readCombatTurnEconomy, consumeDndTurnCost, endDndCombatTurn } from "./combatActionPlan.js";
 import { absorbDamage, interruptConcentrationAfterDamage } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
+import { dnd5eProficiencyBonus } from "../../rulesets/index.js";
+import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 
 const canonical=(value:unknown):string=>JSON.stringify(value,(_key,nested)=>nested&&typeof nested==="object"&&!Array.isArray(nested)
   ?Object.fromEntries(Object.keys(nested).sort().map(key=>[key,nested[key]])):nested);
@@ -52,6 +54,43 @@ function supported(definition:Definition):"damage"|"healing"|"effect"|null{
   if(definition.mechanics.effects.length===1&&(kinds.has("condition")||(kinds.has("modifier")&&(definition.mechanics.effects[0]as any).duration!=="instant")))return"effect";
   return null;
 }
+/** Spell attack bonus and save DC from the caster's class casting ability and level. */
+function spellCasterStats(db:DatabaseDriver.Database,campaignId:string,actorId:string):{attackBonus:number;saveDc:number}|null{
+  const row=db.prepare(`SELECT actor.sheet_id,cls.pack_id,cls.pack_version,cls.definition_id,cls.level FROM campaign_actors actor
+    JOIN rpg_character_classes cls ON cls.campaign_id=actor.campaign_id AND cls.sheet_id=actor.sheet_id AND cls.position=0
+    WHERE actor.campaign_id=? AND actor.id=?`).get(campaignId,actorId)as {sheet_id:string;pack_id:string;pack_version:string;definition_id:string;level:number}|undefined;
+  if(!row)return null;
+  const classRow=db.prepare(`SELECT definition.definition_json FROM campaign_catalog_current_pins pin
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=pin.pack_id AND definition.pack_version=pin.pack_version
+    WHERE pin.campaign_id=? AND pin.pack_id=? AND pin.pack_version=? AND definition.kind='class' AND definition.definition_id=?`)
+    .get(campaignId,row.pack_id,row.pack_version,row.definition_id)as {definition_json:string}|undefined;
+  let attribute:string|null=null;try{attribute=classRow?JSON.parse(classRow.definition_json).mechanics?.primaryAttribute:null;}catch{attribute=null;}
+  const value=attribute?db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?")
+    .get(campaignId,row.sheet_id,attribute)as {value:number}|undefined:undefined;
+  const modifier=Number.isInteger(value?.value)?Math.floor(((value as {value:number}).value-10)/2):0,proficiency=dnd5eProficiencyBonus(Number.isInteger(row.level)?row.level:1);
+  return {attackBonus:proficiency+modifier,saveDc:8+proficiency+modifier};
+}
+/** Target armor class from equipped armor (actor) or the pinned enemy definition. */
+function targetArmorClass(db:DatabaseDriver.Database,campaignId:string,target:Row):number|null{
+  if(target.actor_id){try{return resolveSrdEquipment(db,campaignId,target.actor_id).armorClass;}catch{return null;}}
+  const raw=db.prepare(`SELECT definition.definition_json FROM encounter_enemy_provenance_v31 provenance
+    JOIN rpg_catalog_definitions definition ON definition.pack_id=provenance.pack_id AND definition.pack_version=provenance.pack_version
+      AND definition.kind=provenance.kind AND definition.definition_id=provenance.definition_id
+    WHERE provenance.combatant_id=?`).get(target.combatant_id)as {definition_json:string}|undefined;
+  if(!raw)return null;try{const value=Number(JSON.parse(raw.definition_json).mechanics?.defense);return Number.isInteger(value)?value:null;}catch{return null;}
+}
+/** Target save modifier for one ability; enemies have no modeled saves. */
+function targetSaveBonus(db:DatabaseDriver.Database,campaignId:string,target:Row,ability:string):number{
+  if(!target.actor_id)return 0;
+  const actor=db.prepare("SELECT sheet_id FROM campaign_actors WHERE campaign_id=? AND id=?").get(campaignId,target.actor_id)as {sheet_id:string}|undefined;
+  if(!actor)return 0;
+  const value=db.prepare("SELECT value FROM rpg_character_attributes WHERE campaign_id=? AND sheet_id=? AND attribute_id=?").get(campaignId,actor.sheet_id,ability)as {value:number}|undefined;
+  if(!Number.isInteger(value?.value))return 0;
+  const level=(db.prepare("SELECT level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=? AND position=0").get(campaignId,actor.sheet_id)as {level:number}|undefined)?.level;
+  const proficient=Boolean(db.prepare("SELECT 1 FROM rpg_character_proficiencies WHERE campaign_id=? AND sheet_id=? AND category='saving-throw' AND proficiency_id=?")
+    .get(campaignId,actor.sheet_id,ability));
+  return Math.floor(((value as {value:number}).value-10)/2)+(proficient?dnd5eProficiencyBonus(Number.isInteger(level)?(level as number):1):0);
+}
 function resolveFeatureDefinition(db:DatabaseDriver.Database,definition:Definition,campaignId:string,actorId:string):Definition {
   if(definition.reference.kind!=="ability"||definition.reference.definitionId!=="srd-5.1:ability:fighter-second-wind")return definition;
   const level=(db.prepare("SELECT level FROM character_progression_v23 WHERE campaign_id=? AND actor_id=?").get(campaignId,actorId)as any)?.level;
@@ -79,8 +118,8 @@ export function buildCombatPowerLegalActions(db:DatabaseDriver.Database,principa
   const combatants=rows(db,encounterId),acting=combatants.find(value=>value.combatant_id===encounter.acting_id)!;const output:CombatPowerLegalAction[]=[];
   for(const power of powers){let definition:Definition;try{definition=power.kind==="spell"?spellCatalogDefinitionSchema.parse(JSON.parse(power.definition_json)):abilityCatalogDefinitionSchema.parse(JSON.parse(power.definition_json));}catch{continue;}
     definition=resolveFeatureDefinition(db,definition,encounter.campaign_id,acting.actor_id!);const kind=supported(definition);if(!kind)continue;const ref=definition.reference as PowerReference;
-    // Generic damage powers have no SRD attack/save gate; weapon attacks use equipped profiles instead.
-    if(dnd&&kind==="damage")continue;
+    // SRD spell damage powers resolve an attack roll or save; generic non-spell damage abilities stay unavailable.
+    if(dnd&&kind==="damage"&&definition.reference.kind!=="spell")continue;
     if(dnd?!economy![definition.mechanics.actionCost==="bonus-action"?"bonusAction":"action"].available:definition.mechanics.actionCost!=="action")continue;
     const mechanics:any=definition.mechanics;let cost:CombatPowerLegalAction["cost"]=null;if(ref.kind==="spell"&&mechanics.level>0){const id=`slot-${mechanics.level}`,slot=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?").get(encounter.campaign_id,acting.actor_id,id)as any;if(!slot||slot.current<1)continue;cost={kind:"slot",id};}
      if(ref.kind==="ability"&&ref.definitionId===RAGE){const resource=db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='rage'").get(encounter.campaign_id,acting.actor_id)as any;if(!resource||resource.current<1)continue;cost={kind:"resource",id:"rage",amount:1};}
@@ -119,11 +158,30 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
   if(sourceM15!==input.expectedSourceM15Revision||sourceM16!==input.expectedSourceM16Revision||targetM15!==input.expectedTargetM15Revision||targetM16!==input.expectedTargetM16Revision)throw new EncounterStaleError("combat power actor revision is stale");
   if(target.actor_id){const health=db.prepare("SELECT current,max FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='health'").get(action.campaignId,target.actor_id)as any;if(!health||health.current!==target.hit_points||health.max!==target.maximum_hit_points)throw new EncounterConflictError("actor-backed combat health is not synchronized");}
    const at=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),kind=supported(action.definition)!,featureId=feature(action.definition),rage=featureId===RAGE,layOnHands=featureId===LAY_ON_HANDS;let hp=target.hit_points;const outcomes:any[]=[];
-   const effects:any[]=rage?[{type:"modifier",statistic:"physical",amount:0,duration:"round",durationRounds:10}]:layOnHands?[{type:"healing",dice:{count:1,sides:1,modifier:0}}]:action.definition.mechanics.effects;
-   for(const effect of effects){if(effect.type==="damage"){const roll=evaluateDiceExpression(`${effect.dice.count}d${effect.dice.sides}${effect.dice.modifier===0?"":effect.dice.modifier>0?`+${effect.dice.modifier}`:effect.dice.modifier}`,deps.rng),requested=Math.max(0,roll.total),adjust=resolveCombatDamageAdjustment(db,action.campaignId,target,effect.damageType,at),adjusted=adjustedCombatDamage(requested,adjust),before=hp,absorbed=absorbDamage(db,action.encounterId,target.combatant_id,adjusted,at);hp=Math.max(0,hp-absorbed.hitPointDamage);outcomes.push({kind:"damage",damageType:effect.damageType,roll,requested,adjustment:adjust,applied:before-hp,temporaryHitPointsAbsorbed:adjusted-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,before,after:hp});}
+    const dnd=isDndCombat(db,action.campaignId);
+    const effects:any[]=rage?[{type:"modifier",statistic:"physical",amount:0,duration:"round",durationRounds:10}]:layOnHands?[{type:"healing",dice:{count:1,sides:1,modifier:0}}]:action.definition.mechanics.effects;
+   for(const effect of effects){if(effect.type==="damage"){
+     const mechanics:any=action.definition.mechanics,attackType=mechanics.attackType??"none",saveType=mechanics.saveType??"none";
+     let gate:any=null,blocked=false;
+     if(dnd&&action.definition.reference.kind==="spell"&&(attackType!=="none"||saveType!=="none")){
+       const caster=spellCasterStats(db,action.campaignId,action.sourceActorId);
+       if(!caster)throw new EncounterConflictError("spellcasting ability is unavailable");
+       const natural=deps.rng.integer(1,21);if(!Number.isInteger(natural)||natural<1||natural>20)throw new Error("combat RNG returned an out-of-range d20");
+       if(attackType!=="none"){
+         const armorClass=targetArmorClass(db,action.campaignId,target);if(armorClass===null)throw new EncounterConflictError("spell target armor class is unavailable");
+         const automaticMiss=natural===1,critical=natural===20,total=natural+caster.attackBonus,hit=!automaticMiss&&(critical||total>=armorClass);
+         gate={attackRoll:natural,attackTotal:total,armorClass,hit,critical};blocked=!hit;
+       }else{
+         const total=natural+targetSaveBonus(db,action.campaignId,target,saveType),saveSuccess=total>=caster.saveDc;
+         gate={saveRoll:natural,saveTotal:total,saveDc:caster.saveDc,saveSuccess};blocked=saveSuccess;
+       }
+     }
+     if(blocked){outcomes.push({kind:"damage",damageType:effect.damageType,requested:0,adjustment:"none",applied:0,before:hp,after:hp,...gate});}
+     else{const critical=gate?.critical===true,count=effect.dice.count*(critical?2:1);
+       const roll=evaluateDiceExpression(`${count}d${effect.dice.sides}${effect.dice.modifier===0?"":effect.dice.modifier>0?`+${effect.dice.modifier}`:effect.dice.modifier}`,deps.rng),requested=Math.max(0,roll.total),adjust=resolveCombatDamageAdjustment(db,action.campaignId,target,effect.damageType,at),adjusted=adjustedCombatDamage(requested,adjust),before=hp,absorbed=absorbDamage(db,action.encounterId,target.combatant_id,adjusted,at);hp=Math.max(0,hp-absorbed.hitPointDamage);outcomes.push({kind:"damage",damageType:effect.damageType,roll,requested,adjustment:adjust,applied:before-hp,temporaryHitPointsAbsorbed:adjusted-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,before,after:hp,...(gate??{})});}
+   }
       else if(effect.type==="healing"||layOnHands){const roll=layOnHands?evaluateDiceExpression("1d2",{integer:()=>1}):evaluateDiceExpression(`${effect.dice.count}d${effect.dice.sides}${effect.dice.modifier===0?"":effect.dice.modifier>0?`+${effect.dice.modifier}`:effect.dice.modifier}`,deps.rng),pool=layOnHands?(db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='lay-on-hands'").get(action.campaignId,action.sourceActorId)as any)?.current??0:Math.max(0,roll.total),requested=layOnHands?Math.min(pool,target.maximum_hit_points-hp):Math.max(0,roll.total),before=hp;hp=Math.min(target.maximum_hit_points,hp+requested);outcomes.push({kind:"healing",roll,requested,applied:hp-before,before,after:hp});}}
-  const dnd=isDndCombat(db,action.campaignId);
-  let statusAfter=dnd&&target.actor_id&&target.hit_points===0&&hp>0?"active":hp===0?"defeated":target.status;
+   let statusAfter=dnd&&target.actor_id&&target.hit_points===0&&hp>0?"active":hp===0?"defeated":target.status;
   const hitPointDamage=target.hit_points-hp;
   if(dnd&&target.actor_id&&target.hit_points>0&&hp===0){
     db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,0,0,0)
