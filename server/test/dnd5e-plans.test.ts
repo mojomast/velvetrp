@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveDnd5eCharacter, planDnd5eAction, planDnd5eConcentrationReplacement, planDnd5eCondition,
-  planDnd5eMovement, planDnd5eResourceCosts, planDnd5eRest, planDnd5eSpellCost,
+  planDnd5eEncumbrance, planDnd5eMovement, planDnd5eResourceCosts, planDnd5eRest, planDnd5eSpellCost,
   type AbilityId,
 } from "../src/rulesets/index.js";
 
@@ -10,6 +10,14 @@ describe("SRD state and cost plans", () => {
     expect(planDnd5eMovement({ distance: 15, speed: 30 })).toMatchObject({ cost: 15, budget: 30, remaining: 15, legal: true });
     expect(planDnd5eMovement({ distance: 15, speed: 30, mode: "climb", difficultTerrain: true })).toMatchObject({ cost: 45, legal: false });
     expect(planDnd5eMovement({ distance: 30, speed: 30, mode: "swim", specialSpeed: 30, dash: true })).toMatchObject({ cost: 30, budget: 60, remaining: 30, legal: true });
+  });
+
+  it("applies the SRD carrying and encumbrance thresholds", () => {
+    expect(planDnd5eEncumbrance({ carriedWeight: 50, strengthScore: 10 })).toMatchObject({ tier: "unencumbered", carryingCapacity: 150, speedReduction: 0, checkPenaltyDisadvantage: false });
+    expect(planDnd5eEncumbrance({ carriedWeight: 51, strengthScore: 10 })).toMatchObject({ tier: "encumbered", speedReduction: 10, checkPenaltyDisadvantage: false });
+    expect(planDnd5eEncumbrance({ carriedWeight: 100, strengthScore: 10 })).toMatchObject({ tier: "encumbered", speedReduction: 10 });
+    expect(planDnd5eEncumbrance({ carriedWeight: 101, strengthScore: 10 })).toMatchObject({ tier: "heavily-encumbered", speedReduction: 20, checkPenaltyDisadvantage: true });
+    expect(() => planDnd5eEncumbrance({ carriedWeight: 10, strengthScore: 0 })).toThrow();
   });
 
   it("plans short and long rest recovery without mutating state", () => {

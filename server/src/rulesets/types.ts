@@ -188,6 +188,15 @@ export type AttackConditionInput = Readonly<{
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
 
+/** SRD 5.1 carrying, encumbered, and heavily encumbered thresholds. */
+export type EncumbranceInput = Readonly<{ carriedWeight: number; strengthScore: number }>;
+export type EncumbrancePlan = Readonly<{
+  tier: "unencumbered" | "encumbered" | "heavily-encumbered";
+  carryingCapacity: number;
+  speedReduction: number;
+  checkPenaltyDisadvantage: boolean;
+}>;
+
 export type ResourcePool = Readonly<{ id: string; current: number; maximum: number }>;
 export type ResourceCost = Readonly<{ resourceId: string; amount: number }>;
 export type ResourceCostPlan = Readonly<{

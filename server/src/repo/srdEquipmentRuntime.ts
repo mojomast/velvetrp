@@ -138,6 +138,19 @@ export function resolveSrdEquipment(db: DatabaseDriver.Database, campaignId: str
     carryingLimit: { value: strength.value * 15, enumerable: false },
     carriedWeight: { value: carriedWeight, enumerable: false },
     encumbered: { value: carriedWeight > strength.value * 5, enumerable: false },
+    heavilyEncumbered: { value: carriedWeight > strength.value * 10, enumerable: false },
+    strengthScore: { value: strength.value, enumerable: false },
   });
   return result;
+}
+
+/** Reads the derived carrying state without widening the stable resolver shape. */
+export function srdEncumbrance(equipment: ReturnType<typeof resolveSrdEquipment>): {
+  carriedWeight: number; carryingLimit: number; strengthScore: number; heavilyEncumbered: boolean;
+} {
+  const carried = equipment as unknown as {
+    carriedWeight: number; carryingLimit: number; strengthScore: number; heavilyEncumbered: boolean;
+  };
+  return { carriedWeight: carried.carriedWeight, carryingLimit: carried.carryingLimit,
+    strengthScore: carried.strengthScore, heavilyEncumbered: carried.heavilyEncumbered };
 }

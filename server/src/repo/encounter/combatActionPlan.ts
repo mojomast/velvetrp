@@ -1,6 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import { createHash } from "node:crypto";
-import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
+import { planDnd5eEncumbrance } from "../../rulesets/index.js";
+import { resolveSrdEquipment, srdEncumbrance } from "../srdEquipmentRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 import { actionBlockingConditions, conditionsFor, mayAttackTarget } from "./combatConditionRuntime.js";
@@ -194,10 +195,17 @@ function movementAllowance(db: DatabaseDriver.Database, campaignId: string, comb
   try {
     const value = row?.actor_id ? JSON.parse(row.derived_json).speed : JSON.parse(row?.definition_json ?? "{}").mechanics?.speed;
     const base = Number.isInteger(value) && value >= 0 && value <= 1_000_000 ? value : 0;
+    let allowance = base;
+    if (row?.actor_id) {
+      try {
+        const load = srdEncumbrance(resolveSrdEquipment(db, campaignId, row.actor_id));
+        allowance = Math.max(0, base - planDnd5eEncumbrance({ carriedWeight: load.carriedWeight, strengthScore: load.strengthScore }).speedReduction);
+      } catch { /* keep the persisted derived speed when the equipment snapshot is unavailable */ }
+    }
     const encounter = db.prepare("SELECT encounter_id,round_number FROM encounter WHERE current_turn_combatant_id=? AND campaign_id=? AND status='active'")
       .get(combatantId, campaignId) as { encounter_id: string; round_number: number } | undefined;
     return encounter && (["grappled", "restrained", "stunned", "unconscious"].some((condition) =>
-      conditionsFor(db, encounter.encounter_id, combatantId, encounter.round_number).has(condition))) ? 0 : base;
+      conditionsFor(db, encounter.encounter_id, combatantId, encounter.round_number).has(condition))) ? 0 : allowance;
   } catch { return 0; }
 }
 

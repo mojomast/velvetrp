@@ -1,7 +1,7 @@
 import type {
   AbilityId, AttackConditionInput, AttackConditionPlan, AttackInput, AttackResolution, CharacterDerivedInput, CharacterDerivedValues, CheckInput,
   CheckResolution, ConcentrationPlan, ConditionId, ConditionStatePlan, D20RollEvidence, D20TestInput,
-  D20TestResolution, DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution,
+  D20TestResolution, DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, EncumbranceInput, EncumbrancePlan,
   InitiativeEntry, InitiativeResult, LegalActionPlan, MovementInput, MovementPlan, RecoveryPlan,
   ResourceCost, ResourceCostPlan, ResourcePool, RestInput, RollMode, RulesetDescriptor, RulesetMechanics, RulesetModule,
   SkillId, SpellCostInput, SpellCostPlan, TestKind, TestResolution,
@@ -188,6 +188,26 @@ export function resolveDnd5eInitiative(entries: readonly InitiativeEntry[]): rea
   return frozenList(results);
 }
 
+/**
+ * SRD 5.1 carrying capacity. Encumbered (weight above 5 x Strength) reduces
+ * speed by 10; heavily encumbered (above 10 x Strength) reduces speed by 20 and
+ * imposes disadvantage on ability checks, saving throws, and attacks. Capacity
+ * is 15 x Strength.
+ */
+export function planDnd5eEncumbrance(input: EncumbranceInput): EncumbrancePlan {
+  requireNonNegativeInteger(input.carriedWeight, "carried weight");
+  requireInteger(input.strengthScore, "strength score");
+  if (input.strengthScore < 1 || input.strengthScore > 30) throw new RangeError("strength score must be between 1 and 30");
+  const heavily = input.carriedWeight > input.strengthScore * 10;
+  const encumbered = input.carriedWeight > input.strengthScore * 5;
+  return Object.freeze({
+    tier: heavily ? "heavily-encumbered" : encumbered ? "encumbered" : "unencumbered",
+    carryingCapacity: input.strengthScore * 15,
+    speedReduction: heavily ? 20 : encumbered ? 10 : 0,
+    checkPenaltyDisadvantage: heavily,
+  });
+}
+
 export function planDnd5eMovement(input: MovementInput): MovementPlan {
   requireNonNegativeInteger(input.distance, "distance");
   requireNonNegativeInteger(input.speed, "speed");
@@ -330,7 +350,7 @@ const difficultyClasses = Object.freeze([
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
 const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0", damage: "1.1.0" });
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.1.0" });
 const capabilities = Object.freeze([
   "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
