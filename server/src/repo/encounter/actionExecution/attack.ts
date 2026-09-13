@@ -12,6 +12,7 @@ import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrati
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "../combatMarkerRuntime.js";
 import { applyAttackRiderConditions, buildAttackRiderPlans, readRiderUsageThisTurn, resolveAttackRiders, type AttackRiderResolution } from "../riders/index.js";
+import { resolveHitTimeShield } from "../reaction/index.js";
 import { advanceRevision, beginProtocol, canonical, controls, gm, id, member, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
 import { contestScore, dndDamageStatus, setSurvival, survival } from "./survival.js";
 import { persistTurnAdvance, planTurnAdvance } from "./turn.js";
@@ -113,16 +114,25 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
              const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
              proficiencyBonus:(unarmed?DND_5E_UNARMED_STRIKE.proficient:weapon.proficient)?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
-          const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
+          const rolledCritical=attack.critical || (attackPlan.autoCritical && attack.hit);
+          // True hit-time window: an actor-backed target may spend its reaction
+          // and a slot for Shield before the triggering hit is finalized.
+          const shield=dnd&&target.actor_id&&attack.hit
+            ?resolveHitTimeShield(db,deps,{encounterId:combatId,campaignId:encounter.campaign_id,round:encounter.round_number,
+              reactorCombatantId:target.combatant_id,sourceCombatantId:current.combatant_id,attackTotal:attack.total,
+              armorClass:adjustedArmorClass,hit:attack.hit,critical:rolledCritical,occurredAt:at})
+            :null;
+          const finalHit=shield?shield.plan.hit:attack.hit,finalCritical=shield?shield.plan.critical:rolledCritical;
+          const critical=finalCritical;
           if(attackerBenefit){consumeCombatMarker(db,combatId,current.combatant_id,"helped");consumeCombatMarker(db,combatId,current.combatant_id,"hidden");}
           const die=unarmed?DND_5E_UNARMED_STRIKE.damageDie:weapon.damage.die;
-          const damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
+          const damageRolls=finalHit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
-          const damage=attack.hit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
+          const damage=finalHit?binding.module.mechanics.resolveDamageRoll({dice:[die],rolls:[damageRolls],
             modifier:binding.module.abilityModifier(ability.value)+(unarmed?DND_5E_UNARMED_STRIKE.flatDamageBonus:0),critical}).total:0;
           const damageType=unarmed?DND_5E_UNARMED_STRIKE.damageType:weapon.damage.type;
           riderResolutions=resolveAttackRiders(current.actor_id?buildAttackRiderPlans(db,encounter.campaign_id,current.actor_id):[],
-            {hit:attack.hit,critical,advantage:attackPlan.mode==="advantage",
+            {hit:finalHit,critical,advantage:attackPlan.mode==="advantage",
               usedThisTurn:readRiderUsageThisTurn(db,combatId,current.combatant_id),usedThisAttack:new Set()},deps.rng);
           const riderAdjustment=(type:string):ReturnType<typeof resolveCombatDamageAdjustment>=>{
             const value=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,type,at);
@@ -162,7 +172,7 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
           outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage+riderRawDamage,adjustment:conditionedAdjustment,
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:totalAdjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
-             rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:adjustedArmorClass,hit:attack.hit,
+             rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:adjustedArmorClass,hit:finalHit,
              critical,damageRolls:[...damageRolls,...riderRolls],...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
                  rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
                  ...(candidate.targetEvidence ? { targetEvidence: candidate.targetEvidence } : {}),

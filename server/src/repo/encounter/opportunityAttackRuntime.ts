@@ -8,10 +8,14 @@ import { absorbDamage, conditionsFor, readActorExhaustion, resolveCombatArmorCla
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { consumeCombatMarker, hasCombatMarker } from "./combatMarkerRuntime.js";
 import { EncounterConflictError } from "./encounterErrors.js";
+import { claimReactionBudget, selectReactionWindow, type ReactionCandidate, type ReactionEvent } from "./reaction/index.js";
 
 export type OpportunityAttackDeps = { ids: IdGenerator; rng: RandomNumberGenerator };
 export type ReactionAvailability = { combatantId: string; round: number; available: boolean; used: boolean };
 const adjacent = (a: MapPoint, b: MapPoint) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1;
+/** The innate `leaves-reach` reaction every combatant may take against an enemy. */
+const OPPORTUNITY_ATTACK_TRIGGER = Object.freeze({ event: "leaves-reach" as const, subject: "enemy" as const, maxDistanceFeet: 5 });
+const OPPORTUNITY_ATTACK_RESPONSE_ID = "opportunity-attack";
 
 export function readReactionAvailability(db: DatabaseDriver.Database, encounterId: string, round: number): ReactionAvailability[] {
   return (db.prepare(`SELECT combatant.combatant_id,reaction.used FROM combatant LEFT JOIN combat_reaction_usage_v63 reaction
@@ -48,19 +52,31 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
   const mover = db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status='active'").get(input.encounterId, input.movingCombatantId) as any;
   if (!mover) throw new EncounterConflictError("opportunity attack mover is unavailable");
   const reactors = db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND status='active' AND team<>? ORDER BY combatant_id`).all(input.encounterId, mover.team) as any[];
-  const results: unknown[] = [];
+  const moverToken = db.prepare("SELECT x,y FROM tactical_map_tokens_v58 WHERE combatant_id=? AND map_id=(SELECT map_id FROM tactical_maps_v58 WHERE encounter_id=? AND active=1)").get(input.movingCombatantId, input.encounterId) as {x:number;y:number}|undefined;
+  // Tactical movement can exist without a combatant token (for example during
+  // legacy map setup). In that case there is no authoritative reach proof, so
+  // movement succeeds without advertising or resolving an opportunity attack.
+  if (!moverToken) return [];
+  const reactorById = new Map<string, any>();
+  const candidates: ReactionCandidate[] = [];
   for (const reactor of reactors) {
     const token = db.prepare("SELECT x,y FROM tactical_map_tokens_v58 WHERE combatant_id=? AND map_id=(SELECT map_id FROM tactical_maps_v58 WHERE encounter_id=? AND active=1)").get(reactor.combatant_id, input.encounterId) as {x:number;y:number}|undefined;
-    const moverToken = db.prepare("SELECT x,y FROM tactical_map_tokens_v58 WHERE combatant_id=? AND map_id=(SELECT map_id FROM tactical_maps_v58 WHERE encounter_id=? AND active=1)").get(input.movingCombatantId, input.encounterId) as {x:number;y:number}|undefined;
-    // Tactical movement can exist without a combatant token (for example during
-    // legacy map setup). In that case there is no authoritative reach proof, so
-    // movement succeeds without advertising or resolving an opportunity attack.
-    if (!token || !moverToken) return [];
+    if (!token) return [];
     const before = input.from, after = input.to;
     if (!adjacent(before, {x:token.x,y:token.y}) || adjacent(after, {x:token.x,y:token.y})) continue;
-    const used = db.prepare(`INSERT INTO combat_reaction_usage_v63(encounter_id,combatant_id,round_number,used,used_at) VALUES(?,?,?,1,?)
-      ON CONFLICT(encounter_id,combatant_id,round_number) DO UPDATE SET used=1,used_at=excluded.used_at WHERE combat_reaction_usage_v63.used=0`).run(input.encounterId, reactor.combatant_id, input.round, input.occurredAt);
-    if (used.changes !== 1) continue;
+    reactorById.set(reactor.combatant_id, reactor);
+    candidates.push({
+      reactorCombatantId: reactor.combatant_id, reactorTeam: reactor.team, subjectTeam: mover.team, distanceFeet: 5,
+      source: "innate", responseKind: "maneuver", responseId: OPPORTUNITY_ATTACK_RESPONSE_ID, trigger: OPPORTUNITY_ATTACK_TRIGGER,
+    });
+  }
+  const event: ReactionEvent = { kind: "leaves-reach", encounterId: input.encounterId, campaignId: input.campaignId,
+    round: input.round, occurredAt: input.occurredAt, subjectCombatantId: input.movingCombatantId, sourceCombatantId: null };
+  const window = selectReactionWindow(event, candidates);
+  const results: unknown[] = [];
+  for (const entry of window) {
+    const reactor = reactorById.get(entry.reactorCombatantId)!;
+    if (!claimReactionBudget(db, input.encounterId, reactor.combatant_id, input.round, input.occurredAt)) continue;
     let attackBonus = 0, damageModifier = 0, proficiencyBonus = 2, die = { count: 1, sides: 6, modifier: 0 }, attackAbility = 10, damageType = "physical";
     if (reactor.actor_id) {
       const equipment = resolveSrdEquipment(db, input.campaignId, reactor.actor_id);

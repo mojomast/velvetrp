@@ -50,7 +50,7 @@
       "complete": true,
       "sourceSections": [{ "id": "SRD5.1:Combat:Making an Attack", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=94" }],
       "capabilityEvidence": [{ "id": "attacks", "version": "1.5.0", "descriptorStatus": "supported" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/src/map/geometry.ts#lineOfEffectBetween", "server/src/repo/encounter/combatActionPlan.ts#hostileWithinFiveFeet", "server/src/repo/encounter/combatPowerRuntime.ts", "server/src/repo/encounter/encounterWriteRepo.ts#contestScore", "server/test/dnd5e-combat.test.ts", "server/test/dnd5e-attack-conditions.test.ts", "server/test/dnd5e-unarmed-strike.test.ts", "server/test/dnd5e-grapple-contest.test.ts", "server/test/dnd5e-shove.test.ts", "server/test/dnd5e-spell-attack.test.ts", "server/test/srd-ruleset-integration.test.ts", "server/test/tactical-map-projection.test.ts"],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eAttack", "server/src/map/geometry.ts#lineOfEffectBetween", "server/src/repo/encounter/combatActionPlan.ts#hostileWithinFiveFeet", "server/src/repo/encounter/combatPowerRuntime.ts", "server/src/repo/encounter/reaction/engine.ts", "server/src/repo/encounter/reaction/ready.ts", "server/src/repo/encounter/reaction/shield.ts", "server/src/repo/encounter/opportunityAttackRuntime.ts", "server/test/dnd5e-reaction-window.test.ts", "server/src/repo/encounter/encounterWriteRepo.ts#contestScore", "server/test/dnd5e-combat.test.ts", "server/test/dnd5e-attack-conditions.test.ts", "server/test/dnd5e-unarmed-strike.test.ts", "server/test/dnd5e-grapple-contest.test.ts", "server/test/dnd5e-shove.test.ts", "server/test/dnd5e-spell-attack.test.ts", "server/test/srd-ruleset-integration.test.ts", "server/test/tactical-map-projection.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
     },
     {
@@ -59,8 +59,8 @@
       "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Combat:Damage and Healing", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=96" }],
-      "capabilityEvidence": [{ "id": "damage", "version": "1.2.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eDamageRoll", "server/src/rulesets/dnd5e.ts#planDnd5eDamageAdjustment", "server/src/repo/encounter/damageAdjustment.ts", "server/src/repo/encounter/combatConditionRuntime.ts", "server/src/repo/encounter/combatPowerRuntime.ts", "server/test/dnd5e-combat.test.ts", "server/test/combat-damage-adjustment.test.ts", "server/test/dnd5e-temporary-hit-points.test.ts"],
+      "capabilityEvidence": [{ "id": "damage", "version": "1.3.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#resolveDnd5eDamageRoll", "server/src/rulesets/dnd5e.ts#planDnd5eDamageAdjustment", "server/src/rulesets/dnd5e/damage.ts#resolveDnd5eOnHitRiderDamage", "server/src/repo/encounter/riders/pipeline.ts", "server/src/repo/encounter/riders/catalog.ts", "server/src/repo/encounter/actionExecution/attack.ts", "server/src/repo/encounter/damageAdjustment.ts", "server/src/repo/encounter/combatConditionRuntime.ts", "server/src/repo/encounter/combatPowerRuntime.ts", "server/test/dnd5e-combat.test.ts", "server/test/dnd5e-riders.test.ts", "server/test/combat-damage-adjustment.test.ts", "server/test/dnd5e-temporary-hit-points.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
     },
     {
@@ -109,8 +109,8 @@
       "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Appendix A:Conditions", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=358" }],
-      "capabilityEvidence": [{ "id": "conditions", "version": "1.1.0", "descriptorStatus": "partial" }, { "id": "exhaustion", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eCondition", "server/src/rulesets/dnd5e.ts#planDnd5eAttackConditions", "server/src/rulesets/dnd5e.ts#deriveDnd5eExhaustionEffects", "server/test/dnd5e-plans.test.ts", "server/test/dnd5e-attack-conditions.test.ts", "server/test/dnd5e-exhaustion.test.ts"],
+      "capabilityEvidence": [{ "id": "conditions", "version": "1.2.0", "descriptorStatus": "partial" }, { "id": "exhaustion", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eCondition", "server/src/rulesets/dnd5e.ts#planDnd5eAttackConditions", "server/src/rulesets/dnd5e.ts#deriveDnd5eConditionEffects", "server/src/rulesets/dnd5e.ts#deriveDnd5eFrightenedEffects", "server/src/rulesets/dnd5e.ts#deriveDnd5eExhaustionEffects", "server/src/repo/encounter/combatConditionRuntime.ts", "server/test/dnd5e-plans.test.ts", "server/test/dnd5e-attack-conditions.test.ts", "server/test/dnd5e-exhaustion.test.ts", "server/test/dnd5e-condition-engine.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/effect-commands"]
     },
     {
@@ -180,7 +180,7 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Equipment", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=65" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/srdEquipmentRuntime.ts", "server/test/srd-equipment-runtime.test.ts", "server/test/srd-equipment-catalog.test.ts", "docs/srd-5.1-coverage.md#coverage-matrix"],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/srdEquipmentRuntime.ts", "server/src/repo/encounter/magicItem/index.ts", "server/test/srd-equipment-runtime.test.ts", "server/test/srd-equipment-catalog.test.ts", "server/test/dnd5e-magic-items.test.ts", "docs/srd-5.1-coverage.md#coverage-matrix"],
       "apiEvidence": ["GET /api/rpg/v1/content-packs/:packId/versions/:packVersion"]
     },
     {
@@ -210,17 +210,17 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Monsters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/encounter/monsterTurnPlanner.ts", "server/src/repo/encounter/encounterWriteRepo.ts", "server/test/monster-turn-planner.test.ts", "server/test/dnd-turn-economy-repository.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/rulesets/dnd5e/monsters.ts", "server/src/repo/encounter/monsterTurnPlanner.ts", "server/src/repo/encounter/monster/content.ts", "server/src/repo/encounter/monster/execute.ts", "server/src/repo/encounter/encounterWriteRepo.ts", "server/test/monster-turn-planner.test.ts", "server/test/dnd5e-monster-actions.test.ts", "server/test/dnd-turn-economy-repository.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/enemy-turn-commands"]
     },
     {
       "id": "adventuring-environment",
       "title": "Travel, environment, hazards, and downtime",
-      "status": "unsupported",
+      "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Adventuring", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=79" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["docs/srd-5.1-coverage.md#unsupported-srd-areas"],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/adventuring.ts", "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eTravel", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eForcedMarch", "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eSuffocation", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eAdventuringFall", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eHazardExposure", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eFoodAndWater", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5ePoisonExposure", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eDiseaseInterval", "server/src/rulesets/dnd5e/adventuring.ts#resolveDnd5eLifestyleExpense", "server/src/rulesets/dnd5e/adventuring.ts#planDnd5eDowntime", "server/src/repo/adventure/adventuringDayRuntime.ts#planDnd5eAdventureDay", "server/test/dnd5e-adventuring.test.ts"],
       "apiEvidence": []
     },
     {
