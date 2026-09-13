@@ -38,7 +38,7 @@ describe("character progression",()=>{
     expect(preview.levels[0]!.fixedAbilities).toEqual([]);
     const damageDb=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"));damageDb.prepare("UPDATE rpg_actor_resources SET current=max-3 WHERE actor_id=? AND name='health'").run(actorId);damageDb.close();
     const damagedPreview=repo.previewCharacterProgression("local-owner",id)!;
-    const selection={choiceId:preview.pendingChoices[0]!.choiceId,ability:preview.pendingChoices[0]!.options[0]!};
+    const selection={choiceId:preview.pendingChoices[0]!.choiceId,kind:"ability" as const,ability:preview.pendingChoices[0]!.options[0]!};
     const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:damagedPreview.revision,previewToken:damagedPreview.token,selections:[selection],idempotencyKey:"apply-2-3"});
     expect(applied.progression.level).toBe(3);expect(applied.receipt.appliedLevels).toHaveLength(2);
     expect(applied.progression.knownAbilities.map((value)=>value.definitionId)).toContain(selection.ability.definitionId);
@@ -73,7 +73,7 @@ describe("character progression",()=>{
   it("rejects unresolved choices and stale tokens without partial writes, then correction compensates without deleveling",()=>{
     const {repo,id}=finalized();repo.grantCharacterXp("local-owner",id,{amount:900,reason:"Journey award",expectedRevision:0,idempotencyKey:"award"});const preview=repo.previewCharacterProgression("local-owner",id)!;
     expect(()=>repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[],idempotencyKey:"missing-choice"})).toThrow("required");expect(repo.getCharacterProgression("local-owner",id)?.level).toBe(1);
-    const choice=preview.pendingChoices[0]!;repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[{choiceId:choice.choiceId,ability:choice.options[0]!}],idempotencyKey:"apply"});
+    const choice=preview.pendingChoices[0]!;repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[{choiceId:choice.choiceId,kind:"ability" as const,ability:choice.options[0]!}],idempotencyKey:"apply"});
     const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});const entry=(db.prepare("SELECT entry_id FROM character_progression_ledger_v23 WHERE kind='xp'").get() as {entry_id:string}).entry_id;db.close();
     const corrected=repo.correctCharacterProgressionEntry("local-owner",id,{entryId:entry,reason:"Duplicate session award",expectedRevision:2,idempotencyKey:"correct"});expect(corrected.progression.totalXp).toBe(0);expect(corrected.progression.level).toBe(3);
     const correction=repo.listCharacterProgressionEvents("local-owner",id).at(-1)!;expect(correction).toMatchObject({type:"progress_corrected",publicData:{kind:"correction",reason:"Duplicate session award"}});expect(JSON.stringify(correction)).not.toMatch(/private|boundaries/);repo.close();

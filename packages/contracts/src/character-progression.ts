@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { abilityCatalogReferenceSchema, attributeIdSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, raceCatalogDefinitionSchema, raceCatalogReferenceSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
+import { abilityCatalogReferenceSchema, attributeIdSchema, catalogDefinitionReferenceSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, raceCatalogDefinitionSchema, raceCatalogReferenceSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { rulesProfileIdSchema } from "./rpg-content.js";
@@ -27,11 +27,51 @@ export const progressionProfileSchema = z.object({
   if (value.maxLevel !== value.thresholds.length) context.addIssue({ code: "custom", path: ["maxLevel"], message: "maxLevel must equal threshold count" });
 });
 
-export const progressionSelectionSchema = z.object({ choiceId: resourceIdSchema, ability: abilityCatalogReferenceSchema }).strict();
-export const progressionPendingChoiceSchema = z.object({
-  level: z.number().int().min(2).max(20), choiceId: resourceIdSchema, kind: z.literal("ability"), required: z.literal(true),
-  options: z.array(abilityCatalogReferenceSchema).min(2).max(16),
-}).strict();
+const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass", bounds: { min: number; max: number }) =>
+  z.array(catalogDefinitionReferenceSchema).min(bounds.min).max(bounds.max).superRefine((options, context) => {
+    const keys = options.map((option) => `${option.packId}\0${option.packVersion}\0${option.definitionId}`);
+    if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "progression choice options must be unique" });
+    if (options.some((option) => option.kind !== kind)) context.addIssue({ code: "custom", message: `progression choice options must be ${kind} references` });
+  });
+const selectionReference = (kind: "ability" | "ability-score" | "feat" | "subclass") =>
+  catalogDefinitionReferenceSchema.refine((reference) => reference.kind === kind, {
+    message: `progression selection must be a ${kind} reference`,
+  });
+/** Legacy ability selections keep their exact `{ choiceId, ability }` input
+ * shape; the preprocessing step supplies the byte-compatible discriminator so
+ * the same schema stays a discriminated union over all four kinds. The shared
+ * `ability` property carries the selected catalog reference for each kind. */
+export const progressionSelectionSchema = z.preprocess(
+  (value) => value !== null && typeof value === "object" && !("kind" in value)
+    ? { ...(value as Record<string, unknown>), kind: "ability" }
+    : value,
+  z.discriminatedUnion("kind", [
+    z.object({ choiceId: resourceIdSchema, kind: z.literal("ability"),
+      ability: selectionReference("ability") }).strict(),
+    z.object({ choiceId: resourceIdSchema, kind: z.literal("ability-score-increase"),
+      ability: selectionReference("ability-score"), amount: z.number().int().min(1).max(2) }).strict(),
+    z.object({ choiceId: resourceIdSchema, kind: z.literal("feat"),
+      ability: selectionReference("feat") }).strict(),
+    z.object({ choiceId: resourceIdSchema, kind: z.literal("subclass"),
+      ability: selectionReference("subclass") }).strict(),
+  ]),
+);
+const progressionPendingChoiceBaseShape = {
+  level: z.number().int().min(2).max(20), choiceId: resourceIdSchema, required: z.literal(true),
+};
+/** Additive generalized pending choices. `kind: "ability"` behavior is unchanged
+ * and every variant keeps uniqueness, bounds, and `.strict()` guarantees. */
+export const progressionPendingChoiceSchema = z.discriminatedUnion("kind", [
+  z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("ability"),
+    options: progressionChoiceOptions("ability", { min: 2, max: 16 }) }).strict(),
+  z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("ability-score-increase"),
+    points: z.number().int().min(1).max(2),
+    options: progressionChoiceOptions("ability-score", { min: 1, max: 6 }) }).strict(),
+  z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("feat"),
+    options: progressionChoiceOptions("feat", { min: 1, max: 16 }) }).strict(),
+  z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("subclass"),
+    options: progressionChoiceOptions("subclass", { min: 1, max: 16 }) }).strict(),
+]);
 export const progressionResourceChangeSchema = z.object({ resourceId: resourceIdSchema, currentBefore: z.number().int().min(0), currentAfter: z.number().int().min(0), maxBefore: z.number().int().min(0), maxAfter: z.number().int().min(0) }).strict();
 export const progressionLevelChangeSchema = z.object({
   level: z.number().int().min(2).max(20),
@@ -102,6 +142,7 @@ export type ProgressionPreview = z.infer<typeof progressionPreviewSchema>;
 export type ProgressionCalculatorInput = z.infer<typeof progressionCalculatorInputSchema>;
 export type ProgressionState = z.infer<typeof progressionStateSchema>;
 export type ProgressionLevelChange = z.infer<typeof progressionLevelChangeSchema>;
+export type ProgressionPendingChoice = z.infer<typeof progressionPendingChoiceSchema>;
 export type ProgressionSelection = z.infer<typeof progressionSelectionSchema>;
 export type GrantCharacterXpInput = z.infer<typeof grantCharacterXpInputSchema>;
 export type GrantCharacterMilestoneInput = z.infer<typeof grantCharacterMilestoneInputSchema>;

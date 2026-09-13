@@ -27,7 +27,7 @@ export function calculateCharacterProgression(
   for(const step of value.classLevels){if(refKey(step.mechanics.classRef)!==classKey)throw new Error("progression class level has a mismatched selected class");
     if(seenLevels.has(step.mechanics.level))throw new Error("progression catalog contains a duplicate class level");seenLevels.add(step.mechanics.level);}
   const byLevel = new Map(value.classLevels.map((step) => [step.mechanics.level, step]));
-  const selections = new Map(value.selections.map((selection) => [selection.choiceId, selection.ability]));
+  const selections = new Map(value.selections.filter((selection) => selection.kind === "ability").map((selection) => [selection.choiceId, selection.ability]));
   const knownAbilities = new Set(value.knownAbilities.map(refKey));
   const knownSpells = new Set(value.knownSpells.map(refKey));
   const resources = new Map(value.resources.map((resource) => [resource.resourceId, { ...resource }]));
@@ -40,10 +40,11 @@ export function calculateCharacterProgression(
     if (!step) throw new Error(`progression catalog has no exact class level ${level}`);
     const selectedAbilities: typeof step.mechanics.abilityRefs = [];
     for (const choice of step.mechanics.progressionChoices ?? []) {
+      if (choice.kind !== "ability") continue;
       const pending = { level, choiceId: choice.choiceId, kind: "ability" as const, required: true as const, options: choice.options };
       pendingChoices.push(pending);
       const selected = selections.get(choice.choiceId);
-      if (selected && choice.options.some((option) => refKey(option) === refKey(selected)) && !knownAbilities.has(refKey(selected))) {
+      if (selected && selected.kind === "ability" && choice.options.some((option) => refKey(option) === refKey(selected)) && !knownAbilities.has(refKey(selected))) {
         selectedAbilities.push(selected); knownAbilities.add(refKey(selected));
       }
     }

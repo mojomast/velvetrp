@@ -53,11 +53,32 @@ export const spellCatalogReferenceSchema = referenceFor("spell");
 export const itemCatalogReferenceSchema = referenceFor("item");
 export const currencyCatalogReferenceSchema = referenceFor("currency");
 export const enemyTemplateCatalogReferenceSchema = referenceFor("enemy-template");
+/**
+ * Additive advancement reference kinds. They are reference-only so the closed
+ * validated catalog definition-kind set (and every published digest that
+ * enumerates it) stays byte-compatible. Catalog definitions of these kinds are
+ * not yet authored; the references let generalized progression choices describe
+ * ability-score increases, feats, and subclasses before content lands.
+ */
+export const advancementReferenceKindSchema = z.enum(["ability-score", "feat", "subclass"]);
+export const abilityScoreCatalogReferenceSchema = z.object({
+  ...exactReferenceShape,
+  kind: z.literal("ability-score"),
+}).strict();
+export const featCatalogReferenceSchema = z.object({
+  ...exactReferenceShape,
+  kind: z.literal("feat"),
+}).strict();
+export const subclassCatalogReferenceSchema = z.object({
+  ...exactReferenceShape,
+  kind: z.literal("subclass"),
+}).strict();
 export const catalogDefinitionReferenceSchema = z.discriminatedUnion("kind", [
   raceCatalogReferenceSchema, backgroundCatalogReferenceSchema, classCatalogReferenceSchema,
   classLevelCatalogReferenceSchema, skillCatalogReferenceSchema, abilityCatalogReferenceSchema,
   spellCatalogReferenceSchema, itemCatalogReferenceSchema, currencyCatalogReferenceSchema,
-  enemyTemplateCatalogReferenceSchema,
+  enemyTemplateCatalogReferenceSchema, abilityScoreCatalogReferenceSchema, featCatalogReferenceSchema,
+  subclassCatalogReferenceSchema,
 ]);
 
 export const attributeIdSchema = z.enum([
@@ -244,6 +265,52 @@ export const classCatalogDefinitionSchema = z.object({
   ...typedBase("class"),
   mechanics: z.object({ hitDie: recoveryDieSidesSchema, primaryAttribute: attributeIdSchema, savingAttributes: z.array(attributeIdSchema).min(1).max(2), levelRefs: z.array(classLevelCatalogReferenceSchema).min(1).max(20) }).strict(),
 }).strict();
+const progressionChoiceBaseShape = {
+  choiceId: resourceIdSchema,
+  required: z.literal(true),
+  count: z.literal(1),
+};
+/** Every variant keeps one shared reference array so existing catalog consumers
+ * (`dependencies`, class-progression resolution) stay additive without a
+ * slice-2 wiring change; `kind` is enforced at parse time for each variant. */
+const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass", bounds: { min: number; max: number }) =>
+  z.array(catalogDefinitionReferenceSchema).min(bounds.min).max(bounds.max).superRefine((options, context) => {
+    const keys = options.map((option) => `${option.packId}\0${option.packVersion}\0${option.definitionId}`);
+    if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "progression choice options must be unique" });
+    if (options.some((option) => option.kind !== kind)) context.addIssue({ code: "custom", message: `progression choice options must be ${kind} references` });
+  });
+/** Additive generalized advancement vocabulary. `kind: "ability"` remains
+ * byte-compatible; the new variants select bounded catalog identities only and
+ * are not executable rules. Every variant keeps exact identity, `.strict()`,
+ * uniqueness, and array bounds. */
+export const abilityProgressionChoiceSchema = z.object({
+  ...progressionChoiceBaseShape,
+  kind: z.literal("ability"),
+  options: progressionChoiceOptions("ability", { min: 2, max: 16 }),
+}).strict();
+export const abilityScoreIncreaseProgressionChoiceSchema = z.object({
+  ...progressionChoiceBaseShape,
+  kind: z.literal("ability-score-increase"),
+  /** Total points distributed across the offered ability scores: SRD +2 or +1/+1. */
+  points: z.number().int().min(1).max(2),
+  options: progressionChoiceOptions("ability-score", { min: 1, max: 6 }),
+}).strict();
+export const featProgressionChoiceSchema = z.object({
+  ...progressionChoiceBaseShape,
+  kind: z.literal("feat"),
+  options: progressionChoiceOptions("feat", { min: 1, max: 16 }),
+}).strict();
+export const subclassProgressionChoiceSchema = z.object({
+  ...progressionChoiceBaseShape,
+  kind: z.literal("subclass"),
+  options: progressionChoiceOptions("subclass", { min: 1, max: 16 }),
+}).strict();
+export const classLevelProgressionChoiceSchema = z.discriminatedUnion("kind", [
+  abilityProgressionChoiceSchema,
+  abilityScoreIncreaseProgressionChoiceSchema,
+  featProgressionChoiceSchema,
+  subclassProgressionChoiceSchema,
+]);
 export const classLevelCatalogDefinitionSchema = z.object({
   ...typedBase("class-level"),
   mechanics: z.object({
@@ -257,16 +324,7 @@ export const classLevelCatalogDefinitionSchema = z.object({
     preparedSpellRefs: z.array(spellCatalogReferenceSchema).max(16).optional(),
     /** Closed advancement choices. These select catalog identities only; they
      * are deliberately not executable rules or a multiclass vocabulary. */
-    progressionChoices: z.array(z.object({
-      choiceId: resourceIdSchema,
-      kind: z.literal("ability"),
-      required: z.literal(true),
-      count: z.literal(1),
-      options: z.array(abilityCatalogReferenceSchema).min(2).max(16).superRefine((options, context) => {
-        const keys = options.map((option) => `${option.packId}\0${option.packVersion}\0${option.definitionId}`);
-        if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "progression choice options must be unique" });
-      }),
-    }).strict()).max(8).optional().superRefine((choices, context) => {
+    progressionChoices: z.array(classLevelProgressionChoiceSchema).max(8).optional().superRefine((choices, context) => {
       if (!choices) return;
       const ids = choices.map((choice) => choice.choiceId);
       if (new Set(ids).size !== ids.length) context.addIssue({ code: "custom", message: "progression choice IDs must be unique within a level" });
@@ -571,6 +629,12 @@ export const campaignCatalogConfigurationResultSchema = z.object({
 
 export type CatalogDefinitionKind = z.infer<typeof catalogDefinitionKindSchema>;
 export type CatalogDefinitionReference = z.infer<typeof catalogDefinitionReferenceSchema>;
+export type AdvancementReferenceKind = z.infer<typeof advancementReferenceKindSchema>;
+export type ClassLevelProgressionChoice = z.infer<typeof classLevelProgressionChoiceSchema>;
+export type AbilityProgressionChoice = z.infer<typeof abilityProgressionChoiceSchema>;
+export type AbilityScoreIncreaseProgressionChoice = z.infer<typeof abilityScoreIncreaseProgressionChoiceSchema>;
+export type FeatProgressionChoice = z.infer<typeof featProgressionChoiceSchema>;
+export type SubclassProgressionChoice = z.infer<typeof subclassProgressionChoiceSchema>;
 export type CatalogDefinition = z.infer<typeof catalogDefinitionSchema>;
 export type SrdWeaponProperty = z.infer<typeof srdWeaponPropertySchema>;
 export type SrdWeaponProfile = z.infer<typeof srdWeaponProfileSchema>;

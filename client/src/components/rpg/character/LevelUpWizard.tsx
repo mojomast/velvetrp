@@ -129,7 +129,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
 
   function choose(choiceId: string, ability: ProgressionSelection["ability"]) {
     generationRef.current += 1;
-    setSelections((current) => [...current.filter((item) => item.choiceId !== choiceId), { choiceId, ability }]);
+    setSelections((current) => [...current.filter((item) => item.choiceId !== choiceId), { choiceId, kind: "ability" as const, ability }]);
     setPreview(null); setPreviewSelectionKey(null); setNotice("Choices changed. Calculate a new exact preview before applying.");
   }
 
