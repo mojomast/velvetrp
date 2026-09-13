@@ -14,7 +14,9 @@ import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombat
 import { applyAttackRiderConditions, buildAttackRiderPlans, readRiderUsageThisTurn, resolveAttackRiders, type AttackRiderResolution } from "../riders/index.js";
 import { resolveHitTimeShield } from "../reaction/index.js";
 import { advanceRevision, beginProtocol, canonical, controls, gm, id, member, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
-import { contestScore, dndDamageStatus, setSurvival, survival } from "./survival.js";
+import { contestScore, dndDamageStatus } from "./survival.js";
+import { resolveDeathSave, resolveStabilization } from "../death/dyingRuntime.js";
+import { endConcentrationOnCondition } from "../concentration/concentrationRuntime.js";
 import { persistTurnAdvance, planTurnAdvance } from "./turn.js";
 
 export function createResolveCombatAction(db:DatabaseDriver.Database,deps:EncounterWriteDependencies){
@@ -171,7 +173,8 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
            const absorbed=absorbDamage(db,combatId,target.combatant_id,totalAdjustedDamage,at),hitPointsAfter=Math.max(0,target.hit_points-absorbed.hitPointDamage);
           outcome={kind:"damage",targetId:command.targetIds[0]!,damageType,requested:damage+riderRawDamage,adjustment:conditionedAdjustment,
             applied:target.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:totalAdjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,hitPointsBefore:target.hit_points,hitPointsAfter,
-            statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage),rulesetId:binding.rulesetId,
+            statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage,
+              {critical,withinFiveFeet:rangeFeet===undefined||rangeFeet<=5}),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:adjustedArmorClass,hit:finalHit,
              critical,damageRolls:[...damageRolls,...riderRolls],...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
                  rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
@@ -187,8 +190,13 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
         const target=db.prepare("SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND team=? AND combatant_kind='actor' AND status='unconscious'")
           .get(combatId,command.targetIds[0]!,current.team) as any;
         if(!target)throw new EncounterConflictError("combatant cannot be stabilized");
-        setSurvival(db,combatId,target.combatant_id,0,0,true);
-        outcome={kind:"survival",targetId:target.combatant_id,successes:0,failures:0,statusAfter:"stable",hitPointsBefore:target.hit_points,hitPointsAfter:target.hit_points,statusBefore:target.status};
+        const assisted=hasCombatMarker(db,combatId,current.combatant_id,"helped");
+        const stabilization=resolveStabilization(db,deps,{campaignId:encounter.campaign_id,encounterId:combatId,
+          stabilizerActorId:current.actor_id??null,targetCombatantId:target.combatant_id,targetStatus:target.status,assisted});
+        if(assisted)consumeCombatMarker(db,combatId,current.combatant_id,"helped");
+        outcome={kind:"survival",targetId:target.combatant_id,roll:stabilization.roll,successes:0,failures:0,
+          statusAfter:stabilization.statusAfter,stabilized:stabilization.stabilized,hitPointsBefore:target.hit_points,
+          hitPointsAfter:target.hit_points,statusBefore:target.status,...(stabilization.check?{check:stabilization.check}:{})};
        }else if(plan.kind==="grapple"||plan.kind==="escape-grapple"||plan.kind==="shove"){
          const targetId=command.targetIds[0]!;
          const target=plan.kind==="escape-grapple" ? db.prepare(`SELECT source_combatant_id combatant_id FROM combat_conditions_v62
@@ -230,13 +238,10 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
            .run(bonus,combatId,current.combatant_id,economy.movement.allowanceFeet);
          if(extended.changes!==1)throw new EncounterConflictError("dash allowance changed before commit");
         }else if(plan.kind==="death-save"){
-        const roll=deps.rng.integer(1,21);if(!Number.isInteger(roll)||roll<1||roll>20)throw new Error("combat RNG returned an out-of-range d20");
-        const prior=survival(db,combatId,current.combatant_id),failures=Math.min(3,prior.failures+(roll===1?2:roll<10?1:0)),successes=Math.min(3,prior.successes+(roll>=10&&roll!==20?1:0));
-        const statusAfter=roll===20?"active":failures===3?"dead":successes===3?"stable":"unconscious",hitPointsAfter=roll===20?1:current.hit_points;
-        if(roll===20)db.prepare("DELETE FROM combat_survival_v61 WHERE encounter_id=? AND combatant_id=?").run(combatId,current.combatant_id);
-        else setSurvival(db,combatId,current.combatant_id,successes,failures,statusAfter==="stable");
-        outcome={kind:"survival",targetId:current.combatant_id,roll,successes,failures,statusAfter,hitPointsBefore:current.hit_points,hitPointsAfter,statusBefore:current.status};
-        interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,current.combatant_id,0,statusAfter,at);
+        const save=resolveDeathSave(db,deps,{encounterId:combatId,combatantId:current.combatant_id,hitPoints:current.hit_points,status:current.status});
+        outcome={kind:"survival",targetId:current.combatant_id,roll:save.roll,successes:save.successes,failures:save.failures,
+          statusAfter:save.statusAfter,hitPointsBefore:current.hit_points,hitPointsAfter:save.hitPointsAfter,statusBefore:current.status};
+        interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,current.combatant_id,0,save.statusAfter,at);
       }else if(plan.kind==="flee"){
         outcome={kind:"status",targetId:current.combatant_id,statusBefore:"active",statusAfter:"fled"};
       }else if(plan.kind==="help"){
@@ -260,9 +265,6 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
           .get(outcome.targetId) as {state_revision:number}).state_revision}]:outcome?.kind==="status"?[{
         combatantId:current.combatant_id,hitPointsBefore:current.hit_points,hitPointsAfter:current.hit_points,
         statusBefore:"active",statusAfter:"fled",stateRevisionBefore:current.state_revision}]:[];
-      const compositionPlan=buildCombatCompositionPlan(db,deps.ids,{encounterId:combatId,campaignId:encounter.campaign_id,
-        roundBefore:encounter.round_number,roundAfter:turnPlan.round,occurredAt:at,
-        combatantChanges});
       const commandId=id(deps),actionId=id(deps);
       const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
        beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
@@ -277,6 +279,16 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
          removeCombatCondition(db,combatId,current.combatant_id,"grappled");
        if(riderResolutions.length&&outcome?.kind==="damage")
          applyAttackRiderConditions(db,combatId,outcome.targetId,current.combatant_id,commandId,at,riderResolutions);
+       // Conditions applied by an on-hit rider can incapacitate a concentrating
+       // target outside the damage-triggered save path. End concentration before
+       // the composition plan pins M1.6 revisions for this transaction.
+       if(outcome?.kind==="damage"){
+         const attacker=db.prepare("SELECT actor_id FROM combatant WHERE encounter_id=? AND combatant_id=?").get(combatId,outcome.targetId) as {actor_id:string|null}|undefined;
+         if(attacker?.actor_id)endConcentrationOnCondition(db,deps.ids,{campaignId:encounter.campaign_id,encounterId:combatId,
+           combatantId:outcome.targetId,actorId:attacker.actor_id,round:encounter.round_number,at});
+       }
+       const compositionPlan=buildCombatCompositionPlan(db,deps.ids,{encounterId:combatId,campaignId:encounter.campaign_id,
+         roundBefore:encounter.round_number,roundAfter:turnPlan.round,occurredAt:at,combatantChanges});
       if(outcome?.kind==="damage"||outcome?.kind==="survival")recordStateEvent(db,deps,combatId,outcome.targetId,outcome.hitPointsAfter,outcome.statusAfter,at,commandId,after);
       else if(outcome?.kind==="status")recordStateEvent(db,deps,combatId,current.combatant_id,current.hit_points,"fled",at,commandId,after);
       executeCombatCompositionPlan(db,compositionPlan);
@@ -287,8 +299,13 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
       advanceRevision(db,combatId,after,at);
       const combat=deps.reads.getCombatState(p,combatId);
       if(!combat)throw new Error("resolved combat projection is unavailable");
+      // The frozen survival receipt shape is strict; internal HP bookkeeping
+      // stays on the receipt only through the combat projection.
+      const contractOutcome=outcome?.kind==="survival"?Object.freeze({kind:"survival",targetId:outcome.targetId,
+        ...(typeof outcome.roll==="number"?{roll:outcome.roll}:{}),successes:outcome.successes,
+        failures:outcome.failures,statusAfter:outcome.statusAfter}):outcome;
       const resolution=combatActionResolutionSchema.parse({actionId,legalActionId:plan.legalActionId,kind:plan.kind,
-        actingCombatantId:current.combatant_id,targetIds:command.targetIds,outcomes:outcome?[outcome]:[],
+        actingCombatantId:current.combatant_id,targetIds:command.targetIds,outcomes:contractOutcome?[contractOutcome]:[],
         roundBefore:encounter.round_number,roundAfter:combat.round,currentCombatantBefore:current.combatant_id,
         currentCombatantAfter:combat.currentCombatant});
       const receipt={commandId,idempotencyKey:command.idempotencyKey,revisionBefore:before,revisionAfter:after,occurredAt:at};

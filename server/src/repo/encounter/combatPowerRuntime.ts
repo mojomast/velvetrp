@@ -8,6 +8,8 @@ import { executeCombatCompositionPlan } from "./combatCompositionExecutor.js";
 import { mayActForConsumable } from "./useConsumableRuntime.js";
 import { isDndCombat, readCombatTurnEconomy, consumeDndTurnCost, endDndCombatTurn } from "./combatActionPlan.js";
 import { grantTemporaryHitPoints, interruptConcentrationAfterDamage } from "./combatConditionRuntime.js";
+import { planDnd5eDyingDamage, planDnd5eHealingEndsDying } from "../../rulesets/dnd5e/conditions.js";
+import { endConcentrationOnCondition } from "./concentration/concentrationRuntime.js";
 import { canonical, sha, nextId, exactlyOne, revision, feature, RAGE, LAY_ON_HANDS } from "./effectHandlers/util.js";
 import { applyEffectKind, getEffectHandler, isV2EffectKind, resolveEffect } from "./effectHandlers/index.js";
 import type { CombatPowerLegalAction, CombatPowerRequest, CombatPowerResult, CombatPowerBoundary, Row, Definition, EffectContext } from "./effectHandlers/types.js";
@@ -119,24 +121,33 @@ export function executeCombatPower(db:DatabaseDriver.Database,deps:EncounterDepe
       const handler=getEffectHandler(effect.type);if(handler)handler(effectContext,effect);
     }
     hp=effectContext.hp;
-    let statusAfter=dnd&&target.actor_id&&target.hit_points===0&&hp>0?"active":hp===0?"defeated":target.status;
-  const hitPointDamage=target.hit_points-hp;
-  if(dnd&&target.actor_id&&target.hit_points>0&&hp===0){
-    db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,0,0,0)
-      ON CONFLICT(encounter_id,combatant_id) DO UPDATE SET successes=0,failures=0,stable=0`).run(action.encounterId,target.combatant_id);
-    statusAfter="unconscious";
-  }else if(dnd&&target.actor_id&&target.hit_points===0&&hitPointDamage>0){
-    const prior=db.prepare("SELECT successes,failures,stable FROM combat_survival_v61 WHERE encounter_id=? AND combatant_id=?")
-      .get(action.encounterId,target.combatant_id) as {successes:number;failures:number;stable:number}|undefined;
-    const failures=Math.min(3,(prior?.failures??0)+1);
-    db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,?,?,?)
-      ON CONFLICT(encounter_id,combatant_id) DO UPDATE SET successes=excluded.successes,failures=excluded.failures,stable=excluded.stable`)
-      .run(action.encounterId,target.combatant_id,prior?.successes??0,failures,prior?.stable??0);
-    statusAfter=failures===3?"dead":target.status;
+  const hitPointDamage=target.hit_points-hp,actorBacked=Boolean(dnd&&target.actor_id);
+  const priorSurvival=actorBacked?db.prepare("SELECT successes,failures,stable FROM combat_survival_v61 WHERE encounter_id=? AND combatant_id=?")
+    .get(action.encounterId,target.combatant_id) as {successes:number;failures:number;stable:number}|undefined:undefined;
+  const healing=planDnd5eHealingEndsDying({hitPointsBefore:target.hit_points,hitPointsAfter:hp,currentStatus:target.status});
+  const dyingPlan=actorBacked?planDnd5eDyingDamage({actorBacked:true,hitPointsBefore:target.hit_points,hitPointsAfter:hp,
+    maximumHitPoints:target.maximum_hit_points,hitPointDamage:Math.max(0,hitPointDamage),currentStatus:target.status,
+    successes:priorSurvival?.successes??0,failures:priorSurvival?.failures??0,stable:priorSurvival?.stable===1}):null;
+  let statusAfter=dyingPlan?(healing.endsDying?"active":dyingPlan.status):hp===0?"defeated":target.status;
+  if(dyingPlan){
+    if(dyingPlan.massiveDamage){
+      db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,0,3,0)
+        ON CONFLICT(encounter_id,combatant_id) DO UPDATE SET successes=0,failures=3,stable=0`).run(action.encounterId,target.combatant_id);
+    }else if(target.hit_points>0&&hp===0){
+      db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,0,0,0)
+        ON CONFLICT(encounter_id,combatant_id) DO UPDATE SET successes=0,failures=0,stable=0`).run(action.encounterId,target.combatant_id);
+    }else if(target.hit_points===0&&hitPointDamage>0){
+      db.prepare(`INSERT INTO combat_survival_v61(encounter_id,combatant_id,successes,failures,stable) VALUES(?,?,?,?,?)
+        ON CONFLICT(encounter_id,combatant_id) DO UPDATE SET successes=excluded.successes,failures=excluded.failures,stable=excluded.stable`)
+        .run(action.encounterId,target.combatant_id,dyingPlan.successes,dyingPlan.failures,dyingPlan.stable?1:0);
+    }else if(healing.endsDying){
+      db.prepare("DELETE FROM combat_survival_v61 WHERE encounter_id=? AND combatant_id=?").run(action.encounterId,target.combatant_id);
+    }
   }
   const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,action.campaignId,action.encounterId,target.combatant_id,hitPointDamage,statusAfter,at);
   if(concentrationCheck){const damage=outcomes.find((outcome)=>outcome.kind==="damage");if(damage)damage.concentrationCheck=concentrationCheck;}
-  if(dnd&&target.actor_id&&target.hit_points===0&&hp>0)db.prepare("DELETE FROM combat_survival_v61 WHERE encounter_id=? AND combatant_id=?").run(action.encounterId,target.combatant_id);
+  if(dnd&&target.actor_id)endConcentrationOnCondition(db,deps.ids,{campaignId:action.campaignId,encounterId:action.encounterId,
+    combatantId:target.combatant_id,actorId:target.actor_id,round:encounter.round_number,at});
   const turnPlan=turn(db,action.encounterId,source.combatant_id,target.combatant_id,statusAfter,encounter.round_number),combatAfter=encounter.revision+1;
   if(dnd&&turnPlan.next!==null){turnPlan.next=source.combatant_id;turnPlan.round=encounter.round_number;turnPlan.event={kind:"turn_continued"};}
   const combatantChanges:CombatantStateChange[]=hp!==target.hit_points?[{combatantId:target.combatant_id,hitPointsBefore:target.hit_points,hitPointsAfter:hp,statusBefore:target.status,statusAfter,stateRevisionBefore:target.state_revision}]:[];

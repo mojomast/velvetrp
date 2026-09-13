@@ -12,14 +12,19 @@
   "capabilityEvidence": [
     {
       "id": "concentration",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "descriptorStatus": "partial"
     }
   ],
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationDamage",
+    "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationEnvironment",
+    "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationEnd",
     "server/src/rulesets/dnd5e.ts#planDnd5eConcentrationReplacement",
-    "server/test/dnd5e-combat.test.ts"
+    "server/src/repo/encounter/concentration/concentrationRuntime.ts",
+    "server/src/repo/encounter/death/dyingRuntime.ts",
+    "server/test/dnd5e-combat.test.ts",
+    "server/test/dnd5e-death-concentration.test.ts"
   ],
   "apiEvidence": [
     "POST /api/rpg/v1/actors/:actorId/effect-commands"

@@ -13,10 +13,13 @@
   "runtimeEvidence": [
     "server/src/repo/encounter/combatActionPlan.ts",
     "server/src/repo/encounter/combatPowerRuntime.ts",
+    "server/src/repo/encounter/death/dyingRuntime.ts",
+    "server/src/repo/encounter/concentration/concentrationRuntime.ts",
     "server/src/repo/campaign/campaignAgentContextReadRepo.ts",
     "server/src/map/geometry.ts",
     "server/test/dnd-turn-economy-repository.test.ts",
     "server/test/dnd5e-agent-combat-awareness.test.ts",
+    "server/test/dnd5e-death-concentration.test.ts",
     "server/test/rpg-generated-campaign-journey.test.ts",
     "server/test/tactical-map-repo.test.ts",
     "docs/srd-5.1-coverage.md#unsupported-srd-areas"
