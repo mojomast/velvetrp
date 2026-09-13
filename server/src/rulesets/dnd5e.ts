@@ -157,6 +157,7 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   for (const condition of ["blinded", "poisoned", "prone", "restrained"] as const) if (attacker.has(condition)) disadvantageSources += 1;
   if (input.longRange) disadvantageSources += 1;
   if (deriveDnd5eExhaustionEffects(input.attackerExhaustion ?? 0).attackDisadvantage) disadvantageSources += 1;
+  if (input.attackerBenefit) advantageSources += 1;
   for (const condition of ["blinded", "restrained", "stunned", "unconscious"] as const) if (target.has(condition)) advantageSources += 1;
   if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }
   const autoCritical = input.kind === "melee"
@@ -368,10 +369,10 @@ const difficultyClasses = Object.freeze([
   Object.freeze({ id: "very-hard", name: "Very Hard", value: 25 }), Object.freeze({ id: "nearly-impossible", name: "Nearly Impossible", value: 30 }),
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
-const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values", "exhaustion"]);
-const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.2.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.1.0", "spell-costs": "1.1.0" });
+const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values", "exhaustion", "combat-markers"]);
+const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.2.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.2.0", "spell-costs": "1.1.0" });
 const capabilities = Object.freeze([
-  "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "exhaustion", "resources", "spell-costs", "derived-values", "legal-action-plans",
+  "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "exhaustion", "combat-markers", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
 
 export const DND_5E_RULESET_DESCRIPTOR: RulesetDescriptor = Object.freeze({

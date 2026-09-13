@@ -7,7 +7,8 @@ const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8");
+  + "\n" + readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -123,6 +124,24 @@ export function upgradeStartingGrantsSchema(
   return true;
 }
 
+/** Upgrades only the complete schema that predates the combat marker table. */
+export function upgradeCombatMarkerSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const markerNames = new Set(["combat_markers_v64"]);
+  const previous = expected.filter((object) => !markerNames.has(object.name));
+  if (JSON.stringify(actual) !== JSON.stringify(previous)) return false;
+  if (db.inTransaction) throw new Error("combat marker upgrade requires an independent transaction");
+  db.transaction(() => {
+    for (const object of expected.filter((object) => markerNames.has(object.name))) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -132,11 +151,18 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       })();
       return;
     }
-    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts") && !object.name.startsWith("campaign_context_inspection_") && !object.name.startsWith("agent_observations"));
+    const recallSql = readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8");
+    const inspectionSql = readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8");
+    const knowledgeSql = readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8");
+    const markerSql = readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8");
+    const prior = expectedObjects().filter(object => !object.name.startsWith("adventure_narration_contexts")
+      && !object.name.startsWith("campaign_context_inspection_") && !object.name.startsWith("agent_observations")
+      && !object.name.startsWith("combat_markers_"));
     const finishRecallUpgrade = () => {
-      db.exec(readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8"));
-      db.exec(readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8"));
-      db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8"));
+      db.exec(recallSql);
+      db.exec(inspectionSql);
+      db.exec(knowledgeSql);
+      db.exec(markerSql);
       assertCurrentDatabase(db, databasePath);
     };
     if (mismatchReason(schemaObjects(db), prior) === null) {
@@ -146,25 +172,37 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const missingRecall = !schemaObjects(db).some(object => object.name === "adventure_narration_contexts");
     const missingInspection = !schemaObjects(db).some(object => object.name === "campaign_context_inspection_headers_v61");
     const missingKnowledge = !schemaObjects(db).some(object => object.name.startsWith("agent_observations"));
+    const missingMarkers = !schemaObjects(db).some(object => object.name.startsWith("combat_markers_"));
     const expected = missingRecall ? prior : expectedObjects().filter(object =>
       (missingInspection ? !object.name.startsWith("campaign_context_inspection_") : true)
-      && (missingKnowledge ? !object.name.startsWith("agent_observations") : true));
+      && (missingKnowledge ? !object.name.startsWith("agent_observations") : true)
+      && (missingMarkers ? !object.name.startsWith("combat_markers_") : true));
     const validate = missingRecall ? finishRecallUpgrade : () => assertCurrentDatabase(db, databasePath);
     if (!missingRecall && missingInspection && mismatchReason(schemaObjects(db), expected) === null) {
       db.transaction(() => {
-        db.exec(readFileSync(new URL("./contextInspectionProvenanceSchema.sql", import.meta.url), "utf8"));
-        if (missingKnowledge) db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8"));
+        db.exec(inspectionSql);
+        if (missingKnowledge) db.exec(knowledgeSql);
+        if (missingMarkers) db.exec(markerSql);
         assertCurrentDatabase(db, databasePath);
       }).immediate();
       return;
     }
     if (!missingRecall && !missingInspection && missingKnowledge && mismatchReason(schemaObjects(db), expected) === null) {
-      db.transaction(() => { db.exec(readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8")); assertCurrentDatabase(db, databasePath); }).immediate();
+      db.transaction(() => {
+        db.exec(knowledgeSql);
+        if (missingMarkers) db.exec(markerSql);
+        assertCurrentDatabase(db, databasePath);
+      }).immediate();
+      return;
+    }
+    if (!missingRecall && !missingInspection && !missingKnowledge && missingMarkers && mismatchReason(schemaObjects(db), expected) === null) {
+      db.transaction(() => { db.exec(markerSql); assertCurrentDatabase(db, databasePath); }).immediate();
       return;
     }
     if (!upgradeStartingGrantsSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

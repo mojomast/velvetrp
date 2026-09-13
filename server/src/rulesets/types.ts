@@ -187,6 +187,8 @@ export type AttackConditionInput = Readonly<{
   longRange?: boolean;
   /** Exhaustion level 3+ imposes disadvantage on attack rolls. */
   attackerExhaustion?: number;
+  /** Help or hidden grants advantage on the next attack roll. */
+  attackerBenefit?: boolean;
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
 

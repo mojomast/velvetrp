@@ -5,6 +5,7 @@ import { resolveSrdEquipment, srdEncumbrance } from "../srdEquipmentRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 import { actionBlockingConditions, conditionsFor, mayAttackTarget, readActorExhaustion } from "./combatConditionRuntime.js";
+import { clearHelpedFromSource } from "./combatMarkerRuntime.js";
 import { authoritativeTacticalMapSchema } from "@velvet/contracts";
 import { lineOfEffectBetween } from "../../map/geometry.js";
 import { pointKey } from "../../map/types.js";
@@ -221,6 +222,8 @@ export function beginDndCombatTurn(
 ): void {
   if (!isDndCombat(db, campaignId)) return;
   if (readCombatTurnEconomy(db, encounterId)) throw new Error("combat already has a current turn economy");
+  // Help lasts until the start of the helper's next turn.
+  clearHelpedFromSource(db, encounterId, combatantId);
   db.prepare(`INSERT INTO combat_turn_economy_v60(turn_id,encounter_id,combatant_id,round_number,
     movement_allowance_feet,started_at) VALUES(?,?,?,?,?,?)`)
     .run(turnId, encounterId, combatantId, round, movementAllowance(db, campaignId, combatantId), at);

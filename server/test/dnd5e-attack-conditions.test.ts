@@ -27,6 +27,12 @@ describe("SRD 5.1 condition attack effects", () => {
     expect(plan([], ["prone"], "ranged")).toMatchObject({ mode: "disadvantage" });
   });
 
+  it("grants advantage for a help or hidden benefit that cancels against hindrance", () => {
+    expect(plan([], [], "melee")).toMatchObject({ mode: "normal" });
+    expect(planDnd5eAttackConditions({ attacker: [], target: [], kind: "melee", attackerBenefit: true })).toMatchObject({ mode: "advantage" });
+    expect(planDnd5eAttackConditions({ attacker: ["prone"], target: [], kind: "melee", attackerBenefit: true })).toMatchObject({ mode: "normal" });
+  });
+
   it("cancels advantage and disadvantage from any source", () => {
     expect(plan(["blinded"], ["restrained"])).toEqual({ mode: "normal", autoCritical: false });
     expect(plan(["prone"], ["prone"], "melee")).toEqual({ mode: "normal", autoCritical: false });

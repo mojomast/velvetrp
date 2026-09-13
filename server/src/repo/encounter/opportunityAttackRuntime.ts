@@ -6,6 +6,7 @@ import { planDnd5eAttackConditions, type ConditionId } from "../../rulesets/inde
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, conditionsFor, readActorExhaustion } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
+import { consumeCombatMarker, hasCombatMarker } from "./combatMarkerRuntime.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 
 export type OpportunityAttackDeps = { ids: IdGenerator; rng: RandomNumberGenerator };
@@ -75,16 +76,19 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
       if (!profile || !effect?.dice) throw new EncounterConflictError("opportunity attack profile is unavailable");
       attackBonus = profile.attack.attackBonus; damageType = effect.damageType; die = { ...effect.dice, modifier: effect.dice.modifier ?? 0 }; damageModifier = die.modifier;
     }
+    const attackerBenefit = hasCombatMarker(db, input.encounterId, reactor.combatant_id, "helped") || hasCombatMarker(db, input.encounterId, reactor.combatant_id, "hidden");
     const attackPlan = planDnd5eAttackConditions({
       attacker: [...conditionsFor(db, input.encounterId, reactor.combatant_id, input.round)] as ConditionId[],
       target: [...conditionsFor(db, input.encounterId, mover.combatant_id, input.round)] as ConditionId[],
       kind: "melee",
       attackerExhaustion: reactor.actor_id ? readActorExhaustion(db, input.campaignId, reactor.actor_id) : 0,
+      attackerBenefit,
     });
     const first = deps.rng.integer(1, 21); if (first < 1 || first > 20) throw new Error("combat RNG returned an out-of-range d20");
     const roll = attackPlan.mode === "normal" ? first : attackPlan.mode === "advantage" ? Math.max(first, deps.rng.integer(1, 21)) : Math.min(first, deps.rng.integer(1, 21));
     const attack = binding.module.mechanics!.resolveAttack({ rolls: [roll], abilityScore: attackAbility, proficiencyBonus, flatBonus: attackBonus - proficiencyBonus, armorClass: armorClass(db, input.encounterId, input.campaignId, mover) });
     const critical = attack.critical || (attackPlan.autoCritical && attack.hit);
+    if (attackerBenefit) { consumeCombatMarker(db, input.encounterId, reactor.combatant_id, "helped"); consumeCombatMarker(db, input.encounterId, reactor.combatant_id, "hidden"); }
     const rolls = attack.hit ? Array.from({length: die.count * (critical ? 2 : 1)}, () => deps.rng.integer(1, die.sides + 1)) : [];
     const damage = attack.hit ? binding.module.mechanics!.resolveDamageRoll({ dice: [die], rolls: [rolls], modifier: damageModifier, critical }).total : 0;
     const adjustedDamage = adjustedCombatDamage(damage, resolveCombatDamageAdjustment(db, input.campaignId, mover, damageType, input.occurredAt));

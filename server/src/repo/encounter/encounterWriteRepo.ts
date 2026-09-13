@@ -47,6 +47,7 @@ import { DND_5E_UNARMED_STRIKE, dnd5eProficiencyBonus, planDnd5eAttackConditions
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
+import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "./combatMarkerRuntime.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
 import { readReactionAvailability } from "./opportunityAttackRuntime.js";
 
@@ -257,8 +258,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             ||(plan.kind!=="attack"&&plan.kind!=="stabilize"&&plan.kind!=="grapple"&&plan.kind!=="escape-grapple"&&plan.kind!=="help"&&command.targetIds.length!==0))
          throw new EncounterConflictError("combat action targets are not legal");
 
-      const at=now(deps);
-      let outcome:any=null;
+       const at=now(deps);
+      let outcome:any=null,helpTarget:string|null=null,hideSucceeded=false;
       if(plan.kind==="attack"){
         const target=db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status ${dnd?"IN ('active','unconscious','stable')":"='active'"}`)
           .get(combatId,command.targetIds[0]!) as any;
@@ -299,17 +300,20 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
              const rangeFeet=candidate?.rangeFeetByTarget[target.combatant_id];
              const cover = candidate?.targetEvidence.find((evidence) => evidence.targetCombatantId === target.combatant_id)?.cover;
              const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
+             const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
              const attackPlan=planDnd5eAttackConditions({
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
                kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
                longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
-               attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0});
+               attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0,
+               attackerBenefit});
              const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
              const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
              proficiencyBonus:(unarmed?DND_5E_UNARMED_STRIKE.proficient:weapon.proficient)?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
           const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
+          if(attackerBenefit){consumeCombatMarker(db,combatId,current.combatant_id,"helped");consumeCombatMarker(db,combatId,current.combatant_id,"hidden");}
           const die=unarmed?DND_5E_UNARMED_STRIKE.damageDie:weapon.damage.die;
           const damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
           if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
@@ -387,6 +391,12 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
         interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,current.combatant_id,0,statusAfter,at);
       }else if(plan.kind==="flee"){
         outcome={kind:"status",targetId:current.combatant_id,statusBefore:"active",statusAfter:"fled"};
+      }else if(plan.kind==="help"){
+        helpTarget=command.targetIds[0]??null;
+      }else if(plan.kind==="hide"){
+        const stealth=deps.rng.integer(1,21);if(!Number.isInteger(stealth)||stealth<1||stealth>20)throw new Error("combat RNG returned an out-of-range d20");
+        const modifier=current.actor_id?actorStealthModifier(db,encounter.campaign_id,current.actor_id):null;
+        hideSucceeded=modifier!==null&&stealth+modifier>=opposingPassivePerception(db,encounter.campaign_id,combatId,current.team);
       }
       const before=root.revision,after=before+1;
       const stateOverrides=new Map<string,string>();
@@ -409,6 +419,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
        beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
          {kind:"action_resolved",actionId,action:plan.kind},"action",0);
+       if(helpTarget)grantCombatMarker(db,combatId,helpTarget,"helped",current.combatant_id,commandId,encounter.round_number,at);
+       if(plan.kind==="hide"&&hideSucceeded)grantCombatMarker(db,combatId,current.combatant_id,"hidden",current.combatant_id,commandId,encounter.round_number,at);
        if(plan.kind==="grapple"&&outcome?.success)
          applyCombatCondition(db,combatId,outcome.targetId,"grappled",current.combatant_id,commandId,null,at);
        if(plan.kind==="escape-grapple"&&outcome?.success)
@@ -466,10 +478,11 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
       if(target){
         let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass;}catch{armorClass=NaN;}
         if(Number.isInteger(armorClass)){
+             const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
              const attackPlan=planDnd5eAttackConditions({
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
-               kind:"melee"});
+               kind:"melee",attackerBenefit});
              const diceCount=attackPlan.mode==="normal"?plan.attackRollCount:Math.max(2,plan.attackRollCount);
              const rolls=Array.from({length:diceCount},()=>deps.rng.integer(1,21));
              if(rolls.some((value)=>!Number.isInteger(value)||value<1||value>20))throw new Error("combat RNG returned an out-of-range d20");
@@ -478,6 +491,7 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
             const binding=resolveCampaignRuleset(db,encounter.campaign_id),attack=binding.module.mechanics!.resolveAttack({rolls:[attackRoll],abilityScore:10,
                proficiencyBonus:profile.proficiencyBonus,flatBonus:profile.attack.attackBonus-profile.proficiencyBonus,armorClass});
            const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
+           if(attackerBenefit){consumeCombatMarker(db,combatId,current.combatant_id,"helped");consumeCombatMarker(db,combatId,current.combatant_id,"hidden");}
            const die=effect.dice,damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
            if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
             const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:effect.dice.modifier,critical}).total:0;
