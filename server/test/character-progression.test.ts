@@ -92,11 +92,11 @@ describe("character progression",()=>{
   it("exposes closed canonical level-one profiles for the broader SRD class set",()=>{
     const definitions=SRD_5_1_STARTER_CATALOG.definitions;
     const expected={
-      Barbarian:{hitDie:12,hpGain:12,abilities:["barbarian-rage"],resource:["rage"]},
-      Rogue:{hitDie:8,hpGain:8,abilities:["rogue-sneak-attack"],resource:[]},
-      Wizard:{hitDie:6,hpGain:6,abilities:["wizard-spellbook"],resource:["spell-slot-1"]},
-      Paladin:{hitDie:10,hpGain:10,abilities:["paladin-divine-sense","paladin-lay-on-hands"],resource:["lay-on-hands"]},
-      Ranger:{hitDie:10,hpGain:10,abilities:["ranger-favored-enemy","ranger-natural-explorer"],resource:[]},
+      Barbarian:{hitDie:12,hpGain:12,abilities:["barbarian-rage"],resource:["rage","hit-dice-d12"]},
+      Rogue:{hitDie:8,hpGain:8,abilities:["rogue-sneak-attack"],resource:["hit-dice-d8"]},
+      Wizard:{hitDie:6,hpGain:6,abilities:["wizard-spellbook"],resource:["spell-slot-1","hit-dice-d6"]},
+      Paladin:{hitDie:10,hpGain:10,abilities:["paladin-divine-sense","paladin-lay-on-hands"],resource:["lay-on-hands","hit-dice-d10"]},
+      Ranger:{hitDie:10,hpGain:10,abilities:["ranger-favored-enemy","ranger-natural-explorer"],resource:["hit-dice-d10"]},
     } as const;
     for(const [name,profile] of Object.entries(expected)){
       const klass=definitions.find((definition)=>definition.reference.kind==="class"&&definition.name===name) as any;

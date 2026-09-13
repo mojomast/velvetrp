@@ -712,6 +712,7 @@ export function createCharacterBuilderWriteRepository(
            const raceResourceGrants = chosen.race.mechanics.resourceGrants ?? [];
            const classResourceGrants = chosen.level.mechanics.resourceGrants ?? [];
            const resourceGrants = new Map<string, { currentIncrease: number; maxIncrease: number }>();
+           const resourceBindings = new Map<string, { kind: "ability" | "spell"; recovery: "encounter" | "short-rest" | "long-rest" }>();
            for (const grant of [...raceResourceGrants, ...classResourceGrants]) {
              const resourceId = grant.resourceId.replace(/^spell-slot-/, "slot-");
              if (resourceId === "health") throw new CharacterBuilderUnavailableError("race resource grant cannot replace health");
@@ -720,18 +721,28 @@ export function createCharacterBuilderWriteRepository(
                currentIncrease: (prior?.currentIncrease ?? 0) + grant.currentIncrease,
                maxIncrease: (prior?.maxIncrease ?? 0) + grant.maxIncrease,
              });
+             // Rest recovery is declared on the class grant; spell slots default to a long rest.
+             const recovery = grant.recovery ?? (resourceId.startsWith("slot-") ? "long-rest" : undefined);
+             if (recovery && recovery !== "none" && !resourceId.startsWith("hit-dice-")) {
+               resourceBindings.set(resourceId, { kind: resourceId.startsWith("slot-") ? "spell" : "ability", recovery });
+             }
            }
            const insertResourceGrant = (resourceId: string, current: number, maximum: number) => db.prepare(
              "INSERT INTO rpg_actor_resources (campaign_id,actor_id,name,current,max) VALUES (?,?,?,?,?)",
            ).run(row.campaign_id, actorId, resourceId, current, maximum);
            for (const [resourceId, grant] of resourceGrants) insertResourceGrant(resourceId, grant.currentIncrease, grant.maxIncrease);
            if (row.rules_profile_id === SRD_5_1_STARTER_RULES_PROFILE_ID) {
-             insertResourceGrant(`hit-dice-d${chosen.klass.mechanics.hitDie}`, 1, 1);
              if (!resourceGrants.has("slot-1") && chosen.level.mechanics.preparedSpellRefs?.length) {
                insertResourceGrant("slot-1", 2, 2);
+               resourceBindings.set("slot-1", { kind: "spell", recovery: "long-rest" });
              }
              insertResourceGrant("exhaustion", 0, 6);
            }
+           for (const [resourceId, binding] of resourceBindings) db.prepare(
+             `INSERT INTO rpg_actor_resource_bindings_v25(campaign_id,actor_id,resource_name,binding_key,binding_json)
+              VALUES(?,?,?,?,?) ON CONFLICT(campaign_id,actor_id,resource_name)
+              DO UPDATE SET binding_key=excluded.binding_key,binding_json=excluded.binding_json`,
+           ).run(row.campaign_id, actorId, resourceId, binding.kind, canonicalCatalogJson(binding));
           db.prepare(
             `INSERT INTO character_derived_snapshots_v19 (draft_id,campaign_id,campaign_character_id,sheet_id,actor_id,calculator_version,derived_json,created_at) VALUES (?,?,?,?,?,'velvet-character-derived-v1',?,?)`,
           ).run(

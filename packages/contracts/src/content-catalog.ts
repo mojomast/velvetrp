@@ -127,7 +127,7 @@ export const raceCatalogDefinitionSchema = z.object({
     languages: z.array(z.string().trim().min(1).max(64)).max(16).optional(), proficiencies: z.array(z.string().trim().min(1).max(128)).max(16).optional(),
     damageResistances: z.array(z.enum(["acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic", "piercing", "poison", "psychic", "radiant", "slashing", "thunder"])).max(8).optional(),
     senses: z.array(srdSenseSchema).max(8).optional(),
-    resourceGrants: z.array(z.object({ resourceId: resourceIdSchema, maxIncrease: z.number().int().min(1).max(100), currentIncrease: z.number().int().min(0).max(100) }).strict()
+    resourceGrants: z.array(z.object({ resourceId: resourceIdSchema, maxIncrease: z.number().int().min(1).max(100), currentIncrease: z.number().int().min(0).max(100), recovery: recoverySchema.optional() }).strict()
       .refine((value) => value.currentIncrease <= value.maxIncrease, "current increase cannot exceed max increase")).max(8).optional(),
   }).strict(),
 }).strict();
@@ -171,6 +171,8 @@ export const classLevelCatalogDefinitionSchema = z.object({
       resourceId: resourceIdSchema,
       maxIncrease: z.number().int().min(1).max(100),
       currentIncrease: z.number().int().min(0).max(100),
+      /** Optional rest recovery for the granted pool; absent means no recharge binding. */
+      recovery: recoverySchema.optional(),
     }).strict().refine((value) => value.currentIncrease <= value.maxIncrease,
       "current increase cannot exceed max increase")).max(8).optional(),
   }).strict(),
