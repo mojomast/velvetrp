@@ -140,6 +140,8 @@ export const actorPowerCommandRequestSchema = z.object({
   choices: actorPowerChoicesSchema,
   expectedRevision: expectedRevisionSchema,
   idempotencyKey: idempotencyKeySchema,
+  /** Explicit upcast slot level for a leveled spell; defaults to the spell's level. */
+  slotLevel: z.number().int().min(1).max(9).optional(),
 }).strict();
 
 /** Costs are derived from the pinned definition, never accepted from a caller. */

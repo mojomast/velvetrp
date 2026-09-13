@@ -129,8 +129,8 @@
       "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Spellcasting:Spell Slots", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=101" }, { "id": "SRD5.1:Spellcasting:Components", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=102" }],
-      "capabilityEvidence": [{ "id": "spell-costs", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eSpellCost", "server/src/repo/spellcastingRepo.ts", "server/src/repo/actorPowerCommandPlanner.ts#isSupportedRangedSpell", "server/test/spellcasting.test.ts"],
+      "capabilityEvidence": [{ "id": "spell-costs", "version": "1.1.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e.ts#planDnd5eSpellCost", "server/src/repo/actorPowerUseRepo.ts", "server/src/repo/spellcastingRepo.ts", "server/src/repo/actorPowerCommandPlanner.ts#isSupportedRangedSpell", "server/test/spellcasting.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/actors/:actorId/spell-commands"]
     },
     {

@@ -12,6 +12,7 @@ import { M16AuthorizationError, M16ConflictError, M16StaleError } from "./effect
 import { m15Authorized } from "./actorResourceRepo.js";
 import { planActorPowerCommands, plannedPowerSelection } from "./actorPowerCommandPlanner.js";
 import { actorHasActiveEncounter } from "./encounter/activeEncounterPolicy.js";
+import { planDnd5eSpellCost } from "../rulesets/index.js";
 
 export class ActorPowerNotFoundError extends Error { readonly code="ACTOR_POWER_NOT_FOUND"; }
 export class ActorPowerConflictError extends Error { readonly code="ACTOR_POWER_CONFLICT"; }
@@ -67,6 +68,33 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     const states=new Map<string,Resource[]>();const load=(id:string)=>{let value=states.get(id);if(!value){value=(db.prepare("SELECT name resourceId,current,max capacity FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? ORDER BY name").all(campaignId,id) as Resource[]).map(row=>({...row}));states.set(id,value);}return value;};
     // The shared planner checked required resources. Re-read into this transaction's mutable working set.
     targetIds.forEach(load);
+    // SRD 5.1 upcasting: a leveled spell may consume a slot above its level.
+    let chosenSlotLevel:number|undefined;
+    if(intent.powerRef.kind==="spell"&&definition.mechanics.level>0){
+      const requested=intent.slotLevel;
+      if(requested!==undefined&&requested<definition.mechanics.level)
+        throw new ActorPowerConflictError("slot level is below the spell level");
+      const slots:Record<number,number>={};
+      for(const resource of load(actorId)){const match=/^(?:spell-)?slot-(\d+)$/.exec(resource.resourceId);if(match)slots[Number(match[1])]=resource.current;}
+      const slotLevel=requested??definition.mechanics.level;
+      if(!planDnd5eSpellCost({spellLevel:definition.mechanics.level,slotLevel,slots}).legal)
+        throw new ActorPowerConflictError("spell slot is unavailable at that level");
+      chosenSlotLevel=slotLevel;
+      for(let index=0;index<costs.length;index+=1)if(costs[index].kind==="slot")costs[index]={kind:"slot",slotId:`slot-${slotLevel}`,amount:1};
+      // Each slot above the spell level adds one die to a single-effect spell and
+      // one more instance to a multi-effect spell (for example Magic Missile darts).
+      const extra=slotLevel-definition.mechanics.level;
+      if(extra>0){
+        const effects=definition.mechanics.effects as any[];
+        const scaling=effects.filter((effect)=>effect.type==="damage"||effect.type==="healing");
+        if(effects.length===1&&scaling.length===1)
+          definition.mechanics={...definition.mechanics,effects:[{...scaling[0],dice:{...scaling[0].dice,count:scaling[0].dice.count+extra}}]};
+        else if(scaling.length===effects.length)
+          definition.mechanics={...definition.mechanics,effects:[...effects,...Array.from({length:extra},()=>({...scaling[0]}))]};
+      }
+    }else if(intent.slotLevel!==undefined){
+      throw new ActorPowerConflictError("slot level is only valid for a leveled spell");
+    }
     const now=utcIsoTimestampSchema.parse(deps.clock.now().toISOString()),commandId=resourceIdSchema.parse(deps.ids.nextId()),powerUseId=resourceIdSchema.parse(deps.ids.nextId());
     const outcomes:any[]=[],deltas:any[]=[],newEffects=new Map<string,NewEffect>(),replacements=new Map<string,string>();
     const change=(id:string,name:string,amount:number)=>{const row=load(id).find(item=>item.resourceId===name)!;const prior=row.current;row.current=Math.max(0,Math.min(row.capacity,prior+amount));if(prior!==row.current)deltas.push({kind:"resource",actorId:id,resourceId:name,before:prior,after:row.current});return row.current-prior;};
@@ -97,7 +125,7 @@ export function useActorPower(db:DatabaseDriver.Database,deps:M16Dependencies,gu
     for(const [id,effect] of newEffects){const cmd=id===actorId?{id:commandId,after:before+1}:targetCommands.get(id)!;persistEffect(id,effect,cmd.id,cmd.after);}
     // v26's nullable slot_level CHECK accidentally rejects SQL NULL. Preserve
     // its established sentinel while the public resolution remains truthful.
-    db.prepare("INSERT INTO rpg_power_uses_v26(power_use_id,campaign_id,actor_id,command_id,resulting_revision,power_pack_id,power_pack_version,power_kind,power_definition_id,slot_kind,slot_level,target_actor_id,use_json,used_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(powerUseId,campaignId,actorId,commandId,before+1,intent.powerRef.packId,intent.powerRef.packVersion,intent.powerRef.kind,intent.powerRef.definitionId,"slot",intent.powerRef.kind==="spell"&&definition.mechanics.level>0?definition.mechanics.level:1,targetIds.length===1?targetIds[0]:null,request,now);
+    db.prepare("INSERT INTO rpg_power_uses_v26(power_use_id,campaign_id,actor_id,command_id,resulting_revision,power_pack_id,power_pack_version,power_kind,power_definition_id,slot_kind,slot_level,target_actor_id,use_json,used_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(powerUseId,campaignId,actorId,commandId,before+1,intent.powerRef.packId,intent.powerRef.packVersion,intent.powerRef.kind,intent.powerRef.definitionId,"slot",chosenSlotLevel??(intent.powerRef.kind==="spell"&&definition.mechanics.level>0?definition.mechanics.level:1),targetIds.length===1?targetIds[0]:null,request,now);
     costs.filter(cost=>cost.kind==="slot").forEach((cost:any,index)=>db.prepare("INSERT INTO rpg_power_use_costs_v26 VALUES(?,?,?,?,?)").run(powerUseId,index,"slot",cost.slotId,1));
     db.prepare("INSERT INTO rpg_m16_events_v26 VALUES(?,?,?,?,?,?,?,?)").run(resourceIdSchema.parse(deps.ids.nextId()),campaignId,actorId,commandId,before+1,"power_used",canonical(result),now);
     for(const [id,cmd] of targetCommands){const linked={linkedPowerUseId:powerUseId};db.prepare("INSERT INTO rpg_m16_events_v26 VALUES(?,?,?,?,?,?,?,?)").run(resourceIdSchema.parse(deps.ids.nextId()),campaignId,id,cmd.id,cmd.after,newEffects.has(id)?"effect_applied":"power_used",canonical(linked),now);db.prepare("UPDATE rpg_m16_mutation_revisions_v26 SET revision=?,updated_at=? WHERE campaign_id=? AND actor_id=?").run(cmd.after,now,campaignId,id);}

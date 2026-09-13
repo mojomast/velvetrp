@@ -63,6 +63,45 @@ describe("spellcasting vertical slice", () => {
     reopened.close();
   });
 
+  it("upcasts a leveled spell into a higher slot and scales the effect", () => {
+    let sequence = 0;
+    const repo = createRepository({ clock: { now: () => new Date(at) }, ids: { nextId: () => `upcast-${++sequence}` }, rng: { integer: () => 4 } });
+    const campaign = repo.createCampaign("local-owner", { name: "Spell upcasting" });
+    repo.installSrdStarterCatalog("local-owner");
+    repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });
+    const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+    const cure = ref("srd-5.1:spell:cure-wounds");
+    const createActor = (name: string, classId: string, preparedSpells?: ReturnType<typeof ref>[]) => {
+      const id = name.replace(/\s+/g, "-");
+      const persona = repo.createCharacter({ name, age: 30, archetype: name, boundaries: "", fictionalConfirmed: true });
+      const base = repo.updateCharacterDraft("local-owner", repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable", allocation: { method: "standard-array", scores }, idempotencyKey: `${id}-draft` }).draft.id, { expectedRevision: 0, idempotencyKey: `${id}-base`, selections: {
+        race: definitions.find((entry) => entry.reference.kind === "race")!.reference,
+        background: definitions.find((entry) => entry.reference.kind === "background")!.reference,
+        class: definitions.find((entry) => entry.reference.definitionId === classId)!.reference,
+        starterGrant: "kit",
+      } } as never);
+      const selected = preparedSpells ? repo.updateCharacterDraft("local-owner", base.draft.id, { expectedRevision: base.draft.revision, idempotencyKey: `${id}-spells`, selections: { preparedSpells } } as never) : base;
+      return repo.finalizeCharacterDraft("local-owner", selected.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: `${id}-final` }).receipt.actorId;
+    };
+    const cleric = createActor("Upcast Cleric", "srd-5.1:class:cleric", [cure]);
+    const target = createActor("Upcast Target", "srd-5.1:class:fighter");
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    db.prepare("UPDATE rpg_actor_resources SET current=1 WHERE campaign_id=? AND actor_id=? AND name='health'").run(campaign.id, target);
+    expect((db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='slot-1'").get(campaign.id, cleric) as { current: number }).current).toBeGreaterThan(0);
+    db.prepare("INSERT INTO rpg_actor_resources(campaign_id,actor_id,name,current,max) VALUES(?,?,'slot-2',1,1)").run(campaign.id, cleric);
+    db.close();
+    const command = { powerRef: cure, targetIds: [target], choices: [] as [], components: { verbal: true, somatic: true, material: false }, expectedRevision: 0, idempotencyKey: "upcast-cure", slotLevel: 2 };
+    const result = repo.castSpell("local-owner", cleric, command);
+    expect(result.resolution.costs).toEqual([{ kind: "slot", slotId: "slot-2", amount: 1 }]);
+    expect(result.resolution.outcomes).toContainEqual(expect.objectContaining({ kind: "healing", targetId: target, applied: 8 }));
+    const stateDb = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    expect(stateDb.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='slot-2'").get(campaign.id, cleric)).toEqual({ current: 0 });
+    expect(stateDb.prepare("SELECT slot_level FROM rpg_power_uses_v26 WHERE campaign_id=? AND actor_id=? AND power_definition_id=?").get(campaign.id, cleric, "srd-5.1:spell:cure-wounds")).toEqual({ slot_level: 2 });
+    stateDb.close();
+    expect(() => repo.castSpell("local-owner", cleric, { ...command, expectedRevision: 1, idempotencyKey: "upcast-missing-slot", slotLevel: 3 })).toThrow();
+    repo.close();
+  });
+
   it("validates supported ranged spells against authoritative maps and replays receipts", async () => {
     let sequence = 0;
     const repo = createRepository({ clock: { now: () => new Date(at) }, ids: { nextId: () => `ranged-${++sequence}` }, rng: { integer: () => 4 } });
