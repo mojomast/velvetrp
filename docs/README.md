@@ -62,5 +62,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [RPG integration plan](rpg-integration-plan.md) - Original integration design and historical operation ledgers; current implementation can be newer.
 - [Roleplay architecture notes (2026)](roleplay-architecture-2026.md) - Dated architecture decisions and historical checkpoints; current status statements may age.
 - [Roleplay product/feature snapshot (2026)](trending-roleplay-features-2026.md) - Dated internal planning snapshot, not external research, provenance, a commitment, or a contract.
+- [SRD 5.1 parity plan](srd-5.1-parity-plan.md) - Gap map and phased plan for full SRD 5.1 rules and content coverage; planning only.
+- [OmniVoice Studio support plan](omnivoice-support-plan.md) - Proposed optional voiced narration design and remote OmniVoice builder handoff; planning only.
 
 For behavior conflicts, prefer shared runtime contracts and current code, then the [API reference](api.md), [Streaming](streaming.md), and normative repository architecture where applicable. Use dated planning records only for historical rationale.
