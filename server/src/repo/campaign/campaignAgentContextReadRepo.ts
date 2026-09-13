@@ -273,15 +273,25 @@ export function createCampaignAgentContextReadRepository(
           || (audience.kind === "enemy" && current?.combatant_id === targetEnemyId);
         if (audienceOwnsCurrent) {
           const plans=buildCombatActionPlans(db, principal, campaign, encounter.encounter_id,encounter.current_turn_combatant_id);
-          legalActionCandidates=plans.filter((plan):plan is typeof plan&{kind:"attack"|"flee"|"end-turn"}=>["attack","flee","end-turn"].includes(plan.kind)).flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).flatMap((targetId)=>{
+          const actionLabel=(kind:(typeof plans)[number]["kind"],targetLabel:string|null):string=>kind==="attack"?`Basic attack against ${targetLabel}`
+            :kind==="grapple"?`Grapple ${targetLabel}`:kind==="shove"?`Shove ${targetLabel}`:kind==="help"?`Help ${targetLabel}`
+            :kind==="stabilize"?`Stabilize ${targetLabel}`:kind==="escape-grapple"?"Escape grapple":kind==="dash"?"Dash"
+            :kind==="disengage"?"Disengage":kind==="hide"?"Hide":kind==="death-save"?"Roll death saving throw"
+            :kind==="flee"?"Flee encounter":"End turn";
+          const actionConsequence=(kind:(typeof plans)[number]["kind"]):string=>kind==="attack"?"resolve one basic attack and advance the turn"
+            :kind==="grapple"?"contest Strength to grapple the target":kind==="shove"?"contest Strength to knock the target prone"
+            :kind==="help"?"grant the ally advantage on their next attack":kind==="stabilize"?"stabilize the unconscious ally"
+            :kind==="escape-grapple"?"contest to escape the grapple":kind==="dash"?"gain extra movement this turn"
+            :kind==="disengage"?"move without provoking opportunity attacks":kind==="hide"?"attempt to hide and gain advantage"
+            :kind==="death-save"?"roll a death saving throw":kind==="flee"?"leave the encounter if the action succeeds":"finish the current turn";
+          legalActionCandidates=plans.flatMap((plan)=>(plan.targetIds.length?plan.targetIds:[null]).flatMap((targetId)=>{
             const targetRow=targetId===null?null:combatants.find((combatant)=>combatant.combatant_id===targetId);
             const targetLabel=targetRow ? combatantLabels.get(targetRow.combatant_id) ?? null : null;
             if(targetId!==null&&!targetLabel)return[];
             const legalActionId=targetId===null?plan.legalActionId:`${plan.legalActionId}:target:${createHash("sha256").update(targetId).digest("hex").slice(0,12)}`;
-            const actionLabel=plan.kind==="end-turn"?"End turn":plan.kind==="flee"?"Flee encounter":`Basic attack against ${targetLabel}`;
-            return[{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,label:actionLabel,targetLabel,
+            return[{legalActionId,commandLegalActionId:plan.legalActionId,kind:plan.kind,targetId,label:actionLabel(plan.kind,targetLabel),targetLabel,
               digest:createHash("sha256").update(JSON.stringify([encounter.encounter_id,encounter.revision,legalActionId,plan.actingCombatantId,targetId])).digest("hex")}];}));
-          legalActions = legalActionCandidates.map((candidate) => `${candidate.label}; consequence: ${candidate.kind==="attack"?"resolve one basic attack and advance the turn":candidate.kind==="flee"?"leave the encounter if the action succeeds":"finish the current turn"}.`);
+          legalActions = legalActionCandidates.map((candidate) => `${candidate.label}; consequence: ${actionConsequence(candidate.kind)}.`);
         }
       }
 

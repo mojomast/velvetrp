@@ -114,7 +114,8 @@ export interface CampaignAgentContextSnapshot {
     currentCombatantKind: "actor" | "enemy" | null;
     currentActorId: string | null;
     legalActionCandidates: Array<{ legalActionId:string; commandLegalActionId:string; digest:string;
-      kind:"attack"|"flee"|"end-turn"; targetId:string|null; label?:string; targetLabel?:string|null }>;
+      kind:"attack"|"grapple"|"escape-grapple"|"shove"|"dash"|"disengage"|"help"|"hide"|"flee"|"end-turn"|"stabilize"|"death-save";
+      targetId:string|null; label?:string; targetLabel?:string|null }>;
   };
 }
 
