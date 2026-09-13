@@ -45,7 +45,7 @@ import { buildCombatPowerLegalActions, executeCombatPower, getCombatPowerResultB
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, removeCombatCondition } from "./combatConditionRuntime.js";
+import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { isMonsterKnockdown, planMonsterTurn } from "./monsterTurnPlanner.js";
 import { readReactionAvailability } from "./opportunityAttackRuntime.js";
@@ -303,7 +303,8 @@ export function createEncounterWriteRepository(db:DatabaseDriver.Database,deps:E
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
                kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
-               longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0)});
+               longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
+               attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0});
              const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
              const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,

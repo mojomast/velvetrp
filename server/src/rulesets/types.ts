@@ -185,8 +185,20 @@ export type AttackConditionInput = Readonly<{
   target: readonly ConditionId[];
   kind: "melee" | "ranged" | "thrown";
   longRange?: boolean;
+  /** Exhaustion level 3+ imposes disadvantage on attack rolls. */
+  attackerExhaustion?: number;
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
+
+/** SRD 5.1 exhaustion levels 0-6 and their mechanical effects. */
+export type ExhaustionEffects = Readonly<{
+  level: number;
+  checkDisadvantage: boolean;
+  speedMultiplier: 0 | 0.5 | 1;
+  attackDisadvantage: boolean;
+  saveDisadvantage: boolean;
+  hitPointMaximumMultiplier: 0.5 | 1;
+}>;
 
 /** SRD 5.1 carrying, encumbered, and heavily encumbered thresholds. */
 export type EncumbranceInput = Readonly<{ carriedWeight: number; strengthScore: number }>;

@@ -1,7 +1,7 @@
 import type {
   AbilityId, AttackConditionInput, AttackConditionPlan, AttackInput, AttackResolution, CharacterDerivedInput, CharacterDerivedValues, CheckInput,
   CheckResolution, ConcentrationPlan, ConditionId, ConditionStatePlan, D20RollEvidence, D20TestInput,
-  D20TestResolution, DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, EncumbranceInput, EncumbrancePlan,
+  D20TestResolution, DamageAdjustment, DamageAdjustmentPlan, DamageRollInput, DamageRollResolution, EncumbranceInput, EncumbrancePlan, ExhaustionEffects,
   InitiativeEntry, InitiativeResult, LegalActionPlan, MovementInput, MovementPlan, RecoveryPlan,
   ResourceCost, ResourceCostPlan, ResourcePool, RestInput, RollMode, RulesetDescriptor, RulesetMechanics, RulesetModule,
   SkillId, SpellCostInput, SpellCostPlan, TestKind, TestResolution,
@@ -127,6 +127,24 @@ export function resolveDnd5eAttack(input: AttackInput): AttackResolution {
 }
 
 /**
+ * SRD 5.1 exhaustion: level 1 disadvantage on ability checks; level 2 speed
+ * halved; level 3 disadvantage on attack rolls and saving throws; level 4 hit
+ * point maximum halved; level 5 speed 0; level 6 death.
+ */
+export function deriveDnd5eExhaustionEffects(level: number): ExhaustionEffects {
+  requireInteger(level, "exhaustion level");
+  if (level < 0 || level > 6) throw new RangeError("exhaustion level must be between 0 and 6");
+  return Object.freeze({
+    level,
+    checkDisadvantage: level >= 1,
+    speedMultiplier: level >= 5 ? 0 : level >= 2 ? 0.5 : 1,
+    attackDisadvantage: level >= 3,
+    saveDisadvantage: level >= 3,
+    hitPointMaximumMultiplier: level >= 4 ? 0.5 : 1,
+  });
+}
+
+/**
  * SRD 5.1 condition effects on one attack roll. Attacker hindrances produce
  * disadvantage; a blinded, restrained, stunned, or unconscious target (and a
  * prone target in melee) produces advantage. Advantage and disadvantage from
@@ -138,6 +156,7 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   let advantageSources = 0, disadvantageSources = 0;
   for (const condition of ["blinded", "poisoned", "prone", "restrained"] as const) if (attacker.has(condition)) disadvantageSources += 1;
   if (input.longRange) disadvantageSources += 1;
+  if (deriveDnd5eExhaustionEffects(input.attackerExhaustion ?? 0).attackDisadvantage) disadvantageSources += 1;
   for (const condition of ["blinded", "restrained", "stunned", "unconscious"] as const) if (target.has(condition)) advantageSources += 1;
   if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }
   const autoCritical = input.kind === "melee"
@@ -349,10 +368,10 @@ const difficultyClasses = Object.freeze([
   Object.freeze({ id: "very-hard", name: "Very Hard", value: 25 }), Object.freeze({ id: "nearly-impossible", name: "Nearly Impossible", value: 30 }),
 ]);
 const supportedMechanics = Object.freeze(["d20 tests and passive checks", "attacks and damage", "initiative and movement", "rests and concentration", "conditions and resource plans", "character derived values"]);
-const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values"]);
+const partialCapabilities = new Set(["damage", "movement", "rests", "concentration", "conditions", "spell-costs", "derived-values", "exhaustion"]);
 const capabilityVersions: Readonly<Record<string, string>> = Object.freeze({ attacks: "1.1.0", conditions: "1.1.0", damage: "1.1.0", movement: "1.1.0" });
 const capabilities = Object.freeze([
-  "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "resources", "spell-costs", "derived-values", "legal-action-plans",
+  "checks", "passive-checks", "attacks", "damage", "initiative", "movement", "rests", "concentration", "conditions", "exhaustion", "resources", "spell-costs", "derived-values", "legal-action-plans",
 ].map((id) => Object.freeze({ id, version: capabilityVersions[id] ?? "1.0.0", status: partialCapabilities.has(id) ? "partial" as const : "supported" as const })));
 
 export const DND_5E_RULESET_DESCRIPTOR: RulesetDescriptor = Object.freeze({

@@ -4,7 +4,7 @@ import type { IdGenerator, RandomNumberGenerator } from "../../runtime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { planDnd5eAttackConditions, type ConditionId } from "../../rulesets/index.js";
 import { resolveSrdEquipment } from "../srdEquipmentRuntime.js";
-import { absorbDamage, conditionsFor } from "./combatConditionRuntime.js";
+import { absorbDamage, conditionsFor, readActorExhaustion } from "./combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "./damageAdjustment.js";
 import { EncounterConflictError } from "./encounterErrors.js";
 
@@ -79,6 +79,7 @@ export function resolveOpportunityAttacks(db: DatabaseDriver.Database, deps: Opp
       attacker: [...conditionsFor(db, input.encounterId, reactor.combatant_id, input.round)] as ConditionId[],
       target: [...conditionsFor(db, input.encounterId, mover.combatant_id, input.round)] as ConditionId[],
       kind: "melee",
+      attackerExhaustion: reactor.actor_id ? readActorExhaustion(db, input.campaignId, reactor.actor_id) : 0,
     });
     const first = deps.rng.integer(1, 21); if (first < 1 || first > 20) throw new Error("combat RNG returned an out-of-range d20");
     const roll = attackPlan.mode === "normal" ? first : attackPlan.mode === "advantage" ? Math.max(first, deps.rng.integer(1, 21)) : Math.min(first, deps.rng.integer(1, 21));

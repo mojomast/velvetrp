@@ -122,6 +122,32 @@ describe("persisted D&D turn economy",()=>{
     repo.close();
   });
 
+  it("halves the turn-start movement allowance for an exhausted actor", async () => {
+    let sequence = 0;
+    const options = { clock: { now: () => new Date("2036-03-01T00:00:00.000Z") }, ids: { nextId: () => `exhaustion-${++sequence}` }, rng: { integer: () => 20 } };
+    const repo = createRepository(options);
+    const campaign = repo.createCampaign("local-owner", { name: "Exhaustion" });
+    repo.installSrdStarterCatalog("local-owner");
+    repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });
+    const persona = repo.createCharacter({ name: "Tired Hero", age: 30, archetype: "Fighter", boundaries: "", fictionalConfirmed: true });
+    const draft = repo.createCharacterDraft("local-owner", campaign.id, { personaId: persona.id, controllerPrincipalId: "local-owner", durability: "durable",
+      allocation: { method: "standard-array", scores: Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((key, i) => [key, CHARACTER_BUILDER_STANDARD_ARRAY[i]])) as any }, idempotencyKey: "draft" });
+    const definitions = SRD_5_1_STARTER_CATALOG.definitions;
+    const selected = repo.updateCharacterDraft("local-owner", draft.draft.id, { expectedRevision: 0, idempotencyKey: "select", selections: {
+      race: definitions.find(d => d.reference.kind === "race")!.reference, background: definitions.find(d => d.reference.kind === "background")!.reference,
+      class: definitions.find(d => d.reference.kind === "class")!.reference, starterGrant: "kit" } } as any);
+    const actor = repo.finalizeCharacterDraft("local-owner", draft.draft.id, { expectedRevision: selected.draft.revision, idempotencyKey: "final" }).receipt.actorId;
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    db.prepare("UPDATE rpg_actor_resources SET current=2 WHERE campaign_id=? AND actor_id=? AND name='exhaustion'").run(campaign.id, actor);
+    db.close();
+    const session = await createSession({ characterId: persona.id, title: "Exhausted combat" });
+    repo.attachCampaignSession("local-owner", { campaignId: campaign.id, sessionId: session.id } as any);
+    const prepared = repo.createEncounter("local-owner", campaign.id, { sessionId: session.id, name: "Tired fight", combatants: [{ kind: "actor", actorId: actor, team: "allies" }], idempotencyKey: "prepare" });
+    const combat = repo.startEncounter("local-owner", prepared.encounter.encounterId, { expectedRevision: 1, idempotencyKey: "start" }).combat;
+    expect(combat.turnEconomy!.movement.allowanceFeet).toBe(15);
+    repo.close();
+  });
+
   it("rejects an unavailable exact pin and ends a pinned enemy turn with no actor target",async()=>{
     let sequence=0;const options={clock:{now:()=>new Date("2036-01-01T00:00:00.000Z")},ids:{nextId:()=>`enemy-profile-${++sequence}`},rng:{integer:()=>20}};
     const repo=createRepository(options),campaign=repo.createCampaign("local-owner",{name:"Enemy pins"});

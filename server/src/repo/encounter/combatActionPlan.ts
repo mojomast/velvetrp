@@ -1,10 +1,10 @@
 import type DatabaseDriver from "better-sqlite3";
 import { createHash } from "node:crypto";
-import { planDnd5eEncumbrance } from "../../rulesets/index.js";
+import { deriveDnd5eExhaustionEffects, planDnd5eEncumbrance } from "../../rulesets/index.js";
 import { resolveSrdEquipment, srdEncumbrance } from "../srdEquipmentRuntime.js";
 import { resolveCampaignRuleset } from "../../rulesets/campaignBinding.js";
 import { EncounterConflictError } from "./encounterErrors.js";
-import { actionBlockingConditions, conditionsFor, mayAttackTarget } from "./combatConditionRuntime.js";
+import { actionBlockingConditions, conditionsFor, mayAttackTarget, readActorExhaustion } from "./combatConditionRuntime.js";
 import { authoritativeTacticalMapSchema } from "@velvet/contracts";
 import { lineOfEffectBetween } from "../../map/geometry.js";
 import { pointKey } from "../../map/types.js";
@@ -200,6 +200,7 @@ function movementAllowance(db: DatabaseDriver.Database, campaignId: string, comb
       try {
         const load = srdEncumbrance(resolveSrdEquipment(db, campaignId, row.actor_id));
         allowance = Math.max(0, base - planDnd5eEncumbrance({ carriedWeight: load.carriedWeight, strengthScore: load.strengthScore }).speedReduction);
+        allowance = Math.floor(allowance * deriveDnd5eExhaustionEffects(readActorExhaustion(db, campaignId, row.actor_id)).speedMultiplier);
       } catch { /* keep the persisted derived speed when the equipment snapshot is unavailable */ }
     }
     const encounter = db.prepare("SELECT encounter_id,round_number FROM encounter WHERE current_turn_combatant_id=? AND campaign_id=? AND status='active'")

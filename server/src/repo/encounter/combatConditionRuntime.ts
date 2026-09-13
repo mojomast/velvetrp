@@ -29,6 +29,13 @@ export function removeCombatCondition(
     .run(encounterId, combatantId, condition);
 }
 
+/** Reads the clamped persisted exhaustion level for one actor (0 when absent). */
+export function readActorExhaustion(db: DatabaseDriver.Database, campaignId: string, actorId: string): number {
+  const value = (db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name='exhaustion'")
+    .get(campaignId, actorId) as { current: number } | undefined)?.current;
+  return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 6 ? value as number : 0;
+}
+
 /** Reads only non-expired closed combat conditions. Source identity remains private. */
 export function conditionsFor(db: DatabaseDriver.Database, encounterId: string, combatantId: string, round: number): Set<string> {
   return new Set((db.prepare(`SELECT DISTINCT condition FROM combat_conditions_v62
