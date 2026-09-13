@@ -182,9 +182,11 @@ describe("campaign-bound SRD 5.1 starter", () => {
       { category: "saving-throw", proficiencyId: "strength" },
       { category: "saving-throw", proficiencyId: "constitution" },
     ]);
-    expect(finalized.receipt.startingGrants).toEqual([
+    expect(finalized.receipt.startingGrants).toHaveLength(2);
+    expect(finalized.receipt.startingGrants).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "item", quantity: 1, reference: expect.objectContaining({ definitionId: "srd-5.1:item:acolyte-equipment" }) }),
-    ]);
+      expect.objectContaining({ kind: "item", quantity: 1, source: "class-starter-kit", reference: expect.objectContaining({ definitionId: "srd-5.1:item:longsword" }) }),
+    ]));
     expect(repo.grantCharacterXp("local-owner", finalized.receipt.campaignCharacterId,
       { amount: 300, reason: "level-two threshold", expectedRevision: 0, idempotencyKey: "srd-xp" }).progression.totalXp)
       .toBe(300);
@@ -214,7 +216,7 @@ describe("campaign-bound SRD 5.1 starter", () => {
       idempotencyKey: "srd-encounter" });
     const started = repo.startEncounter("local-owner", encounter.encounter.encounterId, { expectedRevision: 1, idempotencyKey: "srd-start" });
     const target = started.combat.combatants.find((entry) => entry.kind === "enemy")!;
-    expect(started.combat.legalActions.some(action => action.kind === "attack")).toBe(false);
+    expect(started.combat.legalActions.find(action => action.kind === "attack")).toMatchObject({ legalActionId: "attack:unarmed" });
     const remainingRolls = [...rolls];
     expect(() => repo.resolveCombatAction("local-owner", started.combat.combatId, { legalActionId: "attack:basic",
       targetIds: [target.combatantId], choices: [], expectedRevision: started.combat.revision, idempotencyKey: "unarmed" })).toThrow(/not legal/);
@@ -226,7 +228,7 @@ describe("campaign-bound SRD 5.1 starter", () => {
     equip("equip", "equip");
     const oldAction = repo.getCombatState("local-owner", started.combat.combatId)!.legalActions.find(action => action.kind === "attack")!;
     equip("unequip", "unequip");
-    expect(repo.getCombatState("local-owner", started.combat.combatId)!.legalActions.some(action => action.kind === "attack")).toBe(false);
+    expect(repo.getCombatState("local-owner", started.combat.combatId)!.legalActions.some(action => action.legalActionId === oldAction.legalActionId)).toBe(false);
     equip("equip", "reequip");
     expect(() => repo.resolveCombatAction("local-owner", started.combat.combatId, { legalActionId: oldAction.legalActionId,
       targetIds: [target.combatantId], choices: [], expectedRevision: started.combat.revision, idempotencyKey: "stale-equipment" })).toThrow(/not legal/);
