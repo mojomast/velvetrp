@@ -680,8 +680,37 @@ export function createCharacterProgressionWriteRepository(
             );
           for (const selection of normalized.selections) {
             const choice = required.get(selection.choiceId);
-            if (
-              !choice ||
+            if (!choice)
+              throw new CharacterProgressionConflictError(
+                "progression selection is not an exact offered option",
+              );
+            if (selection.kind === "ability-score-increase") {
+              if (choice.kind !== "ability-score-increase")
+                throw new CharacterProgressionConflictError(
+                  "progression selection does not match its pending choice kind",
+                );
+              const spent = selection.increases.reduce(
+                (total, increase) => total + increase.amount,
+                0,
+              );
+              if (spent !== choice.points)
+                throw new CharacterProgressionConflictError(
+                  "ability score increase must spend exactly the offered points",
+                );
+              if (
+                !selection.increases.every((increase) =>
+                  choice.options.some(
+                    (option) =>
+                      progressionReferenceKey(option) ===
+                      progressionReferenceKey(increase.ability),
+                  ),
+                )
+              )
+                throw new CharacterProgressionConflictError(
+                  "progression selection is not an exact offered option",
+                );
+            } else if (
+              choice.kind === "ability-score-increase" ||
               !choice.options.some(
                 (option) =>
                   progressionReferenceKey(option) ===
@@ -788,6 +817,9 @@ export function createCharacterProgressionWriteRepository(
           db.prepare(
             "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND position=0",
           ).run(final.level, row.sheet_id);
+          const applyAttributeIncrease = db.prepare(
+            "UPDATE rpg_character_attributes SET value=value+? WHERE sheet_id=? AND attribute_id=?",
+          );
           for (const level of selected.levels) {
             db.prepare(
               "UPDATE rpg_actor_resources SET current=?,max=? WHERE actor_id=? AND name='health'",
@@ -802,6 +834,15 @@ export function createCharacterProgressionWriteRepository(
                 resource.currentAfter,
                 resource.maxAfter,
               );
+            for (const increase of level.abilityScoreIncreases ?? []) {
+              if (
+                applyAttributeIncrease.run(increase.amount, row.sheet_id, increase.attribute)
+                  .changes !== 1
+              )
+                throw new CharacterProgressionConflictError(
+                  "ability score increase target is unavailable",
+                );
+            }
           }
           db.prepare(
             "UPDATE character_progression_v23 SET level=?,derived_json=?,revision=revision+1,updated_at=? WHERE campaign_character_id=?",
@@ -869,6 +910,7 @@ export function createCharacterProgressionWriteRepository(
             for (const reference of level.selectedAbilities) {
               const selection = levelSelections.find(
                   (value) =>
+                    value.kind !== "ability-score-increase" &&
                     progressionReferenceKey(value.ability) ===
                     progressionReferenceKey(reference),
                 )!,
@@ -907,6 +949,7 @@ export function createCharacterProgressionWriteRepository(
             ]) {
               const selection = levelSelections.find(
                 (value) =>
+                  value.kind !== "ability-score-increase" &&
                   progressionReferenceKey(value.ability) ===
                   progressionReferenceKey(reference),
               )!;

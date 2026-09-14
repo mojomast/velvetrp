@@ -37,6 +37,19 @@ const selectionReference = (kind: "ability" | "ability-score" | "feat" | "subcla
   catalogDefinitionReferenceSchema.refine((reference) => reference.kind === kind, {
     message: `progression selection must be a ${kind} reference`,
   });
+/** One bounded ability-score-increase distribution. `amount` is per-ability and the
+ * whole distribution must spend one or two points across unique exact targets; the
+ * write repo additionally requires the total to equal the pending choice's `points`. */
+const abilityScoreIncreaseTargetSchema = z.object({
+  ability: selectionReference("ability-score"),
+  amount: z.number().int().min(1).max(2),
+}).strict();
+const abilityScoreIncreasesSchema = z.array(abilityScoreIncreaseTargetSchema).min(1).max(2).superRefine((increases, context) => {
+  const keys = increases.map((increase) => `${increase.ability.packId}\0${increase.ability.packVersion}\0${increase.ability.definitionId}`);
+  if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "ability score increases must target unique abilities" });
+  const total = increases.reduce((sum, increase) => sum + increase.amount, 0);
+  if (total < 1 || total > 2) context.addIssue({ code: "custom", message: "ability score increases must total one or two points" });
+});
 /** Legacy ability selections keep their exact `{ choiceId, ability }` input
  * shape; the preprocessing step supplies the byte-compatible discriminator so
  * the same schema stays a discriminated union over all four kinds. The shared
@@ -49,7 +62,7 @@ export const progressionSelectionSchema = z.preprocess(
     z.object({ choiceId: resourceIdSchema, kind: z.literal("ability"),
       ability: selectionReference("ability") }).strict(),
     z.object({ choiceId: resourceIdSchema, kind: z.literal("ability-score-increase"),
-      ability: selectionReference("ability-score"), amount: z.number().int().min(1).max(2) }).strict(),
+      increases: abilityScoreIncreasesSchema }).strict(),
     z.object({ choiceId: resourceIdSchema, kind: z.literal("feat"),
       ability: selectionReference("feat") }).strict(),
     z.object({ choiceId: resourceIdSchema, kind: z.literal("subclass"),
@@ -83,6 +96,11 @@ export const progressionLevelChangeSchema = z.object({
   /** Optional so advancement records authored before feats/subclasses landed still parse. */
   selectedFeats: z.array(featCatalogReferenceSchema).max(8).optional(),
   selectedSubclasses: z.array(subclassCatalogReferenceSchema).max(8).optional(),
+  /** Exact applied ability-score increases for deterministic persistence and replay. */
+  abilityScoreIncreases: z.array(z.object({
+    attribute: attributeIdSchema,
+    amount: z.number().int().min(1).max(2),
+  }).strict()).max(2).optional(),
   spells: z.array(spellCatalogReferenceSchema).max(32),
   derivedBefore: characterDerivedStatsSchema,
   derivedAfter: characterDerivedStatsSchema,

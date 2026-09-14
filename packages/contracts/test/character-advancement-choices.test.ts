@@ -30,13 +30,15 @@ describe("generalized class-level progression choices", () => {
 
   it("accepts a bounded ability-score-increase distribution", () => {
     const choice = { choiceId: "velvet:choice:asi", kind: "ability-score-increase", ...base, points: 2,
-      options: [score("strength"), score("dexterity")] };
+      scores: ["strength", "dexterity"], options: [] };
     expect(classLevelProgressionChoiceSchema.parse(choice)).toEqual(choice);
+    expect(abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, scores: ["strength"] }).scores).toEqual(["strength"]);
     expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, points: 3 })).toThrow();
     expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, points: 0 })).toThrow();
-    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, options: [] })).toThrow();
-    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, options: [ability("beacon")] })).toThrow();
-    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, options: [score("strength"), score("strength")] })).toThrow(/unique/);
+    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, scores: [] })).toThrow();
+    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, scores: ["luck" as never] })).toThrow();
+    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, scores: ["strength", "strength"] })).toThrow(/unique/);
+    expect(() => abilityScoreIncreaseProgressionChoiceSchema.parse({ ...choice, options: [score("strength")] })).toThrow();
   });
 
   it("accepts feat and subclass catalog references and rejects cross-kind options", () => {
@@ -68,7 +70,7 @@ describe("generalized class-level progression choices", () => {
         abilityRefs: [],
         spellRefs: [],
         progressionChoices: [
-          { choiceId: "velvet:choice:asi", kind: "ability-score-increase", ...base, points: 2, options: [score("strength"), score("dexterity")] },
+          { choiceId: "velvet:choice:asi", kind: "ability-score-increase", ...base, points: 2, scores: ["strength", "dexterity"], options: [] },
           { choiceId: "velvet:choice:feat", kind: "feat", ...base, options: [feat("tough")] },
         ],
       },
@@ -101,11 +103,14 @@ describe("generalized selections", () => {
   });
 
   it("parses added selection variants and rejects malformed input", () => {
-    const increase = { choiceId: "asi", kind: "ability-score-increase", ability: score("strength"), amount: 2 };
+    const increase = { choiceId: "asi", kind: "ability-score-increase", increases: [{ ability: score("strength"), amount: 2 }] };
     expect(progressionSelectionSchema.parse(increase)).toEqual(increase);
+    expect(progressionSelectionSchema.parse({ choiceId: "asi", kind: "ability-score-increase", increases: [{ ability: score("strength"), amount: 1 }, { ability: score("dexterity"), amount: 1 }] })).toMatchObject({ kind: "ability-score-increase" });
     expect(progressionSelectionSchema.parse({ choiceId: "feat", kind: "feat", ability: feat("tough") })).toEqual({ choiceId: "feat", kind: "feat", ability: feat("tough") });
     expect(progressionSelectionSchema.parse({ choiceId: "subclass", kind: "subclass", ability: subclass("champion") })).toMatchObject({ kind: "subclass" });
-    expect(() => progressionSelectionSchema.parse({ ...increase, amount: 3 })).toThrow();
+    expect(() => progressionSelectionSchema.parse({ ...increase, increases: [{ ability: score("strength"), amount: 3 }] })).toThrow();
+    expect(() => progressionSelectionSchema.parse({ ...increase, increases: [{ ability: score("strength"), amount: 1 }, { ability: score("strength"), amount: 1 }] })).toThrow(/unique/);
+    expect(() => progressionSelectionSchema.parse({ ...increase, increases: [] })).toThrow();
     expect(() => progressionSelectionSchema.parse({ choiceId: "feat", kind: "feat", ability: ability("beacon") })).toThrow();
     expect(() => progressionSelectionSchema.parse({ choiceId: "feat", kind: "feat" })).toThrow();
     expect(() => progressionSelectionSchema.parse({ ...increase, extra: true })).toThrow();

@@ -170,7 +170,7 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Beyond 1st Level", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56" }, { "id": "SRD5.1:Multiclassing", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=57" }],
       "capabilityEvidence": [],
-      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/characterBuilder/characterBuilderWriteRepo.ts", "server/src/rulesets/dnd5e/multiclassing.ts", "server/test/character-progression.test.ts", "server/test/dnd5e-multiclassing.test.ts", "server/test/dnd5e-progression-feats-subclasses.test.ts"],
+      "runtimeEvidence": ["server/src/content/srdStarterCatalog.ts", "server/src/repo/characterBuilder/characterBuilderWriteRepo.ts", "server/src/rulesets/dnd5e/multiclassing.ts", "server/test/character-progression.test.ts", "server/test/dnd5e-multiclassing.test.ts", "server/test/dnd5e-progression-feats-subclasses.test.ts", "server/test/dnd5e-progression-asi.test.ts"],
       "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"]
     },
     {

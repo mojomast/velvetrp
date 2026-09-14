@@ -6,6 +6,8 @@ import type {
 import { ApiError, ApiInputError } from "../../../api";
 import { createClientId } from "../../../utils/clientId";
 
+type AbilitySelection = Extract<ProgressionSelection, { kind: "ability" }>;
+
 export interface LevelUpWizardApi {
   getProgression: (campaignId: string, campaignCharacterId: string) => Promise<CharacterProgressionHttpState>;
   preview: (campaignId: string, campaignCharacterId: string, input: CharacterProgressionHttpPreviewRequest) => Promise<CharacterProgressionHttpPreview>;
@@ -33,10 +35,12 @@ function publish(key: string, lock: ApplyLock | null) { if (lock) applyLocks.set
 function intentKey(kind: string) { return `ui-${kind}-${createClientId()}`; }
 function knownNonCommit(error: unknown) { return error instanceof ApiInputError || (error instanceof ApiError && [400, 404, 409, 415, 422].includes(error.status)); }
 function isMissingProgression(error: unknown) { return error instanceof ApiError && error.status === 404 && error.code === "RPG_CHARACTER_PROGRESSION_NOT_FOUND"; }
-function optionKey(option: ProgressionSelection["ability"]) { return `${option.packId}:${option.packVersion}:${option.definitionId}`; }
+function optionKey(option: AbilitySelection["ability"]) { return `${option.packId}:${option.packVersion}:${option.definitionId}`; }
 function selectionKey(selections: ProgressionSelection[]): string {
   return JSON.stringify([...selections].sort((left, right) => left.choiceId.localeCompare(right.choiceId))
-    .map(({ choiceId, ability }) => [choiceId, ability.kind, ability.packId, ability.packVersion, ability.definitionId]));
+    .map((selection) => selection.kind === "ability"
+      ? [selection.choiceId, selection.kind, selection.ability.kind, selection.ability.packId, selection.ability.packVersion, selection.ability.definitionId]
+      : [selection.choiceId, selection.kind, JSON.stringify(selection)]));
 }
 
 export function resetLevelUpWizardModuleStateForTests(): void { applyLocks.clear(); applyListeners.clear(); }
@@ -127,7 +131,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
     } catch { if (mountedRef.current && generationRef.current === generation) { setError("Choices could not be previewed. Nothing was applied."); focusStatus(generation); } }
   }
 
-  function choose(choiceId: string, ability: ProgressionSelection["ability"]) {
+  function choose(choiceId: string, ability: AbilitySelection["ability"]) {
     generationRef.current += 1;
     setSelections((current) => [...current.filter((item) => item.choiceId !== choiceId), { choiceId, kind: "ability" as const, ability }]);
     setPreview(null); setPreviewSelectionKey(null); setNotice("Choices changed. Calculate a new exact preview before applying.");
@@ -184,7 +188,7 @@ export function LevelUpWizard({ campaignId, campaignCharacterId, api, mode = "st
     <div className="builder-section-heading"><div><p className="eyebrow">SERVER-CALCULATED ADVANCEMENT</p><h2 id="level-up-heading">Level up wizard</h2></div><span className="status-pill">Level {state.level}</span></div>
     {(error || notice || lock) && <div ref={statusRef} tabIndex={-1} className={`builder-status ${error || lock?.phase === "uncertain" ? "is-error" : ""}`} role={error || lock?.phase === "uncertain" ? "alert" : "status"}><p>{error || lock?.message || notice}</p>{lock?.phase === "uncertain" && <button className="primary" disabled={refreshing} onClick={() => void load(true)}>{refreshing ? "Refreshing…" : "Refresh authoritative state"}</button>}</div>}
     <dl className="progression-summary"><div><dt>Current level</dt><dd>{state.level}</dd></div><div><dt>Eligible level</dt><dd>{preview?.eligibleLevel ?? state.level}</dd></div><div><dt>Total XP</dt><dd>{state.totalXp}</dd></div><div><dt>Milestones</dt><dd>{state.milestoneCount}</dd></div></dl>
-    {pending.length > 0 && <fieldset disabled={Boolean(lock)}><legend>All required choices</legend>{pending.map((choice) => <label className="field" key={choice.choiceId}><span>Level {choice.level} · required ability</span><select value={selections.find((item) => item.choiceId === choice.choiceId) ? optionKey(selections.find((item) => item.choiceId === choice.choiceId)!.ability) : ""} onChange={(event) => { const ability = choice.options.find((item) => optionKey(item) === event.target.value); if (ability) choose(choice.choiceId, ability); }}><option value="">Choose an ability</option>{choice.options.map((option) => <option key={optionKey(option)} value={optionKey(option)}>{option.definitionId}</option>)}</select></label>)}</fieldset>}
+    {pending.length > 0 && <fieldset disabled={Boolean(lock)}><legend>All required choices</legend>{pending.map((choice) => <label className="field" key={choice.choiceId}><span>Level {choice.level} · required ability</span><select value={selections.find((item): item is AbilitySelection => item.kind === "ability" && item.choiceId === choice.choiceId) ? optionKey(selections.find((item): item is AbilitySelection => item.kind === "ability" && item.choiceId === choice.choiceId)!.ability) : ""} onChange={(event) => { const ability = choice.options.find((item) => optionKey(item) === event.target.value); if (ability) choose(choice.choiceId, ability); }}><option value="">Choose an ability</option>{choice.options.map((option) => <option key={optionKey(option)} value={optionKey(option)}>{option.definitionId}</option>)}</select></label>)}</fieldset>}
     <button className="ghost" disabled={Boolean(lock) || !allSelected} onClick={() => void updatePreview()}>Calculate exact changes</button>
     {previewCurrent && preview && <section className="level-crossings" aria-labelledby="level-crossings-heading"><h3 id="level-crossings-heading">Every crossed level</h3>{preview.levels.length === 0 ? <p>No levels are currently ready to apply.</p> : <ol>{preview.levels.map((level) => <li key={level.level}><h4>Level {level.level}</h4><dl><div><dt>Health</dt><dd>{level.hp.currentBefore} / {level.hp.maxBefore} → {level.hp.currentAfter} / {level.hp.maxAfter} (+{level.hp.gain} max)</dd></div><div><dt>Proficiency</dt><dd>{level.proficiency.before} → {level.proficiency.after}</dd></div><div><dt>Maximum health derived</dt><dd>{level.derivedBefore.maxHp} → {level.derivedAfter.maxHp}</dd></div><div><dt>Fixed abilities</dt><dd>{level.fixedAbilities.map((item) => item.definitionId).join(", ") || "None"}</dd></div><div><dt>Selected abilities</dt><dd>{level.selectedAbilities.map((item) => item.definitionId).join(", ") || "None"}</dd></div><div><dt>Spells</dt><dd>{level.spells.map((item) => item.definitionId).join(", ") || "None"}</dd></div>{level.resources.map((resource) => <div key={resource.resourceId}><dt>{resource.resourceId}</dt><dd>{resource.currentBefore}/{resource.maxBefore} → {resource.currentAfter}/{resource.maxAfter}</dd></div>)}</dl></li>)}</ol>}</section>}
     {previewCurrent && preview.levels.length ? <button className="primary" disabled={blocked || checking || Boolean(lock) || !allSelected} onClick={() => void applyOnce()}>Apply reviewed levels once</button> : null}

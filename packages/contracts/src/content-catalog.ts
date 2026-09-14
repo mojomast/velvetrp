@@ -305,7 +305,15 @@ export const abilityScoreIncreaseProgressionChoiceSchema = z.object({
   kind: z.literal("ability-score-increase"),
   /** Total points distributed across the offered ability scores: SRD +2 or +1/+1. */
   points: z.number().int().min(1).max(2),
-  options: progressionChoiceOptions("ability-score", { min: 1, max: 6 }),
+  /** Attribute ids the increase may target. Ability-score targets are reference-only
+   * (they are not catalog definitions), so they are carried here as bounded attribute
+   * ids instead of resolvable catalog references. */
+  scores: z.array(attributeIdSchema).min(1).max(6).superRefine((scores, context) => {
+    if (new Set(scores).size !== scores.length) context.addIssue({ code: "custom", message: "ability score increase targets must be unique" });
+  }),
+  /** Kept present but empty: the shared catalog dependency walker reads `options` for
+   * every choice, and attribute ids must never become dependency edges. */
+  options: z.array(catalogDefinitionReferenceSchema).max(0),
 }).strict();
 export const featProgressionChoiceSchema = z.object({
   ...progressionChoiceBaseShape,
