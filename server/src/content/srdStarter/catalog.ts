@@ -9,7 +9,7 @@ import { buildBackgrounds } from "./backgrounds.js";
 import { buildClasses, buildClassLevels, buildSubclasses } from "./classes/index.js";
 import { buildSkills } from "./skills.js";
 import { buildAbilities } from "./abilities.js";
-import { buildSpells } from "./spells.js";
+import { buildSpells } from "./spells/index.js";
 import { buildItems } from "./items.js";
 import { buildCurrencies } from "./currencies.js";
 import { buildEnemies } from "./enemies.js";
