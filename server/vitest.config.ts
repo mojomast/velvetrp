@@ -13,9 +13,9 @@ export default defineConfig({
     fileParallelism: true,
     pool: "forks",
     // Generous per-test budget: under 4-core parallel contention each test file
-    // creates a full SQLite schema, and a tight 20s budget produced occasional
-    // timeout flakes.
-    testTimeout: 40000,
-    hookTimeout: 40000,
+    // creates a full SQLite schema and installs a ~2,250-definition starter
+    // catalog, so bounded acceptance tests can exceed a minute.
+    testTimeout: 90000,
+    hookTimeout: 90000,
   },
 });

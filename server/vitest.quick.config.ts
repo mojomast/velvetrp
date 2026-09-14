@@ -11,8 +11,8 @@ export default defineConfig({
     environment: "node",
     fileParallelism: true,
     pool: "forks",
-    testTimeout: 40000,
-    hookTimeout: 40000,
+    testTimeout: 90000,
+    hookTimeout: 90000,
     exclude: [
       ...configDefaults.exclude,
       "**/reviewed-adventure-*.test.ts",
