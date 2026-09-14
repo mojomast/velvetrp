@@ -13,6 +13,7 @@ import { buildSpells } from "./spells/index.js";
 import { buildItems } from "./items.js";
 import { buildCurrencies } from "./currencies.js";
 import { buildEnemies } from "./enemies.js";
+import { buildMonsterAbilities, buildMonsterEnemies } from "./monsters/index.js";
 import { buildFeats } from "./feats.js";
 
 export function buildStarterCatalog(catalogVersion: string, digest: string): PublishContentCatalogInput {
@@ -28,10 +29,12 @@ export function buildStarterCatalog(catalogVersion: string, digest: string): Pub
       ...buildSubclasses(refs),
       ...buildSkills(refs),
       ...buildAbilities(refs),
+      ...buildMonsterAbilities(refs),
       ...buildSpells(refs),
       ...buildItems(refs),
       ...buildCurrencies(refs),
       ...buildEnemies(refs),
+      ...buildMonsterEnemies(refs),
       ...buildFeats(refs),
     ],
   });
