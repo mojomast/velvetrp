@@ -1302,7 +1302,7 @@ CREATE TRIGGER campaign_content_catalog_pins_prevent_replace BEFORE INSERT ON ca
         AND (old.pack_id=NEW.pack_id OR old.position=NEW.position)) BEGIN SELECT RAISE(ABORT,'campaign catalog pins are immutable'); END;
 CREATE TABLE rpg_catalog_publication_attestations (
       pack_id TEXT NOT NULL, pack_version TEXT NOT NULL,
-      definition_count INTEGER NOT NULL CHECK (typeof(definition_count)='integer' AND definition_count BETWEEN 1 AND 1024),
+      definition_count INTEGER NOT NULL CHECK (typeof(definition_count)='integer' AND definition_count BETWEEN 1 AND 4096),
       definition_counts_json TEXT NOT NULL CHECK (json_valid(definition_counts_json) AND json_type(definition_counts_json)='array'),
       publication_digest TEXT NOT NULL CHECK (length(publication_digest)=64 AND publication_digest NOT GLOB '*[^0-9a-f]*'),
       public_projection_digest TEXT NOT NULL CHECK (length(public_projection_digest)=64 AND public_projection_digest NOT GLOB '*[^0-9a-f]*'),

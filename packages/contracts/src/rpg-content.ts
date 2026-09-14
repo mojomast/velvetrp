@@ -6,7 +6,12 @@ export const rpgContentDescriptionSchema = z.string().trim().min(1).max(4_000);
 export const rpgContentTagSchema = z.string().trim().min(1).max(64).regex(/^[A-Za-z0-9._:-]+$/);
 export const rpgContentTagsSchema = z.array(rpgContentTagSchema).max(32);
 export const MAX_DEFINITIONS_PER_KIND = 256;
-export const MAX_DEFINITIONS_PER_PACK = 1_024;
+/**
+ * Upper bound on catalog definitions per pack. Raised from 1024 to make room
+ * for full SRD 5.1 parity (all spells, classes/levels, monsters + their
+ * abilities, magic items, feats, races, and backgrounds).
+ */
+export const MAX_DEFINITIONS_PER_PACK = 4_096;
 export const MAX_CAMPAIGN_CONTENT_PACKS = 64;
 
 export const rulesProfileIdSchema = resourceIdSchema;

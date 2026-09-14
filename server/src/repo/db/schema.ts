@@ -34,6 +34,15 @@ export const CATALOG_DEFINITION_KINDS_CHECK =
 export const CATALOG_DEFINITION_KINDS_PREDECESSOR_CHECK =
   "CHECK (kind IN ('race','background','class','class-level','skill','ability','spell','item','currency','enemy-template'))";
 
+/**
+ * The catalog publication-attestation definition-count CHECK widened for full
+ * SRD 5.1 parity, and its exact predecessor that capped at 1024.
+ */
+export const CATALOG_ATTESTATION_LIMIT_CHECK =
+  "CHECK (typeof(definition_count)='integer' AND definition_count BETWEEN 1 AND 4096)";
+export const CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK =
+  "CHECK (typeof(definition_count)='integer' AND definition_count BETWEEN 1 AND 1024)";
+
 /** Objects added by the durable character known-option table. */
 export const CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES: ReadonlySet<string> = new Set([
   "character_known_options_v25",
@@ -276,6 +285,38 @@ export function upgradeAdvancementCatalogSchema(
   }
 }
 
+/**
+ * Upgrades only the complete schema whose catalog publication-attestation
+ * definition-count CHECK predates the widened parity limit. The table is
+ * rebuilt with the new CHECK and its immutability/validation triggers are
+ * recreated, so pre-existing publications upgrade without data loss.
+ */
+export function upgradeCatalogAttestationLimitSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const table = "rpg_catalog_publication_attestations";
+  const predecessor = expected.map((object) => object.name === table && object.type === "table"
+    ? { ...object, sql: object.sql.replace(CATALOG_ATTESTATION_LIMIT_CHECK, CATALOG_ATTESTATION_LIMIT_PREDECESSOR_CHECK) }
+    : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("catalog attestation limit upgrade requires an independent transaction");
+  const definition = expected.find((object) => object.type === "table" && object.name === table)!;
+  const tableObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === table);
+  db.transaction(() => {
+    db.exec(`CREATE TEMP TABLE ${table}_upgrade AS SELECT * FROM ${table}`);
+    db.exec(`DROP TABLE ${table}`);
+    db.exec(definition.sql);
+    db.exec(`INSERT INTO ${table} SELECT * FROM ${table}_upgrade`);
+    db.exec(`DROP TABLE ${table}_upgrade`);
+    for (const object of tableObjects) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -338,7 +379,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {
