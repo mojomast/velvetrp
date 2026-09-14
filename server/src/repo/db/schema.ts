@@ -26,6 +26,22 @@ export const COMBAT_CONDITIONS_PREDECESSOR_CHECK =
   "CHECK(condition IN ('blinded','charmed','frightened','grappled','incapacitated','poisoned','prone','restrained','stunned','unconscious'))";
 
 /**
+ * The catalog definition kind CHECK widened with the optional advancement
+ * definition kinds, and its exact predecessor that predates them.
+ */
+export const CATALOG_DEFINITION_KINDS_CHECK =
+  "CHECK (kind IN ('race','background','class','class-level','skill','ability','spell','item','currency','enemy-template','feat','subclass'))";
+export const CATALOG_DEFINITION_KINDS_PREDECESSOR_CHECK =
+  "CHECK (kind IN ('race','background','class','class-level','skill','ability','spell','item','currency','enemy-template'))";
+
+/** Objects added by the durable character known-option table. */
+export const CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES: ReadonlySet<string> = new Set([
+  "character_known_options_v25",
+  "character_known_options_v25_immutable_update",
+  "character_known_options_v25_immutable_delete",
+]);
+
+/**
  * The exact campaign-deletion cleanup trigger published before it also released
  * the pinned catalog definitions that restrict deletion. A database carrying
  * this trigger is upgraded in place.
@@ -217,6 +233,49 @@ export function upgradeCombatConditionsSchema(
   return true;
 }
 
+/**
+ * Upgrades only the complete schema that predates feat/subclass catalog
+ * definitions and the durable character option table. The catalog definition
+ * kind CHECK is widened in place and the additive option table is created, so
+ * pre-existing publications and characters upgrade without data loss.
+ */
+export function upgradeAdvancementCatalogSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const definitionsTable = "rpg_catalog_definitions";
+  const predecessor = expected
+    .filter((object) => !CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES.has(object.name))
+    .map((object) => object.name === definitionsTable && object.type === "table"
+      ? { ...object, sql: object.sql.replace(CATALOG_DEFINITION_KINDS_CHECK, CATALOG_DEFINITION_KINDS_PREDECESSOR_CHECK) }
+      : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("advancement catalog upgrade requires an independent transaction");
+  const definition = expected.find((object) => object.type === "table" && object.name === definitionsTable)!;
+  const definitionObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === definitionsTable);
+  const optionObjects = expected.filter((object) => CHARACTER_KNOWN_OPTIONS_OBJECT_NAMES.has(object.name));
+  const foreignKeys = db.pragma("foreign_keys", { simple: true }) as number;
+  db.pragma("foreign_keys = OFF");
+  try {
+    db.transaction(() => {
+      db.exec(`CREATE TEMP TABLE ${definitionsTable}_upgrade AS SELECT * FROM ${definitionsTable}`);
+      db.exec(`DROP TABLE ${definitionsTable}`);
+      db.exec(definition.sql);
+      db.exec(`INSERT INTO ${definitionsTable} SELECT * FROM ${definitionsTable}_upgrade`);
+      db.exec(`DROP TABLE ${definitionsTable}_upgrade`);
+      for (const object of definitionObjects) db.exec(object.sql);
+      for (const object of optionObjects) db.exec(object.sql);
+      if (db.prepare("PRAGMA foreign_key_check").get()) throw new Error("advancement catalog upgrade violates foreign keys");
+      validate();
+    }).immediate();
+    return true;
+  } finally {
+    db.pragma(`foreign_keys = ${foreignKeys ? "ON" : "OFF"}`);
+  }
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -278,7 +337,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !upgradeCampaignDmSchema(db, schemaObjects(db), expected, validate)
       && !upgradeTacticalMapSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

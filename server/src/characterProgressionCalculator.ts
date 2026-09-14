@@ -27,7 +27,7 @@ export function calculateCharacterProgression(
   for(const step of value.classLevels){if(refKey(step.mechanics.classRef)!==classKey)throw new Error("progression class level has a mismatched selected class");
     if(seenLevels.has(step.mechanics.level))throw new Error("progression catalog contains a duplicate class level");seenLevels.add(step.mechanics.level);}
   const byLevel = new Map(value.classLevels.map((step) => [step.mechanics.level, step]));
-  const selections = new Map(value.selections.filter((selection) => selection.kind === "ability").map((selection) => [selection.choiceId, selection.ability]));
+  const selections = new Map(value.selections.map((selection) => [selection.choiceId, selection.ability]));
   const knownAbilities = new Set(value.knownAbilities.map(refKey));
   const knownSpells = new Set(value.knownSpells.map(refKey));
   const resources = new Map(value.resources.map((resource) => [resource.resourceId, { ...resource }]));
@@ -39,14 +39,27 @@ export function calculateCharacterProgression(
     const step = byLevel.get(level);
     if (!step) throw new Error(`progression catalog has no exact class level ${level}`);
     const selectedAbilities: typeof step.mechanics.abilityRefs = [];
+    const selectedFeats: NonNullable<ProgressionPreview["levels"][number]["selectedFeats"]> = [];
+    const selectedSubclasses: NonNullable<ProgressionPreview["levels"][number]["selectedSubclasses"]> = [];
     for (const choice of step.mechanics.progressionChoices ?? []) {
-      if (choice.kind !== "ability") continue;
-      const pending = { level, choiceId: choice.choiceId, kind: "ability" as const, required: true as const, options: choice.options };
-      pendingChoices.push(pending);
       const selected = selections.get(choice.choiceId);
-      if (selected && selected.kind === "ability" && choice.options.some((option) => refKey(option) === refKey(selected)) && !knownAbilities.has(refKey(selected))) {
-        selectedAbilities.push(selected); knownAbilities.add(refKey(selected));
+      if (choice.kind === "ability") {
+        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "ability", required: true, options: choice.options });
+        if (selected?.kind === "ability" && choice.options.some((option) => refKey(option) === refKey(selected)) && !knownAbilities.has(refKey(selected))) {
+          selectedAbilities.push(selected); knownAbilities.add(refKey(selected));
+        }
+      } else if (choice.kind === "feat") {
+        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "feat", required: true, options: choice.options });
+        if (selected?.kind === "feat" && choice.options.some((option) => refKey(option) === refKey(selected))) {
+          selectedFeats.push(selected);
+        }
+      } else if (choice.kind === "subclass") {
+        pendingChoices.push({ level, choiceId: choice.choiceId, kind: "subclass", required: true, options: choice.options });
+        if (selected?.kind === "subclass" && choice.options.some((option) => refKey(option) === refKey(selected))) {
+          selectedSubclasses.push(selected);
+        }
       }
+      // Ability-score-increase application is intentionally owned by a later slice.
     }
     const before = derived;
     // The repository persists race-adjusted scores; do not apply ancestry bonuses again.
@@ -74,7 +87,7 @@ export function calculateCharacterProgression(
     spells.forEach((reference) => knownSpells.add(refKey(reference)));
     levels.push({ level, hp: { maxBefore: before.maxHp, maxAfter: after.maxHp, currentBefore: hpBefore,
       currentAfter: hp, gain: step.mechanics.hpGain }, proficiency: { before: Number(before.explanations.find((entry) => entry.statistic === "spell-attack")?.inputs.proficiencyBonus ?? step.mechanics.proficiencyBonus), after: step.mechanics.proficiencyBonus },
-      resources: resourceChanges, fixedAbilities, selectedAbilities, spells,
+      resources: resourceChanges, fixedAbilities, selectedAbilities, selectedFeats, selectedSubclasses, spells,
       derivedBefore: before, derivedAfter: after });
     derived = after;
   }

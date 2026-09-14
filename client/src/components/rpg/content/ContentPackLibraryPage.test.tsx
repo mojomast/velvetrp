@@ -43,7 +43,7 @@ describe("ContentPackLibraryPage", () => {
     const adapter = api();
     vi.stubGlobal("crypto", { randomUUID: () => "publish-command" });
     render(<ContentPackLibraryPage api={adapter} onBack={vi.fn()} />);
-    expect(screen.getAllByRole("button", { name: /^Add .* definition$/ })).toHaveLength(10);
+    expect(screen.getAllByRole("button", { name: /^Add .* definition$/ })).toHaveLength(12);
     await validateTwice();
     const exactDraft = vi.mocked(adapter.validate).mock.calls.at(-1)?.[0];
     expect(validateContentCatalog({ ...exactDraft, idempotencyKey: "proof" }).valid).toBe(true);

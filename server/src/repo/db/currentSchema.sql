@@ -1239,7 +1239,7 @@ CREATE TABLE rpg_content_pack_publications (
 CREATE INDEX idx_rpg_content_pack_publications_validation ON rpg_content_pack_publications(validation_level,pack_id,pack_version);
 CREATE TABLE rpg_catalog_definitions (
       pack_id TEXT NOT NULL, pack_version TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('race','background','class','class-level','skill','ability','spell','item','currency','enemy-template')),
+      kind TEXT NOT NULL CHECK (kind IN ('race','background','class','class-level','skill','ability','spell','item','currency','enemy-template','feat','subclass')),
       definition_id TEXT NOT NULL CHECK (length(definition_id) BETWEEN 1 AND 128 AND definition_id NOT GLOB '*[^A-Za-z0-9._:-]*'),
       definition_json TEXT NOT NULL CHECK (json_valid(definition_json) AND json_type(definition_json)='object'),
       public_definition_json TEXT NOT NULL CHECK (json_valid(public_definition_json) AND json_type(public_definition_json)='object'),
@@ -2196,6 +2196,15 @@ CREATE TRIGGER character_progression_receipts_v24_require_event BEFORE INSERT ON
       BEGIN SELECT RAISE(ABORT,'progression receipt must match its exact event proposal'); END;
 CREATE TRIGGER character_known_power_sources_v24_immutable_update BEFORE UPDATE ON character_known_power_sources_v24 BEGIN SELECT RAISE(ABORT,'known power provenance is immutable'); END;
 CREATE TRIGGER character_known_power_sources_v24_immutable_delete BEFORE DELETE ON character_known_power_sources_v24 BEGIN SELECT RAISE(ABORT,'known power provenance is immutable'); END;
+CREATE TABLE character_known_options_v25 (
+      campaign_character_id TEXT NOT NULL REFERENCES character_progression_v23(campaign_character_id) ON DELETE RESTRICT,
+      kind TEXT NOT NULL CHECK(kind IN ('feat','subclass')), pack_id TEXT NOT NULL, pack_version TEXT NOT NULL, definition_id TEXT NOT NULL,
+      source_level INTEGER NOT NULL CHECK(typeof(source_level)='integer' AND source_level BETWEEN 1 AND 20), source_choice_id TEXT,
+      granted_by_command_id TEXT, granted_at TEXT NOT NULL, PRIMARY KEY(campaign_character_id,kind,pack_id,pack_version,definition_id),
+      FOREIGN KEY(campaign_character_id,granted_by_command_id) REFERENCES character_progression_commands_v23(campaign_character_id,command_id) ON DELETE RESTRICT
+    );
+CREATE TRIGGER character_known_options_v25_immutable_update BEFORE UPDATE ON character_known_options_v25 BEGIN SELECT RAISE(ABORT,'known options are immutable'); END;
+CREATE TRIGGER character_known_options_v25_immutable_delete BEFORE DELETE ON character_known_options_v25 BEGIN SELECT RAISE(ABORT,'known options are immutable'); END;
 CREATE TABLE rpg_actor_resource_charges_v25 (
       campaign_id TEXT NOT NULL, actor_id TEXT NOT NULL, resource_name TEXT NOT NULL,
       current_charges INTEGER NOT NULL CHECK(typeof(current_charges)='integer' AND current_charges BETWEEN 0 AND 9007199254740991),

@@ -17,11 +17,11 @@ export interface ContentPackEditorProps {
   onValidate: () => void;
 }
 
-export const CONTENT_DEFINITION_KINDS: CatalogDefinitionKind[] = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template"];
+export const CONTENT_DEFINITION_KINDS: CatalogDefinitionKind[] = ["race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template", "feat", "subclass"];
 const DEFAULT_IDS: Record<CatalogDefinitionKind, string> = {
   race: "local-race", background: "local-background", class: "local-class", "class-level": "local-class-level-1",
   skill: "local-skill", ability: "local-ability", spell: "local-spell", item: "local-item",
-  currency: "local-currency", "enemy-template": "local-enemy",
+  currency: "local-currency", "enemy-template": "local-enemy", feat: "local-feat", subclass: "local-subclass",
 };
 
 const tags = (value: string) => value.split(",").map((entry) => entry.trim()).filter(Boolean);
@@ -70,6 +70,8 @@ function defaultDefinition(kind: CatalogDefinitionKind, packId: string, packVers
     case "item": return catalogDefinitionSchema.parse({ ...base, mechanics: { category: "gear", stackable: false, slot: "hand", price: { currency, amount: 5 }, effects: [] } });
     case "currency": return catalogDefinitionSchema.parse({ ...base, mechanics: { symbol: "lc", minorPerMajor: 100 } });
     case "enemy-template": return catalogDefinitionSchema.parse({ ...base, mechanics: { tier: 1, maxHp: 8, defense: 10, speed: 25, abilityRefs: [ability], resistances: [], vulnerabilities: [], immunities: [] }, private: { tactics: "Approach the nearest opponent.", gmNotes: "Original local opponent.", hiddenAbilityRefs: [] } });
+    case "feat": return catalogDefinitionSchema.parse({ ...base, mechanics: { grantedAbilityRefs: [ability] } });
+    case "subclass": return catalogDefinitionSchema.parse({ ...base, mechanics: { classRef: klass, level: 3, abilityRefs: [ability] } });
   }
 }
 

@@ -712,12 +712,24 @@ export function createCharacterProgressionWriteRepository(
             newSpells = [
               ...known.knownSpells,
               ...selected.levels.flatMap((level) => level.spells),
+            ],
+            newFeats = [
+              ...(known.knownFeats ?? []),
+              ...selected.levels.flatMap((level) => level.selectedFeats ?? []),
+            ],
+            newSubclasses = [
+              ...(known.knownSubclasses ?? []),
+              ...selected.levels.flatMap((level) => level.selectedSubclasses ?? []),
             ];
           if (
             new Set(newAbilities.map(progressionReferenceKey)).size !==
               newAbilities.length ||
             new Set(newSpells.map(progressionReferenceKey)).size !==
-              newSpells.length
+              newSpells.length ||
+            new Set(newFeats.map(progressionReferenceKey)).size !==
+              newFeats.length ||
+            new Set(newSubclasses.map(progressionReferenceKey)).size !==
+              newSubclasses.length
           )
             throw new CharacterProgressionConflictError(
               "advancement contains a duplicate known power",
@@ -729,6 +741,8 @@ export function createCharacterProgressionWriteRepository(
               pendingChoices: [],
               knownAbilities: sortReferences(newAbilities),
               knownSpells: sortReferences(newSpells),
+              knownFeats: sortReferences(newFeats),
+              knownSubclasses: sortReferences(newSubclasses),
               derived: final.derivedAfter,
               updatedAt: now,
             }),
@@ -797,6 +811,9 @@ export function createCharacterProgressionWriteRepository(
             ),
             source = db.prepare(
               `INSERT INTO character_known_power_sources_v24(campaign_character_id,kind,pack_id,pack_version,definition_id,source_kind,source_reference_json,source_digest) VALUES(?,?,?,?,?,?,?,?)`,
+            ),
+            option = db.prepare(
+              `INSERT INTO character_known_options_v25(campaign_character_id,kind,pack_id,pack_version,definition_id,source_level,source_choice_id,granted_by_command_id,granted_at) VALUES(?,?,?,?,?,?,?,?,?)`,
             );
           for (const [index, level] of selected.levels.entries()) {
             const advancementId = advancementIds[index]!,
@@ -882,6 +899,27 @@ export function createCharacterProgressionWriteRepository(
                 "advancement-choice",
                 json,
                 progressionCatalogDigest(sourceRef),
+              );
+            }
+            for (const reference of [
+              ...(level.selectedFeats ?? []),
+              ...(level.selectedSubclasses ?? []),
+            ]) {
+              const selection = levelSelections.find(
+                (value) =>
+                  progressionReferenceKey(value.ability) ===
+                  progressionReferenceKey(reference),
+              )!;
+              option.run(
+                id,
+                reference.kind,
+                reference.packId,
+                reference.packVersion,
+                reference.definitionId,
+                level.level,
+                selection.choiceId,
+                commandId,
+                now,
               );
             }
           }

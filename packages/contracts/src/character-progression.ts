@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { abilityCatalogReferenceSchema, attributeIdSchema, catalogDefinitionReferenceSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, raceCatalogDefinitionSchema, raceCatalogReferenceSchema, spellCatalogReferenceSchema } from "./content-catalog.js";
+import { abilityCatalogReferenceSchema, attributeIdSchema, catalogDefinitionReferenceSchema, classCatalogReferenceSchema, classLevelCatalogDefinitionSchema, featCatalogReferenceSchema, raceCatalogDefinitionSchema, raceCatalogReferenceSchema, spellCatalogReferenceSchema, subclassCatalogReferenceSchema } from "./content-catalog.js";
 import { resourceIdSchema, utcIsoTimestampSchema } from "./domain-primitives.js";
 import { expectedRevisionSchema, idempotencyKeySchema, revisionSchema } from "./rpg-commands.js";
 import { rulesProfileIdSchema } from "./rpg-content.js";
@@ -80,6 +80,9 @@ export const progressionLevelChangeSchema = z.object({
   resources: z.array(progressionResourceChangeSchema).max(16),
   fixedAbilities: z.array(abilityCatalogReferenceSchema).max(32),
   selectedAbilities: z.array(abilityCatalogReferenceSchema).max(8),
+  /** Optional so advancement records authored before feats/subclasses landed still parse. */
+  selectedFeats: z.array(featCatalogReferenceSchema).max(8).optional(),
+  selectedSubclasses: z.array(subclassCatalogReferenceSchema).max(8).optional(),
   spells: z.array(spellCatalogReferenceSchema).max(32),
   derivedBefore: characterDerivedStatsSchema,
   derivedAfter: characterDerivedStatsSchema,
@@ -117,7 +120,11 @@ export const progressionStateSchema = z.object({
   profile: progressionProfileSchema, classRef: classCatalogReferenceSchema, raceRef: raceCatalogReferenceSchema, race: raceCatalogDefinitionSchema, level: z.number().int().min(1).max(20),
   totalXp: z.number().int().min(0).max(9_007_199_254_740_991), milestoneCount: z.number().int().min(0).max(19), revision: revisionSchema,
   pendingChoices: z.array(progressionPendingChoiceSchema).max(32), knownAbilities: z.array(abilityCatalogReferenceSchema).max(128),
-  knownSpells: z.array(spellCatalogReferenceSchema).max(128), derived: characterDerivedStatsSchema, updatedAt: utcIsoTimestampSchema,
+  knownSpells: z.array(spellCatalogReferenceSchema).max(128),
+  /** Optional so stored receipts authored before feats/subclasses landed still parse. */
+  knownFeats: z.array(featCatalogReferenceSchema).max(128).optional(),
+  knownSubclasses: z.array(subclassCatalogReferenceSchema).max(128).optional(),
+  derived: characterDerivedStatsSchema, updatedAt: utcIsoTimestampSchema,
 }).strict();
 
 export const grantCharacterXpInputSchema = z.object({ amount: z.number().int().min(1).max(1_000_000), reason: progressionReasonSchema, expectedRevision: expectedRevisionSchema, idempotencyKey: idempotencyKeySchema }).strict();

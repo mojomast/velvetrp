@@ -23,7 +23,19 @@ export const LEGACY_CONTENT_VALIDATION_LEVEL = "legacy-v10" as const;
 
 export const catalogDefinitionKindSchema = z.enum([
   "race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template",
+  /** Optional advancement definition kinds; they never participate in the required starter completeness set. */
+  "feat", "subclass",
 ]);
+/**
+ * Definition kinds that are optional in a validated publication. They may be
+ * absent from an immutable publication authored before advancement content
+ * landed, so the starter completeness check must not require them.
+ */
+export const optionalCatalogDefinitionKindSchema = z.enum(["feat", "subclass"]);
+const OPTIONAL_DEFINITION_KINDS = new Set<string>(optionalCatalogDefinitionKindSchema.options);
+/** Counts always include every required kind and only present optional kinds. */
+export const REQUIRED_DEFINITION_KIND_COUNT = catalogDefinitionKindSchema.options
+  .filter((kind) => !OPTIONAL_DEFINITION_KINDS.has(kind)).length;
 export const catalogValidationLevelSchema = z.enum([LEGACY_CONTENT_VALIDATION_LEVEL, CONTENT_VALIDATION_LEVEL]);
 export const catalogRoleSchema = campaignMemberRoleSchema;
 export const contentDigestSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -54,11 +66,11 @@ export const itemCatalogReferenceSchema = referenceFor("item");
 export const currencyCatalogReferenceSchema = referenceFor("currency");
 export const enemyTemplateCatalogReferenceSchema = referenceFor("enemy-template");
 /**
- * Additive advancement reference kinds. They are reference-only so the closed
- * validated catalog definition-kind set (and every published digest that
- * enumerates it) stays byte-compatible. Catalog definitions of these kinds are
- * not yet authored; the references let generalized progression choices describe
- * ability-score increases, feats, and subclasses before content lands.
+ * Additive advancement reference kinds. `ability-score` remains reference-only
+ * (it is a distribution target, not a catalog definition). `feat` and `subclass`
+ * are both reference kinds and optional catalog definition kinds; a publication
+ * may omit them so immutable catalogs authored before advancement content landed
+ * keep validating byte-for-byte.
  */
 export const advancementReferenceKindSchema = z.enum(["ability-score", "feat", "subclass"]);
 export const abilityScoreCatalogReferenceSchema = z.object({
@@ -491,12 +503,40 @@ export const enemyTemplateCatalogDefinitionSchema = z.object({
     hiddenRefs: z.array(catalogDefinitionReferenceSchema).max(32).optional() }).strict(),
 }).strict();
 
+/**
+ * Optional advancement definitions. A feat carries bounded, description-free
+ * mechanical grants; a subclass binds to exactly one class and a minimum level
+ * gate. Neither is executable on its own; progression selections reference them
+ * by exact catalog identity.
+ */
+export const featCatalogDefinitionSchema = z.object({
+  ...typedBase("feat"),
+  mechanics: z.object({
+    abilityBonuses: z.partialRecord(attributeIdSchema, z.number().int().min(-5).max(5)).optional(),
+    modifiers: z.array(modifierEffectSchema).max(8).optional(),
+    grantedAbilityRefs: z.array(abilityCatalogReferenceSchema).max(16),
+    prerequisites: z.object({
+      minimumLevel: levelSchema.optional(),
+      minimumAttribute: z.object({ attribute: attributeIdSchema, value: z.number().int().min(1).max(30) }).strict().optional(),
+    }).strict().optional(),
+  }).strict(),
+}).strict();
+export const subclassCatalogDefinitionSchema = z.object({
+  ...typedBase("subclass"),
+  mechanics: z.object({
+    classRef: classCatalogReferenceSchema,
+    level: levelSchema,
+    abilityRefs: z.array(abilityCatalogReferenceSchema).max(32),
+    spellRefs: z.array(spellCatalogReferenceSchema).max(32).optional(),
+  }).strict(),
+}).strict();
+
 // Zod cannot discriminate on a nested key, so use a union plus exact per-kind literals.
 export const catalogDefinitionSchema = z.union([
   raceCatalogDefinitionSchema, backgroundCatalogDefinitionSchema, classCatalogDefinitionSchema,
   classLevelCatalogDefinitionSchema, skillCatalogDefinitionSchema, abilityCatalogDefinitionSchema,
   spellCatalogDefinitionSchema, itemCatalogDefinitionSchema, currencyCatalogDefinitionSchema,
-  enemyTemplateCatalogDefinitionSchema,
+  enemyTemplateCatalogDefinitionSchema, featCatalogDefinitionSchema, subclassCatalogDefinitionSchema,
 ]);
 /** Descriptive alias retained for callers that use the full domain name. */
 export const contentCatalogDefinitionSchema = catalogDefinitionSchema;
@@ -560,7 +600,10 @@ export const catalogDefinitionCountSchema = z.object({ kind: catalogDefinitionKi
 export const catalogValidationReportSchema = z.object({
   valid: z.boolean(),
   issues: z.array(catalogValidationIssueSchema).max(MAX_DEFINITIONS_PER_PACK * 8),
-  normalizedSummary: z.object({ totalDefinitions: z.number().int().min(0).max(MAX_DEFINITIONS_PER_PACK), counts: z.array(catalogDefinitionCountSchema).length(catalogDefinitionKindSchema.options.length), digest: contentDigestSchema.nullable() }).strict(),
+  /** Required kinds are always counted; optional feat/subclass counts appear
+   * only when present so immutable publications authored before advancement
+   * content landed keep their exact stored report shape. */
+  normalizedSummary: z.object({ totalDefinitions: z.number().int().min(0).max(MAX_DEFINITIONS_PER_PACK), counts: z.array(catalogDefinitionCountSchema).min(REQUIRED_DEFINITION_KIND_COUNT).max(catalogDefinitionKindSchema.options.length), digest: contentDigestSchema.nullable() }).strict(),
 }).strict().superRefine((report, context) => {
   if (report.valid !== (report.issues.length === 0)) context.addIssue({ code: "custom", message: "valid must exactly reflect issues", path: ["valid"] });
 });
@@ -580,6 +623,7 @@ export const memberCatalogDefinitionSchema = z.union([
   raceCatalogDefinitionSchema, backgroundCatalogDefinitionSchema, classCatalogDefinitionSchema,
   classLevelCatalogDefinitionSchema, skillCatalogDefinitionSchema, abilityCatalogDefinitionSchema,
   spellCatalogDefinitionSchema, itemCatalogDefinitionSchema, currencyCatalogDefinitionSchema, publicEnemySchema,
+  featCatalogDefinitionSchema, subclassCatalogDefinitionSchema,
 ]);
 /** Observer catalog entries intentionally carry presentation metadata only. */
 export const observerCatalogDefinitionSchema = z.object(definitionBaseShape).strict();

@@ -12,6 +12,11 @@ import {
 } from "@velvet/contracts";
 
 const KINDS = catalogDefinitionKindSchema.options;
+/** Optional advancement kinds are counted when present but never required. */
+const OPTIONAL_KINDS: ReadonlySet<CatalogDefinitionKind> = new Set(["feat", "subclass"]);
+const REQUIRED_KINDS = KINDS.filter((kind) => !OPTIONAL_KINDS.has(kind));
+const summaryKinds = (counts: ReadonlyMap<CatalogDefinitionKind, number>): CatalogDefinitionKind[] =>
+  KINDS.filter((kind) => !OPTIONAL_KINDS.has(kind) || (counts.get(kind) ?? 0) > 0);
 
 export function binaryCompare(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -54,6 +59,8 @@ export function dependencies(definition: CatalogDefinition): CatalogDefinitionRe
       ...(value.mechanics.progressionChoices ?? []).flatMap((choice) => choice.options)]; }
     case "item": return [asKind(definition, "item").mechanics.price.currency];
     case "enemy-template": { const value = asKind(definition, "enemy-template"); return [...value.mechanics.abilityRefs, ...value.private.hiddenAbilityRefs, ...(value.private.hiddenRefs ?? [])]; }
+    case "feat": return [...asKind(definition, "feat").mechanics.grantedAbilityRefs];
+    case "subclass": { const value = asKind(definition, "subclass"); return [value.mechanics.classRef, ...value.mechanics.abilityRefs, ...(value.mechanics.spellRefs ?? [])]; }
     case "skill": case "ability": case "spell": case "currency": return [];
   }
 }
@@ -128,7 +135,7 @@ export function validateContentCatalog(input: unknown): CatalogValidationReport 
     return catalogValidationReportSchema.parse({
       valid: false,
       issues,
-      normalizedSummary: { totalDefinitions: 0, counts: KINDS.map((kind) => ({ kind, count: 0 })), digest: null },
+      normalizedSummary: { totalDefinitions: 0, counts: REQUIRED_KINDS.map((kind) => ({ kind, count: 0 })), digest: null },
     });
   }
 
@@ -147,7 +154,7 @@ export function validateContentCatalog(input: unknown): CatalogValidationReport 
     else identities.set(key, definition);
   });
 
-  for (const kind of KINDS) {
+  for (const kind of REQUIRED_KINDS) {
     if ((counts.get(kind) ?? 0) === 0) issues.push({ code: "incomplete-starter", path: `definitions.${kind}`, message: `validated-v1 requires at least one ${kind} definition` });
   }
 
@@ -214,7 +221,11 @@ export function validateContentCatalog(input: unknown): CatalogValidationReport 
   const graph = new Map<string, string[]>();
   for (const definition of normalized.definitions) {
     const refs = dependencies(definition).filter((reference) => {
-      if (definition.reference.kind !== "class-level" || reference.kind !== "class") return true;
+      if (reference.kind !== "class") return true;
+      // Class ownership back-references (class-level and subclass) are structural,
+      // not execution dependencies, so they never form a dependency cycle.
+      if (definition.reference.kind === "subclass") return false;
+      if (definition.reference.kind !== "class-level") return true;
       const owner = identities.get(definitionKey(reference));
       return owner?.reference.kind !== "class"
         || !asKind(owner, "class").mechanics.levelRefs.some((levelRef) => definitionKey(levelRef) === definitionKey(definition.reference));
@@ -252,6 +263,6 @@ export function validateContentCatalog(input: unknown): CatalogValidationReport 
   return catalogValidationReportSchema.parse({
     valid: issues.length === 0,
     issues,
-    normalizedSummary: { totalDefinitions: normalized.definitions.length, counts: KINDS.map((kind) => ({ kind, count: counts.get(kind) ?? 0 })), digest },
+    normalizedSummary: { totalDefinitions: normalized.definitions.length, counts: summaryKinds(counts).map((kind) => ({ kind, count: counts.get(kind) ?? 0 })), digest },
   });
 }

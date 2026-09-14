@@ -19,7 +19,8 @@
     "server/src/repo/characterBuilder/characterBuilderWriteRepo.ts",
     "server/src/rulesets/dnd5e/multiclassing.ts",
     "server/test/character-progression.test.ts",
-    "server/test/dnd5e-multiclassing.test.ts"
+    "server/test/dnd5e-multiclassing.test.ts",
+    "server/test/dnd5e-progression-feats-subclasses.test.ts"
   ],
   "apiEvidence": [
     "POST /api/rpg/v1/campaigns/:campaignId/character-drafts/:draftId/finalize"

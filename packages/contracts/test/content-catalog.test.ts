@@ -17,9 +17,10 @@ import {
 const exact = { packId: "velvet:test", packVersion: "1.0.0+123456789abc", definitionId: "velvet:test:skill", kind: "skill" } as const;
 
 describe("M1.2 content catalog contracts", () => {
-  it("owns all ten exact kinds and rejects ranges and unknown reference fields", () => {
+  it("owns the required and optional advancement kinds and rejects ranges and unknown reference fields", () => {
     expect(catalogDefinitionKindSchema.options).toEqual([
       "race", "background", "class", "class-level", "skill", "ability", "spell", "item", "currency", "enemy-template",
+      "feat", "subclass",
     ]);
     expect(catalogDefinitionReferenceSchema.parse(exact)).toEqual(exact);
     expect(catalogDefinitionReferenceSchema.safeParse({ ...exact, packVersion: undefined }).success).toBe(false);

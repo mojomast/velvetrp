@@ -26,6 +26,12 @@ import {
 
 type Role = "owner" | "gm" | "player" | "observer";
 
+/** Reads the durably persisted known feat/subclass references for a character. */
+function readKnownOptionReferences(db: DatabaseDriver.Database, characterId: string) {
+  return (db.prepare("SELECT kind,pack_id,pack_version,definition_id FROM character_known_options_v25 WHERE campaign_character_id=? ORDER BY kind,pack_id,pack_version,definition_id")
+    .all(characterId) as Array<any>).map((option) => ({ kind: option.kind, packId: option.pack_id, packVersion: option.pack_version, definitionId: option.definition_id }));
+}
+
 /** Read collaborators shared by the public progression queries and commands. */
 export interface CharacterProgressionReadRepository {
   rootFor(campaignCharacterId: string): ProgressionRootRow | undefined;
@@ -90,10 +96,38 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
     assertPowerProvenance(row);
     return readKnownPowerReferences(db, row.campaign_character_id);
   };
+  /** Ensures every known feat/subclass still matches its exact advancement choice. */
+  const assertOptionProvenance = (row: ProgressionRootRow): void => {
+    const options = db.prepare(`SELECT kind,pack_id,pack_version,definition_id,source_level,source_choice_id
+      FROM character_known_options_v25 WHERE campaign_character_id=?`).all(row.campaign_character_id) as Array<any>;
+    if (options.length === 0) return;
+    const advancements = db.prepare(`SELECT level,selections_json,changes_json FROM character_level_advancements_v23
+      WHERE campaign_character_id=?`).all(row.campaign_character_id) as Array<any>;
+    const byLevel = new Map(advancements.map((advancement) => [advancement.level, advancement]));
+    for (const option of options) {
+      const advancement = byLevel.get(option.source_level);
+      if (!advancement) throw new Error("known option provenance is incomplete");
+      const reference = { kind: option.kind, packId: option.pack_id, packVersion: option.pack_version, definitionId: option.definition_id };
+      const key = progressionReferenceKey(reference);
+      const changes = JSON.parse(advancement.changes_json);
+      const selected = option.kind === "feat" ? (changes.selectedFeats ?? []) : (changes.selectedSubclasses ?? []);
+      if (!selected.some((value: any) => progressionReferenceKey(value) === key)) throw new Error("known option advancement provenance is inconsistent");
+      const selections = JSON.parse(advancement.selections_json) as Array<any>;
+      if (!selections.some((value) => value.choiceId === option.source_choice_id && progressionReferenceKey(value.ability) === key)) {
+        throw new Error("known option selection provenance is inconsistent");
+      }
+    }
+  };
+  /** Reuses the option provenance closure before surfacing known feats/subclasses. */
+  const getValidatedKnownOptions = (row: ProgressionRootRow): ReturnType<typeof readKnownOptionReferences> => {
+    assertOptionProvenance(row);
+    return readKnownOptionReferences(db, row.campaign_character_id);
+  };
   /** Builds and validates the current authoritative progression state. */
   const getState = (row: ProgressionRootRow, pendingOverride?: ProgressionPreview["pendingChoices"]): ProgressionState => {
     loadCanonicalProgressionProfile(db, row.profile_id);
     const refs = getValidatedKnownPowers(row);
+    const optionRefs = getValidatedKnownOptions(row);
     const catalog = loadExactProgressionCatalog(db, row);
     const derived = JSON.parse(row.derived_json);
     if (resolveCampaignRuleset(db, row.campaign_id).rulesetId === "dnd-5e") {
@@ -102,7 +136,9 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
     return progressionStateSchema.parse({ campaignCharacterId: row.campaign_character_id, campaignId: row.campaign_id, sheetId: row.sheet_id, actorId: row.actor_id,
        profile: loadCanonicalProgressionProfile(db, row.profile_id), classRef: { kind: "class", packId: row.class_pack_id, packVersion: row.class_pack_version, definitionId: row.class_definition_id }, raceRef: catalog.raceRef, race: catalog.selectedRace,
       level: row.level, totalXp: row.total_xp, milestoneCount: row.milestone_count, revision: row.revision, pendingChoices: pendingOverride ?? pendingFor(row),
-      knownAbilities: refs.filter((ref) => ref.kind === "ability"), knownSpells: refs.filter((ref) => ref.kind === "spell"), derived, updatedAt: row.updated_at });
+      knownAbilities: refs.filter((ref) => ref.kind === "ability"), knownSpells: refs.filter((ref) => ref.kind === "spell"),
+      knownFeats: optionRefs.filter((ref) => ref.kind === "feat"), knownSubclasses: optionRefs.filter((ref) => ref.kind === "subclass"),
+      derived, updatedAt: row.updated_at });
   };
   /** Delegates previews to the shared persistence-backed authoritative calculator. */
   const getPreview = (row: ProgressionRootRow, selections: ProgressionSelection[] = []): ProgressionPreview => calculateAuthoritativeProgressionPreview(db, row, selections);
