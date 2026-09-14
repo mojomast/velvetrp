@@ -5,7 +5,7 @@ import { ensureCurrentSchema, TURN_ECONOMY_GUARD_PREDECESSOR_SQL, CAMPAIGN_DELET
 
 const asset = (name: string) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8");
 const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
-  "npcKnowledgeSchema.sql", "combatMarkerSchema.sql"].map(asset).join("\n");
+  "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql"].map(asset).join("\n");
 
 function predecessorStore(): DatabaseDriver.Database {
   const db = new DatabaseDriver(":memory:");

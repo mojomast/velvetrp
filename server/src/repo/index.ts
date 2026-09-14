@@ -98,6 +98,8 @@ export { ActorResourceAuthorizationError, ActorResourceConflictError, ActorResou
 export { InventoryAuthorizationError, InventoryBindingError, InventoryCapacityError, InventorySlotConflictError, InventoryStaleError, type InventoryRepository } from "./inventoryRepo.js";
 export { EconomyAuthorizationError, EconomyConflictError, QuoteExpiredError, ShopStockExhaustedError, TradeStaleError, type EconomyRepository } from "./economyRepo.js";
 export { RestAuthorizationError, RestIllegalStateError, RestStaleError, type RestRepository } from "./restRepo.js";
+export { createAttunementRepository, type AttunementRepository, type AttunementDependencies,
+  type ActorAttunementSnapshot, type AttunementEntryView, type AttunementOutcome } from "./attunementRepo.js";
 export { ActorCheckNotFoundError, CheckUnavailableError, type CheckRepository } from "./checkRepo.js";
 export { createAdventureCheckRepository, type AdventureCheckRepository, type AdventureCheckPublicReceipt,
   type ProviderSafeAdventureCheckCandidate } from "./adventureCheckRepo.js";
