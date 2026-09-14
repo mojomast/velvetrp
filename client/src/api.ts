@@ -3,6 +3,8 @@ import { campaignDmSceneBindingRequestSchema, type CampaignDmSceneBindingRequest
 import { campaignDmControlSchema, campaignDmModeRequestSchema, campaignDmBeatRequestSchema, campaignDmDecisionRequestSchema, campaignDmRunSchema, campaignDmPrivateRunSchema, campaignDmHistorySchema, campaignDmReadinessResponseSchema, type CampaignDmModeRequest, type CampaignDmBeatRequest, type CampaignDmDecisionRequest, type CampaignDmReadinessResponse } from "@velvet/contracts";
 import { campaignContextInspectionDispatchReferenceSelectorIdentitySchema, campaignContextInspectionDispatchReferenceSelectorSchema, campaignContextInspectionIdentitySchema, campaignContextInspectionResponseSchema,
   type CampaignContextInspectionDispatchReferenceSource, type CampaignContextInspectionLane } from "@velvet/contracts";
+import { encounterPlanningRequestSchema, encounterPlanResponseSchema,
+  type EncounterPlanningRequest, type EncounterPlanResponse } from "@velvet/contracts";
 
 const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
   const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
@@ -30,6 +32,14 @@ export async function commandCampaignDmMode(campaignId: string, input: CampaignD
   const value = campaignDmControlSchema.parse(await dmRequest(`${dmPath(campaignId)}/mode-commands`, { method: "POST", body: JSON.stringify(body) }));
   if (value.campaignId !== campaignId || value.mode !== body.mode || value.revision !== body.expectedRevision + 1) throw new Error("DM mode response mismatch");
   return value;
+}
+export async function planCampaignEncounter(campaignId: string, input: EncounterPlanningRequest): Promise<EncounterPlanResponse> {
+  const id = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
+  const body = parseApiInput(() => encounterPlanningRequestSchema.parse(input));
+  const response = await requestResponse<unknown>(`/rpg/v1/campaigns/${id}/encounter-plans`,
+    { method: "POST", body: JSON.stringify(body), cache: "no-store" },
+    { status: 200, message: "Encounter plan status was not confirmed" });
+  return encounterPlanResponseSchema.parse(response.body);
 }
 export async function getCampaignDmHistory(campaignId: string, sessionId: string) {
   const value = campaignDmHistorySchema.parse(await dmRequest(dmPath(campaignId, sessionId)));

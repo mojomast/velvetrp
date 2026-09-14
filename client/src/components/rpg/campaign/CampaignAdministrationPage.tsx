@@ -46,6 +46,7 @@ import { MembershipManager } from "./MembershipManager";
 import { TimelineCheckpointPanel } from "./TimelineCheckpointPanel";
 import { CampaignContentPicker } from "../content/CampaignContentPicker";
 import { CampaignGeneratorPanel } from "./CampaignGeneratorPanel";
+import { EncounterBuilderPanel } from "./EncounterBuilderPanel";
 import { GenerationRecoveryPanel, RulesetAdministrationPanel, SessionZeroSafetyPanel,
   VendorShopAdministrationPanel } from "../administration";
 import { createClientId } from "../../../utils/clientId";
@@ -416,6 +417,8 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         api={{ openDraft: setOpenDraftId, reconcileJob: () => void load(true, true) }} />}
 
       {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <CampaignGeneratorPanel campaignId={campaignId} openDraftId={openDraftId} disabled={mutationLocked || refreshing} />}
+
+      {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <section className="admin-section"><EncounterBuilderPanel campaignId={campaignId} /></section>}
 
       {(catalogContent || catalogError) && <section className="admin-section campaign-catalog-section">
         {catalogContent && <CampaignContentPicker actorRole={campaign.actorRole} current={catalogContent} publications={catalogPublications} expectedRevision={expectedRevision} busy={busy || catalogInspecting} mutationLocked={mutationLocked}
