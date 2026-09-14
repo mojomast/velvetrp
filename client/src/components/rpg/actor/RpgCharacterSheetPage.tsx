@@ -12,6 +12,7 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActorChecksPanel } from "./ActorChecksPanel";
 import { ActorEffectsPanel } from "./ActorEffectsPanel";
+import { KnownOptionsPanel } from "./KnownOptionsPanel";
 import { PowerLibraryPanel } from "../combat/PowerLibraryPanel";
 import { SpellcastingPanel } from "./SpellcastingPanel";
 import { InventoryPanel, type InventoryIntent } from "./InventoryPanel";
@@ -391,6 +392,9 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
       {!embedded && <form className="actor-section known-actor-form" onSubmit={(event) => { event.preventDefault(); void connectActor(); }}><div className="actor-section-heading"><h2>Actor binding</h2>{actorId && <span className="status-pill">Connected</span>}</div>{actorId && <p>Current campaign-provided actor: <bdi dir="auto">{actorId}</bdi></p>}<label className="field">Campaign-provided actor ID<input ref={actorInputRef} value={actorIdDraft} onChange={(event) => setActorIdDraft(event.target.value)} autoComplete="off" /></label><div className="button-row"><button ref={actorCorrectionRef} className="ghost" type="submit" disabled={!resourceIdSchema.safeParse(actorIdDraft).success}>{actorId ? "Change actor" : "Load actor resources"}</button>{actorId && <button className="ghost" type="button" onClick={disconnectActor}>Disconnect actor</button>}</div><p className="actor-help">The character-sheet route does not expose its actor binding. Enter an exact actor ID supplied by the campaign; this client never guesses one.</p></form>}
       {sheet && <><section className="actor-section actor-overview" aria-labelledby="overview-heading"><div className="actor-section-heading"><h2 id="overview-heading">Statistics & defenses</h2><span className="status-pill">Level {sheet.progression.level}</span></div><dl className="actor-stat-grid">{derivedStats.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>
       <section className="actor-section" aria-labelledby="skills-heading"><div className="actor-section-heading"><h2 id="skills-heading">Skills, saves & proficiencies</h2></div>{sheet.sheet.proficiencies.length ? <ul className="compact-server-list">{sheet.sheet.proficiencies.map((item, index) => <li key={`${item.category}-${index}`}><span>{item.category}</span><strong>{item.label}</strong></li>)}</ul> : <p className="actor-empty">No proficiencies returned.</p>}</section></>}
+      {sheet && <KnownOptionsPanel options={sheet.sheet.choices.map((choice) => ({
+        id: choice.label, label: choice.label, selectionLabel: choice.selection.name, kind: choice.selection.kind,
+      }))} />}
       {resources && <ResourceTrackers resources={resources.resources} disabled={commandDisabled} onAdjust={submitResource} />}
       {actorId && <ActorChecksPanel disabled={commandDisabled} result={confirmedResult?.kind === "check" ? confirmedResult.value : null} onSubmit={submitCheck} />}
       {actorId && <PowerLibraryPanel powers={powers} disabled={commandDisabled} onRefresh={() => void load()} onUse={submitPower} result={confirmedResult?.kind === "power" ? confirmedResult.value : null} />}
