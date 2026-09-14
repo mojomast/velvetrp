@@ -214,6 +214,36 @@
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/enemy-turn-commands"]
     },
     {
+      "id": "encounter-builder",
+      "title": "Encounter building with XP budgets",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Building Combat Encounters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=165" }],
+      "capabilityEvidence": [{ "id": "encounter-builder", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterXp.ts", "server/src/rulesets/dnd5e/encounterBuilder.ts", "server/test/dnd5e-encounter-xp.test.ts", "server/test/dnd5e-encounter-builder.test.ts"],
+      "apiEvidence": []
+    },
+    {
+      "id": "encounter-rewards",
+      "title": "Encounter XP rewards and level-up eligibility",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Beyond 1st Level", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56" }, { "id": "SRD5.1:Building Combat Encounters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=165" }],
+      "capabilityEvidence": [{ "id": "encounter-rewards", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterRewards.ts", "server/test/dnd5e-encounter-rewards.test.ts"],
+      "apiEvidence": []
+    },
+    {
+      "id": "npc-selection",
+      "title": "NPC and monster stat-block selection",
+      "status": "partial",
+      "complete": false,
+      "sourceSections": [{ "id": "SRD5.1:Monsters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254" }],
+      "capabilityEvidence": [{ "id": "npc-selection", "version": "1.0.0", "descriptorStatus": "partial" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/npcSelection.ts", "server/test/dnd5e-npc-selection.test.ts"],
+      "apiEvidence": []
+    },
+    {
       "id": "adventuring-environment",
       "title": "Travel, environment, hazards, and downtime",
       "status": "partial",
