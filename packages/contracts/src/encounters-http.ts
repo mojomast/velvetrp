@@ -172,7 +172,7 @@ export const combatantStateSchema = z.discriminatedUnion("kind", [
 
 export const combatLegalActionSchema = z.object({
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "ready", "power", "item", "defend", "flee", "end-turn", "stabilize", "death-save"]),
   targetIds: z.array(resourceIdSchema).max(128),
   cost: z.enum(["action", "bonus-action", "reaction"]).nullable().optional(),
   targetEvidence: z.array(z.object({ targetCombatantId: resourceIdSchema, lineOfEffect: z.enum(["clear", "blocked"]),
@@ -202,6 +202,21 @@ export const combatTurnEconomySchema = z.object({
   "remaining movement must match the safe unused allowance"),
 }).strict();
 
+/** A bounded, expiring held response declared with the Ready action. */
+export const combatReadyActionSchema = z.object({
+  combatantId: resourceIdSchema,
+  readyId: resourceIdSchema,
+  responseKind: z.enum(["spell", "maneuver"]),
+  responseId: resourceIdSchema,
+  trigger: z.object({
+    event: z.enum(["hit", "targeted", "turn-start", "leaves-reach"]),
+    subject: z.enum(["self", "ally", "enemy"]),
+    maxDistanceFeet: z.number().int().min(0).max(1_000).optional(),
+    requiresHit: z.boolean().optional(),
+  }).strict(),
+  expiresAtRound: z.number().int().min(1).max(1_000_000),
+}).strict();
+
 /** Server-derived reaction state; reactions are encounter-wide, not turn-local. */
 export const combatReactionAvailabilitySchema = z.object({
   combatantId: resourceIdSchema,
@@ -218,6 +233,7 @@ export const combatStateSchema = z.object({
   legalActions: z.array(combatLegalActionSchema).max(128),
   turnEconomy: combatTurnEconomySchema.nullable().optional(),
   reactionAvailability: z.array(combatReactionAvailabilitySchema).max(128).optional(),
+  readyActions: z.array(combatReadyActionSchema).max(128).optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -265,6 +281,7 @@ export const combatReadResponseSchema = z.object({
   legalActions: z.array(combatLegalActionSchema).max(128),
   turnEconomy: combatTurnEconomySchema.nullable().optional(),
   reactionAvailability: z.array(combatReactionAvailabilitySchema).max(128).optional(),
+  readyActions: z.array(combatReadyActionSchema).max(128).optional(),
   revision: revisionSchema,
 }).strict().superRefine((combat, context) => {
   const combatantIds = combat.combatants.map((combatant) => combatant.combatantId);
@@ -401,7 +418,7 @@ export const combatActionOutcomeSchema = z.discriminatedUnion("kind", [
 export const combatActionResolutionSchema = z.object({
   actionId: resourceIdSchema,
   legalActionId: resourceIdSchema,
-  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
+  kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "ready", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
   /** A player attack has one outcome; a monster multiattack has one ordered outcome per step. */
@@ -464,7 +481,7 @@ export const combatActionResolutionSchema = z.object({
         || outcome?.kind !== "stand-up" || outcome.targetId !== resolution.actingCombatantId) {
       context.addIssue({ code: "custom", message: "stand up resolution must target the acting combatant with one stand-up outcome" });
     }
-  } else if (["dash", "disengage", "hide"].includes(resolution.kind)
+  } else if (["dash", "disengage", "hide", "ready"].includes(resolution.kind)
       && (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0)) {
     context.addIssue({ code: "custom", message: "utility action cannot contain targets or outcomes" });
   } else if (resolution.targetIds.length !== 0 || resolution.outcomes.length !== 0) {

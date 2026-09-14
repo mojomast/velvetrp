@@ -12,6 +12,7 @@ import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrati
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { consumeCombatMarker, hasCombatMarker } from "../combatMarkerRuntime.js";
 import { isMonsterKnockdown, planMonsterTurn } from "../monsterTurnPlanner.js";
+import { resolveHitTimeShield } from "../reaction/index.js";
 import { advanceRevision, beginProtocol, canonical, gm, id, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
 import { dndDamageStatus } from "./survival.js";
 import { persistTurnAdvance, planTurnAdvance } from "./turn.js";
@@ -65,17 +66,25 @@ export function createExecuteCombatEnemyTurn(db:DatabaseDriver.Database,deps:Enc
              const attackRoll=attackPlan.mode==="disadvantage"?Math.min(...rolls):Math.max(...rolls);
              const attack=binding.module.mechanics!.resolveAttack({rolls:[attackRoll],abilityScore:10,
                proficiencyBonus:profile.proficiencyBonus,flatBonus:step.attackBonus-profile.proficiencyBonus,armorClass});
-             const critical=attack.critical || (attackPlan.autoCritical && attack.hit);
-             const die=step.damageDie,damageRolls=attack.hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
+             const rolledCritical=attack.critical || (attackPlan.autoCritical && attack.hit);
+             // True hit-time window: an actor-backed target may spend its reaction
+             // (including a readied Shield) before the triggering hit is finalized.
+             const shield=target.actor_id&&attack.hit
+               ?resolveHitTimeShield(db,deps,{encounterId:combatId,campaignId:encounter.campaign_id,round:encounter.round_number,
+                 reactorCombatantId:target.combatant_id,sourceCombatantId:current.combatant_id,attackTotal:attack.total,
+                 armorClass,hit:attack.hit,critical:rolledCritical,occurredAt:at})
+               :null;
+             const hit=shield?shield.plan.hit:attack.hit,critical=shield?shield.plan.critical:rolledCritical;
+             const die=step.damageDie,damageRolls=hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
              if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
-             const damage=attack.hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:step.damageModifier,critical}).total:0;
+             const damage=hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:step.damageModifier,critical}).total:0;
              const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,running,step.damageType,at),adjustedDamage=adjustedCombatDamage(damage,adjustment);
              const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,running.hit_points-absorbed.hitPointDamage);
              const statusAfter=dndDamageStatus(db,running,hitPointsAfter,absorbed.hitPointDamage);
-             anyHit=anyHit||attack.hit;totalApplied+=running.hit_points-hitPointsAfter;finalStatus=statusAfter;finalHitPoints=hitPointsAfter;
+             anyHit=anyHit||hit;totalApplied+=running.hit_points-hitPointsAfter;finalStatus=statusAfter;finalHitPoints=hitPointsAfter;
              outcomes.push({kind:"damage",targetId:target.combatant_id,damageType:step.damageType,requested:damage,adjustment,applied:running.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
               hitPointsBefore:running.hit_points,hitPointsAfter,statusBefore:running.status,statusAfter,rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion,
-              attackRoll,attackTotal:attack.total,armorClass,hit:attack.hit,critical,damageRolls});
+              attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:armorClass,hit,critical,damageRolls});
              running.hit_points=hitPointsAfter;running.status=statusAfter;
              if(statusAfter==="dead"||statusAfter==="defeated")break;
             }

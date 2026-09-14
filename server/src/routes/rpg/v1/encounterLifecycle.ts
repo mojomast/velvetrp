@@ -68,7 +68,7 @@ function projectEncounter(value: NonNullable<ReturnType<EncounterLifecycleReposi
 
 function projectCombat(value: ReturnType<EncounterLifecycleRepository["startEncounter"]>["combat"]): CombatState {
   const allowed = new Set([
-    "campaignId", "encounterId", "combatId", "round", "currentCombatant", "combatants", "legalActions", "turnEconomy", "reactionAvailability", "revision",
+    "campaignId", "encounterId", "combatId", "round", "currentCombatant", "combatants", "legalActions", "turnEconomy", "reactionAvailability", "readyActions", "revision",
   ]);
   if (typeof value !== "object" || value === null
       || Object.keys(value).some((key) => !allowed.has(key))) {
@@ -82,6 +82,7 @@ function projectCombat(value: ReturnType<EncounterLifecycleRepository["startEnco
     legalActions: value.legalActions,
     turnEconomy: value.turnEconomy,
     reactionAvailability: value.reactionAvailability,
+    readyActions: value.readyActions,
     revision: value.revision,
   };
 }

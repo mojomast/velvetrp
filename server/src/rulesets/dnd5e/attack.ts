@@ -8,7 +8,7 @@ import { dnd5eRollMode, resolveDnd5eD20Test } from "./d20.js";
 import { frozenList, requireInteger } from "./internal.js";
 
 export const DND_5E_ATTACK_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
-  Object.freeze({ id: "attacks", version: "1.6.0", status: "supported" as const }),
+  Object.freeze({ id: "attacks", version: "1.7.0", status: "supported" as const }),
 ]);
 
 export function resolveDnd5eAttack(input: AttackInput): AttackResolution {

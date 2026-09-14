@@ -12,7 +12,8 @@ import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrati
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "../combatMarkerRuntime.js";
 import { applyAttackRiderConditions, buildAttackRiderPlans, readRiderUsageThisTurn, resolveAttackRiders, type AttackRiderResolution } from "../riders/index.js";
-import { resolveHitTimeShield } from "../reaction/index.js";
+import { planDnd5eReadyAction, resolveHitTimeShield } from "../reaction/index.js";
+import { declareReadyAction } from "../reaction/readyActionRuntime.js";
 import { advanceRevision, beginProtocol, canonical, controls, gm, id, member, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
 import { contestScore, dndDamageStatus } from "./survival.js";
 import { resolveDeathSave, resolveStabilization } from "../death/dyingRuntime.js";
@@ -62,6 +63,7 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
 
        const at=now(deps);
       let outcome:any=null,helpTarget:string|null=null,hideSucceeded=false,riderResolutions:readonly AttackRiderResolution[]=Object.freeze([]);
+      let readyToDeclare=false;
       if(plan.kind==="attack"){
         const target=db.prepare(`SELECT * FROM combatant WHERE encounter_id=? AND combatant_id=? AND status ${dnd?"IN ('active','unconscious','stable')":"='active'"}`)
           .get(combatId,command.targetIds[0]!) as any;
@@ -237,7 +239,13 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
            WHERE encounter_id=? AND combatant_id=? AND ended_at IS NULL AND movement_allowance_feet=?`)
            .run(bonus,combatId,current.combatant_id,economy.movement.allowanceFeet);
          if(extended.changes!==1)throw new EncounterConflictError("dash allowance changed before commit");
-        }else if(plan.kind==="death-save"){
+        }else if(plan.kind==="ready"){
+         // The Ready action spends the action and holds a bounded response
+         // against the closed trigger vocabulary. It expires at the start of
+         // the readying combatant's next turn and fires through the reaction
+         // window when its trigger matches.
+         readyToDeclare=true;
+       }else if(plan.kind==="death-save"){
         const save=resolveDeathSave(db,deps,{encounterId:combatId,combatantId:current.combatant_id,hitPoints:current.hit_points,status:current.status});
         outcome={kind:"survival",targetId:current.combatant_id,roll:save.roll,successes:save.successes,failures:save.failures,
           statusAfter:save.statusAfter,hitPointsBefore:current.hit_points,hitPointsAfter:save.hitPointsAfter,statusBefore:current.status};
@@ -256,7 +264,7 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
       if(outcome?.kind==="damage"||outcome?.kind==="survival")stateOverrides.set(outcome.targetId,outcome.statusAfter);
       else if(outcome?.kind==="status")stateOverrides.set(current.combatant_id,"fled");
       const plannedAdvance=planTurnAdvance(db,combatId,encounter,current.combatant_id,stateOverrides);
-       const keepsTurn=["attack","dash","disengage","help","hide","grapple","escape-grapple","shove","stand-up"].includes(plan.kind) && dnd;
+        const keepsTurn=["attack","dash","disengage","help","hide","ready","grapple","escape-grapple","shove","stand-up"].includes(plan.kind) && dnd;
        const advancesTurn=!keepsTurn||plannedAdvance.nextId===null;
       const turnPlan=advancesTurn?plannedAdvance:{event:null,nextId:current.combatant_id,round:encounter.round_number};
       const combatantChanges:CombatantStateChange[]=(outcome?.kind==="damage"||outcome?.kind==="survival")?[{combatantId:outcome.targetId,
@@ -266,6 +274,18 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
         combatantId:current.combatant_id,hitPointsBefore:current.hit_points,hitPointsAfter:current.hit_points,
         statusBefore:"active",statusAfter:"fled",stateRevisionBefore:current.state_revision}]:[];
       const commandId=id(deps),actionId=id(deps);
+      if(readyToDeclare){
+        const readyPlan=planDnd5eReadyAction({readyId:`ready:${commandId}`,reactorCombatantId:current.combatant_id,
+          responseKind:"spell",responseId:"srd-5.1:spell:shield",
+          trigger:{event:"hit",subject:"self",requiresHit:true},round:encounter.round_number,
+          expiresAtRound:encounter.round_number+1});
+        if(!readyPlan.legal||!readyPlan.ready)throw new EncounterConflictError("ready action plan is invalid");
+        declareReadyAction(db,{encounterId:combatId,combatantId:current.combatant_id,readyId:readyPlan.ready.readyId,
+          responseKind:readyPlan.ready.responseKind,responseId:readyPlan.ready.responseId,
+          triggerEvent:readyPlan.ready.trigger.event,triggerSubject:readyPlan.ready.trigger.subject,
+          maxDistanceFeet:readyPlan.ready.trigger.maxDistanceFeet??null,requiresHit:readyPlan.ready.trigger.requiresHit===true,
+          expiresAtRound:readyPlan.ready.expiresAtRound,commandId,at});
+      }
       const internal={type:"http_action",encounterId:combatId,idempotencyKey:command.idempotencyKey};
        beginProtocol(db,deps,internal,request,commandId,current.actor_id,before,after,at,"combat_action_resolved",
          {kind:"action_resolved",actionId,action:plan.kind},"action",0);

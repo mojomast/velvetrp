@@ -9,7 +9,7 @@ describe("tactical map generation", () => {
   const context = { campaignId: "campaign", sessionId: "session", actorId: "actor", locationId: "location", actorLocationRevision: 0,
     spawns: [{ position: { x: 1, y: 1 }, footprint: { width: 2, height: 2 } }] };
   const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
-    "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql"]
+    "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql", "combatReadyActionSchema.sql"]
     .map((name) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8")).join("\n");
   const rollBackTacticalMap = (sql: string) => sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "")
     .replace("  actor_location_revision INTEGER,\n", "")

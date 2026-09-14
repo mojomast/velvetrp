@@ -12,7 +12,7 @@
   "capabilityEvidence": [
     {
       "id": "attacks",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "descriptorStatus": "supported"
     }
   ],
@@ -23,6 +23,7 @@
     "server/src/repo/encounter/combatPowerRuntime.ts",
     "server/src/repo/encounter/reaction/engine.ts",
     "server/src/repo/encounter/reaction/ready.ts",
+    "server/src/repo/encounter/reaction/readyActionRuntime.ts",
     "server/src/repo/encounter/reaction/shield.ts",
     "server/src/repo/encounter/opportunityAttackRuntime.ts",
     "server/test/dnd5e-reaction-window.test.ts",
@@ -35,6 +36,7 @@
     "server/test/dnd5e-spell-attack.test.ts",
     "server/src/repo/encounter/monsterTurnPlanner.ts",
     "server/test/dnd5e-monster-multiattack-repository.test.ts",
+    "server/test/dnd5e-ready-action-repository.test.ts",
     "server/test/srd-ruleset-integration.test.ts",
     "server/test/tactical-map-projection.test.ts"
   ],

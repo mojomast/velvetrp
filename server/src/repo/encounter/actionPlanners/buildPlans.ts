@@ -95,6 +95,7 @@ export function buildCombatActionPlans(
       actingCombatantId: current.combatant_id, targetIds: [current.combatant_id], cost: null }] : []),
     ...(utility ? [{ legalActionId: "dash", kind: "dash" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const },
       { legalActionId: "disengage", kind: "disengage" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const },
+      { legalActionId: "ready", kind: "ready" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const },
       ...helpTargets.map(targetId => ({ legalActionId: `help:${targetId}`, kind: "help" as const, actingCombatantId: current.combatant_id, targetIds: [targetId], cost: "action" as const })),
       { legalActionId: "hide", kind: "hide" as const, actingCombatantId: current.combatant_id, targetIds: [], cost: "action" as const }] : []),
     { legalActionId: "flee", kind: "flee", actingCombatantId: current.combatant_id, targetIds: [], cost: null },

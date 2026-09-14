@@ -35,10 +35,10 @@ function notFound(request:FastifyRequest,reply:Parameters<typeof sendApiProblem>
   return sendApiProblem(request,reply,404,"RPG_COMBAT_NOT_FOUND","Combat not found");
 }
 function publicCombat(value:ReturnType<CombatCommandRepository["resolveCombatAction"]>["combat"]):CombatState{
-   const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","turnEconomy","reactionAvailability","revision"]);
+   const allowed=new Set(["campaignId","encounterId","combatId","round","currentCombatant","combatants","legalActions","turnEconomy","reactionAvailability","readyActions","revision"]);
   if(Object.keys(value).some((key)=>!allowed.has(key)))throw new Error("combat result shape is invalid");
   return {combatId:value.combatId,round:value.round,currentCombatant:value.currentCombatant,combatants:value.combatants,
-     legalActions:value.legalActions,turnEconomy:value.turnEconomy,reactionAvailability:value.reactionAvailability,revision:value.revision};
+     legalActions:value.legalActions,turnEconomy:value.turnEconomy,reactionAvailability:value.reactionAvailability,readyActions:value.readyActions,revision:value.revision};
 }
 function publicEncounter(value:ReturnType<CombatCommandRepository["endCombat"]>["encounter"]):EncounterPublic{
   const allowed=new Set(["campaignId","encounterId","sessionId","name","status","combatId","combatants","revision","createdAt","updatedAt"]);

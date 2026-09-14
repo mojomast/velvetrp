@@ -52,11 +52,12 @@ describe("SRD 5.1 agent combat awareness", () => {
     const snapshot = repo.getCampaignAgentContextSnapshot(OWNER, campaign.id, "aware-session", { kind: "player", actorId: heroActorId })!;
     const candidates = snapshot.encounter!.legalActionCandidates;
     const kinds = candidates.map((candidate) => candidate.kind);
-    expect(new Set(kinds)).toEqual(new Set(["attack", "grapple", "shove", "dash", "disengage", "hide", "help", "flee", "end-turn"]));
+    expect(new Set(kinds)).toEqual(new Set(["attack", "grapple", "shove", "dash", "disengage", "hide", "ready", "help", "flee", "end-turn"]));
     const labeled = (label: string) => candidates.find((candidate) => candidate.label === label);
     expect(labeled("Dash")).toMatchObject({ targetId: null });
     expect(labeled("Disengage")?.digest).toMatch(/^[0-9a-f]{64}$/);
     expect(labeled("Hide")?.digest).toMatch(/^[0-9a-f]{64}$/);
+    expect(labeled("Ready an action")?.digest).toMatch(/^[0-9a-f]{64}$/);
     expect(candidates.filter((candidate) => candidate.kind === "grapple").every((candidate) => candidate.targetLabel)).toBe(true);
     expect(candidates.some((candidate) => candidate.label?.startsWith("Shove "))).toBe(true);
     expect(candidates.some((candidate) => candidate.label?.startsWith("Help "))).toBe(true);

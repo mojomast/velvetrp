@@ -13,12 +13,12 @@ export interface LegalActionTrayProps {
   onUsePower?:(action:DirectCombatPowerCandidate)=>void;
 }
 
-const supportedKinds = ["attack", "flee", "end-turn", "stabilize", "death-save", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide"] as const;
+const supportedKinds = ["attack", "flee", "end-turn", "stabilize", "death-save", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "ready"] as const;
 type SupportedKind = typeof supportedKinds[number];
 const supported = (action: CombatLegalAction): action is CombatLegalAction & { kind: SupportedKind } =>
   (supportedKinds as readonly string[]).includes(action.kind);
 const actionLabel = (kind: SupportedKind) => ({ attack: "Attack", flee: "Flee", "end-turn": "End turn", stabilize: "Stabilize", "death-save": "Make death save",
-  grapple: "Grapple", "escape-grapple": "Escape grapple", shove: "Shove", "stand-up": "Stand up", dash: "Dash", disengage: "Disengage", help: "Help", hide: "Hide" })[kind];
+  grapple: "Grapple", "escape-grapple": "Escape grapple", shove: "Shove", "stand-up": "Stand up", dash: "Dash", disengage: "Disengage", help: "Help", hide: "Hide", ready: "Ready" })[kind];
 const actionExplanation = (kind: SupportedKind) => ({
   attack: "The server resolves the attack and its outcome.",
   flee: "The server decides whether leaving combat succeeds.",
@@ -33,6 +33,7 @@ const actionExplanation = (kind: SupportedKind) => ({
   disengage: "Prevents opportunity attacks as you leave reach this turn.",
   help: "Grants an ally advantage on its next attack until the start of your next turn.",
   hide: "The server rolls Dexterity (Stealth) against opposing passive Perception and may hide you.",
+  ready: "Holds a bounded response until your next turn; it fires through the reaction window when its trigger matches.",
 })[kind];
 
 /**

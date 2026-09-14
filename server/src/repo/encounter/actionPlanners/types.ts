@@ -1,6 +1,6 @@
 export type CombatActionPlan = {
   legalActionId: string;
-  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "stand-up" | "dash" | "disengage" | "help" | "hide" | "flee" | "end-turn" | "stabilize" | "death-save";
+  kind: "attack" | "grapple" | "escape-grapple" | "shove" | "stand-up" | "dash" | "disengage" | "help" | "hide" | "ready" | "flee" | "end-turn" | "stabilize" | "death-save";
   actingCombatantId: string;
   targetIds: string[];
   cost: "action" | null;

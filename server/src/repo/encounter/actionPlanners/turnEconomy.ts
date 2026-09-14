@@ -5,6 +5,7 @@ import { resolveCampaignRuleset } from "../../../rulesets/campaignBinding.js";
 import { EncounterConflictError } from "../encounterErrors.js";
 import { conditionsFor, movementDenialConditions, readActorExhaustion } from "../combatConditionRuntime.js";
 import { clearHelpedFromSource } from "../combatMarkerRuntime.js";
+import { clearReadyActionForCombatant, expireReadyActions } from "../reaction/readyActionRuntime.js";
 import type { PersistedCombatTurnEconomy } from "./types.js";
 
 export function isDndCombat(db: DatabaseDriver.Database, campaignId: string): boolean {
@@ -66,6 +67,9 @@ export function beginDndCombatTurn(
   if (readCombatTurnEconomy(db, encounterId)) throw new Error("combat already has a current turn economy");
   // Help lasts until the start of the helper's next turn.
   clearHelpedFromSource(db, encounterId, combatantId);
+  // A Ready action expires at the start of the readying combatant's next turn.
+  clearReadyActionForCombatant(db, encounterId, combatantId);
+  expireReadyActions(db, encounterId, round);
   db.prepare(`INSERT INTO combat_turn_economy_v60(turn_id,encounter_id,combatant_id,round_number,
     movement_allowance_feet,started_at) VALUES(?,?,?,?,?,?)`)
     .run(turnId, encounterId, combatantId, round, movementAllowance(db, campaignId, combatantId), at);

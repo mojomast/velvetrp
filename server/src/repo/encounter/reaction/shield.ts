@@ -3,8 +3,9 @@ import { resourceIdSchema, spellCatalogDefinitionSchema } from "@velvet/contract
 import type { EncounterDependencies } from "../encounterWriteRepo.js";
 import { applyEffectRecord } from "../effectHandlers/index.js";
 import type { CombatPowerLegalAction, EffectContext, Row } from "../effectHandlers/types.js";
-import { claimReactionBudget, releaseReactionBudget, readReactionBudget, buildReactionReceipt } from "./engine.js";
-import type { ReactionReceipt, ReactionResponseKind } from "./types.js";
+import { claimReactionBudget, releaseReactionBudget, readReactionBudget, buildReactionReceipt, selectReactionWindow } from "./engine.js";
+import { buildReadyCandidates, consumeReadyAction } from "./readyActionRuntime.js";
+import type { ReactionReceipt, ReactionEvent, ReactionResponseKind } from "./types.js";
 
 export const DND_5E_SHIELD_RESPONSE_ID = "srd-5.1:spell:shield";
 export const DND_5E_SHIELD_RESPONSE_KIND: ReactionResponseKind = "spell";
@@ -127,11 +128,23 @@ export function resolveHitTimeShield(
   if (!budget.available) return null;
   const definition = readShieldDefinition(db, input.campaignId, target.actor_id);
   if (!definition) return null;
+  // A readied Shield declaration takes precedence over the standing Shield
+  // response; firing it consumes the held ready action and reports `ready`.
+  const event: ReactionEvent = { kind: "hit", encounterId: input.encounterId, campaignId: input.campaignId,
+    round: input.round, occurredAt: input.occurredAt, subjectCombatantId: input.reactorCombatantId,
+    sourceCombatantId: input.sourceCombatantId, hit: true, attackTotal: input.attackTotal, armorClass: input.armorClass, critical: input.critical };
+  const readyWindow = selectReactionWindow(event, buildReadyCandidates(db, event, { x: 0, y: 0 }))
+    .filter((entry) => entry.reactorCombatantId === input.reactorCombatantId && entry.responseId === DND_5E_SHIELD_RESPONSE_ID);
+  const readiness: "declared" | "ready" = readyWindow.length > 0 ? "ready" : "declared";
   const slotResourceId = `slot-${(definition.mechanics as any).level ?? 1}`;
   const slot = db.prepare("SELECT current FROM rpg_actor_resources WHERE campaign_id=? AND actor_id=? AND name=?")
     .get(input.campaignId, target.actor_id, slotResourceId) as { current: number } | undefined;
   if (!slot || slot.current < 1) return null;
   if (!claimReactionBudget(db, input.encounterId, input.reactorCombatantId, input.round, input.occurredAt)) return null;
+  if (readiness === "ready" && !consumeReadyAction(db, input.encounterId, input.reactorCombatantId, readyWindow[0]!.readyId!)) {
+    releaseReactionBudget(db, input.encounterId, input.reactorCombatantId, input.round);
+    return null;
+  }
   const spent = db.prepare("UPDATE rpg_actor_resources SET current=current-1 WHERE campaign_id=? AND actor_id=? AND name=? AND current=?")
     .run(input.campaignId, target.actor_id, slotResourceId, slot.current);
   if (spent.changes !== 1) {
@@ -150,7 +163,7 @@ export function resolveHitTimeShield(
     round: input.round,
     responseKind: DND_5E_SHIELD_RESPONSE_KIND,
     responseId: DND_5E_SHIELD_RESPONSE_ID,
-    readiness: "declared",
+    readiness,
     outcome: {
       hitBefore: true, hitAfter: plan.hit, attackTotal: input.attackTotal,
       armorClassBefore: input.armorClass, armorClassAfter: plan.armorClass,

@@ -29,6 +29,7 @@ import { projectCombatLogRows, type CombatLogRow } from "./encounterRowTypes.js"
 import { buildCombatActionPlans, isDndCombat, readCombatTurnEconomy } from "./combatActionPlan.js";
 import { buildUseConsumableLegalActions, mayActForConsumable, readUseConsumableCommandResult } from "./useConsumableRuntime.js";
 import { readReactionAvailability } from "./opportunityAttackRuntime.js";
+import { readReadyActions } from "./reaction/readyActionRuntime.js";
 
 /** Dependencies required by non-mutating encounter operations. */
 export interface EncounterReadDependencies { clock: Clock; }
@@ -249,6 +250,12 @@ export function createEncounterReadRepository(
       legalActions,
        ...(isDndCombat(db,encounter.campaign_id)?{turnEconomy}:{}),
        ...(isDndCombat(db,encounter.campaign_id)?{reactionAvailability:readReactionAvailability(db,combatId,encounter.round_number)}:{}),
+       ...(isDndCombat(db,encounter.campaign_id)?{readyActions:readReadyActions(db,combatId,encounter.round_number).map((ready)=>({
+         combatantId:ready.combatantId,readyId:ready.readyId,responseKind:ready.responseKind,responseId:ready.responseId,
+         trigger:{event:ready.triggerEvent,subject:ready.triggerSubject,
+           ...(ready.maxDistanceFeet===null?{}:{maxDistanceFeet:ready.maxDistanceFeet}),
+           ...(ready.requiresHit?{requiresHit:true}:{})},
+         expiresAtRound:ready.expiresAtRound}))}:{}),
       revision: encounter.revision,
     });
     return { campaignId: encounter.campaign_id, encounterId: encounter.encounter_id, ...combat };
