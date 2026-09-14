@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const SRD_5_1_STARTER_RULES_PROFILE_ID = "srd-5.1:rules:starter-v1" as const;
 export const SRD_5_1_STARTER_PACK_ID = "srd-5.1:starter" as const;
-export const SRD_5_1_STARTER_PACK_VERSION = "1.6.0+d1c1c53cfd62" as const;
+export const SRD_5_1_STARTER_PACK_VERSION = "1.6.0+0d182dd617e2" as const;
 export const SRD_5_1_STARTER_ID = `${SRD_5_1_STARTER_PACK_ID}@${SRD_5_1_STARTER_PACK_VERSION}` as const;
 
 export const srdStarterIdentitySchema = z.object({

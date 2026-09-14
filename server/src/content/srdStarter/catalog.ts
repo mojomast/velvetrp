@@ -14,6 +14,7 @@ import { buildSpells } from "./spells.js";
 import { buildItems } from "./items.js";
 import { buildCurrencies } from "./currencies.js";
 import { buildEnemies } from "./enemies.js";
+import { buildFeats } from "./feats.js";
 
 export function buildStarterCatalog(catalogVersion: string, digest: string): PublishContentCatalogInput {
   const refs = createStarterReferences(catalogVersion);
@@ -31,6 +32,7 @@ export function buildStarterCatalog(catalogVersion: string, digest: string): Pub
       ...buildItems(refs),
       ...buildCurrencies(refs),
       ...buildEnemies(refs),
+      ...buildFeats(refs),
     ],
   });
 }

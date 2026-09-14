@@ -11,6 +11,45 @@ export function buildAbilities(refs: StarterReferences) {
   const tieflingHellishResistance = ref("ability", "srd-5.1:ability:tiefling-hellish-resistance");
   const tieflingInfernalLegacy = ref("ability", "srd-5.1:ability:tiefling-infernal-legacy");
   const tieflingDarkvision = ref("ability", "srd-5.1:ability:tiefling-darkvision");
+  const batBite = ref("ability", "srd-5.1:ability:bat-bite");
+  const catClaws = ref("ability", "srd-5.1:ability:cat-claws");
+  const crabClaw = ref("ability", "srd-5.1:ability:crab-claw");
+  const giantFireBeetleBite = ref("ability", "srd-5.1:ability:giant-fire-beetle-bite");
+  const jackalBite = ref("ability", "srd-5.1:ability:jackal-bite");
+  const lizardBite = ref("ability", "srd-5.1:ability:lizard-bite");
+  const ratBite = ref("ability", "srd-5.1:ability:rat-bite");
+  const weaselBite = ref("ability", "srd-5.1:ability:weasel-bite");
+  const bloodHawkBeak = ref("ability", "srd-5.1:ability:blood-hawk-beak");
+  const cultistScimitar = ref("ability", "srd-5.1:ability:cultist-scimitar");
+  const giantRatBite = ref("ability", "srd-5.1:ability:giant-rat-bite");
+  const giantWeaselBite = ref("ability", "srd-5.1:ability:giant-weasel-bite");
+  const guardSpear = ref("ability", "srd-5.1:ability:guard-spear");
+  const koboldDagger = ref("ability", "srd-5.1:ability:kobold-dagger");
+  const mastiffBite = ref("ability", "srd-5.1:ability:mastiff-bite");
+  const tribalWarriorSpear = ref("ability", "srd-5.1:ability:tribal-warrior-spear");
+  const axeBeakBeak = ref("ability", "srd-5.1:ability:axe-beak-beak");
+  const boarTusk = ref("ability", "srd-5.1:ability:boar-tusk");
+  const constrictorSnakeBite = ref("ability", "srd-5.1:ability:constrictor-snake-bite");
+  const giantBatBite = ref("ability", "srd-5.1:ability:giant-bat-bite");
+  const giantLizardBite = ref("ability", "srd-5.1:ability:giant-lizard-bite");
+  const giantWolfSpiderBite = ref("ability", "srd-5.1:ability:giant-wolf-spider-bite");
+  const pantherBite = ref("ability", "srd-5.1:ability:panther-bite");
+  const skeletonShortsword = ref("ability", "srd-5.1:ability:skeleton-shortsword");
+  const zombieSlam = ref("ability", "srd-5.1:ability:zombie-slam");
+  const apeFist = ref("ability", "srd-5.1:ability:ape-fist");
+  const blackBearBite = ref("ability", "srd-5.1:ability:black-bear-bite");
+  const crocodileBite = ref("ability", "srd-5.1:ability:crocodile-bite");
+  const giantGoatRam = ref("ability", "srd-5.1:ability:giant-goat-ram");
+  const hobgoblinLongsword = ref("ability", "srd-5.1:ability:hobgoblin-longsword");
+  const orcGreataxe = ref("ability", "srd-5.1:ability:orc-greataxe");
+  const scoutShortsword = ref("ability", "srd-5.1:ability:scout-shortsword");
+  const warhorseHooves = ref("ability", "srd-5.1:ability:warhorse-hooves");
+  const worgBite = ref("ability", "srd-5.1:ability:worg-bite");
+  const enemyPackTactics = ref("ability", "srd-5.1:ability:enemy-pack-tactics");
+  const koboldSunlightSensitivity = ref("ability", "srd-5.1:ability:kobold-sunlight-sensitivity");
+  const zombieUndeadFortitude = ref("ability", "srd-5.1:ability:zombie-undead-fortitude");
+  const orcAggressive = ref("ability", "srd-5.1:ability:orc-aggressive");
+  const hobgoblinMartialAdvantage = ref("ability", "srd-5.1:ability:hobgoblin-martial-advantage");
   return [
     { reference: attack, name: "Longsword Attack", description: "A basic Strength-based melee weapon attack.", tags: ["srd-5.1"], mechanics: { actionCost: "action", recovery: "none", uses: 0, target: "enemy", effects: [{ type: "damage", damageType: "physical", dice: { count: 1, sides: 8, modifier: 0 } }] } },
     { reference: secondWind, name: "Second Wind", description: "Fighter feature: as a bonus action, recover 1d10 hit points plus your Fighter level; one use per short or long rest.", tags: ["srd-5.1", "fighter-1-2", "combat-feature"], mechanics: { actionCost: "bonus-action", recovery: "short-rest", uses: 1, target: "self", effects: [{ type: "healing", dice: { count: 1, sides: 10, modifier: 1 } }] } },
@@ -41,5 +80,38 @@ export function buildAbilities(refs: StarterReferences) {
     { reference: wolfAttack, name: "Wolf Bite", description: "The executable basic melee attack selected from the Wolf entry.", tags: ["srd-5.1", "enemy-basic-attack"], mechanics: { actionCost: "action", recovery: "none", uses: 0, target: "enemy", effects: [{ type: "damage", damageType: "piercing", dice: { count: 2, sides: 4, modifier: 2 } }] } },
     { reference: wolfPackTactics, name: "Pack Tactics", description: "Wolf trait marker for the executable two-roll attack policy when an active ally is present.", tags: ["srd-5.1", "enemy-trait", "combat-feature"], mechanics: { actionCost: "passive", recovery: "none", uses: 0, target: "self", effects: [] } },
     { reference: wolfKnockdown, name: "Wolf Knockdown", description: "Wolf bite rider marker for the executable prone condition after a confirmed hit.", tags: ["srd-5.1", "enemy-trait", "combat-feature"], mechanics: { actionCost: "passive", recovery: "none", uses: 0, target: "enemy", effects: [] } },
+    ...([
+      [batBite, "Bat Bite", "piercing", 1, 4, -1], [catClaws, "Cat Claws", "slashing", 1, 4, -1],
+      [crabClaw, "Crab Claw", "bludgeoning", 1, 4, -1], [giantFireBeetleBite, "Giant Fire Beetle Bite", "slashing", 1, 6, -1],
+      [jackalBite, "Jackal Bite", "piercing", 1, 4, -1], [lizardBite, "Lizard Bite", "piercing", 1, 4, -1],
+      [ratBite, "Rat Bite", "piercing", 1, 4, -1], [weaselBite, "Weasel Bite", "piercing", 1, 4, -1],
+      [bloodHawkBeak, "Blood Hawk Beak", "piercing", 1, 4, 2], [cultistScimitar, "Cultist Scimitar", "slashing", 1, 6, 1],
+      [giantRatBite, "Giant Rat Bite", "piercing", 1, 4, 2], [giantWeaselBite, "Giant Weasel Bite", "piercing", 1, 4, 3],
+      [guardSpear, "Guard Spear", "piercing", 1, 6, 1], [koboldDagger, "Kobold Dagger", "piercing", 1, 4, 2],
+      [mastiffBite, "Mastiff Bite", "piercing", 1, 6, 1], [tribalWarriorSpear, "Tribal Warrior Spear", "piercing", 1, 6, 1],
+      [axeBeakBeak, "Axe Beak Beak", "slashing", 1, 8, 2], [boarTusk, "Boar Tusk", "slashing", 1, 6, 1],
+      [constrictorSnakeBite, "Constrictor Snake Bite", "piercing", 1, 6, 2], [giantBatBite, "Giant Bat Bite", "piercing", 1, 6, 2],
+      [giantLizardBite, "Giant Lizard Bite", "piercing", 1, 8, 2], [giantWolfSpiderBite, "Giant Wolf Spider Bite", "piercing", 1, 6, 1],
+      [pantherBite, "Panther Bite", "piercing", 1, 6, 2], [skeletonShortsword, "Skeleton Shortsword", "piercing", 1, 6, 2],
+      [zombieSlam, "Zombie Slam", "bludgeoning", 1, 6, 1], [apeFist, "Ape Fist", "bludgeoning", 1, 6, 3],
+      [blackBearBite, "Black Bear Bite", "piercing", 1, 6, 2], [crocodileBite, "Crocodile Bite", "piercing", 1, 10, 2],
+      [giantGoatRam, "Giant Goat Ram", "bludgeoning", 2, 4, 3], [hobgoblinLongsword, "Hobgoblin Longsword", "slashing", 1, 8, 1],
+      [orcGreataxe, "Orc Greataxe", "slashing", 1, 12, 3], [scoutShortsword, "Scout Shortsword", "piercing", 1, 6, 2],
+      [warhorseHooves, "Warhorse Hooves", "bludgeoning", 2, 6, 4], [worgBite, "Worg Bite", "piercing", 2, 6, 3],
+    ] as const).map(([reference, name, damageType, count, sides, modifier]) => ({
+      reference, name, description: `The executable basic melee attack selected from the ${name.replace(/ (Bite|Claws?|Claw|Beak|Dagger|Scimitar|Spear|Tusk|Slam|Fist|Ram|Longsword|Greataxe|Shortsword|Hooves)$/, "")} entry.`,
+      tags: ["srd-5.1", "enemy-basic-attack"],
+      mechanics: { actionCost: "action", recovery: "none", uses: 0, target: "enemy", effects: [{ type: "damage", damageType, dice: { count, sides, modifier } }] },
+    })),
+    ...([
+      [enemyPackTactics, "Pack Tactics", "SRD pack tactics trait marker for the bounded two-roll attack policy when an active ally is present."],
+      [koboldSunlightSensitivity, "Sunlight Sensitivity", "Kobold sunlight sensitivity trait marker; the runtime does not model lighting, so this is metadata only."],
+      [zombieUndeadFortitude, "Undead Fortitude", "Zombie Undead Fortitude trait marker; the death-saving throw is metadata only."],
+      [orcAggressive, "Aggressive", "Orc Aggressive bonus-action movement marker; grid movement is not modeled."],
+      [hobgoblinMartialAdvantage, "Martial Advantage", "Hobgoblin Martial Advantage conditional damage marker; the extra damage rider is metadata only."],
+    ] as const).map(([reference, name, description]) => ({
+      reference, name, description, tags: ["srd-5.1", "enemy-trait", "bounded", "unsupported-runtime"],
+      mechanics: { actionCost: "passive" as const, recovery: "none" as const, uses: 0, target: "self" as const, effects: [] },
+    })),
   ];
 }
