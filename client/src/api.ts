@@ -5,6 +5,8 @@ import { campaignContextInspectionDispatchReferenceSelectorIdentitySchema, campa
   type CampaignContextInspectionDispatchReferenceSource, type CampaignContextInspectionLane } from "@velvet/contracts";
 import { encounterPlanningRequestSchema, encounterPlanResponseSchema,
   type EncounterPlanningRequest, type EncounterPlanResponse } from "@velvet/contracts";
+import { attunementCommandSchema, attunementResponseSchema, attunementSnapshotSchema,
+  type AttunementCommand, type AttunementResponse, type AttunementSnapshot } from "@velvet/contracts";
 
 const dmPath = (campaignId: string, sessionId?: string, runId?: string) => {
   const id = (value: string) => encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(value)));
@@ -1705,6 +1707,31 @@ export async function commandActorRest(campaignId: string, actorId: string, inpu
     || response.receipt.recovery.resources.some((delta) => returnedResources.get(delta.resourceId)?.current !== delta.after)) {
     throw new Error("Actor rest receipt did not match the request");
   }
+  return response;
+}
+
+/** Reads the actor's durable magic-item attunement set from the pinned campaign catalog. */
+export async function getActorAttunements(campaignId: string, actorId: string): Promise<AttunementSnapshot> {
+  const campaign = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
+  const actor = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(actorId)));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${campaign}/actors/${actor}/attunements`, { cache: "no-store" });
+  requireStatus(success, 200, "Actor attunement read");
+  const snapshot = attunementSnapshotSchema.parse(success.body);
+  if (snapshot.campaignId !== campaignId || snapshot.actorId !== actorId) throw new Error("Actor attunement response did not match the request");
+  return snapshot;
+}
+
+/** Drives one idempotent attune or drop command and returns the engine outcome. */
+export async function commandActorAttunement(campaignId: string, actorId: string, command: AttunementCommand): Promise<AttunementResponse> {
+  const campaign = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(campaignId)));
+  const actor = encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(actorId)));
+  const body = parseApiInput(() => attunementCommandSchema.parse(command));
+  const success = await requestResponse<unknown>(`/rpg/v1/campaigns/${campaign}/actors/${actor}/attunements`, {
+    method: "POST", cache: "no-store", body: JSON.stringify(body),
+  });
+  requireStatus(success, 200, "Actor attunement command");
+  const response = attunementResponseSchema.parse(success.body);
+  if (response.snapshot.campaignId !== campaignId || response.snapshot.actorId !== actorId) throw new Error("Actor attunement response did not match the request");
   return response;
 }
 

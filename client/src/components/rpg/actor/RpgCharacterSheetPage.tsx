@@ -8,11 +8,13 @@ import type {
   VendorSaleQuoteRequest, VendorSaleQuoteResponse,
   EconomyHttpCommandRequest, EconomyHttpCommandResponse, EconomyHttpShopGetResponse, EconomyHttpWalletGetResponse,
   InventoryHttpCommandRequest, InventoryHttpCommandResponse, InventoryHttpGetResponse, RestHttpRequest, RestHttpResponse,
+  AttunementCommand, AttunementResponse, AttunementSnapshot,
 } from "@velvet/contracts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActorChecksPanel } from "./ActorChecksPanel";
 import { ActorEffectsPanel } from "./ActorEffectsPanel";
 import { KnownOptionsPanel } from "./KnownOptionsPanel";
+import { MagicItemAttunementPanel, type AttunementCandidate } from "./MagicItemAttunementPanel";
 import { PowerLibraryPanel } from "../combat/PowerLibraryPanel";
 import { SpellcastingPanel } from "./SpellcastingPanel";
 import { InventoryPanel, type InventoryIntent } from "./InventoryPanel";
@@ -43,6 +45,8 @@ export interface RpgCharacterSheetApi {
   vendorSaleQuote: (campaignId: string, actorId: string, command: VendorSaleQuoteRequest) => Promise<VendorSaleQuoteResponse>;
   getCampaignContent: (campaignId: string) => Promise<ContentCatalogHttpCampaignContentGetResponse>;
   getCampaignPack: (campaignId: string, packId: string, packVersion: string) => Promise<ContentCatalogHttpCampaignPackDetailResponse>;
+  getActorAttunements?: (campaignId: string, actorId: string) => Promise<AttunementSnapshot>;
+  commandActorAttunement?: (campaignId: string, actorId: string, command: AttunementCommand) => Promise<AttunementResponse>;
 }
 
 export interface RpgCharacterSheetPageProps {
@@ -129,6 +133,7 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
   const [phase, setPhase] = useState<"loading" | "ready" | "failed">("loading");
   const [optionalWarning, setOptionalWarning] = useState("");
   const [itemNames, setItemNames] = useState(new Map<string, { name: string; category?: string; slot?: string | null }>());
+  const [magicItems, setMagicItems] = useState(new Map<string, { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }>());
   const [currencies, setCurrencies] = useState<CurrencyPresentations>(new Map());
   const [shop, setShop] = useState<EconomyHttpShopGetResponse | null>(null);
   const [shopId, setShopId] = useState("");
@@ -169,20 +174,22 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
       const packs = await Promise.all(content.content.contentPacks.map((pin) => api.getCampaignPack(campaignId, pin.packId, pin.packVersion)));
       if (!current(generation)) return;
       const nextItems = new Map<string, { name: string; category?: string; slot?: string | null }>();
+      const nextMagic = new Map<string, { definitionId: string; name: string; prerequisite: "short-rest" | "long-rest" | null }>();
       const nextCurrencies: CurrencyPresentations = new Map();
       for (const pack of packs) for (const definition of pack.catalog.definitions) {
         const key = catalogReferenceKey(definition.reference);
         if (definition.reference.kind === "item" && "mechanics" in definition) {
-          const mechanics = definition.mechanics as { category: string; slot: string | null };
+          const mechanics = definition.mechanics as { category: string; slot: string | null; magic?: { attunement: { prerequisite: "short-rest" | "long-rest" } | null } };
           nextItems.set(key, { name: definition.name, category: mechanics.category, slot: mechanics.slot });
+          if (mechanics.magic) nextMagic.set(key, { definitionId: definition.reference.definitionId, name: definition.name, prerequisite: mechanics.magic.attunement?.prerequisite ?? null });
         }
         if (definition.reference.kind === "currency" && "mechanics" in definition) {
           const mechanics = definition.mechanics as { symbol: string; minorPerMajor: number };
           nextCurrencies.set(key, { name: definition.name, symbol: mechanics.symbol, minorPerMajor: mechanics.minorPerMajor });
         }
       }
-      setItemNames(nextItems); setCurrencies(nextCurrencies);
-    } catch { if (current(generation)) { setItemNames(new Map()); setCurrencies(new Map()); } }
+      setItemNames(nextItems); setMagicItems(nextMagic); setCurrencies(nextCurrencies);
+    } catch { if (current(generation)) { setItemNames(new Map()); setMagicItems(new Map()); setCurrencies(new Map()); } }
   }, [api, campaignId, current]);
 
   const loadActor = useCallback(async (generation: number, exactActorId: string): Promise<number> => {
@@ -313,6 +320,18 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
   };
 
   const describeItem = (item: InventoryHttpGetResponse["entries"][number]["item"]) => itemNames.get(catalogReferenceKey(item)) ?? { name: item.definitionId };
+  const attunementCandidates = useMemo((): AttunementCandidate[] => {
+    if (!inventory) return [];
+    const seen = new Set<string>();
+    const candidates: AttunementCandidate[] = [];
+    for (const entry of inventory.entries) {
+      const magicItem = magicItems.get(catalogReferenceKey(entry.item));
+      if (!magicItem || magicItem.prerequisite === null || seen.has(magicItem.definitionId)) continue;
+      seen.add(magicItem.definitionId);
+      candidates.push({ definitionId: magicItem.definitionId, name: magicItem.name, prerequisite: magicItem.prerequisite });
+    }
+    return candidates;
+  }, [inventory, magicItems]);
   function submitInventory(intent: InventoryIntent) {
     if (!inventory) return;
     const command = { ...intent, expectedRevision: inventory.revision, idempotencyKey: commandKey(`inventory-${intent.kind}`) } as InventoryHttpCommandRequest;
@@ -395,6 +414,9 @@ export function RpgCharacterSheetPage({ campaignId, campaignCharacterId = "", ap
       {sheet && <KnownOptionsPanel options={sheet.sheet.choices.map((choice) => ({
         id: choice.label, label: choice.label, selectionLabel: choice.selection.name, kind: choice.selection.kind,
       }))} />}
+      {actorId && api.getActorAttunements && api.commandActorAttunement && <MagicItemAttunementPanel campaignId={campaignId} actorId={actorId}
+        disabled={commandDisabled} candidates={attunementCandidates}
+        api={{ getActorAttunements: api.getActorAttunements, commandActorAttunement: api.commandActorAttunement }} />}
       {resources && <ResourceTrackers resources={resources.resources} disabled={commandDisabled} onAdjust={submitResource} />}
       {actorId && <ActorChecksPanel disabled={commandDisabled} result={confirmedResult?.kind === "check" ? confirmedResult.value : null} onSubmit={submitCheck} />}
       {actorId && <PowerLibraryPanel powers={powers} disabled={commandDisabled} onRefresh={() => void load()} onUse={submitPower} result={confirmedResult?.kind === "power" ? confirmedResult.value : null} />}
