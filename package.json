@@ -23,6 +23,8 @@
     "test:hydration-cli": "tsx --test scripts/test/*.test.ts",
     "typecheck:hydration-cli": "tsc --noEmit -p scripts/tsconfig.json",
     "test:planning-board": "node --test planning-board/test/*.test.js",
+    "test:server:quick": "npm --workspace velvet-mvp-server run test:quick",
+    "test:server:serial": "npm --workspace velvet-mvp-server run test:serial",
     "build": "npm run build --workspace @velvet/contracts && npm --workspace velvet-mvp-server run build && npm --workspace velvet-mvp-client run build",
     "typecheck": "npm run build --workspace @velvet/contracts && npm run typecheck --workspace @velvet/contracts && npm --workspace velvet-mvp-server run typecheck && npm --workspace velvet-mvp-client run typecheck && npm run typecheck:e2e && npm run typecheck:hydration-cli",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
