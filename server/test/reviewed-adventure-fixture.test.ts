@@ -15,7 +15,7 @@ describe("reviewed Last Harbor Light fixture", () => {
     process.env.FEATURE_RPG_COMBAT = "true";
     const directory = makeTmpDir("reviewed-harbor-");
     process.env.VELVET_DATA_DIR = directory;
-    expect(REVIEWED_ADVENTURE_MANIFEST_DIGEST).toBe("11e7ca9c612ec68858be077fc432ad92a7cd6de2afcea007d321a65e6490a929");
+    expect(REVIEWED_ADVENTURE_MANIFEST_DIGEST).toBe("9c6a559238d6132f65794e90e565d43cea9e04977e5cd74cbddf45523cf85703");
     const fixture = await createReviewedAdventure(directory);
     expect(fixture.providerDispatches).toBe(0);
     expect(fixture.optionalEncounterInstanceId).toBe(fixture.resourceIds["optional-encounter-instance"]);
