@@ -1,0 +1,24 @@
+{
+  "id": "npc-selection",
+  "title": "NPC and monster stat-block selection",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Monsters",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "npc-selection",
+      "version": "1.0.0",
+      "descriptorStatus": "partial"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e/npcSelection.ts",
+    "server/test/dnd5e-npc-selection.test.ts"
+  ],
+  "apiEvidence": []
+}

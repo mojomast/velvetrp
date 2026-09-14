@@ -16,7 +16,7 @@ import { frozenList, requireInteger } from "./internal.js";
  */
 
 export const DND_5E_ENCOUNTER_BUILDER_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
-  Object.freeze({ id: "encounter-builder", version: "1.0.0", status: "partial" as const }),
+  Object.freeze({ id: "encounter-builder", version: "1.1.0", status: "supported" as const }),
 ]);
 
 export type EncounterBuilderDifficulty = "easy" | "medium" | "hard" | "deadly";

@@ -52,6 +52,9 @@ const DOMAIN_ORDER = [
   "complete-combat-system",
   "spellcasting-and-spells",
   "monsters",
+  "encounter-builder",
+  "encounter-rewards",
+  "npc-selection",
   "adventuring-environment",
   "training-dummy",
 ];

@@ -1,0 +1,28 @@
+{
+  "id": "encounter-rewards",
+  "title": "Encounter XP rewards and level-up eligibility",
+  "status": "partial",
+  "complete": false,
+  "sourceSections": [
+    {
+      "id": "SRD5.1:Beyond 1st Level",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56"
+    },
+    {
+      "id": "SRD5.1:Building Combat Encounters",
+      "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=165"
+    }
+  ],
+  "capabilityEvidence": [
+    {
+      "id": "encounter-rewards",
+      "version": "1.0.0",
+      "descriptorStatus": "partial"
+    }
+  ],
+  "runtimeEvidence": [
+    "server/src/rulesets/dnd5e/encounterRewards.ts",
+    "server/test/dnd5e-encounter-rewards.test.ts"
+  ],
+  "apiEvidence": []
+}
