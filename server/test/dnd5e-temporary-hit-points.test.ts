@@ -98,10 +98,15 @@ describe("SRD 5.1 temporary hit points", () => {
     }
     expect(current.currentCombatant).toBe(enemyCombatant);
     const beforeHp = current.combatants.find((entry: any) => entry.combatantId === casterCombatant)!.hitPoints;
-    const after = repo.executeCombatEnemyTurn(OWNER, current.combatId, { expectedRevision: current.revision, idempotencyKey: "enemy-turn" }).combat;
-    const casterAfter = after.combatants.find((entry: any) => entry.combatantId === casterCombatant)!;
-    expect(casterAfter.hitPoints).toBe(beforeHp);
-    expect(casterAfter.temporaryHitPoints ?? 0).toBeLessThan(pool);
+    const enemy = repo.executeCombatEnemyTurn(OWNER, current.combatId, { expectedRevision: current.revision, idempotencyKey: "enemy-turn" });
+    // The Goblin's SRD multiattack makes two scimitar attacks; the pool absorbs
+    // in order and only the overflow beyond the pool reaches hit points.
+    const outcomes = (enemy.resolution as any).outcomes;
+    expect(outcomes).toHaveLength(2);
+    const totalApplied = outcomes.reduce((sum: number, outcome: any) => sum + outcome.applied, 0);
+    const casterAfter = enemy.combat.combatants.find((entry: any) => entry.combatantId === casterCombatant)!;
+    expect(casterAfter.temporaryHitPoints ?? 0).toBe(0);
+    expect(casterAfter.hitPoints).toBe(beforeHp - totalApplied);
     repo.close();
   });
 });

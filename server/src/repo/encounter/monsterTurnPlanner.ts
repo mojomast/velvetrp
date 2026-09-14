@@ -1,11 +1,15 @@
 import type DatabaseDriver from "better-sqlite3";
 import { abilityCatalogDefinitionSchema, enemyTemplateCatalogDefinitionSchema } from "@velvet/contracts";
+import type { MonsterAttackStep } from "../../rulesets/dnd5e/monsters.js";
 import { actionBlockingConditions, conditionsFor, mayAttackTarget } from "./combatConditionRuntime.js";
 import { EncounterConflictError } from "./encounterErrors.js";
+import { monsterActionPlanFromContent, type PinnedAbilityDefinition } from "./monster/content.js";
 
 export type MonsterTurnPlan = Readonly<{
   enemy: ReturnType<typeof enemyTemplateCatalogDefinitionSchema.parse>;
   ability: ReturnType<typeof abilityCatalogDefinitionSchema.parse>;
+  /** Ordered executable attacks: the SRD multiattack sequence, a single attack, or empty for a save-only action. */
+  sequence: readonly MonsterAttackStep[];
   target: any | null;
   attackRollCount: 1 | 2;
   knockdown: boolean;
@@ -75,15 +79,38 @@ function hasPinnedTraits(enemy: ReturnType<typeof enemyTemplateCatalogDefinition
     && value.packId === enemy.reference.packId && value.packVersion === enemy.reference.packVersion));
 }
 
+/** Loads every ability pinned by the enemy so the multiattack shape can be planned from exact content. */
+function pinnedAbilities(db: DatabaseDriver.Database, enemy: ReturnType<typeof enemyTemplateCatalogDefinitionSchema.parse>): PinnedAbilityDefinition[] {
+  const abilities: PinnedAbilityDefinition[] = [];
+  for (const ref of enemy.mechanics.abilityRefs) {
+    const row = db.prepare(`SELECT definition_json FROM rpg_catalog_definitions
+      WHERE pack_id=? AND pack_version=? AND kind='ability' AND definition_id=?`).get(ref.packId, ref.packVersion, ref.definitionId) as { definition_json: string } | undefined;
+    if (!row) continue;
+    const ability = abilityCatalogDefinitionSchema.parse(JSON.parse(row.definition_json));
+    if (sameRef(ability.reference, ref)) abilities.push(ability);
+  }
+  return abilities;
+}
+
+/** The ordered executable attack sequence for the enemy's planned action. */
+function attackSequence(db: DatabaseDriver.Database, enemy: ReturnType<typeof enemyTemplateCatalogDefinitionSchema.parse>): readonly MonsterAttackStep[] {
+  const plan = monsterActionPlanFromContent(enemy, pinnedAbilities(db, enemy));
+  if (!plan) return Object.freeze([]);
+  if (plan.kind === "multiattack") return plan.sequence;
+  if (plan.kind === "attack") return Object.freeze([plan.step]);
+  return Object.freeze([]);
+}
+
 /** Selects only targets that the combat model can legally attack. No caller input participates. */
 export function planMonsterTurn(db: DatabaseDriver.Database, encounterId: string, current: any, round: number): MonsterTurnPlan {
   const enemy = pinnedEnemy(db, encounterId, current.combatant_id);
   const ability = abilityFor(db, enemy);
+  const sequence = attackSequence(db, enemy);
   const behavior = monsterBehavior(enemy.reference.definitionId);
   const blocked = [...actionBlockingConditions].some((condition) => conditionsFor(db, encounterId, current.combatant_id, round).has(condition));
   const evidence = behavior.nimbleEscape && hasPinnedTraits(enemy, "goblin") ? ["goblin:nimble-escape:short-reposition"]
     : behavior.packTactics && hasPinnedTraits(enemy, "wolf") ? ["wolf:pack-tactics", "wolf:knockdown-on-hit"] : [];
-  if (blocked) return { enemy, ability, target: null, attackRollCount: 1, knockdown: false, legalActionId: "end-turn", actionEvidence: evidence };
+  if (blocked) return { enemy, ability, sequence, target: null, attackRollCount: 1, knockdown: false, legalActionId: "end-turn", actionEvidence: evidence };
 
   const order = behavior.targetPriority === "lowest-hit-points"
     ? "CASE status WHEN 'active' THEN 0 ELSE 1 END, hit_points, combatant_id" : "combatant_id";
@@ -91,12 +118,12 @@ export function planMonsterTurn(db: DatabaseDriver.Database, encounterId: string
     AND status IN ('active','unconscious','stable') AND team<>? AND actor_id IS NOT NULL
     ORDER BY ${order}`).all(encounterId, current.team) as any[];
   const target = targets.find((value) => mayAttackTarget(db, encounterId, current.combatant_id, value.combatant_id, round)) ?? null;
-  if (!target) return { enemy, ability, target: null, attackRollCount: 1, knockdown: false, legalActionId: "end-turn", actionEvidence: evidence };
+  if (!target) return { enemy, ability, sequence, target: null, attackRollCount: 1, knockdown: false, legalActionId: "end-turn", actionEvidence: evidence };
 
   const allies = (db.prepare(`SELECT count(*) AS count FROM combatant WHERE encounter_id=? AND team=? AND status='active'`)
     .get(encounterId, current.team) as { count: number }).count;
   const wolfTraitsPinned = hasPinnedTraits(enemy, "wolf");
-  return { enemy, ability, target, attackRollCount: behavior.packTactics && wolfTraitsPinned && allies > 1 ? 2 : 1,
+  return { enemy, ability, sequence, target, attackRollCount: behavior.packTactics && wolfTraitsPinned && allies > 1 ? 2 : 1,
     knockdown: behavior.knockdown && wolfTraitsPinned, legalActionId: behavior.knockdown && wolfTraitsPinned ? "attack:wolf:knockdown" : "attack:basic", actionEvidence: evidence };
 }
 

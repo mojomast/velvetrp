@@ -404,18 +404,19 @@ export const combatActionResolutionSchema = z.object({
   kind: z.enum(["attack", "grapple", "escape-grapple", "shove", "stand-up", "dash", "disengage", "help", "hide", "flee", "end-turn", "stabilize", "death-save"]),
   actingCombatantId: resourceIdSchema,
   targetIds: z.array(resourceIdSchema).max(1),
-  outcomes: z.array(combatActionOutcomeSchema).max(1),
+  /** A player attack has one outcome; a monster multiattack has one ordered outcome per step. */
+  outcomes: z.array(combatActionOutcomeSchema).max(8),
   roundBefore: z.number().int().min(1).max(1_000_000),
   roundAfter: z.number().int().min(1).max(1_000_000),
   currentCombatantBefore: resourceIdSchema,
   currentCombatantAfter: resourceIdSchema.nullable(),
 }).strict().superRefine((resolution, context) => {
   if (resolution.kind === "attack") {
-    const outcome = resolution.outcomes[0];
-    if (resolution.targetIds.length !== 1 || outcome?.kind !== "damage"
-        || outcome.targetId !== resolution.targetIds[0]
-        || outcome.applied !== outcome.hitPointsBefore - outcome.hitPointsAfter) {
-      context.addIssue({ code: "custom", message: "attack resolution must contain one exact damage outcome" });
+    const targetId = resolution.targetIds[0];
+    if (resolution.targetIds.length !== 1 || resolution.outcomes.length < 1
+        || resolution.outcomes.some((outcome) => outcome.kind !== "damage" || outcome.targetId !== targetId
+          || outcome.applied !== outcome.hitPointsBefore - outcome.hitPointsAfter)) {
+      context.addIssue({ code: "custom", message: "attack resolution must contain exact damage outcomes for one target" });
     }
   } else if (resolution.kind === "flee") {
     const outcome = resolution.outcomes[0];
