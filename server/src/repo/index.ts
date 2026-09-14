@@ -113,6 +113,8 @@ export { M16AuthorizationError, M16StaleError, M16ConflictError, EffectUnavailab
 export { EncounterAuthorizationError, EncounterStaleError, EncounterConflictError, EncounterUnavailableError, EncounterTurnError, type EncounterRepository } from "./encounterRepo.js";
 export { TacticalMapAuthorizationError, TacticalMapUnavailableError, TacticalMapStaleError, TacticalMapConflictError, type TacticalMapRepository } from "./tacticalMapRepo.js";
 export { WorldAuthorizationError, WorldStaleError, WorldConflictError, WorldUnavailableError, type WorldRepository } from "./worldRepo.js";
+export { createEncounterPlanningService, type EncounterPlanningService, type EncounterPlanningDependencies,
+  type EncounterCandidate, type EncounterPlanningDifficulty, type CampaignEncounterRequest, type CampaignEncounterPlan } from "./dm/encounterPlanning.js";
 export {
   CampaignStartingLocationAuthorizationError,
   CampaignStartingLocationConflictError,

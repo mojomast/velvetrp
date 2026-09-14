@@ -1,0 +1,70 @@
+import type { CampaignCatalogResolutionReport, CatalogDefinition } from "@velvet/contracts";
+import { describe, expect, it } from "vitest";
+import { createEncounterPlanningService, type EncounterPlanningDependencies } from "../src/repo/dm/encounterPlanning.js";
+
+const PACK = { packId: "srd-5.1", packVersion: "1.6.0+test", digest: "0".repeat(64) };
+
+function enemy(id: string, name: string, challengeRating?: number): CatalogDefinition {
+  return {
+    reference: { packId: PACK.packId, packVersion: PACK.packVersion, kind: "enemy-template", definitionId: id },
+    name, description: `${name} is a bounded profile.`, tags: ["srd-5.1"],
+    mechanics: { tier: Math.max(1, Math.ceil(challengeRating ?? 1)), ...(challengeRating === undefined ? {} : { challengeRating }), maxHp: 7, defense: 12, speed: 30, abilityRefs: [], resistances: [], vulnerabilities: [], immunities: [] },
+    private: { tactics: "t", gmNotes: "g", hiddenAbilityRefs: [] },
+  } as unknown as CatalogDefinition;
+}
+
+const spell = {
+  reference: { packId: PACK.packId, packVersion: PACK.packVersion, kind: "spell", definitionId: "srd-5.1:spell:light" },
+  name: "Light", description: "d", tags: ["srd-5.1"],
+  mechanics: { level: 0, actionCost: "action", range: 0, target: "self", concentration: false, effects: [] },
+} as unknown as CatalogDefinition;
+
+const catalog = (overrides: Partial<CampaignCatalogResolutionReport> = {}): CampaignCatalogResolutionReport => ({
+  campaignId: "campaign-one", compatible: true, rulesProfileId: "srd-5.1:rules:starter-v1",
+  contentPacks: [PACK], issues: [], ...overrides,
+} as CampaignCatalogResolutionReport);
+
+function service(options: { catalog?: CampaignCatalogResolutionReport | null; definitions?: CatalogDefinition[] } = {}) {
+  const dependencies: EncounterPlanningDependencies = {
+    resolveCampaignCatalog: () => options.catalog === undefined ? catalog() : options.catalog,
+    getCampaignContentCatalog: () => ({ definitions: options.definitions ?? [
+      enemy("srd-5.1:enemy-template:goblin", "Goblin", 0.25),
+      enemy("srd-5.1:enemy-template:orc", "Orc", 0.5),
+      enemy("srd-5.1:enemy-template:bugbear", "Bugbear", 1),
+      enemy("srd-5.1:enemy-template:unknown-cr", "Unknown CR"),
+      spell,
+    ] }),
+  };
+  return createEncounterPlanningService(dependencies);
+}
+
+describe("campaign encounter planning service", () => {
+  it("resolves pinned enemy templates into sorted exact-CR candidates, skipping non-monsters and CR-less profiles", () => {
+    expect(service().listEncounterCandidates("local-owner", "campaign-one")).toEqual([
+      { id: "srd-5.1:enemy-template:goblin", name: "Goblin", challengeRating: 0.25 },
+      { id: "srd-5.1:enemy-template:orc", name: "Orc", challengeRating: 0.5 },
+      { id: "srd-5.1:enemy-template:bugbear", name: "Bugbear", challengeRating: 1 },
+    ]);
+  });
+
+  it("returns no candidates when the campaign has no configured catalog", () => {
+    expect(service({ catalog: null }).listEncounterCandidates("local-owner", "campaign-one")).toEqual([]);
+  });
+
+  it("plans an encounter from the configured candidates and honors candidateIds", () => {
+    const plan = service().planEncounter("local-owner", "campaign-one", {
+      partyLevels: [3, 3], targetDifficulty: "medium",
+      candidateIds: ["srd-5.1:enemy-template:goblin", "srd-5.1:enemy-template:orc"],
+    });
+    expect(plan.plan.targetDifficulty).toBe("medium");
+    expect(plan.candidates).toHaveLength(3);
+    const rosterIds = plan.plan.roster.map((entry) => entry.id);
+    expect(rosterIds.every((id) => id !== "srd-5.1:enemy-template:bugbear")).toBe(true);
+  });
+
+  it("is deterministic", () => {
+    const first = service().planEncounter("local-owner", "campaign-one", { partyLevels: [5, 5, 5, 5], targetDifficulty: "hard" });
+    const second = service().planEncounter("local-owner", "campaign-one", { partyLevels: [5, 5, 5, 5], targetDifficulty: "hard" });
+    expect(JSON.stringify(first)).toBe(JSON.stringify(second));
+  });
+});

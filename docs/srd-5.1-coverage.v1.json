@@ -220,7 +220,7 @@
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Building Combat Encounters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=165" }],
       "capabilityEvidence": [{ "id": "encounter-builder", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterXp.ts", "server/src/rulesets/dnd5e/encounterBuilder.ts", "server/test/dnd5e-encounter-xp.test.ts", "server/test/dnd5e-encounter-builder.test.ts"],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterXp.ts", "server/src/rulesets/dnd5e/encounterBuilder.ts", "server/src/repo/dm/encounterPlanning.ts", "server/test/dnd5e-encounter-xp.test.ts", "server/test/dnd5e-encounter-builder.test.ts", "server/test/campaign-encounter-planning.test.ts"],
       "apiEvidence": []
     },
     {
