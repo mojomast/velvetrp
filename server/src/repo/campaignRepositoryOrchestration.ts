@@ -81,6 +81,8 @@ import { createActorResourceRepository, type ActorResourceRepository } from "./a
 import { createInventoryRepository, type InventoryRepository } from "./inventoryRepo.js";
 import { createEconomyRepository, type EconomyRepository } from "./economyRepo.js";
 import { createRestRepository, type RestRepository } from "./restRepo.js";
+import { createAttunementRepository, type AttunementRepository } from "./attunementRepo.js";
+import { magicItemDefinitionFromCatalog } from "./encounter/magicItem/index.js";
 import { createCheckRepository, type CheckRepository } from "./checkRepo.js";
 import { createAdventureCheckRepository } from "./adventureCheckRepo.js";
 import { createAdventureInventoryRepository } from "./adventureInventoryRepo.js";
@@ -712,6 +714,22 @@ function createRepositoryComposition<T>(
       return (...args: unknown[]) => { assertOpen(); return value(...args); };
     },
   }) as ContentCatalogRepository;
+  const attunementRepository = createAttunementRepository(db, {
+    clock: dependencies.clock,
+    resolveMagicItem: (campaignId, definitionId) => {
+      const catalog = contentCatalogRepository.resolveCampaignCatalog(LOCAL_OWNER_PRINCIPAL_ID, campaignId);
+      if (!catalog) return null;
+      for (const pack of catalog.contentPacks) {
+        const projection = contentCatalogRepository.getCampaignContentCatalog(LOCAL_OWNER_PRINCIPAL_ID, campaignId, pack.packId, pack.packVersion);
+        if (!projection) continue;
+        const definition = projection.definitions.find((candidate) => candidate.reference.definitionId === definitionId);
+        if (definition === undefined || definition.reference.kind !== "item") continue;
+        const magic = magicItemDefinitionFromCatalog(definition as unknown as Parameters<typeof magicItemDefinitionFromCatalog>[0]);
+        if (magic !== null) return magic;
+      }
+      return null;
+    },
+  });
   const rawCharacterBuilderRepository = createCharacterBuilderRepository(db, dependencies, () => {
     assertOpen();
     if (transactionDepth > 0) throw new Error("character builder mutation cannot run inside a repository transaction");
@@ -855,6 +873,7 @@ function createRepositoryComposition<T>(
     ...inventoryRepository,
     ...economyRepository,
     ...restRepository,
+    ...attunementRepository,
     ...checkRepository,
     ...adventureCheckRepository,
     ...adventureInventoryRepository,

@@ -68,7 +68,7 @@ describe("actor item attunement repository", () => {
     const { repo, close } = repository((definitionId) => definitionId.includes("missing") ? null : magicItem(definitionId));
     expect(repo.listActorAttunements("attacker", "actor")).toBeNull();
     expect(repo.attuneActorItem("attacker", "actor", { definitionId: "srd-5.1:item:ring", key: "ring-1", satisfiedRest: "short-rest" })).toBeNull();
-    expect(() => attune(repo, "srd-5.1:item:missing", "ring-1")).toThrow();
+    expect(attune(repo, "srd-5.1:item:missing", "ring-1")).toMatchObject({ ok: false, code: "definition-unavailable", snapshot: { attunements: [] } });
     close();
   });
 });

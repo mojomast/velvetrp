@@ -137,6 +137,8 @@ import { actorEffectsHttpRoutes } from "./actorEffects.js";
 import type { EffectRepository } from "../../../repo/effectRepo.js";
 import { encounterLifecycleHttpRoutes } from "./encounterLifecycle.js";
 import { encounterPlanningHttpRoutes } from "./encounterPlanning.js";
+import { attunementHttpRoutes } from "./attunement.js";
+import type { AttunementRepository } from "../../../repo/attunementRepo.js";
 import type { EncounterRepository } from "../../../repo/encounterRepo.js";
 import { combatReadsHttpRoutes } from "./combatReads.js";
 import { combatCommandsHttpRoutes } from "./combatCommands.js";
@@ -174,6 +176,7 @@ export interface CampaignListRepository extends
   Partial<Pick<ActorResourceRepository, "getActorResourceSnapshot" | "changeActorResourceForActor">>,
   Partial<Pick<InventoryRepository, "getActorInventorySnapshot" | "mutateInventoryForActor">>,
   Partial<Pick<RestRepository, "takeRest">>,
+  Partial<Pick<AttunementRepository, "listActorAttunements" | "attuneActorItem" | "dropActorAttunement">>,
   Partial<Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">>,
   Partial<Pick<AdventureCommerceRepository, "requestVendorSaleQuote">>,
   Partial<Pick<CheckRepository, "resolveActorCheck">>,
@@ -339,6 +342,7 @@ type ActorResourceLaneRepository = Pick<ActorResourceRepository,
 type InventoryLaneRepository = Pick<InventoryRepository,
   "getActorInventorySnapshot" | "mutateInventoryForActor">;
 type RestLaneRepository = Pick<RestRepository, "takeRest">;
+type AttunementLaneRepository = Pick<AttunementRepository, "listActorAttunements" | "attuneActorItem" | "dropActorAttunement">;
 type EconomyLaneRepository = Pick<EconomyRepository, "getActorEconomySnapshot" | "getShop" | "mutateEconomyForActor">
   & Pick<AdventureCommerceRepository, "requestVendorSaleQuote">;
 type CheckLaneRepository = Pick<CheckRepository, "resolveActorCheck">;
@@ -488,6 +492,10 @@ function assertInventoryRepository(repository: CampaignListRepository): asserts 
 }
 function assertRestRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & RestLaneRepository {
   if (typeof repository.takeRest !== "function") throw new UnsupportedCampaignRepositoryError();
+}
+function assertAttunementRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & AttunementLaneRepository {
+  if (typeof repository.listActorAttunements !== "function" || typeof repository.attuneActorItem !== "function"
+    || typeof repository.dropActorAttunement !== "function") throw new UnsupportedCampaignRepositoryError();
 }
 function assertEconomyRepository(repository: CampaignListRepository): asserts repository is CampaignListRepository & EconomyLaneRepository {
   if (typeof repository.getActorEconomySnapshot !== "function" || typeof repository.getShop !== "function"
@@ -683,6 +691,11 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertRestRepository(repository);
     return repository;
   };
+  const attunementRepositoryAccessor = (): AttunementLaneRepository => {
+    const repository = getCampaignRepository();
+    assertAttunementRepository(repository);
+    return repository;
+  };
   const economyRepositoryAccessor = (): EconomyLaneRepository => {
     const repository = getCampaignRepository();
     assertEconomyRepository(repository);
@@ -774,6 +787,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(actorResourcesHttpRoutes, { actorResourceRepositoryAccessor });
   await app.register(actorInventoryHttpRoutes, { inventoryRepositoryAccessor });
   await app.register(actorRestHttpRoutes, { restRepositoryAccessor });
+  await app.register(attunementHttpRoutes, { attunementRepositoryAccessor });
   await app.register(actorEconomyHttpRoutes, { economyRepositoryAccessor });
   await app.register(actorChecksHttpRoutes, { checkRepositoryAccessor });
   await app.register(actorPowersHttpRoutes, { powerRepositoryAccessor });

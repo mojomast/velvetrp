@@ -90,7 +90,7 @@ export function createAttunementRepository(db: DatabaseDriver.Database, dependen
       const access = authorize(principal, actorId);
       if (access === null) return null;
       const definition = dependencies.resolveMagicItem(access.campaignId, input.definitionId);
-      if (definition === null) throw new Error("attuned item definition is unavailable");
+      if (definition === null) return { ok: false, code: "definition-unavailable", snapshot: snapshot(principal, access.actorId)! };
       const result = attuneItem({
         state: currentState(access.campaignId, access.actorId), key: input.key, definition,
         prerequisite: { satisfiedRest: input.satisfiedRest }, occurredAt: dependencies.clock.now().toISOString(),

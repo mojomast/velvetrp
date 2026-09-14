@@ -424,7 +424,7 @@ describe("documentation drift guards", () => {
 
     const operations = documentedOperations();
     const count = operations.filter((operation) => operation.inventoryClass === "operation").length;
-    expect(count).toBe(150);
+    expect(count).toBe(152);
     const countClaims = ["README.md", "docs/api.md", "docs/operations.md", "docs/ROADMAP.md", "devplan.md", "handoff.md"];
     for (const relativePath of countClaims) expect(read(relativePath), relativePath).toContain(`${count} counted`);
   });
