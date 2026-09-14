@@ -570,7 +570,7 @@ export const currencyCatalogDefinitionSchema = z.object({
 }).strict();
 export const enemyTemplateCatalogDefinitionSchema = z.object({
   ...typedBase("enemy-template"),
-  mechanics: z.object({ tier: z.number().int().min(1).max(20), maxHp: positiveMechanicIntegerSchema, defense: z.number().int().min(0).max(100), speed: z.number().int().min(1).max(100), abilityRefs: z.array(abilityCatalogReferenceSchema).min(1).max(32), resistances: z.array(damageTypeSchema).max(6), vulnerabilities: z.array(damageTypeSchema).max(6), immunities: z.array(damageTypeSchema).max(6),
+  mechanics: z.object({ tier: z.number().int().min(1).max(20), /** Exact SRD challenge rating (0, 1/8, 1/4, 1/2, or 1-30); tier is its ceiling. */ challengeRating: z.number().min(0).max(30).optional(), maxHp: positiveMechanicIntegerSchema, defense: z.number().int().min(0).max(100), speed: z.number().int().min(1).max(100), abilityRefs: z.array(abilityCatalogReferenceSchema).min(1).max(32), resistances: z.array(damageTypeSchema).max(6), vulnerabilities: z.array(damageTypeSchema).max(6), immunities: z.array(damageTypeSchema).max(6),
     /** A closed executable binding, not a general monster-statblock vocabulary. */
     combatProfile: z.object({ kind: z.literal("dnd-5e-pinned-basic-attack-v1"), proficiencyBonus: z.number().int().min(0).max(10),
       attack: z.object({ abilityRef: abilityCatalogReferenceSchema, attackBonus: z.number().int().min(-20).max(30) }).strict() }).strict().optional() }).strict(),

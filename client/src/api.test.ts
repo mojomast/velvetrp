@@ -1185,7 +1185,7 @@ describe("HTTP runtime contracts", () => {
   it("sends the exact SRD 5.1 starter request and rejects a different mechanics setup", async () => {
     const campaign = { id: "campaign:one", name: "Road", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z",
       updatedAt: "2030-01-02T00:00:00.000Z", content: { status: "configured", rulesProfileId: "srd-5.1:rules:starter-v1",
-         contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.6.0+5bb1aaf8154c" }] } };
+         contentPacks: [{ packId: "srd-5.1:starter", packVersion: "1.6.0+47f53d909323" }] } };
     const velvetCampaign = { ...campaign, content: { status: "configured", rulesProfileId: "velvet:rules:starter-v1",
       contentPacks: [{ packId: "velvet:mechanics-starter", packVersion: "1.1.0+2f9199b5696d" }] } };
     const fetchMock = vi.fn()
@@ -1196,7 +1196,7 @@ describe("HTTP runtime contracts", () => {
     await expect(setupSrd51Starter("campaign:one")).resolves.toEqual({ campaign });
     expect(fetchMock).toHaveBeenNthCalledWith(1,
       "/api/rpg/v1/campaigns/campaign%3Aone/mechanics-starter-setup",
-       expect.objectContaining({ method: "PUT", cache: "no-store", body: JSON.stringify({ starterId: "srd-5.1:starter@1.6.0+5bb1aaf8154c" }) }),
+       expect.objectContaining({ method: "PUT", cache: "no-store", body: JSON.stringify({ starterId: "srd-5.1:starter@1.6.0+47f53d909323" }) }),
     );
     await expect(setupSrd51Starter("campaign:one")).rejects.toThrow(/did not match the request/);
     expect(fetchMock).toHaveBeenCalledTimes(2);

@@ -70,7 +70,7 @@ export function monsterTemplate(refs: StarterReferences, spec: MonsterTemplateSp
     description: `${spec.name} is a bounded SRD 5.1 enemy profile; only its basic attack is executable.`,
     tags: ["srd-5.1", "enemy-basic-attack", "bounded", spec.crTag, ...(traitRefs.length > 0 ? ["enemy-trait"] : [])],
     mechanics: {
-      tier, maxHp: spec.maxHp, defense: spec.defense, speed: spec.speed,
+      tier, challengeRating: spec.cr, maxHp: spec.maxHp, defense: spec.defense, speed: spec.speed,
       abilityRefs: [spec.primaryAttack, ...traitRefs],
       resistances: [...(spec.resistances ?? [])],
       vulnerabilities: [...(spec.vulnerabilities ?? [])],
