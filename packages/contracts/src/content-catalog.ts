@@ -480,6 +480,64 @@ export const srdItemEngineDetailsSchema = z.object({
   weightPounds: z.number().min(0).max(100_000),
   equipmentProfile: z.union([srdWeaponProfileSchema, srdArmorProfileSchema, srdToolProfileSchema, srdAmmunitionProfileSchema]).nullable(),
 }).strict();
+/**
+ * Additive magic-item vocabulary. These optional item fields mirror the
+ * encounter engine's magic-item inputs (`MagicItemDefinition`) so pinned
+ * content can drive attunement, charges, passive modifiers, and granted
+ * powers. Mundane items omit `magic` entirely and keep their exact digest.
+ */
+const magicAbilityIdSchema = z.enum(["strength", "dexterity", "constitution", "intelligence", "wisdom", "charisma"]);
+const magicDamageTypeSchema = z.enum(["acid", "bludgeoning", "cold", "fire", "force", "lightning", "necrotic", "piercing", "poison", "psychic", "radiant", "slashing", "thunder"]);
+const magicDamageScopeSchema = z.union([magicDamageTypeSchema, z.literal("all")]);
+export const magicItemAttunementSchema = z.object({
+  prerequisite: z.enum(["short-rest", "long-rest"]),
+}).strict().nullable();
+export const magicItemChargeRechargeSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("event"), event: z.enum(["dawn", "short-rest", "long-rest"]), amount: z.number().int().min(1).max(100) }).strict(),
+  z.object({ kind: z.literal("roll"), dieSides: z.number().int().min(2).max(100), minimum: z.number().int().min(0).max(100), amount: z.number().int().min(1).max(100) }).strict(),
+  z.object({ kind: z.literal("none") }).strict(),
+]);
+export const magicItemChargesSchema = z.object({
+  maximum: z.number().int().min(1).max(100),
+  recharge: magicItemChargeRechargeSchema,
+}).strict();
+const magicFlatTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("armor-class") }).strict(),
+  z.object({ kind: z.literal("saving-throw"), ability: magicAbilityIdSchema }).strict(),
+  z.object({ kind: z.literal("attack-roll") }).strict(),
+  z.object({ kind: z.literal("damage-roll") }).strict(),
+]);
+const magicCheckTargetSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("saving-throw"), ability: magicAbilityIdSchema }).strict(),
+  z.object({ kind: z.literal("attack-roll") }).strict(),
+]);
+export const magicPassiveModifierSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("flat"), amount: boundedMechanicIntegerSchema, target: magicFlatTargetSchema }).strict(),
+  z.object({ kind: z.literal("proficiency"), bonus: boundedMechanicIntegerSchema, target: magicFlatTargetSchema }).strict(),
+  z.object({ kind: z.literal("advantage"), target: magicCheckTargetSchema }).strict(),
+  z.object({ kind: z.literal("resistance"), damageType: magicDamageScopeSchema }).strict(),
+  z.object({ kind: z.literal("vulnerability"), damageType: magicDamageScopeSchema }).strict(),
+  z.object({ kind: z.literal("immunity"), damageType: magicDamageScopeSchema }).strict(),
+]);
+export const magicItemPassiveModifierSchema = z.object({
+  modifier: magicPassiveModifierSchema,
+  requireAttunement: z.boolean(),
+}).strict();
+const magicPowerReferenceSchema = z.discriminatedUnion("kind", [abilityCatalogReferenceSchema, spellCatalogReferenceSchema]);
+export const magicGrantedPowerSchema = z.object({
+  key: z.string().trim().min(1).max(64),
+  power: magicPowerReferenceSchema,
+  requireAttunement: z.boolean(),
+  actionCost: z.enum(["action", "bonus-action", "reaction"]),
+  cost: z.number().int().min(0).max(100),
+}).strict();
+export const magicItemPropertiesSchema = z.object({
+  attunement: magicItemAttunementSchema,
+  charges: magicItemChargesSchema.nullable(),
+  passiveModifiers: z.array(magicItemPassiveModifierSchema).max(8),
+  grantedPowers: z.array(magicGrantedPowerSchema).max(8),
+}).strict();
+
 export const itemCatalogDefinitionSchema = z.object({
   ...typedBase("item"), mechanics: z.object({
     category: z.enum(["weapon", "armor", "consumable", "tool", "gear"]),
@@ -488,6 +546,8 @@ export const itemCatalogDefinitionSchema = z.object({
     price: z.object({ currency: currencyCatalogReferenceSchema, amount: nonNegativeMechanicIntegerSchema }).strict(),
     effects: starterEffectsSchema,
     engineDetails: srdItemEngineDetailsSchema.nullable().optional(),
+    /** Optional magic-item binding; absent for mundane items. */
+    magic: magicItemPropertiesSchema.optional(),
   }).strict(),
 }).strict().superRefine((item, context) => {
   const profile = item.mechanics.engineDetails?.equipmentProfile;
@@ -687,6 +747,7 @@ export const campaignCatalogConfigurationResultSchema = z.object({
   receipt: campaignCatalogReceiptSchema,
 }).strict();
 
+export type MagicItemProperties = z.infer<typeof magicItemPropertiesSchema>;
 export type CatalogDefinitionKind = z.infer<typeof catalogDefinitionKindSchema>;
 export type CatalogDefinitionReference = z.infer<typeof catalogDefinitionReferenceSchema>;
 export type AdvancementReferenceKind = z.infer<typeof advancementReferenceKindSchema>;
