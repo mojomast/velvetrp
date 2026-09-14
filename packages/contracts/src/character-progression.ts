@@ -27,13 +27,13 @@ export const progressionProfileSchema = z.object({
   if (value.maxLevel !== value.thresholds.length) context.addIssue({ code: "custom", path: ["maxLevel"], message: "maxLevel must equal threshold count" });
 });
 
-const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass", bounds: { min: number; max: number }) =>
+const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass" | "class", bounds: { min: number; max: number }) =>
   z.array(catalogDefinitionReferenceSchema).min(bounds.min).max(bounds.max).superRefine((options, context) => {
     const keys = options.map((option) => `${option.packId}\0${option.packVersion}\0${option.definitionId}`);
     if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "progression choice options must be unique" });
     if (options.some((option) => option.kind !== kind)) context.addIssue({ code: "custom", message: `progression choice options must be ${kind} references` });
   });
-const selectionReference = (kind: "ability" | "ability-score" | "feat" | "subclass") =>
+const selectionReference = (kind: "ability" | "ability-score" | "feat" | "subclass" | "class") =>
   catalogDefinitionReferenceSchema.refine((reference) => reference.kind === kind, {
     message: `progression selection must be a ${kind} reference`,
   });
@@ -67,6 +67,8 @@ export const progressionSelectionSchema = z.preprocess(
       ability: selectionReference("feat") }).strict(),
     z.object({ choiceId: resourceIdSchema, kind: z.literal("subclass"),
       ability: selectionReference("subclass") }).strict(),
+    z.object({ choiceId: resourceIdSchema, kind: z.literal("class"),
+      ability: selectionReference("class") }).strict(),
   ]),
 );
 const progressionPendingChoiceBaseShape = {
@@ -84,7 +86,22 @@ export const progressionPendingChoiceSchema = z.discriminatedUnion("kind", [
     options: progressionChoiceOptions("feat", { min: 1, max: 16 }) }).strict(),
   z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("subclass"),
     options: progressionChoiceOptions("subclass", { min: 1, max: 16 }) }).strict(),
+  z.object({ ...progressionPendingChoiceBaseShape, kind: z.literal("class"),
+    options: progressionChoiceOptions("class", { min: 1, max: 12 }) }).strict(),
 ]);
+
+/** Additive multiclass representation: one exact current class level. Single-class
+ * payloads omit it entirely, so existing calculator inputs and outputs remain
+ * byte-compatible. */
+export const progressionClassLevelSchema = z.object({
+  classRef: classCatalogReferenceSchema,
+  level: z.number().int().min(1).max(20),
+}).strict();
+/** Closed multiclass proficiency vocabulary granted on entering a class. */
+export const multiclassProficiencySchema = z.enum([
+  "light-armor", "medium-armor", "heavy-armor", "shields", "simple-weapons", "martial-weapons",
+]);
+const multiclassSpellSlotsSchema = z.record(z.string(), z.number().int().min(0).max(9));
 export const progressionResourceChangeSchema = z.object({ resourceId: resourceIdSchema, currentBefore: z.number().int().min(0), currentAfter: z.number().int().min(0), maxBefore: z.number().int().min(0), maxAfter: z.number().int().min(0) }).strict();
 export const progressionLevelChangeSchema = z.object({
   level: z.number().int().min(2).max(20),
@@ -102,6 +119,12 @@ export const progressionLevelChangeSchema = z.object({
     amount: z.number().int().min(1).max(2),
   }).strict()).max(2).optional(),
   spells: z.array(spellCatalogReferenceSchema).max(32),
+  /** Additive multiclass routing: which class this total level advanced and its
+   * resulting class level. Single-class advancements omit both fields. */
+  classRef: classCatalogReferenceSchema.optional(),
+  classLevel: z.number().int().min(1).max(20).optional(),
+  /** Additive first-entry multiclass proficiency grants; absent when none apply. */
+  grantedProficiencies: z.array(multiclassProficiencySchema).max(6).optional(),
   derivedBefore: characterDerivedStatsSchema,
   derivedAfter: characterDerivedStatsSchema,
 }).strict();
@@ -110,6 +133,9 @@ export const progressionPreviewSchema = z.object({
   mode: progressionModeSchema, currentLevel: z.number().int().min(1).max(20), eligibleLevel: z.number().int().min(1).max(20),
   totalXp: z.number().int().min(0).max(9_007_199_254_740_991), milestoneCount: z.number().int().min(0).max(19),
   pendingChoices: z.array(progressionPendingChoiceSchema).max(32), levels: z.array(progressionLevelChangeSchema).max(19),
+  /** Additive multiclass projections. Absent for single-class characters. */
+  classLevelsByClass: z.array(progressionClassLevelSchema).min(1).max(12).optional(),
+  spellSlots: multiclassSpellSlotsSchema.optional(),
 }).strict().superRefine((value, context) => {
   value.levels.forEach((level, index) => { if (level.level !== value.currentLevel + index + 1) context.addIssue({ code: "custom", path: ["levels", index, "level"], message: "crossed levels must be ascending and contiguous" }); });
 });
@@ -127,6 +153,14 @@ export const progressionCalculatorInputSchema = z.object({
     raceSpeed: z.number().int().min(1).max(1_000), spellcastingAttribute: attributeIdSchema,
   }).strict(),
   classLevels: z.array(classLevelCatalogDefinitionSchema).min(1).max(20),
+  /** Additive multiclass catalog steps. When present it includes every class the
+   * character holds or may enter; absent means the single `selectedClassRef`. */
+  classProgressions: z.array(z.object({
+    classRef: classCatalogReferenceSchema,
+    classLevels: z.array(classLevelCatalogDefinitionSchema).min(1).max(20),
+  }).strict()).min(1).max(12).optional(),
+  /** Additive current class levels. Absent means `selectedClassRef` at `currentLevel`. */
+  classLevelsByClass: z.array(progressionClassLevelSchema).min(1).max(12).optional(),
   knownAbilities: z.array(abilityCatalogReferenceSchema).max(128),
   knownSpells: z.array(spellCatalogReferenceSchema).max(128),
   resources: z.array(z.object({ resourceId: resourceIdSchema, current: z.number().int().min(0).max(1_000_000), max: z.number().int().min(0).max(1_000_000) }).strict()).max(32),
@@ -142,6 +176,9 @@ export const progressionStateSchema = z.object({
   /** Optional so stored receipts authored before feats/subclasses landed still parse. */
   knownFeats: z.array(featCatalogReferenceSchema).max(128).optional(),
   knownSubclasses: z.array(subclassCatalogReferenceSchema).max(128).optional(),
+  /** Additive multiclass projections. Absent for single-class characters. */
+  classLevelsByClass: z.array(progressionClassLevelSchema).min(1).max(12).optional(),
+  knownProficiencies: z.array(multiclassProficiencySchema).max(6).optional(),
   derived: characterDerivedStatsSchema, updatedAt: utcIsoTimestampSchema,
 }).strict();
 
@@ -169,6 +206,8 @@ export type ProgressionState = z.infer<typeof progressionStateSchema>;
 export type ProgressionLevelChange = z.infer<typeof progressionLevelChangeSchema>;
 export type ProgressionPendingChoice = z.infer<typeof progressionPendingChoiceSchema>;
 export type ProgressionSelection = z.infer<typeof progressionSelectionSchema>;
+export type ProgressionClassLevel = z.infer<typeof progressionClassLevelSchema>;
+export type MulticlassProficiency = z.infer<typeof multiclassProficiencySchema>;
 export type GrantCharacterXpInput = z.infer<typeof grantCharacterXpInputSchema>;
 export type GrantCharacterMilestoneInput = z.infer<typeof grantCharacterMilestoneInputSchema>;
 export type CorrectCharacterXpInput = z.infer<typeof correctCharacterXpInputSchema>;

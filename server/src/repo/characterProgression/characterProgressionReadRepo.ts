@@ -26,11 +26,29 @@ import {
 
 type Role = "owner" | "gm" | "player" | "observer";
 
-/** Reads the durably persisted known feat/subclass references for a character. */
-function readKnownOptionReferences(db: DatabaseDriver.Database, characterId: string) {
-  return (db.prepare("SELECT kind,pack_id,pack_version,definition_id FROM character_known_options_v25 WHERE campaign_character_id=? ORDER BY kind,pack_id,pack_version,definition_id")
-    .all(characterId) as Array<any>).map((option) => ({ kind: option.kind, packId: option.pack_id, packVersion: option.pack_version, definitionId: option.definition_id }));
-}
+  /** Reads the durably persisted known feat/subclass references for a character. */
+  function readKnownOptionReferences(db: DatabaseDriver.Database, characterId: string) {
+    return (db.prepare("SELECT kind,pack_id,pack_version,definition_id FROM character_known_options_v25 WHERE campaign_character_id=? ORDER BY kind,pack_id,pack_version,definition_id")
+      .all(characterId) as Array<any>).map((option) => ({ kind: option.kind, packId: option.pack_id, packVersion: option.pack_version, definitionId: option.definition_id }));
+  }
+
+  /** Reads additive per-class levels from the sheet's durable class rows. */
+  function readClassLevels(db: DatabaseDriver.Database, row: ProgressionRootRow) {
+    return (db.prepare("SELECT pack_id,pack_version,definition_id,level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=? ORDER BY position")
+      .all(row.campaign_id, row.sheet_id) as Array<any>)
+      .map((entry) => ({ classRef: { kind: "class" as const, packId: entry.pack_id as string, packVersion: entry.pack_version as string, definitionId: entry.definition_id as string }, level: entry.level as number }))
+      .sort((left, right) => progressionReferenceKey(left.classRef).localeCompare(progressionReferenceKey(right.classRef)));
+  }
+
+  /** Derives additive multiclass proficiency grants from immutable advancements. */
+  function readKnownProficiencies(db: DatabaseDriver.Database, characterId: string) {
+    const granted = new Set<string>();
+    for (const advancement of db.prepare("SELECT changes_json FROM character_level_advancements_v23 WHERE campaign_character_id=? ORDER BY level")
+      .all(characterId) as Array<{ changes_json: string }>) {
+      for (const entry of JSON.parse(advancement.changes_json).grantedProficiencies ?? []) granted.add(entry);
+    }
+    return [...granted].sort();
+  }
 
 /** Read collaborators shared by the public progression queries and commands. */
 export interface CharacterProgressionReadRepository {
@@ -133,11 +151,14 @@ export function createCharacterProgressionReadRepository(db: DatabaseDriver.Data
     if (resolveCampaignRuleset(db, row.campaign_id).rulesetId === "dnd-5e") {
       derived.armorClass = resolveSrdEquipment(db, row.campaign_id, row.actor_id).armorClass;
     }
+    const classLevels = readClassLevels(db, row), knownProficiencies = readKnownProficiencies(db, row.campaign_character_id);
     return progressionStateSchema.parse({ campaignCharacterId: row.campaign_character_id, campaignId: row.campaign_id, sheetId: row.sheet_id, actorId: row.actor_id,
        profile: loadCanonicalProgressionProfile(db, row.profile_id), classRef: { kind: "class", packId: row.class_pack_id, packVersion: row.class_pack_version, definitionId: row.class_definition_id }, raceRef: catalog.raceRef, race: catalog.selectedRace,
       level: row.level, totalXp: row.total_xp, milestoneCount: row.milestone_count, revision: row.revision, pendingChoices: pendingOverride ?? pendingFor(row),
       knownAbilities: refs.filter((ref) => ref.kind === "ability"), knownSpells: refs.filter((ref) => ref.kind === "spell"),
       knownFeats: optionRefs.filter((ref) => ref.kind === "feat"), knownSubclasses: optionRefs.filter((ref) => ref.kind === "subclass"),
+      ...(classLevels.length > 1 ? { classLevelsByClass: classLevels } : {}),
+      ...(knownProficiencies.length ? { knownProficiencies } : {}),
       derived, updatedAt: row.updated_at });
   };
   /** Delegates previews to the shared persistence-backed authoritative calculator. */

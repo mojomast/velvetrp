@@ -763,6 +763,20 @@ export function createCharacterProgressionWriteRepository(
             throw new CharacterProgressionConflictError(
               "advancement contains a duplicate known power",
             );
+          const classLevelMap = new Map(
+              (known.classLevelsByClass ?? [{ classRef: known.classRef, level: known.level }])
+                .map((entry) => [progressionReferenceKey(entry.classRef), entry]),
+            );
+          for (const level of selected.levels) {
+            if (!level.classRef || !level.classLevel) continue;
+            classLevelMap.set(progressionReferenceKey(level.classRef), { classRef: level.classRef, level: level.classLevel });
+          }
+          const classLevelsAfter = [...classLevelMap.values()]
+            .sort((left, right) => progressionReferenceKey(left.classRef).localeCompare(progressionReferenceKey(right.classRef)));
+          const knownProficiencies = [...new Set([
+              ...(known.knownProficiencies ?? []),
+              ...selected.levels.flatMap((level) => level.grantedProficiencies ?? []),
+            ])].sort();
           const projected = progressionStateSchema.parse({
               ...known,
               level: final.level,
@@ -772,6 +786,8 @@ export function createCharacterProgressionWriteRepository(
               knownSpells: sortReferences(newSpells),
               knownFeats: sortReferences(newFeats),
               knownSubclasses: sortReferences(newSubclasses),
+              ...(classLevelsAfter.length > 1 ? { classLevelsByClass: classLevelsAfter } : {}),
+              ...(knownProficiencies.length ? { knownProficiencies } : {}),
               derived: final.derivedAfter,
               updatedAt: now,
             }),
@@ -814,9 +830,30 @@ export function createCharacterProgressionWriteRepository(
             now,
             result,
           });
-          db.prepare(
-            "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND position=0",
-          ).run(final.level, row.sheet_id);
+          if (final.classRef) {
+            // Additive multiclass: persist each advanced class's own level, inserting
+            // a new class row the first time the character enters it.
+            for (const level of selected.levels) {
+              if (!level.classRef || !level.classLevel) continue;
+              const existing = db.prepare(
+                "SELECT position FROM rpg_character_classes WHERE sheet_id=? AND pack_id=? AND pack_version=? AND definition_id=?",
+              ).get(row.sheet_id, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId) as { position: number } | undefined;
+              if (existing)
+                db.prepare(
+                  "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND pack_id=? AND pack_version=? AND definition_id=?",
+                ).run(level.classLevel, row.sheet_id, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId);
+              else {
+                const nextPosition = (db.prepare("SELECT COALESCE(MAX(position),-1)+1 AS next FROM rpg_character_classes WHERE sheet_id=?")
+                  .get(row.sheet_id) as { next: number }).next;
+                db.prepare(
+                  `INSERT INTO rpg_character_classes(campaign_id,sheet_id,position,pack_id,pack_version,kind,definition_id,level) VALUES(?,?,?,?,?,'class',?,?)`,
+                ).run(row.campaign_id, row.sheet_id, nextPosition, level.classRef.packId, level.classRef.packVersion, level.classRef.definitionId, level.classLevel);
+              }
+            }
+          } else
+            db.prepare(
+              "UPDATE rpg_character_classes SET level=? WHERE sheet_id=? AND position=0",
+            ).run(final.level, row.sheet_id);
           const applyAttributeIncrease = db.prepare(
             "UPDATE rpg_character_attributes SET value=value+? WHERE sheet_id=? AND attribute_id=?",
           );

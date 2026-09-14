@@ -285,7 +285,7 @@ const progressionChoiceBaseShape = {
 /** Every variant keeps one shared reference array so existing catalog consumers
  * (`dependencies`, class-progression resolution) stay additive without a
  * slice-2 wiring change; `kind` is enforced at parse time for each variant. */
-const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass", bounds: { min: number; max: number }) =>
+const progressionChoiceOptions = (kind: "ability" | "ability-score" | "feat" | "subclass" | "class", bounds: { min: number; max: number }) =>
   z.array(catalogDefinitionReferenceSchema).min(bounds.min).max(bounds.max).superRefine((options, context) => {
     const keys = options.map((option) => `${option.packId}\0${option.packVersion}\0${option.definitionId}`);
     if (new Set(keys).size !== keys.length) context.addIssue({ code: "custom", message: "progression choice options must be unique" });
@@ -325,11 +325,19 @@ export const subclassProgressionChoiceSchema = z.object({
   kind: z.literal("subclass"),
   options: progressionChoiceOptions("subclass", { min: 1, max: 16 }),
 }).strict();
+/** Additive multiclass vocabulary: a class-level step may offer whole classes.
+ * Options select class catalog identities only and never execute rules. */
+export const classProgressionChoiceSchema = z.object({
+  ...progressionChoiceBaseShape,
+  kind: z.literal("class"),
+  options: progressionChoiceOptions("class", { min: 1, max: 12 }),
+}).strict();
 export const classLevelProgressionChoiceSchema = z.discriminatedUnion("kind", [
   abilityProgressionChoiceSchema,
   abilityScoreIncreaseProgressionChoiceSchema,
   featProgressionChoiceSchema,
   subclassProgressionChoiceSchema,
+  classProgressionChoiceSchema,
 ]);
 export const classLevelCatalogDefinitionSchema = z.object({
   ...typedBase("class-level"),
@@ -687,6 +695,7 @@ export type AbilityProgressionChoice = z.infer<typeof abilityProgressionChoiceSc
 export type AbilityScoreIncreaseProgressionChoice = z.infer<typeof abilityScoreIncreaseProgressionChoiceSchema>;
 export type FeatProgressionChoice = z.infer<typeof featProgressionChoiceSchema>;
 export type SubclassProgressionChoice = z.infer<typeof subclassProgressionChoiceSchema>;
+export type ClassProgressionChoice = z.infer<typeof classProgressionChoiceSchema>;
 export type CatalogDefinition = z.infer<typeof catalogDefinitionSchema>;
 export type SrdWeaponProperty = z.infer<typeof srdWeaponPropertySchema>;
 export type SrdWeaponProfile = z.infer<typeof srdWeaponProfileSchema>;

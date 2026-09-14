@@ -59,6 +59,15 @@ export function qualifiesForMulticlass(
   return entry.mode === "any" ? checks.some(Boolean) : checks.every(Boolean);
 }
 
+/** Maps an exact catalog class definition id to the bounded SRD multiclass
+ * vocabulary. Unknown or non-SRD ids return null and carry no multiclass rules. */
+export function multiclassClassIdFromDefinitionId(definitionId: string): Dnd5eMulticlassClassId | null {
+  const suffix = definitionId.split(":").at(-1) ?? "";
+  return (DND_5E_MULTICLASS_CLASS_IDS as readonly string[]).includes(suffix)
+    ? suffix as Dnd5eMulticlassClassId
+    : null;
+}
+
 /** Closed proficiency categories granted when multiclassing into a class. */
 export type Dnd5eMulticlassProficiency =
   | "light-armor"

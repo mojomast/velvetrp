@@ -4,6 +4,7 @@ import {
   abilityScoreIncreaseProgressionChoiceSchema,
   classLevelCatalogDefinitionSchema,
   classLevelProgressionChoiceSchema,
+  classProgressionChoiceSchema,
   featProgressionChoiceSchema,
   progressionPendingChoiceSchema,
   progressionSelectionSchema,
@@ -52,6 +53,16 @@ describe("generalized class-level progression choices", () => {
     expect(() => subclassProgressionChoiceSchema.parse({ ...subclassChoice, options: [feat("tough")] })).toThrow();
   });
 
+  it("accepts bounded class choices without changing existing variants", () => {
+    const classRef = (definitionId: string) => ({ ...pack, kind: "class" as const, definitionId });
+    const choice = { choiceId: "velvet:choice:class", kind: "class", ...base, options: [classRef("wizard"), classRef("cleric")] };
+    expect(classProgressionChoiceSchema.parse(choice)).toEqual(choice);
+    expect(classLevelProgressionChoiceSchema.parse(choice)).toEqual(choice);
+    expect(() => classProgressionChoiceSchema.parse({ ...choice, options: [] })).toThrow();
+    expect(() => classProgressionChoiceSchema.parse({ ...choice, options: [ability("beacon")] })).toThrow();
+    expect(() => classProgressionChoiceSchema.parse({ ...choice, options: [classRef("wizard"), classRef("wizard")] })).toThrow(/unique/);
+  });
+
   it("rejects an unknown choice kind", () => {
     expect(() => classLevelProgressionChoiceSchema.parse({ choiceId: "velvet:choice:bad", kind: "epic-boon", ...base, options: [feat("tough")] })).toThrow();
   });
@@ -90,6 +101,8 @@ describe("generalized pending choices", () => {
     expect(progressionPendingChoiceSchema.parse({ level: 4, choiceId: "asi", kind: "ability-score-increase", required: true, points: 1, options: [score("strength")] })).toMatchObject({ kind: "ability-score-increase" });
     expect(progressionPendingChoiceSchema.parse({ level: 4, choiceId: "feat", kind: "feat", required: true, options: [feat("tough")] })).toMatchObject({ kind: "feat" });
     expect(progressionPendingChoiceSchema.parse({ level: 3, choiceId: "subclass", kind: "subclass", required: true, options: [subclass("champion")] })).toMatchObject({ kind: "subclass" });
+    expect(progressionPendingChoiceSchema.parse({ level: 2, choiceId: "class", kind: "class", required: true,
+      options: [{ ...pack, kind: "class", definitionId: "wizard" }] })).toMatchObject({ kind: "class" });
     expect(() => progressionPendingChoiceSchema.parse({ level: 4, choiceId: "feat", kind: "feat", required: true, options: [ability("beacon")] })).toThrow();
     expect(() => progressionPendingChoiceSchema.parse({ level: 1, choiceId: "feat", kind: "feat", required: true, options: [feat("tough")] })).toThrow();
     expect(() => progressionPendingChoiceSchema.parse({ level: 4, choiceId: "feat", kind: "feat", required: true, options: [feat("tough"), feat("tough")] })).toThrow(/unique/);
@@ -108,6 +121,7 @@ describe("generalized selections", () => {
     expect(progressionSelectionSchema.parse({ choiceId: "asi", kind: "ability-score-increase", increases: [{ ability: score("strength"), amount: 1 }, { ability: score("dexterity"), amount: 1 }] })).toMatchObject({ kind: "ability-score-increase" });
     expect(progressionSelectionSchema.parse({ choiceId: "feat", kind: "feat", ability: feat("tough") })).toEqual({ choiceId: "feat", kind: "feat", ability: feat("tough") });
     expect(progressionSelectionSchema.parse({ choiceId: "subclass", kind: "subclass", ability: subclass("champion") })).toMatchObject({ kind: "subclass" });
+    expect(progressionSelectionSchema.parse({ choiceId: "class", kind: "class", ability: { ...pack, kind: "class", definitionId: "cleric" } })).toMatchObject({ kind: "class" });
     expect(() => progressionSelectionSchema.parse({ ...increase, increases: [{ ability: score("strength"), amount: 3 }] })).toThrow();
     expect(() => progressionSelectionSchema.parse({ ...increase, increases: [{ ability: score("strength"), amount: 1 }, { ability: score("strength"), amount: 1 }] })).toThrow(/unique/);
     expect(() => progressionSelectionSchema.parse({ ...increase, increases: [] })).toThrow();

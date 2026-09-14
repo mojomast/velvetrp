@@ -1,5 +1,5 @@
 import type DatabaseDriver from "better-sqlite3";
-import { progressionProfileSchema, raceCatalogDefinitionSchema, type ProgressionSelection } from "@velvet/contracts";
+import { classCatalogDefinitionSchema, classLevelCatalogDefinitionSchema, progressionProfileSchema, raceCatalogDefinitionSchema, type ProgressionSelection } from "@velvet/contracts";
 import { calculateCharacterProgression } from "../characterProgressionCalculator.js";
 import { isExecutableClassLevel, progressionReferenceKey, resolveInitialKnownPowers, resolveSelectedClassProgression, type ExactReference } from "../characterProgressionCatalog.js";
 import { assertCanonicalProgressionProfile } from "../characterProgressionProfile.js";
@@ -17,6 +17,32 @@ export function loadCanonicalProgressionProfile(db:DatabaseDriver.Database,id:st
   assertCanonicalProgressionProfile(row);
   return progressionProfileSchema.parse({profileId:row.profile_id,rulesProfileId:row.rules_profile_id,mode:row.mode,
     maxLevel:row.max_level,thresholds:JSON.parse(row.thresholds_json)});
+}
+
+/** Loads one exact class's executable class-level steps for additive multiclass input. */
+function loadClassProgression(db: DatabaseDriver.Database, packId: string, packVersion: string, definitionId: string) {
+  const classRow = db.prepare("SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind='class' AND definition_id=?")
+    .get(packId, packVersion, definitionId) as { definition_json: string } | undefined;
+  if (!classRow) throw new Error("multiclass class definition is unavailable");
+  const selectedClass = classCatalogDefinitionSchema.parse(JSON.parse(classRow.definition_json));
+  const classRef = { kind: "class" as const, packId, packVersion, definitionId };
+  const levelStatement = db.prepare("SELECT definition_json FROM rpg_catalog_definitions WHERE pack_id=? AND pack_version=? AND kind='class-level' AND definition_id=?");
+  const levels = selectedClass.mechanics.levelRefs
+    .map((reference) => levelStatement.get(reference.packId, reference.packVersion, reference.definitionId) as { definition_json: string } | undefined)
+    .filter((value): value is { definition_json: string } => Boolean(value))
+    .map((value) => classLevelCatalogDefinitionSchema.parse(JSON.parse(value.definition_json)))
+    .filter(isExecutableClassLevel);
+  const byLevel = new Map<number, (typeof levels)[number]>();
+  for (const level of levels) {
+    if (progressionReferenceKey(level.mechanics.classRef) !== progressionReferenceKey(classRef)) continue;
+    if (byLevel.has(level.mechanics.level)) throw new Error("multiclass class progression contains a duplicate level");
+    byLevel.set(level.mechanics.level, level);
+  }
+  if (!byLevel.size) throw new Error("multiclass class has no executable progression levels");
+  const maximum = Math.max(...byLevel.keys());
+  const classLevels = Array.from({ length: maximum }, (_, index) => byLevel.get(index + 1));
+  if (classLevels.some((level) => level === undefined)) throw new Error("multiclass class progression is incomplete");
+  return { classRef, classLevels: classLevels as Array<(typeof levels)[number]> };
 }
 
 export function loadExactProgressionCatalog(db:DatabaseDriver.Database,row:ProgressionRootRow){
@@ -69,11 +95,25 @@ export function calculateAuthoritativeProgressionPreview(db:DatabaseDriver.Datab
   const resources=db.prepare("SELECT name,current,max FROM rpg_actor_resources WHERE actor_id=? ORDER BY name").all(row.actor_id) as Array<{name:string;current:number;max:number}>;
   const health=resources.find((resource)=>resource.name==="health");if(!health)throw new Error("health resource is unavailable");
   const known=readKnownPowerReferences(db,row.campaign_character_id);
+  const classRows=db.prepare("SELECT pack_id,pack_version,definition_id,level FROM rpg_character_classes WHERE campaign_id=? AND sheet_id=? ORDER BY position").all(row.campaign_id,row.sheet_id) as Array<{pack_id:string;pack_version:string;definition_id:string;level:number}>;
+  const classChoiceRefs=(catalog.levels as Array<{mechanics:{progressionChoices?:Array<{kind:string;options:Array<{kind:string;packId:string;packVersion:string;definitionId:string}>}>}}>)
+    .flatMap((level)=>level.mechanics.progressionChoices??[]).filter((choice)=>choice.kind==="class").flatMap((choice)=>choice.options).filter((option)=>option.kind==="class");
+  const multiclass=classRows.length>1||classChoiceRefs.length>0;
+  const classProgressions=multiclass?(()=>{const seen=new Set<string>();const entries:Array<ReturnType<typeof loadClassProgression>>=[];
+    const refs=[{packId:row.class_pack_id,packVersion:row.class_pack_version,definitionId:row.class_definition_id},
+      ...classRows.map((entry)=>({packId:entry.pack_id,packVersion:entry.pack_version,definitionId:entry.definition_id})),
+      ...classChoiceRefs.map((entry)=>({packId:entry.packId,packVersion:entry.packVersion,definitionId:entry.definitionId}))];
+    for(const entry of refs){const key=`${entry.packId}\0${entry.packVersion}\0${entry.definitionId}`;
+      if(seen.has(key))continue;seen.add(key);
+      entries.push(loadClassProgression(db,entry.packId,entry.packVersion,entry.definitionId));}
+    return entries;})():undefined;
+  const classLevelsByClass=classRows.length>1?classRows.map((entry)=>({classRef:{kind:"class" as const,packId:entry.pack_id,packVersion:entry.pack_version,definitionId:entry.definition_id},level:entry.level})):undefined;
   return calculateCharacterProgression({campaignCharacterId:row.campaign_character_id,revision:row.revision,profile:catalog.profile,
      selectedClassRef:(catalog.selectedClass as any).reference,raceRef:catalog.raceRef,
     currentLevel:row.level,totalXp:row.total_xp,milestoneCount:row.milestone_count,currentHp:health.current,
        currentDerived:JSON.parse(row.derived_json),derivedBase:{scores:attributes as any,raceSpeed:catalog.selectedRace.mechanics.speed,
       spellcastingAttribute:(catalog.selectedClass as any).mechanics.primaryAttribute},classLevels:catalog.levels,
+      ...(classProgressions?{classProgressions}:{}),...(classLevelsByClass?{classLevelsByClass}:{}),
     knownAbilities:known.filter((ref)=>ref.kind==="ability") as any,knownSpells:known.filter((ref)=>ref.kind==="spell") as any,
     resources:resources.filter((resource)=>resource.name!=="health").map((resource)=>({resourceId:resource.name,current:resource.current,max:resource.max})),selections},{rulesetId:ruleset.rulesetId,rulesetVersion:ruleset.rulesetVersion});
 }
