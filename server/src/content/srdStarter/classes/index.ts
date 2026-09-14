@@ -6,6 +6,11 @@ import { rogueDefinition, rogueLevels } from "./rogue.js";
 import { wizardDefinition, wizardLevels } from "./wizard.js";
 import { paladinDefinition, paladinLevels } from "./paladin.js";
 import { rangerDefinition, rangerLevels } from "./ranger.js";
+import { bardDefinition, bardLevels, bardSubclasses } from "./bard.js";
+import { druidDefinition, druidLevels, druidSubclasses } from "./druid.js";
+import { monkDefinition, monkLevels, monkSubclasses } from "./monk.js";
+import { sorcererDefinition, sorcererLevels, sorcererSubclasses } from "./sorcerer.js";
+import { warlockDefinition, warlockLevels, warlockSubclasses } from "./warlock.js";
 
 export { fighterDefinition, fighterLevels } from "./fighter.js";
 export { clericDefinition, clericLevels } from "./cleric.js";
@@ -14,6 +19,11 @@ export { rogueDefinition, rogueLevels } from "./rogue.js";
 export { wizardDefinition, wizardLevels } from "./wizard.js";
 export { paladinDefinition, paladinLevels } from "./paladin.js";
 export { rangerDefinition, rangerLevels } from "./ranger.js";
+export { bardDefinition, bardLevels, bardSubclasses } from "./bard.js";
+export { druidDefinition, druidLevels, druidSubclasses } from "./druid.js";
+export { monkDefinition, monkLevels, monkSubclasses } from "./monk.js";
+export { sorcererDefinition, sorcererLevels, sorcererSubclasses } from "./sorcerer.js";
+export { warlockDefinition, warlockLevels, warlockSubclasses } from "./warlock.js";
 
 /**
  * Class modules in canonical catalog order. Wave 2 (C2) appends one module per
@@ -34,6 +44,11 @@ const classModules: readonly ClassModule[] = [
   { definition: wizardDefinition, levels: wizardLevels },
   { definition: paladinDefinition, levels: paladinLevels },
   { definition: rangerDefinition, levels: rangerLevels },
+  { definition: bardDefinition, levels: bardLevels, subclasses: bardSubclasses },
+  { definition: druidDefinition, levels: druidLevels, subclasses: druidSubclasses },
+  { definition: monkDefinition, levels: monkLevels, subclasses: monkSubclasses },
+  { definition: sorcererDefinition, levels: sorcererLevels, subclasses: sorcererSubclasses },
+  { definition: warlockDefinition, levels: warlockLevels, subclasses: warlockSubclasses },
 ];
 
 export function buildClasses(refs: StarterReferences): object[] {
