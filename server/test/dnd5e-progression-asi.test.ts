@@ -86,9 +86,12 @@ describe("ability-score-increase progression", () => {
     expect(choice).toMatchObject({ kind: "ability-score-increase", level: 2, points: 2 });
     expect(choice.options.map((option) => option.definitionId)).toEqual(["constitution", "strength"]);
     const constitutionOption = choice.options.find((option) => option.definitionId === "constitution")!;
+    // Reaching level 3 requires selecting the class's required subclass choice.
+    const subclassChoice = preview.pendingChoices.find((pending) => pending.kind === "subclass")!;
 
     const applied = repo.applyCharacterProgression("local-owner", id, { previewRevision: preview.revision, previewToken: preview.token,
-      selections: [{ choiceId: choice.choiceId, kind: "ability-score-increase", increases: [{ ability: constitutionOption, amount: 2 }] }], idempotencyKey: "asi-apply" });
+      selections: [{ choiceId: choice.choiceId, kind: "ability-score-increase", increases: [{ ability: constitutionOption, amount: 2 }] },
+        { choiceId: subclassChoice.choiceId, kind: "subclass", ability: subclassChoice.options[0]! }], idempotencyKey: "asi-apply" });
     expect(applied.progression.level).toBe(3);
     expect(applied.receipt.appliedLevels[0]!.abilityScoreIncreases).toEqual([{ attribute: "constitution", amount: 2 }]);
     expect(applied.receipt.appliedLevels[1]!.abilityScoreIncreases).toEqual([]);
@@ -97,7 +100,7 @@ describe("ability-score-increase progression", () => {
     expect(attributes(sheetId).constitution).toBe(expectedConstitution);
     expect(applied.progression.derived.abilityModifiers?.constitution).toBe(Math.floor((expectedConstitution - 10) / 2));
     // The Constitution modifier delta is reflected in the new max HP and carried to level 3.
-    expect(applied.progression.derived.maxHp).toBe(initialMaxHp + 13);
+    expect(applied.progression.derived.maxHp).toBe(initialMaxHp + 15);
     expect(applied.receipt.appliedLevels[1]!.derivedAfter.maxHp).toBe(applied.progression.derived.maxHp);
     const health = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true })
       .prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='health'").get(actorId) as any;

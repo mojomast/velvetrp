@@ -160,29 +160,30 @@ describe("character progression",()=>{
    });
   it("leaves the preserved level-one-only publication progression-unavailable",()=>{const {repo,id}=finalized("xp",MECHANICS_STARTER_PRIOR_CATALOG as PublishContentCatalogInput);
     expect(repo.getCharacterProgression("local-owner",id)).toBeNull();expect(repo.previewCharacterProgression("local-owner",id)).toBeNull();const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});expect(db.prepare("SELECT count(*) count FROM character_progression_v23 WHERE campaign_character_id=?").get(id)).toEqual({count:0});db.close();repo.close();});
-   it("advances the pinned SRD Human Acolyte Fighter to level 2 only, with fixed d10 advancement and durable power provenance",()=>{const {repo,id,actorId}=finalized("xp",SRD_5_1_STARTER_CATALOG);
+   it("advances the pinned SRD Human Acolyte Fighter through levels 2-3, with fixed d10 advancement and durable power provenance",()=>{const {repo,id,actorId}=finalized("xp",SRD_5_1_STARTER_CATALOG);
      const initial=repo.getCharacterProgression("local-owner",id)!;expect(initial.knownAbilities.map(value=>value.definitionId)).toContain("srd-5.1:ability:fighter-second-wind");
     repo.grantCharacterXp("local-owner",id,{amount:900,reason:"SRD award",expectedRevision:0,idempotencyKey:"srd-award"});const preview=repo.previewCharacterProgression("local-owner",id)!;
-    expect(preview.eligibleLevel).toBe(2);expect(preview.levels).toHaveLength(1);expect(preview.levels[0]).toMatchObject({level:2,hp:{gain:6},proficiency:{before:2,after:2}});
-    const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[],idempotencyKey:"srd-apply"});expect(repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections:[],idempotencyKey:"srd-apply"})).toEqual(applied);expect(applied.progression.level).toBe(2);expect(applied.progression.knownAbilities.map(value=>value.definitionId)).toContain("srd-5.1:ability:fighter-action-surge");
-    const capped=repo.previewCharacterProgression("local-owner",id)!;expect(capped.eligibleLevel).toBe(2);expect(capped.levels).toEqual([]);expect(()=>repo.applyCharacterProgression("local-owner",id,{previewRevision:capped.revision,previewToken:capped.token,selections:[],idempotencyKey:"srd-level-three"})).toThrow("no eligible levels");
-      const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='hit-dice-d10'").get(actorId)).toEqual({current:2,max:2});db.close();repo.close();const reopened=createRepository({dataDir:process.env.VELVET_DATA_DIR!});expect(reopened.getCharacterProgression("local-owner",id)?.level).toBe(2);reopened.close();});
+    expect(preview.eligibleLevel).toBe(3);expect(preview.levels).toHaveLength(2);expect(preview.levels[0]).toMatchObject({level:2,hp:{gain:6},proficiency:{before:2,after:2}});expect(preview.levels[1]).toMatchObject({level:3,hp:{gain:6}});
+    const subclassChoice=preview.pendingChoices.find((choice)=>choice.kind==="subclass")!;const selections=[{choiceId:subclassChoice.choiceId,kind:"subclass" as const,ability:subclassChoice.options[0]!}];
+    const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections,idempotencyKey:"srd-apply"});expect(repo.applyCharacterProgression("local-owner",id,{previewRevision:1,previewToken:preview.token,selections,idempotencyKey:"srd-apply"})).toEqual(applied);expect(applied.progression.level).toBe(3);expect(applied.progression.knownAbilities.map(value=>value.definitionId)).toContain("srd-5.1:ability:fighter-action-surge");
+    const capped=repo.previewCharacterProgression("local-owner",id)!;expect(capped.eligibleLevel).toBe(3);expect(capped.levels).toEqual([]);expect(()=>repo.applyCharacterProgression("local-owner",id,{previewRevision:capped.revision,previewToken:capped.token,selections,idempotencyKey:"srd-level-four"})).toThrow("no eligible levels");
+      const db=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});expect(db.prepare("SELECT current,max FROM rpg_actor_resources WHERE actor_id=? AND name='hit-dice-d10'").get(actorId)).toEqual({current:3,max:3});db.close();repo.close();const reopened=createRepository({dataDir:process.env.VELVET_DATA_DIR!});expect(reopened.getCharacterProgression("local-owner",id)?.level).toBe(3);reopened.close();});
   it("retains the persisted Human ancestry ability bonus after level advancement",()=>{const {repo,id}=finalized("xp",SRD_5_1_STARTER_CATALOG);
     const initial=repo.getCharacterProgression("local-owner",id)!;expect(initial.derived.abilityModifiers?.strength).toBe(3);
     repo.grantCharacterXp("local-owner",id,{amount:300,reason:"Human progression regression",expectedRevision:0,idempotencyKey:"human-xp"});const preview=repo.previewCharacterProgression("local-owner",id)!;
     const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:preview.revision,previewToken:preview.token,selections:[],idempotencyKey:"human-level-two"});
     expect(applied.progression.derived.abilityModifiers?.strength).toBe(3);expect(applied.progression.derived.carryingLimit).toBe(240);repo.close();});
-  it("advances every authored SRD class through levels 2-3 while retaining the Fighter archetype cap",()=>{
-    const expected={Fighter:2,Cleric:3,Barbarian:3,Rogue:3,Wizard:3,Paladin:3,Ranger:3} as const;
+  it("advances every authored SRD class through levels 2-3",()=>{
+    const expected={Fighter:3,Cleric:3,Barbarian:3,Rogue:3,Wizard:3,Paladin:3,Ranger:3} as const;
     for(const [className,maximum] of Object.entries(expected)){
       const {repo,id}=finalized("xp",SRD_5_1_STARTER_CATALOG,className);
       repo.grantCharacterXp("local-owner",id,{amount:900,reason:"Authored class progression",expectedRevision:0,idempotencyKey:`${className}-xp`});
       const preview=repo.previewCharacterProgression("local-owner",id)!;
       expect(preview.eligibleLevel).toBe(maximum);
-      expect(preview.levels.map((level)=>level.level)).toEqual(maximum===2?[2]:[2,3]);
-      const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:preview.revision,previewToken:preview.token,selections:[],idempotencyKey:`${className}-apply`});
+      expect(preview.levels.map((level)=>level.level)).toEqual([2,3]);
+      const subclassChoice=preview.pendingChoices.find((choice)=>choice.kind==="subclass")!;const applied=repo.applyCharacterProgression("local-owner",id,{previewRevision:preview.revision,previewToken:preview.token,selections:[{choiceId:subclassChoice.choiceId,kind:"subclass" as const,ability:subclassChoice.options[0]!}],idempotencyKey:`${className}-apply`});
       expect(applied.progression.level).toBe(maximum);
-      expect(applied.receipt.appliedLevels.map((level)=>level.level)).toEqual(maximum===2?[2]:[2,3]);
+      expect(applied.receipt.appliedLevels.map((level)=>level.level)).toEqual([2,3]);
       repo.close();
     }
   });

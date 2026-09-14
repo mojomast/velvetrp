@@ -79,7 +79,9 @@ describe("D&D 5.1 additive multiclass progression", () => {
       expect("classLevel" in level).toBe(false);
       expect("grantedProficiencies" in level).toBe(false);
     }
-    const applied = repo.applyCharacterProgression("local-owner", id, { previewRevision: preview.revision, previewToken: preview.token, selections: [], idempotencyKey: "single-class-apply" });
+    const subclassChoice = preview.pendingChoices.find((choice) => choice.kind === "subclass")!;
+    const applied = repo.applyCharacterProgression("local-owner", id, { previewRevision: preview.revision, previewToken: preview.token,
+      selections: [{ choiceId: subclassChoice.choiceId, kind: "subclass", ability: subclassChoice.options[0]! }], idempotencyKey: "single-class-apply" });
     expect("classLevelsByClass" in applied.progression).toBe(false);
     expect("knownProficiencies" in applied.progression).toBe(false);
     // Single-class advancement stays deterministic and matches the reviewed preview.
@@ -113,8 +115,8 @@ describe("D&D 5.1 additive multiclass progression", () => {
     const input = { previewRevision: preview.revision, previewToken: preview.token, selections, idempotencyKey: "multiclass-apply" };
     const applied = repo.applyCharacterProgression("local-owner", id, input);
     expect(applied.progression.level).toBe(3);
-    // Per-class HP gain uses each class's own hit-die-based level step (Cleric d8 then d6 fixed).
-    expect(applied.receipt.appliedLevels.map((level) => level.hp.gain)).toEqual([8, 6]);
+    // Per-class HP gain uses each class's own hit-die-based level step (Cleric d8 max at 1, then fixed average 5).
+    expect(applied.receipt.appliedLevels.map((level) => level.hp.gain)).toEqual([8, 5]);
     expect(applied.receipt.appliedLevels.map((level) => level.classLevel)).toEqual([1, 2]);
     expect(applied.receipt.appliedLevels.map((level) => level.classRef!.definitionId)).toEqual(["srd-5.1:class:cleric", "srd-5.1:class:cleric"]);
     expect(applied.receipt.appliedLevels[0]!.grantedProficiencies).toEqual(["light-armor", "medium-armor", "shields"]);
@@ -126,8 +128,8 @@ describe("D&D 5.1 additive multiclass progression", () => {
     expect(applied.progression.knownProficiencies).toEqual(["light-armor", "medium-armor", "shields"]);
     const selectedPreview = repo.previewCharacterProgression("local-owner", id, selections as any)!;
     expect(selectedPreview.spellSlots).toEqual({ 1: 4, 2: 2 });
-    // Each crossed level adds that class's own hit-die-based gain (Cleric d8 then 6).
-    expect(applied.progression.derived.maxHp).toBe(initialMaxHp + 14);
+    // Each crossed level adds that class's own hit-die-based gain (Cleric d8 then 5).
+    expect(applied.progression.derived.maxHp).toBe(initialMaxHp + 13);
     expect(applied.receipt.appliedLevels[1]!.derivedAfter.maxHp).toBe(applied.progression.derived.maxHp);
 
     const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"), { readonly: true });
