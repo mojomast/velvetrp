@@ -1,16 +1,22 @@
-import type { CampaignCatalogResolutionReport, CatalogDefinition } from "@velvet/contracts";
+import type { CampaignCatalogResolutionReport } from "@velvet/contracts";
 import { planDnd5eEncounter, type Dnd5eEncounterPlan } from "../../rulesets/index.js";
 
 /**
  * Campaign-aware encounter planning. Resolves the pinned enemy templates of a
  * campaign's configured catalog into exact-CR candidates and drives the pure
- * SRD encounter builder. Read-only and deterministic; the HTTP surface is a
- * separate Wave 4 concern.
+ * SRD encounter builder. Read-only and deterministic; routes adapt the catalog
+ * projection into `EncounterCatalogDefinition`.
  */
+
+export interface EncounterCatalogDefinition {
+  reference: { kind: string; definitionId: string };
+  name: string;
+  mechanics: { challengeRating?: number };
+}
 
 export interface EncounterPlanningDependencies {
   resolveCampaignCatalog(actorPrincipalId: string, campaignId: string): CampaignCatalogResolutionReport | null;
-  getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string): { definitions: readonly CatalogDefinition[] } | null;
+  getCampaignContentCatalog(actorPrincipalId: string, campaignId: string, packId: string, packVersion: string): { definitions: readonly EncounterCatalogDefinition[] } | null;
 }
 
 export interface EncounterCandidate {
@@ -24,17 +30,13 @@ export type EncounterPlanningDifficulty = "easy" | "medium" | "hard" | "deadly";
 export interface CampaignEncounterRequest {
   partyLevels: readonly number[];
   targetDifficulty: EncounterPlanningDifficulty;
-  candidateIds?: readonly string[];
-  maxMonsters?: number;
+  candidateIds?: readonly string[] | undefined;
+  maxMonsters?: number | undefined;
 }
 
 export interface CampaignEncounterPlan {
   candidates: readonly EncounterCandidate[];
   plan: Dnd5eEncounterPlan;
-}
-
-function isEnemyTemplate(definition: CatalogDefinition): definition is Extract<CatalogDefinition, { reference: { kind: "enemy-template" } }> {
-  return definition.reference.kind === "enemy-template";
 }
 
 export function createEncounterPlanningService(dependencies: EncounterPlanningDependencies) {
@@ -46,7 +48,7 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
       const projection = dependencies.getCampaignContentCatalog(actorPrincipalId, campaignId, pack.packId, pack.packVersion);
       if (!projection) continue;
       for (const definition of projection.definitions) {
-        if (!isEnemyTemplate(definition)) continue;
+        if (definition.reference.kind !== "enemy-template") continue;
         const challengeRating = definition.mechanics.challengeRating;
         if (typeof challengeRating !== "number") continue;
         candidates.push({ id: definition.reference.definitionId, name: definition.name, challengeRating });
@@ -57,6 +59,9 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
   };
 
   return Object.freeze({
+    hasCampaignCatalog(actorPrincipalId: string, campaignId: string): boolean {
+      return dependencies.resolveCampaignCatalog(actorPrincipalId, campaignId) !== null;
+    },
     listEncounterCandidates(actorPrincipalId: string, campaignId: string): readonly EncounterCandidate[] {
       return Object.freeze(candidatesFor(actorPrincipalId, campaignId));
     },

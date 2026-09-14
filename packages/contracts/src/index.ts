@@ -203,6 +203,7 @@ export {
 // M1.2 validated immutable catalog contracts. The legacy rpg-content exports
 // above intentionally remain unchanged for existing APIs and stored v10 packs.
 export * from "./content-catalog.js";
+export * from "./encounter-planning.js";
 export * from "./content-catalog-http.js";
 export type {
   AbilityDefinition,

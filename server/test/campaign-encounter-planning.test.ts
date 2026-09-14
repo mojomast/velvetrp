@@ -1,30 +1,25 @@
-import type { CampaignCatalogResolutionReport, CatalogDefinition } from "@velvet/contracts";
+import type { CampaignCatalogResolutionReport } from "@velvet/contracts";
 import { describe, expect, it } from "vitest";
-import { createEncounterPlanningService, type EncounterPlanningDependencies } from "../src/repo/dm/encounterPlanning.js";
+import { createEncounterPlanningService, type EncounterCatalogDefinition, type EncounterPlanningDependencies } from "../src/repo/dm/encounterPlanning.js";
 
 const PACK = { packId: "srd-5.1", packVersion: "1.6.0+test", digest: "0".repeat(64) };
 
-function enemy(id: string, name: string, challengeRating?: number): CatalogDefinition {
+function enemy(id: string, name: string, challengeRating?: number): EncounterCatalogDefinition {
   return {
-    reference: { packId: PACK.packId, packVersion: PACK.packVersion, kind: "enemy-template", definitionId: id },
-    name, description: `${name} is a bounded profile.`, tags: ["srd-5.1"],
-    mechanics: { tier: Math.max(1, Math.ceil(challengeRating ?? 1)), ...(challengeRating === undefined ? {} : { challengeRating }), maxHp: 7, defense: 12, speed: 30, abilityRefs: [], resistances: [], vulnerabilities: [], immunities: [] },
-    private: { tactics: "t", gmNotes: "g", hiddenAbilityRefs: [] },
-  } as unknown as CatalogDefinition;
+    reference: { kind: "enemy-template", definitionId: id },
+    name,
+    mechanics: challengeRating === undefined ? {} : { challengeRating },
+  };
 }
 
-const spell = {
-  reference: { packId: PACK.packId, packVersion: PACK.packVersion, kind: "spell", definitionId: "srd-5.1:spell:light" },
-  name: "Light", description: "d", tags: ["srd-5.1"],
-  mechanics: { level: 0, actionCost: "action", range: 0, target: "self", concentration: false, effects: [] },
-} as unknown as CatalogDefinition;
+const spell: EncounterCatalogDefinition = { reference: { kind: "spell", definitionId: "srd-5.1:spell:light" }, name: "Light", mechanics: {} };
 
 const catalog = (overrides: Partial<CampaignCatalogResolutionReport> = {}): CampaignCatalogResolutionReport => ({
   campaignId: "campaign-one", compatible: true, rulesProfileId: "srd-5.1:rules:starter-v1",
   contentPacks: [PACK], issues: [], ...overrides,
 } as CampaignCatalogResolutionReport);
 
-function service(options: { catalog?: CampaignCatalogResolutionReport | null; definitions?: CatalogDefinition[] } = {}) {
+function service(options: { catalog?: CampaignCatalogResolutionReport | null; definitions?: EncounterCatalogDefinition[] } = {}) {
   const dependencies: EncounterPlanningDependencies = {
     resolveCampaignCatalog: () => options.catalog === undefined ? catalog() : options.catalog,
     getCampaignContentCatalog: () => ({ definitions: options.definitions ?? [
@@ -47,8 +42,11 @@ describe("campaign encounter planning service", () => {
     ]);
   });
 
-  it("returns no candidates when the campaign has no configured catalog", () => {
-    expect(service({ catalog: null }).listEncounterCandidates("local-owner", "campaign-one")).toEqual([]);
+  it("reports catalog presence and no candidates when the campaign has no configured catalog", () => {
+    const absent = service({ catalog: null });
+    expect(absent.hasCampaignCatalog("local-owner", "campaign-one")).toBe(false);
+    expect(absent.listEncounterCandidates("local-owner", "campaign-one")).toEqual([]);
+    expect(service().hasCampaignCatalog("local-owner", "campaign-one")).toBe(true);
   });
 
   it("plans an encounter from the configured candidates and honors candidateIds", () => {

@@ -46,6 +46,9 @@ import {
   CampaignSessionAttachmentUnavailableError,
   ContentCatalogConflictError,
   ContentCatalogStaleError,
+  createEncounterPlanningService,
+  type EncounterCatalogDefinition,
+  type EncounterPlanningService,
 } from "../../../repo/index.js";
 import type { OriginalStarterSetupRepository } from "../../../content/originalStarterSetup.js";
 import type {
@@ -133,6 +136,7 @@ import type { PowerRepository } from "../../../repo/powerRepo.js";
 import { actorEffectsHttpRoutes } from "./actorEffects.js";
 import type { EffectRepository } from "../../../repo/effectRepo.js";
 import { encounterLifecycleHttpRoutes } from "./encounterLifecycle.js";
+import { encounterPlanningHttpRoutes } from "./encounterPlanning.js";
 import type { EncounterRepository } from "../../../repo/encounterRepo.js";
 import { combatReadsHttpRoutes } from "./combatReads.js";
 import { combatCommandsHttpRoutes } from "./combatCommands.js";
@@ -656,6 +660,14 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
     assertContentCatalogRepository(repository);
     return repository;
   };
+  const encounterPlanningAccessor = (): EncounterPlanningService => {
+    const repository = contentCatalogRepositoryAccessor();
+    return createEncounterPlanningService({
+      resolveCampaignCatalog: (actor, campaignId) => repository.resolveCampaignCatalog(actor, campaignId),
+      getCampaignContentCatalog: (actor, campaignId, packId, packVersion) =>
+        repository.getCampaignContentCatalog(actor, campaignId, packId, packVersion) as { definitions: readonly EncounterCatalogDefinition[] } | null,
+    });
+  };
   const actorResourceRepositoryAccessor = (): ActorResourceLaneRepository => {
     const repository = getCampaignRepository();
     assertActorResourceRepository(repository);
@@ -758,6 +770,7 @@ export const rpgV1Routes: FastifyPluginAsync<RpgV1RoutesOptions> = async (app, o
   await app.register(questHttpRoutes, { questRepositoryAccessor });
   await app.register(storyHttpRoutes, { storyRepositoryAccessor });
   await app.register(contentCatalogHttpRoutes, { contentCatalogRepositoryAccessor });
+  await app.register(encounterPlanningHttpRoutes, { encounterPlanningAccessor });
   await app.register(actorResourcesHttpRoutes, { actorResourceRepositoryAccessor });
   await app.register(actorInventoryHttpRoutes, { inventoryRepositoryAccessor });
   await app.register(actorRestHttpRoutes, { restRepositoryAccessor });
