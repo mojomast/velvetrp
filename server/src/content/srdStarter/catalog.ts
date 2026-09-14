@@ -11,6 +11,7 @@ import { buildSkills } from "./skills.js";
 import { buildAbilities } from "./abilities.js";
 import { buildSpells } from "./spells/index.js";
 import { buildItems } from "./items.js";
+import { buildMagicItems } from "./magicItems/index.js";
 import { buildCurrencies } from "./currencies.js";
 import { buildEnemies } from "./enemies.js";
 import { buildMonsterAbilities, buildMonsterEnemies } from "./monsters/index.js";
@@ -32,6 +33,7 @@ export function buildStarterCatalog(catalogVersion: string, digest: string): Pub
       ...buildMonsterAbilities(refs),
       ...buildSpells(refs),
       ...buildItems(refs),
+      ...buildMagicItems(refs),
       ...buildCurrencies(refs),
       ...buildEnemies(refs),
       ...buildMonsterEnemies(refs),
