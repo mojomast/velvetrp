@@ -23,6 +23,7 @@ export { rangerDefinition, rangerLevels } from "./ranger.js";
 interface ClassModule {
   definition: (refs: StarterReferences) => object;
   levels: (refs: StarterReferences) => object[];
+  subclasses?: (refs: StarterReferences) => object[];
 }
 
 const classModules: readonly ClassModule[] = [
@@ -41,4 +42,8 @@ export function buildClasses(refs: StarterReferences): object[] {
 
 export function buildClassLevels(refs: StarterReferences): object[] {
   return classModules.flatMap((module) => module.levels(refs));
+}
+
+export function buildSubclasses(refs: StarterReferences): object[] {
+  return classModules.flatMap((module) => module.subclasses?.(refs) ?? []);
 }

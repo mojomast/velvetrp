@@ -6,7 +6,7 @@ import { buildManifest } from "./manifest.js";
 import { createStarterReferences } from "./references.js";
 import { buildRaces } from "./races.js";
 import { buildBackgrounds } from "./backgrounds.js";
-import { buildClasses, buildClassLevels } from "./classes/index.js";
+import { buildClasses, buildClassLevels, buildSubclasses } from "./classes/index.js";
 import { buildSkills } from "./skills.js";
 import { buildAbilities } from "./abilities.js";
 import { buildSpells } from "./spells.js";
@@ -25,6 +25,7 @@ export function buildStarterCatalog(catalogVersion: string, digest: string): Pub
       ...buildBackgrounds(refs),
       ...buildClasses(refs),
       ...buildClassLevels(refs),
+      ...buildSubclasses(refs),
       ...buildSkills(refs),
       ...buildAbilities(refs),
       ...buildSpells(refs),
