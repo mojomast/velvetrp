@@ -544,6 +544,9 @@ export function buildApp(options: {
 } = {}) {
   const runtime = options.runtime ?? systemRuntime;
   const app = Fastify({
+    // A full SRD 5.1 starter publication (as sent to POST /content-packs) is
+    // multiple megabytes of catalog JSON, well above Fastify's 1 MiB default.
+    bodyLimit: 16 * 1024 * 1024,
     logger: process.env.NODE_ENV === "test"
       ? false
       : {
