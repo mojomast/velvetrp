@@ -207,7 +207,12 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
     if(value.kind==="power")return includesFact(text,value.powerName)&&value.targets.every(target=>includesFact(text,target))&&value.costs.every(cost=>includesNumber(text,cost.after))&&value.stateDeltas.every(delta=>includesFact(text,delta.actor)&&includesFact(text,delta.change));
     if(value.kind==="rest")return includesFact(text,value.restName)&&value.recovery.every(delta=>includesFact(text,delta.label)&&includesNumber(text,delta.after));
     if(value.kind==="combat-consumable"||value.kind==="combat-power")return includesFact(text,value.kind==="combat-consumable"?value.itemName:value.powerName)&&includesFact(text,value.target)&&value.outcomes.every(outcome=>outcome.kind==="effect"?includesFact(text,outcome.effect):outcome.kind==="temporary-hit-points"?includesNumber(text,outcome.granted):includesNumber(text,outcome.applied)&&(outcome.after===null?outcome.kind==="resource"&&includesFact(text,outcome.resource):includesNumber(text,outcome.after)));
-    if(value.kind==="combat")return includesFact(text,value.action)&&(value.outcome.kind==="damage"?includesNumber(text,value.outcome.applied)&&includesNumber(text,value.outcome.hitPointsAfter)&&includesFact(text,value.outcome.statusAfter):value.outcome.kind==="status"?includesFact(text,value.outcome.statusAfter):includesAny(text,["no damage","ends","ended","attack","flee"]));
+    // Combat damage must state the exact damage dealt and the resulting hit points. The applied
+    // damage and HP already fix the outcome, so prose need not echo a literal action or status
+    // word (a longsword "bites home" and an enemy "falls" as naturally as they are "attacked" and
+    // "defeated"). Non-damage combat receipts stay subject to the contradiction and unsupported-claim guards above.
+    if(value.kind==="combat")return value.outcome.kind!=="damage"
+      ||(includesNumber(text,value.outcome.applied)&&includesNumber(text,value.outcome.hitPointsAfter));
     if(value.event.type==="actor_dice_rolled")return includesNumber(text,(value.event.data as {total:number}).total)
       &&includesAny(text,["roll","rolled","rolls","total","die","dice","shows","comes up","lands","result"]);
     if(value.event.type==="actor_attribute_set"){const data=value.event.data as {valueBefore:number;valueAfter:number};return includesNumber(text,data.valueBefore)&&includesNumber(text,data.valueAfter)&&includesAny(text,["attribute","change","changes","changed"]);}

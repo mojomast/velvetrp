@@ -419,6 +419,12 @@ describe("M2.11 adventure turn routes", () => {
       [damageReceipt])).toBe(false);
     expect(providerNarrationMatchesReceipts("The attack deals 5 physical damage. The target has 10 HP and is active. You heal for 3 HP.",
       [damageReceipt])).toBe(false);
+    const defeatReceipt={kind:"combat",action:"attack",outcome:{kind:"damage",damageType:"slashing",requested:11,applied:11,
+      hitPointsBefore:11,hitPointsAfter:0,statusAfter:"defeated"},roundBefore:2,roundAfter:2} as any;
+    expect(providerNarrationMatchesReceipts("Your longsword bites home for 11 damage; the bandit drops to 0 hit points.",
+      [defeatReceipt])).toBe(true);
+    expect(providerNarrationMatchesReceipts("Your longsword bites home for 6 damage; the bandit drops to 0 hit points.",
+      [defeatReceipt])).toBe(false);
   });
 
   it("keeps travel pending when no exact legal candidate exists",async()=>{
