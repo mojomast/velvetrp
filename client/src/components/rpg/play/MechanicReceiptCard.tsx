@@ -114,7 +114,7 @@ function ReceiptBody({ receipt }: { receipt: Receipt }) {
     <div><dt>Proficiency bonus</dt><dd>{receipt.proficiencyBonus?`+${receipt.proficiencyBonus}`:"Not proficient"}</dd></div>
     <div><dt>Total</dt><dd><strong>{receipt.total}</strong></dd></div>
     <div><dt>Difficulty</dt><dd>{receipt.difficulty} (DC {receipt.dc})</dd></div>
-    <div><dt>Outcome</dt><dd>{receipt.outcome === "success" ? "Success" : "Failure"}</dd></div>
+    <div><dt>Outcome</dt><dd data-outcome={receipt.outcome}>{receipt.outcome === "success" ? "Success" : "Failure"}</dd></div>
     <div><dt>Committed at</dt><dd><time dateTime={receipt.occurredAt}>{new Date(receipt.occurredAt).toLocaleString()}</time></dd></div>
   </dl>;
   if (receipt.kind === "quest") return <dl>
