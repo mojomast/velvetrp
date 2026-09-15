@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "name": "The Emberwake Reach",
+  "tone": "Storm-bitten high fantasy on a planar frontier: heroic but costly, strange magic as weather, frontier humor, cosmic dread, and SRD 5.1 classes and monsters as native physics.",
+  "exclusions": [
+    "sexual violence",
+    "graphic torture",
+    "harm to children",
+    "real living people as characters",
+    "real religious practice or sacred objects",
+    "slavery played for entertainment",
+    "species essentialism or ancestry-as-alignment"
+  ],
+  "stages": [
+    {
+      "id": "factions",
+      "jobs": [
+        {
+          "id": "arcane-factions",
+          "sections": ["factions"],
+          "brief": "In the frontier port of Cinderhold on the Emberwake Reach, create three public arcane factions: (1) a practical wizard college that maps and contains the Emberwake scar, staffed by evokers and diviners; (2) an old sorcerer bloodline that claims the scar chooses its heirs and resents the college's paperwork; (3) a secretive warlock pact-order that brokers with entities from beyond the tear and is officially illegal. Give each concrete leverage, a public grievance, and one credible path to compromise. Use SRD 5.1 class and ancestry language freely; invent all names.",
+          "desiredCounts": { "factions": 3 }
+        },
+        {
+          "id": "divine-nature-factions",
+          "sections": ["factions"],
+          "brief": "Create three public faith-and-nature factions for Cinderhold: (1) an Acolyte-led temple order that shelters refugees and runs the hospital, split between militant and pastoral wings; (2) a druidic circle that tends the Emberwake's unnatural seasons and distrusts extraction; (3) a paladin order sworn to hold the tear closed, honorable but dangerously rigid. Give each a specific negotiating position and a reason they cannot simply impose their will. Treat belief as in-world invention, not real religion.",
+          "desiredCounts": { "factions": 3 }
+        },
+        {
+          "id": "martial-underworld-factions",
+          "sections": ["factions"],
+          "brief": "Create four public factions for Cinderhold's edges: (1) a veteran mercenary company that fights monsters for pay (Fighters and Barbarians); (2) a monastic order that keeps the deep roads and takes no coin (Monks); (3) ranger border wardens who patrol the Wilds and the highroad (Rangers and Rogues); (4) a merchants' and smugglers' league that moves magic items through the Drowned Harbor (Rogues and Bards). Give each practical leverage, a public grievance, and one credible compromise.",
+          "desiredCounts": { "factions": 4 }
+        }
+      ]
+    },
+    {
+      "id": "foundation",
+      "dependsOn": ["factions"],
+      "jobs": [
+        {
+          "id": "cinderhold-foundation",
+          "sections": ["outline", "locations"],
+          "brief": "Open the campaign in Cinderhold during a storm season when the Emberwake tear flares. Create one public outline as a premise and actionable invitation, then four public locations that map onto SRD 5.1 play: the harbor quarter and Drowned Harbor seawall (underwater and aquatic threats); the Bone Catacombs beneath the old temple (undead and darkness); the Emberwake Crater rim (elementals, fiends, and planar hazards); and the Highroad Plateau gate (mounted travel and open battle). Add three public connections naming routes; every connection's fromLocationKey and toLocationKey MUST exactly match a key defined in this same response's locations array. Set the outline startLocationKey to the harbor quarter.",
+          "expandFrom": [
+            { "jobId": "arcane-factions", "fields": ["factions"], "limit": 3 },
+            { "jobId": "divine-nature-factions", "fields": ["factions"], "limit": 3 },
+            { "jobId": "martial-underworld-factions", "fields": ["factions"], "limit": 4 }
+          ],
+          "desiredCounts": { "outlines": 1, "locations": 4, "connections": 3 }
+        }
+      ]
+    },
+    {
+      "id": "wider",
+      "dependsOn": ["foundation"],
+      "jobs": [
+        {
+          "id": "reach-locations",
+          "sections": ["locations"],
+          "brief": "Add four public locations beyond Cinderhold that exercise SRD 5.1 exploration: the Deep Vault, a lightless underdark descent where obscurement and darkvision matter; the Dragonspine Roost, a volcanic aerie of a hostile dragon and its servants; the Verdant Wilds, a beast- and plant-haunted forest; and the Storm Reef, a submerged wreck field where combat happens fully immersed. Create locations only in this job; do not create connections.",
+          "expandFrom": [
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 4 }
+          ],
+          "desiredCounts": { "locations": 4 }
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "dependsOn": ["wider"],
+      "jobs": [
+        {
+          "id": "reach-connections",
+          "sections": ["locations"],
+          "brief": "Create four public connections for the accepted locations. Every connection's fromLocationKey and toLocationKey MUST exactly match one of the exact accepted location keys supplied in the accepted canon; never invent, rename, abbreviate, or paraphrase a key. Connect two Cinderhold locations to two wider locations and connect two wider locations to each other. Create connections only in this job.",
+          "expandFrom": [
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 4 },
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }
+          ],
+          "desiredCounts": { "connections": 4 }
+        }
+      ]
+    },
+    {
+      "id": "cast",
+      "dependsOn": ["connections"],
+      "jobs": [
+        {
+          "id": "class-cast",
+          "sections": ["npcs"],
+          "brief": "Create four public NPCs who each embody a different SRD 5.1 class fantasy and tie to accepted factions and places: a cleric of the temple order, a ranger border warden, a rogue harbor broker, and a bard chronicler. Give each a public description with observable voice and a short sample line, an archetype, and privateGoals with motives, leverage, knowledge boundaries, and reactions to help or threats. Make them ordinary, competent, and morally mixed. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "divine-nature-factions", "fields": ["factions"], "limit": 3 },
+            { "jobId": "martial-underworld-factions", "fields": ["factions"], "limit": 4 },
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "npcs": 4 }
+        },
+        {
+          "id": "antagonist-cast",
+          "sections": ["npcs"],
+          "brief": "Create three public NPCs with hidden agendas tied to the Emberwake tear: a wizard researcher who wants to widen it, a pact-broker who serves something across it, and a mercenary captain who profits from the storm season. Keep their public faces sympathetic and their privateGoals GM-only, with concrete knowledge boundaries and persuasive justifications rather than cartoon villainy. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "arcane-factions", "fields": ["factions"], "limit": 3 },
+            { "jobId": "martial-underworld-factions", "fields": ["factions"], "limit": 4 },
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }
+          ],
+          "desiredCounts": { "npcs": 3 }
+        }
+      ]
+    },
+    {
+      "id": "opening-story",
+      "dependsOn": ["cast"],
+      "jobs": [
+        {
+          "id": "emberwake-opening",
+          "sections": ["arcs", "story", "clues"],
+          "brief": "Build the first playable movement: one public arc about the storm season and the tear, three public story nodes (a flare over the harbor, a theft of a warded relic, and a first breach in the Catacombs), two public story relationships, and three fair public clues that point to the crater, the reef, and a hidden pact. Give the arc a GM-only antagonist agenda and branching early/middle/final progression with setbacks and alternative finales. Clues must never be a single bottleneck. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "cinderhold-foundation", "fields": ["outlines", "locations"], "limit": 4 },
+            { "jobId": "class-cast", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "antagonist-cast", "fields": ["npcs"], "limit": 2 }
+          ],
+          "desiredCounts": { "arcs": 1, "storyNodes": 3, "storyRelationships": 2, "clues": 3 }
+        }
+      ]
+    },
+    {
+      "id": "wider-story",
+      "dependsOn": ["opening-story"],
+      "jobs": [
+        {
+          "id": "planar-escalation",
+          "sections": ["arcs", "story", "clues"],
+          "brief": "Extend the mystery into the wider Reach. Add a second public arc about the tear's true nature, three public story nodes that escalate reversibly, three public story relationships, and three public clues that keep containment, negotiation, and exploitation all viable. Require the arc to include at least two alternate finales with aftermath and a fail-forward path for a missed clue. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "emberwake-opening", "fields": ["arcs", "storyNodes", "clues"], "limit": 6 },
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 },
+            { "jobId": "antagonist-cast", "fields": ["npcs"], "limit": 3 }
+          ],
+          "desiredCounts": { "arcs": 1, "storyNodes": 3, "storyRelationships": 3, "clues": 3 }
+        }
+      ]
+    },
+    {
+      "id": "quests",
+      "dependsOn": ["wider-story"],
+      "jobs": [
+        {
+          "id": "class-quests",
+          "sections": ["quests"],
+          "brief": "Create three table-ready public quests that spotlight different SRD 5.1 classes: (1) a temple-and-crypt quest to cleanse the Bone Catacombs and recover a relic (Cleric or Paladin); (2) a wilds-and-highroad quest to track a beast and escort a caravan on horseback (Ranger or Fighter); (3) a harbor-and-reef quest to dive on a wreck before rivals claim it (Rogue or Bard). Each needs two or three actionable objectives with dependencies and one modest bounded reward. Prefer investigation, negotiation, and repair over pure violence. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "emberwake-opening", "fields": ["arcs", "storyNodes"], "limit": 4 },
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 3 }
+          ],
+          "desiredCounts": { "quests": 3 }
+        },
+        {
+          "id": "arcane-quests",
+          "sections": ["quests"],
+          "brief": "Create two table-ready public quests for arcane and planar play: (1) a college quest to stabilize a failing ward at the crater using a specific spell or ritual; (2) a pact quest to broker or break a bargain with something across the tear. Each needs actionable objectives, a GM-only alternate consequence, and a bounded reward. Keep outcomes open rather than predetermined. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "planar-escalation", "fields": ["storyNodes", "clues"], "limit": 4 },
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 3 }
+          ],
+          "desiredCounts": { "quests": 2 }
+        }
+      ]
+    },
+    {
+      "id": "bestiary",
+      "dependsOn": ["quests"],
+      "jobs": [
+        {
+          "id": "low-cr-bestiary",
+          "sections": ["monster-concepts"],
+          "brief": "Create three public monster concepts for low-level play in the Wilds and Catacombs. Bind each concept to an exact SRD 5.1 enemy-template reference supplied in pinnedCatalog if one fits (for example a beast, low-tier undead such as a skeleton or ghoul, a goblinoid, or a giant rat/wolf); otherwise mark its mechanics inert with a short reason. Each needs an in-world role, a short tactics list, and a habitat tied to an accepted location.",
+          "expandFrom": [
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 2 },
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }
+          ],
+          "desiredCounts": { "monsterConcepts": 3 }
+        },
+        {
+          "id": "mid-cr-bestiary",
+          "sections": ["monster-concepts"],
+          "brief": "Create three public monster concepts for mid-level play at the crater, the reef, and the deep roads. Bind each concept to an exact SRD 5.1 enemy-template reference supplied in pinnedCatalog where one fits (for example an ogre, owlbear, mummy, gargoyle, water elemental, or young dragon); otherwise mark its mechanics inert. Each needs a role that is not merely a damage sponge, a tactics list, and ties to an accepted location.",
+          "expandFrom": [
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 }
+          ],
+          "desiredCounts": { "monsterConcepts": 3 }
+        },
+        {
+          "id": "high-cr-bestiary",
+          "sections": ["monster-concepts"],
+          "brief": "Create three public monster concepts for high-level play around the tear and the Dragonspine Roost. Bind each concept to an exact SRD 5.1 enemy-template reference supplied in pinnedCatalog where one fits (for example a powerful fiend, a high-tier dragon, a beholder-like aberration, a giant, or a powerful undead); otherwise mark its mechanics inert. Give each a public warning sign, a tactics list, and a way the party could avoid or bargain with it rather than only fight.",
+          "expandFrom": [
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 4 },
+            { "jobId": "planar-escalation", "fields": ["arcs", "storyNodes"], "limit": 3 }
+          ],
+          "desiredCounts": { "monsterConcepts": 3 }
+        }
+      ]
+    },
+    {
+      "id": "treasures",
+      "dependsOn": ["bestiary"],
+      "jobs": [
+        {
+          "id": "magic-items",
+          "sections": ["quest-items"],
+          "brief": "Create four public quest items that are SRD 5.1 magic items. For each, bind mechanics to an exact SRD 5.1 magic-item reference supplied in pinnedCatalog (for example a ring, a wand, a staff, a potion, a scroll, enchanted armor, a magic weapon, or a wondrous item) and link it to an accepted quest and location. If no exact pin fits, mark it inert with a short reason. Treat each as a discovered object with provenance, not a vending-machine reward. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "class-quests", "fields": ["quests"], "limit": 3 },
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 3 }
+          ],
+          "desiredCounts": { "questItems": 4 }
+        },
+        {
+          "id": "relics",
+          "sections": ["quest-items"],
+          "brief": "Create three public quest items tied to the tear: a warded relic that keeps a breach closed, a broken focus that once bound an entity, and a chart of the Drowned Harbor wards. Bind mechanics to exact SRD 5.1 magic-item references supplied in pinnedCatalog where possible, otherwise mark inert. Link each to an accepted arc, quest, or location and keep them as hard-won leads, not guaranteed solutions. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "arcane-quests", "fields": ["quests"], "limit": 2 },
+            { "jobId": "planar-escalation", "fields": ["storyNodes", "clues"], "limit": 3 }
+          ],
+          "desiredCounts": { "questItems": 3 }
+        }
+      ]
+    },
+    {
+      "id": "encounters",
+      "dependsOn": ["treasures"],
+      "jobs": [
+        {
+          "id": "wilderness-encounters",
+          "sections": ["encounters"],
+          "brief": "Create two public encounter plans for the Wilds and Highroad: one mounted pursuit on open ground and one beast ambush in dense cover where lightly obscured terrain and vision matter. Set enemyReferences to exact SRD 5.1 enemy-template references supplied in pinnedCatalog. Include objectives, terrain, escalation, a resolution, and at least one non-combat approach. Each enemyReferences entry MUST be an exact pinned enemy-template reference from pinnedCatalog; reference only exact accepted keys or keys defined in this same response.",
+          "expandFrom": [
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "low-cr-bestiary", "fields": ["monsterConcepts"], "limit": 2 }
+          ],
+          "desiredCounts": { "encounters": 2 }
+        },
+        {
+          "id": "dungeon-encounters",
+          "sections": ["encounters"],
+          "brief": "Create two public encounter plans for the Bone Catacombs and the Deep Vault: one against undead in magical darkness where unseen-attacker rules matter, and one in the lightless Deep Vault where obscurement and darkvision decide the fight. Set enemyReferences to exact SRD 5.1 enemy-template references supplied in pinnedCatalog. Include terrain, hazards, escalation, and a resolution that can end without a total slaughter. Each enemyReferences entry MUST be an exact pinned enemy-template reference from pinnedCatalog; reference only exact accepted keys or keys defined in this same response.",
+          "expandFrom": [
+            { "jobId": "mid-cr-bestiary", "fields": ["monsterConcepts"], "limit": 2 },
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 2 }
+          ],
+          "desiredCounts": { "encounters": 2 }
+        },
+        {
+          "id": "coastal-encounters",
+          "sections": ["encounters"],
+          "brief": "Create two public encounter plans for the Drowned Harbor and the Storm Reef where the party is fully immersed: one aquatic monster fight that applies the underwater melee-disadvantage and ranged auto-miss rules, and one elemental or dragon confrontation at the crater rim. Set enemyReferences to exact SRD 5.1 enemy-template references supplied in pinnedCatalog. Include terrain, environmental saves, escalation, and a fair resolution. Each enemyReferences entry MUST be an exact pinned enemy-template reference from pinnedCatalog; reference only exact accepted keys or keys defined in this same response.",
+          "expandFrom": [
+            { "jobId": "reach-locations", "fields": ["locations"], "limit": 2 },
+            { "jobId": "high-cr-bestiary", "fields": ["monsterConcepts"], "limit": 2 }
+          ],
+          "desiredCounts": { "encounters": 2 }
+        }
+      ]
+    },
+    {
+      "id": "lore",
+      "dependsOn": ["encounters"],
+      "jobs": [
+        {
+          "id": "reach-lore",
+          "sections": ["lore"],
+          "brief": "Create four public lore entries: the fall of the Emberwake shard and the first storm season; the founding of Cinderhold as a monster-hunting port; the drowned fleet that made the Storm Reef; and the laws that forbid pact-broking. Each needs a title, a summary, and two to four details, tied to accepted locations, factions, or story nodes. Treat all of it as invented in-world history.",
+          "expandFrom": [
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 3 },
+            { "jobId": "emberwake-opening", "fields": ["storyNodes"], "limit": 3 }
+          ],
+          "desiredCounts": { "lore": 4 }
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "dependsOn": ["lore"],
+      "jobs": [
+        {
+          "id": "reach-table",
+          "sections": ["handouts", "scene-prompts"],
+          "brief": "Create three public player handouts (a storm-warning notice, a page of the harbor ward chart, and a monster bounty poster) and three public GM scene prompts: a temple triage during a flare, a horse-mounted pursuit on the Highroad, and a fully immersed dive at the Storm Reef. Ground every prompt in accepted people and places. Handouts must not spoil the clues. Reference only exact accepted keys or keys defined in this same response; never invent or paraphrase a key.",
+          "expandFrom": [
+            { "jobId": "reach-lore", "fields": ["lore"], "limit": 3 },
+            { "jobId": "class-cast", "fields": ["npcs"], "limit": 2 },
+            { "jobId": "cinderhold-foundation", "fields": ["locations"], "limit": 3 }
+          ],
+          "desiredCounts": { "handouts": 3, "scenePrompts": 3 }
+        }
+      ]
+    }
+  ]
+}
