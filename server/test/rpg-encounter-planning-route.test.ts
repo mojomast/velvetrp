@@ -12,11 +12,19 @@ const plan = {
   reasons: ["the roster is below the medium target"],
 };
 
+const rewardPlan = {
+  xpAwarded: 50, totalXp: 350, currentLevel: 1, nextLevel: 2, nextLevelXp: 300,
+  levelUpEligible: true, levelsGained: 1, legal: true, reasons: [],
+};
+const npcSelected = { selected: [{ id: candidate.id, name: "Goblin", challengeRating: 0.25 }], legal: true, reasons: [] };
+
 function service(hasCatalog = true) {
   return {
     hasCampaignCatalog: vi.fn(() => hasCatalog),
     listEncounterCandidates: vi.fn(() => [candidate]),
     planEncounter: vi.fn(() => ({ candidates: [candidate], plan })),
+    previewEncounterRewards: vi.fn(() => ({ plan: rewardPlan, defeated: [{ id: candidate.id, challengeRating: 0.25 }] })),
+    selectNpcs: vi.fn(() => npcSelected),
   };
 }
 
@@ -66,6 +74,36 @@ describe("encounter planning HTTP lane", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ code: "RPG_CAMPAIGN_NOT_FOUND" });
     expect(planningService.planEncounter).not.toHaveBeenCalled();
+    await instance.close();
+  });
+
+  it("previews encounter rewards for pinned enemies and rejects invalid bodies", async () => {
+    process.env.FEATURE_RPG_CAMPAIGN = "true";
+    process.env.FEATURE_RPG_MECHANICS = "true";
+    const { instance, planningService } = app();
+    const base = "/api/rpg/v1/campaigns/campaign/encounter-reward-previews";
+    const ok = await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [candidate.id], currentXp: 300, currentLevel: 1 } });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json()).toEqual(rewardPlan);
+    expect(planningService.previewEncounterRewards).toHaveBeenCalledWith("local-owner", "campaign", { defeatedEnemyIds: [candidate.id], currentXp: 300, currentLevel: 1 });
+    expect((await instance.inject({ method: "POST", url: `${base}?x=1`, payload: { defeatedEnemyIds: [candidate.id], currentXp: 0, currentLevel: 1 } })).statusCode).toBe(400);
+    expect((await instance.inject({ method: "POST", url: base, headers: { "content-type": "text/plain" }, payload: "{}" })).statusCode).toBe(415);
+    expect((await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [], currentXp: 0, currentLevel: 1 } })).statusCode).toBe(400);
+    expect((await instance.inject({ method: "POST", url: base, payload: { defeatedEnemyIds: [candidate.id], currentXp: -1, currentLevel: 1 } })).statusCode).toBe(400);
+    await instance.close();
+  });
+
+  it("selects NPC stat blocks and rejects invalid bodies", async () => {
+    process.env.FEATURE_RPG_CAMPAIGN = "true";
+    process.env.FEATURE_RPG_MECHANICS = "true";
+    const { instance, planningService } = app();
+    const base = "/api/rpg/v1/campaigns/campaign/npc-selections";
+    const ok = await instance.inject({ method: "POST", url: base, payload: { count: 1, minChallengeRating: 0.25, maxChallengeRating: 1 } });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json()).toEqual(npcSelected);
+    expect(planningService.selectNpcs).toHaveBeenCalledWith("local-owner", "campaign", { count: 1, minChallengeRating: 0.25, maxChallengeRating: 1 });
+    expect((await instance.inject({ method: "POST", url: base, payload: { count: 0 } })).statusCode).toBe(400);
+    expect((await instance.inject({ method: "POST", url: base, payload: { count: 33 } })).statusCode).toBe(400);
     await instance.close();
   });
 

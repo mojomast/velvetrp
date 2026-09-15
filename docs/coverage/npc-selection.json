@@ -1,8 +1,8 @@
 {
   "id": "npc-selection",
   "title": "NPC and monster stat-block selection",
-  "status": "partial",
-  "complete": false,
+  "status": "implemented",
+  "complete": true,
   "sourceSections": [
     {
       "id": "SRD5.1:Monsters",
@@ -12,13 +12,18 @@
   "capabilityEvidence": [
     {
       "id": "npc-selection",
-      "version": "1.0.0",
-      "descriptorStatus": "partial"
+      "version": "1.1.0",
+      "descriptorStatus": "supported"
     }
   ],
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e/npcSelection.ts",
-    "server/test/dnd5e-npc-selection.test.ts"
+    "server/src/repo/dm/encounterPlanning.ts",
+    "server/test/dnd5e-npc-selection.test.ts",
+    "server/test/campaign-encounter-planning.test.ts",
+    "server/test/rpg-encounter-planning-route.test.ts"
   ],
-  "apiEvidence": []
+  "apiEvidence": [
+    "POST /api/rpg/v1/campaigns/:campaignId/npc-selections"
+  ]
 }

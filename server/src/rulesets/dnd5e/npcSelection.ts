@@ -36,7 +36,7 @@ export type Dnd5eNpcSelectionResult = Readonly<{
 }>;
 
 export const DND_5E_NPC_SELECTION_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
-  Object.freeze({ id: "npc-selection", version: "1.0.0", status: "partial" as const }),
+  Object.freeze({ id: "npc-selection", version: "1.1.0", status: "supported" as const }),
 ]);
 
 /** Order by SRD XP value so fractional challenge ratings sort correctly. */

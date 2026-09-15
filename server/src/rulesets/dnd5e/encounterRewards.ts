@@ -11,7 +11,7 @@ import { rawEncounterXp } from "./encounterXp.js";
  */
 
 export const DND_5E_ENCOUNTER_REWARD_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
-  Object.freeze({ id: "encounter-rewards", version: "1.0.0", status: "partial" as const }),
+  Object.freeze({ id: "encounter-rewards", version: "1.1.0", status: "supported" as const }),
 ]);
 
 /** Cumulative XP required to reach each character level 2-20 in SRD 5.1. */

@@ -226,22 +226,22 @@
     {
       "id": "encounter-rewards",
       "title": "Encounter XP rewards and level-up eligibility",
-      "status": "partial",
-      "complete": false,
+      "status": "implemented",
+      "complete": true,
       "sourceSections": [{ "id": "SRD5.1:Beyond 1st Level", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=56" }, { "id": "SRD5.1:Building Combat Encounters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=165" }],
-      "capabilityEvidence": [{ "id": "encounter-rewards", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterRewards.ts", "server/test/dnd5e-encounter-rewards.test.ts"],
-      "apiEvidence": []
+      "capabilityEvidence": [{ "id": "encounter-rewards", "version": "1.1.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/encounterRewards.ts", "server/src/repo/dm/encounterPlanning.ts", "server/test/dnd5e-encounter-rewards.test.ts", "server/test/campaign-encounter-planning.test.ts", "server/test/rpg-encounter-planning-route.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/encounter-reward-previews"]
     },
     {
       "id": "npc-selection",
       "title": "NPC and monster stat-block selection",
-      "status": "partial",
-      "complete": false,
+      "status": "implemented",
+      "complete": true,
       "sourceSections": [{ "id": "SRD5.1:Monsters", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=254" }],
-      "capabilityEvidence": [{ "id": "npc-selection", "version": "1.0.0", "descriptorStatus": "partial" }],
-      "runtimeEvidence": ["server/src/rulesets/dnd5e/npcSelection.ts", "server/test/dnd5e-npc-selection.test.ts"],
-      "apiEvidence": []
+      "capabilityEvidence": [{ "id": "npc-selection", "version": "1.1.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/npcSelection.ts", "server/src/repo/dm/encounterPlanning.ts", "server/test/dnd5e-npc-selection.test.ts", "server/test/campaign-encounter-planning.test.ts", "server/test/rpg-encounter-planning-route.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/campaigns/:campaignId/npc-selections"]
     },
     {
       "id": "adventuring-environment",

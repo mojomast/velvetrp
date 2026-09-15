@@ -17,7 +17,7 @@ const CANDIDATES = [
 describe("selectDnd5eNpcStatBlocks", () => {
   it("filters by role and inclusive CR band, then selects in deterministic order", () => {
     expect(DND_5E_NPC_SELECTION_CAPABILITIES).toEqual([
-      { id: "npc-selection", version: "1.0.0", status: "partial" },
+      { id: "npc-selection", version: "1.1.0", status: "supported" },
     ]);
 
     const result = selectDnd5eNpcStatBlocks({

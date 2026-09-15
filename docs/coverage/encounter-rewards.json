@@ -1,8 +1,8 @@
 {
   "id": "encounter-rewards",
   "title": "Encounter XP rewards and level-up eligibility",
-  "status": "partial",
-  "complete": false,
+  "status": "implemented",
+  "complete": true,
   "sourceSections": [
     {
       "id": "SRD5.1:Beyond 1st Level",
@@ -16,13 +16,18 @@
   "capabilityEvidence": [
     {
       "id": "encounter-rewards",
-      "version": "1.0.0",
-      "descriptorStatus": "partial"
+      "version": "1.1.0",
+      "descriptorStatus": "supported"
     }
   ],
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e/encounterRewards.ts",
-    "server/test/dnd5e-encounter-rewards.test.ts"
+    "server/src/repo/dm/encounterPlanning.ts",
+    "server/test/dnd5e-encounter-rewards.test.ts",
+    "server/test/campaign-encounter-planning.test.ts",
+    "server/test/rpg-encounter-planning-route.test.ts"
   ],
-  "apiEvidence": []
+  "apiEvidence": [
+    "POST /api/rpg/v1/campaigns/:campaignId/encounter-reward-previews"
+  ]
 }
