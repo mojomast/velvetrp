@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { AdventureTurnTranscriptEntry, CampaignDmHistory } from "@velvet/contracts";
-import { afterEach, describe, expect, it } from "vitest";
-import { buildReplayTimeline, CampaignReplay } from "./CampaignReplay";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildReplayTimeline, CampaignReplay, type ReplayTraceApi } from "./CampaignReplay";
 
 const early = "2030-01-01T00:00:00.000Z";
 const late = "2030-01-01T00:05:00.000Z";
@@ -12,6 +12,14 @@ const dmHistory = { control: { campaignId: "campaign", mode: "ai", revision: 1 }
   { runId: "run", campaignId: "campaign", sessionId: "session", intent: "open", mode: "ai", modeRevision: 1, revision: 2, state: "completed",
     narration: "The ember crown awakens.", receipts: [{ action: "reveal-node", summary: "A sealed scene is revealed." }], blockers: [], createdAt: late },
 ] } as CampaignDmHistory;
+const checkReceipt = { kind: "check", checkKind: "skill", skill: "Investigation", ability: "intelligence",
+  rolls: [{ value: 1, kept: true }], mode: "normal", abilityModifier: 1, proficiencyBonus: 2, total: 4,
+  difficulty: "medium", dc: 15, outcome: "failure", revisionBefore: 3, revisionAfter: 4, occurredAt: late };
+
+function renderReplay(trace?: ReplayTraceApi) {
+  return render(<CampaignReplay campaignId="campaign" sessionId="session" dmHistory={dmHistory} transcript={transcript}
+    actorNames={new Map([["actor", "Aria"]])} trace={trace} onExit={() => undefined} />);
+}
 
 describe("CampaignReplay", () => {
   afterEach(cleanup);
@@ -23,7 +31,7 @@ describe("CampaignReplay", () => {
   });
 
   it("maps the transcript's declaration plus director narration into the replay log", () => {
-    render(<CampaignReplay dmHistory={dmHistory} transcript={transcript} actorNames={new Map([["actor", "Aria"]])} onExit={() => undefined} />);
+    renderReplay();
     const log = screen.getByRole("log", { name: "Replayed session" });
     expect(log.textContent).toContain("I draw my blade.");
     expect(log.textContent).toContain("The blade hums.");
@@ -33,7 +41,7 @@ describe("CampaignReplay", () => {
   });
 
   it("skips backward and forward through the session with the transport controls", () => {
-    render(<CampaignReplay dmHistory={dmHistory} transcript={transcript} actorNames={new Map([["actor", "Aria"]])} onExit={() => undefined} />);
+    renderReplay();
     fireEvent.click(screen.getByRole("button", { name: "Previous beat" }));
     expect(screen.getByText("1 / 2")).toBeTruthy();
     expect(screen.queryByText("The ember crown awakens.")).toBeNull();
@@ -46,8 +54,19 @@ describe("CampaignReplay", () => {
     expect(screen.getByRole("button", { name: "Pause replay" })).toBeTruthy();
   });
 
+  it("attaches the authoritative committed mechanics to a replayed player turn", async () => {
+    const trace = {
+      getAdventureTurn: vi.fn().mockResolvedValue({ receipts: [{ commandId: "cmd", proposalId: null, linkedAt: late }] }),
+      getCampaignCommandReceipt: vi.fn().mockResolvedValue({ receipt: checkReceipt }),
+    } as unknown as ReplayTraceApi;
+    renderReplay(trace);
+    expect(await screen.findByText("Committed mechanics")).toBeTruthy();
+    expect(screen.getByText(/DC 15/)).toBeTruthy();
+    expect(trace.getAdventureTurn).toHaveBeenCalledWith("turn", expect.objectContaining({ campaignId: "campaign", sessionId: "session", actorId: "actor" }));
+  });
+
   it("reports an empty replayable history without fabricating a scene", () => {
-    render(<CampaignReplay dmHistory={null} transcript={[]} actorNames={new Map()} onExit={() => undefined} />);
+    render(<CampaignReplay campaignId="campaign" sessionId="session" dmHistory={null} transcript={[]} actorNames={new Map()} onExit={() => undefined} />);
     expect(screen.getByText(/No replayable history yet/)).toBeTruthy();
   });
 });

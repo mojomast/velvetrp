@@ -6,5 +6,6 @@
 .campaign-replay-log { max-height: min(60vh, 34rem); overflow-y: auto; }
 .campaign-replay-log .conversation-turn { border-left: 2px solid #b98746; padding-left: 1rem; }
 .replay-kicker { text-transform: uppercase; letter-spacing: .06em; font-size: .7rem; opacity: .7; margin: 0; }
+.replay-mechanics { margin: .4rem 0 .6rem; padding-left: 1rem; border-left: 2px solid #4f745d; }
 .replay-receipt { display: block; opacity: .8; }
 .replay-blocker { display: block; color: #b98746; }

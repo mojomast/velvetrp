@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AdventureTurnTranscriptEntry, CampaignDmHistory } from "@velvet/contracts";
+import type { AdventureTurnGetResponse, AdventureTurnTranscriptEntry, CampaignDmHistory } from "@velvet/contracts";
+import type { AdventureTurnClientBinding } from "../../../api";
+import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
 import "./campaignReplay.css";
 
 /** One ordered, player-facing moment reconstructed from durable session history. */
@@ -23,17 +25,42 @@ export function buildReplayTimeline(
   return beats.sort((left, right) => left.at.localeCompare(right.at) || left.id.localeCompare(right.id));
 }
 
+/** Read-only mechanics reader used to attach authoritative receipts to replayed turns. */
+export interface ReplayTraceApi {
+  getAdventureTurn: (turnId: string, expected: AdventureTurnClientBinding) => Promise<AdventureTurnGetResponse>;
+  getCampaignCommandReceipt: MechanicReceiptApi["getCampaignCommandReceipt"];
+}
+
 const REPLAY_STEP_MS = 2600;
 
 export interface CampaignReplayProps {
+  campaignId: string;
+  sessionId: string;
   dmHistory: CampaignDmHistory | null;
   transcript: readonly AdventureTurnTranscriptEntry[];
   actorNames: ReadonlyMap<string, string>;
+  trace?: ReplayTraceApi;
   onExit: () => void;
 }
 
+/** Loads and renders one replayed turn's committed mechanics from the authoritative receipt chain. */
+function ReplayTurnMechanics({ campaignId, sessionId, actorId, turnId, trace }: {
+  campaignId: string; sessionId: string; actorId: string; turnId: string; trace: ReplayTraceApi;
+}) {
+  const [links, setLinks] = useState<AdventureTurnGetResponse["receipts"] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    trace.getAdventureTurn(turnId, { campaignId, sessionId, actorId, turnId })
+      .then((result) => { if (alive) setLinks(result.receipts); })
+      .catch(() => { if (alive) setLinks([]); });
+    return () => { alive = false; };
+  }, [actorId, campaignId, sessionId, trace, turnId]);
+  if (!links || links.length === 0) return null;
+  return <div className="replay-mechanics"><MechanicReceiptCard campaignId={campaignId} links={links} api={trace} /></div>;
+}
+
 /** Steps through a finished or in-progress session as a continuous, natural-game transcript. */
-export function CampaignReplay({ dmHistory, transcript, actorNames, onExit }: CampaignReplayProps) {
+export function CampaignReplay({ campaignId, sessionId, dmHistory, transcript, actorNames, trace, onExit }: CampaignReplayProps) {
   const beats = useMemo(() => buildReplayTimeline(dmHistory, transcript), [dmHistory, transcript]);
   const total = beats.length;
   const [position, setPosition] = useState(0);
@@ -80,6 +107,7 @@ export function CampaignReplay({ dmHistory, transcript, actorNames, onExit }: Ca
             <div className="conversation-exchange declaration"><strong>{actorNames.get(beat.actorId) ?? "Adventurer"}</strong><p>{beat.declaration}</p></div>
             <div className="conversation-exchange dm"><strong>Dungeon Master</strong><p>{beat.narration}</p>
               <time dateTime={beat.at}>{new Date(beat.at).toLocaleString()}</time></div>
+            {trace && <ReplayTurnMechanics campaignId={campaignId} sessionId={sessionId} actorId={beat.actorId} turnId={beat.id.slice("turn:".length)} trace={trace} />}
           </article>
         : <article className="conversation-turn" key={beat.id}>
             <div className="conversation-exchange dm"><strong>Dungeon Master</strong>

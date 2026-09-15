@@ -508,7 +508,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     <div className="atlas-turn-tools" aria-label="Session replay">
       <button type="button" className={replayOpen ? "ghost" : "primary"} aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>
     </div>
-    {replayOpen ? <CampaignReplay dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} onExit={() => setReplayOpen(false)} />
+    {replayOpen ? <CampaignReplay campaignId={campaignId} sessionId={sessionId} dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} trace={api} onExit={() => setReplayOpen(false)} />
       : <>
     <CampaignDmChronicle history={dmHistory} />
     <CampaignConversation transcript={transcript} transcriptState={transcriptState} legacyMessages={legacyMessages} legacyParticipants={legacyParticipants}
