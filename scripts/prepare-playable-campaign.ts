@@ -41,6 +41,7 @@ export interface PreparePlayableCampaignOptions {
   campaignId: string;
   campaignName?: string;
   starter?: PlayableStarter;
+  roomTitle?: string;
 }
 
 export interface PreparePlayableCampaignResult {
@@ -52,7 +53,7 @@ export interface PreparePlayableCampaignResult {
   campaignCharacterIds: string[];
 }
 
-type ParsedArgs = Required<Pick<PreparePlayableCampaignOptions, "dataDir" | "campaignId" | "campaignName" | "starter">>;
+type ParsedArgs = Required<Pick<PreparePlayableCampaignOptions, "dataDir" | "campaignId" | "campaignName" | "starter">> & Pick<PreparePlayableCampaignOptions, "roomTitle">;
 
 function parseArgs(argv: string[]): ParsedArgs {
   const args: Record<string, string> = {};
@@ -62,7 +63,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     args[key.slice(2)] = argv[++index] ?? "";
   }
   if (!args["data-dir"] || !args["campaign-id"]) {
-    throw new Error("usage: --data-dir DIR --campaign-id ID [--campaign-name NAME] [--starter mechanics|srd-5.1]");
+    throw new Error("usage: --data-dir DIR --campaign-id ID [--campaign-name NAME] [--starter mechanics|srd-5.1] [--room-title TITLE]");
   }
   const starter = args["starter"] ?? "mechanics";
   if (starter !== "mechanics" && starter !== "srd-5.1") {
@@ -73,6 +74,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     campaignId: args["campaign-id"],
     campaignName: args["campaign-name"] ?? "Campaign",
     starter,
+    ...(args["room-title"] ? { roomTitle: args["room-title"] } : {}),
   };
 }
 
@@ -139,7 +141,7 @@ export async function preparePlayableCampaign(options: PreparePlayableCampaignOp
     }
     const actors = personaIds.map((personaId, index) => finalizeActor(personaId, `actor-${index}`));
 
-    const roomTitle = `${campaignName} - Opening Room`;
+    const roomTitle = options.roomTitle ?? `${campaignName} - Opening Room`;
     const attachments = repository.listCampaignSessionAttachments(OWNER, options.campaignId);
     const attachedSessionIds = new Set(attachments.map((attachment) => attachment.sessionId));
     const sessions = await listSessions();
