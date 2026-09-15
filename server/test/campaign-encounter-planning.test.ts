@@ -57,6 +57,8 @@ describe("campaign encounter planning service", () => {
     });
     expect(plan.plan.targetDifficulty).toBe("medium");
     expect(plan.candidates).toHaveLength(3);
+    // The public candidate projection omits the internal tag list.
+    expect(plan.candidates[0]).toEqual({ id: "srd-5.1:enemy-template:goblin", name: "Goblin", challengeRating: 0.25 });
     const rosterIds = plan.plan.roster.map((entry) => entry.id);
     expect(rosterIds.every((id) => id !== "srd-5.1:enemy-template:bugbear")).toBe(true);
   });

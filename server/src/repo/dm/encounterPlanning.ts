@@ -31,6 +31,13 @@ export interface EncounterCandidate {
   tags: readonly string[];
 }
 
+/** The public encounter candidate shape; tags are an internal selection input only. */
+export interface EncounterCandidateView {
+  id: string;
+  name: string;
+  challengeRating: number;
+}
+
 export interface EncounterRewardPreviewRequest {
   defeatedEnemyIds: readonly string[];
   currentXp: number;
@@ -67,7 +74,7 @@ export interface CampaignEncounterRequest {
 }
 
 export interface CampaignEncounterPlan {
-  candidates: readonly EncounterCandidate[];
+  candidates: readonly EncounterCandidateView[];
   plan: Dnd5eEncounterPlan;
 }
 
@@ -108,7 +115,10 @@ export function createEncounterPlanningService(dependencies: EncounterPlanningDe
         candidates: selected.map((candidate) => ({ id: candidate.id, challengeRating: candidate.challengeRating })),
         ...(request.maxMonsters === undefined ? {} : { maxMonsters: request.maxMonsters }),
       });
-      return Object.freeze({ candidates: Object.freeze(all), plan });
+      return Object.freeze({
+        candidates: Object.freeze(all.map((candidate) => Object.freeze({ id: candidate.id, name: candidate.name, challengeRating: candidate.challengeRating }))),
+        plan,
+      });
     },
     previewEncounterRewards(actorPrincipalId: string, campaignId: string, request: EncounterRewardPreviewRequest): EncounterRewardPreview {
       const byId = new Map(candidatesFor(actorPrincipalId, campaignId).map((candidate) => [candidate.id, candidate] as const));
