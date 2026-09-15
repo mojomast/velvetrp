@@ -30,10 +30,11 @@
 - `e2e/tests/srd-feature-flows.spec.ts`: deterministic API game-flow tests for the new features.
 - Client surfaces: DM encounter-builder panel and character-sheet advancement-choices panel.
 - Browser E2E coverage for the new client surfaces: `e2e/tests/client-feature-surfaces.spec.ts` drives the SRD magic-item attunement panel (attune, prerequisite rejection, drop), the DM encounter-builder panel, and the character-sheet advancement-choices panel against the deterministic server; a disposable `POST /api/__e2e/materialize-inventory-entry` fixture holds one exact pinned catalog item.
+- Underwater combat runtime wiring and honest coverage flip: the durable player-attack, enemy-turn, and opportunity-attack paths derive immersion from the persisted combat map's water terrain (`server/src/repo/encounter/combatEnvironment.ts`), apply the pure `planDnd5eUnderwaterAttack` melee/ranged rules and `dnd5eUnderwaterDamageAdjustment` fire resistance, a new server-generated `underwater` map kind emits all-water layouts, the client map setup exposes the layout, and `underwater-combat@1.0.0` is its own `implemented` coverage domain.
 
 ## Coverage Status
 
-`implemented`: d20-tests, passive-checks, attack-resolution, initiative, encounter-builder, encounter-rewards, npc-selection. Every other domain remains `partial` on purpose because its bounded behavior is executable but the full SRD domain is not. Do not flip a domain to `implemented` unless its bounded behavior has runtime and test evidence and the descriptor capability is `supported`.
+`implemented`: d20-tests, passive-checks, attack-resolution, initiative, encounter-builder, encounter-rewards, npc-selection, underwater-combat. Every other domain remains `partial` on purpose because its bounded behavior is executable but the full SRD domain is not. Do not flip a domain to `implemented` unless its bounded behavior has runtime and test evidence and the descriptor capability is `supported`.
 
 ## Verification
 
@@ -48,6 +49,7 @@
 - Adding an HTTP operation requires updating the checked inventory in `docs/api.md` and the `${count} counted` claims in README.md, docs/api.md, docs/operations.md, docs/ROADMAP.md, devplan.md, and handoff.md; `server/test/documentation-drift.test.ts` enforces this.
 - Adding a capability requires a matching coverage-inventory evidence entry; `server/test/srd-coverage-inventory.test.ts` enforces an exact match between advertised capabilities and inventory evidence.
 - Add new persistence only through the additive late-schema path in `server/src/repo/db/schema.ts`; also add the new SQL file to the five migration-test schema lists.
+- Extending an existing CHECK/constraint in `currentSchema.sql` requires updating every exact-predecessor reconstruction (`server/src/map/schemaUpgrade.ts`, `server/src/repo/db/campaignDmUpgrade.ts`, and the migration tests) that strips the v2/underwater algorithm list; since the development schema is disposable, a stale predecessor DB is recreated rather than repaired.
 - The deterministic E2E server RNG (`e2e/support/deterministic-server.ts`) is intentionally narrow and throws on unexpected ranges; extend it explicitly when new dice ranges are consumed.
 - E2E specs must use explicit `process.env.NAME` access, never dynamic `process.env[key]`, or the environment-classification drift guard fails.
 - Content changes require republishing: `npm run build --workspace @velvet/contracts && node --import tsx scripts/publish-srd-starter.ts --write`, then rebuild contracts before running server tests.
@@ -58,7 +60,7 @@
 No in-flight work. Candidate follow-ups, in rough priority:
 
 - Give the remaining `partial` domains runtime + API evidence where their bounded behavior is already complete, then flip them honestly (for example the `monster-turn-planner` save riders or the spell execution lanes).
-- Surface vision/obscurement and mounted/underwater states through campaign persistence and the tactical map so the pure rules have runtime callers.
+- Surface vision/obscurement and mounted states through campaign persistence and the tactical map so the remaining pure rules have runtime callers. Underwater now has a durable caller; mounted still needs persisted mount/size state and vision needs persisted light/obscurement.
 
 ## Working Tree
 

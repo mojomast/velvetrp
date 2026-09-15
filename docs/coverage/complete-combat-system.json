@@ -19,11 +19,6 @@
       "id": "mounted-combat",
       "version": "1.0.0",
       "descriptorStatus": "supported"
-    },
-    {
-      "id": "underwater-combat",
-      "version": "1.0.0",
-      "descriptorStatus": "supported"
     }
   ],
   "runtimeEvidence": [

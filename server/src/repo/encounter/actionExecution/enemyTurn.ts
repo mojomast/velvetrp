@@ -6,11 +6,12 @@ import { consumeDndTurnCost, isDndCombat } from "../combatActionPlan.js";
 import { buildCombatCompositionPlan, type CombatantStateChange } from "../combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "../combatCompositionExecutor.js";
 import { resolveCampaignRuleset } from "../../../rulesets/campaignBinding.js";
-import { planDnd5eAttackConditions, type ConditionId } from "../../../rulesets/index.js";
+import { planDnd5eAttackConditions, planDnd5eUnderwaterAttack, type ConditionId } from "../../../rulesets/index.js";
 import { resolveSrdEquipment } from "../../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, resolveCombatArmorClassBonus } from "../combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { consumeCombatMarker, hasCombatMarker } from "../combatMarkerRuntime.js";
+import { combatantTerrains, underwaterTerrain, underwaterDamageAdjustment } from "../combatEnvironment.js";
 import { isMonsterKnockdown, planMonsterTurn } from "../monsterTurnPlanner.js";
 import { resolveHitTimeShield } from "../reaction/index.js";
 import { advanceRevision, beginProtocol, canonical, gm, id, now, recordStateEvent, sealReceipt, type EncounterResult, type EncounterWriteDependencies } from "./shared.js";
@@ -50,10 +51,13 @@ export function createExecuteCombatEnemyTurn(db:DatabaseDriver.Database,deps:Enc
         let armorClass:number;try{armorClass=resolveSrdEquipment(db,encounter.campaign_id,target.actor_id).armorClass+resolveCombatArmorClassBonus(db,encounter.campaign_id,target.actor_id,at);}catch{armorClass=NaN;}
         if(Number.isInteger(armorClass)){
              const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
+             const terrain=combatantTerrains(db,combatId,[current.combatant_id,target.combatant_id]);
+             const attackerImmersed=underwaterTerrain(terrain.get(current.combatant_id)),targetImmersed=underwaterTerrain(terrain.get(target.combatant_id));
+             const underwater=attackerImmersed?planDnd5eUnderwaterAttack({kind:"melee",hasSwimSpeed:false,weapon:""}):null;
              const attackPlan=planDnd5eAttackConditions({
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...conditionsFor(db,combatId,target.combatant_id,encounter.round_number)] as ConditionId[],
-               kind:"melee",attackerBenefit});
+               kind:"melee",attackerBenefit,underwaterDisadvantage:underwater?.disadvantage===true});
            if(attackerBenefit){consumeCombatMarker(db,combatId,current.combatant_id,"helped");consumeCombatMarker(db,combatId,current.combatant_id,"hidden");}
             const profile=plan.enemy.mechanics.combatProfile!;
             const binding=resolveCampaignRuleset(db,encounter.campaign_id);
@@ -78,13 +82,16 @@ export function createExecuteCombatEnemyTurn(db:DatabaseDriver.Database,deps:Enc
              const die=step.damageDie,damageRolls=hit?Array.from({length:die.count*(critical?2:1)},()=>deps.rng.integer(1,die.sides+1)):[];
              if(damageRolls.some(value=>!Number.isInteger(value)||value<1||value>die.sides))throw new Error("combat RNG returned an out-of-range damage die");
              const damage=hit?binding.module.mechanics!.resolveDamageRoll({dice:[die],rolls:[damageRolls],modifier:step.damageModifier,critical}).total:0;
-             const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,running,step.damageType,at),adjustedDamage=adjustedCombatDamage(damage,adjustment);
+             const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,running,step.damageType,at);
+             // SRD 5.1: fully immersed targets have resistance to fire.
+             const underwaterAdjustment=underwaterDamageAdjustment(adjustment,step.damageType,targetImmersed?"water":null);
+             const adjustedDamage=adjustedCombatDamage(damage,underwaterAdjustment);
              const absorbed=absorbDamage(db,combatId,target.combatant_id,adjustedDamage,at),hitPointsAfter=Math.max(0,running.hit_points-absorbed.hitPointDamage);
              const statusAfter=dndDamageStatus(db,running,hitPointsAfter,absorbed.hitPointDamage);
              anyHit=anyHit||hit;totalApplied+=running.hit_points-hitPointsAfter;finalStatus=statusAfter;finalHitPoints=hitPointsAfter;
-             outcomes.push({kind:"damage",targetId:target.combatant_id,damageType:step.damageType,requested:damage,adjustment,applied:running.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
+             outcomes.push({kind:"damage",targetId:target.combatant_id,damageType:step.damageType,requested:damage,adjustment:underwaterAdjustment,applied:running.hit_points-hitPointsAfter,temporaryHitPointsAbsorbed:adjustedDamage-absorbed.hitPointDamage,temporaryHitPointsAfter:absorbed.temporaryHitPointsAfter,
               hitPointsBefore:running.hit_points,hitPointsAfter,statusBefore:running.status,statusAfter,rulesetId:binding.rulesetId,rulesetVersion:binding.rulesetVersion,
-              attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:armorClass,hit,critical,damageRolls});
+               attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:armorClass,hit,critical,damageRolls,disadvantage:attackPlan.mode==="disadvantage"});
              running.hit_points=hitPointsAfter;running.status=statusAfter;
              if(statusAfter==="dead"||statusAfter==="defeated")break;
             }

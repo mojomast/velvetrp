@@ -1,5 +1,5 @@
 {
-  "inventoryVersion": "1.0.9",
+  "inventoryVersion": "1.0.10",
   "ruleset": {
     "id": "dnd-5e",
     "version": "1.0.0"
@@ -189,9 +189,19 @@
       "status": "partial",
       "complete": false,
       "sourceSections": [{ "id": "SRD5.1:Combat", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=88" }],
-      "capabilityEvidence": [{ "id": "vision-light", "version": "1.0.0", "descriptorStatus": "supported" }, { "id": "mounted-combat", "version": "1.0.0", "descriptorStatus": "supported" }, { "id": "underwater-combat", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "capabilityEvidence": [{ "id": "vision-light", "version": "1.0.0", "descriptorStatus": "supported" }, { "id": "mounted-combat", "version": "1.0.0", "descriptorStatus": "supported" }],
       "runtimeEvidence": ["server/src/rulesets/dnd5e/vision.ts", "server/test/dnd5e-vision.test.ts", "server/src/rulesets/dnd5e/specialCombat.ts", "server/test/dnd5e-special-combat.test.ts", "server/src/repo/encounter/combatActionPlan.ts", "server/src/repo/encounter/combatPowerRuntime.ts", "server/src/repo/encounter/death/dyingRuntime.ts", "server/src/repo/encounter/concentration/concentrationRuntime.ts", "server/src/repo/campaign/campaignAgentContextReadRepo.ts", "server/src/map/geometry.ts", "server/test/dnd-turn-economy-repository.test.ts", "server/test/dnd5e-agent-combat-awareness.test.ts", "server/test/dnd5e-death-concentration.test.ts", "server/test/rpg-generated-campaign-journey.test.ts", "server/test/tactical-map-repo.test.ts", "docs/srd-5.1-coverage.md#unsupported-srd-areas"],
       "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands"]
+    },
+    {
+      "id": "underwater-combat",
+      "title": "Underwater combat",
+      "status": "implemented",
+      "complete": true,
+      "sourceSections": [{ "id": "SRD5.1:Combat:Underwater Combat", "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=95" }],
+      "capabilityEvidence": [{ "id": "underwater-combat", "version": "1.0.0", "descriptorStatus": "supported" }],
+      "runtimeEvidence": ["server/src/rulesets/dnd5e/specialCombat.ts", "server/test/dnd5e-special-combat.test.ts", "server/src/repo/encounter/combatEnvironment.ts", "server/src/repo/encounter/actionExecution/attack.ts", "server/src/repo/encounter/actionExecution/enemyTurn.ts", "server/src/repo/encounter/opportunityAttackRuntime.ts", "server/src/map/generation.ts", "server/test/dnd5e-underwater-runtime.test.ts", "server/test/tactical-map-generation.test.ts"],
+      "apiEvidence": ["POST /api/rpg/v1/combats/:combatId/action-commands", "POST /api/rpg/v1/combats/:combatId/enemy-turn-commands", "POST /api/rpg/v1/campaigns/:campaignId/rooms/:sessionId/tactical-maps"]
     },
     {
       "id": "spellcasting-and-spells",

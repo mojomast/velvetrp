@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { MapTerrain, MapTile, TacticalMap } from "./types.js";
 import { tacticalMapGenerationContextSchema, type MapGenerationProvenance, type TacticalMapGenerationContext } from "@velvet/contracts";
 
-export type MapGeneratorKind = "dungeon" | "cave" | "arena";
+export type MapGeneratorKind = "dungeon" | "cave" | "arena" | "underwater";
 
 export interface GenerateMapOptions {
   readonly kind: MapGeneratorKind;
@@ -83,6 +83,15 @@ function arena(width: number, height: number, random: () => number): MapTile[] {
   });
 }
 
+/**
+ * An all-water layout for underwater combat. Every cell is open water so token
+ * placement is unconstrained; the durable attack paths read this terrain to
+ * apply the SRD underwater rules.
+ */
+function underwater(width: number, height: number, random: () => number): MapTile[] {
+  return gridTiles(width, height, (x, y) => open({ x, y }, (x * 7 + y * 13) % 17 === 0 && random() < 0.4 ? "stone" : "water"));
+}
+
 function gridTiles(width: number, height: number, create: (x: number, y: number) => MapTile): MapTile[] {
   const tiles: MapTile[] = [];
   for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) tiles.push(create(x, y));
@@ -101,10 +110,11 @@ export function generateTacticalMap(options: GenerateMapOptions): TacticalMap {
   const random = randomSource(`${options.kind}:${options.seed}:${options.width}x${options.height}${context ? `:${JSON.stringify(context)}` : ""}`);
   const tiles = options.kind === "dungeon" ? dungeon(options.width, options.height, random)
     : options.kind === "cave" ? cave(options.width, options.height, random)
-      : arena(options.width, options.height, random);
+      : options.kind === "arena" ? arena(options.width, options.height, random)
+        : underwater(options.width, options.height, random);
   if (context) {
     const { width, height } = options;
-    const terrain = options.kind === "cave" ? "stone" : options.kind === "arena" ? "sand" : "floor";
+    const terrain = options.kind === "cave" ? "stone" : options.kind === "arena" ? "sand" : options.kind === "underwater" ? "water" : "floor";
     const carve = (x: number, y: number) => { tiles[y * width + x] = open({ x, y }, terrain); };
     const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
     // Guarantee a useful central room and preserve the explicitly submitted spawn footprints.

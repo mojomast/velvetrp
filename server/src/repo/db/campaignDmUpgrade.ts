@@ -31,7 +31,7 @@ export function upgradeCampaignDmSchema(db: DatabaseDriver.Database, actual: Sch
   const previous = expected.filter(object => !object.name.startsWith("dm_"));
   const mapNames = new Set(["tactical_map_contexts_v2", "tactical_map_contexts_v2_update", "tactical_map_contexts_v2_delete"]);
   const oldMap = previous.filter(object => !mapNames.has(object.name)).map(object => ({ ...object,
-    sql: object.name === "tactical_maps_v58" ? object.sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "")
+    sql: object.name === "tactical_maps_v58" ? object.sql.replace(",'dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2'", "")
       : object.name === "tactical_map_previews_v58" ? object.sql.replace("  actor_location_revision INTEGER,\n", "") : object.sql,
   }));
   const upgradeMap = JSON.stringify(actual) === JSON.stringify(oldMap);

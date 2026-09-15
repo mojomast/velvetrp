@@ -149,7 +149,7 @@ describe("tactical map repository", () => {
       legacy.exec("DROP TABLE tactical_map_contexts_v2");
       for (const table of ["tactical_maps_v58", "tactical_map_previews_v58"]) {
         const objects = legacy.prepare("SELECT type,sql FROM sqlite_master WHERE tbl_name=? AND sql IS NOT NULL ORDER BY type DESC").all(table) as { type: string; sql: string }[];
-        const sql = objects.find((object) => object.type === "table")!.sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "").replace("  actor_location_revision INTEGER,\n", "");
+        const sql = objects.find((object) => object.type === "table")!.sql.replace(",'dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2'", "").replace("  actor_location_revision INTEGER,\n", "");
         const columns = (legacy.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).filter((column) => column.name !== "actor_location_revision").map((column) => column.name).join(",");
         legacy.exec(`CREATE TEMP TABLE old_map_backup AS SELECT ${columns} FROM ${table}`);
         legacy.exec(`DROP TABLE ${table}`); legacy.exec(sql);

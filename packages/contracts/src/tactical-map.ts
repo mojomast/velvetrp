@@ -47,7 +47,7 @@ export const tacticalMapGenerationContextSchema = z.object({
 }).strict();
 
 export const mapGenerationProvenanceSchema = z.object({
-  algorithm: z.enum(["dungeon-v1", "cave-v1", "arena-v1", "dungeon-v2", "cave-v2", "arena-v2"]),
+  algorithm: z.enum(["dungeon-v1", "cave-v1", "arena-v1", "dungeon-v2", "cave-v2", "arena-v2", "underwater-v1", "underwater-v2"]),
   seed: z.string().min(1).max(256),
   parameters: z.object({
     width: z.number().int().min(5).max(500),
@@ -136,7 +136,7 @@ export const tacticalMapGenerationTokenSchema = authoritativeMapTokenSchema.exte
 export const tacticalMapGenerateRequestSchema = z.object({
   mode: tacticalMapModeSchema,
   encounterId: resourceIdSchema.nullable(),
-  kind: z.enum(["dungeon", "cave", "arena"]),
+  kind: z.enum(["dungeon", "cave", "arena", "underwater"]),
   seed: z.string().min(1).max(256),
   width: z.number().int().min(5).max(500),
   height: z.number().int().min(5).max(500),

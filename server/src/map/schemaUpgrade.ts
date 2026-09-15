@@ -6,7 +6,7 @@ interface SchemaObject { type: string; name: string; tbl_name: string; sql: stri
 export function upgradeTacticalMapSchema(db: DatabaseDriver.Database, actual: SchemaObject[], expected: SchemaObject[], validate: () => void): boolean {
   const contextNames = new Set(["tactical_map_contexts_v2", "tactical_map_contexts_v2_update", "tactical_map_contexts_v2_delete"]);
   const previous = expected.filter((object) => !contextNames.has(object.name)).map((object) => ({ ...object,
-    sql: object.name === "tactical_maps_v58" ? object.sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "")
+    sql: object.name === "tactical_maps_v58" ? object.sql.replace(",'dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2'", "")
       : object.name === "tactical_map_previews_v58" ? object.sql.replace("  actor_location_revision INTEGER,\n", "") : object.sql,
   }));
   if (JSON.stringify(actual) !== JSON.stringify(previous)) return false;

@@ -11,7 +11,7 @@ describe("tactical map generation", () => {
   const currentSql = () => ["currentSchema.sql", "campaignDmSchema.sql", "recallSchema.sql", "contextInspectionProvenanceSchema.sql",
     "npcKnowledgeSchema.sql", "combatMarkerSchema.sql", "attunementSchema.sql", "combatReadyActionSchema.sql"]
     .map((name) => readFileSync(new URL(`../src/repo/db/${name}`, import.meta.url), "utf8")).join("\n");
-  const rollBackTacticalMap = (sql: string) => sql.replace(",'dungeon-v2','cave-v2','arena-v2'", "")
+  const rollBackTacticalMap = (sql: string) => sql.replace(",'dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2'", "")
     .replace("  actor_location_revision INTEGER,\n", "")
     .replace(/CREATE TABLE tactical_map_contexts_v2 \([\s\S]*?CREATE TRIGGER tactical_map_contexts_v2_delete[^\n]*\n/, "");
 
@@ -100,6 +100,17 @@ describe("tactical map generation", () => {
     expect(first.provenance?.algorithm).toBe(`${kind}-v1`);
     expect(first.provenance?.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(first.tiles.filter((tile) => !tile.blocksMovement).length).toBeGreaterThan(0);
+  });
+
+  it("generates deterministic all-water underwater maps for the SRD underwater attack rules", () => {
+    const first = generateTacticalMap({ kind: "underwater", seed: "velvet-underwater", width: 12, height: 10 });
+    const second = generateTacticalMap({ kind: "underwater", seed: "velvet-underwater", width: 12, height: 10 });
+    expect(second).toEqual(first);
+    expect(first.provenance?.algorithm).toBe("underwater-v1");
+    expect(first.tiles).toHaveLength(12 * 10);
+    expect(first.tiles.every((tile) => !tile.blocksMovement && !tile.blocksSight)).toBe(true);
+    expect(first.tiles.filter((tile) => tile.terrain === "water").length).toBeGreaterThan(100);
+    expect(first.tiles.every((tile) => tile.terrain === "water" || tile.terrain === "stone")).toBe(true);
   });
 
   it("changes content hashes with seeds and rejects unsafe dimensions", () => {

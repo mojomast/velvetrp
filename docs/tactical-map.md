@@ -27,7 +27,7 @@ Callers supply occupied cells as a set of `"x,y"` keys when creatures or tempora
 
 ## Generation
 
-`generateTacticalMap` supports `dungeon`, `cave`, and `arena`. Generation is deterministic for kind, seed, width, height, and algorithm version. Every result records the algorithm version, original seed, dimensions, and a SHA-256 hash over canonical generated content.
+`generateTacticalMap` supports `dungeon`, `cave`, `arena`, and `underwater`. The `underwater` layout is all open water (with rare stone islets) so the durable attack paths can apply the SRD underwater rules from the persisted terrain. Generation is deterministic for kind, seed, width, height, and algorithm version. Every result records the algorithm version, original seed, dimensions, and a SHA-256 hash over canonical generated content.
 
 Changing an algorithm's output requires a new version identifier so saved provenance remains meaningful. Generated maps persist the exact seed, algorithm version, dimensions, canonical tiles, and hash. Every load regenerates and verifies that provenance before projection.
 

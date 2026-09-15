@@ -89,7 +89,7 @@ export function createTacticalMapRepository(db: DatabaseDriver.Database, depende
       grid: { kind: "square", feetPerCell: 5 }, tiles: JSON.parse(row.tiles_json), tokens: tokens.map((token) => ({ tokenId: token.token_id, label: token.label,
         position: { x: token.x, y: token.y }, footprint: { width: token.width, height: token.height }, disposition: token.disposition, hidden: token.hidden === 1 })),
       provenance: { algorithm: row.algorithm, seed: row.seed, parameters: { width: row.width, height: row.height }, hash: row.provenance_hash, ...(context ? { context } : {}) } });
-    const generated = generateTacticalMap({ kind: row.algorithm.split("-v")[0] as "dungeon" | "cave" | "arena", algorithm: row.algorithm, seed: row.seed, width: row.width, height: row.height, ...(context ? { context } : {}) });
+    const generated = generateTacticalMap({ kind: row.algorithm.split("-v")[0] as "dungeon" | "cave" | "arena" | "underwater", algorithm: row.algorithm, seed: row.seed, width: row.width, height: row.height, ...(context ? { context } : {}) });
     if (generated.provenance?.hash !== row.provenance_hash || canonical(generated.tiles) !== canonical(map.tiles)) throw new Error("tactical map provenance verification failed");
     return { map, tokens };
   }

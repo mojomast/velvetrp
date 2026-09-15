@@ -17,7 +17,7 @@ function predecessor(db:DatabaseDriver.Database,oldMap=false){
     for(const object of objects(db).filter(o=>o.name.startsWith("tactical_map_contexts_v2")))db.exec(`DROP ${object.type} IF EXISTS ${object.name}`);
     for(const table of ["tactical_maps_v58","tactical_map_previews_v58"]){
       const definition=expected.find(o=>o.name===table)!;
-      db.exec(`DROP TABLE ${table}`);db.exec(table==="tactical_maps_v58"?definition.sql.replace(",'dungeon-v2','cave-v2','arena-v2'","")
+      db.exec(`DROP TABLE ${table}`);db.exec(table==="tactical_maps_v58"?definition.sql.replace(",'dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2'","")
         :definition.sql.replace("  actor_location_revision INTEGER,\n",""));
       for(const object of expected.filter(o=>o.tbl_name===table&&o.type!=="table"))db.exec(object.sql);
     }

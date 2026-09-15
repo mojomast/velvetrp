@@ -6,11 +6,12 @@ import { buildCombatActionPlans, buildRangedCombatCandidate, buildThrownCombatCa
 import { buildCombatCompositionPlan, type CombatantStateChange } from "../combatCompositionPlan.js";
 import { executeCombatCompositionPlan } from "../combatCompositionExecutor.js";
 import { resolveCampaignRuleset } from "../../../rulesets/campaignBinding.js";
-import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, type ConditionId } from "../../../rulesets/index.js";
+import { DND_5E_UNARMED_STRIKE, planDnd5eAttackConditions, planDnd5eUnderwaterAttack, type ConditionId } from "../../../rulesets/index.js";
 import { resolveSrdEquipment } from "../../srdEquipmentRuntime.js";
 import { absorbDamage, applyCombatCondition, conditionsFor, interruptConcentrationAfterDamage, readActorExhaustion, removeCombatCondition, resolveCombatArmorClassBonus } from "../combatConditionRuntime.js";
 import { adjustedCombatDamage, resolveCombatDamageAdjustment } from "../damageAdjustment.js";
 import { actorStealthModifier, consumeCombatMarker, grantCombatMarker, hasCombatMarker, opposingPassivePerception } from "../combatMarkerRuntime.js";
+import { combatantTerrains, underwaterTerrain, underwaterDamageAdjustment } from "../combatEnvironment.js";
 import { applyAttackRiderConditions, buildAttackRiderPlans, readRiderUsageThisTurn, resolveAttackRiders, type AttackRiderResolution } from "../riders/index.js";
 import { planDnd5eReadyAction, resolveHitTimeShield } from "../reaction/index.js";
 import { declareReadyAction } from "../reaction/readyActionRuntime.js";
@@ -103,6 +104,13 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
              const candidate = thrownCandidate ?? rangedCandidate;
              const rangeFeet=candidate?.rangeFeetByTarget[target.combatant_id];
              const cover = candidate?.targetEvidence.find((evidence) => evidence.targetCombatantId === target.combatant_id)?.cover;
+             // SRD 5.1 underwater combat derives immersion from the persisted
+             // tactical-map terrain; without a map the flags stay false.
+             const terrain=combatantTerrains(db,combatId,[current.combatant_id,target.combatant_id]);
+             const attackerImmersed=underwaterTerrain(terrain.get(current.combatant_id)),targetImmersed=underwaterTerrain(terrain.get(target.combatant_id));
+             const weaponKey=unarmed?"":weapon.reference.definitionId.split(":").pop()!;
+             const beyondNormalRange=rangeFeet!==undefined&&rangeFeet>(candidate?.normalRangeFeet??0);
+             const underwater=attackerImmersed?planDnd5eUnderwaterAttack({kind:ranged?"ranged":thrown?"thrown":"melee",hasSwimSpeed:false,weapon:weaponKey,beyondNormalRange}):null;
              const adjustedArmorClass = armorClass + (cover ? coverArmorClassBonus(cover) : 0);
              const attackerBenefit=hasCombatMarker(db,combatId,current.combatant_id,"helped")||hasCombatMarker(db,combatId,current.combatant_id,"hidden");
              const attackerInMelee=(ranged||thrown)&&hostileWithinFiveFeet(db,combatId,current.combatant_id,current.team);
@@ -111,22 +119,24 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
                attacker:[...conditionsFor(db,combatId,current.combatant_id,encounter.round_number)] as ConditionId[],
                target:[...targetConditions] as ConditionId[],
                kind: ranged ? "ranged" : thrown ? "thrown" : "melee",
-               longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
-               attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0,
-               attackerBenefit,attackerInMelee});
+                longRange: rangeFeet !== undefined && rangeFeet > (candidate?.normalRangeFeet ?? 0),
+                attackerExhaustion: current.actor_id ? readActorExhaustion(db,encounter.campaign_id,current.actor_id) : 0,
+                attackerBenefit,attackerInMelee,underwaterDisadvantage:underwater?.disadvantage===true});
              const firstRoll=deps.rng.integer(1,21);if(!Number.isInteger(firstRoll)||firstRoll<1||firstRoll>20)throw new Error("combat RNG returned an out-of-range d20");
              const attackRoll=attackPlan.mode==="normal"?firstRoll:attackPlan.mode==="advantage"?Math.max(firstRoll,deps.rng.integer(1,21)):Math.min(firstRoll,deps.rng.integer(1,21));
            const attack=binding.module.mechanics.resolveAttack({rolls:[attackRoll],abilityScore:ability.value,
              proficiencyBonus:(unarmed?DND_5E_UNARMED_STRIKE.proficient:weapon.proficient)?binding.module.proficiencyBonus(sheet.level):0,armorClass:adjustedArmorClass});
-          const rolledCritical=attack.critical || (attackPlan.autoCritical && attack.hit);
-          // True hit-time window: an actor-backed target may spend its reaction
-          // and a slot for Shield before the triggering hit is finalized.
-          const shield=dnd&&target.actor_id&&attack.hit
-            ?resolveHitTimeShield(db,deps,{encounterId:combatId,campaignId:encounter.campaign_id,round:encounter.round_number,
-              reactorCombatantId:target.combatant_id,sourceCombatantId:current.combatant_id,attackTotal:attack.total,
-              armorClass:adjustedArmorClass,hit:attack.hit,critical:rolledCritical,occurredAt:at})
-            :null;
-          const finalHit=shield?shield.plan.hit:attack.hit,finalCritical=shield?shield.plan.critical:rolledCritical;
+           const rolledCritical=attack.critical || (attackPlan.autoCritical && attack.hit);
+           // SRD 5.1: a ranged attack beyond normal range automatically misses underwater.
+           const forcedMiss=underwater?.automaticMiss===true;
+           // True hit-time window: an actor-backed target may spend its reaction
+           // and a slot for Shield before the triggering hit is finalized.
+           const shield=dnd&&target.actor_id&&attack.hit&&!forcedMiss
+             ?resolveHitTimeShield(db,deps,{encounterId:combatId,campaignId:encounter.campaign_id,round:encounter.round_number,
+               reactorCombatantId:target.combatant_id,sourceCombatantId:current.combatant_id,attackTotal:attack.total,
+               armorClass:adjustedArmorClass,hit:attack.hit,critical:rolledCritical,occurredAt:at})
+             :null;
+           const finalHit=forcedMiss?false:(shield?shield.plan.hit:attack.hit),finalCritical=forcedMiss?false:(shield?shield.plan.critical:rolledCritical);
           const critical=finalCritical;
           if(attackerBenefit){consumeCombatMarker(db,combatId,current.combatant_id,"helped");consumeCombatMarker(db,combatId,current.combatant_id,"hidden");}
           const die=unarmed?DND_5E_UNARMED_STRIKE.damageDie:weapon.damage.die;
@@ -140,15 +150,18 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
               usedThisTurn:readRiderUsageThisTurn(db,combatId,current.combatant_id),usedThisAttack:new Set()},deps.rng);
           const riderAdjustment=(type:string):ReturnType<typeof resolveCombatDamageAdjustment>=>{
             const value=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,type,at);
-            return targetConditions.has("petrified")&&value==="none"?"resistance":value;
+            const petrified=targetConditions.has("petrified")&&value==="none"?"resistance":value;
+            return underwaterDamageAdjustment(petrified,type,targetImmersed?"water":null);
           };
           const riderRawDamage=riderResolutions.reduce((sum,rider)=>sum+(rider.damage?.damage??0),0);
           const riderDamage=riderResolutions.reduce((sum,rider)=>
             rider.damage?sum+adjustedCombatDamage(rider.damage.damage,riderAdjustment(rider.damage.damageType)):sum,0);
           const riderRolls=riderResolutions.flatMap((rider)=>rider.damage?[...rider.damage.rolls]:[]);
           const adjustment=resolveCombatDamageAdjustment(db,encounter.campaign_id,target,damageType,at);
-          // SRD 5.1 petrified: resistance to all damage.
-          const conditionedAdjustment=targetConditions.has("petrified")&&adjustment==="none"?"resistance":adjustment;
+          // SRD 5.1 petrified: resistance to all damage; fully immersed targets
+          // have resistance to fire.
+          const petrifiedAdjustment=targetConditions.has("petrified")&&adjustment==="none"?"resistance":adjustment;
+          const conditionedAdjustment=underwaterDamageAdjustment(petrifiedAdjustment,damageType,targetImmersed?"water":null);
           const adjustedDamage=adjustedCombatDamage(damage,conditionedAdjustment);
             let ammunitionBefore: number | undefined, ammunitionAfter: number | undefined;
            if (rangedCandidate?.ammunitionResourceId) {
@@ -178,10 +191,10 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
             statusBefore:target.status,statusAfter:dndDamageStatus(db,target,hitPointsAfter,absorbed.hitPointDamage,
               {critical,withinFiveFeet:rangeFeet===undefined||rangeFeet<=5}),rulesetId:binding.rulesetId,
              rulesetVersion:binding.rulesetVersion,attackRoll,attackTotal:attack.total,armorClass:shield?shield.plan.armorClass:adjustedArmorClass,hit:finalHit,
-             critical,damageRolls:[...damageRolls,...riderRolls],...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
+             critical,damageRolls:[...damageRolls,...riderRolls],disadvantage:attackPlan.mode==="disadvantage",...(candidate ? { attackAbility: candidate.attackAbility, attackModifier: binding.module.abilityModifier(ability.value),
                  rangeFeet: rangeFeet!, normalRangeFeet:candidate.normalRangeFeet, longRangeFeet:candidate.longRangeFeet,
                  ...(candidate.targetEvidence ? { targetEvidence: candidate.targetEvidence } : {}),
-                 disadvantage:attackPlan.mode==="disadvantage", ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
+                 ...(rangedCandidate ? { ammunitionResourceId:rangedCandidate.ammunitionResourceId, ammunitionBefore, ammunitionAfter } : {}),
                 ...(thrownCandidate ? { thrownItemEntryId: thrownCandidate.throwableItemEntryId, thrownItemBefore, thrownItemAfter, targetEvidence: thrownCandidate.targetEvidence } : {}) } : {})};
           const concentrationCheck=interruptConcentrationAfterDamage(db,deps.ids,deps.rng,encounter.campaign_id,combatId,target.combatant_id,
             target.hit_points-hitPointsAfter,outcome.statusAfter,at);if(concentrationCheck)outcome.concentrationCheck=concentrationCheck;

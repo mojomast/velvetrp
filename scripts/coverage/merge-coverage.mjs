@@ -50,6 +50,7 @@ const DOMAIN_ORDER = [
   "character-advancement",
   "equipment-catalog",
   "complete-combat-system",
+  "underwater-combat",
   "spellcasting-and-spells",
   "monsters",
   "encounter-builder",

@@ -5538,7 +5538,7 @@ CREATE TABLE tactical_maps_v58 (
   campaign_id TEXT NOT NULL, session_id TEXT NOT NULL, mode TEXT NOT NULL CHECK(mode IN('exploration','combat')),
   encounter_id TEXT, active INTEGER NOT NULL CHECK(active IN(0,1)), map_revision INTEGER NOT NULL,
   token_revision INTEGER NOT NULL DEFAULT 0, width INTEGER NOT NULL CHECK(width BETWEEN 5 AND 500), height INTEGER NOT NULL CHECK(height BETWEEN 5 AND 500),
-  algorithm TEXT NOT NULL CHECK(algorithm IN('dungeon-v1','cave-v1','arena-v1','dungeon-v2','cave-v2','arena-v2')), seed TEXT NOT NULL CHECK(length(seed) BETWEEN 1 AND 256),
+  algorithm TEXT NOT NULL CHECK(algorithm IN('dungeon-v1','cave-v1','arena-v1','dungeon-v2','cave-v2','arena-v2','underwater-v1','underwater-v2')), seed TEXT NOT NULL CHECK(length(seed) BETWEEN 1 AND 256),
   provenance_hash TEXT NOT NULL CHECK(length(provenance_hash)=64), tiles_json TEXT NOT NULL CHECK(json_valid(tiles_json) AND json_type(tiles_json)='array'),
   created_at TEXT NOT NULL,
   CHECK((mode='combat' AND encounter_id IS NOT NULL) OR (mode='exploration' AND encounter_id IS NULL)),
