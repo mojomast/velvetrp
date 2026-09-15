@@ -43,18 +43,30 @@ export interface CampaignReplayProps {
   onExit: () => void;
 }
 
+/** Caches receipt links per mechanics reader so seeking back and forth never refetches a turn. */
+const receiptLinkCache = new WeakMap<ReplayTraceApi, Map<string, AdventureTurnGetResponse["receipts"]>>();
+function cacheFor(trace: ReplayTraceApi): Map<string, AdventureTurnGetResponse["receipts"]> {
+  let cache = receiptLinkCache.get(trace);
+  if (!cache) { cache = new Map(); receiptLinkCache.set(trace, cache); }
+  return cache;
+}
+
 /** Loads and renders one replayed turn's committed mechanics from the authoritative receipt chain. */
 function ReplayTurnMechanics({ campaignId, sessionId, actorId, turnId, trace }: {
   campaignId: string; sessionId: string; actorId: string; turnId: string; trace: ReplayTraceApi;
 }) {
-  const [links, setLinks] = useState<AdventureTurnGetResponse["receipts"] | null>(null);
+  const cacheKey = `${campaignId}:${turnId}`;
+  const [links, setLinks] = useState<AdventureTurnGetResponse["receipts"] | null>(() => cacheFor(trace).get(cacheKey) ?? null);
   useEffect(() => {
+    const cache = cacheFor(trace);
+    const cached = cache.get(cacheKey);
+    if (cached) { setLinks(cached); return; }
     let alive = true;
     trace.getAdventureTurn(turnId, { campaignId, sessionId, actorId, turnId })
-      .then((result) => { if (alive) setLinks(result.receipts); })
-      .catch(() => { if (alive) setLinks([]); });
+      .then((result) => { cache.set(cacheKey, result.receipts); if (alive) setLinks(result.receipts); })
+      .catch(() => { cache.set(cacheKey, []); if (alive) setLinks([]); });
     return () => { alive = false; };
-  }, [actorId, campaignId, sessionId, trace, turnId]);
+  }, [actorId, cacheKey, campaignId, sessionId, trace, turnId]);
   if (!links || links.length === 0) return null;
   return <div className="replay-mechanics"><MechanicReceiptCard campaignId={campaignId} links={links} api={trace} /></div>;
 }
