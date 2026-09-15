@@ -158,7 +158,7 @@ function generationBody(work: Work, campaignId: string, retry = false): Record<s
   const targets = Object.entries(work.desiredCounts).map(([field, count]) => `${count} ${field}`).join(", ");
   return { campaignId, brief: `${work.brief}\n\nHydration target for this additive candidate: ${targets}. Return as many requested items as safely fit; do not duplicate accepted canon.`, tone: work.tone,
     exclusions: work.exclusions, idempotencyKey: work.idempotencyKey, sections: work.sections, expandArtifactKeys: work.resolvedExpandArtifactKeys ?? work.expandArtifactKeys,
-    revisionFeedback: work.revisionFeedback, retryFailedAttempt: retry ? { failedAttempt: work.failedAttempt } : null };
+    revisionFeedback: work.revisionFeedback, retryFailedAttempt: retry ? { failedAttempt: work.failedAttempt } : null, tolerateInvalidReferences: true };
 }
 function acceptedPublicArtifactKeys(preview: Record<string, unknown>): Record<string, string[]> {
   const result: Record<string, string[]> = {};
@@ -315,20 +315,23 @@ export async function hydrateCampaign(options: HydrateOptions): Promise<Ledger> 
     if (ledger.starterSetup && ledger.starterSetup.starter !== options.starter) fail("ledger starter setup differs from --starter");
     if (ledger.starterSetup?.status !== "complete") { ledger.starterSetup = { starter: options.starter, status: "dispatching" }; await save(); await request(fetcher, apiBase, `/api/rpg/v1/campaigns/${encodeURIComponent(ledger.campaignId)}/${starter.path}`, "PUT", { starterId: starter.starterId }); ledger.starterSetup.status = "complete"; await save(); }
   }
-  let applyTail = Promise.resolve(), active = 0;
-  const scheduleApply = (work: Work) => { applyTail = applyTail.then(() => applyWork(work, ledger!, save, fetcher, options.allowStaleRegeneration === true)); return applyTail; };
   while (true) {
     if (options.allowStaleRegeneration) for (const work of Object.values(ledger.works)) if (work.status === "stale") { addReplacement(ledger, work, "stale", work.desiredCounts); work.reason = "stale replacement authorized on resume"; await save(); }
     const terminalProblem = Object.values(ledger.works).find((work) => work.status === "uncertain" || work.status === "failed");
     if (terminalProblem) fail(`hydration stopped at ${terminalProblem.id}: ${terminalProblem.reason ?? terminalProblem.status}`);
     const staleProblem = Object.values(ledger.works).find((work) => work.status === "stale");
     if (staleProblem) fail(`hydration stopped at ${staleProblem.id}: ${staleProblem.reason}`);
-    const staged = Object.values(ledger.works).filter((work) => work.status === "staged" || work.status === "applying"); for (const work of staged) await scheduleApply(work);
+    // Apply any already-staged draft before staging another so accepted canon does
+    // not advance between a draft's staging and its apply (which would stale it).
+    for (const work of Object.values(ledger.works)) if (work.status === "staged" || work.status === "applying") await applyWork(work, ledger, save, fetcher, options.allowStaleRegeneration === true);
     const pending = Object.values(ledger.works).filter((work) => work.status === "pending" || work.status === "dispatching").filter((work) => stageReady(recipe, ledger!, work.stageId));
-    if (!pending.length) { await applyTail; if (recipe.stages.every((stage) => stage.jobs.every((job) => rootComplete(ledger!, job.id)))) break; fail("hydration cannot progress because dependencies are incomplete"); }
-    for (const work of pending) if (!work.resolvedExpandArtifactKeys) { work.resolvedExpandArtifactKeys = resolveExpansionKeys(recipe, ledger, work); await save(); }
-    let cursor = 0; const workers = Array.from({ length: Math.min(concurrency, pending.length) }, async () => { while (cursor < pending.length) { const work = pending[cursor++]!; active++; log(`Staging ${work.id} (${active}/${concurrency})`); try { await stageWork(work, ledger!, save, fetcher); if (work.status === "staged") await scheduleApply(work); } finally { active--; } } });
-    await Promise.all(workers); await applyTail;
+    if (!pending.length) { if (recipe.stages.every((stage) => stage.jobs.every((job) => rootComplete(ledger!, job.id)))) break; fail("hydration cannot progress because dependencies are incomplete"); }
+    // Stage and apply one work at a time. Same-campaign drafts snapshot one content
+    // revision, so staging a sibling before an earlier apply would stale it.
+    const work = pending[0]!;
+    if (!work.resolvedExpandArtifactKeys) { work.resolvedExpandArtifactKeys = resolveExpansionKeys(recipe, ledger, work); await save(); }
+    log(`Staging ${work.id}`); try { await stageWork(work, ledger!, save, fetcher); } catch (error) { void error; }
+    if (work.status === "staged" || work.status === "applying") await applyWork(work, ledger, save, fetcher, options.allowStaleRegeneration === true);
   }
   const deficits = Object.values(ledger.works).filter((work) => work.status === "deficit");
   log(`Hydration complete for campaign ${ledger.campaignId}${deficits.length ? ` with ${deficits.length} unit-floor deficit(s)` : ""}.`); return ledger;

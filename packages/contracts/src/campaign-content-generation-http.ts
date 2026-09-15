@@ -142,6 +142,8 @@ export const campaignContentGenerationRequestSchema = z.object({
   expandArtifactKeys: z.array(generatedArtifactKeySchema).max(16).default([]),
   revisionFeedback: text.max(2_000).nullable().default(null),
   retryFailedAttempt: retryFailedAttemptSchema.nullable().default(null),
+  /** When true, drop unresolvable generated references instead of failing the whole candidate. */
+  tolerateInvalidReferences: z.boolean().optional(),
   /** Optional reviewed candidate content for provider-free API hydration. */
   reviewedContent: generatedCampaignContentProviderSchema.optional(),
 }).strict();

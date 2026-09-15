@@ -4,7 +4,7 @@ import path from "node:path";
 import { SRD_5_1_STARTER_IDENTITY } from "@velvet/contracts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
-import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson, normalizeGeneratedCampaignContentProvider } from "../src/routes/rpg/v1/campaignContentGeneration.js";
+import { campaignContentGenerationHttpRoutes, canonicalCampaignGenerationJson, normalizeGeneratedCampaignContentProvider, sanitizeGeneratedCampaignContent } from "../src/routes/rpg/v1/campaignContentGeneration.js";
 import { createRepository, MECHANICS_STARTER_CATALOG, SRD_5_1_STARTER_CATALOG, updateProviderSettings } from "../src/repo/index.js";
 import { createSession, transitionSession } from "../src/repo/sessionRepo.js";
 import { useTmpDataDir } from "./helpers.js";
@@ -228,5 +228,28 @@ describe("campaign-content section generation",()=>{
   it("classifies malformed configured-provider output without logging its content",async()=>{
     enable();const messages:string[]=[];const stream={write:(message:string)=>{messages.push(message);}};const repo=createRepository(),campaign=repo.createCampaign("local-owner",{name:"Structured failure"});completeWithProviderMock.mockResolvedValue({message:{role:"assistant",content:'{"outlines":[{"PRIVATE_PROVIDER_ECHO":true}]}'},usage:null,model:{requestedModel:"configured",responseModel:"deepseek-test"}});const app=Fastify({logger:{level:"error",stream} as any});await app.register(campaignContentGenerationHttpRoutes,{prefix:"/api/rpg/v1",generationDraftRepositoryAccessor:()=>repo});
     const response=await app.inject({method:"POST",url:"/api/rpg/v1/campaign-content-drafts",headers:{"content-type":"application/json"},payload:{...request(campaign.id,"structured-log"),sections:["outline"]}}),logs=messages.join("\n");expect(response.statusCode).toBe(503);expect(response.json().code).toBe("RPG_GENERATION_UNAVAILABLE");expect(logs).toContain("invalid-structured-response");expect(logs).not.toContain("PRIVATE_PROVIDER_ECHO");expect(response.body).not.toContain("PRIVATE_PROVIDER_ECHO");await app.close();
+  });
+
+  it("drops unresolvable references instead of failing the whole candidate",()=>{
+    const dependencies=new Map<string,"public"|"gm">([["known-location","public"],["known-faction","public"],["gm-secret","gm"]]);
+    const content=normalizeGeneratedCampaignContentProvider({
+      outlines:[{key:"opening",opening:"Rain.",premise:"A bell.",startLocationKey:"missing-location",visibility:"public"}],
+      locations:[
+        {key:"new-location",name:"New",description:"A place.",visibility:"public",factionKeys:["known-faction","missing-faction"]},
+        {key:"known-location",name:"Duplicate",description:"Collides with accepted canon.",visibility:"public",factionKeys:[]}],
+      connections:[
+        {key:"good-connection",fromLocationKey:"known-location",toLocationKey:"new-location",description:"A road.",visibility:"public"},
+        {key:"bad-connection",fromLocationKey:"new-location",toLocationKey:"missing-location",description:"A road.",visibility:"public"}],
+      npcs:[{key:"guide",name:"Guide",archetype:"Guide",description:"Wary.",visibility:"public",locationKey:"gm-secret",factionKeys:["gm-secret"]}],
+      monsterConcepts:[{key:"beast",name:"Beast",description:"A beast.",visibility:"public",role:"hunter",tactics:[],mechanics:{state:"catalog-bound",reference:{kind:"enemy-template",packId:"pack",packVersion:"1.0.0",definitionId:"not-pinned"}}}],
+    });
+    const sanitized=sanitizeGeneratedCampaignContent(content,dependencies,new Set<string>());
+    expect(sanitized.outlines[0]!.startLocationKey).toBeUndefined();
+    expect(sanitized.locations.map((location)=>location.key)).toEqual(["new-location"]);
+    expect(sanitized.locations[0]!.factionKeys).toEqual(["known-faction"]);
+    expect(sanitized.connections.map((connection)=>connection.key)).toEqual(["good-connection"]);
+    expect(sanitized.npcs[0]!.locationKey).toBeUndefined();
+    expect(sanitized.npcs[0]!.factionKeys).toEqual([]);
+    expect(sanitized.monsterConcepts[0]!.mechanics.state).toBe("inert");
   });
 });
