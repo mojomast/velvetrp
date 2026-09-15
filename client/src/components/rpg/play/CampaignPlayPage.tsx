@@ -30,6 +30,7 @@ import type { StudioAuthorization } from "../StudioAuthorization";
 import { AtlasAdvancement, type AtlasAdvancementApi } from "./AtlasAdvancement";
 import { CampaignDmPanel, CampaignDmChronicle, type CampaignDmApi } from "./CampaignDmPanel";
 import { CampaignReplay } from "./CampaignReplay";
+import { SituationActions } from "./SituationActions";
 import type { CampaignDmHistory } from "@velvet/contracts";
 
 /** Delivery-only handle. Cancelling it never cancels the durable adventure turn. */
@@ -522,6 +523,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {actionable && streamRef.current && <div className="atlas-turn-tools"><button type="button" onClick={cancelLiveDelivery}>Stop receiving live updates</button></div>}
     <VoiceControls campaignId={campaignId} contextKey={JSON.stringify([sessionId, authorizationGeneration, authorizationCanAct, phase,
       sessionLocked, roomToolsLocked, bootstrap.session.active, turn?.turn.turnId ?? "", turn?.turn.state ?? ""])} />
+    {actionable && combatAvailable && combatApi && <SituationActions campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined} api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} onInsert={prefill} />}
     <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
       declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />

@@ -1,0 +1,6 @@
+.situation-actions { display: grid; gap: .5rem; padding: .75rem 1rem; border: 1px solid #73664a; border-radius: 6px; }
+.situation-actions-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.situation-actions-heading h3 { margin: 0; }
+.situation-action-buttons { display: flex; flex-wrap: wrap; gap: .4rem; }
+.situation-action-buttons button { text-transform: none; }
+.situation-note { margin: 0; font-size: .82rem; opacity: .78; }
