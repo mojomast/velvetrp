@@ -68,7 +68,7 @@ function ReplayTurnMechanics({ campaignId, sessionId, actorId, turnId, trace }: 
     return () => { alive = false; };
   }, [actorId, cacheKey, campaignId, sessionId, trace, turnId]);
   if (!links || links.length === 0) return null;
-  return <div className="replay-mechanics"><MechanicReceiptCard campaignId={campaignId} links={links} api={trace} /></div>;
+  return <div className="replay-mechanics"><MechanicReceiptCard campaignId={campaignId} links={links} api={trace} compact /></div>;
 }
 
 /** Steps through a finished or in-progress session as a continuous, natural-game transcript. */
