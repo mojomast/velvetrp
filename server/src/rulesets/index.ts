@@ -39,9 +39,15 @@ export {
   resolveDnd5eCheck,
   resolveDnd5eD20Test,
   resolveDnd5eDamageRoll,
+  DND_5E_VISION_CAPABILITIES,
+  dnd5eSpecialSense,
+  lightLevelAt,
+  obscurementPenalty,
+  passivePerceptionObscurementAdjustment,
   resolveDnd5eFalling,
   resolveDnd5eInitiative,
   resolveDnd5eSkillTest,
+  resolveDnd5eVision,
 } from "./dnd5e.js";
 export type {
   Dnd5eEncounterInput,
@@ -57,6 +63,12 @@ export type {
   SpecialMovementInput,
   SpecialMovementMode,
   SpecialMovementPlan,
+  Dnd5eLightLevel,
+  Dnd5eLightSource,
+  Dnd5eObscurement,
+  Dnd5eSpecialSense,
+  Dnd5eVisibility,
+  Dnd5eVisionInput,
 } from "./dnd5e.js";
 export {
   DEFAULT_RULESET,

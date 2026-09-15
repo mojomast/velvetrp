@@ -41,10 +41,13 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   if (deriveDnd5eExhaustionEffects(input.attackerExhaustion ?? 0).attackDisadvantage) disadvantageSources += 1;
   if (input.attackerBenefit) advantageSources += 1;
   if (attacker.has("invisible")) advantageSources += 1;
+  // SRD 5.1 unseen attackers and targets: an unseen attacker has advantage and
+  // an unseen target imposes disadvantage, independent of the invisible condition.
+  if (input.attackerUnseen) advantageSources += 1;
   if (input.attackerInMelee && input.kind !== "melee") disadvantageSources += 1;
   for (const condition of DND_5E_ATTACKED_WITH_ADVANTAGE_CONDITIONS) if (target.has(condition)) advantageSources += 1;
   if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }
-  if (target.has("invisible")) disadvantageSources += 1;
+  if (target.has("invisible") || input.targetUnseen) disadvantageSources += 1;
   const autoCritical = input.kind === "melee"
     && (target.has("unconscious") || target.has("paralyzed") || target.has("petrified"));
   return Object.freeze({ mode: dnd5eRollMode(advantageSources, disadvantageSources), autoCritical });

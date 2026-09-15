@@ -9,8 +9,16 @@
       "url": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf#page=88"
     }
   ],
-  "capabilityEvidence": [],
+  "capabilityEvidence": [
+    {
+      "id": "vision-light",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
+    }
+  ],
   "runtimeEvidence": [
+    "server/src/rulesets/dnd5e/vision.ts",
+    "server/test/dnd5e-vision.test.ts",
     "server/src/repo/encounter/combatActionPlan.ts",
     "server/src/repo/encounter/combatPowerRuntime.ts",
     "server/src/repo/encounter/death/dyingRuntime.ts",

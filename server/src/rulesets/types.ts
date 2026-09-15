@@ -191,6 +191,10 @@ export type AttackConditionInput = Readonly<{
   attackerBenefit?: boolean;
   /** A ranged attack made while a hostile is within 5 feet has disadvantage. */
   attackerInMelee?: boolean;
+  /** True when the target is unseen by the attacker (heavily obscured or invisible). */
+  targetUnseen?: boolean;
+  /** True when the attacker is unseen by the target. */
+  attackerUnseen?: boolean;
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
 

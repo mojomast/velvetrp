@@ -12,3 +12,4 @@ export * from "./dnd5e/movement.js";
 export * from "./dnd5e/plans.js";
 export * from "./dnd5e/resources.js";
 export * from "./dnd5e/rests.js";
+export * from "./dnd5e/vision.js";

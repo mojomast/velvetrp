@@ -11,6 +11,7 @@ import { DND_5E_MOVEMENT_CAPABILITIES } from "./movement.js";
 import { DND_5E_PLAN_CAPABILITIES } from "./plans.js";
 import { DND_5E_RESOURCE_CAPABILITIES } from "./resources.js";
 import { DND_5E_REST_CAPABILITIES } from "./rests.js";
+import { DND_5E_VISION_CAPABILITIES } from "./vision.js";
 
 export const DND_5E_RULESET_CAPABILITIES: readonly RulesetCapability[] = Object.freeze([
   ...DND_5E_D20_CAPABILITIES,
@@ -25,4 +26,5 @@ export const DND_5E_RULESET_CAPABILITIES: readonly RulesetCapability[] = Object.
   ...DND_5E_ENCOUNTER_BUILDER_CAPABILITIES,
   ...DND_5E_ENCOUNTER_REWARD_CAPABILITIES,
   ...DND_5E_NPC_SELECTION_CAPABILITIES,
+  ...DND_5E_VISION_CAPABILITIES,
 ]);
