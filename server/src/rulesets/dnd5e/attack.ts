@@ -44,6 +44,8 @@ export function planDnd5eAttackConditions(input: AttackConditionInput): AttackCo
   // SRD 5.1 unseen attackers and targets: an unseen attacker has advantage and
   // an unseen target imposes disadvantage, independent of the invisible condition.
   if (input.attackerUnseen) advantageSources += 1;
+  if (input.mountedAdvantage) advantageSources += 1;
+  if (input.underwaterDisadvantage) disadvantageSources += 1;
   if (input.attackerInMelee && input.kind !== "melee") disadvantageSources += 1;
   for (const condition of DND_5E_ATTACKED_WITH_ADVANTAGE_CONDITIONS) if (target.has(condition)) advantageSources += 1;
   if (target.has("prone")) { if (input.kind === "melee") advantageSources += 1; else disadvantageSources += 1; }

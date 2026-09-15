@@ -195,6 +195,10 @@ export type AttackConditionInput = Readonly<{
   targetUnseen?: boolean;
   /** True when the attacker is unseen by the target. */
   attackerUnseen?: boolean;
+  /** True when an underwater attack incurs disadvantage (no swim speed, non-exempt weapon). */
+  underwaterDisadvantage?: boolean;
+  /** True when a mounted attacker strikes an unmounted smaller target in melee. */
+  mountedAdvantage?: boolean;
 }>;
 export type AttackConditionPlan = Readonly<{ mode: RollMode; autoCritical: boolean }>;
 

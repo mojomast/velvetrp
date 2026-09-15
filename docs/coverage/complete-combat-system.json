@@ -14,11 +14,23 @@
       "id": "vision-light",
       "version": "1.0.0",
       "descriptorStatus": "supported"
+    },
+    {
+      "id": "mounted-combat",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
+    },
+    {
+      "id": "underwater-combat",
+      "version": "1.0.0",
+      "descriptorStatus": "supported"
     }
   ],
   "runtimeEvidence": [
     "server/src/rulesets/dnd5e/vision.ts",
     "server/test/dnd5e-vision.test.ts",
+    "server/src/rulesets/dnd5e/specialCombat.ts",
+    "server/test/dnd5e-special-combat.test.ts",
     "server/src/repo/encounter/combatActionPlan.ts",
     "server/src/repo/encounter/combatPowerRuntime.ts",
     "server/src/repo/encounter/death/dyingRuntime.ts",
