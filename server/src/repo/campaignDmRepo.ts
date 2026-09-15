@@ -26,6 +26,32 @@ import { NPC_DISCLOSURE_TRUST_THRESHOLD } from "./observations/agentObservationR
 export class CampaignDmUnavailableError extends Error {}
 export class CampaignDmConflictError extends Error {}
 const json = (value: unknown) => canonicalAgentJson(value as never);
+/**
+ * The planning prompt is byte-capped. A richly generated world must still yield a legal beat, so the
+ * preparation handed to the Director is bounded by halving generated arrays (then dropping the largest)
+ * until it fits. The full preparation still drives candidate generation and freshness.
+ */
+export const DM_PREPARATION_CONTEXT_MAX_CHARS = 12_000;
+export function boundDirectorPreparation<T>(preparation: T | null): T | null {
+  if (preparation == null || json(preparation).length <= DM_PREPARATION_CONTEXT_MAX_CHARS) return preparation;
+  let current: Record<string, unknown> = { ...(preparation as unknown as Record<string, unknown>) };
+  const arrayKeys = Object.keys(current).filter((key) => Array.isArray(current[key]));
+  for (let round = 0; round < 16 && json(current).length > DM_PREPARATION_CONTEXT_MAX_CHARS; round++) {
+    let changed = false;
+    const next: Record<string, unknown> = { ...current };
+    for (const key of arrayKeys) {
+      const items = next[key];
+      if (Array.isArray(items) && items.length > 1) { next[key] = items.slice(0, Math.ceil(items.length / 2)); changed = true; }
+    }
+    if (!changed) {
+      const largest = arrayKeys.filter((key) => Array.isArray(next[key])).sort((a, b) => json(next[b]!).length - json(next[a]!).length)[0];
+      if (!largest) break;
+      delete next[largest];
+    }
+    current = next;
+  }
+  return current as unknown as T;
+}
 const hash = (value: unknown) => createHash("sha256").update(json(value)).digest("hex");
 const privileged = (role: string | undefined) => role === "owner" || role === "gm";
 const MAX_KNOWLEDGE_NPCS = 4;
@@ -477,6 +503,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
       } else blockers.push("waiting-for-player-combat-action");
     }
     const planning = services.getCampaignGeneratedPlanning(g, c);
+    const preparationContext = boundDirectorPreparation(planning);
     const locations = db.prepare("SELECT actor_id,location_id,state_revision FROM campaign_actor_locations_v28 WHERE campaign_id=? AND session_id=? ORDER BY actor_id").all(c, s);
     if (!open) {
       const setup = services.getEncounterSetupCandidates(g, c);
@@ -549,7 +576,7 @@ export function createCampaignDmRepository(db: DatabaseDriver.Database, deps: { 
     const historicalRecall = services.getCampaignRecall(g, { campaignId: c, sessionId: s, audience: { kind: "dm" }, purpose: "dm-planning",
       query: evidence?.intent || graph?.nodes.filter(node => node.status === "revealed").map(node => node.title).join(" ") || context.visibleWorld.join(" ") });
     if (!historicalRecall) throw new CampaignDmConflictError("director recall authority unavailable");
-    const privateContext = { context, story: graph, preparation: planning, evidence, safety, historicalRecall };
+    const privateContext = { context, story: graph, preparation: preparationContext, evidence, safety, historicalRecall };
     // A changing domain snapshot invalidates approvals, including actor health and catalog changes.
     const health = db.prepare("SELECT actor_id,name,current,max FROM rpg_actor_resources WHERE campaign_id=? ORDER BY actor_id,name").all(c);
     const freshness = hash({ context, story, planning, locations, health, combat, candidates: bounded, evidence, safety, historicalRecall });
