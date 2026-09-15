@@ -2,49 +2,64 @@
 
 ## Current Baseline
 
-- Commit `2896613` is the pushed `main`/`origin/main` baseline. The committed tree contains the completed playability program plus the browser-playable client surfaces described below.
-- Persistence: one current disposable development schema; schema changes require deleting/recreating `velvet.sqlite` except for narrowly recognized exact tactical-map, campaign-director, and pre-recall predecessors. Director upgrades also recognize exact review-authority/narration predecessors, preserving historical rows and cancelling pending planning/approval runs during the review-authority upgrade. The third SQL asset adds immutable adventure narration dispatch context; exact older director/map upgrades install it within their validated transaction when absent. Complete startup validation precedes commit and failure rolls back; every other unknown or partially upgraded schema rejects without repair.
+- Commit `8955b10` is the pushed `main`/`origin/main` baseline. The tree contains the completed SRD 5.1 parity program (Waves 0-4) plus the follow-on runtime surfaces and API E2E coverage.
+- Persistence: one current disposable development schema; additive late-schema tables install in place and exact-predecessor upgrades are narrowly recognized. Unknown or partially upgraded schemas reject without repair.
 - HTTP: 154 counted explicit trusted-local RPG operations plus separately classified feature discovery; implicit HEAD aliases are excluded.
 - Security: the server remains loopback-only with fixed `local-owner`. Feature flags and local ownership are not authentication or remote-safe authorization.
-- Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, and `docs/ROADMAP.md` owns milestone status.
+- Authorities: runtime code/contracts own behavior, `docs/api.md` owns HTTP documentation, `docs/operations.md` owns disposable-data/configuration guidance, `docs/repo-architecture.md` owns persistence structure, `docs/ROADMAP.md` owns milestone status, and `docs/srd-5.1-coverage.v1.json` + `docs/srd-5.1-coverage.md` own the bounded SRD parity claims.
 
 ## Delivered
 
-### Living Atlas, AI Director, memory, and knowledge
+### SRD 5.1 parity program (Waves 0-4)
 
-The Living Atlas control plane, grounded combat maps and recovery, reviewed campaign preparation, and a persisted human/AI campaign director are complete. The Director composes ordered one-to-three-candidate beats with per-candidate receipts and partial-completion blockers, runs bounded read-only grounding rounds, records world-time advancement and ambient transition beats, narrates present-NPC ledger knowledge with attribution, and keeps prior-scene continuity explicitly non-authoritative. Plan 4 added an immutable `agent_observations` ledger for witnessed/told/faction/town-gossip knowledge with trust-gated reads and a provider-free attribution/privacy/negation/disclosure evaluator. Plan 3 added direct, source-attributed SQLite recall under strict query/hit/packet caps, immutable narration dispatch provenance, GM-only no-replay context inspection, and the measured `now`/`current` ranking correction. See `docs/ai-dungeon-master.md`, `docs/frontend-control-plane.md`, `docs/campaign-memory.md`, and `docs/npc-knowledge-rumors.md`.
+- Wave 0: modularized `rulesets/dnd5e.ts`, `srdStarterCatalog.ts`, `encounterWriteRepo.ts`, `combatPowerRuntime.ts`, `combatActionPlan.ts`; per-domain coverage fragments merged by `scripts/coverage/merge-coverage.mjs`; `scripts/publish-srd-starter.ts`; composed capability registry.
+- Wave 1: rules engines R1-R11 (effect vocabulary v2, conditions, monsters, adventuring, v2 execution, riders, magic items, reaction window, death/concentration, movement, progression).
+- Wave 2: content breadth - all 12 classes L1-20 with one subclass each, the full 326-spell list, 241 monsters across every CR band, and 278 magic items.
+- Wave 3: deterministic encounter builder, encounter rewards, and NPC selection.
+- Wave 4: product surfaces and verification.
 
-### Browser-playable character and system surfaces
+### Most recent session additions
 
-The client now reaches the deterministic mechanics that previously existed behind HTTP and repository lanes:
+- Magic-item attunement end to end: additive `actor_item_attunements_v65`, `server/src/repo/attunementRepo.ts`, `GET`/`POST /campaigns/:campaignId/actors/:actorId/attunements`, and the `MagicItemAttunementPanel` client surface.
+- Monster multiattack: `planMonsterTurn` exposes the ordered attack sequence and the durable enemy turn resolves one ordered damage outcome per step, stopping early when the target drops. The action-resolution contract allows a bounded multi-outcome attack.
+- Player readied actions: additive `combat_ready_actions_v66`, `server/src/repo/encounter/reaction/readyActionRuntime.ts`, a `ready` legal action and declaration, true hit-time firing (a readied Shield reports readiness `ready`), and expiry at the readying combatant's next turn.
+- Vision/light/obscurement: pure `server/src/rulesets/dnd5e/vision.ts` (`vision-light@1.0.0`), with unseen-attacker/target flags folded into the shared attack-condition planner.
+- Mounted and underwater combat: pure `server/src/rulesets/dnd5e/specialCombat.ts` (`mounted-combat@1.0.0`, `underwater-combat@1.0.0`).
+- Encounter reward preview and NPC selection HTTP surfaces; `encounter-rewards@1.1.0` and `npc-selection@1.1.0` flipped to `supported`/`implemented`.
+- Coverage merge-drift fix: the three Wave 3 domains had been added only to the aggregate, so the merge tool deleted them; fragments and `DOMAIN_ORDER` entries now exist and the merge is idempotent.
+- `e2e/tests/srd-feature-flows.spec.ts`: deterministic API game-flow tests for the new features.
+- Client surfaces: DM encounter-builder panel and character-sheet advancement-choices panel.
 
-- Character sheet actions: server-resolved checks, powers and spells, conditions and effects, resource tracks, rests, equipment, and progression.
-- Economy: present-vendor sale (server-issued quote then `sell_to_shop`) and bilateral trade accept/cancel from the sheet.
-- World: owner/GM expedition actor placement and camp.
-- Cast: companion creation plus exact grant creation/revocation.
-- Combat: reviewed encounter generation and explicit application.
-- Campaign administration: room detach/attach reconciliation.
+## Coverage Status
 
-`e2e/tests/character-surfaces.spec.ts` covers all of the above through the real client, HTTP layer, and disposable SQLite. The deterministic E2E gate is green at 56/56; live-provider and authenticated multi-user coverage are still not claimed.
+`implemented`: d20-tests, passive-checks, attack-resolution, initiative, encounter-builder, encounter-rewards, npc-selection. Every other domain remains `partial` on purpose because its bounded behavior is executable but the full SRD domain is not. Do not flip a domain to `implemented` unless its bounded behavior has runtime and test evidence and the descriptor capability is `supported`.
 
-### Providers and recovery
+## Verification
 
-Dotted provider tool-name wire encoding, `reasoning_effort: "none"` for bounded single-tool calls, and narration-quality fallback fixes are committed. The human-player simulation and live Director playtest harnesses are available under `scripts/` and are capped and owner-authorized. No automatic paid retries, model fallback, or repair loops exist.
+- Focused: run the affected server test file and `npm run typecheck --workspace velvet-mvp-server`.
+- Broad but fast: `npm run test:server:quick`.
+- Wave-boundary checkpoint: `npm run test --workspace velvet-mvp-server` and `npm run test --workspace velvet-mvp-client`.
+- Deterministic E2E: `npm run test:e2e` (starts the fake provider, deterministic server, and client dev server). Run one spec with `npx playwright test e2e/tests/srd-feature-flows.spec.ts`.
+- E2E typecheck: `npm run typecheck:e2e`.
+
+## Conventions and Gotchas
+
+- Adding an HTTP operation requires updating the checked inventory in `docs/api.md` and the `${count} counted` claims in README.md, docs/api.md, docs/operations.md, docs/ROADMAP.md, devplan.md, and handoff.md; `server/test/documentation-drift.test.ts` enforces this.
+- Adding a capability requires a matching coverage-inventory evidence entry; `server/test/srd-coverage-inventory.test.ts` enforces an exact match between advertised capabilities and inventory evidence.
+- Add new persistence only through the additive late-schema path in `server/src/repo/db/schema.ts`; also add the new SQL file to the five migration-test schema lists.
+- The deterministic E2E server RNG (`e2e/support/deterministic-server.ts`) is intentionally narrow and throws on unexpected ranges; extend it explicitly when new dice ranges are consumed.
+- E2E specs must use explicit `process.env.NAME` access, never dynamic `process.env[key]`, or the environment-classification drift guard fails.
+- Content changes require republishing: `npm run build --workspace @velvet/contracts && node --import tsx scripts/publish-srd-starter.ts --write`, then rebuild contracts before running server tests.
+- Full-suite flakes: `test/tactical-map-repo.test.ts` and `test/dnd5e-agent-combat-awareness.test.ts` occasionally fail under full parallel load and pass with `npm run test:server:serial -- <file>` and on re-run. Do not treat those as regressions.
 
 ## Next Task
 
-Scope the closed declarative rules IR milestone with exact consumers, contract boundaries, current-schema impact, and exclusions before implementation. Do not promote live exact-candidate generation/selection HTTP, delegated companion grant exercise and dismissal, remote tenancy, or M5.5 persistence implicitly.
+No in-flight work. Candidate follow-ups, in rough priority:
 
-Candidate follow-ups, in rough priority:
-
-- Broaden live/Director quality evidence or add multi-controlled-actor browser coverage.
-- Add non-mutating terrain/layout preview and supported enemy-token repositioning.
-- Add server-side idempotency or exact receipt discovery for persona and room creation so browser recovery locks become cross-device guarantees.
+- Add browser-level coverage for the new client surfaces (attunement panel, encounter builder, advancement choices) in the deterministic E2E lane.
+- Give the remaining `partial` domains runtime + API evidence where their bounded behavior is already complete, then flip them honestly (for example the `monster-turn-planner` save riders or the spell execution lanes).
+- Surface vision/obscurement and mounted/underwater states through campaign persistence and the tactical map so the pure rules have runtime callers.
 
 ## Working Tree
 
-`.opencode/skills/seed-test-campaign/` and `server/test/two-player-gameplay-api.test.ts` remain intentionally untracked and must not be staged. There is no uncommitted runtime work as of this handoff.
-
-## Pre-Existing Test Failures
-
-These failures predate the current work and are not caused by it: `campaign-recall.test.ts` (missing `adventure_narration_contexts`), `tactical-map-generation.test.ts` (foreign key), `m4-agent-acceptance.test.ts` (`historicalRecall` rendering), `api-provider.test.ts` (RouteTok baseUrl reason string), and environment "database is locked" flakes in `repo.test.ts`, `campaign-session-attachment*.test.ts`, `content-queries.test.ts`, `campaign-character-creation.test.ts`, and `initialize-actor-resource-command.test.ts`. Do not "fix" these as part of unrelated work.
+`.hydration/` and `.opencode/skills/seed-test-campaign/` remain intentionally untracked and must not be staged. There is no uncommitted runtime work as of this handoff.
