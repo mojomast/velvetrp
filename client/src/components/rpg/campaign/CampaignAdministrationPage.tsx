@@ -46,6 +46,7 @@ import { MembershipManager } from "./MembershipManager";
 import { TimelineCheckpointPanel } from "./TimelineCheckpointPanel";
 import { CampaignContentPicker } from "../content/CampaignContentPicker";
 import { CampaignGeneratorPanel } from "./CampaignGeneratorPanel";
+import { WorldbuildingAgentPanel } from "./WorldbuildingAgentPanel";
 import { EncounterBuilderPanel } from "./EncounterBuilderPanel";
 import { GenerationRecoveryPanel, RulesetAdministrationPanel, SessionZeroSafetyPanel,
   VendorShopAdministrationPanel } from "../administration";
@@ -417,6 +418,8 @@ export function CampaignAdministrationPage({ campaignId, campaignName: initialNa
         api={{ openDraft: setOpenDraftId, reconcileJob: () => void load(true, true) }} />}
 
       {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <CampaignGeneratorPanel campaignId={campaignId} openDraftId={openDraftId} disabled={mutationLocked || refreshing} />}
+
+      {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <WorldbuildingAgentPanel campaignId={campaignId} initialCampaignName={campaignName ?? initialName} />}
 
       {(campaign.actorRole === "owner" || campaign.actorRole === "gm") && <section className="admin-section"><EncounterBuilderPanel campaignId={campaignId} /></section>}
 
