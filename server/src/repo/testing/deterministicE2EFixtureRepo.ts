@@ -59,6 +59,7 @@ export interface DeterministicE2EFixtures {
   materializePinnedPower(input: { principalId: string; campaignId: string; power: { kind: "ability" | "spell"; packId: string; packVersion: string; definitionId: string } }): void;
   materializePinnedEnemy(input: { principalId: string; campaignId: string; enemy: { kind: "enemy-template"; packId: string; packVersion: string; definitionId: string } }): void;
   materializeConsumableEntry(input: FixtureTarget & { entryId: string; item: ItemReference }): void;
+  materializeInventoryEntry(input: FixtureTarget & { entryId: string; item: ItemReference }): void;
   materializeShortRestFocus(input: FixtureTarget): void;
   materializeEconomyGraph(input: FixtureTarget): void;
   materializeCampaignLocation(input: {
@@ -195,6 +196,32 @@ export function createDeterministicE2EFixturesForOwnedRepository(
           VALUES(?,?,?,?,?,? ,?,'instanced',1,?,NULL,0,?)`)
           .run(entryId, target.campaignId, target.actorId, WAYLAMP.packId, WAYLAMP.packVersion,
             WAYLAMP.kind, WAYLAMP.definitionId, entryId, FIXTURE_TIME);
+      });
+    },
+    materializeInventoryEntry(input) {
+      immediate(() => {
+        const target = authorizeAndCheckRevision(input);
+        const item = itemCatalogReferenceSchema.parse(input.item);
+        const entryId = resourceIdSchema.parse(input.entryId);
+        // The held definition must already be public in a pinned campaign pack;
+        // this pins it for execution but never invents catalog content.
+        pinPublicCampaignDefinition(db, target.principalId, target.campaignId, item);
+        const existing = db.prepare(`SELECT entry_id entryId,campaign_id campaignId,actor_id actorId,item_pack_id packId,
+          item_pack_version packVersion,item_kind kind,item_definition_id definitionId,entry_mode entryMode,
+          quantity,instance_key instanceKey,slot_key slotKey,equipped,created_at createdAt
+          FROM rpg_inventory_entries_v25 WHERE entry_id=?`).get(entryId) as Record<string, unknown> | undefined;
+        const exact = { entryId, campaignId: target.campaignId, actorId: target.actorId, packId: item.packId,
+          packVersion: item.packVersion, kind: item.kind, definitionId: item.definitionId,
+          entryMode: "instanced", quantity: 1, instanceKey: entryId, slotKey: null, equipped: 0, createdAt: FIXTURE_TIME };
+        if (existing) {
+          if (!same(existing, exact)) conflict("inventory fixture identity already has different state");
+          return;
+        }
+        db.prepare(`INSERT INTO rpg_inventory_entries_v25(entry_id,campaign_id,actor_id,item_pack_id,item_pack_version,
+          item_kind,item_definition_id,entry_mode,quantity,instance_key,slot_key,equipped,created_at)
+          VALUES(?,?,?,?,?,? ,?,'instanced',1,?,NULL,0,?)`)
+          .run(entryId, target.campaignId, target.actorId, item.packId, item.packVersion,
+            item.kind, item.definitionId, entryId, FIXTURE_TIME);
       });
     },
     materializePinnedItemExecution(input) {

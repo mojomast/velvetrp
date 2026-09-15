@@ -29,6 +29,7 @@
 - Coverage merge-drift fix: the three Wave 3 domains had been added only to the aggregate, so the merge tool deleted them; fragments and `DOMAIN_ORDER` entries now exist and the merge is idempotent.
 - `e2e/tests/srd-feature-flows.spec.ts`: deterministic API game-flow tests for the new features.
 - Client surfaces: DM encounter-builder panel and character-sheet advancement-choices panel.
+- Browser E2E coverage for the new client surfaces: `e2e/tests/client-feature-surfaces.spec.ts` drives the SRD magic-item attunement panel (attune, prerequisite rejection, drop), the DM encounter-builder panel, and the character-sheet advancement-choices panel against the deterministic server; a disposable `POST /api/__e2e/materialize-inventory-entry` fixture holds one exact pinned catalog item.
 
 ## Coverage Status
 
@@ -56,7 +57,6 @@
 
 No in-flight work. Candidate follow-ups, in rough priority:
 
-- Add browser-level coverage for the new client surfaces (attunement panel, encounter builder, advancement choices) in the deterministic E2E lane.
 - Give the remaining `partial` domains runtime + API evidence where their bounded behavior is already complete, then flip them honestly (for example the `monster-turn-planner` save riders or the spell execution lanes).
 - Surface vision/obscurement and mounted/underwater states through campaign persistence and the tactical map so the pure rules have runtime callers.
 

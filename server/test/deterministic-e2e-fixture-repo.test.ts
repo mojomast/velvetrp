@@ -169,6 +169,28 @@ describe("deterministic E2E fixture repository", () => {
     fixture.repository.close();
   });
 
+  it("materializes an exact held inventory entry and replays it without M1.5 audit", () => {
+    const fixture = setup();
+    const target = { principalId: OWNER, campaignId: fixture.campaignId, actorId: fixture.actorId, expectedRevision: 0,
+      entryId: "exact-held-waylamp", item: WAYLAMP };
+    expect(fixture.fixtures.materializeInventoryEntry(target)).toBeUndefined();
+    expect(fixture.fixtures.materializeInventoryEntry(target)).toBeUndefined();
+    expect(fixture.repository.getActorInventorySnapshot(OWNER, fixture.campaignId, fixture.actorId)?.inventory.items)
+      .toContainEqual({ kind: "instanced", entryId: target.entryId, item: WAYLAMP });
+    expect(() => fixture.fixtures.materializeInventoryEntry({ ...target, actorId: fixture.otherActorId }))
+      .toThrow(DeterministicE2EFixtureConflictError);
+    expect(() => fixture.fixtures.materializeInventoryEntry({ ...target, principalId: "not-owner", entryId: "forbidden-held" }))
+      .toThrow(DeterministicE2EFixtureAuthorizationError);
+    expect(() => fixture.fixtures.materializeInventoryEntry({ ...target, expectedRevision: 1, entryId: "stale-held" }))
+      .toThrow(DeterministicE2EFixtureStaleError);
+
+    const db = inspect();
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_mutation_revisions_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM rpg_m15_receipts_v25 WHERE campaign_id=?").get(fixture.campaignId)).toEqual({ count: 0 });
+    db.close();
+    fixture.repository.close();
+  });
+
   it("rolls back the entire economy graph when a real database constraint aborts", () => {
     const fixture = setup();
     const db = inspect();

@@ -79,6 +79,7 @@ const materialize = (reply: { code(status: number): { send(body?: unknown): unkn
 
 const fixtureTargetBodySchema = takeShortRestCommandSchema.omit({ type: true, idempotencyKey: true });
 const waylampFixtureBodySchema = fixtureTargetBodySchema.extend({ entryId: resourceIdSchema });
+const inventoryEntryFixtureBodySchema = fixtureTargetBodySchema.extend({ entryId: resourceIdSchema, item: itemCatalogReferenceSchema });
 const pinnedItemExecutionBodySchema = z.object({ campaignId: resourceIdSchema, item: itemCatalogReferenceSchema }).strict();
 const pinnedPowerExecutionBodySchema = z.object({
   campaignId: resourceIdSchema,
@@ -136,6 +137,18 @@ app.post("/api/__e2e/materialize-pinned-item-execution", async (request, reply) 
     return reply.code(400).send({ error: "invalid E2E pinned item execution request" });
   }
   return materialize(reply, () => fixtures.materializePinnedItemExecution({
+    principalId: "local-owner", ...body.data,
+  }));
+});
+
+// This disposable route pins one exact public item and inserts it into an
+// actor's inventory so client surfaces can present a held catalog item.
+app.post("/api/__e2e/materialize-inventory-entry", async (request, reply) => {
+  const body = inventoryEntryFixtureBodySchema.safeParse(request.body);
+  if (!body.success) {
+    return reply.code(400).send({ error: "invalid E2E inventory entry materialization request" });
+  }
+  return materialize(reply, () => fixtures.materializeInventoryEntry({
     principalId: "local-owner", ...body.data,
   }));
 });
