@@ -150,6 +150,9 @@ export function planActorPowerCommands(db: DatabaseDriver.Database, campaignId: 
     if (targeting === "self" && !hasRequiredResources(db, campaignId, actorId, definition)) continue;
     if (validRows.length === 0) continue;
     const effectKinds = [...new Set(definition.mechanics.effects.map((effect: any) => effect.type))];
+    // Metadata-only abilities and spells carry no executable effects; they are never legal powers,
+    // and projecting them as an empty effect-kind command would fail the strict legal-command schema.
+    if (effectKinds.length === 0) continue;
     const publicTargeting=targeting==="ally"||targeting==="enemy"?"single":targeting;
     const maxTargets=publicTargeting==="self"?0:publicTargeting==="single"?1:validRows.length;
     const command = actorPowerLegalCommandSchema.parse({ powerRef: reference, targeting:publicTargeting, validTargets: validRows.map(publicTarget), maxTargets,costs,

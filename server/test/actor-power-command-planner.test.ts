@@ -38,4 +38,16 @@ describe("actor power command planner fail-closed targeting",()=>{
     const selected=plan!.validTargets[7]!.actorId,intent={powerRef:reference,targetIds:[selected],choices:[] as [],expectedRevision:0,idempotencyKey:"single"};
     expect(plannedPowerSelection(plan!,"source",intent)).toEqual([selected]);expect(plannedPowerSelection(plan!,"source",{...intent,targetIds:[selected,plan!.validTargets[8]!.actorId]})).toBeNull();
   });
+
+  it("omits metadata-only powers with no executable effects instead of failing the strict legal-command schema",()=>{
+    const metadata=definition("self");(metadata.mechanics as {effects:unknown[]}).effects=[];
+    const db={prepare(sql:string){return {
+      all(){ if(sql.includes("character_known_powers_v23"))return [{kind:"ability",pack_id:"pack",pack_version:"1.0.0",definition_id:"area",public_definition_json:JSON.stringify(metadata)}];
+        if(sql.includes("persona.name label"))return [{actor_id:"source",actor_kind:"player-character",label:"source"}];
+        if(sql.startsWith("SELECT name FROM rpg_actor_resources"))return [{name:"health"}];
+        throw new Error(`unexpected planner all: ${sql}`); },
+      get(){throw new Error(`unexpected planner get: ${sql}`);},
+    };}} as unknown as DatabaseDriver.Database;
+    expect(planActorPowerCommands(db,"campaign","source")).toEqual([]);
+  });
 });
