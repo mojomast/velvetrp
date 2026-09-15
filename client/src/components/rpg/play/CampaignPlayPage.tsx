@@ -29,6 +29,7 @@ import { RpgCharacterSheetPage, type RpgCharacterSheetApi } from "../actor/RpgCh
 import type { StudioAuthorization } from "../StudioAuthorization";
 import { AtlasAdvancement, type AtlasAdvancementApi } from "./AtlasAdvancement";
 import { CampaignDmPanel, CampaignDmChronicle, type CampaignDmApi } from "./CampaignDmPanel";
+import { CampaignReplay } from "./CampaignReplay";
 import type { CampaignDmHistory } from "@velvet/contracts";
 
 /** Delivery-only handle. Cancelling it never cancels the durable adventure turn. */
@@ -133,6 +134,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
   const [sessionLocked, setSessionLocked] = useState(false);
   const [dmLocked, setDmLocked] = useState(false);
   const [dmHistory, setDmHistory] = useState<CampaignDmHistory | null>(null);
+  const [replayOpen, setReplayOpen] = useState(false);
   useEffect(() => { if (!authorizationCanAct || (bootstrap && !["owner", "gm"].includes(bootstrap.principal.role))) setSessionLocked(false); }, [authorizationCanAct, bootstrap]);
   const [activeTool, setActiveTool] = useState<AtlasTool | null>(null);
   const [visitedTools, setVisitedTools] = useState<AtlasTool[]>([]);
@@ -502,7 +504,10 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       <button type="button" onClick={() => setPendingPrefill(null)}>Cancel</button></div></div>}
     {pendingInitial && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button type="button" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
     {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A known turn needs authoritative reconciliation.</p><button type="button" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
-    <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>
+    <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button>
+      <button type="button" aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay session"}</button></p>
+    {replayOpen ? <CampaignReplay dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} onExit={() => setReplayOpen(false)} />
+      : <>
     <CampaignDmChronicle history={dmHistory} />
     <CampaignConversation transcript={transcript} transcriptState={transcriptState} legacyMessages={legacyMessages} legacyParticipants={legacyParticipants}
       current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={prefill} canPrefill={referenceReady} />
@@ -518,6 +523,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
       declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />
+    </>}
   </>;
   const drawersNode = <>
     <AtlasDrawer tool="director" open={activeTool === "director"} onClose={closeTool}>
