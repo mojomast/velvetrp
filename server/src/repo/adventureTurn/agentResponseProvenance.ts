@@ -310,12 +310,14 @@ export function createAdventureTurnAgentResponseRepository(db:DatabaseDriver.Dat
         JOIN combat_mutation_revisions_v27 revision ON revision.encounter_id=encounter.encounter_id
         WHERE encounter.encounter_id=? AND encounter.campaign_id=? AND encounter.session_id=? AND encounter.status='active'`)
         .get(proposal.encounter_id,row.campaign_id,row.session_id) as any;
-        const currentCandidate=db.prepare(`SELECT 1 FROM combatant current WHERE current.encounter_id=? AND current.combatant_id=? AND current.status='active'`)
+        const currentCandidate=db.prepare(`SELECT 1 FROM combatant current WHERE current.encounter_id=? AND current.combatant_id=? AND current.status IN ('active','unconscious')`)
           .get(proposal.encounter_id,combat?.current_id);
         const action=buildCombatActionPlans(db,principal,row.campaign_id,proposal.encounter_id,combat?.current_id??null)
           .find(plan=>plan.legalActionId===proposal.command_legal_action_id);
-        const exactTarget=action?.kind==='attack'?typeof args.targetId==='string'&&action.targetIds.includes(args.targetId)
-          :Boolean(action&&args.targetId===null&&['flee','end-turn'].includes(action.kind));
+        const targetedKinds=['attack','grapple','shove','help','stabilize','stand-up','escape-grapple'];
+        const targetlessKinds=['flee','end-turn','death-save','dash','disengage','hide','ready'];
+        const exactTarget=action&&targetedKinds.includes(action.kind)?typeof args.targetId==='string'&&action.targetIds.includes(args.targetId)
+          :Boolean(action&&args.targetId===null&&targetlessKinds.includes(action.kind));
         const opaque=args.legalActionId,digestValue=typeof opaque==='string'&&combat
           ?hash(JSON.stringify([proposal.encounter_id,combat.revision,opaque,combat.current_id,args.targetId])):"";
         if(!combat||!currentCandidate||combat.revision!==domain('combat')||combat.revision!==proposal.expected_combat_revision
