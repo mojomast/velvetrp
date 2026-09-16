@@ -444,7 +444,7 @@ export const combatActionResolutionSchema = z.object({
   } else if (resolution.kind === "stabilize") {
     const outcome = resolution.outcomes[0];
     if (resolution.targetIds.length !== 1 || outcome?.kind !== "survival" || outcome.targetId !== resolution.targetIds[0]
-        || outcome.roll !== undefined || outcome.statusAfter !== "stable") {
+        || outcome.statusAfter !== "stable") {
       context.addIssue({ code: "custom", message: "stabilize resolution must contain one exact stable survival outcome" });
     }
   } else if (resolution.kind === "death-save") {

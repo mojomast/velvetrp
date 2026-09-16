@@ -73,7 +73,7 @@ const DEFINITIONS: Record<AdventureRegistryToolName, SelectedAdventureTool> = {
     provider: { name: "actor_dice.roll", description: "Roll bounded dice for the source actor; the server computes the total. This raw roll has no DC, skill identity, success, failure, or task-completion outcome.",
       parameters: objectSchema({ expression: { type: "string", minLength: 3, maxLength: 128 } }, ["expression"]) } },
   "combat_action.execute": {name:"combat_action.execute",kind:"mutation",confirmation:"required",argumentsSchema:combatArguments,
-     provider:{name:"combat_action.execute",description:"Use for one labeled basic attack, flee, or end-turn candidate; do not use for powers, consumables, movement, or invented targets.",parameters:objectSchema({
+     provider:{name:"combat_action.execute",description:"Use for one labeled legal combat action candidate (basic attack, grapple, shove, help, stabilize, stand up, dash, disengage, hide, ready, flee, or end turn); do not use for powers, consumables, or invented targets.",parameters:objectSchema({
        legalActionId:{type:"string",pattern:"^[A-Za-z0-9._:-]+$",maxLength:128},legalActionDigest:{type:"string",pattern:"^[0-9a-f]{64}$"}},["legalActionId","legalActionDigest"]) }},
   "exact_actor_travel.select": {name:"exact_actor_travel.select",kind:"mutation",confirmation:"never",argumentsSchema:exactTravelArguments as never,
     provider:{name:"exact_actor_travel.select",description:"Select exactly one server-issued travel option. Supply no destination, party, revision, or other mechanics arguments.",parameters:objectSchema({

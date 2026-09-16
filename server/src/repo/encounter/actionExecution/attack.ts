@@ -227,10 +227,11 @@ export function createResolveCombatAction(db:DatabaseDriver.Database,deps:Encoun
          if(!Number.isInteger(attackerRoll)||attackerRoll<1||attackerRoll>20||!Number.isInteger(defenderRoll)||defenderRoll<1||defenderRoll>20)
            throw new Error("combat RNG returned an out-of-range contest d20");
          const success=attackerRoll+attackerScore>=defenderRoll+defenderScore;
-         if(plan.kind==="grapple"&&success) outcome={kind:"contest",targetId,contest:"grapple",attackerRoll,defenderRoll,success,condition:"grappled"};
-         else if(plan.kind==="shove"&&success) outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success,condition:"prone"};
-         else if(plan.kind==="shove") outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success};
-          else outcome={kind:"contest",targetId:current.combatant_id,contest:"escape-grapple",attackerRoll,defenderRoll,success};
+          if(plan.kind==="grapple"&&success) outcome={kind:"contest",targetId,contest:"grapple",attackerRoll,defenderRoll,success,condition:"grappled"};
+          else if(plan.kind==="grapple") outcome={kind:"contest",targetId,contest:"grapple",attackerRoll,defenderRoll,success};
+          else if(plan.kind==="shove"&&success) outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success,condition:"prone"};
+          else if(plan.kind==="shove") outcome={kind:"contest",targetId,contest:"shove",attackerRoll,defenderRoll,success};
+           else outcome={kind:"contest",targetId:current.combatant_id,contest:"escape-grapple",attackerRoll,defenderRoll,success};
         }else if(plan.kind==="stand-up"){
          if(!conditionsFor(db,combatId,current.combatant_id,encounter.round_number).has("prone"))
            throw new EncounterConflictError("combatant is not prone");

@@ -121,12 +121,14 @@ describe("encounter HTTP contracts",()=>{
     }]};
     expect(combatActionCommandResponseSchema.safeParse({resolution:grapple,combat:{combatId:"encounter",round:1,currentCombatant:"enemy",combatants:[],legalActions:[],revision:2},receipt:{idempotencyKey:"grapple",revisionBefore:1,revisionAfter:2,occurredAt:at}}).success).toBe(false);
     expect(combatActionResolutionSchema.parse(grapple)).toEqual(grapple);
+    const failedGrapple={...grapple,outcomes:[{kind:"contest" as const,targetId:"enemy",contest:"grapple" as const,attackerRoll:5,defenderRoll:15,success:false}]};
+    expect(combatActionResolutionSchema.parse(failedGrapple)).toEqual(failedGrapple);
     expect(combatActionResolutionSchema.safeParse({...grapple,outcomes:[{...grapple.outcomes[0],targetId:"other"}]}).success).toBe(false);
   });
 
   it("keeps utility actions server-derived and outcome-free",()=>{
     const base={actionId:"action",actingCombatantId:"combatant",roundBefore:1,roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:"combatant",outcomes:[]};
-    for(const kind of ["dash","disengage","hide"] as const) {
+    for(const kind of ["dash","disengage","hide","ready"] as const) {
       expect(combatActionResolutionSchema.parse({...base,legalActionId:kind,kind,targetIds:[]})).toMatchObject({kind,targetIds:[],outcomes:[]});
     }
     const help={...base,legalActionId:"help:ally",kind:"help" as const,targetIds:["ally"]};
@@ -139,6 +141,17 @@ describe("encounter HTTP contracts",()=>{
     expect(combatEnemyTurnCommandRequestSchema.parse(request)).toEqual(request);
     for(const authored of ["targetIds","damage","legalActionId","tactics"])
       expect(combatEnemyTurnCommandRequestSchema.safeParse({...request,[authored]:authored==="targetIds"?[]:1}).success).toBe(false);
+  });
+
+  it("accepts a stabilized survival outcome carrying the server Medicine roll",()=>{
+    const stabilize={actionId:"action",legalActionId:"stabilize",kind:"stabilize" as const,actingCombatantId:"combatant",
+      targetIds:["ally"],outcomes:[{kind:"survival" as const,targetId:"ally",roll:14,successes:0,failures:0,statusAfter:"stable" as const}],
+      roundBefore:1,roundAfter:1,currentCombatantBefore:"combatant",currentCombatantAfter:"combatant"};
+    expect(combatActionResolutionSchema.parse(stabilize)).toEqual(stabilize);
+    const kitStabilize={...stabilize,outcomes:[{kind:"survival" as const,targetId:"ally",successes:0,failures:0,statusAfter:"stable" as const}]};
+    expect(combatActionResolutionSchema.parse(kitStabilize)).toEqual(kitStabilize);
+    expect(combatActionResolutionSchema.safeParse({...stabilize,outcomes:[{...stabilize.outcomes[0],statusAfter:"unconscious"}]}).success).toBe(false);
+    expect(combatActionResolutionSchema.safeParse({...stabilize,targetIds:[]}).success).toBe(false);
   });
 
   it("bounds D&D survival commands and projections",()=>{
