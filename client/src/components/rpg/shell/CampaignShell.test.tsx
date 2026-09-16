@@ -49,6 +49,13 @@ describe("campaign control plane", () => {
     expect(campaignDestinations(null, true, true).some((item) => item.id === "manage")).toBe(false);
   });
 
+  it("defers campaign navigation to the in-room command center while the table is open", () => {
+    render(<CampaignShell campaignId={campaign.id} view="campaign-play" selection={null} studio combat onNavigate={vi.fn()} onCampaigns={vi.fn()}><main><h1>Adventure room</h1></main></CampaignShell>);
+    expect(screen.queryByRole("navigation", { name: "Table tools" })).toBeNull();
+    expect(screen.getByText("Play / Table tools")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Campaign destinations" })).toBeTruthy();
+  });
+
   it("removes privileged destinations when authoritative role changes", () => {
     const props = { campaignId: campaign.id, view: "campaign-detail" as const, selection: null, studio: true, combat: true, onNavigate: vi.fn(), onCampaigns: vi.fn() };
     const result = render(<CampaignShell {...props}><Page role="gm" /></CampaignShell>);

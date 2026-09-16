@@ -1,6 +1,9 @@
-.situation-actions { display: grid; gap: .35rem; padding: .5rem .75rem; border: 1px solid #73664a; border-radius: 6px; }
-.situation-actions-heading { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
-.situation-actions-heading h3 { margin: 0; }
+.situation-actions { display: grid; gap: .4rem; padding: .5rem .65rem; border: 1px solid #73664a; border-radius: 6px; }
+.situation-actions-heading { display: flex; align-items: center; justify-content: space-between; gap: .65rem; flex-wrap: wrap; }
+.situation-actions-heading h3 { margin: 0; font-size: .95rem; }
+.situation-heading-end { display: flex; align-items: center; gap: .4rem; }
+.situation-count { min-width: 20px; padding: 1px 6px; border: 1px solid #73664a; border-radius: 999px; color: var(--muted); font: 700 10px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; text-align: center; }
+.situation-toggle { min-height: 28px; padding: 2px 9px; font-size: .78rem; }
 .situation-action-buttons { display: flex; flex-wrap: wrap; gap: .4rem; }
 .situation-action-buttons button { text-transform: none; }
 .situation-note { margin: 0; font-size: .82rem; opacity: .78; }

@@ -32,6 +32,9 @@ const widgetLabels: Record<CampaignContextWidget, string> = {
   location: "Location", cast: "Present cast", objectives: "Objectives", resources: "Party resources", encounter: "Encounter",
 };
 
+/** Tools that configure or administer the table rather than drive the current scene. */
+const SETUP_TOOLS: ReadonlySet<AtlasTool> = new Set(["director", "gm", "security", "create"]);
+
 function clampPaneWidth(value: number) { return Math.max(220, Math.min(520, Math.round(value))); }
 
 function PanelSeparator({ side, value, controls, label, onChange, onCollapse }: { side: "left" | "right"; value: number; controls: string; label: string;
@@ -111,6 +114,14 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
 
   const gridStyle = { "--campaign-context-width": `${preferences.contextWidth}px`, "--campaign-quick-width": `${preferences.quickToolsWidth}px` } as CSSProperties;
   const gridClass = `campaign-play-grid ${preferences.contextVisible ? "has-context" : ""} ${preferences.quickToolsVisible ? "has-quick-tools" : ""}`;
+  const sessionTools = tools.filter((tool) => !SETUP_TOOLS.has(tool));
+  const setupTools = tools.filter((tool) => SETUP_TOOLS.has(tool));
+  const toolButton = (tool: AtlasTool) => {
+    const expanded = activeTool === tool || (tool === "character" && (activeTool === "inventory" || activeTool === "advancement"));
+    return <button type="button" className="ghost" key={tool} data-atlas-tool={tool} aria-pressed={activeTool === tool}
+      aria-expanded={expanded} aria-controls={`atlas-${tool === "character" && (activeTool === "inventory" || activeTool === "advancement") ? activeTool : tool}`}
+      onClick={() => onTool(tool)}>{atlasToolLabels[tool]}</button>;
+  };
   return <main ref={rootRef} className="campaign-play-page" data-command-center="true">
     <header className="campaign-play-header">
       <div className="campaign-play-title">
@@ -121,16 +132,14 @@ export function CommandCenter({ headingRef, title, role, phase, actor, tools, ac
       <div className="campaign-play-status"><span role="status">{role} access from server</span><p className="play-phase" role="status">{phase.replaceAll("-", " ")}</p>{actor}</div>
     </header>
     <nav className="campaign-play-nav" aria-label="In-room tools">
-      {tools.map((tool) => {
-        const expanded = activeTool === tool || (tool === "character" && (activeTool === "inventory" || activeTool === "advancement"));
-        return <button type="button" className="ghost" key={tool} data-atlas-tool={tool} aria-pressed={activeTool === tool}
-          aria-expanded={expanded} aria-controls={`atlas-${tool === "character" && (activeTool === "inventory" || activeTool === "advancement") ? activeTool : tool}`}
-          onClick={() => onTool(tool)}>{atlasToolLabels[tool]}</button>;
-      })}
-      {campaignNav}
-      <span className="campaign-nav-spacer" />
-      <button type="button" className="ghost" onClick={() => preferencesDialogRef.current?.showModal()}>Display</button>
-      <button type="button" className="ghost" onClick={() => shortcutDialogRef.current?.showModal()}>Shortcuts</button>
+      <div className="campaign-nav-group" role="group" aria-label="Session tools">{sessionTools.map(toolButton)}</div>
+      <div className="campaign-nav-group campaign-nav-group-setup" role="group" aria-label="Table setup and administration">
+        <span className="campaign-nav-group-label">Table setup</span>
+        {setupTools.map(toolButton)}
+        {campaignNav}
+        <button type="button" className="ghost" onClick={() => preferencesDialogRef.current?.showModal()}>Display</button>
+        <button type="button" className="ghost" onClick={() => shortcutDialogRef.current?.showModal()}>Shortcuts</button>
+      </div>
     </nav>
     <div className={gridClass} style={gridStyle}>
       {preferences.contextVisible && <>{context}<PanelSeparator side="left" value={preferences.contextWidth} controls="campaign-context-panel"

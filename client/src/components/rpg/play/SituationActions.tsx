@@ -52,6 +52,7 @@ function declarationFor(kind: SupportedKind, target: string | null): string {
 /** Situation-aware mechanics for the controlled actor's turn, inserted as exact action context. */
 export function SituationActions({ campaignId, sessionId, controlledActorId, api, refreshKey = 0, disabled = false, onInsert }: SituationActionsProps) {
   const [combat, setCombat] = useState<CombatReadResponse | null>(null);
+  const [expanded, setExpanded] = useState(true);
   useEffect(() => {
     if (!api) { setCombat(null); return; }
     let alive = true;
@@ -73,31 +74,36 @@ export function SituationActions({ campaignId, sessionId, controlledActorId, api
   const currentActorId = current?.kind === "actor" ? current.actorId : null;
   const ownTurn = Boolean(combat && controlledActorId && currentActorId === controlledActorId);
   const actions = (combat?.legalActions ?? []).filter(isSupported);
+  const actionButtons = actions.flatMap((action) => {
+    const kind = action.kind as SupportedKind;
+    if (targeted.has(kind)) {
+      return action.targetIds.map((targetId) => {
+        const target = labels.get(targetId) ?? null;
+        return <button type="button" className="ghost" key={`${action.legalActionId}:${targetId}`} disabled={disabled}
+          onClick={() => onInsert(declarationFor(kind, target))}>{actionLabel[kind]}{target ? `: ${target}` : ""}</button>;
+      });
+    }
+    return [<button type="button" className="ghost" key={action.legalActionId} disabled={disabled}
+      onClick={() => onInsert(declarationFor(kind, null))}>{actionLabel[kind]}</button>];
+  });
+  const offer = ownTurn && actionButtons.length > 0;
 
   if (!combat) return null;
 
   return <section className="situation-actions" aria-label="Situation actions">
     <div className="situation-actions-heading">
       <p className="eyebrow">ROUND {combat.round} · {current ? (currentActorId === controlledActorId ? "YOUR TURN" : `${labels.get(current.combatantId) ?? "Another combatant"}'S TURN`) : "COMBAT"}</p>
-      <h3>What can I do?</h3>
+      <div className="situation-heading-end">
+        <h3>What can I do?</h3>
+        {offer && <span className="situation-count" aria-hidden="true">{actionButtons.length}</span>}
+        {offer && <button type="button" className="ghost situation-toggle" aria-expanded={expanded} aria-controls="situation-action-buttons"
+          onClick={() => setExpanded((value) => !value)}>{expanded ? "Hide options" : "Show options"}</button>}
+      </div>
     </div>
     {!ownTurn && <p className="situation-note" role="status">It is not this character&apos;s turn. Options appear when the initiative order reaches them.</p>}
-    {ownTurn && actions.length === 0 && <p className="situation-note" role="status">No supported action can be taken right now.</p>}
-    {ownTurn && actions.length > 0 && <>
-      <div className="situation-action-buttons" role="group" aria-label="Insert a situation action into your declaration">
-        {actions.flatMap((action) => {
-          const kind = action.kind as SupportedKind;
-          if (targeted.has(kind)) {
-            return action.targetIds.map((targetId) => {
-              const target = labels.get(targetId) ?? null;
-              return <button type="button" className="ghost" key={`${action.legalActionId}:${targetId}`} disabled={disabled}
-                onClick={() => onInsert(declarationFor(kind, target))}>{actionLabel[kind]}{target ? `: ${target}` : ""}</button>;
-            });
-          }
-          return [<button type="button" className="ghost" key={action.legalActionId} disabled={disabled}
-            onClick={() => onInsert(declarationFor(kind, null))}>{actionLabel[kind]}</button>];
-        })}
-      </div>
+    {ownTurn && actionButtons.length === 0 && <p className="situation-note" role="status">No supported action can be taken right now.</p>}
+    {offer && expanded && <>
+      <div id="situation-action-buttons" className="situation-action-buttons" role="group" aria-label="Insert a situation action into your declaration">{actionButtons}</div>
       <p className="situation-note">Each button writes an exact declaration. Add context from your character sheet, then declare it; the DM accepts or rejects the attempt and resolves it against the rules.</p>
     </>}
   </section>;

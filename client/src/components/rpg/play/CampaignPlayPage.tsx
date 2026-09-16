@@ -449,7 +449,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     setActiveTool(tool); setVisitedTools((current) => current.includes(tool) ? current : [...current, tool]);
     if (tool === "character") void openSheet();
     // On narrow layouts the tool host sits below the center column; bring it into view so a tool click visibly opens.
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1100px)").matches) {
+    if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) {
       requestAnimationFrame(() => document.getElementById("campaign-quick-tools")?.scrollIntoView({ block: "start" }));
     }
   }

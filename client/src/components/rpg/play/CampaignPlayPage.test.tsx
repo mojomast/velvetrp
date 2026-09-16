@@ -67,6 +67,19 @@ describe("CampaignPlayPage", () => {
     expect((screen.getByRole("button", { name: "Short rest for Aria" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByRole("button", { name: "Confirm rest" })).toBeNull();
   });
+  it("groups session tools apart from table setup and administration", async () => {
+    const client = api(); vi.mocked(client.getCampaignPlayBootstrap).mockResolvedValue({ ...bootstrap, principal: { role: "gm", control: "all" } });
+    render(<CampaignPlayPage campaignId="campaign" sessionId="session" authorizationGeneration={1} api={client} onBack={vi.fn()} onUnavailable={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Adventure room" });
+    const session = screen.getByRole("group", { name: "Session tools" });
+    expect(within(session).getByRole("button", { name: "Character" })).toBeTruthy();
+    expect(within(session).getByRole("button", { name: "Combat & rewards" })).toBeTruthy();
+    expect(within(session).queryByRole("button", { name: "GM tools" })).toBeNull();
+    const setup = screen.getByRole("group", { name: "Table setup and administration" });
+    expect(within(setup).getByRole("button", { name: "GM tools" })).toBeTruthy();
+    expect(within(setup).getByRole("button", { name: "Display" })).toBeTruthy();
+    expect(within(setup).getByRole("button", { name: "Shortcuts" })).toBeTruthy();
+  });
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) { this.open = true; });
     HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) { this.open = false; });

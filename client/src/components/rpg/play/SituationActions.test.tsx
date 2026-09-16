@@ -46,6 +46,16 @@ describe("SituationActions", () => {
     expect(await screen.findByRole("button", { name: "Make death save" })).toBeTruthy();
   });
 
+  it("keeps a compact affordance that collapses and restores the legal actions", async () => {
+    render(<SituationActions campaignId="campaign" sessionId="session" controlledActorId="lead" api={api()} onInsert={vi.fn()} />);
+    expect(await screen.findByRole("button", { name: "Attack: Bandit" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Hide options" }));
+    expect(screen.queryByRole("button", { name: "Attack: Bandit" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "What can I do?" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Show options" }));
+    expect(screen.getByRole("button", { name: "Attack: Bandit" })).toBeTruthy();
+  });
+
   it("waits when it is another combatant's turn", async () => {
     render(<SituationActions campaignId="campaign" sessionId="session" controlledActorId="lead" api={api("c-bandit")} onInsert={vi.fn()} />);
     expect(await screen.findByText(/Another combatant's turn|not this character's turn/i)).toBeTruthy();

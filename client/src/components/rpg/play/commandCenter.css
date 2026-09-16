@@ -3,7 +3,8 @@
    overlaying the map. */
 .campaign-play-page { --panel-gap: 12px; --panel-padding: 14px; --campaign-context-width: 320px; --campaign-quick-width: 340px; }
 .campaign-play-page [hidden] { display: none !important; }
-.campaign-play-page .campaign-play-title { display: grid; gap: 2px; }
+.campaign-play-page .campaign-play-title { display: grid; gap: 2px; min-width: 0; flex: 0 0 auto; }
+.campaign-play-page .campaign-play-header h1 { white-space: nowrap; }
 .campaign-play-page .campaign-play-status { display: flex; align-items: center; gap: 12px; }
 .campaign-play-page .campaign-play-status .atlas-actor { display: grid; gap: 4px; max-width: 22rem; }
 .campaign-play-page .atlas-actor-readonly { display: grid; gap: 1px; min-width: 0; max-width: 20rem; text-align: right; color: var(--muted); font-size: 11px; line-height: 1.3; }
@@ -19,8 +20,20 @@
 .campaign-play-page .atlas-character-actions { border-radius: 10px 10px 0 0; }
 .campaign-play-page .admin-security-panels { display: grid; gap: var(--panel-gap); }
 .campaign-play-page .campaign-character-creator { display: grid; gap: var(--panel-gap); }
+.campaign-play-page .campaign-nav-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.campaign-play-page .campaign-nav-group-setup { margin-left: auto; padding-left: 10px; border-left: 1px solid var(--border); }
+.campaign-play-page .campaign-nav-group-label { color: var(--muted); font: 700 10px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing: .1em; text-transform: uppercase; }
 .campaign-play-page .campaign-nav-select { display: inline-flex; align-items: center; }
 .campaign-play-page .campaign-nav-select select { min-height: 36px; padding: 7px 11px; white-space: nowrap; }
+@media (max-width: 1280px) {
+  .campaign-play-page .campaign-play-status { gap: 2px 8px; }
+  .campaign-play-page .atlas-actor-readonly { max-width: 15rem; }
+  .campaign-play-page .atlas-actor-readonly .atlas-actor-hint { display: none; }
+}
+@media (max-width: 600px) {
+  .campaign-play-page .campaign-play-header h1 { font-size: 24px; }
+}
 @media (max-width: 1100px) {
   .campaign-play-page .campaign-play-grid.has-context.has-quick-tools { grid-template-columns: minmax(220px, var(--campaign-context-width)) 8px minmax(420px, 1fr); }
+  .campaign-play-page .campaign-nav-group-setup { margin-left: 0; }
 }

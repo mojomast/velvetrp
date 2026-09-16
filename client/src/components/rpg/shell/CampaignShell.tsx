@@ -142,11 +142,14 @@ export function CampaignShell({ campaignId, view, selection, studio, combat, onN
       <div className="control-rail-note"><span className="control-kicker">At your table</span><p>{role === "observer" ? "Follow the story. Read shared material without issuing gameplay commands." : role === "player" ? "Your character, your choices. Available actions are verified by the server." : "Prepare the world. Review AI candidates. Keep the final say."}</p><small>Server-reported role. No role switching or remote sign-in is provided here.</small></div>
     </aside>
     <div className="control-stage">
-      <header className="control-toolbar"><span>{active === "create" ? "Create / Reviewed generation" : active === "play" ? "Play / Table tools" : "Campaign / " + active.charAt(0).toUpperCase() + active.slice(1)}</span><nav aria-label="Table tools">
-        {combat && <button disabled={blocked} aria-current={view === "campaign-combat" ? "page" : undefined} onClick={() => navigate("combat")}>Combat tracker</button>}
-        {studio && <><button disabled={blocked} onClick={() => navigate("world")}>World & routes</button><button disabled={blocked} onClick={() => navigate("cast")}>Browse cast & factions</button></>}
-        <button disabled={blocked} onClick={() => navigate("history")}>Read history & recaps</button>
-      </nav></header>
+      <header className="control-toolbar"><span>{active === "create" ? "Create / Reviewed generation" : active === "play" ? "Play / Table tools" : "Campaign / " + active.charAt(0).toUpperCase() + active.slice(1)}</span>
+        {/* The in-room command center owns campaign navigation while the table is open. */}
+        {view !== "campaign-play" && <nav aria-label="Table tools">
+          {combat && <button disabled={blocked} aria-current={view === "campaign-combat" ? "page" : undefined} onClick={() => navigate("combat")}>Combat tracker</button>}
+          {studio && <><button disabled={blocked} onClick={() => navigate("world")}>World & routes</button><button disabled={blocked} onClick={() => navigate("cast")}>Browse cast & factions</button></>}
+          <button disabled={blocked} onClick={() => navigate("history")}>Read history & recaps</button>
+        </nav>}
+      </header>
       <div id="campaign-workspace" tabIndex={-1} ref={content} className="control-workspace"><CampaignWorkspaceBoundary key={`${campaignId}:${view}`} onOverview={() => onNavigate("overview")}>{children}</CampaignWorkspaceBoundary></div>
     </div>
   </div></ShellContext.Provider>;
