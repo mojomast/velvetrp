@@ -155,11 +155,13 @@ export const campaignHistoryHttpPublicReceiptSchema = z.discriminatedUnion("kind
   }).strict().refine((value) => value.revisionAfter === value.revisionBefore + 1,
     "receipt revision must advance once"),
   z.object({kind:z.literal("combat"),revisionBefore:revisionSchema,revisionAfter:revisionSchema,
-    occurredAt:z.string().datetime({offset:false,precision:3}),action:z.enum(["attack","flee","end-turn"]),
+    occurredAt:z.string().datetime({offset:false,precision:3}),action:z.enum(["attack","flee","end-turn","death-save","dash","disengage","hide","ready","grapple","shove","help","stabilize","stand-up","escape-grapple"]),
     outcome:z.discriminatedUnion("kind",[
       z.object({kind:z.literal("damage"),damageType:z.enum(["physical","bludgeoning","piercing","slashing"]),requested:z.number().int().min(0).max(1_000_000),applied:z.number().int().min(0).max(1_000_000),
         hitPointsBefore:z.number().int().min(0).max(1_000_000),hitPointsAfter:z.number().int().min(0).max(1_000_000),statusAfter:z.enum(["active","defeated"])}).strict(),
       z.object({kind:z.literal("status"),statusAfter:z.literal("fled")}).strict(),
+      z.object({kind:z.literal("survival"),successes:z.number().int().min(0).max(3),failures:z.number().int().min(0).max(3),
+        hitPointsAfter:z.number().int().min(0).max(1_000_000).optional(),statusAfter:z.enum(["unconscious","stable","dead","active"])}).strict(),
       z.object({kind:z.literal("none")}).strict(),
     ]),roundBefore:revisionSchema,roundAfter:revisionSchema}).strict()
     .refine((value)=>value.revisionAfter===value.revisionBefore+1,"receipt revision must advance once"),

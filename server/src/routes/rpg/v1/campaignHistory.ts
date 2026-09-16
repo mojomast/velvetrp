@@ -231,7 +231,8 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
         revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,action:resolution.kind,
         outcome:outcome?.kind==="damage"?{kind:"damage",damageType:outcome.damageType,requested:outcome.requested,applied:outcome.applied,
           hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
-          :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
+          :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}
+          :outcome?.kind==="survival"?{kind:"survival",successes:outcome.successes,failures:outcome.failures,...(typeof outcome.hitPointsAfter==="number"?{hitPointsAfter:outcome.hitPointsAfter}:{}),statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
       const travel=repository.getExactCandidateTravelPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
       if(travel)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"travel",...travel}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);

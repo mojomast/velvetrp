@@ -33,11 +33,10 @@ type Load = LoadIdentity & (
 type CombatReceipt = Extract<Receipt, { kind: "combat" }>;
 
 function combatActionLabel(action: CombatReceipt["action"]): string {
-  switch (action) {
-    case "attack": return "Attack";
-    case "flee": return "Flee";
-    case "end-turn": return "End turn";
-  }
+  const labels: Record<string, string> = { attack: "Attack", flee: "Flee", "end-turn": "End turn", "death-save": "Death save",
+    dash: "Dash", disengage: "Disengage", hide: "Hide", ready: "Ready", grapple: "Grapple", shove: "Shove",
+    help: "Help", stabilize: "Stabilize", "stand-up": "Stand up", "escape-grapple": "Escape grapple" };
+  return labels[action] ?? action;
 }
 
 function CombatOutcome({ outcome }: { outcome: CombatReceipt["outcome"] }) {
@@ -49,6 +48,11 @@ function CombatOutcome({ outcome }: { outcome: CombatReceipt["outcome"] }) {
       </>;
     case "status":
       return <div><dt>Outcome</dt><dd>Fled</dd></div>;
+    case "survival":
+      return <>
+        <div><dt>Death saves</dt><dd>{outcome.successes} success{outcome.successes === 1 ? "" : "es"}, {outcome.failures} failure{outcome.failures === 1 ? "" : "s"}</dd></div>
+        <div><dt>Target condition</dt><dd>{outcome.hitPointsAfter !== undefined ? `${outcome.hitPointsAfter} HP, ` : ""}{outcome.statusAfter}</dd></div>
+      </>;
     case "none":
       return <div><dt>Outcome</dt><dd>No direct target outcome</dd></div>;
   }
@@ -183,7 +187,7 @@ function compactReceiptLine(receipt: Receipt): string {
   }
   if (receipt.kind === "quest") return `Quest ${receipt.title} · ${receipt.objectiveDescription} ${receipt.progressBefore}→${receipt.progressAfter}/${receipt.target}${receipt.objectiveCompleted ? " · objective complete" : ""}${receipt.questCompleted ? " · quest complete" : ""}`;
   if (receipt.kind === "travel") return `Travel → ${receipt.destination}`;
-  if (receipt.kind === "combat") return `Combat ${combatActionLabel(receipt.action)} · ${receipt.outcome.kind === "damage" ? `${receipt.outcome.applied} ${receipt.outcome.damageType} damage, ${receipt.outcome.hitPointsAfter} HP, ${receipt.outcome.statusAfter}` : receipt.outcome.kind === "status" ? "fled" : "no direct target outcome"} · round ${receipt.roundBefore}→${receipt.roundAfter}`;
+  if (receipt.kind === "combat") return `Combat ${combatActionLabel(receipt.action)} · ${receipt.outcome.kind === "damage" ? `${receipt.outcome.applied} ${receipt.outcome.damageType} damage, ${receipt.outcome.hitPointsAfter} HP, ${receipt.outcome.statusAfter}` : receipt.outcome.kind === "status" ? "fled" : receipt.outcome.kind === "survival" ? `${receipt.outcome.successes} success/${receipt.outcome.failures} fail, ${receipt.outcome.hitPointsAfter !== undefined ? `${receipt.outcome.hitPointsAfter} HP, ` : ""}${receipt.outcome.statusAfter}` : "no direct target outcome"} · round ${receipt.roundBefore}→${receipt.roundAfter}`;
   if (receipt.kind === "administration") return "Campaign administration metadata.";
   const event = receipt.event;
   if (event.type === "actor_dice_rolled") return `Dice ${event.data.expression} · ${event.data.terms.map((term) => term.value).join(",")} · ${event.data.modifier >= 0 ? "+" : ""}${event.data.modifier} = ${event.data.total}`;
