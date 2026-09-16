@@ -42,6 +42,17 @@ describe("CampaignContextDrawer NPC presence", () => {
     await waitFor(() => expect(client.generateTacticalMap).toHaveBeenCalledWith("campaign", "session", expect.objectContaining({ grounding: { actorId: "actor", expectedLocationId: "gate", expectedLocationRevision: 7 } })));
   });
 
+  it("loads the independent tactical map pane when the authoritative world viewpoint is unavailable", async () => {
+    const client = api({ getCampaignWorld: vi.fn().mockRejectedValue(new ApiError(409, "Campaign world session is ambiguous")),
+      getTacticalMap: vi.fn().mockRejectedValue(new ApiError(404, "missing")), generateTacticalMap: vi.fn().mockResolvedValue({}), previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
+    render(<CampaignContextDrawer {...props} audience="gm" mapsOnly api={client} />);
+    await screen.findByRole("button", { name: "Generate tactical map" }, { timeout: 5000 });
+    expect(client.getTacticalMap).toHaveBeenCalled();
+    expect(screen.queryByText(/Waiting for the authoritative world viewpoint/)).toBeNull();
+    expect(screen.getByText(/authoritative world viewpoint is unavailable/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Generate tactical map" }) as HTMLButtonElement).closest("fieldset")?.disabled).toBe(false);
+  });
+
   it.each(["authorization", "location"])("retains the map DOM through refreshKey GETs but clears it on %s changes", async (boundary) => {
     const canvasMock = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     const snapshot = { campaignId: "campaign", sessionId: "session", encounterId: null, mode: "exploration", mapRevision: 1, tokenRevision: 1, controlledTokenId: "hero", movement: null, projection: { mapId: "map", width: 2, height: 1, grid: { kind: "square", feetPerCell: 5 }, tiles: [{ position: { x: 0, y: 0 }, terrain: "floor", visibility: "visible" }], tokens: [{ tokenId: "hero", label: "Private viewpoint", position: { x: 0, y: 0 }, footprint: { width: 1, height: 1 }, disposition: "friendly" }], reachable: [], authoritativePath: null } };
