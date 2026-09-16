@@ -177,7 +177,7 @@ describe("persistence and multi-character frontend", () => {
     installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-world",campaignId:campaignAccess.id}));
     routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"Content-Type":"application/json","x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/characters$/,handler:()=>json({characters:[]})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/character-creation-options$/,handler:()=>json(appCreationOptions)},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/dice-rolls$/,handler:()=>json({characters:[],rolls:[]})},
@@ -207,7 +207,7 @@ describe("persistence and multi-character frontend", () => {
   it("opens every campaign studio entry and restores focus to its exact trigger",async()=>{
     installFetch([aria],[],true,true,true);localStorage.setItem("velvet.navigation.v1",JSON.stringify({view:"campaign-detail",campaignId:campaignAccess.id}));routes.push(
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one$/,handler:()=>json(configuredCampaignDetail)},
-      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"0"}})},
+      {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/,handler:()=>new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/,handler:()=>new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200,headers:{"x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/factions$/,handler:()=>new Response(JSON.stringify({factions:[],standings:[]}),{status:200,headers:{"x-world-revision":"0"}})},
       {method:"GET",match:/\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/,handler:()=>new Response(JSON.stringify({quests:[],objectives:[],journal:[]}),{status:200,headers:{"x-quest-revision":"0"}})},
@@ -515,7 +515,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify(world), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify(world), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
@@ -544,7 +544,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/restored-turn$/, handler: () => json({ turn, proposals: [], confirmation: { state: "none" }, receipts: [], narrationStatus: { status: "completed", text: "Restored adventure narration", source: "provider-assisted" } }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },
@@ -584,7 +584,7 @@ describe("persistence and multi-character frontend", () => {
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/play-bootstrap$/, handler: () => json(playBootstrap) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/rooms\/sess-1\/dm$/, handler: () => json({ control: { campaignId: "campaign-one", mode: "human", revision: 0 }, runs: [] }) },
       { method: "GET", match: /\/api\/rpg\/v1\/adventure-turns\/transcript\?campaignId=campaign-one&sessionId=sess-1$/, handler: () => json({ campaignId: campaignAccess.id, sessionId: baseSession.id, turns: [] }) },
-      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world$/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
+      { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/world(?:\?|$)/, handler: () => new Response(JSON.stringify({ currentLocations: [], visibleLocations: [], visibleConnections: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/npcs$/, handler: () => new Response(JSON.stringify({ npcs: [], relationships: [] }), { status: 200, headers: { "x-world-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/quests$/, handler: () => new Response(JSON.stringify({ quests: [], objectives: [], journal: [] }), { status: 200, headers: { "x-quest-revision": "0" } }) },
       { method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one\/actors\/actor\/resources$/, handler: () => json({ resources: [], revision: 0 }) },

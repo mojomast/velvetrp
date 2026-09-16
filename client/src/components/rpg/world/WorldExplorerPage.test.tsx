@@ -23,6 +23,12 @@ describe("embedded travel", () => {
     expect(api.travel).toHaveBeenCalledExactlyOnceWith("actor", expect.objectContaining({ connectionId: "route", partyActorIds: ["actor"], expectedRevision: 2 }));
     expect(auth.reauthorize).toHaveBeenCalledOnce();
   });
+  it("scopes the world read to the attached room when a session is given", async () => {
+    const api: WorldExplorerApi = { getWorld: vi.fn().mockResolvedValue({ data: world, revision: 2 }), travel: vi.fn(), place: vi.fn(), camp: vi.fn() };
+    render(<WorldExplorerPage embedded campaignId="campaign" sessionId="room" authorization={authorization()} api={api} actors={[{ actorId: "actor", name: "Aria" }]} onBack={vi.fn()} />);
+    await screen.findByLabelText("Eligible route");
+    expect(api.getWorld).toHaveBeenCalledWith("campaign", "room");
+  });
   it("rejects submission if another room operation locks during reauthorization", async () => {
     const auth = authorization(); let resolve!: (value: StudioAuthorization) => void;
     vi.mocked(auth.reauthorize).mockReturnValue(new Promise((done) => { resolve = done; }));

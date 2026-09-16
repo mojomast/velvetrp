@@ -571,7 +571,7 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       ? <AtlasAdvancement campaignId={campaignId} api={advancementApi} blocked={toolBlocked || combatLocked || travelLocked || inventoryLocked} reauthorize={authorizeActorTool} onLockChange={setAdvancementLocked} onStateChange={refreshAfterTool} />
       : <p>Advancement requires an active room, an authorized character, and progression services.</p>)}</AtlasDrawer>
     <AtlasDrawer tool="travel" open={activeTool === "travel"} onClose={closeTool}>{visitedTools.includes("travel") && (worldApi && authorization
-      ? <WorldExplorerPage embedded campaignId={campaignId} authorization={authorization} api={worldApi} actors={bootstrap.playableActors}
+      ? <WorldExplorerPage embedded campaignId={campaignId} sessionId={sessionId} authorization={authorization} api={worldApi} actors={bootstrap.playableActors}
         blocked={toolBlocked || combatLocked || inventoryLocked || advancementLocked} onLockChange={setTravelLocked} onStateChange={refreshAfterTool} onBack={closeTool} />
       : <p>Direct travel requires authorized world services. World route buttons can still prepare a declaration; they do not commit travel.</p>)}</AtlasDrawer>
     <AtlasDrawer tool="dice" open={activeTool === "dice"} onClose={closeTool}>{visitedTools.includes("dice") && <CampaignDicePanel campaignId={campaignId} api={api} canView={canViewDice} canRoll={canRollDice && !dmLocked} actorNames={bootstrap.playableActors.map((actor) => actor.name)} selectedActorName={bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name} refreshKey={liveRefreshRevision} />}</AtlasDrawer>
