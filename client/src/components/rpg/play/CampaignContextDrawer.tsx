@@ -16,7 +16,7 @@ type CastView = { audience: Audience; state: "running" | "stopped"; sessionRevis
 
 /** Narrow, role-filtered read/write API consumed by the campaign context drawer. */
 export interface CampaignContextDrawerApi extends Partial<TacticalMapPanelApi> {
-  getCampaignWorld: (campaignId: string) => Promise<{ data: CampaignWorldHttpResponse; revision: number }>;
+  getCampaignWorld: (campaignId: string, sessionId?: string) => Promise<{ data: CampaignWorldHttpResponse; revision: number }>;
   listCampaignNpcs: (campaignId: string, audience: Audience) => Promise<{ data: { npcs: Array<{ npcId: string; publicState: { name: string } }> }; revision: number }>;
   listCampaignQuests: (campaignId: string, audience: Audience) => Promise<{ data: { quests: Array<{ questId: string; status: string }>; objectives: Array<{ objectiveId: string; questId: string; description: string; progress: number; targetProgress: number; completedAt: string | null }> }; revision: number }>;
   getActorResources: (campaignId: string, actorId: string) => Promise<ActorResourcesHttpGetResponse>;
@@ -137,7 +137,7 @@ function BoundCampaignContextDrawer({ campaignId, sessionId, selectedActorId, pl
     }
     previousAuthorizationRef.current = { audience, campaignId, sessionId };
     void refreshCast();
-    void api.getCampaignWorld(campaignId).then((value) => { if (current) setWorld({ state: "ready", value: value.data }); }).catch(() => { if (current) setWorld({ state: "error" }); });
+    void api.getCampaignWorld(campaignId, sessionId).then((value) => { if (current) setWorld({ state: "ready", value: value.data }); }).catch(() => { if (current) setWorld({ state: "error" }); });
     if (audience === "gm") void api.listCampaignNpcs(campaignId, "gm").then((value) => { if (current) setRoster({ state: "ready", value: value.data.npcs.map((npc) => ({ id: npc.npcId, name: npc.publicState.name })) }); }).catch(() => { if (current) setRoster({ state: "error" }); });
     else setRoster({ state: "ready", value: [] });
     void api.listCampaignQuests(campaignId, audience).then((value) => { if (!current) return; const active = new Set(value.data.quests.filter((quest) => quest.status === "active").map((quest) => quest.questId)); setObjectives({ state: "ready", value: value.data.objectives.filter((objective) => active.has(objective.questId) && objective.completedAt === null).map((objective) => ({ id: objective.objectiveId, description: objective.description, progress: objective.progress, target: objective.targetProgress })) }); }).catch(() => { if (current) setObjectives({ state: "error" }); });

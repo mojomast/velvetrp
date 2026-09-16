@@ -525,7 +525,7 @@ Requires both `FEATURE_RPG_CAMPAIGN=true` and `FEATURE_RPG_MECHANICS=true`, with
 
 | Method | Route | Strict request | Success |
 | --- | --- | --- | --- |
-| `GET` | `/rpg/v1/campaigns/:campaignId/world` | No query/body | `{ currentLocations, visibleLocations, visibleConnections }` |
+| `GET` | `/rpg/v1/campaigns/:campaignId/world` | Optional `sessionId` query (scopes the room; omitted fails closed when several rooms are attached); no body | `{ currentLocations, visibleLocations, visibleConnections }` |
 | `POST` | `/rpg/v1/actors/:actorId/travel-commands` | `{ connectionId, partyActorIds, expectedRevision, idempotencyKey }` | `{ locations, discoveries, receipt }` |
 | `GET`, `POST` | `/rpg/v1/campaigns/:campaignId/npcs` | GET: none; POST: `{ personaId, publicState, privateState, expectedRevision, idempotencyKey }` | `{ npcs, relationships }` or `201 { npc, receipt }` |
 | `POST` | `/rpg/v1/npcs/:npcId/relationship-commands` | `{ subjectActorId, affinityDelta, trustDelta, fearDelta, reason, expectedRevision, idempotencyKey }` | `{ relationship, receipt }` |

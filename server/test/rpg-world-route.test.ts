@@ -34,6 +34,17 @@ describe("M2.10 world routes",()=>{
       receipt:{idempotencyKey:"travel",revisionBefore:2,revisionAfter:3,occurredAt:at}});
     expect(calls).toEqual([["world","local-owner","campaign"],["travel","local-owner","actor",body]]);await app.close();
   });
+  it("scopes the world read to a requested attached room and rejects other query parameters",async()=>{
+    enable();const calls:any[]=[];const app=buildApp({campaignRepositoryFactory:()=>repository({
+      getCampaignWorld:(...args:any[])=>{calls.push(args);return world;},
+    })});
+    const scoped=await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/world?sessionId=session"});
+    expect(scoped.statusCode).toBe(200);expect(scoped.json()).toEqual({currentLocations:world.currentLocations,visibleLocations:world.visibleLocations,visibleConnections:[]});
+    expect(calls).toEqual([["local-owner","campaign","session"]]);
+    expect((await app.inject({method:"GET",url:"/api/rpg/v1/campaigns/campaign/world?sessionId=session&x=1"})).statusCode).toBe(400);
+    expect((await app.inject({method:"GET",url:`/api/rpg/v1/campaigns/campaign/world?sessionId=${"x".repeat(129)}`})).statusCode).toBe(400);
+    await app.close();
+  });
   it("gates and normalizes query, media, body, paths, and methods before mutation",async()=>{
     let accesses=0,calls=0;const app=buildApp({campaignRepositoryFactory:()=>{accesses++;return repository({travelActor:()=>{calls++;throw new Error();}});}});
     const body={connectionId:"road",partyActorIds:["actor"],expectedRevision:0,idempotencyKey:"travel"};

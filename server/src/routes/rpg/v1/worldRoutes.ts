@@ -38,15 +38,20 @@ export const worldHttpRoutes:FastifyPluginAsync<WorldHttpOptions>=async(app,opti
   app.get<{Params:{campaignId:string};Querystring:Record<string,unknown>}>("/campaigns/:campaignId/world",{
     exposeHeadRoute:false,onRequest:async(request,reply)=>{reply.header("cache-control","no-store");
       if(!enabled()){await sendApiProblem(request,reply,404,"RPG_ROUTE_NOT_FOUND","RPG route not found");return;}
-      if((request.raw.url??request.url).includes("?")||Object.keys(request.query).length>0)
-        await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Campaign world does not accept query parameters");},
+      if(Object.keys(request.query).some((key)=>key!=="sessionId")
+        ||(request.query.sessionId!==undefined&&!resourceIdSchema.safeParse(request.query.sessionId).success))
+        await sendApiProblem(request,reply,400,"RPG_INVALID_REQUEST","Campaign world accepts only a valid sessionId query parameter");},
   },async(request,reply)=>{
     const campaignId=resourceIdSchema.safeParse(request.params.campaignId);if(!campaignId.success)return campaignNotFound(request,reply);
+    const requested=request.query.sessionId,requestedSessionId=typeof requested==="string"?requested:undefined;
     try{
-      const world=options.worldRepositoryAccessor().getCampaignWorld(LOCAL_OWNER,campaignId.data);if(world===null)return campaignNotFound(request,reply);
+      const accessor=options.worldRepositoryAccessor();
+      const world=requestedSessionId===undefined?accessor.getCampaignWorld(LOCAL_OWNER,campaignId.data):accessor.getCampaignWorld(LOCAL_OWNER,campaignId.data,requestedSessionId);
+      if(world===null)return campaignNotFound(request,reply);
       const allowed=new Set(["campaignId","sessionId","revision","currentLocations","visibleLocations","visibleConnections"]);
       if(Object.keys(world).length!==allowed.size||Object.keys(world).some((key)=>!allowed.has(key))||world.campaignId!==campaignId.data
-        ||!resourceIdSchema.safeParse(world.sessionId).success)throw new Error("campaign world binding is invalid");
+        ||!resourceIdSchema.safeParse(world.sessionId).success||(requestedSessionId!==undefined&&world.sessionId!==requestedSessionId))
+        throw new Error("campaign world binding is invalid");
       reply.header("x-world-revision",String(world.revision));
       return reply.code(200).send(campaignWorldHttpResponseSchema.parse({currentLocations:world.currentLocations,
         visibleLocations:world.visibleLocations,visibleConnections:world.visibleConnections}));

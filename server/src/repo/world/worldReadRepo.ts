@@ -13,7 +13,8 @@ export interface WorldReadContext {
 export interface WorldReadRepository {
   /** Returns the principal's audience-filtered world state for a campaign session. */
   getWorldProjection(principalId: string, campaignId: string, sessionId: string): WorldProjection | null;
-  getCampaignWorld(principalId:string,campaignId:string):WorldCampaignHttpSnapshot|null;
+  /** Reads one attached room's world; without a session it fails closed when the campaign has several. */
+  getCampaignWorld(principalId:string,campaignId:string,requestedSessionId?:string):WorldCampaignHttpSnapshot|null;
   listCampaignNpcs(principalId:string,campaignId:string):CampaignNpcsSnapshot|null;
   listCampaignFactions(principalId:string,campaignId:string):CampaignFactionsSnapshot|null;
 }
@@ -64,13 +65,20 @@ export function createWorldReadRepository(
     });
   };
 
-  const getCampaignWorld=(principalId:string,campaignId:string):WorldCampaignHttpSnapshot|null=>{
+  const getCampaignWorld=(principalId:string,campaignId:string,requestedSessionId?:string):WorldCampaignHttpSnapshot|null=>{
     context.guard();if(!member(principalId,campaignId))return null;
-    const sessions=db.prepare("SELECT session_id FROM campaign_sessions WHERE campaign_id=? ORDER BY attached_at,session_id")
-      .all(campaignId) as Array<{session_id:string}>;
-    if(sessions.length===0)return null;
-    if(sessions.length!==1)throw new WorldConflictError("campaign world session is ambiguous");
-    const sessionId=sessions[0]!.session_id,isGm=gm(principalId,campaignId);
+    let sessionId:string;
+    if(requestedSessionId!==undefined){
+      if(!db.prepare("SELECT 1 FROM campaign_sessions WHERE campaign_id=? AND session_id=?").get(campaignId,requestedSessionId))return null;
+      sessionId=requestedSessionId;
+    }else{
+      const sessions=db.prepare("SELECT session_id FROM campaign_sessions WHERE campaign_id=? ORDER BY attached_at,session_id")
+        .all(campaignId) as Array<{session_id:string}>;
+      if(sessions.length===0)return null;
+      if(sessions.length!==1)throw new WorldConflictError("campaign world session is ambiguous");
+      sessionId=sessions[0]!.session_id;
+    }
+    const isGm=gm(principalId,campaignId);
     const revision=(db.prepare("SELECT revision FROM world_mutation_revisions_v28 WHERE campaign_id=? AND session_id=?")
       .get(campaignId,sessionId) as {revision:number}|undefined)?.revision??0;
     const discoveries=isGm?[]:db.prepare(`SELECT DISTINCT discovery.location_id FROM campaign_location_discoveries_v28 discovery

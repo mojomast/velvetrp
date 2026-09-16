@@ -33,6 +33,7 @@ describe("CampaignContextDrawer NPC presence", () => {
     } }), getTacticalMap: vi.fn().mockRejectedValue(new ApiError(404, "missing")), generateTacticalMap: vi.fn().mockResolvedValue({}), previewTacticalMapMove: vi.fn(), moveTacticalMapToken: vi.fn() });
     render(<CampaignContextDrawer {...props} audience="gm" mapsOnly api={client} />);
     await screen.findByRole("button", { name: "Generate tactical map" }, { timeout: 5000 });
+    expect(client.getCampaignWorld).toHaveBeenCalledWith("campaign", "session");
     expect(screen.getByRole("heading", { name: "Old North Gate" })).toBeTruthy();
     fireEvent.click(screen.getByText("About this location"));
     expect(screen.getByText("Weathered stone above the harbor.")).toBeTruthy();

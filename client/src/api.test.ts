@@ -339,6 +339,13 @@ describe("M2.10 world, cast, quest, and story API bindings",()=>{
     expect(fetchMock.mock.calls.map(([path,init])=>[path,(init as RequestInit).cache])).toEqual([["/api/rpg/v1/campaigns/campaign/world","no-store"],["/api/rpg/v1/campaigns/campaign/npcs","no-store"],["/api/rpg/v1/campaigns/campaign/factions","no-store"],["/api/rpg/v1/campaigns/campaign/quests","no-store"],["/api/rpg/v1/campaigns/campaign/story","no-store"]]);
     vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({npcs:[],relationships:[]}),{status:200})));await expect(listCampaignNpcs("campaign","player")).rejects.toThrow(/x-world-revision/);
   });
+  it("scopes a campaign world read to a requested room",async()=>{
+    const fetchMock=vi.fn().mockResolvedValue(new Response(JSON.stringify({currentLocations:[],visibleLocations:[],visibleConnections:[]}),{status:200,headers:{"x-world-revision":"3"}}));
+    vi.stubGlobal("fetch",fetchMock);
+    await getCampaignWorld("campaign","room");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/rpg/v1/campaigns/campaign/world?sessionId=room");
+    await expect(getCampaignWorld("campaign","")).rejects.toBeInstanceOf(ApiInputError);
+  });
   it("binds exact travel party and claim actor/reward commands",async()=>{const travel={locations:[{actorId:"actor",locationId:"wood",revision:3,updatedAt:at}],discoveries:[{actorId:"actor",locationId:"wood",discoveredAt:at}],receipt:{idempotencyKey:"travel-key",revisionBefore:2,revisionAfter:3,occurredAt:at}};const quest={questId:"quest",campaignId:"campaign",title:"Dawn",description:null,status:"completed",rewards:[{rewardId:"reward",kind:"xp",amount:10,label:"XP",claimedByActorId:"actor",claimedAt:at}],createdAt:at,updatedAt:at};const fetchMock=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(travel),{status:200})).mockResolvedValueOnce(new Response(JSON.stringify({quest,receipt:{idempotencyKey:"claim-key",revisionBefore:4,revisionAfter:5,occurredAt:at}}),{status:200}));vi.stubGlobal("fetch",fetchMock);
     await travelActor("actor",{connectionId:"road",partyActorIds:["actor"],expectedRevision:2,idempotencyKey:"travel-key"});await commandQuest("quest",{kind:"claim-reward",actorId:"actor",rewardId:"reward",expectedRevision:4,idempotencyKey:"claim-key"});
     expect(fetchMock.mock.calls.map(([path,init])=>[path,(init as RequestInit).method,(init as RequestInit).cache])).toEqual([["/api/rpg/v1/actors/actor/travel-commands","POST","no-store"],["/api/rpg/v1/quests/quest/commands","POST","no-store"]]);

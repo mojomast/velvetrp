@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { generatedCampaignContentProviderSchema } from "@velvet/contracts";
 import { buildApp } from "../src/app.js";
-import { createRepository, createSession, SRD_5_1_STARTER_CATALOG } from "../src/repo/index.js";
+import { createRepository, createSession, SRD_5_1_STARTER_CATALOG, WorldConflictError } from "../src/repo/index.js";
 import { CampaignRoomActivationConflictError, CampaignRoomActivationUnavailableError } from "../src/repo/campaignRoomActivationRepo.js";
 import { useTmpDataDir } from "./helpers.js";
 
@@ -94,6 +94,17 @@ describe("campaign room activation", () => {
     expect(() => restarted.activateCampaignRoom(OWNER, campaignId, roomId, { ...input, expectedRevision: input.expectedRevision + 1 })).toThrow(CampaignRoomActivationConflictError);
     expect(JSON.stringify(result)).not.toMatch(/privateGoals|Private test goal|principalId|controller/);
     restarted.close();
+  });
+
+  it("scopes the campaign world read to a requested room and fails closed without one", async () => {
+    const { repo, campaignId, roomId, actors } = await seed();
+    const other = await createSession({ characterId: actors[0]!, title: "Second room" });
+    repo.attachCampaignSession(OWNER, { campaignId, sessionId: other.id });
+    expect(() => repo.getCampaignWorld(OWNER, campaignId)).toThrow(WorldConflictError);
+    expect(repo.getCampaignWorld(OWNER, campaignId, roomId)?.sessionId).toBe(roomId);
+    expect(repo.getCampaignWorld(OWNER, campaignId, other.id)?.sessionId).toBe(other.id);
+    expect(repo.getCampaignWorld(OWNER, campaignId, "not-attached")).toBeNull();
+    repo.close();
   });
 
   it("reports missing start without writes, then accepts content supplied after characters and attachment", async () => {

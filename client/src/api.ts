@@ -2798,8 +2798,10 @@ function bindReceipt(receipt: { idempotencyKey: string; revisionBefore: number; 
 }
 
 /** M2.10 reads expose the mandatory authoritative revision separately from their strict role projection. */
-export async function getCampaignWorld(campaignId: string): Promise<Revisioned<CampaignWorldHttpResponse>> {
-  const success = await requestResponse<unknown>(campaignLane(campaignId, "world"), { cache: "no-store" });
+export async function getCampaignWorld(campaignId: string, sessionId?: string): Promise<Revisioned<CampaignWorldHttpResponse>> {
+  const suffix = sessionId === undefined ? "world"
+    : `world?sessionId=${encodeURIComponent(parseApiInput(() => resourceIdSchema.parse(sessionId)))}`;
+  const success = await requestResponse<unknown>(campaignLane(campaignId, suffix), { cache: "no-store" });
   requireStatus(success, 200, "Campaign world read");
   return { data: campaignWorldHttpResponseSchema.parse(success.body), revision: revisionFrom(success.headers, "x-world-revision") };
 }
