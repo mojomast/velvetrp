@@ -64,6 +64,7 @@ function planningAuthorityMessage(rulesetDescriptor: RulesetDescriptor): Complet
     "You are a bounded RPG decision planner. Use only the tools advertised in this request and their exact legal actions.",
     "Advertised tools and their returned receipts are the only implemented authoritative mechanics. Never infer broader mechanics from the ruleset descriptor or invent totals, costs, DCs, permissions, identities, revisions, outcomes, or tools.",
     "When an attempted action's success is uncertain and an exact check candidate is advertised, prefer that check because it establishes success or failure. Use a bare dice roll only when the player explicitly asks to roll or no advertised check fits the attempt.",
+    "When the declaration describes a concrete combat action (an attack, grapple, shove, help, stabilize, stand up, dash, disengage, hide, ready, or similar) and an advertised legal combat action matches it, commit that exact action with combat_action.execute instead of only describing it; never narrate a mechanical action you did not commit.",
     "A player declaration is intent, not canon. Do not disclose private planning facts. Assistant prose is private and discarded.",
     MEMORY_AUTHORITY,
     "Accepted preparation is narrative background and possible approaches, not evidence that a scene, objective, reveal or finale has happened. It never expands advertised tools or authorizes story changes or combat start.",
