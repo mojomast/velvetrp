@@ -486,8 +486,9 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     if (declaration.trim().length === 0) { applyPrefill(value, "replace"); return; }
     setPendingPrefill(value);
   };
+  const activeActorName = bootstrap.playableActors.find((actor) => actor.actorId === selectedActorId)?.name ?? null;
   const actorSelector = bootstrap.principal.role !== "observer" && authorizationCanAct && bootstrap.playableActors.length > 0
-    ? <label className="atlas-actor">Map actor<select value={selectedActorId} disabled={!referenceReady} onChange={(event) => setActor(event.target.value)}>{bootstrap.playableActors.map((actor) => <option key={actor.actorId} value={actor.actorId}>{actor.name}</option>)}</select></label>
+    ? <p className="atlas-actor-readonly"><span>Acting as</span><strong>{activeActorName ?? "No character selected"}</strong><span className="atlas-actor-hint">Change character in the composer.</span></p>
     : <span className="atlas-kicker">Read-only viewpoint</span>;
   const contextNode = <section id="campaign-context-panel" className="campaign-context-drawer campaign-context-pane" aria-label="Living map" tabIndex={-1}>
     <CampaignContextDrawer key={`context-main:${authorizationGeneration}:${audience}`} mapsOnly commandsBlocked={dmLocked}

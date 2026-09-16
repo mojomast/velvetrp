@@ -48,12 +48,12 @@ describe("CampaignPlayPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Short rest for Aria" }, { timeout: 5000 }));
     await screen.findByRole("button", { name: "Confirm rest" });
     expect((screen.getByRole("button", { name: /Back to campaign/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByLabelText("Map actor") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Acting character") as HTMLSelectElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Declare action" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Combat & rewards" })); expect(navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "GM tools" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel review" }));
-    await waitFor(() => expect((screen.getByLabelText("Map actor") as HTMLSelectElement).disabled).toBe(false));
+    await waitFor(() => expect((screen.getByLabelText("Acting character") as HTMLSelectElement).disabled).toBe(false));
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();
   });
   it("keeps DM session commands locked while adventure streaming is in progress", async () => {
@@ -127,7 +127,7 @@ describe("CampaignPlayPage", () => {
     expect(document.querySelector(".living-atlas")).toBeNull();
     const map = screen.getByRole("region", { name: "Campaign maps" });
     const log = screen.getByRole("log");
-    expect(screen.getByLabelText("Map actor")).toBeTruthy();
+    expect(screen.getByLabelText("Acting character")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Exploration grid" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Combat grid" }));
     expect(screen.getByText(/No active combat in this room/)).toBeTruthy();
@@ -143,7 +143,7 @@ describe("CampaignPlayPage", () => {
     await screen.findByRole("heading", { name: "Adventure room" });
     expect(screen.getByText("Spectator access from server")).toBeTruthy();
     expect(screen.getByText(/Spectator \/ read-only access/)).toBeTruthy();
-    expect(screen.queryByLabelText("Map actor")).toBeNull();
+    expect(screen.queryByText(/Acting as/)).toBeNull();
     expect(client.streamAdventureTurn).not.toHaveBeenCalled();
   });
   it("uses bootstrap revision and streams an initial declaration exactly once", async () => {
