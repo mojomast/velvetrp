@@ -39,7 +39,7 @@ export function routeFromNavigation(navigation: StoredNavigation): string | null
   if (navigation.view === "campaigns") return "#/campaigns";
   if (navigation.view === "campaign-play") {
     if (!navigation.campaignId || !navigation.sessionId) return navigation.campaignId ? `#/campaign/${encode(navigation.campaignId)}` : "";
-    return `#/campaign/${encode(navigation.campaignId)}/play/${encode(navigation.sessionId)}`;
+    return `#/campaign/${encode(navigation.campaignId)}/play/${encode(navigation.sessionId)}${navigation.playSurface === "atlas" ? "/atlas" : ""}`;
   }
   if (navigation.view === "chat") {
     // Only campaign-originated rooms are routable; library chat keeps its local navigation.
@@ -67,7 +67,7 @@ export function navigationFromRoute(hash: string): StoredNavigation | null {
     const sessionId = parts[3];
     if (!sessionId || !resourceIdSchema.safeParse(sessionId).success) return { view: "campaign-detail", campaignId };
     if (segment === "room") return { view: "chat", campaignId, sessionId, chatReturnCampaignId: campaignId };
-    return { view: "campaign-play", campaignId, sessionId };
+    return { view: "campaign-play", campaignId, sessionId, ...(parts[4] === "atlas" ? { playSurface: "atlas" as const } : {}) };
   }
   const view = viewBySegment[segment];
   return view ? { view, campaignId } : null;

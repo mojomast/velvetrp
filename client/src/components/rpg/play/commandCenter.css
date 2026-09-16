@@ -7,7 +7,7 @@
 .campaign-play-page .campaign-play-status { display: flex; align-items: center; gap: 12px; }
 .campaign-play-page .campaign-play-status .atlas-actor { display: grid; gap: 4px; max-width: 22rem; }
 .campaign-play-page .campaign-context-drawer { position: sticky; top: 14px; z-index: 20; width: 100%; max-height: calc(100dvh - 110px); overflow: auto; }
-.campaign-play-page .campaign-quick-tools { min-width: 0; outline: none; position: relative; z-index: 20; }
+.campaign-play-page .campaign-quick-tools { min-width: 0; min-height: 0; max-height: 100%; outline: none; position: relative; z-index: 20; }
 .campaign-play-page .atlas-drawer-slot { position: static; inset: auto; width: 100%; min-height: 0; box-shadow: none; }
 .campaign-play-page .atlas-drawer { position: static; height: auto; max-height: none; margin: 0; border: 1px solid var(--control-border); border-radius: 13px; background: var(--surface); box-shadow: none; }
 .campaign-play-page .atlas-drawer-content { overflow: visible; padding: var(--panel-padding); }
@@ -19,5 +19,5 @@
 .campaign-play-page .campaign-nav-select { display: inline-flex; align-items: center; }
 .campaign-play-page .campaign-nav-select select { min-height: 36px; padding: 7px 11px; white-space: nowrap; }
 @media (max-width: 1100px) {
-  .campaign-play-page .campaign-play-grid.has-context.has-quick-tools { grid-template-columns: var(--campaign-context-width) 8px minmax(420px, 1fr); }
+  .campaign-play-page .campaign-play-grid.has-context.has-quick-tools { grid-template-columns: minmax(220px, var(--campaign-context-width)) 8px minmax(420px, 1fr); }
 }

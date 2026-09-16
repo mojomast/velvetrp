@@ -151,6 +151,7 @@ export default function App() {
   const [activeCampaignCharacterId, setActiveCampaignCharacterId] = useState(stored.campaignCharacterId ?? "");
   const [playSelectedActorId, setPlaySelectedActorId] = useState(stored.playSelectedActorId ?? "");
   const [playTurnId, setPlayTurnId] = useState(stored.adventureTurnId ?? "");
+  const [playSurface, setPlaySurface] = useState<"center" | "atlas">(stored.playSurface === "atlas" ? "atlas" : "center");
   const [characterDraftIds, setCharacterDraftIds] = useState<Record<string, string>>(stored.characterDraftIds ?? {});
   const [activeCampaignName, setActiveCampaignName] = useState("");
   const [chatReturnCampaignId, setChatReturnCampaignId] = useState(stored.chatReturnCampaignId ?? "");
@@ -414,7 +415,8 @@ export default function App() {
     const entry = campaignEntryRef.current ? { campaignEntry: "overview" as const } : {};
     const navigation: StoredNavigation = view === "campaign-play"
       ? { ...entry, view, campaignId: activeCampaignId || undefined, sessionId: session?.id,
-        adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined }
+        adventureTurnId: playTurnId || undefined, playSelectedActorId: playSelectedActorId || undefined,
+        ...(playSurface === "atlas" ? { playSurface } : {}) }
       : { ...entry, view, characterId: activeCharacterId || undefined, sessionId: session?.id, selectedIds, primaryId, campaignId: activeCampaignId || undefined, campaignCharacterId: activeCampaignCharacterId || undefined, characterDraftIds: Object.keys(characterDraftIds).length ? characterDraftIds : undefined, chatReturnCampaignId: view === "chat" && session && chatReturnCampaignId ? chatReturnCampaignId : undefined, combatReturnView: view === "campaign-combat" ? combatReturnView : undefined,
         combatActorRole: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatActorRole : undefined,
         combatControlledActorId: view === "campaign-combat" && combatReturnView === "campaign-play" ? combatControlledActorId || undefined : undefined,
@@ -423,7 +425,7 @@ export default function App() {
         combatReturnFocus: view === "campaign-combat" && combatReturnView === "campaign-play" ? playCombatReturnFocus?.focus : undefined } satisfies StoredNavigation;
     writeNavigation(navigation);
     syncRoute(navigation);
-  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, combatActorRole, combatControlledActorId, initialCombatId, playCombatReturnFocus, playSelectedActorId, playTurnId, syncRoute]);
+  }, [view, activeCharacterId, session?.id, selectedIds, primaryId, activeCampaignId, activeCampaignCharacterId, characterDraftIds, chatReturnCampaignId, combatReturnView, combatActorRole, combatControlledActorId, initialCombatId, playCombatReturnFocus, playSelectedActorId, playTurnId, playSurface, syncRoute]);
 
   const applyRoute = useCallback((navigation: StoredNavigation) => {
     cancelRoomOpenForNavigation();
@@ -435,6 +437,7 @@ export default function App() {
     combatEntryRef.current = request;
     setChatReturnCampaignId(navigation.view === "chat" ? navigation.chatReturnCampaignId ?? navigation.campaignId ?? "" : "");
     setActiveCampaignCharacterId(navigation.campaignCharacterId ?? "");
+    setPlaySurface(navigation.view === "campaign-play" && navigation.playSurface === "atlas" ? "atlas" : "center");
     setCombatReturnView("campaign-detail");
     setCombatActorRole(undefined); setCombatControlledActorId(""); setInitialCombatId(""); setPlayCombatReturnFocus(null);
     if ((navigation.view === "campaign-play" || navigation.view === "chat") && navigation.campaignId && navigation.sessionId) {
@@ -739,6 +742,7 @@ export default function App() {
       setSession(null); setMessages([]); setView("campaign-detail"); };
     return <CampaignAuthorizationGate campaignId={activeCampaignId} onUnavailable={returnToCampaign}>{(authorization) =>
       <CampaignPlayPage key={authorization.generation} campaignId={activeCampaignId} sessionId={session.id} authorizationGeneration={authorization.generation} api={campaignPlayApi}
+        surface={playSurface}
         authorizationCanAct={authorization.role !== "observer"} initialSelectedActorId={playSelectedActorId} initialTurnId={playTurnId || undefined} onSelectedActorChange={(actorId) => setPlaySelectedActorId(actorId ?? "")}
         onTurnIdChange={(turnId) => setPlayTurnId(turnId ?? "")} focusHeading={combatReturnView !== "campaign-play"} combatAvailable={combatAvailable} combatApi={combatTrackerApi}
         authorization={authorization} worldApi={campaignMechanicsAvailable ? worldExplorerApi : undefined} actorToolsApi={rpgCharacterSheetApi} advancementApi={atlasAdvancementApi}

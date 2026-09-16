@@ -28,6 +28,8 @@ export interface StoredNavigation {
   adventureTurnId?: string;
   /** Exact actor selected from the latest server play bootstrap. */
   playSelectedActorId?: string;
+  /** Alternate room surface: the living atlas instead of the command center. */
+  playSurface?: "atlas";
 }
 
 export const NAV_KEY = "velvet.navigation.v1";
@@ -84,6 +86,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if (navigation.view === "campaign-play") {
     if (typeof candidate.adventureTurnId === "string" && resourceIdSchema.safeParse(candidate.adventureTurnId).success) navigation.adventureTurnId = candidate.adventureTurnId;
     if (typeof candidate.playSelectedActorId === "string" && resourceIdSchema.safeParse(candidate.playSelectedActorId).success) navigation.playSelectedActorId = candidate.playSelectedActorId;
+    if (candidate.playSurface === "atlas") navigation.playSurface = "atlas";
   }
   navigation.selectedIds = Array.isArray(candidate.selectedIds)
     ? [...new Set(candidate.selectedIds.filter((id): id is string => typeof id === "string" && id.length > 0))]
@@ -94,7 +97,7 @@ export function parseStoredNavigation(value: unknown): StoredNavigation {
   if ((navigation.view === "campaign-detail" || navigation.view === "campaign-administration" || navigation.view === "campaign-history" || navigation.view === "campaign-transfer" || navigation.view === "campaign-combat" || navigation.view === "campaign-world" || navigation.view === "campaign-cast" || navigation.view === "campaign-journal" || navigation.view === "campaign-story") && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-play" && (!navigation.campaignId || !navigation.sessionId)) {
     navigation.view = navigation.campaignId ? "campaign-detail" : "campaigns";
-    delete navigation.adventureTurnId; delete navigation.playSelectedActorId;
+    delete navigation.adventureTurnId; delete navigation.playSelectedActorId; delete navigation.playSurface;
   }
   if (navigation.view === "campaign-character-builder" && !navigation.campaignId) navigation.view = "campaigns";
   if (navigation.view === "campaign-character" || navigation.view === "campaign-character-sheet") {

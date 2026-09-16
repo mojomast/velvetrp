@@ -6,7 +6,7 @@ export const atlasToolLabels: Record<AtlasTool, string> = {
   character: "Character", inventory: "Inventory & equipment", advancement: "Advancement", travel: "Travel", dice: "Dice", context: "Field journal", combat: "Combat & rewards", gm: "GM tools", security: "Rules & safety", create: "Create character", director: "Director", help: "Help",
 };
 
-/** The atlas owns geometry, never game state. Drawers overlay the map, not the conversation. */
+/** Legacy living-atlas surface, retained for reference. The Command Center is the primary room surface. */
 export function PlaySurface({ headingRef, title, role, phase, actor, tools, activeTool, onTool, onBack, exitDisabled,
   map, conversation, activity, composer, drawers }: {
   headingRef: RefObject<HTMLHeadingElement>; title: string; role: string; phase: string; actor: ReactNode;
@@ -45,7 +45,7 @@ export function PlaySurface({ headingRef, title, role, phase, actor, tools, acti
   return <main ref={rootRef} className="living-atlas" aria-labelledby="atlas-title">
     <header className="atlas-masthead">
       <button type="button" className="atlas-exit" disabled={exitDisabled} onClick={onBack} aria-label="Back to campaign">Exit table</button>
-      <div className="atlas-title"><span className="atlas-kicker">VELVET / LIVING ATLAS</span><h1 id="atlas-title" ref={headingRef} tabIndex={-1}>{title}</h1></div>
+      <div className="atlas-title"><span className="atlas-kicker">VELVET / LIVING ATLAS · LEGACY</span><h1 id="atlas-title" ref={headingRef} tabIndex={-1}>{title}</h1></div>
       <div className="atlas-session"><span>{role} access from server</span><strong role="status">{phase}</strong></div>
     </header>
     <nav className="atlas-tools" aria-label="In-room tools">{tools.map((tool) => <button type="button" key={tool}

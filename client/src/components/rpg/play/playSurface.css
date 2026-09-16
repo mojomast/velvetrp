@@ -49,7 +49,7 @@
 .living-atlas .conversation-exchange.declaration { justify-self: stretch; color: var(--atlas-muted); background: transparent; border-color: var(--atlas-line); }.living-atlas .conversation-exchange.dm { justify-self: stretch; background: transparent; border-color: var(--atlas-brass); }
 .living-atlas .conversation-exchange strong { color: var(--atlas-brass); font-size: .75rem; }.living-atlas .conversation-exchange.dm p { font-family: Georgia, serif; line-height: 1.7; }
 .atlas-activity { flex: 0 1 auto; max-height: 32%; overflow: auto; overscroll-behavior: contain; font-size: .8rem; }.atlas-activity:empty { display: none; }
-.atlas-notice, .atlas-reconcile { margin: .5rem 1rem; padding: .7rem; border-left: 2px solid var(--atlas-brass); background: #23333a; }.atlas-notice p, .atlas-reconcile p { margin: 0 0 .5rem; }
+.atlas-notice, .atlas-reconcile { margin: .5rem 1rem; padding: .7rem; border-left: 2px solid var(--accent); background: var(--surface-2); }.atlas-notice p, .atlas-reconcile p { margin: 0 0 .5rem; }
 .atlas-turn-tools { display: flex; flex-wrap: wrap; gap: .4rem; padding: .4rem 1rem; }.atlas-turn-tools button { font-size: .75rem; }
 .atlas-composer { flex-shrink: 0; border-top: 1px solid var(--atlas-line); padding: .65rem 1rem; }
 .living-atlas .adventure-composer { position: static; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; border: 0; padding: 0; background: transparent; border-radius: 0; box-shadow: none; }

@@ -34,6 +34,14 @@ describe("campaign route codec", () => {
     expect(navigationFromRoute(room!)).toMatchObject({ view: "chat", campaignId: "campaign-one", sessionId: "sess-1", chatReturnCampaignId: "campaign-one" });
   });
 
+  it("routes the alternate living-atlas play surface", () => {
+    const route = routeFromNavigation({ view: "campaign-play", campaignId: "campaign-one", sessionId: "sess-1", playSurface: "atlas" });
+    expect(route).toBe("#/campaign/campaign-one/play/sess-1/atlas");
+    expect(navigationFromRoute(route!)).toMatchObject({ view: "campaign-play", campaignId: "campaign-one", sessionId: "sess-1", playSurface: "atlas" });
+    expect(navigationFromRoute("#/campaign/campaign-one/play/sess-1")).toMatchObject({ view: "campaign-play", sessionId: "sess-1" });
+    expect(navigationFromRoute("#/campaign/campaign-one/play/sess-1")).not.toHaveProperty("playSurface");
+  });
+
   it("never exposes character or sheet identifiers in the URL", () => {
     expect(routeFromNavigation({ view: "campaign-character", campaignId: "campaign-one", campaignCharacterId: "secret-actor" })).toBeNull();
     expect(routeFromNavigation({ view: "campaign-character-sheet", campaignId: "campaign-one", campaignCharacterId: "secret-actor" })).toBeNull();

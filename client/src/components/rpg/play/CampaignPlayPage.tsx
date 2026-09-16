@@ -13,7 +13,7 @@ import { GameplaySheetDrawer } from "./GameplaySheetDrawer";
 import { CampaignDicePanel } from "./CampaignDicePanel";
 import { SessionControls, type SessionCommandApi } from "../session/SessionControls";
 import { createClientId } from "../../../utils/clientId";
-import { AtlasDrawer, type AtlasTool } from "./PlaySurface";
+import { AtlasDrawer, PlaySurface, type AtlasTool } from "./PlaySurface";
 import { campaignDestinations, type CampaignDestination } from "../shell/CampaignShell";
 import { CommandCenter } from "./CommandCenter";
 import { VoiceControls } from "../../../voice/VoiceControls";
@@ -86,6 +86,8 @@ export interface CampaignPlayPageProps {
   authorization?: StudioAuthorization;
   studioAvailable?: boolean;
   onOpenCombat?: () => void;
+  /** Room presentation: the one-screen command center or the living atlas. */
+  surface?: "center" | "atlas";
 }
 
 type StreamPhase = "idle" | "streaming" | "awaiting-confirmation" | "ambiguous" | "terminal";
@@ -125,7 +127,7 @@ function readPendingInitial(campaignId: string, sessionId: string): PendingIniti
 /** Coordinates durable play independently of the atlas presentation and tool drawers. */
 export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneration, api, legacyMessages = [], legacyParticipants = [], onBack, onUnavailable,
   onSelectedActorChange, onTurnIdChange, initialSelectedActorId, initialTurnId, authorizationCanAct = true, focusHeading,
-  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, characterBuilderApi, authorization, onNavigate }: CampaignPlayPageProps) {
+  combatAvailable = false, combatApi, worldApi, actorToolsApi, advancementApi, characterBuilderApi, authorization, onNavigate, surface = "center" }: CampaignPlayPageProps) {
   if (!authorizationCanAct) {
     try { localStorage.removeItem(stateKey(campaignId, sessionId)); localStorage.removeItem(lockKey(campaignId, sessionId));
       if (initialTurnId) localStorage.removeItem(confirmationKey(initialTurnId)); } catch { /* synchronous authority cleanup is best effort */ }
@@ -446,6 +448,10 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     toolOriginRef.current = document.querySelector<HTMLElement>(`[data-atlas-tool="${tool === "inventory" || tool === "advancement" ? "character" : tool}"]`) ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setActiveTool(tool); setVisitedTools((current) => current.includes(tool) ? current : [...current, tool]);
     if (tool === "character") void openSheet();
+    // On narrow layouts the tool host sits below the center column; bring it into view so a tool click visibly opens.
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1100px)").matches) {
+      requestAnimationFrame(() => document.getElementById("campaign-quick-tools")?.scrollIntoView({ block: "start" }));
+    }
   }
   async function openSheet() {
     if (!referenceReady || !selectedActorId || !bootstrap?.playableActors.some((actor) => actor.actorId === selectedActorId)) return;
@@ -494,24 +500,28 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     ? <CampaignQuickPanel campaignId={campaignId} selectedActorId={selectedActorId || null} actors={bootstrap.playableActors} api={quickToolApi}
         refreshKey={reconciliationRevision + liveRefreshRevision} canOpenSheet={referenceReady} onOpenSheet={() => void openSheet()} />
     : <p className="quick-panel-note">Character services are unavailable in this room.</p>;
-  const centerNode = <>
+  const noticesNode = <>
     {error && <p className="atlas-notice" role="alert">{error}</p>}
     {playBlocker && <p className="atlas-notice" role="status">{playBlocker}</p>}
     {dmLocked && <p className="atlas-notice" role="status">Director work needs review or recovery. Open Director; takeover remains available to the GM.</p>}
     {(sessionLocked || combatLocked || travelLocked || inventoryLocked || advancementLocked) && <p className="atlas-notice" role="status">{sessionLocked ? "A GM session operation needs review or recovery. Open GM tools to continue." : travelLocked ? "Travel needs review or recovery. Open Travel to continue." : inventoryLocked || advancementLocked ? "A character operation needs review or recovery. Open Character tools to continue." : "A combat operation needs completion or recovery. Open Combat & rewards to continue."}</p>}
+  </>;
+  const reconcileNode = <>
     {pendingPrefill && <div className="atlas-reconcile" role="group" aria-label="Insert suggested action"><p>You already have a declaration. Append the suggestion or replace what you wrote?</p><div className="button-row">
       <button type="button" onClick={() => applyPrefill(pendingPrefill, "append")}>Append suggestion</button>
       <button type="button" onClick={() => applyPrefill(pendingPrefill, "replace")}>Replace declaration</button>
       <button type="button" onClick={() => setPendingPrefill(null)}>Cancel</button></div></div>}
     {pendingInitial && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A submitted declaration has no confirmed turn identity.</p><button type="button" onClick={() => void reconcilePendingInitial()}>Reconcile submitted declaration</button></div>}
     {pendingTurnReconciliation && phase === "ambiguous" && actionable && <div className="atlas-reconcile"><p>A known turn needs authoritative reconciliation.</p><button type="button" onClick={() => void reconcileKnownTurn(pendingTurnReconciliation)}>Reconcile known turn</button></div>}
-    <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>
-    <div className="atlas-turn-tools" aria-label="Session replay">
-      <button type="button" className={replayOpen ? "ghost" : "primary"} aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>
-    </div>
-    {replayOpen ? <CampaignReplay campaignId={campaignId} sessionId={sessionId} dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} trace={api} onExit={() => setReplayOpen(false)} />
-      : <>
-    <CampaignDmChronicle history={dmHistory} />
+  </>;
+  const dmNoticeNode = <p className="atlas-notice">Table DM: {(dmHistory?.control.mode ?? bootstrap.dm?.mode) === "human" ? "Human DM" : (dmHistory?.control.mode ?? bootstrap.dm?.mode) === "ai" ? "AI DM / no human DM" : "Status unavailable"}. <button type="button" onClick={() => openTool("director")}>Manage director</button></p>;
+  const replayToggleNode = <div className="atlas-turn-tools" aria-label="Session replay">
+      <button type="button" className="ghost" aria-pressed={replayOpen} onClick={() => setReplayOpen((open) => !open)}>{replayOpen ? "Close replay" : "Replay this session"}</button>
+    </div>;
+  const conversationNode = replayOpen
+    ? <CampaignReplay campaignId={campaignId} sessionId={sessionId} dmHistory={dmHistory} transcript={transcript} actorNames={actorNames} trace={api} onExit={() => setReplayOpen(false)} />
+    : <>
+    {dmHistory?.runs.some((run) => run.narration) && <CampaignDmChronicle history={dmHistory} />}
     <CampaignConversation transcript={transcript} transcriptState={transcriptState} legacyMessages={legacyMessages} legacyParticipants={legacyParticipants}
       current={turn} liveEvents={liveEvents} actorNames={actorNames} onPrefillChoice={prefill} canPrefill={referenceReady} />
     {actionable && pending && activeBinding && <ConfirmationBanner turnId={turn!.turn.turnId} revision={turn!.turn.revision} proposals={turn!.proposals} proposalIds={pending.proposalIds} expiresAt={pending.expiresAt} binding={activeBinding} api={confirmationApi} restoreFocusRef={composerRef}
@@ -521,14 +531,21 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-swipe")}>Swipe narration</button>
       <button type="button" disabled={!referenceReady} onClick={() => void narrateVariant("narration-retry")}>Retry narration</button></div>}
     {actionable && streamRef.current && <div className="atlas-turn-tools"><button type="button" onClick={cancelLiveDelivery}>Stop receiving live updates</button></div>}
-    <VoiceControls campaignId={campaignId} contextKey={JSON.stringify([sessionId, authorizationGeneration, authorizationCanAct, phase,
-      sessionLocked, roomToolsLocked, bootstrap.session.active, turn?.turn.turnId ?? "", turn?.turn.state ?? ""])} />
-    {actionable && combatAvailable && combatApi && <SituationActions campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined} api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} onInsert={prefill} />}
-    <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
+    </>;
+  const voiceNode = <VoiceControls campaignId={campaignId} contextKey={JSON.stringify([sessionId, authorizationGeneration, authorizationCanAct, phase,
+      sessionLocked, roomToolsLocked, bootstrap.session.active, turn?.turn.turnId ?? "", turn?.turn.state ?? ""])} />;
+  const situationNode = actionable && combatAvailable && combatApi
+    ? <SituationActions campaignId={campaignId} sessionId={sessionId} controlledActorId={selectedActorId || undefined} api={combatApi} refreshKey={reconciliationRevision + liveRefreshRevision} disabled={!referenceReady} onInsert={prefill} />
+    : null;
+  const composerNode = <AdventureActionComposer actors={bootstrap.playableActors} selectedActorId={selectedActorId} role={authorizationCanAct ? bootstrap.principal.role : "observer"} eligible={bootstrap.session.adventureEligible} inactive={!bootstrap.session.active}
       phase={sessionLocked || roomToolsLocked || phase === "streaming" || phase === "awaiting-confirmation" ? "inflight" : phase === "ambiguous" ? "ambiguous" : "ready"}
-      declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />
-    </>}
+      declaration={declaration} onDeclarationChange={setDeclaration} onActorChange={setActor} onSubmit={(value) => void submit(value)} composerRef={composerRef} />;
+  const centerNode = <>
+    <div className="room-top">{noticesNode}{reconcileNode}</div>
+    <div className="room-main">{conversationNode}</div>
+    <div className="room-bottom"><div className="room-toolbar">{dmNoticeNode}{replayToggleNode}{voiceNode}</div>{situationNode}{composerNode}</div>
   </>;
+  const activityNode = <>{dmNoticeNode}{replayToggleNode}{voiceNode}{situationNode}</>;
   const drawersNode = <>
     <AtlasDrawer tool="director" open={activeTool === "director"} onClose={closeTool}>
       <CampaignDmPanel key={`dm:${campaignId}:${sessionId}:${authorizationGeneration}`} bootstrap={bootstrap} api={api.dm}
@@ -569,7 +586,11 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     {audience === "gm" && authorizationCanAct && characterBuilderApi && <AtlasDrawer tool="create" open={activeTool === "create"} onClose={closeTool}>{visitedTools.includes("create") && <CampaignCharacterCreator campaignId={campaignId} sessionId={sessionId} builderApi={characterBuilderApi} expectedRevision={async () => (await refreshBootstrap()).expectedRevision} onJoined={() => refreshAfterTool()} onExit={closeTool} />}</AtlasDrawer>}
     <AtlasDrawer tool="help" open={activeTool === "help"} onClose={closeTool}>{visitedTools.includes("help") && <PlayHelp />}</AtlasDrawer>
   </>;
+  const drawersMount = <>{quickNode}{drawersNode}</>;
+  if (surface === "atlas") return <PlaySurface headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
+    tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
+    map={contextNode} conversation={<>{noticesNode}{reconcileNode}{conversationNode}</>} activity={activityNode} composer={composerNode} drawers={drawersMount} />;
   return <CommandCenter headingRef={headingRef} title="Adventure room" role={role} phase={phase} actor={actorSelector}
     tools={tools} activeTool={activeTool} onTool={openTool} onBack={onBack} exitDisabled={sessionLocked || roomToolsLocked}
-    context={contextNode} center={centerNode} tool={<>{activeTool === null && quickNode}{drawersNode}</>} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />;
+    context={contextNode} center={centerNode} tool={drawersMount} campaignNav={campaignNav} preferences={preferences} onPreferences={onPreferences} />;
 }
