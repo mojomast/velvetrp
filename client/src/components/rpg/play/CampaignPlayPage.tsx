@@ -448,9 +448,14 @@ export function CampaignPlayPage({ campaignId, sessionId, authorizationGeneratio
     toolOriginRef.current = document.querySelector<HTMLElement>(`[data-atlas-tool="${tool === "inventory" || tool === "advancement" ? "character" : tool}"]`) ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setActiveTool(tool); setVisitedTools((current) => current.includes(tool) ? current : [...current, tool]);
     if (tool === "character") void openSheet();
-    // On narrow layouts the tool host sits below the center column; bring it into view so a tool click visibly opens.
-    if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) {
-      requestAnimationFrame(() => document.getElementById("campaign-quick-tools")?.scrollIntoView({ block: "start" }));
+    // Bring the opened tool into view: scroll its pane when it scrolls, otherwise the page on narrow layouts.
+    if (typeof window !== "undefined") {
+      requestAnimationFrame(() => {
+        const pane = document.getElementById("campaign-quick-tools");
+        const slot = pane?.querySelector<HTMLElement>(`#atlas-${tool}`) ?? null;
+        if (pane && slot && pane.scrollHeight > pane.clientHeight + 1) pane.scrollTo({ top: Math.max(0, slot.offsetTop - 8), behavior: "smooth" });
+        else if (typeof window.matchMedia === "function" && window.matchMedia("(max-width: 1100px)").matches) pane?.scrollIntoView({ block: "start" });
+      });
     }
   }
   async function openSheet() {

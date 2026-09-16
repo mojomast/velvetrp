@@ -1,5 +1,7 @@
 .control-plane { background: #191d1b; }
-.control-plane .control-rail { background: #151916; border-color: #383d36; }
+/* The rail is always dark chrome, so give it dark-theme text tokens. */
+.control-plane .control-rail { background: #151916; border-color: #383d36; color: #ece7f4; --text: #ece7f4; --muted: #b3acbf; }
+.control-plane .control-rail .control-role { border-color: #4a4453; }
 .control-plane .control-identity strong { font-family: Georgia, serif; font-weight: 500; }
 .control-plane .control-nav button[aria-current="page"] { background: #30382c; border-color: #697354; }
 .control-plane .control-toolbar { border-color: #383d36; background: #1d221e; }
