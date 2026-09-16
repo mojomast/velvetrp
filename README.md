@@ -46,9 +46,9 @@ These views are captured from the seeded, provider-free Baie-Comeau campaign at 
 
 ![Campaign library with preparation status](docs/images/campaign-library.png)
 
-**Campaign Command Center** — the authoritative map, narration, and character summary on one screen.
+**Campaign Command Center** — session tools separated from table setup, with the authoritative map, narration, character summary, and composer on one screen.
 
-![Campaign Command Center with authoritative map, narration, and character summary](docs/images/command-center.png)
+![Campaign Command Center with session tools, table setup, map, narration, character summary, and declaration composer](docs/images/command-center.png)
 
 **Director** — human/AI delegation, Open and Continue scene, and private review.
 
@@ -66,9 +66,9 @@ These views are captured from the seeded, provider-free Baie-Comeau campaign at 
 
 ![Encounter lifecycle and reviewed generation](docs/images/combat-tracker.png)
 
-**Cast and companion administration** — create a companion and author an exact grant.
+**Cast and factions** — the NPC roster with GM-only preparation, relationships, factions, and standings.
 
-![Companion administration with an exact grant](docs/images/cast-companion.png)
+![Cast roster, private preparation, factions, and standings](docs/images/cast-factions.png)
 
 ## What Is Shipped
 
