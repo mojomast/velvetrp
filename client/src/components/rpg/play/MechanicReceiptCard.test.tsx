@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { CampaignHistoryHttpPublicReceiptResponse } from "@velvet/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { MechanicReceiptCard, type MechanicReceiptApi } from "./MechanicReceiptCard";
@@ -37,7 +37,7 @@ describe("MechanicReceiptCard", () => {
   });
   it("resolves and renders an authoritative generalized combat receipt without private IDs",async()=>{
     const response = { receipt: { kind: "combat", revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z",
-      action: "attack", outcome: { kind: "damage", damageType: "physical", requested: 1, applied: 1,
+      action: "attack", outcome: { kind: "damage", damageType: "physical", requested: 1, applied: 1, hit: true, critical: false,
         hitPointsBefore: 8, hitPointsAfter: 7, statusAfter: "active" }, roundBefore: 1, roundAfter: 2 } } satisfies CampaignHistoryHttpPublicReceiptResponse;
     const getCampaignCommandReceipt=vi.fn().mockResolvedValue(response);
     render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"combat-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
@@ -51,6 +51,42 @@ describe("MechanicReceiptCard", () => {
     const getCampaignCommandReceipt=vi.fn().mockResolvedValue(response);
     render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"combat-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
     await screen.findByText("Combat update");expect(screen.getByText("End turn")).toBeTruthy();expect(screen.getByText("No direct target outcome")).toBeTruthy();
+  });
+  it("renders an attack miss without damage wording",async()=>{
+    const response = { receipt: { kind: "combat", revisionBefore: 4, revisionAfter: 5, occurredAt: "2030-01-01T00:00:00.000Z",
+      action: "attack", outcome: { kind: "damage", damageType: "slashing", requested: 0, applied: 0, hit: false, critical: false,
+        hitPointsBefore: 11, hitPointsAfter: 11, statusAfter: "active" }, roundBefore: 2, roundAfter: 2 } } satisfies CampaignHistoryHttpPublicReceiptResponse;
+    const getCampaignCommandReceipt=vi.fn().mockResolvedValue(response);
+    const view=render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"miss-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
+    const scope=within(view.container);
+    await scope.findByText("Combat update");expect(scope.getByText("Miss")).toBeTruthy();expect(scope.queryByText(/0 slashing damage/)).toBeNull();
+  });
+  it("renders a grapple contest and a stand-up outcome",async()=>{
+    const getCampaignCommandReceipt=vi.fn()
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:1,revisionAfter:2,occurredAt:"2030-01-01T00:00:00.000Z",action:"grapple",
+        outcome:{kind:"contest",contest:"grapple",attackerRoll:15,defenderRoll:10,success:true,condition:"grappled"},roundBefore:1,roundAfter:1}})
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z",action:"stand-up",
+        outcome:{kind:"stand-up",movementCostFeet:15},roundBefore:1,roundAfter:1}});
+    const view=render(<MechanicReceiptCard campaignId="campaign" links={[{commandId:"grapple-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"},{commandId:"stand-command",proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}]} api={{getCampaignCommandReceipt}}/>);
+    const scope=within(view.container);
+    await scope.findByText("Grapple");expect(scope.getByText("Grapple 15 vs 10")).toBeTruthy();expect(scope.getByText("Success — grappled")).toBeTruthy();
+    expect(scope.getByText("Stood up from prone (15 ft of movement)")).toBeTruthy();
+  });
+  it("renders compact combat lines for hits, misses, contests, and utility",async()=>{
+    const getCampaignCommandReceipt=vi.fn()
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:1,revisionAfter:2,occurredAt:"2030-01-01T00:00:00.000Z",action:"attack",
+        outcome:{kind:"damage",damageType:"slashing",requested:10,applied:10,hit:true,critical:true,hitPointsBefore:21,hitPointsAfter:11,statusAfter:"active"},roundBefore:2,roundAfter:2}})
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:2,revisionAfter:3,occurredAt:"2030-01-01T00:00:00.000Z",action:"attack",
+        outcome:{kind:"damage",damageType:"bludgeoning",requested:0,applied:0,hit:false,critical:false,hitPointsBefore:11,hitPointsAfter:11,statusAfter:"active"},roundBefore:2,roundAfter:2}})
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:3,revisionAfter:4,occurredAt:"2030-01-01T00:00:00.000Z",action:"shove",
+        outcome:{kind:"contest",contest:"shove",attackerRoll:12,defenderRoll:16,success:false},roundBefore:2,roundAfter:2}})
+      .mockResolvedValueOnce({receipt:{kind:"combat",revisionBefore:4,revisionAfter:5,occurredAt:"2030-01-01T00:00:00.000Z",action:"dash",outcome:{kind:"none"},roundBefore:2,roundAfter:3}});
+    const view=render(<MechanicReceiptCard compact campaignId="campaign" links={["a","b","c","d"].map((id)=>({commandId:id,proposalId:null,linkedAt:"2030-01-01T00:00:00.000Z"}))} api={{getCampaignCommandReceipt}}/>);
+    const scope=within(view.container);
+    await scope.findByText(/Combat Attack · critical 10 slashing damage/);
+    expect(scope.getByText(/Combat Attack · miss, 11 HP, active/)).toBeTruthy();
+    expect(scope.getByText(/Combat Shove · Shove 12 vs 16 failure/)).toBeTruthy();
+    expect(scope.getByText(/Combat Dash · round 2→3/)).toBeTruthy();
   });
   it("renders the public travel destination and durable receipt metadata",async()=>{
     const getCampaignCommandReceipt=vi.fn().mockResolvedValue({receipt:{kind:"travel",destination:"Glass Harbor",

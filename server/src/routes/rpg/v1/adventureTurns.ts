@@ -49,8 +49,11 @@ const key = (prefix: string, ...parts: string[]) => `${prefix}:${createHash("sha
 const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
  type NarrationReceipt = { kind: "mechanic"; event: { type: string; data: unknown } } | { kind: "combat"; action: "attack"|"flee"|"end-turn"|"dash"|"grapple"|"escape-grapple"|"shove"|"stand-up"|"disengage"|"help"|"hide"|"ready"|"stabilize"|"death-save";
-  outcome:{kind:"damage";damageType:"physical"|"bludgeoning"|"piercing"|"slashing";requested:number;applied:number;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"unconscious"|"stable"|"defeated"|"dead"}
-    |{kind:"status";statusAfter:"fled"}|{kind:"none"};roundBefore: number; roundAfter: number }
+  outcome:{kind:"damage";damageType:"physical"|"bludgeoning"|"piercing"|"slashing";requested:number;applied:number;hit:boolean;critical:boolean;hitPointsBefore:number;hitPointsAfter:number;statusAfter:"active"|"unconscious"|"stable"|"defeated"|"dead"}
+    |{kind:"status";statusAfter:"fled"}
+    |{kind:"survival";successes:number;failures:number;statusAfter:"unconscious"|"stable"|"dead"|"active"}
+    |{kind:"contest";contest:"grapple"|"escape-grapple"|"shove";attackerRoll:number;defenderRoll:number;success:boolean;condition:"grappled"|"prone"|null}
+    |{kind:"stand-up";movementCostFeet:number}|{kind:"none"};roundBefore: number; roundAfter: number }
   | {kind:"travel";destination:string}
   | {kind:"inventory";itemLabel:string;action:"equip"|"unequip"|"drop"|"gift"|"consume";quantity:number;slot:string|null;recipient:string|null}
   | {kind:"commerce";action:"buy"|"sell"|"give";vendorLabel:string;shopLabel:string;itemLabel:string;quantity:number;currencyLabel:string;priceMinorUnits:number;balanceBefore:number;balanceAfter:number}
@@ -106,8 +109,12 @@ function narrationReceipts(repo: Repo & Repository, turn: PrivateAdventureTurn):
     const resolution=combatActionResolutionSchema.safeParse(combat?.resolution);if(!combat||!resolution.success)return null;
     const outcome=resolution.data.outcomes[0];
     values.push({kind:"combat",action:resolution.data.kind,outcome:outcome?.kind==="damage"?{kind:"damage",damageType:outcome.damageType,
-      requested:outcome.requested,applied:outcome.applied,hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
-      :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.data.roundBefore,roundAfter:resolution.data.roundAfter});
+      requested:outcome.requested,applied:outcome.applied,hit:outcome.hit!==false,critical:outcome.critical===true,hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
+      :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}
+      :outcome?.kind==="survival"?{kind:"survival",successes:outcome.successes,failures:outcome.failures,statusAfter:outcome.statusAfter}
+      :outcome?.kind==="contest"?{kind:"contest",contest:outcome.contest,attackerRoll:outcome.attackerRoll,defenderRoll:outcome.defenderRoll,success:outcome.success,condition:outcome.condition??null}
+      :outcome?.kind==="stand-up"?{kind:"stand-up",movementCostFeet:outcome.movementCostFeet}:{kind:"none"},
+      roundBefore:resolution.data.roundBefore,roundAfter:resolution.data.roundAfter});
   }
   return values;
 }
@@ -138,11 +145,28 @@ function composeNarration(values: readonly NarrationReceipt[]): string {
     if(value.kind==="combat-power"){const outcomes=value.outcomes.map(outcome=>outcome.kind==="damage"?`${outcome.roll.total} rolled; ${outcome.applied} ${outcome.damageType} damage applied${outcome.adjustment!=="none"?` after ${outcome.adjustment}`:""}; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:outcome.kind==="healing"?`${outcome.roll.total} rolled; ${outcome.applied} healing applied; ${value.target} changes from ${outcome.before} to ${outcome.after} HP.`:outcome.kind==="temporary-hit-points"?`${outcome.roll.total} rolled; ${outcome.granted} temporary hit points applied; ${value.target} has ${outcome.after} temporary hit points.`:`${outcome.effect} applied${outcome.replacedConcentration?", replacing concentration":""}.`).join(" ");return `${value.powerName} uses one action on ${value.target}. ${outcomes}${value.costs.map(cost=>` ${cost.label} changes from ${cost.before} to ${cost.after}.`).join("")}${value.roundAfter!==value.roundBefore?` Round ${value.roundAfter} begins.`:""}`;}
     if(value.kind==="rest")return `${value.restName} completed. ${value.recovery.map(delta=>`${delta.label} recovers from ${delta.before} to ${delta.after}.`).join(" ")}`;
     if (value.kind === "combat") {
-      if (value.outcome.kind === "damage") return `The ${value.action} deals ${value.outcome.applied} physical damage. The target has ${value.outcome.hitPointsAfter} HP and is ${value.outcome.statusAfter}.${value.roundAfter !== value.roundBefore ? ` Round ${value.roundAfter} begins.` : ""}`;
-      if (value.outcome.kind === "status") return `The combatant flees during round ${value.roundBefore}.`;
-      if (value.action === "attack") return `The combatant makes the committed attack in round ${value.roundBefore}; no damage is applied.`;
-      if (value.action === "flee") return `The combatant attempts the committed flee action in round ${value.roundBefore}; no fled status is established.`;
-      return `The combatant ends their turn in round ${value.roundBefore}.${value.roundAfter !== value.roundBefore ? ` Round ${value.roundAfter} begins.` : ""}`;
+      const round = value.roundAfter !== value.roundBefore ? ` Round ${value.roundAfter} begins.` : "";
+      if (value.outcome.kind === "damage") return value.outcome.hit
+        ? `The ${value.action} deals ${value.outcome.applied} ${value.outcome.damageType} damage. The target has ${value.outcome.hitPointsAfter} HP and is ${value.outcome.statusAfter}.${round}`
+        : `The ${value.action} misses; no damage is applied and the target remains at ${value.outcome.hitPointsAfter} HP.${round}`;
+      if (value.outcome.kind === "status") return `The combatant flees during round ${value.roundBefore}.${round}`;
+      if (value.outcome.kind === "survival") return value.action === "stabilize"
+        ? `The ally is stabilized; the combatant is ${value.outcome.statusAfter}.${round}`
+        : `The death saving throw resolves with ${value.outcome.successes} successes and ${value.outcome.failures} failures; the combatant is ${value.outcome.statusAfter}.${round}`;
+      if (value.outcome.kind === "contest") {
+        const condition = value.outcome.success ? value.outcome.condition === "prone" ? " and is knocked prone" : value.outcome.condition === "grappled" ? " and is grappled" : " and breaks free" : "";
+        return `The ${value.outcome.contest} contest resolves ${value.outcome.attackerRoll} against ${value.outcome.defenderRoll}: ${value.outcome.success ? "success" : "failure"}${condition}.${round}`;
+      }
+      if (value.outcome.kind === "stand-up") return `The combatant stands up from prone, spending ${value.outcome.movementCostFeet} feet of movement.${round}`;
+      const phrases: Record<string, string> = {
+        attack: "The attack is committed but deals no damage.", grapple: "The combatant attempts a grapple.", shove: "The combatant attempts a shove.",
+        dash: "The combatant dashes, gaining extra movement.", disengage: "The combatant disengages without provoking an opportunity attack.",
+        hide: "The combatant attempts to hide.", ready: "The combatant readies an action.", help: "The combatant helps an ally.",
+        flee: "The combatant attempts to flee.", "end-turn": "The combatant ends their turn.",
+        "death-save": "The combatant rolls a death saving throw.", stabilize: "The combatant attempts to stabilize an ally.",
+        "escape-grapple": "The combatant attempts to escape the grapple.", "stand-up": "The combatant stands up from prone.",
+      };
+      return `${phrases[value.action] ?? "The committed action resolves."}${round}`;
     }
     if (value.event.type === "actor_dice_rolled") {
       const data = value.event.data as { total: number };

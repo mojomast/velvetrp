@@ -230,9 +230,12 @@ export const campaignHistoryHttpRoutes: FastifyPluginAsync<CampaignHistoryHttpOp
       if(combat){const resolution=combat.resolution as any,outcome=resolution.outcomes?.[0];return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"combat",revisionBefore:combat.revisionBefore,
         revisionAfter:combat.revisionAfter,occurredAt:combat.occurredAt,action:resolution.kind,
         outcome:outcome?.kind==="damage"?{kind:"damage",damageType:outcome.damageType,requested:outcome.requested,applied:outcome.applied,
+          hit:outcome.hit!==false,critical:outcome.critical===true,
           hitPointsBefore:outcome.hitPointsBefore,hitPointsAfter:outcome.hitPointsAfter,statusAfter:outcome.statusAfter}
           :outcome?.kind==="status"?{kind:"status",statusAfter:outcome.statusAfter}
-          :outcome?.kind==="survival"?{kind:"survival",successes:outcome.successes,failures:outcome.failures,...(typeof outcome.hitPointsAfter==="number"?{hitPointsAfter:outcome.hitPointsAfter}:{}),statusAfter:outcome.statusAfter}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
+          :outcome?.kind==="survival"?{kind:"survival",successes:outcome.successes,failures:outcome.failures,...(typeof outcome.hitPointsAfter==="number"?{hitPointsAfter:outcome.hitPointsAfter}:{}),statusAfter:outcome.statusAfter}
+          :outcome?.kind==="contest"?{kind:"contest",contest:outcome.contest,attackerRoll:outcome.attackerRoll,defenderRoll:outcome.defenderRoll,success:outcome.success,...(outcome.condition?{condition:outcome.condition}:{})}
+          :outcome?.kind==="stand-up"?{kind:"stand-up",movementCostFeet:outcome.movementCostFeet}:{kind:"none"},roundBefore:resolution.roundBefore,roundAfter:resolution.roundAfter}}));}
       const travel=repository.getExactCandidateTravelPublicReceipt(LOCAL_OWNER,campaignId,request.params.commandId);
       if(travel)return reply.send(campaignHistoryHttpPublicReceiptResponseSchema.parse({receipt:{kind:"travel",...travel}}));
       const administration = repository.getCampaignAdministrationReceipt(LOCAL_OWNER, campaignId, request.params.commandId);

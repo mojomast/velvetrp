@@ -39,11 +39,15 @@ function combatActionLabel(action: CombatReceipt["action"]): string {
   return labels[action] ?? action;
 }
 
+function contestLabel(contest: "grapple" | "escape-grapple" | "shove"): string {
+  return contest === "grapple" ? "Grapple" : contest === "shove" ? "Shove" : "Escape grapple";
+}
+
 function CombatOutcome({ outcome }: { outcome: CombatReceipt["outcome"] }) {
   switch (outcome.kind) {
     case "damage":
       return <>
-        <div><dt>Outcome</dt><dd>{outcome.applied} {outcome.damageType} damage</dd></div>
+        <div><dt>Outcome</dt><dd>{outcome.hit ? `${outcome.critical ? "Critical " : ""}${outcome.applied} ${outcome.damageType} damage` : "Miss"}</dd></div>
         <div><dt>Target condition</dt><dd>{outcome.hitPointsAfter} HP, {outcome.statusAfter}</dd></div>
       </>;
     case "status":
@@ -53,6 +57,13 @@ function CombatOutcome({ outcome }: { outcome: CombatReceipt["outcome"] }) {
         <div><dt>Death saves</dt><dd>{outcome.successes} success{outcome.successes === 1 ? "" : "es"}, {outcome.failures} failure{outcome.failures === 1 ? "" : "s"}</dd></div>
         <div><dt>Target condition</dt><dd>{outcome.hitPointsAfter !== undefined ? `${outcome.hitPointsAfter} HP, ` : ""}{outcome.statusAfter}</dd></div>
       </>;
+    case "contest":
+      return <>
+        <div><dt>Contest</dt><dd>{contestLabel(outcome.contest)} {outcome.attackerRoll} vs {outcome.defenderRoll}</dd></div>
+        <div><dt>Result</dt><dd>{outcome.success ? (outcome.condition ? `Success — ${outcome.condition}` : "Success") : "Failure"}</dd></div>
+      </>;
+    case "stand-up":
+      return <div><dt>Outcome</dt><dd>Stood up from prone ({outcome.movementCostFeet} ft of movement)</dd></div>;
     case "none":
       return <div><dt>Outcome</dt><dd>No direct target outcome</dd></div>;
   }
@@ -170,6 +181,19 @@ function ReceiptBody({ receipt }: { receipt: Receipt }) {
   </>;
 }
 
+function combatOutcomeLine(outcome: CombatReceipt["outcome"]): string {
+  switch (outcome.kind) {
+    case "damage": return outcome.hit
+      ? `${outcome.critical ? "critical " : ""}${outcome.applied} ${outcome.damageType} damage, ${outcome.hitPointsAfter} HP, ${outcome.statusAfter}`
+      : `miss, ${outcome.hitPointsAfter} HP, ${outcome.statusAfter}`;
+    case "status": return "fled";
+    case "survival": return `${outcome.successes} success/${outcome.failures} fail, ${outcome.hitPointsAfter !== undefined ? `${outcome.hitPointsAfter} HP, ` : ""}${outcome.statusAfter}`;
+    case "contest": return `${contestLabel(outcome.contest)} ${outcome.attackerRoll} vs ${outcome.defenderRoll} ${outcome.success ? "success" : "failure"}${outcome.condition ? ` — ${outcome.condition}` : ""}`;
+    case "stand-up": return `stood up from prone (${outcome.movementCostFeet} ft)`;
+    case "none": return "";
+  }
+}
+
 /** One dense, factual line per committed mechanic for compact surfaces such as the replay. */
 function compactReceiptLine(receipt: Receipt): string {
   if (receipt.kind === "progression") return `Progression ${receipt.className} ${receipt.levelBefore}→${receipt.levelAfter}${receipt.features.length ? ` · ${receipt.features.join(", ")}` : ""}${receipt.resources.map((resource) => ` · ${resource.label} ${resource.before}→${resource.after}`).join("")}`;
@@ -187,7 +211,7 @@ function compactReceiptLine(receipt: Receipt): string {
   }
   if (receipt.kind === "quest") return `Quest ${receipt.title} · ${receipt.objectiveDescription} ${receipt.progressBefore}→${receipt.progressAfter}/${receipt.target}${receipt.objectiveCompleted ? " · objective complete" : ""}${receipt.questCompleted ? " · quest complete" : ""}`;
   if (receipt.kind === "travel") return `Travel → ${receipt.destination}`;
-  if (receipt.kind === "combat") return `Combat ${combatActionLabel(receipt.action)} · ${receipt.outcome.kind === "damage" ? `${receipt.outcome.applied} ${receipt.outcome.damageType} damage, ${receipt.outcome.hitPointsAfter} HP, ${receipt.outcome.statusAfter}` : receipt.outcome.kind === "status" ? "fled" : receipt.outcome.kind === "survival" ? `${receipt.outcome.successes} success/${receipt.outcome.failures} fail, ${receipt.outcome.hitPointsAfter !== undefined ? `${receipt.outcome.hitPointsAfter} HP, ` : ""}${receipt.outcome.statusAfter}` : "no direct target outcome"} · round ${receipt.roundBefore}→${receipt.roundAfter}`;
+  if (receipt.kind === "combat") { const outcome = combatOutcomeLine(receipt.outcome); return `Combat ${combatActionLabel(receipt.action)}${outcome ? ` · ${outcome}` : ""} · round ${receipt.roundBefore}→${receipt.roundAfter}`; }
   if (receipt.kind === "administration") return "Campaign administration metadata.";
   const event = receipt.event;
   if (event.type === "actor_dice_rolled") return `Dice ${event.data.expression} · ${event.data.terms.map((term) => term.value).join(",")} · ${event.data.modifier >= 0 ? "+" : ""}${event.data.modifier} = ${event.data.total}`;
