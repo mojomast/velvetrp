@@ -379,6 +379,16 @@ export const SYSTEM_ONE_LANES = [
 
 export type SystemOneLane = (typeof SYSTEM_ONE_LANES)[number];
 
+/**
+ * How a lane participates in a turn:
+ * - `off`: the lane makes no System One call.
+ * - `shadow`: the lane calls and records its would-be decision but never changes behavior.
+ * - `active`: the lane may change behavior, but only when it also has a passing promotion record.
+ */
+export const SYSTEM_ONE_LANE_MODES = ["off", "shadow", "active"] as const;
+
+export type SystemOneLaneMode = (typeof SYSTEM_ONE_LANE_MODES)[number];
+
 /** Confidence bands that convert a Jev answer into act/confirm/fallback. */
 export interface SystemOneConfidenceThresholds {
   /** Minimum confidence (or noul probability) to act on the selection. */
@@ -412,8 +422,8 @@ export interface SystemOneSettings {
   id: "system-one";
   providerType: "system-one";
   enabled: boolean;
-  /** When true, decisions are recorded for comparison but never change behavior. */
-  shadow: boolean;
+  /** Per-lane participation: `off`, `shadow` (record-only), or `active` (act when promoted). */
+  laneModes: Record<SystemOneLane, SystemOneLaneMode>;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -429,7 +439,7 @@ export interface PublicSystemOneSettings {
   id: "system-one";
   providerType: "system-one";
   enabled: boolean;
-  shadow: boolean;
+  laneModes: Record<SystemOneLane, SystemOneLaneMode>;
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
@@ -443,7 +453,7 @@ export interface PublicSystemOneSettings {
 
 export interface UpdateSystemOneInput {
   enabled?: boolean;
-  shadow?: boolean;
+  laneModes?: Partial<Record<SystemOneLane, SystemOneLaneMode>>;
   baseUrl?: string;
   model?: string;
   apiKey?: string;

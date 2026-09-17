@@ -15,7 +15,7 @@ function makeSettings(overrides: Partial<SystemOneSettingsValue> = {}): SystemOn
     id: "system-one",
     providerType: "system-one",
     enabled: false,
-    shadow: false,
+    laneModes: Object.fromEntries(lanes.map((lane) => [lane, "shadow"])) as SystemOneSettingsValue["laneModes"],
     baseUrl: "https://api.typesafe.ai/v1",
     model: "jev-latest",
     hasApiKey: false,
@@ -47,6 +47,7 @@ describe("SystemOneSettings", () => {
       baseUrl: "https://example.test/v1",
       model: "jev-test",
       requestTimeoutSeconds: 45,
+      laneModes: { ...makeSettings().laneModes, "speaker-routing": "active" },
       confidencePolicy: { ...makeSettings().confidencePolicy, "speaker-routing": { actionThreshold: 0.8, reviewThreshold: 0.4 } },
     }));
     render(<SystemOneSettings />);
@@ -54,27 +55,47 @@ describe("SystemOneSettings", () => {
     expect(screen.getByDisplayValue("jev-test")).toBeTruthy();
     expect(screen.getByDisplayValue("45")).toBeTruthy();
     expect((screen.getByLabelText("Speaker routing action threshold") as HTMLInputElement).value).toBe("0.8");
+    expect((screen.getByLabelText("speaker-routing mode") as HTMLSelectElement).value).toBe("active");
     expect((screen.getByRole("checkbox", { name: "Enable System One" }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("saves the edited patch when toggles change", async () => {
     const settings = makeSettings();
     vi.mocked(getSystemOne).mockResolvedValue(settings);
-    vi.mocked(updateSystemOne).mockResolvedValue(makeSettings({ enabled: true, shadow: true }));
+    vi.mocked(updateSystemOne).mockResolvedValue(makeSettings({ enabled: true, laneModes: { ...settings.laneModes, "speaker-routing": "active" } }));
     render(<SystemOneSettings />);
     const enable = await screen.findByRole("checkbox", { name: "Enable System One" });
     fireEvent.click(enable);
-    fireEvent.click(screen.getByRole("checkbox", { name: "Shadow mode" }));
+    fireEvent.change(screen.getByLabelText("speaker-routing mode"), { target: { value: "active" } });
     fireEvent.change(screen.getByDisplayValue("jev-latest"), { target: { value: "jev-1.13.0" } });
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
     await waitFor(() => expect(updateSystemOne).toHaveBeenCalledTimes(1));
     expect(updateSystemOne).toHaveBeenCalledWith(expect.objectContaining({
       enabled: true,
-      shadow: true,
+      laneModes: expect.objectContaining({ "speaker-routing": "active" }),
       model: "jev-1.13.0",
       confidencePolicy: expect.objectContaining({ "speaker-routing": { actionThreshold: 0.75, reviewThreshold: 0.5 } }),
     }));
     await screen.findByText("System One settings saved.");
+  });
+
+  it("summarizes per-lane modes as disabled, shadow, or live", async () => {
+    vi.mocked(getSystemOne).mockResolvedValue(makeSettings({ enabled: true, laneModes: { ...makeSettings().laneModes, guardrails: "active" } }));
+    const { unmount } = render(<SystemOneSettings />);
+    await screen.findByDisplayValue("jev-latest");
+    expect(screen.getByText("live")).toBeTruthy();
+    unmount();
+
+    vi.mocked(getSystemOne).mockResolvedValue(makeSettings({ enabled: true }));
+    render(<SystemOneSettings />);
+    await screen.findByDisplayValue("jev-latest");
+    expect(screen.getByText("shadow")).toBeTruthy();
+    cleanup();
+
+    vi.mocked(getSystemOne).mockResolvedValue(makeSettings({ enabled: false }));
+    render(<SystemOneSettings />);
+    await screen.findByDisplayValue("jev-latest");
+    expect(screen.getByText("disabled")).toBeTruthy();
   });
 
   it("shows a safe success result from preflight", async () => {

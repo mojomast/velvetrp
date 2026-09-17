@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
 import { DM_SCENE_DESCRIPTION_PREFIX } from "../src/agent/dmNarration.js";
-import { defaultSystemOneSettings } from "../src/defaults.js";
+import { defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
 import { narrationReflectionKey } from "../src/agent/systemOneNarration.js";
 import type { SystemOneDirectorDependency } from "../src/agent/systemOneDirector.js";
@@ -15,7 +15,7 @@ useTmpDataDir();
 const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 
 const director = (caller: SystemOneDirectorDependency["caller"]): SystemOneDirectorDependency => ({
-  settings: { ...defaultSystemOneSettings(), enabled: true, shadow: true, apiKey: "test-key" },
+  settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key" },
   caller,
 });
 

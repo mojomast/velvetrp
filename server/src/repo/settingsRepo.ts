@@ -1,6 +1,7 @@
 import type DatabaseDriver from "better-sqlite3";
 import {
   DEFAULT_SAMPLERS,
+  DEFAULT_SYSTEM_ONE_LANE_MODE,
   clampInt,
   clampNullableInt,
   clampNullableNumber,
@@ -8,11 +9,13 @@ import {
   defaultHarnessSettings,
   defaultProviderSettings,
   defaultSystemOneSettings,
+  isSystemOneLaneMode,
   now,
   toPublicProvider,
   toPublicSystemOne,
 } from "../defaults.js";
 import { SYSTEM_ONE_LANES } from "../types.js";
+import type { SystemOneLaneMode } from "../types.js";
 import { systemRuntime } from "../runtime.js";
 import type { Clock } from "../runtime.js";
 import type {
@@ -171,17 +174,33 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
   return toPublicProvider(next);
 }
 
+/**
+ * Resolves a lane mode, migrating the legacy boolean `shadow` field: `true` mapped to
+ * record-only `shadow`, `false` to `active` (acting still requires a promotion record). A
+ * missing or malformed value falls back to the safe record-only default.
+ */
+function migrateSystemOneLaneMode(value: unknown, legacyShadow: unknown): SystemOneLaneMode {
+  if (isSystemOneLaneMode(value)) return value;
+  if (typeof legacyShadow === "boolean") return legacyShadow ? "shadow" : "active";
+  return DEFAULT_SYSTEM_ONE_LANE_MODE;
+}
+
 export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
   const row = db.prepare("SELECT payload FROM provider WHERE id = 'system-one'").get() as { payload: string } | undefined;
   const defaults = defaultSystemOneSettings();
   if (!row) return defaults;
   try {
-    const parsed = JSON.parse(row.payload) as Partial<SystemOneSettings>;
+    const parsed = JSON.parse(row.payload) as Partial<SystemOneSettings> & { shadow?: unknown };
+    const { shadow: legacyShadow, ...rest } = parsed;
     return {
       ...defaults,
-      ...parsed,
+      ...rest,
       id: "system-one",
       providerType: "system-one",
+      laneModes: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
+        lane,
+        migrateSystemOneLaneMode(parsed.laneModes?.[lane], legacyShadow),
+      ])) as SystemOneSettings["laneModes"],
       pricing: { ...defaults.pricing, ...(parsed.pricing ?? {}) },
       budget: { ...defaults.budget, ...(parsed.budget ?? {}) },
       confidencePolicy: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
@@ -223,7 +242,12 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
     ])) as SystemOneSettings["confidenceCalibration"],
   };
   if (patch.enabled !== undefined) next.enabled = patch.enabled;
-  if (patch.shadow !== undefined) next.shadow = patch.shadow;
+  if (patch.laneModes) {
+    next.laneModes = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
+      const requested = patch.laneModes?.[lane];
+      return [lane, isSystemOneLaneMode(requested) ? requested : next.laneModes[lane]];
+    })) as SystemOneSettings["laneModes"];
+  }
   if (patch.baseUrl !== undefined) next.baseUrl = clampText(patch.baseUrl, 300);
   if (patch.model !== undefined) next.model = clampText(patch.model, 120);
   if (patch.apiKey !== undefined) next.apiKey = patch.apiKey.trim().slice(0, 300);

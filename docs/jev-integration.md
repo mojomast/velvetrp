@@ -4,11 +4,11 @@ Status: design plus **W0 scaffolding and the first promoted lane**. The transpor
 strict schemas, second settings profile, feature flag, confidence-policy module, fake
 adapter, and settings/preflight HTTP routes are implemented and tested. The **L5
 room-routing lane is the first promoted lane**: it is wired behind the flag, setting, and
-key, and changes behavior only when it is out of shadow mode **and** carries a recorded,
-passing promotion (`server/src/agent/systemOnePromotion.ts` `isLanePromoted`); otherwise it
-records only. It has confidence gating to the existing LLM/deterministic paths, a
+key, and changes behavior only when its `speaker-routing` lane mode is `active` **and** it
+carries a recorded, passing promotion (`server/src/agent/systemOnePromotion.ts`
+`isLanePromoted`); otherwise it records in `shadow` only. It has confidence gating to the existing LLM/deterministic paths, a
 lane-scoped budget, and an immutable decision-record sidecar. The **L1 Director selector is
-wired in shadow mode**; its [calibration](system-one-director-calibration.md) passes on a
+wired in the `shadow` lane mode**; its [calibration](system-one-director-calibration.md) passes on a
 frozen provider-free corpus once the fitted confidence map is applied, but it has no
 runtime promotion record yet — it waits for live shadow data with negative examples. The
 surrounding tooling includes a **Platt calibration module**, a **promotion-gate module**, a
@@ -160,7 +160,7 @@ validation), `server/src/agent/systemOnePolicy.ts` (confidence bands), and
    Calibrated probabilities can be graded against that oracle with Brier/ECE in
    addition to accuracy.
 6. **Early-use risk is low and reversible.** Every lane is optional, flagged, and
-   wired to a deterministic fallback. A shadow mode can log Jev predictions beside
+   wired to a deterministic fallback. A lane in `shadow` can log Jev predictions beside
    the deterministic oracle before any behavior changes.
 
 ## Controlling invariant
@@ -314,7 +314,7 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   "story-objective progress", so a consequential mechanical beat (e.g. `encounter-start`)
   is not penalized for not advancing plot.
 - **Shadow.** `planCampaignDmBeat` accepts an optional `getSystemOneDirector` dependency.
-  When it resolves (flag + `enabled` + `shadow` + usable key) the battery runs beside the
+  When it resolves (flag + `enabled` + the `director-selection` lane mode `shadow` + usable key) the battery runs beside the
   live planning and the would-be decision is recorded immutably; it never settles, orders,
   or executes anything, and any failure is swallowed. Active Director selection is
   deliberately not enabled yet.
@@ -409,11 +409,12 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   recorded decision without applying it, so `selectRoomSpeakers` continues to the LLM
   path and then `fallbackRoomSpeakers`. A Jev error also returns `null`.
 - **Toggle and promotion.** The lane runs only when `FEATURE_SYSTEM_ONE`,
-  `SystemOneSettings.enabled`, and a usable key are all present; the route resolves it in
-  `server/src/routes/roleplay/interactions.ts`. It changes routing only when it is **both**
-  out of shadow mode **and** carries a recorded, passing promotion
+  `SystemOneSettings.enabled`, a usable key, and a non-`off` `speaker-routing` lane mode are
+  all present; the route resolves it in
+  `server/src/routes/roleplay/interactions.ts`. It changes routing only when its lane mode
+  is **`active`** **and** it carries a recorded, passing promotion
   (`server/src/agent/systemOnePromotion.ts` `isLanePromoted`). Otherwise it records the
-  would-be decision and leaves routing unchanged (`fallback_used: true`). Room routing is the
+  would-be decision in `shadow` and leaves routing unchanged (`fallback_used: true`). Room routing is the
   first promoted lane (evidence: the benchmark below). Usage is recorded under the
   `room_routing_system_one` kind.
 - **Budget.** Each dispatch reserves against the lane's own budget
@@ -622,7 +623,7 @@ Reuse the existing provider-free harness rather than inventing one.
 - **Fake adapter.** Add a deterministic fake System One adapter for CI and the
   deterministic E2E suite. Live calls are opt-in only, mirroring the existing live
   provider test gate.
-- **Promotion gate.** A lane may leave shadow mode only when, on a frozen holdout, it
+- **Promotion gate.** A lane may be set to `active` only when, on a frozen holdout, it
   meets the oracle agreement and calibration targets recorded for that lane. If it
   does not meet the gate, record the lane as incomplete rather than adding complexity.
 

@@ -3107,6 +3107,9 @@ export type SystemOneLane =
   | "guardrails"
   | "cost-router";
 
+/** How a lane participates: `off` makes no call, `shadow` records only, `active` may act when promoted. */
+export type SystemOneLaneMode = "off" | "shadow" | "active";
+
 export interface SystemOneConfidenceThresholds {
   actionThreshold: number;
   reviewThreshold: number;
@@ -3122,7 +3125,7 @@ export interface SystemOneSettings {
   id: "system-one";
   providerType: "system-one";
   enabled: boolean;
-  shadow: boolean;
+  laneModes: Record<SystemOneLane, SystemOneLaneMode>;
   baseUrl: string;
   model: string;
   hasApiKey: boolean;
@@ -3150,7 +3153,7 @@ export function getSystemOne(): Promise<SystemOneSettings> {
 
 export function updateSystemOne(patch: {
   enabled?: boolean;
-  shadow?: boolean;
+  laneModes?: Partial<Record<SystemOneLane, SystemOneLaneMode>>;
   baseUrl?: string;
   model?: string;
   apiKey?: string;

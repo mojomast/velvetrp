@@ -7,9 +7,30 @@ import type {
   SystemOneCalibration,
   SystemOneConfidenceThresholds,
   SystemOneLane,
+  SystemOneLaneMode,
   SystemOneSettings,
 } from "./types.js";
 import { SYSTEM_ONE_LANES } from "./types.js";
+
+/** Safe default: a lane records its would-be decision but never changes behavior. */
+export const DEFAULT_SYSTEM_ONE_LANE_MODE: SystemOneLaneMode = "shadow";
+
+/** Whether an arbitrary value is a valid lane mode. */
+export function isSystemOneLaneMode(value: unknown): value is SystemOneLaneMode {
+  return value === "off" || value === "shadow" || value === "active";
+}
+
+export function defaultSystemOneLaneModes(): Record<SystemOneLane, SystemOneLaneMode> {
+  return Object.fromEntries(
+    SYSTEM_ONE_LANES.map((lane) => [lane, DEFAULT_SYSTEM_ONE_LANE_MODE]),
+  ) as Record<SystemOneLane, SystemOneLaneMode>;
+}
+
+/** The effective mode for a lane, defaulting to shadow for any missing or malformed value. */
+export function systemOneLaneMode(settings: SystemOneSettings, lane: SystemOneLane): SystemOneLaneMode {
+  const mode = settings.laneModes?.[lane];
+  return isSystemOneLaneMode(mode) ? mode : DEFAULT_SYSTEM_ONE_LANE_MODE;
+}
 
 export function now(): string {
   return new Date().toISOString();
@@ -92,7 +113,7 @@ export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
     id: "system-one",
     providerType: "system-one",
     enabled: false,
-    shadow: false,
+    laneModes: defaultSystemOneLaneModes(),
     baseUrl: process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai/v1",
     model: process.env.TYPESAFE_MODEL ?? "jev-latest",
     apiKey: process.env.TYPESAFE_API_KEY ?? "",
@@ -110,7 +131,7 @@ export function toPublicSystemOne(settings: SystemOneSettings): PublicSystemOneS
     id: "system-one",
     providerType: "system-one",
     enabled: settings.enabled,
-    shadow: settings.shadow,
+    laneModes: settings.laneModes,
     baseUrl: settings.baseUrl,
     model: settings.model,
     hasApiKey: settings.apiKey.length > 0,

@@ -2,7 +2,7 @@ import DatabaseDriver from "better-sqlite3";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.js";
-import { defaultSystemOneSettings } from "../src/defaults.js";
+import { defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
 import type { SystemOneDirectorDependency } from "../src/agent/systemOneDirector.js";
 import { dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
@@ -12,7 +12,7 @@ useTmpDataDir();
 const database = () => new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
 
 const director = (caller: SystemOneDirectorDependency["caller"]): SystemOneDirectorDependency => ({
-  settings: { ...defaultSystemOneSettings(), enabled: true, shadow: true, apiKey: "test-key" },
+  settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key" },
   caller,
 });
 
@@ -49,7 +49,7 @@ describe("System One Director shadow lane", () => {
     const { fixture, run } = await openForShadow();
     const caller = createFakeSystemOneCaller();
     const settings = {
-      ...defaultSystemOneSettings(), enabled: true, shadow: true, apiKey: "test-key",
+      ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key",
       confidenceCalibration: {
         ...defaultSystemOneSettings().confidenceCalibration,
         "director-selection": { a: 2.5, b: 3.3 },

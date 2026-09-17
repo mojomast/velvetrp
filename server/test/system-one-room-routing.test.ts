@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultHarnessSettings, defaultProviderSettings, defaultSystemOneSettings } from "../src/defaults.js";
+import { defaultHarnessSettings, defaultProviderSettings, defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import {
   buildRoomRoutingQuestions,
   composeRoomRoutingSelection,
@@ -11,7 +11,7 @@ import { selectRoomSpeakers, type RoomRoutingSystemOne } from "../src/llm.js";
 import { getPromptPreset } from "../src/presets.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
 import type { SystemOneCaller } from "../src/provider/systemOneCompletion.js";
-import type { Character } from "../src/types.js";
+import type { Character, SystemOneSettings } from "../src/types.js";
 import { startFakeProvider, type FakeProvider } from "./helpers.js";
 
 const participants: Character[] = [
@@ -23,9 +23,14 @@ const projection: RoomRoutingParticipant[] = participants.map((participant) => (
 
 const thresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
 
+/** Speaker routing acts only when the lane is `active` and has a passing promotion record. */
+function activeSpeakerRouting(): SystemOneSettings["laneModes"] {
+  return { ...defaultSystemOneLaneModes(), "speaker-routing": "active" };
+}
+
 function systemOneLane(caller: SystemOneCaller, overrides: Partial<RoomRoutingSystemOne["settings"]> = {}): RoomRoutingSystemOne {
   return {
-    settings: { ...defaultSystemOneSettings(), enabled: true, apiKey: "test-key", ...overrides },
+    settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: activeSpeakerRouting(), apiKey: "test-key", ...overrides },
     caller,
     thresholds,
   };
@@ -155,7 +160,7 @@ describe("System One room routing lane", () => {
   it("shadow mode records the decision but leaves routing on the LLM path", async () => {
     fake = await startFakeProvider({ replyTexts: ['["Aria"]'] });
     const caller = createFakeSystemOneCaller({ scripted: { c1: { type: "noul", noul: 0.1 }, c2: { type: "noul", noul: 0.99 } } });
-    const selection = await route(systemOneLane(caller, { shadow: true }), fake.baseUrl);
+    const selection = await route(systemOneLane(caller, { laneModes: defaultSystemOneLaneModes() }), fake.baseUrl);
     expect(selection.speakerIds).toEqual(["c1"]);
     expect(selection.kind).toBe("llm");
     expect(selection.systemOneDecision).toMatchObject({ shadow: true, fallbackUsed: true, lane: "speaker-routing" });

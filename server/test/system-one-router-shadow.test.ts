@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
-import { defaultSystemOneSettings } from "../src/defaults.js";
+import { defaultSystemOneLaneModes, defaultSystemOneSettings } from "../src/defaults.js";
 import {
   ROUTER_COMPLEXITY_KEY,
   ROUTER_DETERMINISTIC_KEY,
@@ -28,7 +28,7 @@ const REQUEST: RouterRequestProjection = {
 };
 
 function lane(caller: SystemOneCaller, overrides: Partial<SystemOneSettings> = {}): { settings: SystemOneSettings; caller: SystemOneCaller } {
-  return { settings: { ...defaultSystemOneSettings(), enabled: true, shadow: true, apiKey: "test-key", ...overrides }, caller };
+  return { settings: { ...defaultSystemOneSettings(), enabled: true, laneModes: defaultSystemOneLaneModes(), apiKey: "test-key", ...overrides }, caller };
 }
 
 function routerAnswers(): Record<string, SystemOneAnswer> {
@@ -211,7 +211,7 @@ async function runRoomTurn(systemOneEnabled: boolean): Promise<{
   await app.inject({
     method: "PUT",
     url: "/api/provider/system-one",
-    payload: systemOneEnabled ? { enabled: true, shadow: true } : { enabled: false },
+    payload: systemOneEnabled ? { enabled: true } : { enabled: false },
   });
 
   const characterInput = (name: string) => ({

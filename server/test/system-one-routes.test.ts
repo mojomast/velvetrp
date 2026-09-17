@@ -1,8 +1,16 @@
+import DatabaseDriver from "better-sqlite3";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
+import { defaultSystemOneLaneModes } from "../src/defaults.js";
+import { SYSTEM_ONE_LANES, type SystemOneLane, type SystemOneLaneMode } from "../src/types.js";
 import { useTmpDataDir } from "./helpers.js";
+
+function laneMap(mode: SystemOneLaneMode): Record<SystemOneLane, SystemOneLaneMode> {
+  return Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [lane, mode])) as Record<SystemOneLane, SystemOneLaneMode>;
+}
 
 process.env.NODE_ENV = "test";
 useTmpDataDir();
@@ -41,18 +49,20 @@ describe("System One provider api", () => {
     await app.close();
   });
 
-  it("returns the public shape with the key redacted and the lane disabled", async () => {
+  it("returns the public shape with the key redacted and lane modes defaulting to shadow", async () => {
     const app = buildApp();
     const response = await app.inject({ method: "GET", url: "/api/provider/system-one" });
     const body = response.json();
     expect(response.statusCode).toBe(200);
     expect(Object.keys(body)).toEqual([
-      "id", "providerType", "enabled", "shadow", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
+      "id", "providerType", "enabled", "laneModes", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
       "pricing", "budget", "confidencePolicy", "confidenceCalibration", "updatedAt",
     ]);
     expect(body.id).toBe("system-one");
     expect(body.enabled).toBe(false);
-    expect(body.shadow).toBe(false);
+    expect(Object.keys(body.laneModes)).toEqual([...SYSTEM_ONE_LANES]);
+    expect(Object.values(body.laneModes)).toEqual(SYSTEM_ONE_LANES.map(() => "shadow"));
+    expect(body.laneModes).toEqual(defaultSystemOneLaneModes());
     expect(body.hasApiKey).toBe(false);
     expect(body.baseUrl).toBe("https://api.typesafe.ai/v1");
     expect(body.model).toBe("jev-latest");
@@ -64,6 +74,35 @@ describe("System One provider api", () => {
     expect(Object.keys(body.confidenceCalibration)).toEqual(Object.keys(body.confidencePolicy));
     expect(body.confidenceCalibration["director-selection"]).toEqual({ a: 1, b: 0 });
     expect(body).not.toHaveProperty("apiKey");
+    await app.close();
+  });
+
+  it("migrates a legacy global shadow boolean into per-lane modes", async () => {
+    const app = buildApp();
+    const dbPath = path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite");
+    const writeLegacyRow = (payload: unknown) => {
+      const db = new DatabaseDriver(dbPath);
+      db.prepare(
+        "INSERT INTO provider (id, payload) VALUES ('system-one', ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
+      ).run(JSON.stringify(payload));
+      db.close();
+    };
+
+    // No persisted row: a fresh install records every lane.
+    const fresh = (await app.inject({ method: "GET", url: "/api/provider/system-one" })).json();
+    expect(fresh.laneModes).toEqual(defaultSystemOneLaneModes());
+    expect(fresh.laneModes).toEqual(laneMap("shadow"));
+
+    // Legacy `shadow: false` meant "may act"; every lane migrates to active.
+    writeLegacyRow({ enabled: true, shadow: false });
+    const acting = (await app.inject({ method: "GET", url: "/api/provider/system-one" })).json();
+    expect(acting.laneModes).toEqual(laneMap("active"));
+
+    // Legacy `shadow: true` meant "record only"; every lane migrates to shadow.
+    writeLegacyRow({ enabled: true, shadow: true });
+    const recording = (await app.inject({ method: "GET", url: "/api/provider/system-one" })).json();
+    expect(recording.laneModes).toEqual(laneMap("shadow"));
+
     await app.close();
   });
 

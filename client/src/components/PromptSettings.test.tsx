@@ -7,7 +7,10 @@ describe("PromptSettings provider preflight", () => {
   it("never probes on load and reports an explicitly requested result", async () => {
     vi.spyOn(api, "listPromptTemplates").mockResolvedValue({ templates: [] });
     vi.spyOn(api, "getSystemOne").mockResolvedValue({
-      id: "system-one", providerType: "system-one", enabled: false, shadow: false, baseUrl: "", model: "jev-latest",
+      id: "system-one", providerType: "system-one", enabled: false,
+      laneModes: { "director-selection": "shadow", "adventure-selection": "shadow", "narration-verification": "shadow",
+        "memory-reranking": "shadow", "speaker-routing": "shadow", guardrails: "shadow", "cost-router": "shadow" },
+      baseUrl: "", model: "jev-latest",
       hasApiKey: false, requestTimeoutSeconds: 30, pricing: { promptPerMillion: null, completionPerMillion: null },
       budget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null, maxRequestsPerWindow: 60, rateWindowMs: 60_000 },
       confidencePolicy: { "director-selection": { actionThreshold: 0.75, reviewThreshold: 0.5 },

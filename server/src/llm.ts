@@ -22,6 +22,7 @@ import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agen
 import { isLanePromoted } from "./agent/systemOnePromotion.js";
 import { estimateTurnTokens } from "./agent/turnBudget.js";
 import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
+import { systemOneLaneMode } from "./defaults.js";
 import type { SystemOneConfidenceThresholds, SystemOneSettings } from "./types.js";
 export { isLoopbackHost, validateProviderBaseUrl } from "./provider/providerTransport.js";
 
@@ -142,6 +143,7 @@ async function trySystemOneRoomRouting(input: {
 }): Promise<SystemOneRoomRoutingOutcome> {
   const { systemOne, participants, history, userContent, maxSpeakers } = input;
   if (!systemOne || !systemOne.settings.enabled || !canUseSystemOne(systemOne.settings)) return null;
+  if (systemOneLaneMode(systemOne.settings, "speaker-routing") === "off") return null;
   const projection = participants.map((participant) => ({ id: participant.id, name: participant.name, archetype: participant.archetype }));
   const thresholds = systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"];
   const names = new Map(participants.map((participant) => [participant.id, participant.name]));
@@ -172,9 +174,9 @@ async function trySystemOneRoomRouting(input: {
     const usage = result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null;
     systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 });
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
-    // A lane changes behavior only when it is both out of shadow mode and has a recorded,
-    // passing promotion. Otherwise it still records the would-be decision.
-    const active = !systemOne.settings.shadow && isLanePromoted("speaker-routing");
+    // A lane changes behavior only when it is `active` and has a recorded, passing promotion.
+    // Otherwise it still records the would-be decision.
+    const active = systemOneLaneMode(systemOne.settings, "speaker-routing") === "active" && isLanePromoted("speaker-routing");
     const decision: SystemOneRoomRoutingDecision = {
       lane: "speaker-routing",
       provider: "typesafe",

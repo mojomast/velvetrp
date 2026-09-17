@@ -30,6 +30,7 @@ import { buildRouterQuestions, composeRouterDecision, type RouterHandler, type R
 import { calibrateTopSignal } from "../../agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "../../agent/systemOnePolicy.js";
 import { readRpgFeatureFlags } from "../../features.js";
+import { systemOneLaneMode } from "../../defaults.js";
 import {
   fallbackRoomSpeakers,
   maybeUpdateSummary,
@@ -260,7 +261,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       }
       if (selection.usage) await recordUsageEvent(session.id, usageKind(selection), selection.usage);
       if (selection.systemOneDecision) recordRoomRoutingDecision(session.id, selection.systemOneDecision);
-      if (routingSystemOne?.settings.shadow) {
+      if (routingSystemOne && systemOneLaneMode(routingSystemOne.settings, "cost-router") !== "off") {
         try {
           await recordRouterShadowDecision(
             session.id,

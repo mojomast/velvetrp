@@ -14,7 +14,7 @@ import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import { buildNarrationQuestions, composeNarrationVerification, narrationVerificationState, type NarrationVerificationInput } from "./systemOneNarration.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
-import { defaultHarnessSettings } from "../defaults.js";
+import { defaultHarnessSettings, systemOneLaneMode } from "../defaults.js";
 import { dmNarrationMessages, dmNarrationTool, parseDmScene } from "./dmNarration.js";
 import { dmReadToolSchemas, parseDmReadCall, type DmReadToolRequest } from "./dmReadTools.js";
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
@@ -23,14 +23,17 @@ const dependencies: AdventureAgentDependencies = { complete: completeWithProvide
   getHarness: getHarnessSettings, now: () => new Date(), getSystemOneDirector: resolveSystemOneDirector };
 
 /**
- * Resolves the Director shadow lane only when explicitly in shadow mode. Active
- * Director selection is intentionally not enabled here: shadow runs record what Jev
- * would decide while the existing provider selection remains authoritative.
+ * Resolves the Director/narration lane when the feature, setting, and key are on and at
+ * least one of those two lanes is not `off`. Active Director selection is intentionally
+ * not enabled here: shadow runs record what Jev would decide while the existing provider
+ * selection remains authoritative.
  */
 async function resolveSystemOneDirector(): Promise<SystemOneDirectorDependency | undefined> {
   if (!readRpgFeatureFlags().systemOne) return undefined;
   const settings = await getSystemOneSettings();
-  if (!settings.enabled || !settings.shadow || !canUseSystemOne(settings)) return undefined;
+  if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  if (systemOneLaneMode(settings, "director-selection") === "off"
+    && systemOneLaneMode(settings, "narration-verification") === "off") return undefined;
   return { settings, caller: callSystemOne };
 }
 
@@ -40,6 +43,7 @@ async function resolveSystemOneDirector(): Promise<SystemOneDirectorDependency |
  * failure is swallowed so shadow evaluation cannot affect planning.
  */
 async function recordDirectorShadowDecision(work: DmPlanningWork, director: SystemOneDirectorDependency): Promise<void> {
+  if (systemOneLaneMode(director.settings, "director-selection") === "off") return;
   const projection = work.candidates.map((candidate) => ({
     candidateId: candidate.candidateId, digest: candidate.digest, action: candidate.action, label: candidate.label,
   }));
@@ -91,6 +95,7 @@ function committedNarrationFacts(context: unknown): string[] {
  */
 async function recordNarrationShadowDecision(runId: string, narration: string, committedFacts: readonly string[],
   director: SystemOneDirectorDependency): Promise<void> {
+  if (systemOneLaneMode(director.settings, "narration-verification") === "off") return;
   const input: NarrationVerificationInput = { narration, committedFacts };
   const questions = buildNarrationQuestions(input);
   const state = narrationVerificationState(input);
