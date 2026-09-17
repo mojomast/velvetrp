@@ -1,4 +1,4 @@
-import type { DmEvalCase, DmEvalExpectation, DmEvalObservation, DmGradeFailureCode, DmGradeResult } from "./dmEvalTypes.js";
+import type { DmCalibrationPoint, DmCalibrationReport, DmEvalCase, DmEvalExpectation, DmEvalObservation, DmGradeFailureCode, DmGradeResult } from "./dmEvalTypes.js";
 
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -77,4 +77,51 @@ export function passAtK(results: readonly DmGradeResult[], k: number): number {
   let miss = 1;
   for (let index = 0; index < k; index += 1) miss *= (n - passing - index) / (n - index);
   return 1 - miss;
+}
+
+/** Mean squared error between each predicted probability and its 0/1 outcome. */
+export function brierScore(points: readonly DmCalibrationPoint[]): number {
+  if (points.length === 0) return 0;
+  const total = points.reduce((sum, point) => {
+    const outcome = point.correct ? 1 : 0;
+    return sum + (point.predictedProbability - outcome) ** 2;
+  }, 0);
+  return total / points.length;
+}
+
+/**
+ * Standard equal-width Expected Calibration Error over [0, 1].
+ * Each bin contributes its population weight times the absolute gap between
+ * the mean predicted probability and the empirical correctness rate.
+ */
+export function expectedCalibrationError(points: readonly DmCalibrationPoint[], bins = 10): number {
+  if (!Number.isInteger(bins) || bins <= 0) throw new RangeError("bins must be a positive integer");
+  if (points.length === 0) return 0;
+  const buckets = Array.from({ length: bins }, () => ({ count: 0, predicted: 0, correct: 0 }));
+  for (const point of points) {
+    const { predictedProbability } = point;
+    if (!Number.isFinite(predictedProbability) || predictedProbability < 0 || predictedProbability > 1) {
+      throw new RangeError(`predicted probability must be within [0, 1]: ${predictedProbability}`);
+    }
+    const index = Math.min(Math.floor(predictedProbability * bins), bins - 1);
+    const bucket = buckets[index]!;
+    bucket.count += 1;
+    bucket.predicted += predictedProbability;
+    bucket.correct += point.correct ? 1 : 0;
+  }
+  return buckets.reduce((sum, bucket) => {
+    if (bucket.count === 0) return sum;
+    const averagePredicted = bucket.predicted / bucket.count;
+    const averageCorrect = bucket.correct / bucket.count;
+    return sum + (bucket.count / points.length) * Math.abs(averagePredicted - averageCorrect);
+  }, 0);
+}
+
+export function gradeCalibration(points: readonly DmCalibrationPoint[], bins = 10): DmCalibrationReport {
+  return {
+    count: points.length,
+    brier: brierScore(points),
+    expectedCalibrationError: expectedCalibrationError(points, bins),
+    bins,
+  };
 }

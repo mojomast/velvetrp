@@ -1,10 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { campaignDmCompositionSchema, campaignDmSelectionSchema, canonicalAgentJson, type CampaignDmSelection } from "@velvet/contracts";
-import { completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
+import { callSystemOne, completeWithProvider, type CompletionFunctionTool, type CompletionMessage, type CompletionToolCall,
   type ProviderCompletionInput, type ProviderCompletionResult } from "../provider/index.js";
-import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
+import { canUseSystemOne } from "../provider/providerTransport.js";
+import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
+import { readRpgFeatureFlags } from "../features.js";
 import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATION_PROMPT_MAX_BYTES, DM_PLANNING_COMPLETION_MAX_TOKENS,
   DM_PLANNING_PROMPT_MAX_BYTES, DM_PROVIDER_DEADLINE_MS, estimatePromptTokens,
-  type CampaignDmRepository, type DmProviderUsage } from "../repo/campaignDmRepo.js";
+  type CampaignDmRepository, type DmPlanningWork, type DmProviderUsage } from "../repo/campaignDmRepo.js";
+import { buildDirectorQuestions, composeDirectorSelection, type SystemOneDirectorDependency } from "./systemOneDirector.js";
+import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
@@ -13,7 +18,53 @@ import { dmReadToolSchemas, parseDmReadCall, type DmReadToolRequest } from "./dm
 import { DIRECT_TOOL_BODY_OVERRIDES } from "./directToolReasoning.js";
 
 const dependencies: AdventureAgentDependencies = { complete: completeWithProvider, getProvider: getProviderSettings,
-  getHarness: getHarnessSettings, now: () => new Date() };
+  getHarness: getHarnessSettings, now: () => new Date(), getSystemOneDirector: resolveSystemOneDirector };
+
+/**
+ * Resolves the Director shadow lane only when explicitly in shadow mode. Active
+ * Director selection is intentionally not enabled here: shadow runs record what Jev
+ * would decide while the existing provider selection remains authoritative.
+ */
+async function resolveSystemOneDirector(): Promise<SystemOneDirectorDependency | undefined> {
+  if (!readRpgFeatureFlags().systemOne) return undefined;
+  const settings = await getSystemOneSettings();
+  if (!settings.enabled || !settings.shadow || !canUseSystemOne(settings)) return undefined;
+  return { settings, caller: callSystemOne };
+}
+
+/**
+ * Runs the Director battery beside the live planning and records the would-be
+ * decision immutably. It never settles, orders, or executes anything, and any
+ * failure is swallowed so shadow evaluation cannot affect planning.
+ */
+async function recordDirectorShadowDecision(work: DmPlanningWork, director: SystemOneDirectorDependency): Promise<void> {
+  const projection = work.candidates.map((candidate) => ({
+    candidateId: candidate.candidateId, digest: candidate.digest, action: candidate.action, label: candidate.label,
+  }));
+  const questions = buildDirectorQuestions(projection);
+  const state = canonicalAgentJson({ private_context: work.context, candidates: projection } as never);
+  const startedAt = performance.now();
+  const result = await director.caller({ settings: director.settings, state, questions });
+  const composed = composeDirectorSelection(projection, result.answers, director.settings.confidencePolicy["director-selection"]);
+  recordSystemOneDecision({
+    decisionId: randomUUID(),
+    lane: "director-selection",
+    turnId: work.runId,
+    provider: "typesafe",
+    model: result.model.responseModel ?? director.settings.model,
+    confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+    state,
+    questions,
+    answers: result.answers,
+    selection: { method: composed.method, hold: composed.hold, selections: composed.selections, topSignal: composed.topSignal },
+    confidenceBand: composed.band,
+    fallbackUsed: true,
+    shadow: true,
+    usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+    latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+    createdAt: new Date().toISOString(),
+  });
+}
 const DM_GROUNDING_OBSERVATION_MAX_BYTES = 12_000;
 // A reasoning model otherwise spends its small completion budget on hidden reasoning, and some
 // routers reject a forced tool_choice while thinking. Disabling reasoning makes beat selection exact.
@@ -75,6 +126,14 @@ async function planCampaignDmBeat(repository: CampaignDmRepository, principal: s
   catch { repository.blockDmBeat(principal, runId, "provider-settings-unavailable"); return; }
   const work = repository.claimDmPlanning(principal, runId, provider.providerType || "openai-compatible", provider.model || "unconfigured");
   if (!work) { repository.executeDmBeat(principal, runId); return; }
+  if (deps.getSystemOneDirector) {
+    try {
+      const director = await deps.getSystemOneDirector();
+      if (director) await recordDirectorShadowDecision(work, director);
+    } catch {
+      // Shadow evaluation is advisory and must never affect planning.
+    }
+  }
   const completionLimit = Math.min(DM_PLANNING_COMPLETION_MAX_TOKENS, provider.samplers.maxTokens ?? DM_PLANNING_COMPLETION_MAX_TOKENS);
   const selectionPairs = work.candidates.map(({ candidateId, digest }) => ({ candidateId, digest }));
   const tools: CompletionFunctionTool[] = [selectDmBeatTool(selectionPairs), ...(dmReadToolSchemas() as unknown as CompletionFunctionTool[])];

@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "bins": 10,
+  "points": [
+    { "predictedProbability": 0.9, "correct": true },
+    { "predictedProbability": 0.9, "correct": false },
+    { "predictedProbability": 0.2, "correct": false },
+    { "predictedProbability": 0.2, "correct": true },
+    { "predictedProbability": 0.5, "correct": true }
+  ],
+  "expected": {
+    "count": 5,
+    "brier": 0.35,
+    "expectedCalibrationError": 0.38,
+    "bins": 10
+  }
+}

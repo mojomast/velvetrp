@@ -79,3 +79,17 @@ export interface DmGradeResult {
   passed: boolean;
   failures: Array<{ code: DmGradeFailureCode; detail: string }>;
 }
+
+/** One probabilistic prediction paired with its observed binary outcome. */
+export interface DmCalibrationPoint {
+  predictedProbability: number;
+  correct: boolean;
+}
+
+/** Aggregate discrimination/calibration summary for a set of predictions. */
+export interface DmCalibrationReport {
+  count: number;
+  brier: number;
+  expectedCalibrationError: number;
+  bins: number;
+}

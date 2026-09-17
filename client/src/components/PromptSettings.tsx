@@ -3,6 +3,7 @@ import {
   HarnessSettings, PromptTemplateDefinition, ProviderSettings, FeatureFlags,
   listPromptTemplates, preflightProviderCapabilities, updateHarness, updatePromptTemplate, updateProvider,
 } from "../api";
+import { SystemOneSettings } from "./SystemOneSettings";
 
 interface Props {
   provider: ProviderSettings | null;
@@ -70,5 +71,6 @@ export function PromptSettings({ provider, harness, features, onProviderChange, 
       <button className="ghost full" disabled={preflighting} onClick={() => void preflightProvider()}>{preflighting ? "Checking capabilities..." : "Test provider capabilities"}</button>
       {preflightStatus && <p className="meta-text full" role="status">{preflightStatus}</p>}
     </div></details>}
+    <SystemOneSettings />
   </section>;
 }

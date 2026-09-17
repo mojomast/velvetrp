@@ -29,6 +29,8 @@ export interface AdventureAgentDependencies {
   getProvider(): Promise<ProviderSettings>;
   getHarness(): Promise<HarnessSettings>;
   now(): Date;
+  /** Optional System One Director shadow hook; absent disables the lane entirely. */
+  getSystemOneDirector?: () => Promise<import("./systemOneDirector.js").SystemOneDirectorDependency | undefined>;
 }
 
 const productionDependencies: AdventureAgentDependencies = {

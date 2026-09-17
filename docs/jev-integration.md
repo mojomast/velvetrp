@@ -5,7 +5,10 @@ schemas, second settings profile, feature flag, confidence-policy module, fake a
 and settings/preflight HTTP routes are implemented and tested. The **L5 room-routing
 lane is wired** behind the flag, setting, and key, with confidence gating to the
 existing LLM/deterministic paths, plus **shadow mode**, a **lane-scoped budget**, and an
-**immutable decision-record sidecar**; **everything remains disabled by default.** This document remains
+**immutable decision-record sidecar**. The **L1 Director selector is also wired in
+shadow mode**, and the surrounding tooling now includes a **probability-calibration
+grader (Brier/ECE)**, a **decision-record read API**, and a **settings UI**;
+**everything remains disabled by default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
@@ -283,21 +286,26 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Where.** `planCampaignDmBeat` and the `select_dm_beat` tool
   (`server/src/agent/campaignDmOrchestrator.ts`), settling through
   `settleDmPlanning` / `settleDmPlanningRound` (`server/src/repo/campaignDmRepo.ts`).
-- **Shape.** The server already issues opaque `CampaignDmCandidate[]` with digests
-  (`campaignDmRepo.ts` `snapshot`). Because Jev evaluates each question independently
-  and cannot emit an ordered list, compose ordering in code from per-candidate signals:
-  one `noul` ("is this candidate a legal, relevant immediate next beat?") and one
-  `score` ("priority/relevance") per candidate, plus a `noul` ("should the Director
-  hold instead of advancing?"). Code orders candidates by score among those above their
-  `noul` threshold, caps the beat at the existing limit, and respects the dependency
-  order already encoded in the candidate set. A single `choice` over candidate ids is
-  the simpler variant for one-beat cases.
-- **Confidence.** `act` composes the beat; `confirm` leaves the run in human mode;
+- **Shape (shadow shipped).** The server already issues opaque `CampaignDmCandidate[]`
+  with digests (`campaignDmRepo.ts` `snapshot`). Because Jev evaluates each question
+  independently and cannot emit an ordered list, ordering is composed in code from
+  per-candidate signals. `server/src/agent/systemOneDirector.ts` builds one `noul`
+  ("is this candidate a legal, grounded next beat?") and one `score` (priority) per
+  candidate, plus a `hold` `noul` and an aggregate `best_candidate` `choice`, then
+  composes hold → grounded-ordered-by-priority → best-pick → defer.
+- **Shadow.** `planCampaignDmBeat` accepts an optional `getSystemOneDirector` dependency.
+  When it resolves (flag + `enabled` + `shadow` + usable key) the battery runs beside the
+  live planning and the would-be decision is recorded immutably; it never settles, orders,
+  or executes anything, and any failure is swallowed. Active Director selection is
+  deliberately not enabled yet.
+- **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;
   `fallback` uses the deterministic rule and provider-free oracle.
 - **Authority.** The existing digest check in `settleDmPlanning` still rejects any
   selection that does not match an advertised candidate.
 - **Risk.** Ordered composition is the hardest mapping; validate against the existing
-  oracle before enabling anything but shadow mode.
+  oracle before enabling anything but shadow mode. The calibration graders
+  (`server/test/evals/dmGraders.ts` `brierScore` / `expectedCalibrationError`) are the
+  measurement path.
 
 ### L2 — Adventure exact-candidate selection
 

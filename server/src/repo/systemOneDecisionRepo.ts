@@ -34,10 +34,30 @@ interface SystemOneDecisionRow {
   latency_ms: number; created_at: string;
 }
 
+export interface SystemOneDecisionSummary {
+  total: number;
+  byLane: Array<{ lane: string; count: number }>;
+  byBand: Array<{ band: "act" | "confirm" | "fallback"; count: number }>;
+  fallbackUsed: number;
+  shadow: number;
+  meanLatencyMs: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
 const CONFIDENCE_BANDS: ReadonlyArray<SystemOneDecisionRecord["confidenceBand"]> = ["act", "confirm", "fallback"];
 
 const sha = (value: unknown): string => createHash("sha256").update(canonicalAgentJson(value as never)).digest("hex");
 const parseJson = (value: string): unknown => JSON.parse(value) as unknown;
+const clampLimit = (limit: number): number => Math.max(1, Math.min(1_000, Math.trunc(limit)));
+
+function usageTokens(usage: unknown): { input: number; output: number } {
+  if (usage === null || typeof usage !== "object") return { input: 0, output: 0 };
+  const value = usage as { inputTokens?: unknown; outputTokens?: unknown };
+  const input = typeof value.inputTokens === "number" && Number.isFinite(value.inputTokens) ? value.inputTokens : 0;
+  const output = typeof value.outputTokens === "number" && Number.isFinite(value.outputTokens) ? value.outputTokens : 0;
+  return { input, output };
+}
 
 function toRecord(row: SystemOneDecisionRow): SystemOneDecisionRecord {
   return {
@@ -82,11 +102,63 @@ export function getSystemOneDecision(decisionId: string): SystemOneDecisionRecor
 }
 
 export function listSystemOneDecisions(limit: number): SystemOneDecisionRecord[] {
-  const bounded = Math.max(1, Math.min(1_000, Math.trunc(limit)));
+  const bounded = clampLimit(limit);
   const rows = getRepositoryDatabase()
     .prepare("SELECT * FROM system_one_decisions_v1 ORDER BY created_at,decision_id LIMIT ?")
     .all(bounded) as SystemOneDecisionRow[];
   return rows.map(toRecord);
+}
+
+/** Lists decisions for one lane in ascending created-at order, bounded to 1..1000 rows. */
+export function listSystemOneDecisionsByLane(lane: string, limit: number): SystemOneDecisionRecord[] {
+  const bounded = clampLimit(limit);
+  const rows = getRepositoryDatabase()
+    .prepare("SELECT * FROM system_one_decisions_v1 WHERE lane=? ORDER BY created_at,decision_id LIMIT ?")
+    .all(lane, bounded) as SystemOneDecisionRow[];
+  return rows.map(toRecord);
+}
+
+/** Lists the most recent decisions across every lane, newest first, bounded to 1..1000 rows. */
+export function listRecentSystemOneDecisions(limit: number): SystemOneDecisionRecord[] {
+  const bounded = clampLimit(limit);
+  const rows = getRepositoryDatabase()
+    .prepare("SELECT * FROM system_one_decisions_v1 ORDER BY created_at DESC,decision_id DESC LIMIT ?")
+    .all(bounded) as SystemOneDecisionRow[];
+  return rows.map(toRecord);
+}
+
+/** Aggregates a bounded window of recent decisions for the read-only System One summary route. */
+export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSummary {
+  const decisions = listRecentSystemOneDecisions(clampLimit(limit));
+  const laneCounts = new Map<string, number>();
+  const bandCounts = new Map<SystemOneDecisionRecord["confidenceBand"], number>();
+  let fallbackUsed = 0;
+  let shadow = 0;
+  let latencyTotal = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  for (const record of decisions) {
+    laneCounts.set(record.lane, (laneCounts.get(record.lane) ?? 0) + 1);
+    bandCounts.set(record.confidenceBand, (bandCounts.get(record.confidenceBand) ?? 0) + 1);
+    if (record.fallbackUsed) fallbackUsed += 1;
+    if (record.shadow) shadow += 1;
+    latencyTotal += record.latencyMs;
+    const tokens = usageTokens(record.usage);
+    totalInputTokens += tokens.input;
+    totalOutputTokens += tokens.output;
+  }
+  return {
+    total: decisions.length,
+    byLane: [...laneCounts.entries()]
+      .map(([lane, count]) => ({ lane, count }))
+      .sort((left, right) => left.lane.localeCompare(right.lane)),
+    byBand: CONFIDENCE_BANDS.map((band) => ({ band, count: bandCounts.get(band) ?? 0 })),
+    fallbackUsed,
+    shadow,
+    meanLatencyMs: decisions.length === 0 ? 0 : latencyTotal / decisions.length,
+    totalInputTokens,
+    totalOutputTokens,
+  };
 }
 
 /** Re-derives every digest from the stored JSON and rejects any tampered or malformed record. */

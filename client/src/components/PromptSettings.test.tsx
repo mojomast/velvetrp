@@ -6,6 +6,19 @@ import * as api from "../api";
 describe("PromptSettings provider preflight", () => {
   it("never probes on load and reports an explicitly requested result", async () => {
     vi.spyOn(api, "listPromptTemplates").mockResolvedValue({ templates: [] });
+    vi.spyOn(api, "getSystemOne").mockResolvedValue({
+      id: "system-one", providerType: "system-one", enabled: false, shadow: false, baseUrl: "", model: "jev-latest",
+      hasApiKey: false, requestTimeoutSeconds: 30, pricing: { promptPerMillion: null, completionPerMillion: null },
+      budget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null, maxRequestsPerWindow: 60, rateWindowMs: 60_000 },
+      confidencePolicy: { "director-selection": { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        "adventure-selection": { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        "narration-verification": { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        "memory-reranking": { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        "speaker-routing": { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        guardrails: { actionThreshold: 0.75, reviewThreshold: 0.5 },
+        "cost-router": { actionThreshold: 0.75, reviewThreshold: 0.5 } },
+      updatedAt: "",
+    });
     const preflight = vi.spyOn(api, "preflightProviderCapabilities").mockResolvedValue({ model: "test", ok: false,
       dmPlayCompatible: true, campaignGenerationCompatible: false, capabilities: [
       { capability: "strict-function-tools", status: "supported" },
