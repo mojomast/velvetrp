@@ -76,7 +76,7 @@ describe("SRD 5.1 class hit dice and rest recharge bindings", () => {
       expect(rest.rest.recovery.resources).toContainEqual({ resourceId: resourceName, before: 0, after: maximum });
       repo.close();
     }
-  });
+  }, 180_000); // Load headroom, not an assertion relaxation: four full catalog fixtures can exceed the shared 90s budget under parallel forks.
 
   it("creates hit-dice pools and binds them without a rest recovery binding", () => {
     const { repo, actorId } = fixture("Fighter");

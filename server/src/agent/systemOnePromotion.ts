@@ -65,6 +65,11 @@ export interface SystemOneGateContext {
 const BASE_LANE_GATE: SystemOneLaneGate = {
   minSamples: 30,
   minAccuracy: 0.9,
+  // Adopted from the gate-v2 design (docs/system-one-harvest-loop.md): a point estimate over tens
+  // of acted samples cannot tell a 0.95 lane from a 1.00 lane, so every default gate now also
+  // requires the Wilson lower bound to clear the tier bar. Coverage and safety stay opt-in because
+  // they need evaluation context.
+  minAccuracyLowerBound: 0.8,
   maxBrier: 0.1,
   maxExpectedCalibrationError: 0.1,
 };
@@ -82,10 +87,10 @@ export const DEFAULT_SYSTEM_ONE_LANE_GATES: Record<SystemOneLane, SystemOneLaneG
   "director-selection": { ...BASE_LANE_GATE },
   "adventure-selection": { ...BASE_LANE_GATE },
   "narration-verification": { ...BASE_LANE_GATE },
-  "memory-reranking": { minSamples: 20, minAccuracy: 0.85, maxBrier: 0.15, maxExpectedCalibrationError: 0.15 },
+  "memory-reranking": { minSamples: 20, minAccuracy: 0.85, minAccuracyLowerBound: 0.75, maxBrier: 0.15, maxExpectedCalibrationError: 0.15 },
   "speaker-routing": { ...BASE_LANE_GATE },
-  guardrails: { minSamples: 30, minAccuracy: 0.95, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
-  "cost-router": { minSamples: 30, minAccuracy: 0.95, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
+  guardrails: { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
+  "cost-router": { minSamples: 30, minAccuracy: 0.95, minAccuracyLowerBound: 0.85, maxBrier: 0.05, maxExpectedCalibrationError: 0.05 },
 };
 
 /** The promotion decision for one lane, with every failed gate spelled out. */
@@ -321,6 +326,12 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     // corpus has no acted errors — the server only advertises authorized beats and the model
     // defers on every mixed state — so this is a promotion candidate, not a stress-tested
     // guarantee. No active Director path is wired, so the record is evidence, not activation.
+    //
+    // The current benchmark also merges 9 live agent-reviewed harvested cases (a pacing-only
+    // empty-world failure mode): that run passes with 94 acted, 100% acceptable/exact, calibrated
+    // ECE 0.0068 and 100% stability, but 81 of those 94 acted samples rest on agent-reviewed
+    // labels pending human confirmation, so the promotion metrics above remain the human-only
+    // measurement until a human confirms the harvested fixture.
     metrics: { samples: 41, accuracy: 1, brier: 0.0001, expectedCalibrationError: 0.0069 },
     calibration: { a: 2.4441, b: 3.4776 },
     promotedAt: "2026-09-17",

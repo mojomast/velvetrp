@@ -16,7 +16,7 @@ import { directorSelectedCandidateIds, type DirectorDisagreementRow } from "./sy
  */
 
 /** Where a proposal came from. */
-export type HarvestProvenance = "review-annotated" | "provider-disagreement";
+export type HarvestProvenance = "review-annotated" | "provider-disagreement" | "agent-review";
 /** Whether the proposal is already labelled, still needs a label, or was rejected on review. */
 export type HarvestStatus = "confirmed" | "proposed" | "rejected";
 
@@ -30,6 +30,8 @@ export interface HarvestAnnotation {
    * right answer yet", and the proposal stays `proposed`.
    */
   expected?: unknown;
+  /** Who reviewed the decision; defaults to a human. Agent-reviewed labels are marked distinctly. */
+  reviewer?: "human" | "agent";
   note?: string;
 }
 
@@ -45,6 +47,8 @@ export interface HarvestProposal {
   state: unknown;
   /** The lane-specific expected outcome, or null while the proposal is unlabelled. */
   expected: unknown | null;
+  /** The reviewer's note when one was supplied (for example the evidence behind an agent review). */
+  note?: string;
   /** Why this proposal exists and what still needs review. */
   reason: string;
 }
@@ -144,36 +148,41 @@ export function harvestProposal(
   const disagreements = authority !== undefined && authority.agreement === "disagree";
   if (!annotation && !disagreements) return null;
 
-  if (annotation?.verdict === "correct") {
-    const expected = recordedExpected(lane, record);
-    if (expected === null) return null;
-    return {
-      proposalId: proposalId(lane, record.stateDigest, expected, "review-annotated"),
-      lane,
-      sourceDecisionId: record.decisionId,
-      createdAt: record.createdAt,
-      provenance: "review-annotated",
-      status: "confirmed",
-      state: normalizeState(record.state),
-      expected,
-      reason: `human review confirmed the recorded ${lane} decision`,
-    };
-  }
-
-  if (annotation?.verdict === "incorrect") {
+  if (annotation?.verdict === "correct" || annotation?.verdict === "incorrect") {
+    const agentReviewed = annotation.reviewer === "agent";
+    const provenance: HarvestProvenance = agentReviewed ? "agent-review" : "review-annotated";
+    const reviewer = agentReviewed ? "agent review" : "human review";
+    const note = annotation.note === undefined ? {} : { note: annotation.note };
+    if (annotation.verdict === "correct") {
+      const expected = recordedExpected(lane, record);
+      if (expected === null) return null;
+      return {
+        proposalId: proposalId(lane, record.stateDigest, expected, provenance),
+        lane,
+        sourceDecisionId: record.decisionId,
+        createdAt: record.createdAt,
+        provenance,
+        status: "confirmed",
+        state: normalizeState(record.state),
+        expected,
+        ...note,
+        reason: `${reviewer} confirmed the recorded ${lane} decision`,
+      };
+    }
     const expected = annotatedExpected(lane, annotation.expected);
     return {
-      proposalId: proposalId(lane, record.stateDigest, expected, "review-annotated"),
+      proposalId: proposalId(lane, record.stateDigest, expected, provenance),
       lane,
       sourceDecisionId: record.decisionId,
       createdAt: record.createdAt,
-      provenance: "review-annotated",
+      provenance,
       status: expected === null ? "proposed" : "confirmed",
       state: normalizeState(record.state),
       expected,
+      ...note,
       reason: expected === null
-        ? `human review rejected the recorded ${lane} decision; the corrected answer is still needed`
-        : `human review rejected the recorded ${lane} decision and supplied the corrected answer`,
+        ? `${reviewer} rejected the recorded ${lane} decision; the corrected answer is still needed`
+        : `${reviewer} rejected the recorded ${lane} decision and supplied the corrected answer`,
     };
   }
 

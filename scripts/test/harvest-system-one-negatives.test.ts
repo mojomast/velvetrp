@@ -209,13 +209,15 @@ test("parseAnnotationEntries ignores invalid entries instead of failing", () => 
   assert.equal(parsed.skipped, 7);
 });
 
-test("harvestAnnotationFromEntry keeps only a string note", () => {
+test("harvestAnnotationFromEntry keeps only a string note and a known reviewer", () => {
   assert.deepEqual(harvestAnnotationFromEntry({ verdict: "correct", note: 42 }), { verdict: "correct" });
   assert.deepEqual(harvestAnnotationFromEntry({ verdict: "incorrect", expected: null }), {
     verdict: "incorrect",
     expected: null,
   });
   assert.equal(harvestAnnotationFromEntry({ verdict: "correct", note: "reviewed" })?.note, "reviewed");
+  assert.equal(harvestAnnotationFromEntry({ verdict: "correct", reviewer: "agent" })?.reviewer, "agent");
+  assert.equal(harvestAnnotationFromEntry({ verdict: "correct", reviewer: "robot" })?.reviewer, undefined);
 });
 
 test("parseAnnotationEntries treats a non-object document as empty", () => {

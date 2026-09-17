@@ -351,7 +351,11 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   Run-to-run variance is material and is recorded rather than hidden: `--repeat 8` fell to 29
   acted samples (below the 30-sample gate) and a uid-decorrelated probe moved the selected
   threshold to 0.30 with a degenerate negative-slope calibration map (calibrated ECE 0.1344 >
-  0.10), so the gate run keeps the production-shaped request. The corpus has no acted errors
+  0.10), so the gate run keeps the production-shaped request. The benchmark also merges 9 live
+  agent-reviewed harvested cases (the pacing-only empty-world hold failure mode); that run passes
+  with 94 acted, 100% acceptable/exact, calibrated ECE 0.0068 and 100% stability, but 81 of those
+  acted samples rest on labels awaiting human confirmation, so the record above stays the
+  human-only measurement. The corpus has no acted errors
   (the server only advertises authorized beats and the model defers on mixed states), so the
   record is an evidence-only snapshot, not a stress-tested guarantee, and no active Director
   path is wired.

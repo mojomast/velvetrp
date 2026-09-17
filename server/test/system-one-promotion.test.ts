@@ -12,8 +12,8 @@ import { wilsonLowerBound } from "../src/agent/systemOneGateStatistics.js";
 import { SYSTEM_ONE_LANES } from "../src/types.js";
 
 const passingMetrics: CalibrationMetrics = {
-  samples: 30,
-  accuracy: 0.9,
+  samples: 60,
+  accuracy: 0.95,
   brier: 0.1,
   expectedCalibrationError: 0.1,
 };
@@ -48,7 +48,10 @@ describe("System One promotion gate", () => {
       expectedCalibrationError: 0.05,
     });
     expect(result.promoted).toBe(false);
-    expect(result.reasons).toEqual(["accuracy below minimum: 0.8000 < 0.9000"]);
+    expect(result.reasons).toEqual([
+      "accuracy below minimum: 0.8000 < 0.9000",
+      "accuracy lower bound below minimum: 0.6822 < 0.8000",
+    ]);
   });
 
   it("fails on high Brier with a precise reason", () => {
@@ -81,7 +84,8 @@ describe("System One promotion gate", () => {
       expectedCalibrationError: 0.5,
     });
     expect(result.promoted).toBe(false);
-    expect(result.reasons).toHaveLength(4);
+    expect(result.reasons).toHaveLength(5);
+    expect(result.reasons).toContain("accuracy lower bound below minimum: 0.1176 < 0.8000");
   });
 
   it("holds guardrails and cost-router to stricter defaults", () => {
@@ -106,9 +110,11 @@ describe("System One promotion gate", () => {
     expect(rerankingGate.minAccuracy).toBeLessThan(gate.minAccuracy);
     expect(rerankingGate.maxBrier).toBeGreaterThan(gate.maxBrier);
     expect(rerankingGate.maxExpectedCalibrationError).toBeGreaterThan(gate.maxExpectedCalibrationError);
+    expect(rerankingGate.minAccuracyLowerBound).toBe(0.75);
+    expect(rerankingGate.minAccuracyLowerBound!).toBeLessThan(DEFAULT_SYSTEM_ONE_LANE_GATES["director-selection"].minAccuracyLowerBound!);
     const result = evaluatePromotionGate("memory-reranking", {
       samples: 20,
-      accuracy: 0.85,
+      accuracy: 1,
       brier: 0.15,
       expectedCalibrationError: 0.15,
     });
@@ -125,7 +131,7 @@ describe("System One promotion gate", () => {
     const result = evaluatePromotionGate("director-selection", passingMetrics, strict);
     expect(result.promoted).toBe(false);
     expect(result.gates).toBe(strict);
-    expect(result.reasons).toContain("insufficient samples: 30 < 100");
+    expect(result.reasons).toContain("insufficient samples: 60 < 100");
 
     const looser: SystemOneLaneGate = {
       minSamples: 1,
@@ -209,7 +215,12 @@ describe("System One promotion gate v2 criteria", () => {
 
   it("keeps today's decision when the optional fields and context are absent", () => {
     const today = evaluatePromotionGate("director-selection", passingMetrics);
-    const explicitUndefined = evaluatePromotionGate("director-selection", passingMetrics, gate, undefined);
+    const explicitUndefined = evaluatePromotionGate(
+      "director-selection",
+      passingMetrics,
+      DEFAULT_SYSTEM_ONE_LANE_GATES["director-selection"],
+      undefined,
+    );
     expect(today.promoted).toBe(true);
     expect(today.reasons).toEqual([]);
     expect(JSON.stringify(explicitUndefined)).toBe(JSON.stringify(today));
@@ -222,26 +233,33 @@ describe("System One promotion gate v2 criteria", () => {
     expect(isLanePromoted("guardrails")).toBe(true);
   });
 
-  it("keeps the optional gate-v2 criteria out of the default gates", () => {
+  it("adopts the accuracy lower bound in the default gates by tier", () => {
     for (const lane of SYSTEM_ONE_LANES) {
-      expect(Object.keys(DEFAULT_SYSTEM_ONE_LANE_GATES[lane]).sort()).toEqual([
-        "maxBrier",
-        "maxExpectedCalibrationError",
-        "minAccuracy",
-        "minSamples",
-      ]);
+      const gate = DEFAULT_SYSTEM_ONE_LANE_GATES[lane];
+      expect(gate.minAccuracyLowerBound).toBeDefined();
+      // Coverage and safety stay opt-in: they need evaluation context.
+      expect(gate.minActedRate).toBeUndefined();
+      expect(gate.minHazardousAccuracy).toBeUndefined();
+      expect(gate.maxBenignFalsePositiveRate).toBeUndefined();
     }
+    expect(DEFAULT_SYSTEM_ONE_LANE_GATES["director-selection"].minAccuracyLowerBound).toBe(0.8);
+    expect(DEFAULT_SYSTEM_ONE_LANE_GATES["adventure-selection"].minAccuracyLowerBound).toBe(0.8);
+    expect(DEFAULT_SYSTEM_ONE_LANE_GATES["memory-reranking"].minAccuracyLowerBound).toBe(0.75);
+    expect(DEFAULT_SYSTEM_ONE_LANE_GATES.guardrails.minAccuracyLowerBound).toBe(0.85);
+    expect(DEFAULT_SYSTEM_ONE_LANE_GATES["cost-router"].minAccuracyLowerBound).toBe(0.85);
   });
 
   it("gates accuracy on the Wilson lower bound when minAccuracyLowerBound is set", () => {
+    // 27/30: the same borderline metrics the default gate now rejects at the base tier.
+    const borderline: CalibrationMetrics = { samples: 30, accuracy: 0.9, brier: 0.1, expectedCalibrationError: 0.1 };
     const strict: SystemOneLaneGate = { ...gate, minAccuracyLowerBound: 0.75 };
-    const result = evaluatePromotionGate("director-selection", passingMetrics, strict);
+    const result = evaluatePromotionGate("director-selection", borderline, strict);
     expect(result.promoted).toBe(false);
     expect(result.reasons).toEqual(["accuracy lower bound below minimum: 0.7438 < 0.7500"]);
     expect(wilsonLowerBound(27, 30)).toBeCloseTo(0.7438, 3);
 
     const lenient: SystemOneLaneGate = { ...gate, minAccuracyLowerBound: 0.74 };
-    expect(evaluatePromotionGate("director-selection", passingMetrics, lenient).promoted).toBe(true);
+    expect(evaluatePromotionGate("director-selection", borderline, lenient).promoted).toBe(true);
   });
 
   it("treats a zero-sample holdout as a zero lower bound instead of throwing", () => {
@@ -374,7 +392,7 @@ describe("System One promotion gate v2 criteria", () => {
     });
     expect(result.promoted).toBe(false);
     expect(result.reasons).toEqual([
-      "accuracy lower bound below minimum: 0.7438 < 0.9000",
+      "accuracy lower bound below minimum: 0.8630 < 0.9000",
       "acted coverage below minimum: 0.1000 < 0.5000",
       "hazardous accuracy below safety minimum: 0.9000 < 0.9900",
       "benign false-positive rate above maximum: 0.1200 > 0.0500",

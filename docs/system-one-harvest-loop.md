@@ -5,7 +5,8 @@ Status: design plus the implemented core. The harvest projection
 (`server/src/agent/systemOneStability.ts`), and harvest CLI (`scripts/harvest-system-one-negatives.ts`)
 are implemented and unit-tested, and the adventure-selection evaluation merges confirmed cases from
 `server/test/fixtures/system-one-harvested/adventure-selection.json` when that fixture exists. The
-review-CLI correction form and every **gate v2** change below are **planned, not shipped**. The
+review-CLI correction form is **planned**; the gate v2 changes below are marked implemented or
+planned individually, and the accuracy lower bound is adopted in the default gates. The
 first loop pass has run against the demo shadow log; see
 [First measured loop pass](#first-measured-loop-pass). The
 [decision review](system-one-decision-review.md) and [Director disagreement
@@ -73,10 +74,17 @@ unconfirmed proposals never score in a gate.
 
 ```
 annotate -> scripts/harvest-system-one-negatives.ts --annotations
-  -> proposals (status proposed|confirmed; provenance review-annotated|provider-disagreement)
+  -> proposals (status proposed|confirmed; provenance review-annotated|agent-review|provider-disagreement)
   -> human review -> --write-fixture -> server/test/fixtures/system-one-harvested/<lane>.json
   -> lane eval merges confirmed cases -> re-run -> updated promotion record
 ```
+
+An annotation may set `reviewer: "agent"` (with a `note` carrying the evidence); those labels keep a
+distinct `agent-review` provenance and proposal identity so they can never alias a human verdict, and
+a corpus can report exactly how much of it is agent-labelled pending human confirmation. The rest of
+this section describes the human path. Provisional rule: agent-reviewed cases may score in a
+benchmark, but a promotion record is re-derived only from human-confirmed labels — the Director
+record is the first lane that follows this rule.
 
 `buildHarvestProposals` is implemented. It projects one proposal per reviewable decision, keeps
 `confirmed` over `proposed` for the same state, keeps the earliest otherwise, and returns a stable
@@ -127,6 +135,15 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   This is the first concrete case for gate v2's bootstrap lower bounds and coverage floors: a
   point-estimate gate on 30-40 acted samples swings between pass and fail on measurement-condition
   noise alone.
+- **Director harvest pass.** The first agent-reviewed harvest added 9 confirmed live cases (all
+  pacing-only empty-world states where the shadow Director held and the provider committed an
+  `ambient-beat`; the review marked 3 Director picks correct, 6 holds incorrect, and left 2
+  ambiguous cases proposed). With the harvested cases merged, the benchmark passes with 94 acted,
+  100% acceptable/exact, calibrated ECE 0.0068 and 100% stability (0 of 15 scenarios conflicted).
+  Provenance matters: 81 of those 94 acted samples rest on agent-reviewed labels, so the Director
+  promotion record stays on the human-only measurement until a human confirms the fixture. The
+  gain is coverage, not proof: the corpus now records the exact failure mode the shadow log
+  exposed instead of hiding it.
 - **A decorrelation caveat.** Adding the `uid` field coincided with higher raw signals than the
   pre-loop runs (18 acted at 0.75 versus 6), which moved the recommended threshold from 0.40 to 0.55.
   The vendor cookbook states that this measurement design "cannot separate sensitivity to the
@@ -143,12 +160,14 @@ Everything below is planned unless marked implemented; the order is priority ord
 1. **A static, never-tuned holdout per lane.** L2's 0.55 action threshold was selected on the same
    corpus that scores it, and the benchmark says so explicitly. Gate v2 reserves a holdout never
    used for threshold selection, criteria tuning, or calibration fitting.
-2. **Bootstrap confidence intervals, gating on the lower bound (mechanism implemented; no lane
-   opts in yet).** A point estimate over tens of acted samples cannot tell a 0.95 lane from a 1.00
-   lane, so the gate requires the lower bound to clear the bar: `systemOneGateStatistics.ts` ships
-   `wilsonLowerBound` and a seeded `bootstrapAccuracyLowerBound`, and a lane may set the optional
-   `minAccuracyLowerBound` gate. No lane sets it yet — the Director's pass/fail swing between
-   `--repeat 8` and `--repeat 10` is the motivating case.
+2. **Bootstrap confidence intervals, gating on the lower bound (adopted).** A point estimate over
+   tens of acted samples cannot tell a 0.95 lane from a 1.00 lane, so every default gate now also
+   requires the Wilson lower bound (`minAccuracyLowerBound`) to clear the tier bar: 0.80 for the base
+   lanes, 0.85 for guardrails/cost-router, 0.75 for `memory-reranking`. `systemOneGateStatistics.ts`
+   also ships a seeded `bootstrapAccuracyLowerBound` for callers that want a resampled interval.
+   Every frozen record clears its bound (narration is closest at 0.8408 against 0.80), and the
+   Director's `--repeat 8` run (29 acted) now fails the bound as well as the sample floor — the
+   intended behavior for a borderline measurement.
 3. **Acted-coverage and false-act floors (mechanism implemented; no lane opts in yet).** "Defer
    everything" currently shrinks the acted subset until it either fails `minSamples` or passes on a
    handful of easy cases. The optional `minActedRate` gate plus a `SystemOneGateContext.coverage`

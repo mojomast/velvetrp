@@ -13,7 +13,9 @@ const scores = Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((i
 
 function fixture() {
   let sequence = 0;
-  const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `stand-${++sequence}` } });
+  // Pin the RNG: the default crypto RNG can let the goblin win initiative and drop the hero
+  // before their turn, which replaces the action set with a lone death save and removes stand-up.
+  const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `stand-${++sequence}` }, rng: { integer: (minimum: number) => minimum } });
   const campaign = repo.createCampaign(OWNER, { name: "Stand up" });
   repo.installSrdStarterCatalog(OWNER);
   repo.configureSrdStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });

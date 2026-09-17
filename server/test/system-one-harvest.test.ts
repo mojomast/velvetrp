@@ -84,6 +84,25 @@ describe("harvestProposal", () => {
     expect(unparsable.state).toBe("not-json");
   });
 
+  it("marks an agent review distinctly and carries its note", () => {
+    const proposal = harvestProposal(record(), {
+      verdict: "incorrect",
+      expected: { disposition: "review" },
+      reviewer: "agent",
+      note: "Provider bound this to a review disposition; the pass missed the boundary.",
+    })!;
+    expect(proposal.provenance).toBe("agent-review");
+    expect(proposal.note).toContain("Provider bound");
+    expect(proposal.reason).toContain("agent review");
+    const human = harvestProposal(record(), {
+      verdict: "incorrect", expected: { disposition: "review" }, reviewer: "human",
+    })!;
+    expect(human.provenance).toBe("review-annotated");
+    expect(human.note).toBeUndefined();
+    // The provenance is part of the identity, so an agent label never aliases a human one.
+    expect(proposal.proposalId).not.toBe(human.proposalId);
+  });
+
   it("skips agreements, unknown lanes, and unactionable corrections", () => {
     expect(harvestProposal(record(), undefined)).toBeNull();
     expect(harvestProposal(record({ lane: "cost-router" }), { verdict: "correct" })).toBeNull();

@@ -191,6 +191,7 @@ export function harvestAnnotationFromEntry(entry: unknown): HarvestAnnotation | 
   if (verdict !== "correct" && verdict !== "incorrect") return null;
   const annotation: HarvestAnnotation = { verdict };
   if (value.expected !== undefined) annotation.expected = value.expected;
+  if (value.reviewer === "human" || value.reviewer === "agent") annotation.reviewer = value.reviewer;
   if (typeof value.note === "string") annotation.note = value.note;
   return annotation;
 }

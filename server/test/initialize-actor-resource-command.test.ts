@@ -564,12 +564,17 @@ describe("initialize actor resource command", () => {
   it("survives busy timeout without local state or dependency use", async () => {
     seed();
     const before = snapshot();
-    const writer = await startLockedWrite(dbPath(), [{
-      sql: "UPDATE campaigns SET name = 'Worker held lock' WHERE id = 'campaign-one'",
-    }], 5_250);
     const nextId = vi.fn(() => "event-after-busy");
     const now = vi.fn(() => new Date(AT));
+    // Open the repository before the worker takes the write lock: opening the store can stall
+    // under parallel fork load, and doing it inside the lock window could let the worker commit
+    // before the command ever observes the lock.
     const repository = createRepository({ dataDir: process.env.VELVET_DATA_DIR as string, ids: { nextId }, clock: { now } });
+    // Hold the write lock past the repository's 5s busy_timeout; the extra margin is load
+    // headroom for scheduling delay between the lock signal and the command, not a relaxed assertion.
+    const writer = await startLockedWrite(dbPath(), [{
+      sql: "UPDATE campaigns SET name = 'Worker held lock' WHERE id = 'campaign-one'",
+    }], 9_000);
     expect(() => repository.executeInitializeActorResource("local-owner", envelope))
       .toThrow(/database is locked|SQLITE_BUSY/i);
     expect(nextId).not.toHaveBeenCalled();
@@ -579,7 +584,7 @@ describe("initialize actor resource command", () => {
     expect(repository.executeInitializeActorResource("local-owner", envelope).events[0]?.eventId)
       .toBe("event-after-busy");
     repository.close();
-  }, 10_000);
+  }, 20_000); // Load headroom: the lock is deliberately held for 9s and parallel forks can stretch setup/scheduling.
 
   it("is factory-only, synchronous, and lifecycle/nesting guarded", () => {
     seed();

@@ -114,7 +114,7 @@ describe("deterministic magic-item attunement journey", () => {
     await restarted.close();
     await app.close();
     reopened.close();
-  });
+  }, 180_000); // Load headroom, not an assertion relaxation: the bootstrap plus durable restart can exceed the shared 90s budget under parallel forks.
 
   it("hides a mismatched campaign and denies an unauthorized actor", async () => {
     enableRpg();

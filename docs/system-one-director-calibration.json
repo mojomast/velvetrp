@@ -4,185 +4,185 @@
   "allPoints": [
     {
       "threshold": 0.3,
-      "acted": 60,
-      "total": 60,
+      "acted": 150,
+      "total": 150,
       "coverage": 1,
-      "actedAccuracy": 1
+      "actedAccuracy": 0.7333333333333333
     },
     {
       "threshold": 0.35,
-      "acted": 60,
-      "total": 60,
+      "acted": 150,
+      "total": 150,
       "coverage": 1,
-      "actedAccuracy": 0.8666666666666667
+      "actedAccuracy": 0.6866666666666666
     },
     {
       "threshold": 0.4,
-      "acted": 60,
-      "total": 60,
+      "acted": 150,
+      "total": 150,
       "coverage": 1,
-      "actedAccuracy": 0.8333333333333334
+      "actedAccuracy": 0.5266666666666666
     },
     {
       "threshold": 0.45,
-      "acted": 60,
-      "total": 60,
+      "acted": 150,
+      "total": 150,
       "coverage": 1,
-      "actedAccuracy": 0.8333333333333334
+      "actedAccuracy": 0.5133333333333333
     },
     {
       "threshold": 0.5,
-      "acted": 56,
-      "total": 60,
-      "coverage": 0.9333333333333333,
-      "actedAccuracy": 0.8214285714285714
+      "acted": 149,
+      "total": 150,
+      "coverage": 0.9933333333333333,
+      "actedAccuracy": 0.6577181208053692
     },
     {
       "threshold": 0.55,
-      "acted": 47,
-      "total": 60,
-      "coverage": 0.7833333333333333,
-      "actedAccuracy": 0.9148936170212766
+      "acted": 138,
+      "total": 150,
+      "coverage": 0.92,
+      "actedAccuracy": 0.7318840579710145
     },
     {
       "threshold": 0.6,
-      "acted": 41,
-      "total": 60,
-      "coverage": 0.6833333333333333,
+      "acted": 130,
+      "total": 150,
+      "coverage": 0.8666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 15,
-      "total": 60,
-      "coverage": 0.25,
+      "acted": 94,
+      "total": 150,
+      "coverage": 0.6266666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.7,
       "acted": 10,
-      "total": 60,
-      "coverage": 0.16666666666666666,
+      "total": 150,
+      "coverage": 0.06666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.75,
       "acted": 10,
-      "total": 60,
-      "coverage": 0.16666666666666666,
+      "total": 150,
+      "coverage": 0.06666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.8,
       "acted": 10,
-      "total": 60,
-      "coverage": 0.16666666666666666,
+      "total": 150,
+      "coverage": 0.06666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.85,
       "acted": 10,
-      "total": 60,
-      "coverage": 0.16666666666666666,
+      "total": 150,
+      "coverage": 0.06666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.9,
       "acted": 10,
-      "total": 60,
-      "coverage": 0.16666666666666666,
+      "total": 150,
+      "coverage": 0.06666666666666667,
       "actedAccuracy": 1
     }
   ],
   "devPoints": [
     {
       "threshold": 0.3,
-      "acted": 30,
-      "total": 30,
+      "acted": 120,
+      "total": 120,
       "coverage": 1,
-      "actedAccuracy": 1
+      "actedAccuracy": 0.6666666666666666
     },
     {
       "threshold": 0.35,
-      "acted": 30,
-      "total": 30,
+      "acted": 120,
+      "total": 120,
       "coverage": 1,
-      "actedAccuracy": 0.7333333333333333
+      "actedAccuracy": 0.6083333333333333
     },
     {
       "threshold": 0.4,
-      "acted": 30,
-      "total": 30,
+      "acted": 120,
+      "total": 120,
       "coverage": 1,
-      "actedAccuracy": 0.6666666666666666
+      "actedAccuracy": 0.4083333333333333
     },
     {
       "threshold": 0.45,
-      "acted": 30,
-      "total": 30,
+      "acted": 120,
+      "total": 120,
       "coverage": 1,
-      "actedAccuracy": 0.6666666666666666
+      "actedAccuracy": 0.39166666666666666
     },
     {
       "threshold": 0.5,
-      "acted": 26,
-      "total": 30,
-      "coverage": 0.8666666666666667,
-      "actedAccuracy": 0.6153846153846154
+      "acted": 119,
+      "total": 120,
+      "coverage": 0.9916666666666667,
+      "actedAccuracy": 0.5714285714285714
     },
     {
       "threshold": 0.55,
-      "acted": 20,
-      "total": 30,
-      "coverage": 0.6666666666666666,
-      "actedAccuracy": 0.8
+      "acted": 110,
+      "total": 120,
+      "coverage": 0.9166666666666666,
+      "actedAccuracy": 0.6636363636363637
     },
     {
       "threshold": 0.6,
-      "acted": 19,
-      "total": 30,
-      "coverage": 0.6333333333333333,
+      "acted": 109,
+      "total": 120,
+      "coverage": 0.9083333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 5,
-      "total": 30,
-      "coverage": 0.16666666666666666,
+      "acted": 82,
+      "total": 120,
+      "coverage": 0.6833333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.7,
       "acted": 0,
-      "total": 30,
+      "total": 120,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.75,
       "acted": 0,
-      "total": 30,
+      "total": 120,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.8,
       "acted": 0,
-      "total": 30,
+      "total": 120,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.85,
       "acted": 0,
-      "total": 30,
+      "total": 120,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.9,
       "acted": 0,
-      "total": 30,
+      "total": 120,
       "coverage": 0,
       "actedAccuracy": 0
     }
@@ -225,23 +225,23 @@
     },
     {
       "threshold": 0.55,
-      "acted": 27,
+      "acted": 28,
       "total": 30,
-      "coverage": 0.9,
+      "coverage": 0.9333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.6,
-      "acted": 22,
+      "acted": 21,
       "total": 30,
-      "coverage": 0.7333333333333333,
+      "coverage": 0.7,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 10,
+      "acted": 12,
       "total": 30,
-      "coverage": 0.3333333333333333,
+      "coverage": 0.4,
       "actedAccuracy": 1
     },
     {
@@ -282,108 +282,108 @@
   ],
   "selected": {
     "selected": {
-      "threshold": 0.6,
-      "acted": 19,
-      "total": 30,
-      "coverage": 0.6333333333333333,
+      "threshold": 0.65,
+      "acted": 82,
+      "total": 120,
+      "coverage": 0.6833333333333333,
       "actedAccuracy": 1
     },
     "points": [
       {
         "threshold": 0.3,
-        "acted": 30,
-        "total": 30,
+        "acted": 120,
+        "total": 120,
         "coverage": 1,
-        "actedAccuracy": 1
+        "actedAccuracy": 0.6666666666666666
       },
       {
         "threshold": 0.35,
-        "acted": 30,
-        "total": 30,
+        "acted": 120,
+        "total": 120,
         "coverage": 1,
-        "actedAccuracy": 0.7333333333333333
+        "actedAccuracy": 0.6083333333333333
       },
       {
         "threshold": 0.4,
-        "acted": 30,
-        "total": 30,
+        "acted": 120,
+        "total": 120,
         "coverage": 1,
-        "actedAccuracy": 0.6666666666666666
+        "actedAccuracy": 0.4083333333333333
       },
       {
         "threshold": 0.45,
-        "acted": 30,
-        "total": 30,
+        "acted": 120,
+        "total": 120,
         "coverage": 1,
-        "actedAccuracy": 0.6666666666666666
+        "actedAccuracy": 0.39166666666666666
       },
       {
         "threshold": 0.5,
-        "acted": 26,
-        "total": 30,
-        "coverage": 0.8666666666666667,
-        "actedAccuracy": 0.6153846153846154
+        "acted": 119,
+        "total": 120,
+        "coverage": 0.9916666666666667,
+        "actedAccuracy": 0.5714285714285714
       },
       {
         "threshold": 0.55,
-        "acted": 20,
-        "total": 30,
-        "coverage": 0.6666666666666666,
-        "actedAccuracy": 0.8
+        "acted": 110,
+        "total": 120,
+        "coverage": 0.9166666666666666,
+        "actedAccuracy": 0.6636363636363637
       },
       {
         "threshold": 0.6,
-        "acted": 19,
-        "total": 30,
-        "coverage": 0.6333333333333333,
+        "acted": 109,
+        "total": 120,
+        "coverage": 0.9083333333333333,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 5,
-        "total": 30,
-        "coverage": 0.16666666666666666,
+        "acted": 82,
+        "total": 120,
+        "coverage": 0.6833333333333333,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.7,
         "acted": 0,
-        "total": 30,
+        "total": 120,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.75,
         "acted": 0,
-        "total": 30,
+        "total": 120,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.8,
         "acted": 0,
-        "total": 30,
+        "total": 120,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.85,
         "acted": 0,
-        "total": 30,
+        "total": 120,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.9,
         "acted": 0,
-        "total": 30,
+        "total": 120,
         "coverage": 0,
         "actedAccuracy": 0
       }
     ],
     "reasons": [
-      "filtered 10 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions",
-      "selected highest threshold 0.6 reaching coverage >= 0.4 while meeting actedAccuracy >= 0.9 with at least 4 acted decisions"
+      "filtered 11 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions",
+      "selected highest threshold 0.65 reaching coverage >= 0.4 while meeting actedAccuracy >= 0.9 with at least 4 acted decisions"
     ]
   },
   "gate": {
@@ -393,6 +393,7 @@
     "gates": {
       "minSamples": 30,
       "minAccuracy": 0.9,
+      "minAccuracyLowerBound": 0.8,
       "maxBrier": 0.1,
       "maxExpectedCalibrationError": 0.1
     }
@@ -401,10 +402,10 @@
   "gateStats": [
     {
       "id": "empty-world",
-      "acted": 10,
+      "acted": 0,
       "total": 10,
-      "accuracy": 1,
-      "meanPredicted": 0.617
+      "accuracy": 0,
+      "meanPredicted": 0
     },
     {
       "id": "story-graph",
@@ -415,24 +416,24 @@
     },
     {
       "id": "encounter-prep",
-      "acted": 9,
+      "acted": 1,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.6422222222222222
+      "meanPredicted": 0.65
     },
     {
       "id": "story-graph-revealed",
-      "acted": 3,
+      "acted": 1,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.6166666666666667
+      "meanPredicted": 0.65
     },
     {
       "id": "encounter-active",
-      "acted": 9,
+      "acted": 1,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.6144444444444443
+      "meanPredicted": 0.65
     },
     {
       "id": "gm-only",
@@ -440,49 +441,112 @@
       "total": 10,
       "accuracy": 1,
       "meanPredicted": 1
+    },
+    {
+      "id": "harvested:0fa81f782c1e",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6729999999999999
+    },
+    {
+      "id": "harvested:1c9f6a75ec2b",
+      "acted": 9,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.658888888888889
+    },
+    {
+      "id": "harvested:271de5fa5486",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6610000000000001
+    },
+    {
+      "id": "harvested:2e1bd6a66deb",
+      "acted": 7,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.65
+    },
+    {
+      "id": "harvested:745e95329d01",
+      "acted": 7,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6614285714285714
+    },
+    {
+      "id": "harvested:79257e872b4e",
+      "acted": 9,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6633333333333334
+    },
+    {
+      "id": "harvested:e548d1784b60",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.668
+    },
+    {
+      "id": "harvested:ee7204591cf8",
+      "acted": 9,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6655555555555556
+    },
+    {
+      "id": "harvested:f5227bfed60b",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.67
     }
   ],
   "calibration": {
     "fitted": {
-      "a": 2.444061717719016,
-      "b": 3.477636794393918
+      "a": 2.7170052842045354,
+      "b": 3.026938709903046
     },
-    "devSamples": 19,
-    "holdoutSamples": 22,
+    "devSamples": 82,
+    "holdoutSamples": 12,
     "holdout": {
       "raw": {
-        "brier": 0.0809818181818182,
-        "expectedCalibrationError": 0.21000000000000005
+        "brier": 0.020416666666666663,
+        "expectedCalibrationError": 0.05833333333333333
       },
       "calibrated": {
-        "brier": 0.000054066499180653925,
-        "expectedCalibrationError": 0.005368144975183564
+        "brier": 0.000013303923105162538,
+        "expectedCalibrationError": 0.0014890669956475477
       }
     },
     "all": {
       "raw": {
-        "brier": 0.10752439024390244,
-        "expectedCalibrationError": 0.2846341463414633
+        "brier": 0.10125319148936168,
+        "expectedCalibrationError": 0.3006382978723407
       },
       "calibrated": {
-        "brier": 0.00006558876730056003,
-        "expectedCalibrationError": 0.0068913131666865635
+        "brier": 0.00005325548215475891,
+        "expectedCalibrationError": 0.0068405483084467145
       }
     }
   },
   "negatives": {
-    "acted": 41,
+    "acted": 94,
     "incorrect": 0,
     "inexact": 0,
     "lowestIncorrectSignal": null
   },
-  "harvestedCases": 0,
+  "harvestedCases": 9,
   "harvest": {
     "fixture": "server/test/fixtures/system-one-harvested/director-selection.json",
-    "present": false,
-    "confirmed": 0,
+    "present": true,
+    "confirmed": 9,
     "skipped": 0,
-    "cases": 0,
+    "cases": 9,
     "warning": null
   },
   "stability": {
@@ -495,8 +559,8 @@
           "defer"
         ],
         "conflicted": false,
-        "meanSignal": 0.626,
-        "signalStdDev": 0.02244994432064367
+        "meanSignal": 0.617,
+        "signalStdDev": 0.02451530134426255
       },
       {
         "caseId": "story-graph",
@@ -506,8 +570,8 @@
           "defer"
         ],
         "conflicted": false,
-        "meanSignal": 0.5009999999999999,
-        "signalStdDev": 0.02071231517720799
+        "meanSignal": 0.523,
+        "signalStdDev": 0.016763054614240224
       },
       {
         "caseId": "encounter-prep",
@@ -517,8 +581,8 @@
           "defer"
         ],
         "conflicted": false,
-        "meanSignal": 0.637,
-        "signalStdDev": 0.022383029285599414
+        "meanSignal": 0.627,
+        "signalStdDev": 0.016155494421403526
       },
       {
         "caseId": "story-graph-revealed",
@@ -528,8 +592,8 @@
           "defer"
         ],
         "conflicted": false,
-        "meanSignal": 0.5720000000000001,
-        "signalStdDev": 0.03399999999999999
+        "meanSignal": 0.571,
+        "signalStdDev": 0.03389690251335657
       },
       {
         "caseId": "encounter-active",
@@ -539,8 +603,8 @@
           "defer"
         ],
         "conflicted": false,
-        "meanSignal": 0.618,
-        "signalStdDev": 0.016000000000000014
+        "meanSignal": 0.62,
+        "signalStdDev": 0.016733200530681523
       },
       {
         "caseId": "gm-only",
@@ -552,13 +616,112 @@
         "conflicted": false,
         "meanSignal": 1,
         "signalStdDev": 0
+      },
+      {
+        "caseId": "harvested:0fa81f782c1e",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.45400000000000007,
+        "signalStdDev": 0.016852299546352718
+      },
+      {
+        "caseId": "harvested:1c9f6a75ec2b",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.449,
+        "signalStdDev": 0.012206555615733698
+      },
+      {
+        "caseId": "harvested:271de5fa5486",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44400000000000006,
+        "signalStdDev": 0.010198039027185565
+      },
+      {
+        "caseId": "harvested:2e1bd6a66deb",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44400000000000006,
+        "signalStdDev": 0.01356465996625053
+      },
+      {
+        "caseId": "harvested:745e95329d01",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44700000000000006,
+        "signalStdDev": 0.017349351572897475
+      },
+      {
+        "caseId": "harvested:79257e872b4e",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44699999999999995,
+        "signalStdDev": 0.01734935157289747
+      },
+      {
+        "caseId": "harvested:e548d1784b60",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44600000000000006,
+        "signalStdDev": 0.015620499351813309
+      },
+      {
+        "caseId": "harvested:ee7204591cf8",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44700000000000006,
+        "signalStdDev": 0.011874342087037916
+      },
+      {
+        "caseId": "harvested:f5227bfed60b",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.44600000000000006,
+        "signalStdDev": 0.020591260281974003
       }
     ],
-    "repeats": 60,
+    "repeats": 150,
     "meanAgreement": 1,
     "conflictCases": 0,
     "conflictRate": 0,
-    "meanSignalStdDev": 0.01925754813057518,
-    "maxSignalStdDev": 0.03399999999999999
+    "meanSignalStdDev": 0.016244687496405806,
+    "maxSignalStdDev": 0.03389690251335657
   }
 }
