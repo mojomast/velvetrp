@@ -12,12 +12,14 @@ import { callSystemOne, completeWithProvider, type CompletionMessage, type Provi
 import { canUseSystemOne } from "../provider/providerTransport.js";
 import { readRpgFeatureFlags } from "../features.js";
 import { systemOneLaneMode } from "../defaults.js";
+import type { CampaignRecallHit } from "../repo/campaign/campaignRecallReadRepo.js";
 import type { Repository } from "../repo/index.js";
 import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
 import type { HarnessSettings, ProviderSettings, SystemOneSettings } from "../types.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import { calibrateTopSignal } from "./systemOneCalibration.js";
 import { buildAdventureSelectionQuestions, composeAdventureSelection, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
+import { buildRerankQuestions, composeRerankOrder, type RerankCandidate } from "./systemOneRerank.js";
 import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArguments,
   selectAdventureTools, type AdventureToolName, type ProviderSafeQuestObjectiveCandidate, type SelectedAdventureTool } from "./toolRegistry.js";
 import { adventurePlanningMessages } from "./adventurePrompt.js";
@@ -36,6 +38,12 @@ export interface SystemOneAdventureDependency {
   caller: SystemOneCaller;
 }
 
+/** An injected memory-reranking shadow lane; absent when the feature, setting, key, or lane mode is off. */
+export interface SystemOneRerankDependency {
+  settings: SystemOneSettings;
+  caller: SystemOneCaller;
+}
+
 export interface AdventureAgentDependencies {
   complete(input: ProviderCompletionInput): Promise<ProviderCompletionResult>;
   getProvider(): Promise<ProviderSettings>;
@@ -45,6 +53,8 @@ export interface AdventureAgentDependencies {
   getSystemOneDirector?: () => Promise<import("./systemOneDirector.js").SystemOneDirectorDependency | undefined>;
   /** Optional System One adventure-selection shadow hook; absent disables the lane entirely. */
   getSystemOneAdventure?: () => Promise<SystemOneAdventureDependency | undefined>;
+  /** Optional System One memory-reranking shadow hook; absent disables the lane entirely. */
+  getSystemOneRerank?: () => Promise<SystemOneRerankDependency | undefined>;
 }
 
 const productionDependencies: AdventureAgentDependencies = {
@@ -53,6 +63,7 @@ const productionDependencies: AdventureAgentDependencies = {
   getHarness: getHarnessSettings,
   now: () => new Date(),
   getSystemOneAdventure: resolveSystemOneAdventure,
+  getSystemOneRerank: resolveSystemOneRerank,
 };
 
 /**
@@ -65,6 +76,20 @@ export async function resolveSystemOneAdventure(): Promise<SystemOneAdventureDep
   const settings = await getSystemOneSettings();
   if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
   if (systemOneLaneMode(settings, "adventure-selection") === "off") return undefined;
+  return { settings, caller: callSystemOne };
+}
+
+/**
+ * Resolves the memory-reranking lane when the feature, setting, and key are on and the lane
+ * mode is not `off`. Even an `active` mode stays record-only here: the orchestrator has no
+ * promoted active path for the lane, so it always records a shadow decision and never reorders
+ * the recall.
+ */
+export async function resolveSystemOneRerank(): Promise<SystemOneRerankDependency | undefined> {
+  if (!readRpgFeatureFlags().systemOne) return undefined;
+  const settings = await getSystemOneSettings();
+  if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  if (systemOneLaneMode(settings, "memory-reranking") === "off") return undefined;
   return { settings, caller: callSystemOne };
 }
 
@@ -169,6 +194,79 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
       // The recorded confidence is calibrated for observability; the band is decided on raw signals.
       selection: { method: composed.method, selection: composed.selection,
         topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["adventure-selection"]) },
+      confidenceBand: composed.band,
+      fallbackUsed: true,
+      shadow: true,
+      usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Shadow evaluation is advisory and must never affect the turn.
+  }
+}
+
+/** Upper bound on the recall rows projected into one shadow rerank battery. */
+export const RERANK_SHADOW_CANDIDATE_CAP = 8;
+
+/**
+ * Projects the already-authorized recall hits into the bounded candidate shortlist the lane
+ * reranks, mirroring the offline evaluation's projection: hits are deduplicated by source id,
+ * kept in deterministic recall order, and each candidate carries the source kind as its label,
+ * the recalled text, and its zero-based rank. The runtime has no labelled source-key map, so the
+ * stable source id is the candidate id; the recall's own caps (eight hits, 2048 bytes each,
+ * 6144 bytes total) bound the shortlist.
+ */
+export function rerankShadowCandidates(hits: readonly CampaignRecallHit[]): RerankCandidate[] {
+  const candidates: RerankCandidate[] = [];
+  const seen = new Set<string>();
+  let rank = 0;
+  for (const hit of hits) {
+    if (seen.has(hit.sourceId)) continue;
+    seen.add(hit.sourceId);
+    candidates.push({ candidateId: hit.sourceId, label: hit.sourceKind, text: hit.text, rank });
+    rank += 1;
+    if (candidates.length >= RERANK_SHADOW_CANDIDATE_CAP) break;
+  }
+  return candidates;
+}
+
+/**
+ * Runs the L4 memory-reranking battery over the already-authorized recall shortlist beside the
+ * live turn and records the advisory order immutably. It never reorders, drops, or authorizes a
+ * candidate and never changes the recall, basket, prompt, provider call, or persistence; any
+ * failure is swallowed so shadow evaluation cannot affect the turn.
+ */
+export async function recordRerankShadowDecision(turn: PrivateAdventureTurn, query: string,
+  candidates: readonly RerankCandidate[], lane: SystemOneRerankDependency): Promise<void> {
+  try {
+    if (systemOneLaneMode(lane.settings, "memory-reranking") === "off") return;
+    if (candidates.length < 2) return;
+    const input = { query, candidates };
+    const questions = buildRerankQuestions(input);
+    // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
+    // shape back); the shortlist is the authorized recall projection, never a reorder.
+    const state = { query, purpose: "adventure-planning", candidates } as never;
+    const startedAt = performance.now();
+    const result = await lane.caller({ settings: lane.settings, state, questions });
+    const composed = composeRerankOrder(input, result.answers, lane.settings.confidencePolicy["memory-reranking"]);
+    recordSystemOneDecision({
+      decisionId: randomUUID(),
+      lane: "memory-reranking",
+      campaignId: turn.campaignId,
+      sessionId: turn.sessionId,
+      turnId: turn.turnId,
+      provider: "typesafe",
+      model: result.model.responseModel ?? lane.settings.model,
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state,
+      questions,
+      answers: result.answers,
+      // The composed order is advisory evidence: the recall order and every provider input are
+      // unchanged. The recorded confidence is calibrated for observability; the band is decided
+      // on raw signals.
+      selection: { order: composed.order, band: composed.band,
+        topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["memory-reranking"]) },
       confidenceBand: composed.band,
       fallbackUsed: true,
       shadow: true,
@@ -778,6 +876,20 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     try {
       const lane = await dependencies.getSystemOneAdventure();
       if (lane) await recordAdventureShadowDecision(turn, shadowCandidates, lane);
+    } catch {
+      // Shadow evaluation is advisory and must never affect the turn.
+    }
+  }
+  // The memory-reranking shadow is advisory: it never reorders, drops, or authorizes a recall
+  // candidate and never changes the recall, basket, prompt, or provider call. A lane failure is
+  // swallowed so shadow evaluation cannot affect the turn.
+  if (dependencies.getSystemOneRerank) {
+    try {
+      const rerankCandidates = rerankShadowCandidates(historicalRecall.hits);
+      if (rerankCandidates.length >= 2) {
+        const lane = await dependencies.getSystemOneRerank();
+        if (lane) await recordRerankShadowDecision(turn, historicalRecall.query, rerankCandidates, lane);
+      }
     } catch {
       // Shadow evaluation is advisory and must never affect the turn.
     }

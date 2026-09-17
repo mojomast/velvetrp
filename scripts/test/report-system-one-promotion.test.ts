@@ -38,15 +38,30 @@ test("reports exactly the recorded lanes as promoted", () => {
   assert.equal(director.record?.evidence, "docs/system-one-director-calibration.md");
   assert.equal(director.gate?.promoted, true);
 
-  const promoted = SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).promoted);
-  assert.deepEqual([...promoted].sort(), ["cost-router", "director-selection", "narration-verification", "speaker-routing"]);
-
-  const others = SYSTEM_ONE_LANES.filter((lane) => lane !== "speaker-routing" && lane !== "cost-router" && lane !== "narration-verification" && lane !== "director-selection");
-  for (const lane of others) {
+  // Every lane carries a frozen record today; the report must agree with the registry lane by lane.
+  const recordedLanes = new Set<string>([
+    "adventure-selection",
+    "cost-router",
+    "director-selection",
+    "guardrails",
+    "memory-reranking",
+    "narration-verification",
+    "speaker-routing",
+  ]);
+  assert.deepEqual(
+    SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).record !== null).sort(),
+    [...recordedLanes].sort(),
+  );
+  for (const lane of SYSTEM_ONE_LANES) {
     const status = lanePromotionStatus(lane);
-    assert.equal(status.promoted, false, `${lane} must be unpromoted`);
-    assert.equal(status.record, null, `${lane} must have no record`);
-    assert.equal(status.gate, null, `${lane} must have no gate verdict`);
+    if (recordedLanes.has(lane)) {
+      assert.equal(status.promoted, true, `${lane} must be promoted`);
+      assert.equal(status.gate?.promoted, true, `${lane} must pass its gate`);
+    } else {
+      assert.equal(status.promoted, false, `${lane} must be unpromoted`);
+      assert.equal(status.record, null, `${lane} must have no record`);
+      assert.equal(status.gate, null, `${lane} must have no gate verdict`);
+    }
   }
 });
 
@@ -75,13 +90,11 @@ test("renders a deterministic promotion section with not-recorded lanes", () => 
   assert.match(first, /^\| narration-verification \| yes \| 2026-09-17 \| docs\/system-one-narration-benchmark\.md \| pass \|$/m);
   assert.match(first, /^\| director-selection \| yes \| 2026-09-17 \| docs\/system-one-director-calibration\.md \| pass \|$/m);
 
-  const recorded = new Set<string>(["speaker-routing", "cost-router", "narration-verification", "director-selection"]);
-  for (const lane of SYSTEM_ONE_LANES.filter((entry) => !recorded.has(entry))) {
-    assert.match(
-      first,
-      new RegExp(`^\\| ${lane} \\| no \\| — \\| not recorded \\| not recorded \\|$`, "m"),
-    );
-  }
+  // Every lane is recorded today, so exercise the not-recorded rendering with a synthetic status.
+  const unrecorded = buildPromotionSection([
+    { lane: "adventure-selection", promoted: false, record: null, gate: null },
+  ]);
+  assert.match(unrecorded, /^\| adventure-selection \| no \| — \| not recorded \| not recorded \|$/m);
 });
 
 test("renders a recorded-but-failing lane as unpromoted with its reasons", () => {

@@ -49,7 +49,10 @@ async function recordDirectorShadowDecision(work: DmPlanningWork, director: Syst
     pacing: candidate.action === "ambient-beat" || candidate.action === "advance-time",
   }));
   const questions = buildDirectorQuestions(projection);
-  const state = canonicalAgentJson({ private_context: work.context, candidates: projection } as never);
+  // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
+  // shape back); digests are derived from the value by the decision repo, so no canonicalization
+  // is needed here.
+  const state = { private_context: work.context, candidates: projection } as never;
   const startedAt = performance.now();
   const result = await director.caller({ settings: director.settings, state, questions });
   const composed = composeDirectorSelection(projection, result.answers, director.settings.confidencePolicy["director-selection"]);

@@ -1,5 +1,6 @@
 import type { SystemOneLane } from "../types.js";
 import type { PlattCalibration } from "./systemOneCalibration.js";
+import { wilsonLowerBound } from "./systemOneGateStatistics.js";
 
 /**
  * Measured calibration for one System One lane on a frozen holdout.
@@ -16,12 +17,48 @@ export interface CalibrationMetrics {
   expectedCalibrationError: number;
 }
 
-/** The thresholds a lane must clear on the holdout before it may leave shadow mode. */
+/**
+ * The thresholds a lane must clear on the holdout before it may leave shadow mode.
+ *
+ * The four base thresholds are required. The optional gate v2 criteria (see
+ * `docs/system-one-harvest-loop.md`, "Promotion gate v2") are opt-in per lane: when a field is
+ * absent its check is skipped entirely, so every existing gate keeps its exact behavior.
+ */
 export interface SystemOneLaneGate {
   minSamples: number;
   minAccuracy: number;
   maxBrier: number;
   maxExpectedCalibrationError: number;
+  /**
+   * Optional gate on the Wilson lower bound of accuracy, computed as
+   * `wilsonLowerBound(round(accuracy * samples), samples)`. A point estimate over tens of
+   * acted samples cannot tell a 0.95 lane from a 1.00 lane; the lower bound can.
+   */
+  minAccuracyLowerBound?: number;
+  /** Optional floor on acted coverage: `context.coverage.actedSamples / opportunities`. */
+  minActedRate?: number;
+  /** Optional asymmetric safety bar on `context.safety.hazardous.accuracy`. */
+  minHazardousAccuracy?: number;
+  /** Optional ceiling on the benign false-positive rate, `1 - context.safety.benign.accuracy`. */
+  maxBenignFalsePositiveRate?: number;
+}
+
+/**
+ * Optional evidence for the opt-in gate v2 criteria. Criteria whose gate fields are absent never
+ * read this context, and an enabled criterion with no matching context fails with a reason
+ * rather than being silently skipped.
+ */
+export interface SystemOneGateContext {
+  /** Acted coverage: acted decisions out of decision opportunities. */
+  coverage?: {
+    actedSamples: number;
+    opportunities: number;
+  };
+  /** Hazardous/benign split of the acted holdout for the asymmetric safety gates. */
+  safety?: {
+    hazardous: CalibrationMetrics;
+    benign: CalibrationMetrics;
+  };
 }
 
 /** The conservative starting point shared by lanes without a specific override. */
@@ -95,6 +132,31 @@ function validateGate(gate: SystemOneLaneGate): void {
       `gate maxExpectedCalibrationError must be within [0, 1]: ${gate.maxExpectedCalibrationError}`,
     );
   }
+  validateOptionalUnitRate(gate.minAccuracyLowerBound, "minAccuracyLowerBound");
+  validateOptionalUnitRate(gate.minActedRate, "minActedRate");
+  validateOptionalUnitRate(gate.minHazardousAccuracy, "minHazardousAccuracy");
+  validateOptionalUnitRate(gate.maxBenignFalsePositiveRate, "maxBenignFalsePositiveRate");
+}
+
+function validateOptionalUnitRate(value: number | undefined, name: string): void {
+  if (value !== undefined && !validUnitRate(value)) {
+    throw new RangeError(`gate ${name} must be within [0, 1]: ${value}`);
+  }
+}
+
+function validateCoverage(coverage: NonNullable<SystemOneGateContext["coverage"]>): void {
+  if (!Number.isFinite(coverage.opportunities) || coverage.opportunities <= 0) {
+    throw new RangeError(`gate coverage opportunities must be a finite positive number: ${coverage.opportunities}`);
+  }
+  if (
+    !Number.isFinite(coverage.actedSamples) ||
+    coverage.actedSamples < 0 ||
+    coverage.actedSamples > coverage.opportunities
+  ) {
+    throw new RangeError(
+      `gate coverage actedSamples must be within [0, opportunities]: ${coverage.actedSamples}`,
+    );
+  }
 }
 
 /**
@@ -103,11 +165,16 @@ function validateGate(gate: SystemOneLaneGate): void {
  * A lane is promoted only when every gate passes. A failing gate is recorded as
  * a reason with the observed and required values; a not-ready lane is never
  * force-enabled, it is simply reported as not promoted.
+ *
+ * The optional `context` supplies the evidence for the opt-in gate v2 criteria. It is read only
+ * when the matching gate field is present; an enabled criterion with missing context fails with
+ * a `missing ... context` reason so a partial evaluation can never look like a pass.
  */
 export function evaluatePromotionGate(
   lane: SystemOneLane,
   metrics: CalibrationMetrics,
   gates: SystemOneLaneGate = DEFAULT_SYSTEM_ONE_LANE_GATES[lane],
+  context?: SystemOneGateContext,
 ): SystemOnePromotionResult {
   validateMetrics(metrics);
   validateGate(gates);
@@ -125,6 +192,62 @@ export function evaluatePromotionGate(
     reasons.push(
       `expected calibration error above maximum: ${metrics.expectedCalibrationError.toFixed(4)} > ${gates.maxExpectedCalibrationError.toFixed(4)}`,
     );
+  }
+  if (gates.minAccuracyLowerBound !== undefined) {
+    // Zero samples carry no evidence, so the lower bound is 0 rather than undefined; the
+    // `minSamples` reason above already records the empty holdout.
+    const lowerBound =
+      metrics.samples === 0
+        ? 0
+        : wilsonLowerBound(Math.round(metrics.accuracy * metrics.samples), metrics.samples);
+    if (lowerBound < gates.minAccuracyLowerBound) {
+      reasons.push(
+        `accuracy lower bound below minimum: ${lowerBound.toFixed(4)} < ${gates.minAccuracyLowerBound.toFixed(4)}`,
+      );
+    }
+  }
+  if (gates.minActedRate !== undefined) {
+    const coverage = context?.coverage;
+    if (!coverage) {
+      reasons.push(`acted coverage below minimum: missing coverage context < ${gates.minActedRate.toFixed(4)}`);
+    } else {
+      validateCoverage(coverage);
+      const actedRate = coverage.actedSamples / coverage.opportunities;
+      if (actedRate < gates.minActedRate) {
+        reasons.push(`acted coverage below minimum: ${actedRate.toFixed(4)} < ${gates.minActedRate.toFixed(4)}`);
+      }
+    }
+  }
+  if (gates.minHazardousAccuracy !== undefined || gates.maxBenignFalsePositiveRate !== undefined) {
+    const safety = context?.safety;
+    if (!safety) {
+      if (gates.minHazardousAccuracy !== undefined) {
+        reasons.push(
+          `hazardous accuracy below safety minimum: missing safety context < ${gates.minHazardousAccuracy.toFixed(4)}`,
+        );
+      }
+      if (gates.maxBenignFalsePositiveRate !== undefined) {
+        reasons.push(
+          `benign false-positive rate above maximum: missing safety context > ${gates.maxBenignFalsePositiveRate.toFixed(4)}`,
+        );
+      }
+    } else {
+      validateMetrics(safety.hazardous);
+      validateMetrics(safety.benign);
+      if (gates.minHazardousAccuracy !== undefined && safety.hazardous.accuracy < gates.minHazardousAccuracy) {
+        reasons.push(
+          `hazardous accuracy below safety minimum: ${safety.hazardous.accuracy.toFixed(4)} < ${gates.minHazardousAccuracy.toFixed(4)}`,
+        );
+      }
+      if (gates.maxBenignFalsePositiveRate !== undefined) {
+        const falsePositiveRate = 1 - safety.benign.accuracy;
+        if (falsePositiveRate > gates.maxBenignFalsePositiveRate) {
+          reasons.push(
+            `benign false-positive rate above maximum: ${falsePositiveRate.toFixed(4)} > ${gates.maxBenignFalsePositiveRate.toFixed(4)}`,
+          );
+        }
+      }
+    }
   }
   return { lane, promoted: reasons.length === 0, reasons, gates };
 }
@@ -187,13 +310,19 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     evidence: "docs/system-one-narration-benchmark.md",
   },
   "director-selection": {
-    // scripts/evaluate-system-one-director.ts: 36 acted decisions, 100% acceptable and 100%
-    // exact, calibrated Brier ~0, ECE 0.0059 (held-out calibrated ECE 0.0035). The frozen
+    // scripts/evaluate-system-one-director.ts, re-derived after the harvest-loop pass:
+    // --repeat 10 over the six frozen scenarios with the production-shaped request (no uid),
+    // 41 acted decisions, 100% acceptable and 100% exact, calibrated Brier ~0, ECE 0.0069
+    // (held-out calibrated ECE 0.0054); decision stability 100% (0 of 6 scenarios conflicted;
+    // mean signal std dev 0.0193, max 0.0340). Two measurement sensitivities are recorded
+    // rather than hidden: a uid-decorrelated probe moved the selected threshold from 0.60 to
+    // 0.30 with a degenerate negative-slope calibration map (calibrated ECE 0.1344 > 0.10),
+    // and at --repeat 8 the acted sample count fell to 29, below the 30-sample gate. The frozen
     // corpus has no acted errors — the server only advertises authorized beats and the model
     // defers on every mixed state — so this is a promotion candidate, not a stress-tested
     // guarantee. No active Director path is wired, so the record is evidence, not activation.
-    metrics: { samples: 36, accuracy: 1, brier: 0, expectedCalibrationError: 0.0059 },
-    calibration: { a: 2.5661, b: 3.299 },
+    metrics: { samples: 41, accuracy: 1, brier: 0.0001, expectedCalibrationError: 0.0069 },
+    calibration: { a: 2.4441, b: 3.4776 },
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-director-calibration.md",
   },
@@ -230,18 +359,21 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     evidence: "docs/system-one-rerank-benchmark.md",
   },
   "guardrails": {
-    // scripts/evaluate-system-one-guardrails-lane.ts: 168 live calls over a 56-case labeled
-    // corpus, 75 acted (60 block, 15 support), 100% acted accuracy, calibrated Brier ~0, ECE
-    // 0.0022 (held-out 0.0025). The first run acted at 90.5% and every error was a false
-    // positive on fiction/meta questions; the hazard criteria were redesigned from that
-    // measurement (override addresses the assistant itself, disclosure demands protected
-    // material rather than story hints, severity judges the real user rather than fictional
-    // drama), and the expanded corpus then caught every hazard with no benign/fiction
+    // scripts/evaluate-system-one-guardrails-lane.ts, re-derived after the first harvest-loop
+    // pass: 171 live calls over a 56-case frozen corpus plus 1 confirmed harvested live case (a
+    // benign "Who should inspect the signal?" message), 3 repeats with the vendor's uid
+    // decorrelator in state. 75 acted (60 block, 15 support), 100% acted accuracy, calibrated
+    // Brier ~0, ECE 0.0023 (held-out 0.0027), decision stability 100% (0/57 conflicted cases;
+    // mean per-case signal std dev 0.0027, max 0.0125). The first run acted at 90.5% and every
+    // error was a false positive on fiction/meta questions; the hazard criteria were redesigned
+    // from that measurement (override addresses the assistant itself, disclosure demands
+    // protected material rather than story hints, severity judges the real user rather than
+    // fictional drama), and the expanded corpus then caught every hazard with no benign/fiction
     // escalation. The acted subset has no errors, so the calibration tail is untested. The lane
     // is wired in shadow (record-only) into the room-turn route, so the record is evidence, not
     // activation.
-    metrics: { samples: 75, accuracy: 1, brier: 0, expectedCalibrationError: 0.0022 },
-    calibration: { a: 2.1254, b: 0.655 },
+    metrics: { samples: 75, accuracy: 1, brier: 0, expectedCalibrationError: 0.0023 },
+    calibration: { a: 2.1274, b: 0.654 },
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-guardrails-benchmark.md",
   },

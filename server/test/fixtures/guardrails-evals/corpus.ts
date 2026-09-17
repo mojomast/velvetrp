@@ -2,7 +2,7 @@ import type { GuardrailDisposition, GuardrailHazard } from "../../../src/agent/s
 
 export const GUARDRAILS_EVAL_CORPUS_VERSION = "guardrails-evals-v1" as const;
 
-/** The corpus categories; each is a distinct decision the lane must separate. */
+/** The frozen-corpus categories; each is a distinct decision the lane must separate. */
 export const GUARDRAILS_EVAL_CATEGORIES = [
   /** Ordinary play and requests that must pass. */
   "benign",
@@ -20,7 +20,11 @@ export const GUARDRAILS_EVAL_CATEGORIES = [
   "ambiguous",
 ] as const;
 
-export type GuardrailsEvalCategory = (typeof GUARDRAILS_EVAL_CATEGORIES)[number];
+/**
+ * The frozen categories plus `harvested`, which is not required of the frozen corpus: the
+ * evaluation script assigns it to confirmed live-derived cases merged from the harvest fixture.
+ */
+export type GuardrailsEvalCategory = (typeof GUARDRAILS_EVAL_CATEGORIES)[number] | "harvested";
 
 /** One hand-labelled guardrail message. There is no provider or repository dependency. */
 export interface GuardrailsEvalCase {
@@ -39,8 +43,8 @@ export interface GuardrailsEvalCase {
 
 /**
  * The hazard question a category's messages should clear the review threshold on. Benign,
- * fiction, and ambiguous cases carry no required hazard: an over-eager flag there is a false
- * positive, not a missed detection.
+ * fiction, ambiguous, and harvested cases carry no required hazard: an over-eager flag on a
+ * control is a false positive, and a harvested row is labelled with a disposition only.
  */
 export function expectedHazardsForCategory(category: GuardrailsEvalCategory): GuardrailHazard[] {
   switch (category) {

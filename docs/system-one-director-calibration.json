@@ -14,7 +14,7 @@
       "acted": 60,
       "total": 60,
       "coverage": 1,
-      "actedAccuracy": 0.8833333333333333
+      "actedAccuracy": 0.8666666666666667
     },
     {
       "threshold": 0.4,
@@ -32,30 +32,30 @@
     },
     {
       "threshold": 0.5,
-      "acted": 58,
+      "acted": 56,
       "total": 60,
-      "coverage": 0.9666666666666667,
-      "actedAccuracy": 0.8275862068965517
+      "coverage": 0.9333333333333333,
+      "actedAccuracy": 0.8214285714285714
     },
     {
       "threshold": 0.55,
-      "acted": 45,
+      "acted": 47,
       "total": 60,
-      "coverage": 0.75,
-      "actedAccuracy": 0.9555555555555556
+      "coverage": 0.7833333333333333,
+      "actedAccuracy": 0.9148936170212766
     },
     {
       "threshold": 0.6,
-      "acted": 39,
+      "acted": 41,
       "total": 60,
-      "coverage": 0.65,
+      "coverage": 0.6833333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 13,
+      "acted": 15,
       "total": 60,
-      "coverage": 0.21666666666666667,
+      "coverage": 0.25,
       "actedAccuracy": 1
     },
     {
@@ -107,7 +107,7 @@
       "acted": 30,
       "total": 30,
       "coverage": 1,
-      "actedAccuracy": 0.7666666666666667
+      "actedAccuracy": 0.7333333333333333
     },
     {
       "threshold": 0.4,
@@ -125,30 +125,30 @@
     },
     {
       "threshold": 0.5,
-      "acted": 28,
+      "acted": 26,
       "total": 30,
-      "coverage": 0.9333333333333333,
-      "actedAccuracy": 0.6428571428571429
+      "coverage": 0.8666666666666667,
+      "actedAccuracy": 0.6153846153846154
     },
     {
       "threshold": 0.55,
       "acted": 20,
       "total": 30,
       "coverage": 0.6666666666666666,
-      "actedAccuracy": 0.9
+      "actedAccuracy": 0.8
     },
     {
       "threshold": 0.6,
-      "acted": 20,
+      "acted": 19,
       "total": 30,
-      "coverage": 0.6666666666666666,
+      "coverage": 0.6333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 2,
+      "acted": 5,
       "total": 30,
-      "coverage": 0.06666666666666667,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     },
     {
@@ -225,23 +225,23 @@
     },
     {
       "threshold": 0.55,
-      "acted": 25,
+      "acted": 27,
       "total": 30,
-      "coverage": 0.8333333333333334,
+      "coverage": 0.9,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.6,
-      "acted": 19,
+      "acted": 22,
       "total": 30,
-      "coverage": 0.6333333333333333,
+      "coverage": 0.7333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 11,
+      "acted": 10,
       "total": 30,
-      "coverage": 0.36666666666666664,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     },
     {
@@ -283,9 +283,9 @@
   "selected": {
     "selected": {
       "threshold": 0.6,
-      "acted": 20,
+      "acted": 19,
       "total": 30,
-      "coverage": 0.6666666666666666,
+      "coverage": 0.6333333333333333,
       "actedAccuracy": 1
     },
     "points": [
@@ -301,7 +301,7 @@
         "acted": 30,
         "total": 30,
         "coverage": 1,
-        "actedAccuracy": 0.7666666666666667
+        "actedAccuracy": 0.7333333333333333
       },
       {
         "threshold": 0.4,
@@ -319,30 +319,30 @@
       },
       {
         "threshold": 0.5,
-        "acted": 28,
+        "acted": 26,
         "total": 30,
-        "coverage": 0.9333333333333333,
-        "actedAccuracy": 0.6428571428571429
+        "coverage": 0.8666666666666667,
+        "actedAccuracy": 0.6153846153846154
       },
       {
         "threshold": 0.55,
         "acted": 20,
         "total": 30,
         "coverage": 0.6666666666666666,
-        "actedAccuracy": 0.9
+        "actedAccuracy": 0.8
       },
       {
         "threshold": 0.6,
-        "acted": 20,
+        "acted": 19,
         "total": 30,
-        "coverage": 0.6666666666666666,
+        "coverage": 0.6333333333333333,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 2,
+        "acted": 5,
         "total": 30,
-        "coverage": 0.06666666666666667,
+        "coverage": 0.16666666666666666,
         "actedAccuracy": 1
       },
       {
@@ -404,7 +404,7 @@
       "acted": 10,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.6139999999999999
+      "meanPredicted": 0.617
     },
     {
       "id": "story-graph",
@@ -415,24 +415,24 @@
     },
     {
       "id": "encounter-prep",
-      "acted": 10,
+      "acted": 9,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.625
+      "meanPredicted": 0.6422222222222222
     },
     {
       "id": "story-graph-revealed",
-      "acted": 1,
+      "acted": 3,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.61
+      "meanPredicted": 0.6166666666666667
     },
     {
       "id": "encounter-active",
-      "acted": 8,
+      "acted": 9,
       "total": 10,
       "accuracy": 1,
-      "meanPredicted": 0.62
+      "meanPredicted": 0.6144444444444443
     },
     {
       "id": "gm-only",
@@ -444,36 +444,121 @@
   ],
   "calibration": {
     "fitted": {
-      "a": 2.387053814449838,
-      "b": 3.5656691613197506
+      "a": 2.444061717719016,
+      "b": 3.477636794393918
     },
-    "devSamples": 20,
-    "holdoutSamples": 19,
+    "devSamples": 19,
+    "holdoutSamples": 22,
     "holdout": {
       "raw": {
-        "brier": 0.0689842105263158,
-        "expectedCalibrationError": 0.18052631578947365
+        "brier": 0.0809818181818182,
+        "expectedCalibrationError": 0.21000000000000005
       },
       "calibrated": {
-        "brier": 0.000039267252008141956,
-        "expectedCalibrationError": 0.004242672004459602
+        "brier": 0.000054066499180653925,
+        "expectedCalibrationError": 0.005368144975183564
       }
     },
     "all": {
       "raw": {
-        "brier": 0.10795384615384614,
-        "expectedCalibrationError": 0.28307692307692317
+        "brier": 0.10752439024390244,
+        "expectedCalibrationError": 0.2846341463414633
       },
       "calibrated": {
-        "brier": 0.00005986887609642239,
-        "expectedCalibrationError": 0.006596010723483481
+        "brier": 0.00006558876730056003,
+        "expectedCalibrationError": 0.0068913131666865635
       }
     }
   },
   "negatives": {
-    "acted": 39,
+    "acted": 41,
     "incorrect": 0,
     "inexact": 0,
     "lowestIncorrectSignal": null
+  },
+  "harvestedCases": 0,
+  "harvest": {
+    "fixture": "server/test/fixtures/system-one-harvested/director-selection.json",
+    "present": false,
+    "confirmed": 0,
+    "skipped": 0,
+    "cases": 0,
+    "warning": null
+  },
+  "stability": {
+    "cases": [
+      {
+        "caseId": "empty-world",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.626,
+        "signalStdDev": 0.02244994432064367
+      },
+      {
+        "caseId": "story-graph",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.5009999999999999,
+        "signalStdDev": 0.02071231517720799
+      },
+      {
+        "caseId": "encounter-prep",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.637,
+        "signalStdDev": 0.022383029285599414
+      },
+      {
+        "caseId": "story-graph-revealed",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.5720000000000001,
+        "signalStdDev": 0.03399999999999999
+      },
+      {
+        "caseId": "encounter-active",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.618,
+        "signalStdDev": 0.016000000000000014
+      },
+      {
+        "caseId": "gm-only",
+        "repeats": 10,
+        "agreement": 1,
+        "decisions": [
+          "hold"
+        ],
+        "conflicted": false,
+        "meanSignal": 1,
+        "signalStdDev": 0
+      }
+    ],
+    "repeats": 60,
+    "meanAgreement": 1,
+    "conflictCases": 0,
+    "conflictRate": 0,
+    "meanSignalStdDev": 0.01925754813057518,
+    "maxSignalStdDev": 0.03399999999999999
   }
 }

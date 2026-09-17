@@ -18,12 +18,16 @@
  * signal. Only `act` decisions (support or block) assert confidence and enter the gate; a
  * `review`/`confirm` or `pass`/`fallback` is a deferral counted as coverage, not a decision.
  *
+ * The run also merges confirmed harvested cases from the parent-owned fixture when one exists (so
+ * live-derived labels join the gate with their provenance flagged) and reports a decision-stability
+ * roll-up (repeat agreement, conflicts, signal variance) beside accuracy.
+ *
  * Opt-in live evaluation: TYPESAFE_API_KEY must be exported. It never touches the store.
  *
  * Usage:
  *   TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-guardrails-lane.ts [--repeat 3] [--out docs/system-one-guardrails-benchmark.md]
  */
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -45,6 +49,13 @@ import {
   type SystemOnePromotionRecord,
   type SystemOnePromotionResult,
 } from "../server/src/agent/systemOnePromotion.js";
+import type { HarvestProposal } from "../server/src/agent/systemOneHarvest.js";
+import {
+  stabilityUid,
+  summarizeStability,
+  type StabilitySample,
+  type StabilitySummary,
+} from "../server/src/agent/systemOneStability.js";
 import { defaultSystemOneSettings } from "../server/src/defaults.js";
 import { completeWithSystemOne } from "../server/src/provider/systemOneCompletion.js";
 import type { SystemOneConfidenceThresholds } from "../server/src/types.js";
@@ -61,6 +72,12 @@ const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const EVIDENCE = "docs/system-one-guardrails-benchmark.md";
 /** The promotion lane and the strict gate tier the guardrails record must clear. */
 const PROMOTION_LANE = "guardrails" as const;
+
+/** The parent-owned confirmed-harvest fixture; absent until a harvest run writes one. */
+export const HARVEST_FIXTURE = "server/test/fixtures/system-one-harvested/guardrails.json";
+const HARVEST_FIXTURE_PATH = path.resolve(ROOT, HARVEST_FIXTURE);
+/** Harvested case ids carry this prefix so the report can mark live-derived labels. */
+export const HARVEST_ID_PREFIX = "harvested:";
 /** Fixed disposition order for tables and the confusion matrix. */
 const DISPOSITION_ORDER: readonly GuardrailDisposition[] = ["pass", "review", "block", "support"];
 /** Categories whose readouts should reach `block` (or `support` for a user crisis). */
@@ -244,9 +261,219 @@ export function evaluateGuardrailsReadouts(
   };
 }
 
+/** One `StabilitySample` per graded call: the composed disposition and its top signal. */
+export function guardrailsStabilitySamples(readouts: readonly GuardrailsReadout[]): StabilitySample[] {
+  return readouts.map((readout) => ({
+    caseId: readout.id,
+    decision: readout.disposition,
+    signal: readout.topSignal,
+  }));
+}
+
+/**
+ * Repeatability roll-up over the graded calls. Pure. Stability is repeatability, not accuracy: a
+ * case that passes on every repeat is stable and still a coverage miss.
+ */
+export function summarizeGuardrailsStability(readouts: readonly GuardrailsReadout[]): StabilitySummary {
+  return summarizeStability(guardrailsStabilitySamples(readouts));
+}
+
+/** How a corpus row entered this run: the frozen projection corpus or a confirmed live harvest. */
+export type GuardrailsCaseProvenance = "frozen" | "harvested";
+
+const provenanceOf = (id: string): GuardrailsCaseProvenance => (id.startsWith(HARVEST_ID_PREFIX) ? "harvested" : "frozen");
+
+/** The parent-owned confirmed-harvest fixture shape (`version: 1`). Proposals are validated defensively. */
+export interface GuardrailsHarvestFixture {
+  version: number;
+  lane: string;
+  generatedAt: string;
+  proposals: HarvestProposal[];
+}
+
+/** The cases a confirmed harvest contributes, and how many confirmed proposals could not be mapped. */
+export interface HarvestedGuardrailsMerge {
+  cases: GuardrailsEvalCase[];
+  /** Confirmed proposals for this lane found in the input. */
+  confirmed: number;
+  /** Confirmed proposals skipped because their state or expected value was unusable. */
+  skipped: number;
+}
+
+/** The merged harvest plus whether the fixture existed and why it may have been unusable. */
+export interface HarvestedGuardrailsCases extends HarvestedGuardrailsMerge {
+  /** True when the fixture file existed (even if malformed). */
+  present: boolean;
+  /** A clear warning when the fixture existed but was unusable; null when it loaded or was absent. */
+  warning: string | null;
+}
+
+/** What the report needs to show the gate included live-derived labels. */
+export interface GuardrailsHarvestReport {
+  fixture: string;
+  present: boolean;
+  confirmed: number;
+  skipped: number;
+  /** Merged harvested cases that actually ran. */
+  cases: number;
+  warning: string | null;
+}
+
+const EMPTY_HARVEST: GuardrailsHarvestReport = {
+  fixture: HARVEST_FIXTURE,
+  present: false,
+  confirmed: 0,
+  skipped: 0,
+  cases: 0,
+  warning: null,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The lane-relevant slice of a proposal, defensively validated from parsed JSON. */
+interface HarvestedProposalShape {
+  proposalId: string;
+  lane: string;
+  status: string;
+  state: unknown;
+  expected: unknown;
+}
+
+function harvestProposalShape(value: unknown): HarvestedProposalShape | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.proposalId !== "string" || !value.proposalId.trim()) return null;
+  if (typeof value.lane !== "string" || typeof value.status !== "string") return null;
+  return {
+    proposalId: value.proposalId,
+    lane: value.lane,
+    status: value.status,
+    state: value.state,
+    expected: value.expected ?? null,
+  };
+}
+
+const GUARDRAIL_DISPOSITIONS: readonly GuardrailDisposition[] = ["pass", "review", "block", "support"];
+
+/**
+ * Maps one confirmed guardrails proposal onto a corpus case, or null when its state or expected
+ * value is unusable. The recorded state is the lane's bounded review input (`message`, plus the
+ * declared boundaries already in scope); the expected label is one of the four dispositions.
+ * Harvested cases are evidence only: they carry no hazard label and are never re-validated.
+ */
+function guardrailsCaseFromHarvest(proposal: HarvestedProposalShape): GuardrailsEvalCase | null {
+  const state = isRecord(proposal.state) ? proposal.state : null;
+  if (!state || typeof state.message !== "string" || !state.message.trim()) return null;
+  let declaredBoundaries: string[] | undefined;
+  if (state.declaredBoundaries !== undefined) {
+    const raw = state.declaredBoundaries;
+    if (!Array.isArray(raw) || !raw.every((entry): entry is string => typeof entry === "string")) return null;
+    const cleaned = raw.map((entry) => entry.trim()).filter(Boolean);
+    if (cleaned.length > 0) declaredBoundaries = cleaned;
+  }
+  const expected = isRecord(proposal.expected) ? proposal.expected : null;
+  const disposition = expected?.disposition;
+  if (typeof disposition !== "string" || !(GUARDRAIL_DISPOSITIONS as readonly string[]).includes(disposition)) return null;
+  const testCase: GuardrailsEvalCase = {
+    id: `${HARVEST_ID_PREFIX}${proposal.proposalId.slice(0, 12)}`,
+    category: "harvested",
+    message: state.message.trim(),
+    expected: disposition as GuardrailDisposition,
+    holdout: false,
+  };
+  if (declaredBoundaries) testCase.declaredBoundaries = declaredBoundaries;
+  return testCase;
+}
+
+/**
+ * Merges confirmed guardrails proposals from a parsed fixture. Non-confirmed and foreign-lane
+ * proposals are ignored; confirmed proposals with a null or malformed expected value (or an
+ * unusable state) are counted in `skipped`. Duplicate ids keep the first case.
+ */
+export function mergeHarvestedGuardrailsCases(proposals: readonly unknown[]): HarvestedGuardrailsMerge {
+  const cases: GuardrailsEvalCase[] = [];
+  const seen = new Set<string>();
+  let confirmed = 0;
+  let skipped = 0;
+  for (const value of proposals) {
+    const proposal = harvestProposalShape(value);
+    if (!proposal || proposal.lane !== PROMOTION_LANE || proposal.status !== "confirmed") continue;
+    confirmed += 1;
+    const testCase = guardrailsCaseFromHarvest(proposal);
+    if (!testCase || seen.has(testCase.id)) {
+      skipped += 1;
+      continue;
+    }
+    seen.add(testCase.id);
+    cases.push(testCase);
+  }
+  return { cases, confirmed, skipped };
+}
+
+/**
+ * Parses the parent-owned harvest fixture text. A malformed fixture never throws: it yields zero
+ * cases and a clear warning the caller can print and report.
+ */
+export function parseHarvestedGuardrailsCases(text: string): HarvestedGuardrailsCases {
+  const unusable = (warning: string): HarvestedGuardrailsCases => ({
+    cases: [],
+    confirmed: 0,
+    skipped: 0,
+    present: true,
+    warning,
+  });
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    return unusable(`harvested fixture is not valid JSON: ${messageOf(error)}`);
+  }
+  if (!isRecord(value) || !Array.isArray(value.proposals)) {
+    return unusable("harvested fixture must be an object with a proposals array");
+  }
+  if (value.version !== 1) {
+    return unusable(`unsupported harvested fixture version: ${String(value.version)}`);
+  }
+  if (value.lane !== PROMOTION_LANE) {
+    return unusable(`harvested fixture lane is ${String(value.lane)}, expected ${PROMOTION_LANE}`);
+  }
+  return { ...mergeHarvestedGuardrailsCases(value.proposals), present: true, warning: null };
+}
+
+/**
+ * Reads the confirmed harvest fixture. Absence is normal (no harvest yet) and yields zero cases
+ * with no warning; any other read or parse failure is reported as a warning and skipped so the
+ * live benchmark never fails because of the fixture.
+ */
+export async function loadHarvestedGuardrailsCases(filePath: string = HARVEST_FIXTURE_PATH): Promise<HarvestedGuardrailsCases> {
+  let text: string;
+  try {
+    text = await readFile(filePath, "utf8");
+  } catch (error) {
+    if (isRecord(error) && error.code === "ENOENT") {
+      return { cases: [], confirmed: 0, skipped: 0, present: false, warning: null };
+    }
+    return {
+      cases: [],
+      confirmed: 0,
+      skipped: 0,
+      present: true,
+      warning: `harvested fixture could not be read: ${messageOf(error)}`,
+    };
+  }
+  return parseHarvestedGuardrailsCases(text);
+}
+
 export interface GuardrailsCaseSummary {
   id: string;
   category: GuardrailsEvalCategory;
+  /** `harvested` rows are confirmed live-derived labels included in the run and the gate. */
+  provenance: GuardrailsCaseProvenance;
   holdout: boolean;
   total: number;
   acted: number;
@@ -297,6 +524,7 @@ export function summarizeGuardrailsCases(
       return {
         id,
         category: first.category,
+        provenance: provenanceOf(id),
         holdout: first.holdout,
         total: rows.length,
         acted: rows.filter((row) => row.acted).length,
@@ -349,13 +577,22 @@ export function renderGuardrailsBenchmark(input: {
   failures: readonly GuardrailsCallFailure[];
   evaluation: GuardrailsEvaluation;
   proposedRecord: SystemOnePromotionRecord | null;
+  /** The cases this run evaluated: the frozen corpus plus any merged harvested cases. */
+  cases?: readonly GuardrailsEvalCase[];
+  /** Confirmed-harvest provenance for the report; omit when no fixture was considered. */
+  harvest?: GuardrailsHarvestReport;
 }): string {
   const { generatedAt, model, baseUrl, repeats, thresholds, readouts, failures, evaluation, proposedRecord } = input;
+  const cases = input.cases ?? GUARDRAILS_EVAL_CORPUS;
+  const harvest = input.harvest ?? EMPTY_HARVEST;
   const { calibration, gate } = evaluation;
-  const summaries = summarizeGuardrailsCases(readouts);
-  const totalCalls = GUARDRAILS_EVAL_CORPUS.length * repeats;
-  const holdoutCases = GUARDRAILS_EVAL_CORPUS.filter((entry) => entry.holdout).length;
-  const expectedById = new Map(GUARDRAILS_EVAL_CORPUS.map((entry) => [entry.id, entry]));
+  const summaries = summarizeGuardrailsCases(readouts, cases);
+  const totalCalls = cases.length * repeats;
+  const holdoutCases = cases.filter((entry) => entry.holdout).length;
+  const expectedById = new Map(cases.map((entry) => [entry.id, entry]));
+  const stability = summarizeGuardrailsStability(readouts);
+  const stabilityConflicts = stability.cases.filter((entry) => entry.conflicted);
+  const stdText = (value: number | null): string => (value === null ? "n/a" : value.toFixed(4));
   const lines: string[] = [];
 
   lines.push("# System One (Jev) L6 guardrails and boundaries lane benchmark");
@@ -390,28 +627,39 @@ export function renderGuardrailsBenchmark(input: {
   lines.push(`| Base URL | \`${baseUrl}\` |`);
   lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
   lines.push(`| Repeats | ${repeats} |`);
-  lines.push(`| Corpus | ${GUARDRAILS_EVAL_CORPUS.length} messages x ${repeats} repeats = ${totalCalls} calls |`);
+  lines.push(`| Corpus | ${cases.length} messages x ${repeats} repeats = ${totalCalls} calls |`);
   lines.push(`| Holdout | ${holdoutCases} messages kept out of the Platt fit |`);
+  lines.push(`| Harvested cases | ${harvest.cases} confirmed merged, ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
   lines.push("| Deterministic policy | `server/src/policy.ts` remains authoritative |");
   lines.push("");
+  if (harvest.warning) {
+    lines.push(`> **Harvest warning:** ${harvest.warning} Those proposals are skipped; the run continues.`);
+    lines.push("");
+  }
   lines.push("## Corpus");
   lines.push("");
-  lines.push("| Case | Category | Split | Expected (also acceptable) |");
-  lines.push("| --- | --- | --- | --- |");
-  for (const entry of GUARDRAILS_EVAL_CORPUS) {
+  if (harvest.cases > 0 || harvest.confirmed > 0) {
+    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: confirmed live-derived labels from`);
+    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). They run through the same composition,`);
+    lines.push("calibration, and gate logic as the frozen corpus, so the gate metrics below include them.");
+    lines.push("");
+  }
+  lines.push("| Case | Category | Split | Provenance | Expected (also acceptable) |");
+  lines.push("| --- | --- | --- | --- | --- |");
+  for (const entry of cases) {
     const also = (entry.acceptable ?? []).filter((disposition) => disposition !== entry.expected);
-    lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${entry.expected}${also.length === 0 ? "" : ` (also ${also.join(", ")})`} |`);
+    lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${provenanceOf(entry.id)} | ${entry.expected}${also.length === 0 ? "" : ` (also ${also.join(", ")})`} |`);
   }
   lines.push("");
   lines.push("## Per-case results (all repeats)");
   lines.push("");
-  lines.push("| Case | Expected | Composed (pass/review/block/support) | Hazards | Acted | Correct | Mean signal | Mean severity |");
-  lines.push("| --- | --- | --- | --- | ---: | ---: | ---: | ---: |");
+  lines.push("| Case | Category | Provenance | Expected | Composed (pass/review/block/support) | Hazards | Acted | Correct | Mean signal | Mean severity |");
+  lines.push("| --- | --- | :---: | --- | --- | --- | ---: | ---: | ---: | ---: |");
   for (const summary of summaries.cases) {
     const expected = expectedById.get(summary.id)?.expected ?? "—";
     const counts = summary.dispositions;
     const hazards = summary.hazards.length === 0 ? "—" : summary.hazards.join(", ");
-    lines.push(`| ${summary.id} | ${expected} | ${counts.pass}/${counts.review}/${counts.block}/${counts.support} | ${hazards} | ${summary.acted}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanSeverity === null ? "n/a" : summary.meanSeverity.toFixed(3)} |`);
+    lines.push(`| ${summary.id} | ${summary.category} | ${summary.provenance} | ${expected} | ${counts.pass}/${counts.review}/${counts.block}/${counts.support} | ${hazards} | ${summary.acted}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanSeverity === null ? "n/a" : summary.meanSeverity.toFixed(3)} |`);
   }
   lines.push("");
   if (failures.length > 0) {
@@ -419,6 +667,28 @@ export function renderGuardrailsBenchmark(input: {
     for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
     lines.push("");
   }
+  lines.push("## Decision stability");
+  lines.push("");
+  lines.push("Repeated draws of the same case should produce the same disposition. `decision` is the composed");
+  lines.push("disposition; every repeat carries a deterministic throwaway `uid` in the request state so the");
+  lines.push("draws are decorrelated.");
+  lines.push("");
+  lines.push("| Metric | Value |");
+  lines.push("| --- | ---: |");
+  lines.push(`| Mean agreement | ${stability.cases.length === 0 ? "n/a" : pct(stability.meanAgreement)} |`);
+  lines.push(`| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`);
+  lines.push(`| Mean signal std dev | ${stdText(stability.meanSignalStdDev)} |`);
+  lines.push(`| Max signal std dev | ${stdText(stability.maxSignalStdDev)} |`);
+  lines.push("");
+  if (stabilityConflicts.length > 0) {
+    lines.push("Conflicted cases:");
+    for (const entry of stabilityConflicts.slice(0, 10)) {
+      lines.push(`- \`${entry.caseId}\` (agreement ${pct(entry.agreement)}): ${entry.decisions.join(" / ")}`);
+    }
+    lines.push("");
+  }
+  lines.push("Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still a coverage miss.");
+  lines.push("");
   lines.push("## Confusion matrix — expected vs composed disposition");
   lines.push("");
   lines.push("| Expected \\ composed | pass | review | block | support | total |");
@@ -442,7 +712,7 @@ export function renderGuardrailsBenchmark(input: {
   lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)} (fit on ${calibration.devSamples} development acted decision(s); held out ${calibration.holdoutSamples}).`);
   lines.push("");
   const coverage = DISPOSITION_ORDER.map((expected) => {
-    const ids = new Set(GUARDRAILS_EVAL_CORPUS.filter((entry) => entry.expected === expected).map((entry) => entry.id));
+    const ids = new Set(cases.filter((entry) => entry.expected === expected).map((entry) => entry.id));
     const rows = readouts.filter((readout) => ids.has(readout.id));
     return `${expected} ${rows.filter((readout) => readout.acted).length}/${rows.length} acted`;
   });
@@ -513,9 +783,12 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("  and on the HTTP routes sanitization runs before the check, so `prompt-injection-marker` rejection is");
   lines.push("  currently unreachable. The stub context is why a passing guardrails gate is a promotion candidate,");
   lines.push("  not a moderation or content-safety guarantee.");
-  lines.push(`- **Hand-labelled corpus.** The ${GUARDRAILS_EVAL_CORPUS.length} messages and ${holdoutCases} held-out cases are hand-labelled;`);
+  lines.push(`- **Hand-labelled corpus.** The ${GUARDRAILS_EVAL_CORPUS.length} frozen messages and ${holdoutCases} held-out cases are hand-labelled;`);
   lines.push("  \"expected\" is the labeller's judgment, borderline cases carry an explicit `acceptable` set, and the");
   lines.push("  corpus cannot cover the full tail of production messages.");
+  lines.push("- **Decision stability is repeatability, not accuracy**: a consistently deferred case is stable and");
+  lines.push("  still a coverage miss. Harvested rows are live-derived labels and are flagged as such in the tables");
+  lines.push("  so a reviewer can see the gate includes them.");
   lines.push("- **Promotion candidate, not a guarantee.** The `guardrails` gate is the strict tier (accuracy >= 0.95,");
   lines.push("  Brier/ECE <= 0.05, at least 30 acted samples). The verdict above is reported as measured, and a passing");
   lines.push("  gate is a promotion candidate, not a moderation guarantee.");
@@ -563,12 +836,25 @@ async function main(): Promise<void> {
   const thresholds = settings.confidencePolicy[PROMOTION_LANE];
   const promotedAt = new Date().toISOString().slice(0, 10);
 
+  const harvest = await loadHarvestedGuardrailsCases();
+  if (harvest.warning) console.warn(`harvested fixture warning: ${harvest.warning}`);
+  const harvestReport: GuardrailsHarvestReport = {
+    fixture: HARVEST_FIXTURE,
+    present: harvest.present,
+    confirmed: harvest.confirmed,
+    skipped: harvest.skipped,
+    cases: harvest.cases.length,
+    warning: harvest.warning,
+  };
+  const cases = [...GUARDRAILS_EVAL_CORPUS, ...harvest.cases];
+
   const readouts: GuardrailsReadout[] = [];
   const failures: GuardrailsCallFailure[] = [];
   let model = settings.model;
-  console.log(`evaluating ${GUARDRAILS_EVAL_CORPUS.length} guardrail messages x ${repeats} repeats against ${settings.model}`);
+  console.log(`evaluating ${cases.length} guardrail messages (${harvest.cases.length} harvested) x ${repeats} repeats against ${settings.model}`);
+  console.log(`harvested cases: ${harvest.cases.length}${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
 
-  for (const testCase of GUARDRAILS_EVAL_CORPUS) {
+  for (const testCase of cases) {
     const view = testCase.declaredBoundaries
       ? { message: testCase.message, declaredBoundaries: testCase.declaredBoundaries }
       : { message: testCase.message };
@@ -577,7 +863,12 @@ async function main(): Promise<void> {
       try {
         const result = await completeWithSystemOne({
           settings,
-          state: { message: view.message, declaredBoundaries: [...(view.declaredBoundaries ?? [])] },
+          state: {
+            message: view.message,
+            declaredBoundaries: [...(view.declaredBoundaries ?? [])],
+            // Throwaway decorrelator for repeated draws (vendor consistency-cookbook trick).
+            uid: stabilityUid(PROMOTION_LANE, testCase.id, repeat),
+          },
           questions,
         });
         model = result.model.responseModel ?? model;
@@ -597,6 +888,7 @@ async function main(): Promise<void> {
   }
 
   const evaluation = evaluateGuardrailsReadouts(readouts, promotedAt);
+  const stability = summarizeGuardrailsStability(readouts);
   const report = renderGuardrailsBenchmark({
     generatedAt: new Date().toISOString(),
     model,
@@ -607,15 +899,22 @@ async function main(): Promise<void> {
     failures,
     evaluation,
     proposedRecord: evaluation.proposedRecord,
+    cases,
+    harvest: harvestReport,
   });
   await writeFile(outPath, report, "utf8");
   await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
     model,
+    baseUrl: settings.baseUrl,
     repeats,
     thresholds,
-    corpus: GUARDRAILS_EVAL_CORPUS,
+    corpus: cases,
+    samples: cases.length * repeats,
+    harvestedCases: harvest.cases.length,
+    harvest: harvestReport,
     failures,
     readouts,
+    stability,
     calibration: evaluation.calibration,
     gate: evaluation.gate,
     proposedRecord: evaluation.proposedRecord,
@@ -625,6 +924,7 @@ async function main(): Promise<void> {
   console.log(`brier: raw ${evaluation.calibration.allRaw.brier.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.brier.toFixed(4)}`);
   console.log(`ece: raw ${evaluation.calibration.allRaw.expectedCalibrationError.toFixed(4)} -> calibrated ${evaluation.calibration.allCalibrated.expectedCalibrationError.toFixed(4)}`);
   console.log(`gate: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`);
+  console.log(`stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`);
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

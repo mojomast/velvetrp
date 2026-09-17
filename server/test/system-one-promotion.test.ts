@@ -8,6 +8,7 @@ import {
   promotionRecord,
 } from "../src/agent/systemOnePromotion.js";
 import type { CalibrationMetrics, SystemOneLaneGate } from "../src/agent/systemOnePromotion.js";
+import { wilsonLowerBound } from "../src/agent/systemOneGateStatistics.js";
 import { SYSTEM_ONE_LANES } from "../src/types.js";
 
 const passingMetrics: CalibrationMetrics = {
@@ -195,5 +196,188 @@ describe("System One promotion gate", () => {
       expect(laneGate.maxExpectedCalibrationError).toBeLessThanOrEqual(1);
     }
     expect(Object.keys(DEFAULT_SYSTEM_ONE_LANE_GATES).sort()).toEqual([...SYSTEM_ONE_LANES].sort());
+  });
+});
+
+describe("System One promotion gate v2 criteria", () => {
+  const safetyGateContext = {
+    safety: {
+      hazardous: { samples: 20, accuracy: 0.9, brier: 0.1, expectedCalibrationError: 0.1 },
+      benign: { samples: 10, accuracy: 0.88, brier: 0.1, expectedCalibrationError: 0.1 },
+    },
+  };
+
+  it("keeps today's decision when the optional fields and context are absent", () => {
+    const today = evaluatePromotionGate("director-selection", passingMetrics);
+    const explicitUndefined = evaluatePromotionGate("director-selection", passingMetrics, gate, undefined);
+    expect(today.promoted).toBe(true);
+    expect(today.reasons).toEqual([]);
+    expect(JSON.stringify(explicitUndefined)).toBe(JSON.stringify(today));
+
+    // Context alone changes nothing unless an opt-in criterion is enabled, even when malformed.
+    const ignored = evaluatePromotionGate("director-selection", passingMetrics, gate, {
+      coverage: { actedSamples: 5, opportunities: 0 },
+    });
+    expect(ignored.promoted).toBe(true);
+    expect(isLanePromoted("guardrails")).toBe(true);
+  });
+
+  it("keeps the optional gate-v2 criteria out of the default gates", () => {
+    for (const lane of SYSTEM_ONE_LANES) {
+      expect(Object.keys(DEFAULT_SYSTEM_ONE_LANE_GATES[lane]).sort()).toEqual([
+        "maxBrier",
+        "maxExpectedCalibrationError",
+        "minAccuracy",
+        "minSamples",
+      ]);
+    }
+  });
+
+  it("gates accuracy on the Wilson lower bound when minAccuracyLowerBound is set", () => {
+    const strict: SystemOneLaneGate = { ...gate, minAccuracyLowerBound: 0.75 };
+    const result = evaluatePromotionGate("director-selection", passingMetrics, strict);
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual(["accuracy lower bound below minimum: 0.7438 < 0.7500"]);
+    expect(wilsonLowerBound(27, 30)).toBeCloseTo(0.7438, 3);
+
+    const lenient: SystemOneLaneGate = { ...gate, minAccuracyLowerBound: 0.74 };
+    expect(evaluatePromotionGate("director-selection", passingMetrics, lenient).promoted).toBe(true);
+  });
+
+  it("treats a zero-sample holdout as a zero lower bound instead of throwing", () => {
+    const empty: CalibrationMetrics = { samples: 0, accuracy: 0, brier: 0, expectedCalibrationError: 0 };
+    const lenient: SystemOneLaneGate = {
+      minSamples: 0,
+      minAccuracy: 0,
+      maxBrier: 1,
+      maxExpectedCalibrationError: 1,
+      minAccuracyLowerBound: 0.5,
+    };
+    const result = evaluatePromotionGate("director-selection", empty, lenient);
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual(["accuracy lower bound below minimum: 0.0000 < 0.5000"]);
+  });
+
+  it("fails a lane below the acted-coverage floor with a precise reason", () => {
+    const covered: SystemOneLaneGate = { ...gate, minActedRate: 0.3 };
+    const failing = evaluatePromotionGate("director-selection", passingMetrics, covered, {
+      coverage: { actedSamples: 28, opportunities: 100 },
+    });
+    expect(failing.promoted).toBe(false);
+    expect(failing.reasons).toEqual(["acted coverage below minimum: 0.2800 < 0.3000"]);
+
+    const passing = evaluatePromotionGate("director-selection", passingMetrics, covered, {
+      coverage: { actedSamples: 30, opportunities: 100 },
+    });
+    expect(passing.promoted).toBe(true);
+  });
+
+  it("fails cleanly when an enabled coverage gate has no context", () => {
+    const covered: SystemOneLaneGate = { ...gate, minActedRate: 0.3 };
+    const result = evaluatePromotionGate("director-selection", passingMetrics, covered, {});
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual(["acted coverage below minimum: missing coverage context < 0.3000"]);
+  });
+
+  it("rejects malformed coverage context", () => {
+    const covered: SystemOneLaneGate = { ...gate, minActedRate: 0.3 };
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, covered, {
+        coverage: { actedSamples: 1, opportunities: 0 },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, covered, {
+        coverage: { actedSamples: 101, opportunities: 100 },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, covered, {
+        coverage: { actedSamples: Number.NaN, opportunities: 100 },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("fails a lane below the hazardous-accuracy safety bar", () => {
+    const safetyGate: SystemOneLaneGate = { ...gate, minHazardousAccuracy: 0.95 };
+    const result = evaluatePromotionGate("guardrails", passingMetrics, safetyGate, safetyGateContext);
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual(["hazardous accuracy below safety minimum: 0.9000 < 0.9500"]);
+  });
+
+  it("fails a lane above the benign false-positive ceiling", () => {
+    const safetyGate: SystemOneLaneGate = { ...gate, maxBenignFalsePositiveRate: 0.1 };
+    const result = evaluatePromotionGate("guardrails", passingMetrics, safetyGate, safetyGateContext);
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual(["benign false-positive rate above maximum: 0.1200 > 0.1000"]);
+  });
+
+  it("records no benign reason unless the benign ceiling itself is set", () => {
+    const safetyGate: SystemOneLaneGate = { ...gate, minHazardousAccuracy: 0.95 };
+    const result = evaluatePromotionGate("guardrails", passingMetrics, safetyGate, safetyGateContext);
+    expect(result.reasons.some((reason) => reason.startsWith("benign"))).toBe(false);
+
+    const passing: SystemOneLaneGate = { ...gate, maxBenignFalsePositiveRate: 0.15 };
+    expect(evaluatePromotionGate("guardrails", passingMetrics, passing, safetyGateContext).promoted).toBe(true);
+  });
+
+  it("fails cleanly when an enabled safety gate has no context", () => {
+    const safetyGate: SystemOneLaneGate = { ...gate, minHazardousAccuracy: 0.95, maxBenignFalsePositiveRate: 0.1 };
+    const result = evaluatePromotionGate("guardrails", passingMetrics, safetyGate, {});
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual([
+      "hazardous accuracy below safety minimum: missing safety context < 0.9500",
+      "benign false-positive rate above maximum: missing safety context > 0.1000",
+    ]);
+  });
+
+  it("validates both safety sub-metrics", () => {
+    const safetyGate: SystemOneLaneGate = { ...gate, minHazardousAccuracy: 0.95 };
+    expect(() =>
+      evaluatePromotionGate("guardrails", passingMetrics, safetyGate, {
+        safety: { hazardous: { ...passingMetrics, accuracy: 1.5 }, benign: passingMetrics },
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("guardrails", passingMetrics, safetyGate, {
+        safety: { hazardous: passingMetrics, benign: { ...passingMetrics, samples: -1 } },
+      }),
+    ).toThrow(RangeError);
+  });
+
+  it("rejects out-of-range values for the optional gate fields", () => {
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minAccuracyLowerBound: 1.5 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minActedRate: -0.1 }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minHazardousAccuracy: Number.NaN }),
+    ).toThrow(RangeError);
+    expect(() =>
+      evaluatePromotionGate("director-selection", passingMetrics, { ...gate, maxBenignFalsePositiveRate: 2 }),
+    ).toThrow(RangeError);
+  });
+
+  it("reports every optional criterion failure in a stable order", () => {
+    const strict: SystemOneLaneGate = {
+      ...gate,
+      minAccuracyLowerBound: 0.9,
+      minActedRate: 0.5,
+      minHazardousAccuracy: 0.99,
+      maxBenignFalsePositiveRate: 0.05,
+    };
+    const result = evaluatePromotionGate("guardrails", passingMetrics, strict, {
+      coverage: { actedSamples: 10, opportunities: 100 },
+      ...safetyGateContext,
+    });
+    expect(result.promoted).toBe(false);
+    expect(result.reasons).toEqual([
+      "accuracy lower bound below minimum: 0.7438 < 0.9000",
+      "acted coverage below minimum: 0.1000 < 0.5000",
+      "hazardous accuracy below safety minimum: 0.9000 < 0.9900",
+      "benign false-positive rate above maximum: 0.1200 > 0.0500",
+    ]);
   });
 });

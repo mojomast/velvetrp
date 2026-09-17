@@ -1,36 +1,62 @@
 # System One Director (L1) calibration
 
-Generated 2026-09-17T06:53:25.309Z by `scripts/evaluate-system-one-director.ts` using the live System One adapter.
+Generated 2026-09-17T18:09:53.488Z by `scripts/evaluate-system-one-director.ts` using the live System One adapter.
 
 The L1 selector builds two atomic questions per advertised candidate — a `progress` `noul` (is committing this a good, meaningful next step now?) and a priority `score` — plus a `hold` `noul` and an aggregate `best_candidate` `choice`. It composes grounded candidates (progress at the action threshold, ordered by priority) → hold → best-pick → defer. An atomic `legal` question was tried and dropped: the advertised set is server-authorized, so re-asking legality only added hedging (a legal `encounter-start` scored 0.51) without changing decisions. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold.
 
-Correctness uses a two-tier provider-free candidate oracle. **Acceptable** (the primary, gating metric) means the selected action is the preferred beat or a legal non-regression alternative; **exact** means the single preferred beat. `hold` is only preferred where no beat should be forced. This grades a trustworthy beat, not one arbitrary label among several legal ones.
+Correctness uses a two-tier provider-free candidate oracle. **Acceptable** (the primary, gating metric) means the selected action is the preferred beat or a legal non-regression alternative; **exact** means the single preferred beat. Frozen scenarios label a beat by its action; harvested scenarios label it by its exact candidate id. `hold` is only preferred where no beat should be forced. This grades a trustworthy beat, not one arbitrary label among several legal ones.
 
-Live model: `jev-1.13.0`. 6 scenarios x 10 repeats = 60 sampled decisions per threshold.
+## Setup
+
+| Setting | Value |
+| --- | --- |
+| Model | jev-1.13.0 |
+| Repeats | 10 |
+| Scenarios | 6 (6 frozen + 0 harvested) x 10 repeats = 60 sampled decisions per threshold |
+| Harvested cases | 0 confirmed merged, 0 skipped — fixture absent |
 
 ## Scenarios at the default threshold (0.75)
 
-| Scenario | Oracle actions | Preferred | Acceptable | Method | Selected | Top signal | Acted | Accept | Exact |
-| --- | --- | --- | --- | --- | --- | ---: | :---: | :---: | :---: |
-| empty-world | advance-time, ambient-beat | ambient-beat | advance-time | defer | — | 0.610 | defer | n/a | n/a |
-| story-graph | advance-time, ambient-beat, reveal-node | reveal-node | ambient-beat, advance-time | defer | — | 0.490 | defer | n/a | n/a |
-| encounter-prep | encounter-start | encounter-start | — | defer | — | 0.610 | defer | n/a | n/a |
-| story-graph-revealed | advance-time, ambient-beat, reveal-clue | reveal-clue | ambient-beat, advance-time | defer | — | 0.510 | defer | n/a | n/a |
-| encounter-active | enemy-turn | enemy-turn | — | defer | — | 0.590 | defer | n/a | n/a |
-| gm-only | — | hold | — | hold | hold | 1.000 | yes | yes | yes |
+| Scenario | Provenance | Oracle actions | Preferred | Acceptable | Method | Selected | Top signal | Acted | Accept | Exact |
+| --- | :---: | --- | --- | --- | --- | --- | ---: | :---: | :---: | :---: |
+| empty-world | frozen | advance-time, ambient-beat | ambient-beat | advance-time | defer | — | 0.600 | defer | n/a | n/a |
+| story-graph | frozen | advance-time, ambient-beat, reveal-node | reveal-node | ambient-beat, advance-time | defer | — | 0.490 | defer | n/a | n/a |
+| encounter-prep | frozen | encounter-start | encounter-start | — | defer | — | 0.590 | defer | n/a | n/a |
+| story-graph-revealed | frozen | advance-time, ambient-beat, reveal-clue | reveal-clue | ambient-beat, advance-time | defer | — | 0.520 | defer | n/a | n/a |
+| encounter-active | frozen | enemy-turn | enemy-turn | — | defer | — | 0.600 | defer | n/a | n/a |
+| gm-only | frozen | — | hold | — | hold | hold | 1.000 | yes | yes | yes |
+
+## Decision stability
+
+Repeated draws of the same scenario should produce the same decision. `decision` is the composed
+ordered selection (`candidateId > candidateId`), `hold` when the composition holds, or `defer` when
+it commits nothing; compositions are taken at the default action threshold (0.75) and every repeat
+keeps the production-shaped request (no `uid`). A uid-decorrelated probe moved the selected
+threshold from 0.60 to 0.30 and produced a degenerate negative-slope calibration map
+(calibrated ECE 0.1344 > 0.10), so the gate measurement intentionally omits the decorrelator.
+
+| Metric | Value |
+| --- | ---: |
+| Mean agreement | 100.0% |
+| Conflict cases | 0 of 6 (0.0%) |
+| Mean signal std dev | 0.0193 |
+| Max signal std dev | 0.0340 |
+
+Stability is repeatability, not accuracy: a consistently deferred scenario is stable and still a
+coverage miss, and a conflicted scenario may still have every individual pick labeled acceptable.
 
 ## Threshold sweep (all samples)
 
 | Action threshold | Acted | Coverage | Acted accuracy |
 | ---: | ---: | ---: | ---: |
 | 0.30 | 60/60 | 100.0% | 100.0% |
-| 0.35 | 60/60 | 100.0% | 88.3% |
+| 0.35 | 60/60 | 100.0% | 86.7% |
 | 0.40 | 60/60 | 100.0% | 83.3% |
 | 0.45 | 60/60 | 100.0% | 83.3% |
-| 0.50 | 58/60 | 96.7% | 82.8% |
-| 0.55 | 45/60 | 75.0% | 95.6% |
-| 0.60 | 39/60 | 65.0% | 100.0% |
-| 0.65 | 13/60 | 21.7% | 100.0% |
+| 0.50 | 56/60 | 93.3% | 82.1% |
+| 0.55 | 47/60 | 78.3% | 91.5% |
+| 0.60 | 41/60 | 68.3% | 100.0% |
+| 0.65 | 15/60 | 25.0% | 100.0% |
 | 0.70 | 10/60 | 16.7% | 100.0% |
 | 0.75 | 10/60 | 16.7% | 100.0% |
 | 0.80 | 10/60 | 16.7% | 100.0% |
@@ -41,8 +67,8 @@ Live model: `jev-1.13.0`. 6 scenarios x 10 repeats = 60 sampled decisions per th
 
 Selection is made on the **development split only** (empty-world, story-graph, encounter-prep), then validated on the held-out split (story-graph-revealed, encounter-active, gm-only).
 
-Selected action threshold: **0.60** (dev coverage 66.7%, dev acted accuracy 100.0% over 20 acted decisions).
-Held-out coverage 63.3%, held-out acted accuracy 100.0% over 19 acted decisions.
+Selected action threshold: **0.60** (dev coverage 63.3%, dev acted accuracy 100.0% over 19 acted decisions).
+Held-out coverage 73.3%, held-out acted accuracy 100.0% over 22 acted decisions.
 - filtered 10 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions
 - selected highest threshold 0.6 reaching coverage >= 0.4 while meeting actedAccuracy >= 0.9 with at least 4 acted decisions
 
@@ -51,13 +77,13 @@ Held-out coverage 63.3%, held-out acted accuracy 100.0% over 19 acted decisions.
 | Action threshold | Acted | Coverage | Acted accuracy |
 | ---: | ---: | ---: | ---: |
 | 0.30 | 30/30 | 100.0% | 100.0% |
-| 0.35 | 30/30 | 100.0% | 76.7% |
+| 0.35 | 30/30 | 100.0% | 73.3% |
 | 0.40 | 30/30 | 100.0% | 66.7% |
 | 0.45 | 30/30 | 100.0% | 66.7% |
-| 0.50 | 28/30 | 93.3% | 64.3% |
-| 0.55 | 20/30 | 66.7% | 90.0% |
-| 0.60 | 20/30 | 66.7% | 100.0% |
-| 0.65 | 2/30 | 6.7% | 100.0% |
+| 0.50 | 26/30 | 86.7% | 61.5% |
+| 0.55 | 20/30 | 66.7% | 80.0% |
+| 0.60 | 19/30 | 63.3% | 100.0% |
+| 0.65 | 5/30 | 16.7% | 100.0% |
 | 0.70 | 0/30 | 0.0% | n/a |
 | 0.75 | 0/30 | 0.0% | n/a |
 | 0.80 | 0/30 | 0.0% | n/a |
@@ -73,9 +99,9 @@ Held-out coverage 63.3%, held-out acted accuracy 100.0% over 19 acted decisions.
 | 0.40 | 30/30 | 100.0% | 100.0% |
 | 0.45 | 30/30 | 100.0% | 100.0% |
 | 0.50 | 30/30 | 100.0% | 100.0% |
-| 0.55 | 25/30 | 83.3% | 100.0% |
-| 0.60 | 19/30 | 63.3% | 100.0% |
-| 0.65 | 11/30 | 36.7% | 100.0% |
+| 0.55 | 27/30 | 90.0% | 100.0% |
+| 0.60 | 22/30 | 73.3% | 100.0% |
+| 0.65 | 10/30 | 33.3% | 100.0% |
 | 0.70 | 10/30 | 33.3% | 100.0% |
 | 0.75 | 10/30 | 33.3% | 100.0% |
 | 0.80 | 10/30 | 33.3% | 100.0% |
@@ -86,29 +112,29 @@ Held-out coverage 63.3%, held-out acted accuracy 100.0% over 19 acted decisions.
 
 | Scenario | Acted | Coverage | Acted accuracy | Mean predicted |
 | --- | ---: | ---: | ---: | ---: |
-| empty-world | 10/10 | 100.0% | 100.0% | 0.614 |
+| empty-world | 10/10 | 100.0% | 100.0% | 0.617 |
 | story-graph | 0/10 | 0.0% | n/a | n/a |
-| encounter-prep | 10/10 | 100.0% | 100.0% | 0.625 |
-| story-graph-revealed | 1/10 | 10.0% | 100.0% | 0.610 |
-| encounter-active | 8/10 | 80.0% | 100.0% | 0.620 |
+| encounter-prep | 9/10 | 90.0% | 100.0% | 0.642 |
+| story-graph-revealed | 3/10 | 30.0% | 100.0% | 0.617 |
+| encounter-active | 9/10 | 90.0% | 100.0% | 0.614 |
 | gm-only | 10/10 | 100.0% | 100.0% | 1.000 |
 
 ## Calibration (fit on development, scored on holdout)
 
-Fitted a monotonic Platt map on 20 acted development decision(s).
+Fitted a monotonic Platt map on 19 acted development decision(s).
 
 | Split | Signal | Brier | ECE |
 | --- | --- | ---: | ---: |
-| held-out (19 acted) | raw | 0.0690 | 0.1805 |
-| held-out (19 acted) | calibrated | 0.0000 | 0.0042 |
-| all collected | raw | 0.1080 | 0.2831 |
-| all collected | calibrated | 0.0001 | 0.0066 |
+| held-out (22 acted) | raw | 0.0810 | 0.2100 |
+| held-out (22 acted) | calibrated | 0.0001 | 0.0054 |
+| all collected | raw | 0.1075 | 0.2846 |
+| all collected | calibrated | 0.0001 | 0.0069 |
 
-Map: `sigmoid(a * logit(p) + b)` with a = 2.3871, b = 3.5657. The held-out row is the unbiased estimate.
+Map: `sigmoid(a * logit(p) + b)` with a = 2.4441, b = 3.4776. The held-out row is the unbiased estimate.
 
 ## Negative examples
 
-None of the 39 acted decisions was unacceptable, and 0 of 39 was not the exact preferred beat. The server candidate generator only advertises authorized beats and these frozen states contain no trap, so an acted error requires the model to pick a wrong advertised beat or to act when a player decision is required — neither occurs here. This corpus does not stress-test the calibrated gate, so a pass is a promotion **candidate**, not proof.
+None of the 41 acted decisions was unacceptable, and 0 of 41 was not the exact preferred beat. The server candidate generator only advertises authorized beats and these frozen states contain no trap, so an acted error requires the model to pick a wrong advertised beat or to act when a player decision is required — neither occurs here. This corpus does not stress-test the calibrated gate, so a pass is a promotion **candidate**, not proof.
 
 ## Promotion gate — `director-selection`
 

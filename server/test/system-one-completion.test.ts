@@ -190,4 +190,44 @@ describe("System One completion adapter", () => {
     })).rejects.toBeInstanceOf(SystemOneConfigurationError);
     expect(requests).toHaveLength(0);
   });
+
+  it("accepts the vendor's structured instructions and criteria and forwards them unchanged", async () => {
+    const structured: Record<string, SystemOneQuestion> = {
+      route: {
+        type: "choice",
+        instructions: { question: "Which team should handle this?", focus: "Classify the primary request." },
+        criteria: {
+          billing: { what: "Charges, invoices, refunds", not_for: "Order tracking", examples: ["I was charged twice"] },
+          orders: { what: "Order status and delivery", not_for: "Charges", examples: ["Where is my package?"] },
+          taxonomy: { "Sporting Goods": { Cycling: ["Bike Bottles", "Helmets"] } },
+        },
+      },
+      scope: {
+        type: "score",
+        instructions: { question: "How focused is the change?" },
+        criteria: [
+          { summary: "One change", signals: ["A single fix", "No \"also\" clauses"] },
+          { summary: "Several independent changes", signals: ["Could each be their own PR"] },
+        ],
+      },
+      credentials: {
+        type: "noul",
+        instructions: { question: "Does it request a credential?", inspect: "message" },
+        criteria: { true: { what: "Asks for a password or code" }, false: null },
+      },
+      absent: { type: "noul", instructions: null },
+    };
+    const structuredAnswers = {
+      route: { type: "choice", choice: "billing", confidence: 0.9, probabilities: { billing: 0.8, orders: 0.1, taxonomy: 0.1 } },
+      scope: { type: "score", score: 0, confidence: 0.9, legend: { 0: "One change", 1: "Several independent changes" }, probabilities: { 0: 0.9, 1: 0.1 } },
+      credentials: { type: "noul", noul: 0.7 },
+      absent: { type: "noul", noul: 0.5 },
+    };
+    const { baseUrl, requests } = await startServer({ body: { model: "jev-1.13.0", answers: structuredAnswers } });
+    const result = await completeWithSystemOne({ settings: settings(baseUrl), state: { message: "hi" }, questions: structured });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.body.questions).toEqual(structured);
+    expect(result.answers.route).toMatchObject({ type: "choice", choice: "billing" });
+  });
 });

@@ -104,11 +104,14 @@ test("resume neither redispatches nor reapplies completed work", async () => {
   assert.doesNotMatch(await readFile(path, "utf8"), /apiKey/i);
 });
 
-test("generation pool respects the selected concurrency cap", async () => {
+test("stages serially even when a wider concurrency is requested", async () => {
   const recipe: HydrationRecipe = { version: 1, name: "Pool", tone: "calm", stages: [{ id: "parallel", jobs: Array.from({ length: 5 }, (_, index) => ({ id: `job-${index}`, sections: ["locations"], brief: "Place", desiredCounts: { locations: 1 } })) }] };
   const api = new FakeApi(async (body, current) => { await new Promise((resolve) => setTimeout(resolve, 15)); return current.success(body); });
   const messages: string[] = [];
-  await run(recipe, api, await ledgerPath(), 2, true, (message) => messages.push(message)); assert.equal(api.peak, 2);
+  await run(recipe, api, await ledgerPath(), 2, true, (message) => messages.push(message));
+  // Same-campaign drafts snapshot one content revision, so staging is serial by design even when
+  // a wider cap is requested; the flag is accepted with a warning, never a worker pool.
+  assert.equal(api.peak, 1);
   assert.ok(messages[0]?.startsWith("WARNING:"));
 });
 

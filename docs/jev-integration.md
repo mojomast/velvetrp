@@ -20,7 +20,8 @@ now has a [narration](system-one-narration-benchmark.md) and
 both pass their gates, carry records, and still have no activation path (the narration
 verifier is advisory and never rewrites prose). The **L4 memory-reranking primitive** now
 has a [memory-reranking benchmark](system-one-rerank-benchmark.md): it passes its lane
-gate and carries an evidence-only record, and it is not wired into recall. The **L2
+gate and carries an evidence-only record, and it is now wired in shadow (record-only) into
+the adventure planning recall path. The **L2
 adventure-selection** and **L6 guardrails** primitives now exist with
 [adventure](system-one-adventure-benchmark.md) and
 [guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
@@ -113,10 +114,17 @@ plus a type-specific `criteria`, and the response echoes the same keys:
 - `noul` returns `{ "type": "noul", "noul": 0.0–1.0 }` and never a `confidence`.
 - `choice` returns `{ "type": "choice", "choice": "<option>", "confidence": 0–1,
   "probabilities": { "<option>": 0–1, ... } }`; `criteria` is a map of option to a
-  rubric string (or `null`); a sentinel such as `none_of_these` is the fail-closed option.
+  rubric value (or `null`); a sentinel such as `none_of_these` is the fail-closed option.
 - `score` returns `{ "type": "score", "score": <weighted mean>, "confidence": 0–1,
   "legend": { "0": "<level>", ... }, "probabilities": { "0": 0–1, ... } }`; `criteria`
   is an ordered array of level descriptions (minimum two), and level keys are strings.
+- Instructions accept `null` and nested structures, and every criteria value is the
+  vendor's `EntryType`: a `string`, `null`, an `array`, or an object with named fields.
+  `server/src/provider/systemOneCompletion.ts` accepts the structured forms (for example a
+  choice rubric with `what` / `not_for` / `examples`, a score level with `summary` and
+  `signals`, or a nested taxonomy subtree); the batteries still use strings, so the
+  structured forms are validated-but-unused capability until a measured battery change
+  adopts them.
 - Unknown top-level and unknown question fields are ignored by the service, so Velvet must
   apply its own strict Zod validation rather than relying on the server to reject extras.
 - Failures carry the `x-typesafe-request-id` response header, which the adapter records
@@ -337,10 +345,16 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   deliberately not enabled yet.
 - **Evaluation.** [System One Director calibration](system-one-director-calibration.md) runs
   the six-state corpus and the promotion gate on the calibrated signal; at the selected 0.60
-  threshold it acts on ~39/60 samples (run-to-run variance is a few decisions) with **100%
-  acceptable and 100% exact** accuracy, so it carries a promotion record. The corpus has no acted errors (the server only advertises
-  authorized beats and the model defers on mixed states), so the record is an evidence-only
-  snapshot, not a stress-tested guarantee, and no active Director path is wired.
+  threshold the `--repeat 10` run re-derived after the harvest-loop pass acted on 41 samples
+  with **100% acceptable and 100% exact** accuracy, calibrated ECE 0.0069 (held-out 0.0054) and
+  100% decision stability (0 of 6 scenarios conflicted), so it carries a promotion record.
+  Run-to-run variance is material and is recorded rather than hidden: `--repeat 8` fell to 29
+  acted samples (below the 30-sample gate) and a uid-decorrelated probe moved the selected
+  threshold to 0.30 with a degenerate negative-slope calibration map (calibrated ECE 0.1344 >
+  0.10), so the gate run keeps the production-shaped request. The corpus has no acted errors
+  (the server only advertises authorized beats and the model defers on mixed states), so the
+  record is an evidence-only snapshot, not a stress-tested guarantee, and no active Director
+  path is wired.
 - **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;
   `fallback` uses the deterministic rule and provider-free oracle. The raw model is
   systematically **under-confident** (correct decisions at ~0.6), so the evaluation fits
@@ -440,8 +454,15 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `DEFAULT_RERANK_WEIGHTS = { deterministic: 0.5, model: 0.5 }`, where `rankScore` is `1`
   for rank 0 and `0` for the worst rank. The lane never drops a candidate, and ties break
   by deterministic rank, so an all-equal model response reproduces the deterministic order
-  exactly. It is **not wired** into recall, but it now has a
-  [benchmark](system-one-rerank-benchmark.md) and an evidence-only promotion record.
+  exactly. It has a [benchmark](system-one-rerank-benchmark.md) and an evidence-only
+  promotion record.
+- **Wiring (primitive shipped).** `server/src/agent/adventureOrchestrator.ts` resolves the lane
+  behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable key, and a non-`off`
+  `memory-reranking` lane mode, and after a recall fetch projects the hits into a bounded
+  shortlist and records one immutable advisory decision per adventure turn. The hook is awaited
+  inside a swallowing try/catch and never reorders the recall, context, candidates, or provider
+  dispatch the turn uses; a live shadow turn recorded one structured decision with a
+  two-candidate shortlist and a `confirm` band.
 - **Evaluation.** [System One memory-reranking benchmark](system-one-rerank-benchmark.md)
   replays the Plan 3 provider-free recall oracle (33 labelled cases, 27 non-empty
   shortlists) through the live battery and scores the fused order against the deterministic
@@ -524,7 +545,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   list mirrored into `selection.flags` for the review queue, and never blocks, rewrites,
   sanitizes, or influences routing/generation/fallbacks; a lane failure is swallowed.
 - **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
-  56 labeled messages x 3 repeats (168 live calls, 75 acted). The first 40-case run acted at
+  56 frozen labeled messages plus 1 confirmed harvested live case x 3 repeats (171 live calls
+  with a per-repeat `uid` decorrelator, 75 acted). The first 40-case run acted at
   **90.5%** and missed the strict gate; every error was a false positive on fiction or meta
   questions (a hint request about the traitor and an out-of-character question about an NPC
   read as disclosure demands, in-character villain dialogue read as an override attempt, and a
@@ -534,8 +556,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   instructions, unrevealed setup) rather than asking about the shared fiction, and severity
   judges the real user's behavior rather than fictional drama. On the expanded corpus every
   hazard-category message reached block or support with **100%** acted accuracy, calibrated
-  Brier ~0, and ECE 0.0022 (held-out 0.0025), so the lane carries an evidence-only promotion
-  record. The acted subset has no errors, so the calibration tail is untested. Honesty: the
+  Brier ~0, and ECE 0.0023 (held-out 0.0027), with **100%** decision stability (0 of 57 cases
+  conflicted), so the lane carries an evidence-only promotion record. The harvested live case
+  is a benign "Who should inspect the signal?" message the lane passes 3/3. The acted subset
+  has no errors, so the calibration tail is untested. Honesty: the
   deterministic policy checks are a permissive stub (`checkUserMessage` is allow/deny only,
   `checkCharacter` always allows, and routes sanitize before checking, so marker rejection is
   currently unreachable), so this lane must not be described as comprehensive moderation or a

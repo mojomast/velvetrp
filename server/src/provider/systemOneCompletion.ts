@@ -24,23 +24,38 @@ const jsonValueSchema: z.ZodType<SystemOneJsonValue> = z.lazy(() => z.union([
   z.record(z.string(), jsonValueSchema),
 ]));
 
-/** Instructions may be a string, or nested arrays/objects with named fields. */
+/** Instructions may be a string, an array, an object with named fields, or null. */
 const instructionsSchema: z.ZodType<SystemOneJsonValue> = z.lazy(() => z.union([
+  z.null(),
   z.string(),
   z.array(instructionsSchema),
   z.record(z.string(), instructionsSchema),
 ]));
 
+/**
+ * The vendor's EntryType: the value describing a Choice option, a Score level, or a Noul
+ * `true`/`false` boundary. It may be a string, null, an array, or a structured object (for
+ * example a choice rubric with `what`/`not_for`/`examples`, a score level with `summary` and
+ * `signals`, or a taxonomy subtree the model should walk). See the vendor "Advanced: structure"
+ * page; structure is accepted everywhere a string description is.
+ */
+const entrySchema = z.union([
+  z.string(),
+  z.null(),
+  z.array(jsonValueSchema),
+  z.record(z.string(), jsonValueSchema),
+]);
+
 const noulCriteriaSchema = z.object({
-  true: z.string(),
-  false: z.string(),
+  true: entrySchema,
+  false: entrySchema,
 }).partial();
 
-const choiceCriteriaSchema = z.record(z.string(), z.union([z.string(), z.null()]))
+const choiceCriteriaSchema = z.record(z.string(), entrySchema)
   .refine((value) => Object.keys(value).length >= 1, "choice criteria must declare at least one option")
   .refine((value) => Object.keys(value).length <= 255, "choice criteria may declare at most 255 options");
 
-const scoreCriteriaSchema = z.array(z.union([z.string(), z.record(z.string(), z.unknown())]))
+const scoreCriteriaSchema = z.array(entrySchema)
   .min(2, "score criteria must declare at least two levels")
   .max(10, "score criteria may declare at most ten levels");
 
