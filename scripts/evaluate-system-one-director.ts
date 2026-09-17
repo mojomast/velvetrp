@@ -147,8 +147,9 @@ function render(input: {
   exactAccuracy: number;
   gateStats: Array<{ id: string; acted: number; total: number; accuracy: number; meanPredicted: number }>;
   calibration: CalibrationReport;
+  negatives: { acted: number; incorrect: number; inexact: number; lowestIncorrectSignal: number | null };
 }): string {
-  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples, exactAccuracy, gateStats, calibration } = input;
+  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples, exactAccuracy, gateStats, calibration, negatives } = input;
   const selectedThreshold = selected.selected?.threshold;
   const holdoutAtSelected = selectedThreshold === undefined ? undefined : holdoutPoints.find((point) => point.threshold === selectedThreshold);
   const lines: string[] = [];
@@ -156,7 +157,7 @@ function render(input: {
   lines.push("");
   lines.push(`Generated ${new Date().toISOString()} by \`scripts/evaluate-system-one-director.ts\` using the live System One adapter.`);
   lines.push("");
-  lines.push("The L1 selector builds three atomic questions per advertised candidate — `legal` (may this be committed now?), `progress` (does it advance an active story objective?), and a priority `score` — plus a `hold` `noul` and an aggregate `best_candidate` `choice`. It composes grounded candidates (legal **and** progress at the action threshold, ordered by priority) → best-pick → hold → defer. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold and the picked candidate must be legal.");
+  lines.push("The L1 selector builds two atomic questions per advertised candidate — a `progress` `noul` (is committing this a good, meaningful next step now?) and a priority `score` — plus a `hold` `noul` and an aggregate `best_candidate` `choice`. It composes grounded candidates (progress at the action threshold, ordered by priority) → hold → best-pick → defer. An atomic `legal` question was tried and dropped: the advertised set is server-authorized, so re-asking legality only added hedging (a legal `encounter-start` scored 0.51) without changing decisions. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold.");
   lines.push("");
   lines.push("Correctness uses a two-tier provider-free candidate oracle. **Acceptable** (the primary, gating metric) means the selected action is the preferred beat or a legal non-regression alternative; **exact** means the single preferred beat. `hold` is only preferred where no beat should be forced. This grades a trustworthy beat, not one arbitrary label among several legal ones.");
   lines.push("");
@@ -216,7 +217,17 @@ function render(input: {
   lines.push(`| all collected | raw | ${calibration.all.raw.brier.toFixed(4)} | ${calibration.all.raw.expectedCalibrationError.toFixed(4)} |`);
   lines.push(`| all collected | calibrated | ${calibration.all.calibrated.brier.toFixed(4)} | ${calibration.all.calibrated.expectedCalibrationError.toFixed(4)} |`);
   lines.push("");
-  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}. The held-out row is the unbiased estimate; because this frozen corpus has no errors, the fit is provisional until the corpus is larger and includes error cases.`);
+  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}. The held-out row is the unbiased estimate.`);
+  lines.push("");
+  lines.push("## Negative examples");
+  lines.push("");
+  if (negatives.acted === 0) {
+    lines.push("No acted decisions were collected, so the calibrated gate could not be scored at all.");
+  } else if (negatives.incorrect === 0) {
+    lines.push(`None of the ${negatives.acted} acted decisions was unacceptable, and ${negatives.inexact} of ${negatives.acted} was not the exact preferred beat. The server candidate generator only advertises authorized beats, so an acted error requires the model to pick a wrong advertised beat or to act when a player decision is required; the live model defers on every mixed state, so this corpus does not stress-test the calibrated gate. A pass here is a promotion **candidate**, not proof.`);
+  } else {
+    lines.push(`${negatives.incorrect} of ${negatives.acted} acted decisions were unacceptable (${((negatives.incorrect / negatives.acted) * 100).toFixed(1)}%)${negatives.lowestIncorrectSignal === null ? "" : `, the lowest-signal wrong pick at ${negatives.lowestIncorrectSignal.toFixed(3)}`}, so the calibrated gate is scored against real errors.`);
+  }
   lines.push("");
   lines.push("## Promotion gate — `director-selection`");
   lines.push("");
@@ -325,6 +336,13 @@ async function main(): Promise<void> {
   });
   const accuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.correct).length / actedOutcomes.length;
   const exactAccuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.exact).length / actedOutcomes.length;
+  const incorrectOutcomes = actedOutcomes.filter((outcome) => !outcome.correct);
+  const negatives = {
+    acted: actedOutcomes.length,
+    incorrect: incorrectOutcomes.length,
+    inexact: actedOutcomes.filter((outcome) => !outcome.exact).length,
+    lowestIncorrectSignal: incorrectOutcomes.length === 0 ? null : Math.min(...incorrectOutcomes.map((outcome) => outcome.topSignal)),
+  };
 
   // Fit the calibration map on the development split and score it on the held-out split, so
   // the reported improvement is out of sample. The same map produces the calibrated signal
@@ -349,9 +367,9 @@ async function main(): Promise<void> {
     samples: actedOutcomes.length, accuracy, brier: calibration.all.calibrated.brier, expectedCalibrationError: calibration.all.calibrated.expectedCalibrationError,
   });
 
-  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats, exactAccuracy, gateStats, calibration });
+  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats, exactAccuracy, gateStats, calibration, negatives });
   await writeFile(outPath, markdown, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate, exactAccuracy, gateStats, calibration }, null, 2), "utf8");
+  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate, exactAccuracy, gateStats, calibration, negatives }, null, 2), "utf8");
 
   console.log(`selected threshold: ${selected.selected ? selected.selected.threshold.toFixed(2) : "none"} (dev coverage ${selected.selected ? (selected.selected.coverage * 100).toFixed(1) : 0}%, dev accuracy ${selected.selected ? (selected.selected.actedAccuracy * 100).toFixed(1) : 0}%)`);
   console.log(`acted: ${actedOutcomes.length} acceptable=${(accuracy * 100).toFixed(1)}% exact=${(exactAccuracy * 100).toFixed(1)}%`);
