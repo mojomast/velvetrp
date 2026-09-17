@@ -31,6 +31,7 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [Provider configuration](provider-configuration.md) - Provider precedence, credentials, outbound privacy, live tests, and troubleshooting.
 - [Provider hardening](provider-hardening.md) - Provider failure classification, privacy, and retry boundaries.
 - [System One decision review](system-one-decision-review.md) - Read-only human review of the immutable System One decision log, turning incorrect verdicts into negative examples for a lane's evaluation corpus.
+- [System One Director disagreement report](system-one-disagreement-report.md) - Read-only, deterministic comparison of the shadow Director lane's would-be selections against the authoritative provider composition, producing a review queue of divergent cases.
 - [Administration UX](administration-ux.md) - Campaign administration interaction guidance.
 - [Frontend control plane](frontend-control-plane.md) - Campaign Command Center workspace, preparation, session recovery, and browser acceptance coverage.
 - [Campaign hydration CLI](hydration-cli.md) - Reviewed recipe execution over HTTP, durable ledgers, and generation reconciliation.

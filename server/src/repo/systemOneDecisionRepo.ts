@@ -127,6 +127,63 @@ export function listRecentSystemOneDecisions(limit: number): SystemOneDecisionRe
   return rows.map(toRecord);
 }
 
+/** One Director decision paired with the authoritative provider composition for its turn. */
+export interface DirectorDecisionAuthority {
+  decision: SystemOneDecisionRecord;
+  /** Candidate ids the authoritative provider composition selected, in order; null when it held. */
+  authoritativeCandidateIds: string[] | null;
+  /** True when no run exists for the decision's turn id (or the run table is absent). */
+  authoritativeMissing: boolean;
+}
+
+/** Normalizes a stored composition (ordered array, or a legacy single object) to candidate ids. */
+function proposalCandidateIds(proposalJson: string | null): string[] | null {
+  if (proposalJson === null) return null;
+  try {
+    const parsed = JSON.parse(proposalJson) as unknown;
+    if (parsed === null || parsed === undefined) return null;
+    const composition = Array.isArray(parsed) ? parsed : [parsed];
+    return composition.flatMap((item) => item && typeof item === "object" && typeof (item as { candidateId?: unknown }).candidateId === "string"
+      ? [(item as { candidateId: string }).candidateId]
+      : []);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Lists recent Director decisions, newest first, each paired with the authoritative composition
+ * the provider settled for the same run. The Director record is shadow-only evidence, so this is
+ * the read side that lets a reviewer see where the would-be call matched or diverged from the
+ * committed one. Missing runs or run tables degrade to `authoritativeMissing` rather than throwing.
+ */
+export function listDirectorDecisionsWithAuthority(limit: number): DirectorDecisionAuthority[] {
+  const bounded = clampLimit(limit);
+  let rows: SystemOneDecisionRow[];
+  try {
+    rows = getRepositoryDatabase()
+      .prepare("SELECT * FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC,decision_id DESC LIMIT ?")
+      .all(bounded) as SystemOneDecisionRow[];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table/i.test(message)) return [];
+    throw error;
+  }
+  return rows.map((row) => {
+    const decision = toRecord(row);
+    if (decision.turnId === null) return { decision, authoritativeCandidateIds: null, authoritativeMissing: true };
+    try {
+      const run = getRepositoryDatabase()
+        .prepare("SELECT proposal_json FROM dm_runs WHERE run_id=?")
+        .get(decision.turnId) as { proposal_json: string | null } | undefined;
+      if (!run) return { decision, authoritativeCandidateIds: null, authoritativeMissing: true };
+      return { decision, authoritativeCandidateIds: proposalCandidateIds(run.proposal_json), authoritativeMissing: false };
+    } catch {
+      return { decision, authoritativeCandidateIds: null, authoritativeMissing: true };
+    }
+  });
+}
+
 /** Aggregates a bounded window of recent decisions for the read-only System One summary route. */
 export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSummary {
   const decisions = listRecentSystemOneDecisions(clampLimit(limit));
