@@ -32,9 +32,10 @@ describe("System One Director shadow lane", () => {
       ...dmDependencies(), getSystemOneDirector: async () => director(caller),
     });
 
-    expect(caller.calls).toHaveLength(1);
+    // The same resolved lane also drives the L3 narration shadow, so scope to the Director lane.
+    expect(caller.calls.length).toBeGreaterThanOrEqual(1);
     const db = database();
-    const row = db.prepare("SELECT lane,shadow,fallback_used,confidence_band,provider FROM system_one_decisions_v1 ORDER BY created_at DESC LIMIT 1").get();
+    const row = db.prepare("SELECT lane,shadow,fallback_used,confidence_band,provider FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1").get();
     db.close();
     expect(row).toMatchObject({ lane: "director-selection", shadow: 1, fallback_used: 1, provider: "typesafe" });
     expect(row).toHaveProperty("confidence_band");

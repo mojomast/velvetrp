@@ -1,0 +1,75 @@
+{
+  "model": "jev-1.13.0",
+  "outcomes": [
+    {
+      "id": "empty-world",
+      "expected": "ambient-beat",
+      "actions": [
+        "advance-time",
+        "ambient-beat"
+      ],
+      "method": "defer",
+      "selectedAction": null,
+      "topSignal": 0.71,
+      "correct": false,
+      "acted": false
+    },
+    {
+      "id": "story-graph",
+      "expected": "reveal-node",
+      "actions": [
+        "advance-time",
+        "ambient-beat",
+        "reveal-node"
+      ],
+      "method": "defer",
+      "selectedAction": null,
+      "topSignal": 0.59,
+      "correct": false,
+      "acted": false
+    },
+    {
+      "id": "encounter-prep",
+      "expected": "encounter-start",
+      "actions": [
+        "encounter-start"
+      ],
+      "method": "best-pick",
+      "selectedAction": "encounter-start",
+      "topSignal": 0.59,
+      "correct": true,
+      "acted": true
+    },
+    {
+      "id": "gm-only",
+      "expected": "hold",
+      "actions": [],
+      "method": "defer",
+      "selectedAction": null,
+      "topSignal": 0.58,
+      "correct": false,
+      "acted": false
+    }
+  ],
+  "report": {
+    "count": 1,
+    "brier": 0.16810000000000003,
+    "expectedCalibrationError": 0.41000000000000003,
+    "bins": 10
+  },
+  "gate": {
+    "lane": "director-selection",
+    "promoted": false,
+    "reasons": [
+      "insufficient samples: 1 < 30",
+      "brier above maximum: 0.1681 > 0.1000",
+      "expected calibration error above maximum: 0.4100 > 0.1000"
+    ],
+    "gates": {
+      "minSamples": 30,
+      "minAccuracy": 0.9,
+      "maxBrier": 0.1,
+      "maxExpectedCalibrationError": 0.1
+    }
+  }
+}

@@ -10,6 +10,7 @@ import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATIO
   type CampaignDmRepository, type DmPlanningWork, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import { buildDirectorQuestions, composeDirectorSelection, type SystemOneDirectorDependency } from "./systemOneDirector.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
+import { buildNarrationQuestions, composeNarrationVerification, narrationVerificationState, type NarrationVerificationInput } from "./systemOneNarration.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
 import { getPromptPreset } from "../presets.js";
 import { defaultHarnessSettings } from "../defaults.js";
@@ -65,6 +66,55 @@ async function recordDirectorShadowDecision(work: DmPlanningWork, director: Syst
     createdAt: new Date().toISOString(),
   });
 }
+/**
+ * Projects the committed receipt summaries out of the narration work context. These are the
+ * authoritative public facts the verifier holds the candidate narration against. The context is
+ * untrusted shape, so anything unexpected projects to no facts rather than throwing.
+ */
+function committedNarrationFacts(context: unknown): string[] {
+  if (!context || typeof context !== "object") return [];
+  const receipts = (context as { receipts?: unknown }).receipts;
+  if (!Array.isArray(receipts)) return [];
+  return receipts.flatMap((receipt) => {
+    if (!receipt || typeof receipt !== "object") return [];
+    const summary = (receipt as { summary?: unknown }).summary;
+    return typeof summary === "string" && summary.trim() ? [summary] : [];
+  });
+}
+
+/**
+ * Runs the narration/receipt verification battery beside the live narration and records the
+ * would-be decision immutably. It never rewrites, blocks, or settles narration and never touches
+ * receipts or game state; any failure is swallowed so shadow evaluation cannot affect the beat.
+ */
+async function recordNarrationShadowDecision(runId: string, narration: string, committedFacts: readonly string[],
+  director: SystemOneDirectorDependency): Promise<void> {
+  const input: NarrationVerificationInput = { narration, committedFacts };
+  const questions = buildNarrationQuestions(input);
+  const state = narrationVerificationState(input);
+  const startedAt = performance.now();
+  const result = await director.caller({ settings: director.settings, state, questions });
+  const composed = composeNarrationVerification(result.answers, director.settings.confidencePolicy["narration-verification"]);
+  recordSystemOneDecision({
+    decisionId: randomUUID(),
+    lane: "narration-verification",
+    turnId: runId,
+    provider: "typesafe",
+    model: result.model.responseModel ?? director.settings.model,
+    confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+    state,
+    questions,
+    answers: result.answers,
+    selection: { band: composed.band, flags: composed.flags, groundedness: composed.groundedness, topSignal: composed.topSignal },
+    confidenceBand: composed.band,
+    fallbackUsed: true,
+    shadow: true,
+    usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+    latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+    createdAt: new Date().toISOString(),
+  });
+}
+
 const DM_GROUNDING_OBSERVATION_MAX_BYTES = 12_000;
 // A reasoning model otherwise spends its small completion budget on hidden reasoning, and some
 // routers reject a forced tool_choice while thinking. Disabling reasoning makes beat selection exact.
@@ -287,6 +337,15 @@ export async function orchestrateCampaignDmBeat(repository: CampaignDmRepository
       if(calls?.length!==1||calls[0]?.name!=="submit_dm_scene")throw new Error("invalid narration call");
       const scene=parseDmScene(JSON.parse(calls[0].arguments),work.context);
       repository.settleDmNarration(principal,runId,claimId,scene,"invalid-public-scene");
+      // Record-only shadow verification of the produced scene; it never alters the narration, state, or receipts.
+      if(scene!==null&&deps.getSystemOneDirector){
+        try{
+          const director=await deps.getSystemOneDirector();
+          if(director)await recordNarrationShadowDecision(runId,scene,committedNarrationFacts(work.context),director);
+        }catch{
+          // Shadow evaluation is advisory and must never affect narration.
+        }
+      }
     }
   } catch {
     if(claimId&&!accounting&&reserved)repository.recordDmProviderUsage(principal,runId,'narration',reserved);

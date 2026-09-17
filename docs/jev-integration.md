@@ -9,8 +9,11 @@ existing LLM/deterministic paths, plus **shadow mode**, a **lane-scoped budget**
 shadow mode**, and the surrounding tooling now includes a **probability-calibration
 grader (Brier/ECE)**, a **decision-record read API**, a **settings UI**, and a
 **shadow-decision report CLI**. The **L3 narration/receipt verification** and **L7
-cost/quality router** primitives are implemented as pure, tested, **unwired** modules;
-**everything remains disabled by default.** This document remains
+cost/quality router** are implemented and **wired in shadow (record-only)** in the
+Director narration and roleplay room-turn paths, with a **promotion-gate module** and a
+first [live Director calibration](system-one-director-calibration.md) that currently
+reports **not ready** at the default thresholds; **everything remains disabled by
+default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
@@ -333,8 +336,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   "groundedness".
 - **Shape (primitive shipped).** `server/src/agent/systemOneNarration.ts` builds the
   battery (three contrastive hazard `noul`s plus a groundedness `score`) and composes a
-  `NarrationVerification { band, flags, groundedness, topSignal }` in code. It is a pure
-  module with unit tests and is **not yet wired** into the narration path.
+  `NarrationVerification { band, flags, groundedness, topSignal }` in code. It is
+  **wired in shadow (record-only)** into the Director narration half, producing a
+  `narration-verification` decision record after a scene is produced while narration
+  itself is never altered.
 - **Composition.** Produces an observation only. High contradiction probability flags
   for deterministic replacement (already implemented for travel) or GM review. It never
   rewrites narration and never becomes story truth.
@@ -411,9 +416,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   sufficient?". This is the vendor intent-routing and confidence-gated routing pattern.
 - **Shape (primitive shipped).** `server/src/agent/systemOneRouter.ts` builds the
   handler `choice`, complexity `score`, and deterministic-sufficiency `noul`, and
-  composes a `RouterDecision`. It is a pure module with unit tests and is **not yet
-  wired** to any handler. Its safety gate routes `requiresHumanDecision`/`safetySensitive`
-  requests to `human-review` unconditionally.
+  composes a `RouterDecision`. It is **wired in shadow (record-only)** into the roleplay
+  room-turn path, recording a `cost-router` decision without changing which handler
+  runs. Its safety gate routes `requiresHumanDecision`/`safetySensitive` requests to
+  `human-review` unconditionally.
 - **Composition.** `act` routes to the chosen handler; `confirm` and `fallback` use the
   currently configured handler, so the router can only ever change behavior toward a
   cheaper or human path, never bypass a required safety check.

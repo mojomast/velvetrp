@@ -22,10 +22,12 @@ import {
   setActiveBranch,
   transitionSession,
 } from "../../repo/index.js";
-import type { Message, PostMessageInput, RoomContinueInput, RoomTurnInput, Session } from "../../types.js";
+import type { Message, PostMessageInput, RoomContinueInput, RoomTurnInput, Session, SystemOneSettings } from "../../types.js";
 import type { RoomRoutingSystemOne, SystemOneRoomRoutingDecision } from "../../llm.js";
 import { canUseSystemOne } from "../../provider/providerTransport.js";
-import { callSystemOne } from "../../provider/systemOneCompletion.js";
+import { callSystemOne, type SystemOneCaller } from "../../provider/systemOneCompletion.js";
+import { buildRouterQuestions, composeRouterDecision, type RouterHandler, type RouterRequestProjection } from "../../agent/systemOneRouter.js";
+import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "../../agent/systemOnePolicy.js";
 import { readRpgFeatureFlags } from "../../features.js";
 import {
   fallbackRoomSpeakers,
@@ -73,6 +75,59 @@ function recordRoomRoutingDecision(sessionId: string, decision: SystemOneRoomRou
     });
   } catch {
     // Advisory only: a decision-record failure must not affect routing or the turn.
+  }
+}
+
+/**
+ * Records a record-only cost-router shadow decision. It builds the L7 router battery,
+ * asks the injected caller, composes against the current handler, and persists an
+ * immutable `cost-router` row. It is advisory: it never throws, never selects a
+ * handler, and never influences routing, generation, fallbacks, or the response.
+ */
+export async function recordRouterShadowDecision(
+  sessionId: string,
+  request: RouterRequestProjection,
+  lane: { settings: SystemOneSettings; caller: SystemOneCaller },
+  currentHandler: RouterHandler,
+): Promise<void> {
+  try {
+    const questions = buildRouterQuestions(request);
+    const state = { ...request };
+    const startedAt = performance.now();
+    const result = await lane.caller({ settings: lane.settings, state, questions });
+    const decision = composeRouterDecision(
+      request,
+      result.answers,
+      lane.settings.confidencePolicy["cost-router"],
+      currentHandler,
+    );
+    recordSystemOneDecision({
+      decisionId: randomUUID(),
+      lane: "cost-router",
+      sessionId,
+      provider: "typesafe",
+      model: result.model.responseModel ?? lane.settings.model,
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state,
+      questions,
+      answers: result.answers,
+      selection: {
+        band: decision.band,
+        handler: decision.handler,
+        complexity: decision.complexity,
+        deterministicSufficient: decision.deterministicSufficient,
+        topSignal: decision.topSignal,
+        reason: decision.reason,
+      },
+      confidenceBand: decision.band,
+      fallbackUsed: true,
+      shadow: true,
+      usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Advisory shadow recording: never affects routing, generation, or the response.
   }
 }
 
@@ -179,8 +234,10 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       const maxSpeakers = Math.min(body.maxSpeakers ?? 3, session.participants.length);
       const provider = await getProviderSettings();
       const harness = await getHarnessSettings();
+      let routingSystemOne: RoomRoutingSystemOne | undefined;
       let selection;
       try {
+        routingSystemOne = await resolveRoomRoutingSystemOne();
         selection = await selectRoomSpeakers({
           participants: session.participants,
           primaryCharacterId: session.primaryCharacterId,
@@ -190,7 +247,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           provider,
           harness,
           preset: getPromptPreset(session.presetId),
-          systemOne: await resolveRoomRoutingSystemOne(),
+          systemOne: routingSystemOne,
         });
       } catch {
         request.log.error({ operation: "room-routing" }, "room routing failed; using deterministic fallback");
@@ -202,6 +259,18 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
       }
       if (selection.usage) await recordUsageEvent(session.id, usageKind(selection), selection.usage);
       if (selection.systemOneDecision) recordRoomRoutingDecision(session.id, selection.systemOneDecision);
+      if (routingSystemOne?.settings.shadow) {
+        try {
+          await recordRouterShadowDecision(
+            session.id,
+            { summary: content, hasDeterministicPath: false, requiresHumanDecision: false, safetySensitive: false },
+            routingSystemOne,
+            "frontier-generation",
+          );
+        } catch {
+          // Advisory shadow routing: never affects routing, generation, fallbacks, or the response.
+        }
+      }
 
       const userMessage = await addMessage(session.id, "user", content);
       const roomSse = request.headers.accept?.includes("text/event-stream") ? openSse(reply) : null;
