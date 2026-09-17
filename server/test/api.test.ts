@@ -144,6 +144,7 @@ describe("api", () => {
       combat: false,
       studio: false,
       remoteAuthentication: false,
+      systemOne: false,
     });
     const missing = await app.inject({ method: "GET", url: "/api/rpg/v1/not-implemented", headers: { "x-request-id": "rpg-request" } });
     expect(missing.statusCode).toBe(404);

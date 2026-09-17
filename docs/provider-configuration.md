@@ -36,6 +36,7 @@ Do not source an untrusted environment file. Keep `.env` out of version control.
 - `POST /api/provider/preflight` is the only capability probe. It accepts `{}`, performs one schema-bound function-tool request and one strict-JSON-Schema request, and is initiated only by the settings button or another explicit caller. It reports DM-play compatibility (usable function tool calls) separately from campaign-generation compatibility (strict JSON Schema response format). It is `no-store` and may incur provider charges.
 - Send `baseUrl: ""` to deliberately disable outbound generation and use the local deterministic stub.
 - A nonblank malformed or disallowed `baseUrl` receives HTTP 400. HTTPS is accepted; HTTP is accepted only for `localhost`, `*.localhost`, `127.x`, `::1`, or the expanded IPv6 loopback form.
+- `GET`/`PUT /api/provider/system-one` and `POST /api/provider/system-one/preflight` manage a separate, optional System One (Jev) decision profile described below. It never shares the OpenAI-compatible row.
 
 The profile includes `baseUrl`, `model`, `streaming`, `requestTimeoutSeconds` (15-300), OpenRouter routing/privacy controls, token pricing, adventure-turn budgets, and samplers. `adventureTurnBudget.maxTotalTokens` is 1-1,000,000,000 and defaults to 65,536. `adventureTurnBudget.maxEstimatedCostUsd` is nullable (disabled) or 0-1,000,000; enabling it requires both pricing fields or adventure provider dispatch fails closed. Supported finite numeric timeout and sampler values are clamped to their bounds when saved. Sampler bounds are:
 
@@ -70,6 +71,18 @@ The API key is stored as plain JSON inside the `provider` table in `<resolved da
 Restrict data-directory and backup permissions, avoid syncing them to untrusted storage, and rotate the provider key after suspected disclosure. `GET /api/provider` redacts the key, but that does not protect direct database access.
 
 Velvet sends `Authorization: Bearer <key>` only when the destination's exact host is one of `api.openai.com`, `openrouter.ai`, `requesty.ai`, `router.requesty.ai`, or a loopback host. A configured key is not sent to other HTTPS hosts. OpenRouter `HTTP-Referer` and `X-Title` headers are sent only to the exact `openrouter.ai` host.
+
+## System One (Jev) profile
+
+System One is TypeSafe AI's typed-decision service (Jev). It is an optional sibling profile for optional decision lanes, not part of the OpenAI-compatible provider and not an LLM. The profile is disabled by default; `FEATURE_SYSTEM_ONE` only advertises it, and the `enabled` setting and key gate real calls. See [Jev integration](jev-integration.md) for the lane design and the invariant that no System One answer can mutate campaign state.
+
+- `GET /api/provider/system-one` returns `{ id, providerType, enabled, baseUrl, model, hasApiKey, requestTimeoutSeconds, pricing, budget, confidencePolicy, updatedAt }` and never returns the key.
+- `PUT /api/provider/system-one` updates supplied fields, clamps `requestTimeoutSeconds` to 5-120, `pricing` to 0-1,000,000 USD per million, `budget.maxTotalTokens` to 1-1,000,000,000, `budget.maxRequestsPerWindow` to 1-100,000, and `budget.rateWindowMs` to 1,000-3,600,000, and clamps each lane's `reviewThreshold` to at most its `actionThreshold`.
+- `POST /api/provider/system-one/preflight` accepts exactly `{}`, rejects queries, and returns `no-store` `{ enabled, configured, model, ok, latencyMs, requestId }` on success or `{ ok: false, failure }` with only a safe kind/status/retryable/detail classification. It is never called by a page load and never returns provider text.
+
+When the flag, `enabled`, and a usable key are all set, the optional **room-routing lane** uses System One for which characters reply to a room turn, falling back to the OpenAI-compatible routing path and then to deterministic `fallbackRoomSpeakers` when System One defers, is unavailable, over budget, or fails. Dispatches are recorded under the `room_routing_system_one` usage kind and immutably in `system_one_decisions_v1`. Set `shadow: true` to run the lane and record its decisions without changing routing (`fallback_used: true`); this is the recommended way to evaluate it on real sessions. Turning `enabled` off (or unsetting `FEATURE_SYSTEM_ONE`) restores the previous behavior exactly.
+
+Transport is stricter than the OpenAI-compatible lane: the base URL must be HTTPS or loopback HTTP, and the credential is sent only to the exact allowlisted host `api.typesafe.ai` or a loopback host. Arbitrary HTTPS hosts are structurally rejected for use. The default base URL is `https://api.typesafe.ai/v1`, the default model is `jev-latest` (resolved live to `jev-1.13.0`), and the adapter posts to `<baseUrl>/systemone`, which is **not** an OpenAI `/chat/completions` endpoint.
 
 ## Outbound context and privacy
 

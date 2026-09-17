@@ -1,4 +1,14 @@
-import type { HarnessSettings, ProviderSettings, PublicProviderSettings, SamplerSettings } from "./types.js";
+import type {
+  HarnessSettings,
+  ProviderSettings,
+  PublicProviderSettings,
+  PublicSystemOneSettings,
+  SamplerSettings,
+  SystemOneConfidenceThresholds,
+  SystemOneLane,
+  SystemOneSettings,
+} from "./types.js";
+import { SYSTEM_ONE_LANES } from "./types.js";
 
 export function now(): string {
   return new Date().toISOString();
@@ -55,6 +65,49 @@ export function defaultProviderSettings(updatedAt = now()): ProviderSettings {
     adventureTurnBudget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null },
     samplers: { ...DEFAULT_SAMPLERS },
     updatedAt,
+  };
+}
+
+/** Conservative starting thresholds; every lane begins at confirm-or-fallback. */
+export const DEFAULT_SYSTEM_ONE_THRESHOLDS: SystemOneConfidenceThresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
+
+export function defaultSystemOneConfidencePolicy(): Record<SystemOneLane, SystemOneConfidenceThresholds> {
+  return Object.fromEntries(
+    SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_THRESHOLDS }]),
+  ) as Record<SystemOneLane, SystemOneConfidenceThresholds>;
+}
+
+export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
+  return {
+    id: "system-one",
+    providerType: "system-one",
+    enabled: false,
+    shadow: false,
+    baseUrl: process.env.TYPESAFE_BASE_URL ?? "https://api.typesafe.ai/v1",
+    model: process.env.TYPESAFE_MODEL ?? "jev-latest",
+    apiKey: process.env.TYPESAFE_API_KEY ?? "",
+    requestTimeoutSeconds: 30,
+    pricing: { promptPerMillion: 0.042, completionPerMillion: 0 },
+    budget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null, maxRequestsPerWindow: 60, rateWindowMs: 60_000 },
+    confidencePolicy: defaultSystemOneConfidencePolicy(),
+    updatedAt,
+  };
+}
+
+export function toPublicSystemOne(settings: SystemOneSettings): PublicSystemOneSettings {
+  return {
+    id: "system-one",
+    providerType: "system-one",
+    enabled: settings.enabled,
+    shadow: settings.shadow,
+    baseUrl: settings.baseUrl,
+    model: settings.model,
+    hasApiKey: settings.apiKey.length > 0,
+    requestTimeoutSeconds: settings.requestTimeoutSeconds,
+    pricing: settings.pricing,
+    budget: settings.budget,
+    confidencePolicy: settings.confidencePolicy,
+    updatedAt: settings.updatedAt,
   };
 }
 

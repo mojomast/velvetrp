@@ -288,7 +288,7 @@ export default function App() {
     // Optional RPG discovery is intentionally independent: a slow or legacy
     // server endpoint must never hold the character library or restored chat.
     void getRpgFeatures()
-      .catch(() => ({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false }))
+      .catch(() => ({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }))
       .then((rpgFeatureData) => {
         if (!mounted) return;
         campaignAvailabilityRef.current = rpgFeatureData.campaign;

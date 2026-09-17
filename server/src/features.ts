@@ -8,5 +8,6 @@ export function readRpgFeatureFlags(env: NodeJS.ProcessEnv = process.env): RpgFe
     combat: env.FEATURE_RPG_COMBAT === "true",
     studio: env.FEATURE_RPG_STUDIO === "true",
     remoteAuthentication: env.FEATURE_REMOTE_AUTHENTICATION === "true",
+    systemOne: env.FEATURE_SYSTEM_ONE === "true",
   });
 }

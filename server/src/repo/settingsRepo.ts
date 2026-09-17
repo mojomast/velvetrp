@@ -7,18 +7,24 @@ import {
   clampText,
   defaultHarnessSettings,
   defaultProviderSettings,
+  defaultSystemOneSettings,
   now,
   toPublicProvider,
+  toPublicSystemOne,
 } from "../defaults.js";
+import { SYSTEM_ONE_LANES } from "../types.js";
 import { systemRuntime } from "../runtime.js";
 import type { Clock } from "../runtime.js";
 import type {
   HarnessSettings,
   ProviderSettings,
   PublicProviderSettings,
+  PublicSystemOneSettings,
   SamplerSettings,
+  SystemOneSettings,
   UpdateHarnessInput,
   UpdateProviderInput,
+  UpdateSystemOneInput,
 } from "../types.js";
 import { getRepositoryDatabase } from "./repoContext.js";
 
@@ -163,4 +169,95 @@ export async function updateProviderSettings(patch: UpdateProviderInput): Promis
     "INSERT INTO provider (id, payload) VALUES ('provider', ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
   ).run(JSON.stringify(next));
   return toPublicProvider(next);
+}
+
+export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
+  const row = db.prepare("SELECT payload FROM provider WHERE id = 'system-one'").get() as { payload: string } | undefined;
+  const defaults = defaultSystemOneSettings();
+  if (!row) return defaults;
+  try {
+    const parsed = JSON.parse(row.payload) as Partial<SystemOneSettings>;
+    return {
+      ...defaults,
+      ...parsed,
+      id: "system-one",
+      providerType: "system-one",
+      pricing: { ...defaults.pricing, ...(parsed.pricing ?? {}) },
+      budget: { ...defaults.budget, ...(parsed.budget ?? {}) },
+      confidencePolicy: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
+        lane,
+        { ...defaults.confidencePolicy[lane], ...(parsed.confidencePolicy?.[lane] ?? {}) },
+      ])) as SystemOneSettings["confidencePolicy"],
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+export async function getSystemOneSettings(): Promise<SystemOneSettings> {
+  return readSystemOne(getRepositoryDatabase());
+}
+
+export async function getPublicSystemOneSettings(): Promise<PublicSystemOneSettings> {
+  return toPublicSystemOne(await getSystemOneSettings());
+}
+
+export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Promise<PublicSystemOneSettings> {
+  const db = getRepositoryDatabase();
+  const current = readSystemOne(db);
+  const next: SystemOneSettings = {
+    ...current,
+    pricing: { ...current.pricing, ...(patch.pricing ?? {}) },
+    budget: { ...current.budget, ...(patch.budget ?? {}) },
+    confidencePolicy: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
+      lane,
+      { ...current.confidencePolicy[lane], ...(patch.confidencePolicy?.[lane] ?? {}) },
+    ])) as SystemOneSettings["confidencePolicy"],
+  };
+  if (patch.enabled !== undefined) next.enabled = patch.enabled;
+  if (patch.shadow !== undefined) next.shadow = patch.shadow;
+  if (patch.baseUrl !== undefined) next.baseUrl = clampText(patch.baseUrl, 300);
+  if (patch.model !== undefined) next.model = clampText(patch.model, 120);
+  if (patch.apiKey !== undefined) next.apiKey = patch.apiKey.trim().slice(0, 300);
+  if (patch.requestTimeoutSeconds !== undefined && Number.isFinite(patch.requestTimeoutSeconds)) {
+    next.requestTimeoutSeconds = clampInt(patch.requestTimeoutSeconds, 5, 120);
+  }
+  if (patch.pricing) {
+    if (patch.pricing.promptPerMillion === null) next.pricing.promptPerMillion = null;
+    if (typeof patch.pricing.promptPerMillion === "number" && Number.isFinite(patch.pricing.promptPerMillion)) {
+      next.pricing.promptPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.promptPerMillion));
+    }
+    if (patch.pricing.completionPerMillion === null) next.pricing.completionPerMillion = null;
+    if (typeof patch.pricing.completionPerMillion === "number" && Number.isFinite(patch.pricing.completionPerMillion)) {
+      next.pricing.completionPerMillion = Math.max(0, Math.min(1_000_000, patch.pricing.completionPerMillion));
+    }
+  }
+  if (patch.budget) {
+    if (typeof patch.budget.maxTotalTokens === "number" && Number.isFinite(patch.budget.maxTotalTokens)) {
+      next.budget.maxTotalTokens = clampInt(patch.budget.maxTotalTokens, 1, 1_000_000_000);
+    }
+    if (patch.budget.maxEstimatedCostUsd === null) next.budget.maxEstimatedCostUsd = null;
+    if (typeof patch.budget.maxEstimatedCostUsd === "number" && Number.isFinite(patch.budget.maxEstimatedCostUsd)) {
+      next.budget.maxEstimatedCostUsd = Math.max(0, Math.min(1_000_000, patch.budget.maxEstimatedCostUsd));
+    }
+    if (typeof patch.budget.maxRequestsPerWindow === "number" && Number.isFinite(patch.budget.maxRequestsPerWindow)) {
+      next.budget.maxRequestsPerWindow = clampInt(patch.budget.maxRequestsPerWindow, 1, 100_000);
+    }
+    if (typeof patch.budget.rateWindowMs === "number" && Number.isFinite(patch.budget.rateWindowMs)) {
+      next.budget.rateWindowMs = clampInt(patch.budget.rateWindowMs, 1_000, 3_600_000);
+    }
+  }
+  if (patch.confidencePolicy) {
+    next.confidencePolicy = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
+      const thresholds = next.confidencePolicy[lane];
+      const action = clampNullableNumber(thresholds.actionThreshold, 0, 1) ?? 0;
+      const review = clampNullableNumber(thresholds.reviewThreshold, 0, 1) ?? 0;
+      return [lane, { actionThreshold: action, reviewThreshold: Math.min(review, action) }];
+    })) as SystemOneSettings["confidencePolicy"];
+  }
+  next.updatedAt = now();
+  db.prepare(
+    "INSERT INTO provider (id, payload) VALUES ('system-one', ?) ON CONFLICT(id) DO UPDATE SET payload = excluded.payload",
+  ).run(JSON.stringify(next));
+  return toPublicSystemOne(next);
 }

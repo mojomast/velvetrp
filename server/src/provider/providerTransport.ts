@@ -2,6 +2,12 @@ import type { ProviderSettings } from "../types.js";
 
 const SUPPORTED_HOSTED_PROVIDER_HOSTS = new Set(["api.openai.com", "openrouter.ai", "router.requesty.ai", "requesty.ai"]);
 const AUTHORIZED_HTTP_PROVIDER = { hostname: "100.72.41.9", port: "8787", pathname: "/v1" } as const;
+/**
+ * The single hosted host that may receive the System One credential. Unlike the
+ * OpenAI-compatible allowlist, this is deliberately not extended with a loopback
+ * HTTP exception beyond ordinary loopback hosts, and never with arbitrary HTTPS.
+ */
+const SYSTEM_ONE_HOSTED_HOST = "api.typesafe.ai";
 
 function providerHostname(baseUrl: string): string | null {
   try {
@@ -82,6 +88,56 @@ export function buildProviderHeaders(baseUrl: string, provider: ProviderSettings
     if (provider.appTitle.trim()) headers["X-Title"] = provider.appTitle.trim();
     const userAgent = process.env.OPENROUTER_USER_AGENT?.trim() ?? "";
     if (/^[\x20-\x7E]{1,200}$/.test(userAgent)) headers["User-Agent"] = userAgent;
+  }
+  return headers;
+}
+
+function systemOneHostname(baseUrl: string): string | null {
+  try {
+    return new URL(baseUrl.trim()).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Validates the transport policy for the System One base URL (HTTPS or loopback HTTP). */
+export function validateSystemOneBaseUrl(baseUrl: string): { ok: true } | { ok: false; reason: string } {
+  let url: URL;
+  try {
+    url = new URL(baseUrl.trim());
+  } catch {
+    return { ok: false, reason: "baseUrl is not a valid URL" };
+  }
+  if (url.protocol === "https:") return { ok: true };
+  if (url.protocol === "http:" && isLoopbackHost(url.hostname)) return { ok: true };
+  return { ok: false, reason: "baseUrl must use https or http loopback" };
+}
+
+/**
+ * Returns whether System One settings permit a real decision request.
+ *
+ * The hosted host requires a key; loopback may run keyless for local doubles.
+ * An arbitrary HTTPS host is structurally valid but unusable without being
+ * allowlisted, and never receives the credential.
+ */
+export function canUseSystemOne(settings: { baseUrl: string; apiKey: string }): boolean {
+  const baseUrl = settings.baseUrl.trim().replace(/\/+$/, "");
+  const hostname = systemOneHostname(baseUrl);
+  if (!baseUrl || !hostname || !validateSystemOneBaseUrl(baseUrl).ok) return false;
+  if (hostname === SYSTEM_ONE_HOSTED_HOST) return settings.apiKey.trim().length > 0;
+  if (isLoopbackHost(hostname)) return true;
+  return false;
+}
+
+/**
+ * Builds System One headers. The bearer credential is sent only to the exact
+ * allowlisted hosted host or a loopback host; arbitrary HTTPS hosts get none.
+ */
+export function buildSystemOneHeaders(baseUrl: string, apiKey: string): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const hostname = systemOneHostname(baseUrl);
+  if (hostname && apiKey.trim() && (hostname === SYSTEM_ONE_HOSTED_HOST || isLoopbackHost(hostname))) {
+    headers.Authorization = `Bearer ${apiKey.trim()}`;
   }
   return headers;
 }

@@ -107,6 +107,7 @@ Local-first describes storage and deployment, not a guarantee that all processin
 
 - SQLite data is local by default.
 - When a remote model provider is configured, Velvet sends assembled prompts and conversation context to that provider. Review the provider's privacy and retention terms.
+- An optional, disabled-by-default System One (Jev) typed-decision profile can be configured separately. It sends a bounded decision `state` and typed questions to `api.typesafe.ai`, is gated by `FEATURE_SYSTEM_ONE` plus its own `enabled` setting and key, and is not required by any request path; see [Jev integration](docs/jev-integration.md).
 - Without a usable provider, roleplay uses a clearly marked deterministic local stub. RPG adventure turns use deterministic recovery after provider failure, including receipt-backed fallback narration and authoritative enemy-turn recovery; this is a delivered M4 recovery path, not a placeholder for future tool-loop work.
 - The server defaults to `127.0.0.1` and RPG routes use the fixed `local-owner` principal. There is no authentication boundary. Authorization and principal headers are ignored.
 - Do not expose this server to a LAN, the internet, a reverse proxy, or multiple untrusted users. `FEATURE_REMOTE_AUTHENTICATION` is discovery-only rollout state, not implemented authentication.

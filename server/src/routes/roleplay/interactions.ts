@@ -12,6 +12,8 @@ import {
   getMessage,
   getProviderSettings,
   getSession,
+  getSystemOneSettings,
+  recordSystemOneDecision,
   listBranchChildren,
   listBranchMessages,
   listMessages,
@@ -21,6 +23,10 @@ import {
   transitionSession,
 } from "../../repo/index.js";
 import type { Message, PostMessageInput, RoomContinueInput, RoomTurnInput, Session } from "../../types.js";
+import type { RoomRoutingSystemOne, SystemOneRoomRoutingDecision } from "../../llm.js";
+import { canUseSystemOne } from "../../provider/providerTransport.js";
+import { callSystemOne } from "../../provider/systemOneCompletion.js";
+import { readRpgFeatureFlags } from "../../features.js";
 import {
   fallbackRoomSpeakers,
   maybeUpdateSummary,
@@ -31,6 +37,44 @@ import {
   targetCharacter,
 } from "./generationService.js";
 import { generationRegistry } from "./generationRegistry.js";
+
+/** Resolves the optional room-routing System One lane from the flag, setting, and key. */
+async function resolveRoomRoutingSystemOne(): Promise<RoomRoutingSystemOne | undefined> {
+  if (!readRpgFeatureFlags().systemOne) return undefined;
+  const settings = await getSystemOneSettings();
+  if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  return { settings, caller: callSystemOne };
+}
+
+function usageKind(selection: { kind?: "llm" | "system-one" }): string {
+  return selection.kind === "system-one" ? "room_routing_system_one" : "room_routing";
+}
+
+/** Records one System One routing decision immutably; never allowed to fail a room turn. */
+function recordRoomRoutingDecision(sessionId: string, decision: SystemOneRoomRoutingDecision): void {
+  try {
+    recordSystemOneDecision({
+      decisionId: randomUUID(),
+      lane: decision.lane,
+      sessionId,
+      provider: decision.provider,
+      model: decision.model,
+      confidencePolicyVersion: decision.confidencePolicyVersion,
+      state: decision.state,
+      questions: decision.questions,
+      answers: decision.answers,
+      selection: decision.selection,
+      confidenceBand: decision.confidenceBand,
+      fallbackUsed: decision.fallbackUsed,
+      shadow: decision.shadow,
+      usage: decision.usage,
+      latencyMs: decision.latencyMs,
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Advisory only: a decision-record failure must not affect routing or the turn.
+  }
+}
 
 export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Params: { id: string }; Body: PostMessageInput }>("/sessions/:id/messages", async (request, reply) => {
@@ -146,6 +190,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           provider,
           harness,
           preset: getPromptPreset(session.presetId),
+          systemOne: await resolveRoomRoutingSystemOne(),
         });
       } catch {
         request.log.error({ operation: "room-routing" }, "room routing failed; using deterministic fallback");
@@ -155,7 +200,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           usage: null,
         };
       }
-      if (selection.usage) await recordUsageEvent(session.id, "room_routing", selection.usage);
+      if (selection.usage) await recordUsageEvent(session.id, usageKind(selection), selection.usage);
+      if (selection.systemOneDecision) recordRoomRoutingDecision(session.id, selection.systemOneDecision);
 
       const userMessage = await addMessage(session.id, "user", content);
       const roomSse = request.headers.accept?.includes("text/event-stream") ? openSse(reply) : null;
@@ -250,6 +296,7 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           provider,
           harness,
           preset: getPromptPreset(session.presetId),
+          systemOne: await resolveRoomRoutingSystemOne(),
         });
       } catch {
         request.log.error({ operation: "room-continuation-routing" }, "room continuation routing failed; using deterministic fallback");
@@ -259,7 +306,8 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
           usage: null,
         };
       }
-      if (selection.usage) await recordUsageEvent(session.id, "room_routing", selection.usage);
+      if (selection.usage) await recordUsageEvent(session.id, usageKind(selection), selection.usage);
+      if (selection.systemOneDecision) recordRoomRoutingDecision(session.id, selection.systemOneDecision);
       const firstOther = selection.speakerIds.find((id) => id !== previousCharacter.id)
         ?? session.participants.find((participant) => participant.id !== previousCharacter.id)?.id;
       const selectedSpeakerIds = firstOther

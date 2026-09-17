@@ -84,7 +84,8 @@ const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta
   + "\n" + readFileSync(new URL("./npcKnowledgeSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8")
-  + "\n" + readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8");
+  + "\n" + readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8")
+  + "\n" + readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
 
 interface SchemaObject {
   type: string;
@@ -352,6 +353,7 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const markerSql = readFileSync(new URL("./combatMarkerSchema.sql", import.meta.url), "utf8");
     const attunementSql = readFileSync(new URL("./attunementSchema.sql", import.meta.url), "utf8");
     const readyActionSql = readFileSync(new URL("./combatReadyActionSchema.sql", import.meta.url), "utf8");
+    const systemOneSql = readFileSync(new URL("./systemOneSchema.sql", import.meta.url), "utf8");
     const actual = schemaObjects(db);
     const missingRecall = !actual.some(object => object.name === "adventure_narration_contexts");
     const missingInspection = !actual.some(object => object.name === "campaign_context_inspection_headers_v61");
@@ -359,14 +361,16 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
     const missingMarkers = !actual.some(object => object.name.startsWith("combat_markers_"));
     const missingAttunements = !actual.some(object => object.name.startsWith("actor_item_attunements_"));
     const missingReadyActions = !actual.some(object => object.name.startsWith("combat_ready_actions_"));
-    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions;
+    const missingSystemOne = !actual.some(object => object.name.startsWith("system_one_"));
+    const missingLateSchema = missingRecall || missingInspection || missingKnowledge || missingMarkers || missingAttunements || missingReadyActions || missingSystemOne;
     const expected = expectedObjects().filter(object =>
       !(missingRecall && object.name.startsWith("adventure_narration_contexts"))
       && !(missingInspection && object.name.startsWith("campaign_context_inspection_"))
       && !(missingKnowledge && object.name.startsWith("agent_observations"))
       && !(missingMarkers && object.name.startsWith("combat_markers_"))
       && !(missingAttunements && object.name.startsWith("actor_item_attunements_"))
-      && !(missingReadyActions && object.name.startsWith("combat_ready_actions_")));
+      && !(missingReadyActions && object.name.startsWith("combat_ready_actions_"))
+      && !(missingSystemOne && (object.name.startsWith("system_one_") || object.tbl_name === "system_one_decisions_v1")));
     if (mismatchReason(actual, expected) === null) {
       if (!missingLateSchema) {
         assertCurrentDatabase(db, databasePath);
@@ -379,6 +383,7 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
         if (missingMarkers) db.exec(markerSql);
         if (missingAttunements) db.exec(attunementSql);
         if (missingReadyActions) db.exec(readyActionSql);
+        if (missingSystemOne) db.exec(systemOneSql);
         assertCurrentDatabase(db, databasePath);
       }).immediate();
       return;

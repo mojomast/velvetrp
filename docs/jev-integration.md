@@ -1,12 +1,18 @@
 # Jev (TypeSafe System One) integration
 
-Status: researched integration spec, **not implemented**. This document is a design
-and evaluation plan. It does not override runtime code, shared Zod contracts, the
-[API reference](api.md), [repository architecture](repo-architecture.md),
+Status: design plus **W0 scaffolding and the first lane**. The transport lane, strict
+schemas, second settings profile, feature flag, confidence-policy module, fake adapter,
+and settings/preflight HTTP routes are implemented and tested. The **L5 room-routing
+lane is wired** behind the flag, setting, and key, with confidence gating to the
+existing LLM/deterministic paths, plus **shadow mode**, a **lane-scoped budget**, and an
+**immutable decision-record sidecar**; **everything remains disabled by default.** This document remains
+the design and evaluation plan and does not override runtime code, shared Zod
+contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
 [roadmap](ROADMAP.md). TypeSafe product facts were verified September 16, 2026
-against the public documentation listed under [Sources](#sources). No paid System
-One calls, live database access, or dependency changes were made for this research.
+against the live API and the public documentation listed under [Sources](#sources).
+The API was exercised live during this work; the decision-record sidecar and every
+lane above shadow mode remain future work.
 
 ## Summary
 
@@ -46,8 +52,11 @@ Operational properties relevant to Velvet:
 - **Endpoint.** `POST https://api.typesafe.ai/v1/systemone`, `Authorization: Bearer <key>`,
   body `{ state, model, questions }`, response `{ model, answers, usage: { input_tokens, output_tokens } }`.
   `state` may be a string, object, or array. `model` examples include `jev-latest` and pinned
-  versions such as `jev-1.12`. The endpoint is **not** OpenAI `/chat/completions`.
-- **Errors.** `401` invalid key, `422` invalid body, `429` rate limit, `529` overloaded.
+  versions such as `jev-1.13.0`. The endpoint is **not** OpenAI `/chat/completions`.
+- **Model discovery.** `GET /v1/models` returns `{ models: [{ name, description, release_date }] }`.
+  Live verification resolved `jev-latest` to `jev-1.13.0`; `jev-preview` is also advertised.
+- **Errors.** `401` missing/invalid key, `422` invalid body (with the offending field path),
+  `429` rate limit, `529` overloaded, and `400` `api_usage_error` for an unknown model.
   The vendor recommends exponential backoff on `429`/`529`.
 - **Confidence.** `choice` and `score` answers include `confidence` derived from the
   probability distribution shape (concentrated = high, flat = low). `noul` does not.
@@ -56,6 +65,42 @@ Operational properties relevant to Velvet:
   and roughly 70–500 ms per call. Adding questions to one call has little effect on latency.
 - **Maturity.** Early access. Treat availability, schemas, and model versions as unstable
   and fail closed. Pin a model version for evaluations.
+
+### Verified wire schema (September 16, 2026)
+
+The public API was exercised live while planning the implementation. The exact request
+shape is a map of typed questions keyed by `type`; each question carries `instructions`
+plus a type-specific `criteria`, and the response echoes the same keys:
+
+```json
+{
+  "state": "Player: I swing at the goblin. Receipt: no attack committed.",
+  "model": "jev-latest",
+  "questions": {
+    "hold":     { "type": "noul",   "instructions": "Should the Director hold?" },
+    "grounded": { "type": "score",  "instructions": "Rate groundedness.",
+                  "criteria": ["grounded", "partly grounded", "contradicts the receipt"] },
+    "pick":     { "type": "choice", "instructions": "Pick a legal action.",
+                  "criteria": { "attack": "commit the attack", "none_of_these": null } }
+  }
+}
+```
+
+- `noul` returns `{ "type": "noul", "noul": 0.0–1.0 }` and never a `confidence`.
+- `choice` returns `{ "type": "choice", "choice": "<option>", "confidence": 0–1,
+  "probabilities": { "<option>": 0–1, ... } }`; `criteria` is a map of option to a
+  rubric string (or `null`); a sentinel such as `none_of_these` is the fail-closed option.
+- `score` returns `{ "type": "score", "score": <weighted mean>, "confidence": 0–1,
+  "legend": { "0": "<level>", ... }, "probabilities": { "0": 0–1, ... } }`; `criteria`
+  is an ordered array of level descriptions (minimum two), and level keys are strings.
+- Unknown top-level and unknown question fields are ignored by the service, so Velvet must
+  apply its own strict Zod validation rather than relying on the server to reject extras.
+- Failures carry the `x-typesafe-request-id` response header, which the adapter records
+  as provenance.
+
+The implementation lives in `server/src/provider/systemOneCompletion.ts` (transport and
+validation), `server/src/agent/systemOnePolicy.ts` (confidence bands), and
+`server/src/agent/systemOneRoomRouting.ts` (the wired L5 battery/composition).
 
 ### Sources
 
@@ -299,12 +344,35 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 
 - **Where.** Room speaker routing (`server/src/llm.ts` `selectRoomSpeakers`), and
   declaration classification inside the adventure turn.
-- **Shape.** `choice` over the participant ids (with `none`) for speaker routing;
-  `choice` over `declaration`/`dialogue`/`meta` for message intent.
-- **Composition.** `act` routes directly; `confirm` queues for the next deterministic
-  pass; `fallback` uses `fallbackRoomSpeakers`.
-- **Authority.** Intent classification only prefilters; the server still selects tools
-  and legal commands.
+- **Shape (shipped for routing).** Because a room turn can select several speakers,
+  routing uses **one atomic `noul` per participant** ("should this participant speak?")
+  plus one aggregate `best_speaker` `choice`, built by
+  `server/src/agent/systemOneRoomRouting.ts`. Code composes the answer: participants
+  that clear `actionThreshold` are ordered by probability and capped, then passed
+  through the existing `ensureGroupSpeakers`. When no participant clears the threshold,
+  the aggregate choice acts as a fallback if its top pick is a real participant and its
+  probability clears `reviewThreshold`; otherwise the lane defers. Declaration/intent
+  classification is still unimplemented.
+- **Composition.** `act` uses the Jev selection; `confirm`/`fallback` returns the
+  recorded decision without applying it, so `selectRoomSpeakers` continues to the LLM
+  path and then `fallbackRoomSpeakers`. A Jev error also returns `null`.
+- **Toggle and shadow.** The lane runs only when `FEATURE_SYSTEM_ONE`,
+  `SystemOneSettings.enabled`, and a usable key are all present; the route resolves it in
+  `server/src/routes/roleplay/interactions.ts`. `SystemOneSettings.shadow` runs the
+  battery and records the decision while leaving routing unchanged (`fallback_used: true`).
+  Usage is recorded under the `room_routing_system_one` kind.
+- **Budget.** Each dispatch reserves against the lane's own budget
+  (`server/src/agent/systemOneBudget.ts`) before shipping and settles from reported
+  usage; a denied reserve, like any lane failure, falls back without dispatching.
+- **Decision records.** Every dispatch (active or shadow) is written immutably to
+  `system_one_decisions_v1` via `server/src/repo/systemOneDecisionRepo.ts`, with
+  request/questions/state digests and a re-verifiable integrity assertion. Recording is
+  advisory and can never fail a room turn.
+- **Authority.** Jev only nominates participant ids from the closed room roster; the
+  server still selects tools and legal commands, and the deterministic fallback is
+  unchanged.
+- **Benchmark.** [System One room-routing benchmark](system-one-benchmark.md) compares
+  the Jev arm, the raw LLM arm, and the gated lane on a labelled routing battery.
 
 ### L6 — Guardrails and boundaries
 
@@ -491,6 +559,36 @@ Reuse the existing provider-free harness rather than inventing one.
 - **Promotion gate.** A lane may leave shadow mode only when, on a frozen holdout, it
   meets the oracle agreement and calibration targets recorded for that lane. If it
   does not meet the gate, record the lane as incomplete rather than adding complexity.
+
+## Expected improvements and success metrics
+
+Adopting the core lanes plus the evaluation harness and router should move behavior in a
+few measurable directions. These are expectations to confirm in shadow mode, not
+guarantees; the vendor's headline ratios are measured on System-One-shaped queries
+against frontier models and will be smaller locally.
+
+| Area | Expected improvement | Confidence | Primary metric |
+| --- | --- | --- | --- |
+| Decision latency | Replace sequential multi-round model calls with one ~100 ms parallel call | Medium | p50/p95 decision latency vs. the replaced call |
+| Cost | Decision calls near-free; frees budget for new checks | High | Provider cost per Director turn; cost per lane |
+| Decision reliability | No free text, so no parse, type, or undeclared-candidate failures | High | Tool/parse failure rate; fallback rate |
+| Decision quality | Decomposed atomic signals combined in code with tunable weights | Medium | Oracle agreement; pass@k vs. the deterministic path |
+| Calibration | Native confidence enables act/confirm/hold gating | Medium | Brier score and ECE per lane |
+| Auditability | Immutable probability records per decision | High | Decision-record coverage; explainability spot checks |
+| Safety | Advisory verification and guardrail routing | Medium | Flagged/reviewed turns vs. false positives |
+| Evaluation velocity | Automated rubric grading replaces paid judge calls | High | Eval cost and wall-clock per run |
+
+What not to expect:
+
+- No change to prose quality; narration, NPC voice, and generation stay generative.
+- No gain from a net-new check on the critical path; run verification and reranking
+  asynchronously or accept roughly ~100 ms each.
+- No immediate user-visible change until a lane clears its promotion gate.
+- No guarantee the model beats the deterministic oracle; if it does not, keep the
+  fallback and the gained measurement.
+
+The shadow-mode calibration report is the decision point: it converts each expectation
+above into a measured number before any lane is enabled.
 
 ## Failure, privacy, and safety
 

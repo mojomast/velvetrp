@@ -36,7 +36,7 @@ function installFetch(characters = [aria, rowan], sessions = [baseSession], camp
     { method: "GET", match: /\/api\/characters$/, handler: () => json({ characters }) },
     { method: "GET", match: /\/api\/sessions$/, handler: () => json({ sessions }) },
     { method: "GET", match: /\/api\/features$/, handler: () => json({ voice: false, images: false }) },
-    { method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign, mechanics, combat: false, studio, remoteAuthentication: false }) },
+    { method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign, mechanics, combat: false, studio, remoteAuthentication: false, systemOne: false }) },
     { method: "GET", match: /\/api\/provider$/, handler: () => json(provider) },
     { method: "GET", match: /\/api\/harness$/, handler: () => json(harness) },
   ];
@@ -307,7 +307,7 @@ describe("persistence and multi-character frontend", () => {
     await openLibrary();
     fireEvent.click(screen.getByText(baseSession.title).closest("button")!);
     await screen.findByText("Newer ordinary chat");
-    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false }));
+    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }));
     await discovery.promise;
     await Promise.resolve();
     expect(screen.getByText("Newer ordinary chat")).toBeTruthy();
@@ -328,7 +328,7 @@ describe("persistence and multi-character frontend", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Private chat with Aria" }));
     await screen.findByText("Newer private chat");
-    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false }));
+    discovery.resolve(json({ campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false }));
     await discovery.promise;
     await Promise.resolve();
     expect(screen.getByText("Newer private chat")).toBeTruthy();
@@ -397,7 +397,7 @@ describe("persistence and multi-character frontend", () => {
 
   it("restores persisted campaign administration and authoritatively loads its campaign name", async () => {
     installFetch([aria], [], true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: true, remoteAuthentication: false }) });
+    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: true, remoteAuthentication: false, systemOne: false }) });
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-administration", campaignId: campaignAccess.id }));
     const at = "2030-01-02T00:00:00.000Z";
     routes.push(
@@ -576,7 +576,7 @@ describe("persistence and multi-character frontend", () => {
   it("embeds combat without leaving play and still restores previously saved combat routes", async () => {
     const playBootstrap = { dm: { mode: "human", revision: 0 }, campaignId: campaignAccess.id, sessionId: baseSession.id, expectedRevision: 7, session: { attached: true, attachedAt: "2030-01-03T00:00:00.000Z", active: true, adventureEligible: true }, principal: { role: "owner", control: "all" }, capabilities: { campaignDice: { canView: true, canRoll: true } }, playableActors: [{ actorId: "actor", name: "Aria" }] };
     installFetch([aria], [baseSession], true, true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false }) });
+    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false, systemOne: false }) });
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-play", campaignId: campaignAccess.id, sessionId: baseSession.id, playSelectedActorId: "actor" }));
     routes.push(
       { method: "GET", match: /\/api\/sessions\/sess-1$/, handler: () => json({ session: baseSession, messages: [] }) },
@@ -617,7 +617,7 @@ describe("persistence and multi-character frontend", () => {
 
   it("keeps the legacy campaign-detail combat entry free of room authority", async () => {
     installFetch([aria], [], true, true);
-    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false }) });
+    routes.unshift({ method: "GET", match: /\/api\/rpg\/v1\/features$/, handler: () => json({ campaign: true, mechanics: true, combat: true, studio: false, remoteAuthentication: false, systemOne: false }) });
     localStorage.setItem("velvet.navigation.v1", JSON.stringify({ view: "campaign-detail", campaignId: campaignAccess.id }));
     routes.push({ method: "GET", match: /\/api\/rpg\/v1\/campaigns\/campaign-one$/, handler: () => json(configuredCampaignDetail) });
     render(<App />); await screen.findByRole("heading", { name: campaignAccess.name });

@@ -72,7 +72,7 @@ describe("feature flag contracts", () => {
   });
 
   it("requires every RPG feature to be an explicit boolean", () => {
-    const flags = { campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false };
+    const flags = { campaign: false, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false };
     expect(rpgFeatureFlagsSchema.parse(flags)).toEqual(flags);
     expect(() => rpgFeatureFlagsSchema.parse({ ...flags, combat: 1 })).toThrow();
   });

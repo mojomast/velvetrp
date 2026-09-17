@@ -147,6 +147,7 @@ export {
 } from "./storyRepo.js";
 export * from "./adventureTurnRepo.js";
 export * from "./candidateRepo/index.js";
+export * from "./systemOneDecisionRepo.js";
 export {
   createCharacter,
   deleteCharacter,
@@ -158,8 +159,12 @@ export {
   getHarnessSettings,
   getProviderSettings,
   getPublicProviderSettings,
+  getPublicSystemOneSettings,
+  getSystemOneSettings,
+  readSystemOne,
   updateHarnessSettings,
   updateProviderSettings,
+  updateSystemOneSettings,
 } from "./settingsRepo.js";
 export {
   addConsentEvent,

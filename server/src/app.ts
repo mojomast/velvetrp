@@ -14,6 +14,7 @@ import { roleplayLoreRoutes } from "./routes/roleplay/lore.js";
 import { roleplayMemoryRoutes } from "./routes/roleplay/memories.js";
 import { roleplayPromptTemplateRoutes } from "./routes/roleplay/promptTemplates.js";
 import { roleplayProviderRoutes } from "./routes/roleplay/provider.js";
+import { roleplaySystemOneRoutes } from "./routes/roleplay/systemOne.js";
 import { roleplaySessionLifecycleRoutes } from "./routes/roleplay/sessionLifecycle.js";
 import { roleplaySessionRoutes } from "./routes/roleplay/sessions.js";
 import { roleplaySystemRoutes } from "./routes/roleplay/system.js";
@@ -892,6 +893,7 @@ export function buildApp(options: {
   void app.register(roleplaySessionLifecycleRoutes, { prefix: "/api" });
   void app.register(roleplayInteractionRoutes, { prefix: "/api" });
   void app.register(roleplayProviderRoutes, { prefix: "/api" });
+  void app.register(roleplaySystemOneRoutes, { prefix: "/api" });
   void app.register(roleplayUsageRoutes, { prefix: "/api" });
   void app.register(rpgV1Routes, {
     prefix: "/api/rpg/v1",

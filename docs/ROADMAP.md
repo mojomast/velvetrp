@@ -63,6 +63,11 @@ Later: rules/simulation use only relevant mechanics; remote identity -> harness 
 - Reference ingestion remains blocked until Unscheduled mutable authoring is promoted and delivered, unless a separately reviewed immutable-draft-only ingestion path is approved. This dependency does not promote ingestion.
 - Remote identity/tenancy precedes remote multi-user harness semantics, proactive automation, and autonomous work. OIDC PKCE/server sessions are a recommended implementation detail subject to threat-model approval, not a caller-header identity scheme.
 
+### Build later — System One (Jev) decision lanes
+
+- **W0 shipped:** optional System One (Jev) transport lane, strict request/response schemas, a second settings profile (`GET`/`PUT /api/provider/system-one`), an explicit preflight route, the `FEATURE_SYSTEM_ONE` discovery flag, a pure confidence-policy module, and a deterministic fake adapter. The **L5 room-routing lane is wired** behind the flag, setting, and key, with confidence gating to the existing LLM and deterministic paths. It uses a per-participant `noul` battery plus an aggregate best-speaker `choice`, a **shadow mode** for behavior-preserving evaluation, a **lane-scoped budget**, and an **immutable decision-record sidecar**. Usage records under `room_routing_system_one`. Disabled by default. A Jev-vs-DeepSeek [benchmark](system-one-benchmark.md) is committed alongside the lane.
+- **W1–W6 planned:** shadow-mode Director calibration, then confidence-gated lanes (Director, adventure selection, routing, advisory narration verification, reranking, guardrails) with deterministic fallback; the immutable decision-record sidecar and evaluation-harness grading follow the same shadow-evaluate-promote discipline. Design and invariant: [Jev integration](jev-integration.md). No lane may mutate state or become load-bearing.
+
 ### Approved Build Unscheduled
 
 - **Unscheduled:** append-only multiclass levels/prerequisites; mutable logical unpinned pack authoring that creates immutable revisions while exact pins/history never mutate; zones/range bands before full grids; explicit boss phase state; autonomous parties with revocable scoped grants. Promotion gates, full milestone fields, and `vNext`-only-at-promotion policy are defined in the detailed plan.

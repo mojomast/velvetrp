@@ -3097,3 +3097,71 @@ export function updateProvider(patch: {
     body: JSON.stringify(patch),
   });
 }
+
+export type SystemOneLane =
+  | "director-selection"
+  | "adventure-selection"
+  | "narration-verification"
+  | "memory-reranking"
+  | "speaker-routing"
+  | "guardrails"
+  | "cost-router";
+
+export interface SystemOneConfidenceThresholds {
+  actionThreshold: number;
+  reviewThreshold: number;
+}
+
+export interface SystemOneSettings {
+  id: "system-one";
+  providerType: "system-one";
+  enabled: boolean;
+  shadow: boolean;
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
+  requestTimeoutSeconds: number;
+  pricing: { promptPerMillion: number | null; completionPerMillion: number | null };
+  budget: { maxTotalTokens: number; maxEstimatedCostUsd: number | null; maxRequestsPerWindow: number; rateWindowMs: number };
+  confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  updatedAt: string;
+}
+
+export interface SystemOnePreflightResult {
+  enabled: boolean;
+  configured: boolean;
+  model: string;
+  ok: boolean;
+  latencyMs?: number;
+  requestId?: string | null;
+  failure?: { kind: string; status: number | null; retryable: boolean; detail: string };
+}
+
+export function getSystemOne(): Promise<SystemOneSettings> {
+  return request<SystemOneSettings>("/provider/system-one");
+}
+
+export function updateSystemOne(patch: {
+  enabled?: boolean;
+  shadow?: boolean;
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  requestTimeoutSeconds?: number;
+  pricing?: Partial<SystemOneSettings["pricing"]>;
+  budget?: Partial<SystemOneSettings["budget"]>;
+  confidencePolicy?: Partial<Record<SystemOneLane, Partial<SystemOneConfidenceThresholds>>>;
+}): Promise<SystemOneSettings> {
+  return request<SystemOneSettings>("/provider/system-one", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function preflightSystemOne(): Promise<SystemOnePreflightResult> {
+  return request<SystemOnePreflightResult>("/provider/system-one/preflight", {
+    method: "POST",
+    cache: "no-store",
+    body: "{}",
+  });
+}

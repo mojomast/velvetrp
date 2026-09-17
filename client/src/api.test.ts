@@ -864,7 +864,7 @@ describe("HTTP runtime contracts", () => {
   });
 
   it("runtime-validates RPG flags and the exact campaign list response", async () => {
-    const flags = { campaign: true, mechanics: false, combat: false, studio: false, remoteAuthentication: false };
+    const flags = { campaign: true, mechanics: false, combat: false, studio: false, remoteAuthentication: false, systemOne: false };
     const campaign = { id: "campaign-one", name: "Road", activeTimelineId: "timeline-one", ownerPrincipalId: "local-owner", actorRole: "owner", createdAt: "2030-01-01T00:00:00.000Z", updatedAt: "2030-01-02T00:00:00.000Z" };
     vi.stubGlobal("fetch", vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(flags), { status: 200 }))

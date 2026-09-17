@@ -366,6 +366,78 @@ export interface ProviderPricing {
   completionPerMillion: number | null;
 }
 
+/** The fixed set of Jev/System One decision lanes that may carry confidence thresholds. */
+export const SYSTEM_ONE_LANES = [
+  "director-selection",
+  "adventure-selection",
+  "narration-verification",
+  "memory-reranking",
+  "speaker-routing",
+  "guardrails",
+  "cost-router",
+] as const;
+
+export type SystemOneLane = (typeof SYSTEM_ONE_LANES)[number];
+
+/** Confidence bands that convert a Jev answer into act/confirm/fallback. */
+export interface SystemOneConfidenceThresholds {
+  /** Minimum confidence (or noul probability) to act on the selection. */
+  actionThreshold: number;
+  /** Minimum confidence to hold for review; below this the deterministic fallback runs. */
+  reviewThreshold: number;
+}
+
+export interface SystemOneBudgetSettings {
+  maxTotalTokens: number;
+  maxEstimatedCostUsd: number | null;
+  maxRequestsPerWindow: number;
+  rateWindowMs: number;
+}
+
+/** The independent System One provider profile; never shares the OpenAI-compatible row. */
+export interface SystemOneSettings {
+  id: "system-one";
+  providerType: "system-one";
+  enabled: boolean;
+  /** When true, decisions are recorded for comparison but never change behavior. */
+  shadow: boolean;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  requestTimeoutSeconds: number;
+  pricing: ProviderPricing;
+  budget: SystemOneBudgetSettings;
+  confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  updatedAt: string;
+}
+
+export interface PublicSystemOneSettings {
+  id: "system-one";
+  providerType: "system-one";
+  enabled: boolean;
+  shadow: boolean;
+  baseUrl: string;
+  model: string;
+  hasApiKey: boolean;
+  requestTimeoutSeconds: number;
+  pricing: ProviderPricing;
+  budget: SystemOneBudgetSettings;
+  confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  updatedAt: string;
+}
+
+export interface UpdateSystemOneInput {
+  enabled?: boolean;
+  shadow?: boolean;
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  requestTimeoutSeconds?: number;
+  pricing?: Partial<ProviderPricing>;
+  budget?: Partial<SystemOneBudgetSettings>;
+  confidencePolicy?: Partial<Record<SystemOneLane, Partial<SystemOneConfidenceThresholds>>>;
+}
+
 export interface UsageSummary {
   calls: number;
   promptTokens: number;

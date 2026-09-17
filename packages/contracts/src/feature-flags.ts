@@ -11,6 +11,7 @@ export const rpgFeatureFlagsSchema = z.object({
   combat: z.boolean(),
   studio: z.boolean(),
   remoteAuthentication: z.boolean(),
+  systemOne: z.boolean(),
 });
 
 export type RoleplayFeatureFlags = z.infer<typeof roleplayFeatureFlagsSchema>;

@@ -14,7 +14,13 @@ import type {
   Session,
   TokenUsage,
 } from "./types.js";
-import { buildProviderHeaders, canUseProvider } from "./provider/providerTransport.js";
+import { buildProviderHeaders, canUseProvider, canUseSystemOne } from "./provider/providerTransport.js";
+import type { SystemOneCaller } from "./provider/systemOneCompletion.js";
+import { buildRoomRoutingQuestions, composeRoomRoutingSelection } from "./agent/systemOneRoomRouting.js";
+import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agent/systemOnePolicy.js";
+import { estimateTurnTokens } from "./agent/turnBudget.js";
+import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
+import type { SystemOneConfidenceThresholds, SystemOneSettings } from "./types.js";
 export { isLoopbackHost, validateProviderBaseUrl } from "./provider/providerTransport.js";
 
 function stubReply(userContent: string, memoryCount: number, loreCount: number): string {
@@ -83,6 +89,126 @@ export interface RoomSpeakerSelection {
   speakerIds: string[];
   source: "model" | "fallback";
   usage: TokenUsage | null;
+  /** Internal usage discriminator; never serialized to HTTP. */
+  kind?: "llm" | "system-one";
+  /** Set when a System One decision was made (shadow or active) so the route can record it. */
+  systemOneDecision?: SystemOneRoomRoutingDecision;
+}
+
+/** An audit payload for one System One room-routing dispatch, recorded immutably by the route. */
+export interface SystemOneRoomRoutingDecision {
+  lane: "speaker-routing";
+  provider: string;
+  model: string;
+  confidencePolicyVersion: string;
+  state: unknown;
+  questions: unknown;
+  answers: unknown;
+  selection: unknown;
+  confidenceBand: SystemOneBand;
+  fallbackUsed: boolean;
+  shadow: boolean;
+  usage: { inputTokens: number; outputTokens: number } | null;
+  latencyMs: number;
+}
+
+/** Optional System One lane for room routing; absent when the flag, setting, or key is off. */
+export interface RoomRoutingSystemOne {
+  settings: SystemOneSettings;
+  caller: SystemOneCaller;
+  /** Defaults to `settings.confidencePolicy["speaker-routing"]`. */
+  thresholds?: SystemOneConfidenceThresholds;
+}
+
+type SystemOneRoomRoutingOutcome =
+  | { kind: "selection"; selection: RoomSpeakerSelection }
+  | { kind: "shadow"; decision: SystemOneRoomRoutingDecision }
+  | null;
+
+/**
+ * Attempts the System One routing lane. Returns `null` — never throws — when the
+ * lane is unavailable, over budget, low-confidence, or fails, so the caller always
+ * retains the LLM and deterministic paths. In shadow mode it records the decision
+ * but reports `kind: "shadow"` so behavior is unchanged.
+ */
+async function trySystemOneRoomRouting(input: {
+  systemOne: RoomRoutingSystemOne | undefined;
+  participants: Character[];
+  history: Message[];
+  userContent: string;
+  maxSpeakers: number;
+}): Promise<SystemOneRoomRoutingOutcome> {
+  const { systemOne, participants, history, userContent, maxSpeakers } = input;
+  if (!systemOne || !systemOne.settings.enabled || !canUseSystemOne(systemOne.settings)) return null;
+  const projection = participants.map((participant) => ({ id: participant.id, name: participant.name, archetype: participant.archetype }));
+  const thresholds = systemOne.thresholds ?? systemOne.settings.confidencePolicy["speaker-routing"];
+  const names = new Map(participants.map((participant) => [participant.id, participant.name]));
+  const recent = history.slice(-8).map((message) => {
+    const speaker = message.role === "character" ? names.get(message.speakerCharacterId ?? "") ?? "Character" : "User";
+    return `${speaker}: ${message.content.slice(0, 300)}`;
+  }).join("\n");
+  const questions = buildRoomRoutingQuestions(projection, userContent, recent);
+  const state = {
+    user_message: userContent,
+    recent_history: recent,
+    max_speakers: maxSpeakers,
+    participants: projection,
+  };
+  const reservation = systemOneLaneBudgets.reserve("speaker-routing", systemOne.settings.budget, {
+    estimatedInputTokens: estimateTurnTokens(JSON.stringify({ state, questions })),
+    maxOutputTokens: 0,
+    pricing: {
+      inputPerMillionUsd: systemOne.settings.pricing.promptPerMillion ?? 0,
+      outputPerMillionUsd: systemOne.settings.pricing.completionPerMillion ?? 0,
+    },
+    nowMs: Date.now(),
+  });
+  if (!reservation.allowed) return null;
+  const startedAt = performance.now();
+  try {
+    const result = await systemOne.caller({ settings: systemOne.settings, state, questions });
+    const usage = result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null;
+    systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 });
+    const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
+    const decision: SystemOneRoomRoutingDecision = {
+      lane: "speaker-routing",
+      provider: "typesafe",
+      model: result.model.responseModel ?? systemOne.settings.model,
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state,
+      questions,
+      answers: result.answers,
+      selection: { method: composed.method, speakerIds: composed.speakerIds, topSignal: composed.topSignal },
+      confidenceBand: composed.band,
+      fallbackUsed: systemOne.settings.shadow || composed.band !== "act",
+      shadow: systemOne.settings.shadow,
+      usage,
+      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+    };
+    if (systemOne.settings.shadow) return { kind: "shadow", decision };
+    if (composed.band !== "act" || composed.speakerIds.length === 0) return { kind: "shadow", decision };
+    return {
+      kind: "selection",
+      selection: {
+        speakerIds: ensureGroupSpeakers(composed.speakerIds, participants, userContent, maxSpeakers),
+        source: "model",
+        kind: "system-one",
+        systemOneDecision: decision,
+        usage: usage
+          ? {
+              promptTokens: usage.inputTokens,
+              completionTokens: usage.outputTokens,
+              totalTokens: usage.inputTokens + usage.outputTokens,
+              source: "provider",
+              model: result.model.responseModel ?? systemOne.settings.model,
+            }
+          : null,
+      },
+    };
+  } catch {
+    systemOneLaneBudgets.release("speaker-routing");
+    return null;
+  }
 }
 
 export async function synthesizeSceneState(input: {
@@ -133,7 +259,7 @@ function requestedGroupSize(content: string, maxSpeakers: number): number {
   return 0;
 }
 
-function ensureGroupSpeakers(speakerIds: string[], participants: Character[], content: string, maxSpeakers: number): string[] {
+export function ensureGroupSpeakers(speakerIds: string[], participants: Character[], content: string, maxSpeakers: number): string[] {
   const result = [...speakerIds];
   const minimum = requestedGroupSize(content, maxSpeakers);
   if (minimum > 0) {
@@ -163,10 +289,19 @@ export async function selectRoomSpeakers(input: {
   provider: ProviderSettings;
   harness: HarnessSettings;
   preset: PromptPreset;
+  /** Optional toggleable System One routing lane; absent leaves routing unchanged. */
+  systemOne?: RoomRoutingSystemOne | undefined;
 }): Promise<RoomSpeakerSelection> {
   const { participants, primaryCharacterId, history, userContent, maxSpeakers, provider, harness, preset } = input;
   const fallback = fallbackRoomSpeakers(participants, primaryCharacterId, userContent, maxSpeakers);
-  if (participants.length === 1 || !canUseProvider(provider)) return { speakerIds: fallback, source: "fallback", usage: null };
+  const withDecision = (selection: RoomSpeakerSelection, decision: SystemOneRoomRoutingDecision | undefined): RoomSpeakerSelection =>
+    decision ? { ...selection, systemOneDecision: decision } : selection;
+  const fallbackSelection: RoomSpeakerSelection = { speakerIds: fallback, source: "fallback", usage: null };
+  if (participants.length === 1) return fallbackSelection;
+  const outcome = await trySystemOneRoomRouting({ systemOne: input.systemOne, participants, history, userContent, maxSpeakers });
+  if (outcome?.kind === "selection") return outcome.selection;
+  const shadowDecision = outcome?.kind === "shadow" ? outcome.decision : undefined;
+  if (!canUseProvider(provider)) return withDecision(fallbackSelection, shadowDecision);
 
   const participantByToken = new Map<string, string>();
   for (const participant of participants) {
@@ -196,7 +331,9 @@ export async function selectRoomSpeakers(input: {
     ...buildRequestBody(provider, harness, preset, messages, false),
     stream: false,
     temperature: 0,
-    max_tokens: Math.min(provider.samplers.maxTokens ?? 96, 96),
+    // 96 tokens was too small for reasoning-style models, which returned no JSON array
+    // and forced a deterministic fallback; 512 leaves headroom while staying bounded.
+    max_tokens: Math.min(provider.samplers.maxTokens ?? 512, 512),
   };
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -219,7 +356,7 @@ export async function selectRoomSpeakers(input: {
     return id ? [id] : [];
   }))], participants, userContent, maxSpeakers);
   if (speakerIds.length === 0) throw new Error("room routing selected no valid participants");
-  return { speakerIds, source: "model", usage: normalizeUsage(payload as StreamChunk, provider.model) };
+  return withDecision({ speakerIds, source: "model", kind: "llm", usage: normalizeUsage(payload as StreamChunk, provider.model) }, shadowDecision);
 }
 
 export function buildRequestBody(
