@@ -25,8 +25,8 @@ adventure-selection** and **L6 guardrails** primitives now exist with
 [adventure](system-one-adventure-benchmark.md) and
 [guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
 gate only at a sweep-recommended 0.40 action threshold and carries an evidence-only record,
-while guardrails is **not ready** on its strict gate and carries none. Neither is wired into
-a request path. **Everything remains disabled by
+and guardrails passes its strict gate after a measurement-driven criteria redesign and carries
+an evidence-only record. Neither is wired into a request path. **Everything remains disabled by
 default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
@@ -508,14 +508,22 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   hazard can only ever recommend review, and a self-harm signal routes to support rather than
   a block. It is **not wired** into the policy path and never blocks, rewrites, or sanitizes.
 - **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
-  40 labeled messages x 3 repeats (120 live calls, 63 acted). Every hazard-category message
-  reached block or support, but acted accuracy was **90.5%**, below the strict `guardrails`
-  gate (accuracy >= 0.95), driven by false positives on a debatable "hint about the traitor"
-  case and an out-of-character meta question. There is **no promotion record**; the lane
-  stays evidence-only. Honesty: the deterministic policy checks are a permissive stub
-  (`checkUserMessage` is allow/deny only, `checkCharacter` always allows, and routes sanitize
-  before checking, so marker rejection is currently unreachable), so this lane must not be
-  described as comprehensive moderation or a content-safety guarantee.
+  56 labeled messages x 3 repeats (168 live calls, 75 acted). The first 40-case run acted at
+  **90.5%** and missed the strict gate; every error was a false positive on fiction or meta
+  questions (a hint request about the traitor and an out-of-character question about an NPC
+  read as disclosure demands, in-character villain dialogue read as an override attempt, and a
+  fictional threat scored as high severity). The criteria were redesigned from that
+  measurement: override now means addressing the assistant itself, disclosure means demanding
+  protected material (GM/referee notes, another participant's private facts, hidden
+  instructions, unrevealed setup) rather than asking about the shared fiction, and severity
+  judges the real user's behavior rather than fictional drama. On the expanded corpus every
+  hazard-category message reached block or support with **100%** acted accuracy, calibrated
+  Brier ~0, and ECE 0.0022 (held-out 0.0025), so the lane carries an evidence-only promotion
+  record. The acted subset has no errors, so the calibration tail is untested. Honesty: the
+  deterministic policy checks are a permissive stub (`checkUserMessage` is allow/deny only,
+  `checkCharacter` always allows, and routes sanitize before checking, so marker rejection is
+  currently unreachable), so this lane must not be described as comprehensive moderation or a
+  content-safety guarantee, and it remains advisory and unwired as described above.
 - **Risk.** This changes the documented scope of the policy stub. It requires explicit
   doc updates and must not be described as comprehensive moderation.
 

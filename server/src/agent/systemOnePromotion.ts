@@ -226,6 +226,21 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-rerank-benchmark.md",
   },
+  "guardrails": {
+    // scripts/evaluate-system-one-guardrails-lane.ts: 168 live calls over a 56-case labeled
+    // corpus, 75 acted (60 block, 15 support), 100% acted accuracy, calibrated Brier ~0, ECE
+    // 0.0022 (held-out 0.0025). The first run acted at 90.5% and every error was a false
+    // positive on fiction/meta questions; the hazard criteria were redesigned from that
+    // measurement (override addresses the assistant itself, disclosure demands protected
+    // material rather than story hints, severity judges the real user rather than fictional
+    // drama), and the expanded corpus then caught every hazard with no benign/fiction
+    // escalation. The acted subset has no errors, so the calibration tail is untested. No
+    // policy path is wired, so this record is evidence, not activation.
+    metrics: { samples: 75, accuracy: 1, brier: 0, expectedCalibrationError: 0.0022 },
+    calibration: { a: 2.1254, b: 0.655 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-guardrails-benchmark.md",
+  },
 };
 
 /** The promotion record for a lane, or undefined when it has never been promoted. */

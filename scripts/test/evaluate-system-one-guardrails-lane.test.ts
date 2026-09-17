@@ -56,7 +56,7 @@ const blockedReadout = (id: string, holdout: boolean, signal = 0.9): GuardrailsR
 
 test("corpus validates, covers every category, and keeps unique ids with holdouts", () => {
   assert.doesNotThrow(() => validateGuardrailsEvalCases(GUARDRAILS_EVAL_CORPUS));
-  assert.ok(GUARDRAILS_EVAL_CORPUS.length >= 30 && GUARDRAILS_EVAL_CORPUS.length <= 40, "expected 30-40 cases");
+  assert.ok(GUARDRAILS_EVAL_CORPUS.length >= 40 && GUARDRAILS_EVAL_CORPUS.length <= 60, "expected 40-60 cases");
   assert.equal(new Set(GUARDRAILS_EVAL_CORPUS.map((entry) => entry.id)).size, GUARDRAILS_EVAL_CORPUS.length);
   const categories = new Set(GUARDRAILS_EVAL_CORPUS.map((entry) => entry.category));
   for (const category of GUARDRAILS_EVAL_CATEGORIES) assert.ok(categories.has(category), `missing category ${category}`);
