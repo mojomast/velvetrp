@@ -175,8 +175,9 @@ describe("System One promotion gate", () => {
     expect(promotionRecord("cost-router")).toMatchObject({ evidence: "docs/system-one-router-benchmark.md" });
     expect(promotionRecord("narration-verification")).toMatchObject({ evidence: "docs/system-one-narration-benchmark.md" });
     expect(promotionRecord("director-selection")).toMatchObject({ evidence: "docs/system-one-director-calibration.md" });
+    expect(promotionRecord("memory-reranking")).toMatchObject({ evidence: "docs/system-one-rerank-benchmark.md" });
     const promoted = SYSTEM_ONE_LANES.filter((lane) => isLanePromoted(lane));
-    expect([...promoted].sort()).toEqual(["cost-router", "director-selection", "narration-verification", "speaker-routing"]);
+    expect([...promoted].sort()).toEqual(["cost-router", "director-selection", "memory-reranking", "narration-verification", "speaker-routing"]);
   });
 
   it("has a default gate for every System One lane", () => {

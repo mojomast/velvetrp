@@ -1,0 +1,3949 @@
+{
+  "model": "jev-1.13.0",
+  "repeats": 3,
+  "thresholds": {
+    "actionThreshold": 0.75,
+    "reviewThreshold": 0.5
+  },
+  "k": 3,
+  "plans": [
+    {
+      "id": "p3-harbor-task-offered-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-task-accepted-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-keeper-statement-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "expected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-negotiation-failed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "expected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-saltglass-alternate-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-clue-timing-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "expected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-reward-unclaimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-reward-claimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-location-past-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-location-current-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-past-v1",
+        "current:beacon"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-finale-callback-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "p3-harbor-unsupported-retreat-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "promise-old-lantern-v1",
+      "category": "promise",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "promise:lantern",
+        "holdout:passage",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [
+        "outcome:lantern"
+      ]
+    },
+    {
+      "id": "outcome-lantern-v1",
+      "category": "outcome",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "current-beacon-update-v1",
+      "category": "current-update",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1",
+        "past:beacon"
+      ],
+      "expected": [
+        "current:beacon"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "private-other-actor-v1",
+      "category": "private-match",
+      "holdout": false,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [],
+      "forbidden": [
+        "private:bryn"
+      ]
+    },
+    {
+      "id": "wrong-actor-v1",
+      "category": "wrong-actor",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [],
+      "forbidden": [
+        "private:bryn"
+      ]
+    },
+    {
+      "id": "wrong-timeline-v1",
+      "category": "wrong-timeline",
+      "holdout": false,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [],
+      "forbidden": [
+        "timeline:alternate"
+      ]
+    },
+    {
+      "id": "false-premise-v1",
+      "category": "false-premise",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "no-match-v1",
+      "category": "no-match",
+      "holdout": false,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [],
+      "forbidden": []
+    },
+    {
+      "id": "unicode-v1",
+      "category": "unicode",
+      "holdout": false,
+      "candidateCount": 1,
+      "baseline": [
+        "unicode:cafe"
+      ],
+      "expected": [
+        "unicode:cafe"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "retry-v1",
+      "category": "retry",
+      "holdout": false,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [
+        "retry:compass"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "oversize-v1",
+      "category": "oversize",
+      "holdout": false,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [],
+      "forbidden": [
+        "oversize:meteor"
+      ]
+    },
+    {
+      "id": "packing-pressure-v1",
+      "category": "packing",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "expected": [
+        "packing:00"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "quest-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "past:beacon",
+        "current:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "expected": [
+        "quest:hydration"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "travel-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "candidateCount": 3,
+      "baseline": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "expected": [
+        "travel:hydration"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": false,
+      "candidateCount": 8,
+      "baseline": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage",
+        "past:beacon"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "pronoun-baseline-miss-v1",
+      "category": "pronoun",
+      "holdout": false,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "holdout-promise-negation-v1",
+      "category": "promise",
+      "holdout": true,
+      "candidateCount": 2,
+      "baseline": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "expected": [
+        "holdout:passage"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "holdout-current-reversal-v1",
+      "category": "current-update",
+      "holdout": true,
+      "candidateCount": 8,
+      "baseline": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "holdout:tide-current"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "holdout-private-name-v1",
+      "category": "private-match",
+      "holdout": true,
+      "candidateCount": 0,
+      "baseline": [],
+      "expected": [],
+      "forbidden": [
+        "holdout:bryn-private"
+      ]
+    },
+    {
+      "id": "holdout-alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": true,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": []
+    },
+    {
+      "id": "holdout-pronoun-baseline-miss-v1",
+      "category": "pronoun",
+      "holdout": true,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": []
+    }
+  ],
+  "failures": [],
+  "samples": [
+    {
+      "id": "p3-harbor-task-offered-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1343,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.83,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 362
+    },
+    {
+      "id": "p3-harbor-task-offered-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1343,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.83,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 126
+    },
+    {
+      "id": "p3-harbor-task-offered-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-offered-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1343,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.83,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 152
+    },
+    {
+      "id": "p3-harbor-task-accepted-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1344,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.67,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 130
+    },
+    {
+      "id": "p3-harbor-task-accepted-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1344,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.66,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 80
+    },
+    {
+      "id": "p3-harbor-task-accepted-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "p2:p3-harbor-task-offered-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1344,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.69,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 194
+    },
+    {
+      "id": "p3-harbor-keeper-statement-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "holdout:passage",
+        "promise:lantern",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3079,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.81,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 132
+    },
+    {
+      "id": "p3-harbor-keeper-statement-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "holdout:passage",
+        "promise:lantern",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3079,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.79,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 97
+    },
+    {
+      "id": "p3-harbor-keeper-statement-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "holdout:passage",
+        "promise:lantern",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3079,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.8,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 129
+    },
+    {
+      "id": "p3-harbor-negotiation-failed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "fused": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "expected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1046,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.56,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 172
+    },
+    {
+      "id": "p3-harbor-negotiation-failed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "fused": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "expected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1046,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.53,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 93
+    },
+    {
+      "id": "p3-harbor-negotiation-failed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "fused": [
+        "p2:p3-harbor-negotiation-failed-v1",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82"
+      ],
+      "expected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-negotiation-failed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1046,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.51,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 180
+    },
+    {
+      "id": "p3-harbor-saltglass-alternate-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 631,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.68,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 109
+    },
+    {
+      "id": "p3-harbor-saltglass-alternate-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 631,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.66,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 98
+    },
+    {
+      "id": "p3-harbor-saltglass-alternate-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-saltglass-alternate-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 631,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.67,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 81
+    },
+    {
+      "id": "p3-harbor-clue-timing-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "fused": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "expected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.38,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 110
+    },
+    {
+      "id": "p3-harbor-clue-timing-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "fused": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "expected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.36,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 153
+    },
+    {
+      "id": "p3-harbor-clue-timing-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "fused": [
+        "p2:p3-harbor-clue-timing-v1",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667"
+      ],
+      "expected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-clue-timing-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.34,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 92
+    },
+    {
+      "id": "p3-harbor-reward-unclaimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1363,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.75,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 141
+    },
+    {
+      "id": "p3-harbor-reward-unclaimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1363,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.75,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 88
+    },
+    {
+      "id": "p3-harbor-reward-unclaimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-unclaimed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1363,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.76,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 116
+    },
+    {
+      "id": "p3-harbor-reward-claimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1361,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.8,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 68
+    },
+    {
+      "id": "p3-harbor-reward-claimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1361,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.81,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 87
+    },
+    {
+      "id": "p3-harbor-reward-claimed-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-reward-claimed-v1",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-reward-unclaimed-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-reward-claimed-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1361,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.82,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 66
+    },
+    {
+      "id": "p3-harbor-location-past-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 880,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.8,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 64
+    },
+    {
+      "id": "p3-harbor-location-past-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 880,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.82,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 110
+    },
+    {
+      "id": "p3-harbor-location-past-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 880,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.81,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 171
+    },
+    {
+      "id": "p3-harbor-location-current-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-past-v1",
+        "current:beacon"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "current:beacon",
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3431,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.92,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 380
+    },
+    {
+      "id": "p3-harbor-location-current-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-past-v1",
+        "current:beacon"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "current:beacon",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3431,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.92,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 88
+    },
+    {
+      "id": "p3-harbor-location-current-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-past-v1",
+        "current:beacon"
+      ],
+      "fused": [
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "current:beacon",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-location-past-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3431,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.92,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 112
+    },
+    {
+      "id": "p3-harbor-finale-callback-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 589,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.5,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 116
+    },
+    {
+      "id": "p3-harbor-finale-callback-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 589,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.51,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 161
+    },
+    {
+      "id": "p3-harbor-finale-callback-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 1,
+      "baseline": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "fused": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "expected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-finale-callback-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 589,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.49,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 89
+    },
+    {
+      "id": "p3-harbor-unsupported-retreat-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "fused": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1050,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.42,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 100
+    },
+    {
+      "id": "p3-harbor-unsupported-retreat-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "fused": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1050,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.45,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 221
+    },
+    {
+      "id": "p3-harbor-unsupported-retreat-v1",
+      "category": "p2-observation",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "fused": [
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1050,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.46,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 76
+    },
+    {
+      "id": "promise-old-lantern-v1",
+      "category": "promise",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "promise:lantern",
+        "holdout:passage",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "holdout:passage",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [
+        "outcome:lantern"
+      ],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3112,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.96,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 83
+    },
+    {
+      "id": "promise-old-lantern-v1",
+      "category": "promise",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "promise:lantern",
+        "holdout:passage",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "holdout:passage",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [
+        "outcome:lantern"
+      ],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3112,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.95,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 112
+    },
+    {
+      "id": "promise-old-lantern-v1",
+      "category": "promise",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "promise:lantern",
+        "holdout:passage",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "p2:p3-harbor-keeper-statement-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "holdout:passage",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [
+        "outcome:lantern"
+      ],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3112,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.95,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 101
+    },
+    {
+      "id": "outcome-lantern-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1319,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.87,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 139
+    },
+    {
+      "id": "outcome-lantern-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1319,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.91,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 90
+    },
+    {
+      "id": "outcome-lantern-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1319,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.92,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 348
+    },
+    {
+      "id": "current-beacon-update-v1",
+      "category": "current-update",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1",
+        "past:beacon"
+      ],
+      "fused": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "past:beacon",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "current:beacon"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "current:beacon"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3423,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.94,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 155
+    },
+    {
+      "id": "current-beacon-update-v1",
+      "category": "current-update",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1",
+        "past:beacon"
+      ],
+      "fused": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "past:beacon",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "current:beacon"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "current:beacon"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3423,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.94,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 119
+    },
+    {
+      "id": "current-beacon-update-v1",
+      "category": "current-update",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1",
+        "past:beacon"
+      ],
+      "fused": [
+        "current:beacon",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "past:beacon",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "expected": [
+        "current:beacon"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "current:beacon"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3423,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.94,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 234
+    },
+    {
+      "id": "wrong-actor-v1",
+      "category": "wrong-actor",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [],
+      "forbidden": [
+        "private:bryn"
+      ],
+      "availableExpected": [],
+      "answerable": false,
+      "supported": true,
+      "bytes": 1031,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": null,
+      "bestRankAfter": null,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.06,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 63
+    },
+    {
+      "id": "wrong-actor-v1",
+      "category": "wrong-actor",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [],
+      "forbidden": [
+        "private:bryn"
+      ],
+      "availableExpected": [],
+      "answerable": false,
+      "supported": true,
+      "bytes": 1031,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": null,
+      "bestRankAfter": null,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.06,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 103
+    },
+    {
+      "id": "wrong-actor-v1",
+      "category": "wrong-actor",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [],
+      "forbidden": [
+        "private:bryn"
+      ],
+      "availableExpected": [],
+      "answerable": false,
+      "supported": true,
+      "bytes": 1031,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": null,
+      "bestRankAfter": null,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.06,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 87
+    },
+    {
+      "id": "false-premise-v1",
+      "category": "false-premise",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1323,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.04,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 150
+    },
+    {
+      "id": "false-premise-v1",
+      "category": "false-premise",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1323,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.03,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 116
+    },
+    {
+      "id": "false-premise-v1",
+      "category": "false-premise",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "fused": [
+        "promise:lantern",
+        "outcome:lantern",
+        "p2:p3-harbor-location-past-v1"
+      ],
+      "expected": [
+        "outcome:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "outcome:lantern"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1323,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 1,
+      "bestRankAfter": 1,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.03,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 141
+    },
+    {
+      "id": "unicode-v1",
+      "category": "unicode",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 1,
+      "baseline": [
+        "unicode:cafe"
+      ],
+      "fused": [
+        "unicode:cafe"
+      ],
+      "expected": [
+        "unicode:cafe"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "unicode:cafe"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 590,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.09,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 79
+    },
+    {
+      "id": "unicode-v1",
+      "category": "unicode",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 1,
+      "baseline": [
+        "unicode:cafe"
+      ],
+      "fused": [
+        "unicode:cafe"
+      ],
+      "expected": [
+        "unicode:cafe"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "unicode:cafe"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 590,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.08,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 73
+    },
+    {
+      "id": "unicode-v1",
+      "category": "unicode",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 1,
+      "baseline": [
+        "unicode:cafe"
+      ],
+      "fused": [
+        "unicode:cafe"
+      ],
+      "expected": [
+        "unicode:cafe"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "unicode:cafe"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 590,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.08,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 82
+    },
+    {
+      "id": "retry-v1",
+      "category": "retry",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [
+        "retry:compass"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "retry:compass"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.25,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 121
+    },
+    {
+      "id": "retry-v1",
+      "category": "retry",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [
+        "retry:compass"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "retry:compass"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.26,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 81
+    },
+    {
+      "id": "retry-v1",
+      "category": "retry",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "fused": [
+        "retry:compass",
+        "unknown:44444f768f6375b5b472b6b83040de8503e2441c2cf0f166f59d8bebadff2f93"
+      ],
+      "expected": [
+        "retry:compass"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "retry:compass"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1018,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.25,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 118
+    },
+    {
+      "id": "packing-pressure-v1",
+      "category": "packing",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "fused": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "expected": [
+        "packing:00"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "packing:00"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 4990,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.38,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 144
+    },
+    {
+      "id": "packing-pressure-v1",
+      "category": "packing",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "fused": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "expected": [
+        "packing:00"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "packing:00"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 4990,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.37,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 112
+    },
+    {
+      "id": "packing-pressure-v1",
+      "category": "packing",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "fused": [
+        "packing:00",
+        "packing:01",
+        "packing:02",
+        "packing:03",
+        "packing:04",
+        "packing:05",
+        "packing:06",
+        "packing:07"
+      ],
+      "expected": [
+        "packing:00"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "packing:00"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 4990,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.41,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 121
+    },
+    {
+      "id": "quest-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "past:beacon",
+        "current:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "fused": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "current:beacon",
+        "past:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "expected": [
+        "quest:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "quest:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3087,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.52,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 71
+    },
+    {
+      "id": "quest-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "past:beacon",
+        "current:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "fused": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "current:beacon",
+        "past:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "expected": [
+        "quest:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "quest:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3087,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.54,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 150
+    },
+    {
+      "id": "quest-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "past:beacon",
+        "current:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "fused": [
+        "quest:hydration",
+        "unknown:cd10fa446614beaec74d3e41604646c09f719f2bc47218ad9fb63d7448a01aef",
+        "unknown:3263045cdff40cfe9893867cfa4310dada30001f0317af18363055b2fe523a14",
+        "p2:p3-harbor-saltglass-alternate-v1",
+        "current:beacon",
+        "past:beacon",
+        "holdout:tide-past",
+        "holdout:tide-current"
+      ],
+      "expected": [
+        "quest:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "quest:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3087,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.53,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 105
+    },
+    {
+      "id": "travel-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 3,
+      "baseline": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "fused": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "expected": [
+        "travel:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "travel:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1480,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.66,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 61
+    },
+    {
+      "id": "travel-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 3,
+      "baseline": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "fused": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "expected": [
+        "travel:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "travel:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1480,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.62,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 57
+    },
+    {
+      "id": "travel-hydration-v1",
+      "category": "outcome",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 3,
+      "baseline": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "fused": [
+        "travel:hydration",
+        "unknown:df0d9d1c72eeb536c77419cfd8fc35f11d7c59b7168a6e026a0c630335768e4b",
+        "quest:hydration"
+      ],
+      "expected": [
+        "travel:hydration"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "travel:hydration"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 1480,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.61,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 91
+    },
+    {
+      "id": "alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": false,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage",
+        "past:beacon"
+      ],
+      "fused": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "past:beacon",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3017,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 5,
+      "bestRankAfter": 3,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.4,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 91
+    },
+    {
+      "id": "alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": false,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage",
+        "past:beacon"
+      ],
+      "fused": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "past:beacon",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3017,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 5,
+      "bestRankAfter": 3,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.41,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 89
+    },
+    {
+      "id": "alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": false,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage",
+        "past:beacon"
+      ],
+      "fused": [
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "past:beacon",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3017,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 5,
+      "bestRankAfter": 3,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.44,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 87
+    },
+    {
+      "id": "holdout-promise-negation-v1",
+      "category": "promise",
+      "holdout": true,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "fused": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "expected": [
+        "holdout:passage"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:passage"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 986,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.53,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 95
+    },
+    {
+      "id": "holdout-promise-negation-v1",
+      "category": "promise",
+      "holdout": true,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "fused": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "expected": [
+        "holdout:passage"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:passage"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 986,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.58,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 69
+    },
+    {
+      "id": "holdout-promise-negation-v1",
+      "category": "promise",
+      "holdout": true,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "fused": [
+        "holdout:passage",
+        "promise:lantern"
+      ],
+      "expected": [
+        "holdout:passage"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:passage"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 986,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.55,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 88
+    },
+    {
+      "id": "holdout-current-reversal-v1",
+      "category": "current-update",
+      "holdout": true,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "holdout:tide-current"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:tide-current"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3451,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.93,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 106
+    },
+    {
+      "id": "holdout-current-reversal-v1",
+      "category": "current-update",
+      "holdout": true,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "holdout:tide-current"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:tide-current"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3451,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.93,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 77
+    },
+    {
+      "id": "holdout-current-reversal-v1",
+      "category": "current-update",
+      "holdout": true,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-unsupported-retreat-v1",
+        "p2:p3-harbor-location-current-v1"
+      ],
+      "fused": [
+        "holdout:tide-current",
+        "holdout:tide-past",
+        "p2:p3-harbor-clue-timing-v1",
+        "p2:p3-harbor-negotiation-failed-v1",
+        "p2:p3-harbor-reward-claimed-v1",
+        "p2:p3-harbor-task-accepted-v1",
+        "p2:p3-harbor-location-current-v1",
+        "p2:p3-harbor-unsupported-retreat-v1"
+      ],
+      "expected": [
+        "holdout:tide-current"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "holdout:tide-current"
+      ],
+      "answerable": true,
+      "supported": true,
+      "bytes": 3451,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.94,
+      "band": "act",
+      "decisive": true,
+      "latencyMs": 86
+    },
+    {
+      "id": "holdout-alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": true,
+      "repeat": 1,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3081,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 6,
+      "bestRankAfter": 4,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.36,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 97
+    },
+    {
+      "id": "holdout-alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": true,
+      "repeat": 2,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3081,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 6,
+      "bestRankAfter": 4,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.38,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 95
+    },
+    {
+      "id": "holdout-alias-baseline-miss-v1",
+      "category": "alias",
+      "holdout": true,
+      "repeat": 3,
+      "candidateCount": 8,
+      "baseline": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "promise:lantern",
+        "holdout:passage"
+      ],
+      "fused": [
+        "p2:p3-harbor-keeper-statement-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a",
+        "unknown:f1d2dca31d75abfa1870b0bbbf37c6a41061be0b95d19789c1e82113cc265b82",
+        "unknown:f8b8c37515b1c9ae5d35f4597391dc561e8d5f4ad14ce762fd314a00a55ca667",
+        "promise:lantern",
+        "unknown:2a2e370a7fdb80e78ed51129c97054f2cf41559e8ae3529dee7af27c72be188c",
+        "unknown:7fdc1cda57b2e1613c42ac7bd5a59f49bbd62787a48b304954b70b818fdc4419",
+        "holdout:passage"
+      ],
+      "expected": [
+        "promise:lantern"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "promise:lantern"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 3081,
+      "hydrated": true,
+      "surfacedBefore": 0,
+      "surfacedAfter": 0,
+      "bestRankBefore": 6,
+      "bestRankAfter": 4,
+      "privacyPass": true,
+      "baselineCorrect": false,
+      "correct": false,
+      "topSignal": 0.4,
+      "band": "fallback",
+      "decisive": false,
+      "latencyMs": 105
+    },
+    {
+      "id": "holdout-pronoun-baseline-miss-v1",
+      "category": "pronoun",
+      "holdout": true,
+      "repeat": 1,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 1028,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.61,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 114
+    },
+    {
+      "id": "holdout-pronoun-baseline-miss-v1",
+      "category": "pronoun",
+      "holdout": true,
+      "repeat": 2,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 1028,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.65,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 96
+    },
+    {
+      "id": "holdout-pronoun-baseline-miss-v1",
+      "category": "pronoun",
+      "holdout": true,
+      "repeat": 3,
+      "candidateCount": 2,
+      "baseline": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "fused": [
+        "p2:p3-harbor-task-accepted-v1",
+        "unknown:0a296e62cee19f9ff6556278de31cb17c8f3d711f012703f4b95f5cbf44e1c6a"
+      ],
+      "expected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "forbidden": [],
+      "availableExpected": [
+        "p2:p3-harbor-task-accepted-v1"
+      ],
+      "answerable": true,
+      "supported": false,
+      "bytes": 1028,
+      "hydrated": true,
+      "surfacedBefore": 1,
+      "surfacedAfter": 1,
+      "bestRankBefore": 0,
+      "bestRankAfter": 0,
+      "privacyPass": true,
+      "baselineCorrect": true,
+      "correct": true,
+      "topSignal": 0.63,
+      "band": "confirm",
+      "decisive": false,
+      "latencyMs": 72
+    }
+  ],
+  "evaluation": {
+    "fitted": {
+      "a": 2.6453933122572555,
+      "b": 1.387440952228999
+    },
+    "calls": 81,
+    "evaluatedCases": 27,
+    "eligibleCalls": 78,
+    "decisiveCalls": 30,
+    "devSamples": 27,
+    "holdoutSamples": 3,
+    "accuracy": 1,
+    "baselinePassRate": 0.9230769230769231,
+    "fusedPassRate": 0.9230769230769231,
+    "improvedCalls": 6,
+    "demotedCalls": 0,
+    "misassertedCalls": 0,
+    "eligibleFailures": 6,
+    "deferredFailures": 6,
+    "actedFailures": 0,
+    "top1BeforeRate": 0.8461538461538461,
+    "top1AfterRate": 0.8461538461538461,
+    "baseline": {
+      "recallAtK": 1,
+      "recallAt8": 1,
+      "mrr": 0.9166666666666666,
+      "ndcg": 0.9275774794642881,
+      "negativePassRate": 1,
+      "packingPassRate": 1,
+      "hydrationPassRate": 1,
+      "maxSerializedBytes": 4990
+    },
+    "fused": {
+      "recallAtK": 1,
+      "recallAt8": 1,
+      "mrr": 0.9166666666666666,
+      "ndcg": 0.9275774794642881,
+      "negativePassRate": 1,
+      "packingPassRate": 1,
+      "hydrationPassRate": 1,
+      "maxSerializedBytes": 4990
+    },
+    "holdout": {
+      "raw": {
+        "brier": 0.004466666666666664,
+        "expectedCalibrationError": 0.06666666666666676
+      },
+      "calibrated": {
+        "brier": 5.720318327482094e-8,
+        "expectedCalibrationError": 0.00023501881003618053
+      }
+    },
+    "all": {
+      "raw": {
+        "brier": 0.022930000000000006,
+        "expectedCalibrationError": 0.1350000000000001
+      },
+      "calibrated": {
+        "brier": 0.00002828354265117931,
+        "expectedCalibrationError": 0.0035554631495529065
+      }
+    },
+    "gate": {
+      "lane": "memory-reranking",
+      "promoted": true,
+      "reasons": [],
+      "gates": {
+        "minSamples": 20,
+        "minAccuracy": 0.85,
+        "maxBrier": 0.15,
+        "maxExpectedCalibrationError": 0.15
+      }
+    }
+  },
+  "proposedRecord": {
+    "metrics": {
+      "samples": 30,
+      "accuracy": 1,
+      "brier": 0,
+      "expectedCalibrationError": 0.0036
+    },
+    "calibration": {
+      "a": 2.6454,
+      "b": 1.3874
+    },
+    "promotedAt": "2026-09-17",
+    "evidence": "docs/system-one-rerank-benchmark.md"
+  }
+}

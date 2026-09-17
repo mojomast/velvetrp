@@ -197,6 +197,20 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-director-calibration.md",
   },
+  "memory-reranking": {
+    // scripts/evaluate-system-one-rerank-lane.ts: 81 live reranks over the Plan 3 recall
+    // oracle, 30 decisive (band act), 100% decisive case accuracy, raw ECE 0.135 -> calibrated
+    // 0.0036. The lane improved the best required-source position on 6 calls and demoted none;
+    // aggregate recall@K/MRR/nDCG are unchanged because every supported-corpus required source
+    // was already inside top-K. Both alias cases stayed a top-K miss and the lane deferred on
+    // every one of them at ~0.4 confidence, so the acted subset has no observed errors and the
+    // calibration tail is untested. No rerank path is wired into recall, so this record is
+    // evidence, not activation.
+    metrics: { samples: 30, accuracy: 1, brier: 0, expectedCalibrationError: 0.0036 },
+    calibration: { a: 2.6454, b: 1.3874 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-rerank-benchmark.md",
+  },
 };
 
 /** The promotion record for a lane, or undefined when it has never been promoted. */

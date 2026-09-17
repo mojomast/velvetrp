@@ -18,7 +18,10 @@ verification** and **L7 cost/quality router** are **wired in shadow (record-only
 now has a [narration](system-one-narration-benchmark.md) and
 [router](system-one-router-benchmark.md) evaluation — after the per-fact prompt redesign
 both pass their gates, carry records, and still have no activation path (the narration
-verifier is advisory and never rewrites prose). **Everything remains disabled by
+verifier is advisory and never rewrites prose). The **L4 memory-reranking primitive** now
+has a [memory-reranking benchmark](system-one-rerank-benchmark.md): it passes its lane
+gate and carries an evidence-only record, and it is not wired into recall. **Everything
+remains disabled by
 default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
@@ -403,7 +406,21 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `DEFAULT_RERANK_WEIGHTS = { deterministic: 0.5, model: 0.5 }`, where `rankScore` is `1`
   for rank 0 and `0` for the worst rank. The lane never drops a candidate, and ties break
   by deterministic rank, so an all-equal model response reproduces the deterministic order
-  exactly. It is **not wired** into recall and has no evaluation or promotion record yet.
+  exactly. It is **not wired** into recall, but it now has a
+  [benchmark](system-one-rerank-benchmark.md) and an evidence-only promotion record.
+- **Evaluation.** [System One memory-reranking benchmark](system-one-rerank-benchmark.md)
+  replays the Plan 3 provider-free recall oracle (33 labelled cases, 27 non-empty
+  shortlists) through the live battery and scores the fused order against the deterministic
+  baseline with the Plan 3 `scoreCases` metrics. Across 81 calls the case-label pass rate
+  was unchanged (92.3%) and recall@K/MRR/nDCG were unchanged, because every supported-case
+  required source was already inside top-K; the lane improved the best required-source
+  position on 6 calls (both alias expected-miss cases, +2 ranks) and demoted none. 30
+  decisive calls (band `act`) scored **100%** case accuracy with raw ECE 0.135 → calibrated
+  **0.0036** (held-out 0.0002), so the gate reports **PROMOTE**. Honesty: the 6 eligible
+  misses are precisely the alias cases where the lane deferred at ~0.4 confidence, so the
+  acted subset has no observed errors and the calibration tail is untested; the lane also
+  cannot recover a source recall never retrieved. The record is evidence, not a
+  stress-tested guarantee.
 - **Composition.** Fuses the model relevance with the existing deterministic rank using
   code-owned weights; the deterministic rank is never replaced outright, and an absent or
   malformed model response reproduces it. The advisory `band` derives from the strongest
