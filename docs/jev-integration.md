@@ -16,9 +16,10 @@ surrounding tooling includes a **Platt calibration module**, a **promotion-gate 
 [before/after benefit report](system-one-benefit-report.md). The **L3 narration/receipt
 verification** and **L7 cost/quality router** are **wired in shadow (record-only)**; each
 now has a [narration](system-one-narration-benchmark.md) and
-[router](system-one-router-benchmark.md) evaluation — the router passes its gate and
-carries a record (no activation path yet), while narration is **not ready** and needs a
-battery redesign. **Everything remains disabled by default.** This document remains
+[router](system-one-router-benchmark.md) evaluation — after the per-fact prompt redesign
+both pass their gates, carry records, and still have no activation path (the narration
+verifier is advisory and never rewrites prose). **Everything remains disabled by
+default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
@@ -348,24 +349,27 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   (`server/src/agent/dmNarration.ts`), and near the assistant-output policy check
   (`server/src/policy.ts`).
 - **Shape.** State carries the candidate narration and the committed receipt facts.
-  Battery: `noul` "does the narration contradict a committed receipt fact?",
-  `noul` "does it invent a mechanic or outcome not present in the facts?",
-  `noul` "does it cross a declared character or content boundary?", and `score`
-  "groundedness".
+  Battery: one coverage `noul` and one contradiction `noul` per committed fact, plus
+  `noul`s "does it invent a mechanic or outcome not present in the facts?" and "does it
+  cross a declared character or content boundary?".
 - **Shape (primitive shipped).** `server/src/agent/systemOneNarration.ts` builds the
-  battery (three contrastive hazard `noul`s plus a groundedness `score`) and composes a
-  `NarrationVerification { band, flags, groundedness, topSignal }` in code. It is
-  **wired in shadow (record-only)** into the Director narration half, producing a
-  `narration-verification` decision record after a scene is produced while narration
-  itself is never altered.
-- **Composition.** Produces an observation only. High contradiction probability flags
-  for deterministic replacement (already implemented for travel) or GM review. It never
-  rewrites narration and never becomes story truth.
+  **per-fact decomposed battery** and composes a `NarrationVerification { band, flags,
+  groundedness, topSignal }` in code, where `groundedness` is the coverage fraction
+  (`reflected facts / total facts`) rather than a model-reported score. This replaced an
+  earlier three-level `groundedness` `score` that over-credited narrations restating a
+  single fact. It is **wired in shadow (record-only)** into the Director narration half,
+  producing a `narration-verification` decision record after a scene is produced while
+  narration itself is never altered.
+- **Composition.** Produces an observation only. `act` requires every committed fact to be
+  reflected with no hazard; any hazard flag falls back; partial coverage defers. High
+  contradiction probability flags for deterministic replacement (already implemented for
+  travel) or GM review. It never rewrites narration and never becomes story truth.
 - **Evaluation.** [System One narration benchmark](system-one-narration-benchmark.md)
-  runs the battery on a labeled corpus with Brier/ECE and the promotion gate; it is
-  **NOT READY** (accuracy 0.727, Brier 0.168, ECE 0.204) because the `groundedness` score
-  under-credits multi-fact grounded narration and over-credits single-fact narration. The
-  battery needs a redesign before a promotion record may be added.
+  runs the battery on a labeled corpus with Brier/ECE and the promotion gate; after the
+  per-fact redesign it **passes** (51 decisive verdicts, 94.1% verdict accuracy, calibrated
+  Brier 0.057, ECE 0.056) with no false accepts, and carries a promotion record. The one
+  miss is a flag-label mismatch on a contradiction the lane still refused to accept, and
+  there is no active narration path, so the record is evidence, not activation.
 - **Risk.** Must not be represented as a content-safety guarantee. See
   [Privacy and safety](#failure-privacy-and-safety).
 

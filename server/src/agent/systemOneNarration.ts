@@ -10,26 +10,44 @@ import { bandForConfidence, type SystemOneBand } from "./systemOnePolicy.js";
  * It never rewrites narration, never mutates game state, and never throws on partial
  * model output. Its band is ADVISORY ONLY and is NOT a safety guarantee: a low hazard
  * signal means the verifier did not detect a hazard, not that the narration is safe.
+ *
+ * The battery decomposes the old three-level `groundedness` judgement into atomic,
+ * per-fact questions:
+ * - one `noul` per committed fact asking whether the narration reflects it (coverage),
+ * - one `noul` per committed fact asking whether the narration contradicts it (hazard),
+ * - one `invents_mechanic` `noul` and one `crosses_boundary` `noul` (aggregate hazards).
+ *
+ * Coverage is then computed deterministically as the fraction of facts the model was
+ * confident the narration reflects, so a narration that restates a single fact no longer
+ * scores as fully grounded.
  */
 
-/** Question key: the narration contradicts or recasts a committed fact. */
+/** Public flag: the narration contradicts or recasts a committed fact. */
 export const NARRATION_CONTRADICTS_RECEIPT_KEY = "contradicts_receipt";
-/** Question key: the narration invents a mechanic, numeric outcome, or state transition. */
+/** Public flag: the narration invents a mechanic, numeric outcome, or state transition. */
 export const NARRATION_INVENTS_MECHANIC_KEY = "invents_mechanic";
-/** Question key: the narration crosses a declared boundary. */
+/** Public flag: the narration crosses a declared boundary. */
 export const NARRATION_CROSSES_BOUNDARY_KEY = "crosses_boundary";
-/** Question key: the score question measuring how well the narration is grounded. */
-export const NARRATION_GROUNDEDNESS_KEY = "groundedness";
 
-/** Ordered groundedness levels; the score ranges over their zero-based indices. */
-export const NARRATION_GROUNDEDNESS_LEVELS = ["ungrounded", "partly grounded", "fully grounded"] as const;
-
-/** The hazard questions that can become flags; each is an independent `noul`. */
-const NARRATION_HAZARD_KEYS = [
-  NARRATION_CONTRADICTS_RECEIPT_KEY,
+/** The aggregate hazard questions that are not tied to a single committed fact. */
+const NARRATION_GLOBAL_HAZARD_KEYS = [
   NARRATION_INVENTS_MECHANIC_KEY,
   NARRATION_CROSSES_BOUNDARY_KEY,
 ] as const;
+
+/** Question-key prefixes for the per-fact coverage and contradiction `noul`s. */
+const REFLECTION_PREFIX = "reflects_receipt:";
+const CONTRADICTION_PREFIX = "contradicts_receipt:";
+
+/** Builds the question key for the coverage check of committed fact `index`. */
+export function narrationReflectionKey(index: number): string {
+  return `${REFLECTION_PREFIX}${index}`;
+}
+
+/** Builds the question key for the contradiction check of committed fact `index`. */
+export function narrationContradictionKey(index: number): string {
+  return `${CONTRADICTION_PREFIX}${index}`;
+}
 
 /** The minimal narration projection the verification battery reasons over. */
 export interface NarrationVerificationInput {
@@ -42,53 +60,47 @@ export interface NarrationVerificationInput {
 export interface NarrationVerification {
   /** Advisory confidence that the narration should be accepted as-is. */
   band: SystemOneBand;
-  /** Hazard question keys whose `noul` reached the action threshold. */
+  /** Public hazard flag keys that reached the action threshold. */
   flags: string[];
-  /** Normalized groundedness in [0, 1], or null when the score answer was absent. */
+  /** Coverage: the fraction of committed facts the narration reflects, or null when there are none. */
   groundedness: number | null;
   /** The strongest signal reasoned over, for observability and calibration. */
   topSignal: number | null;
+}
+
+/** Optional composition inputs. */
+export interface NarrationComposeOptions {
+  /**
+   * The number of committed facts the battery was built over. When provided, reflection
+   * answers that are missing from partial model output count against coverage (safe). When
+   * omitted, the count is inferred from the reflection answers present.
+   */
+  factCount?: number;
 }
 
 function renderList(values: readonly string[], empty: string): string {
   return values.length > 0 ? values.map((value) => `- ${value}`).join("\n") : empty;
 }
 
-function normalizeGroundedness(score: number): number {
-  const maxScore = NARRATION_GROUNDEDNESS_LEVELS.length - 1;
-  if (!Number.isFinite(score)) return 0;
-  return Math.max(0, Math.min(1, score / maxScore));
-}
-
 /**
- * Builds the narration verification battery: one atomic `noul` per hazard
- * (contradiction, invented mechanic, boundary crossing) plus a three-level
- * `score` for groundedness. Committed facts and declared boundaries are embedded
- * in the instructions so each hazard question is judged against the same authority.
+ * Builds the narration verification battery: one coverage `noul` and one contradiction
+ * `noul` per committed fact, plus aggregate `invents_mechanic` and `crosses_boundary`
+ * `noul`s. Committed facts and declared boundaries are embedded in the instructions so
+ * each question is judged against the same authority.
  */
 export function buildNarrationQuestions(input: NarrationVerificationInput): SystemOneQuestions {
-  const committedFacts = renderList(input.committedFacts, "(no committed facts were recorded)");
+  const committedFacts = input.committedFacts;
+  const allFacts = renderList(committedFacts, "(no committed facts were recorded)");
   const declaredBoundaries = renderList(input.declaredBoundaries ?? [], "(no boundaries were declared)");
   const narration = input.narration.trim() || "(empty narration)";
   const candidate = `Candidate narration (non-authoritative prose):\n${narration}`;
-  return {
-    [NARRATION_CONTRADICTS_RECEIPT_KEY]: {
-      type: "noul",
-      instructions: [
-        "Does the candidate narration contradict, negate, or recast any committed fact?",
-        `Committed facts (authoritative; they override the narration):\n${committedFacts}`,
-        candidate,
-      ].join("\n"),
-      criteria: {
-        true: "The narration asserts or implies something incompatible with a committed fact",
-        false: "The narration is consistent with every committed fact, or only adds compatible atmosphere",
-      },
-    },
+
+  const questions: SystemOneQuestions = {
     [NARRATION_INVENTS_MECHANIC_KEY]: {
       type: "noul",
       instructions: [
         "Does the candidate narration invent a mechanic, numeric outcome, or state transition absent from the committed facts?",
-        `Committed facts (authoritative; they override the narration):\n${committedFacts}`,
+        `Committed facts (authoritative; they override the narration):\n${allFacts}`,
         candidate,
       ].join("\n"),
       criteria: {
@@ -108,16 +120,40 @@ export function buildNarrationQuestions(input: NarrationVerificationInput): Syst
         false: "The narration respects every declared boundary, or no boundary is relevant to it",
       },
     },
-    [NARRATION_GROUNDEDNESS_KEY]: {
-      type: "score",
+  };
+
+  committedFacts.forEach((fact, index) => {
+    questions[narrationReflectionKey(index)] = {
+      type: "noul",
       instructions: [
-        `How well is the candidate narration grounded in the committed facts? 0 = ${NARRATION_GROUNDEDNESS_LEVELS[0]}, 1 = ${NARRATION_GROUNDEDNESS_LEVELS[1]}, 2 = ${NARRATION_GROUNDEDNESS_LEVELS[2]}.`,
-        `Committed facts (authoritative; they override the narration):\n${committedFacts}`,
+        "Does the candidate narration state or clearly imply this one committed fact?",
+        `Committed fact to check:\n- ${fact}`,
+        "The fact is NOT reflected when the narration merely omits it or asserts anything incompatible with it.",
+        `All committed facts (for context):\n${allFacts}`,
         candidate,
       ].join("\n"),
-      criteria: [...NARRATION_GROUNDEDNESS_LEVELS],
-    },
-  };
+      criteria: {
+        true: "The narration states or clearly implies this committed fact",
+        false: "The narration omits this committed fact or asserts something incompatible with it",
+      },
+    };
+    questions[narrationContradictionKey(index)] = {
+      type: "noul",
+      instructions: [
+        "Does the candidate narration contradict, negate, or recast this one committed fact?",
+        `Committed fact to check:\n- ${fact}`,
+        "Answer false when the narration states, implies, or simply does not address this fact.",
+        `All committed facts (for context):\n${allFacts}`,
+        candidate,
+      ].join("\n"),
+      criteria: {
+        true: "The narration asserts or implies the opposite of this committed fact",
+        false: "The narration is compatible with this committed fact, whether or not it mentions it",
+      },
+    };
+  });
+
+  return questions;
 }
 
 function safeBand(signal: number, thresholds: SystemOneConfidenceThresholds): SystemOneBand | null {
@@ -129,29 +165,33 @@ function safeBand(signal: number, thresholds: SystemOneConfidenceThresholds): Sy
  * Composes the advisory narration verification from possibly-partial answers.
  *
  * Exact band rule:
- * 1. `fallback` when there is no usable answer (no well-formed hazard `noul` and no
- *    groundedness `score`).
- * 2. `fallback` when any hazard `noul` reaches `actionThreshold`; those keys become flags.
- * 3. `act` when nothing is flagged, groundedness reaches `actionThreshold`, and no hazard
- *    sits in the moderate `confirm` band.
- * 4. `confirm` when groundedness or a hazard signal reaches `reviewThreshold` but not the
- *    action threshold.
- * 5. `fallback` otherwise (usable but weak signals).
+ * 1. `fallback` when there is no usable answer (no well-formed hazard or coverage `noul`).
+ * 2. `fallback` when any hazard reaches `actionThreshold`; the corresponding public flag is set.
+ * 3. `confirm` when a hazard sits in the moderate `confirm` band.
+ * 4. `act` when every committed fact is reflected and no hazard reached `confirm`.
+ * 5. `confirm` when at least one fact is reflected but coverage is incomplete.
+ * 6. `fallback` otherwise (nothing reflected, so the narration cannot be grounded).
  *
- * This is ADVISORY: it never rewrites narration and is NOT a safety guarantee. A missing
- * hazard answer or a low hazard probability means the verifier did not detect a hazard,
- * not that none exists. Never throws on partial answers.
+ * Coverage is `reflected / factCount`, where a fact counts as reflected when its coverage
+ * `noul` reaches `reviewThreshold`. This is ADVISORY: it never rewrites narration and is NOT
+ * a safety guarantee. A missing hazard answer or a low hazard probability means the verifier
+ * did not detect a hazard, not that none exists. Never throws on partial answers.
  */
 export function composeNarrationVerification(
   answers: Record<string, SystemOneAnswer>,
   thresholds: SystemOneConfidenceThresholds,
+  options: NarrationComposeOptions = {},
 ): NarrationVerification {
   const flags: string[] = [];
   const hazardSignals: number[] = [];
+  const reflectionSignals: number[] = [];
   let moderateHazard = false;
+  let contradiction = false;
   let usable = false;
+  let inferredFacts = 0;
+  let reflected = 0;
 
-  for (const key of NARRATION_HAZARD_KEYS) {
+  for (const key of NARRATION_GLOBAL_HAZARD_KEYS) {
     const answer = answers[key];
     if (!answer || answer.type !== "noul") continue;
     const band = safeBand(answer.noul, thresholds);
@@ -162,19 +202,46 @@ export function composeNarrationVerification(
     else if (band === "confirm") moderateHazard = true;
   }
 
-  const groundedAnswer = answers[NARRATION_GROUNDEDNESS_KEY];
-  const groundedness = groundedAnswer && groundedAnswer.type === "score"
-    ? normalizeGroundedness(groundedAnswer.score)
-    : null;
-  const groundedBand = groundedness === null ? null : safeBand(groundedness, thresholds);
-  if (groundedness !== null) usable = true;
+  for (const [key, answer] of Object.entries(answers)) {
+    if (key.startsWith(CONTRADICTION_PREFIX)) {
+      if (answer.type !== "noul") continue;
+      const band = safeBand(answer.noul, thresholds);
+      if (band === null) continue;
+      usable = true;
+      hazardSignals.push(answer.noul);
+      if (band === "act") contradiction = true;
+      else if (band === "confirm") moderateHazard = true;
+      continue;
+    }
+    if (key.startsWith(REFLECTION_PREFIX)) {
+      inferredFacts += 1;
+      if (answer.type !== "noul") continue;
+      const signal = answer.noul;
+      if (!Number.isFinite(signal) || signal < 0 || signal > 1) continue;
+      usable = true;
+      reflectionSignals.push(signal);
+      if (signal >= thresholds.reviewThreshold) reflected += 1;
+    }
+  }
 
-  if (!usable) return { band: "fallback", flags, groundedness, topSignal: null };
+  if (contradiction) flags.push(NARRATION_CONTRADICTS_RECEIPT_KEY);
 
-  const topSignal = Math.max(...hazardSignals, groundedness ?? 0);
+  const totalFacts = options.factCount ?? inferredFacts;
+  const groundedness = totalFacts > 0 ? Math.min(1, reflected / totalFacts) : null;
+
+  if (!usable) return { band: "fallback", flags, groundedness: null, topSignal: null };
+
+  const fullyGrounded = totalFacts > 0 && reflected === totalFacts && reflectionSignals.length > 0;
+  const topSignal = flags.length > 0
+    ? Math.max(...hazardSignals)
+    : fullyGrounded
+      ? Math.min(...reflectionSignals)
+      : groundedness;
+
   if (flags.length > 0) return { band: "fallback", flags, groundedness, topSignal };
-  if (groundedBand === "act" && !moderateHazard) return { band: "act", flags, groundedness, topSignal };
-  if (groundedBand === "confirm" || moderateHazard) return { band: "confirm", flags, groundedness, topSignal };
+  if (moderateHazard) return { band: "confirm", flags, groundedness, topSignal };
+  if (fullyGrounded) return { band: "act", flags, groundedness, topSignal };
+  if (reflected > 0) return { band: "confirm", flags, groundedness, topSignal };
   return { band: "fallback", flags, groundedness, topSignal };
 }
 

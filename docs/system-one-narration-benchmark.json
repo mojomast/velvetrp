@@ -98,6 +98,39 @@
       }
     },
     {
+      "id": "g7",
+      "category": "grounded",
+      "holdout": false,
+      "narration": "At the water's edge the skiff lies half-sunk beneath the pier, and old Doran waits beside it, hat in hand.",
+      "committedFacts": [
+        "The skiff is half-sunk at the pier",
+        "Doran waits by the skiff"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "act",
+        "flags": [],
+        "groundedness": 1
+      }
+    },
+    {
+      "id": "g8",
+      "category": "grounded",
+      "holdout": true,
+      "narration": "Lantern light spills across the cellar, where the iron door stands sealed and three casks are stacked against the far wall.",
+      "committedFacts": [
+        "The cellar is lit by a lantern",
+        "The iron door is sealed",
+        "Three casks stand against the wall"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "act",
+        "flags": [],
+        "groundedness": 1
+      }
+    },
+    {
       "id": "c1",
       "category": "contradiction",
       "holdout": false,
@@ -149,6 +182,41 @@
       }
     },
     {
+      "id": "c4",
+      "category": "contradiction",
+      "holdout": false,
+      "narration": "The skiff floats soundly at the pier, and Doran waits beside it.",
+      "committedFacts": [
+        "The skiff is half-sunk at the pier",
+        "Doran waits by the skiff"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "fallback",
+        "flags": [
+          "contradicts_receipt"
+        ],
+        "groundedness": null
+      }
+    },
+    {
+      "id": "c5",
+      "category": "contradiction",
+      "holdout": true,
+      "narration": "The iron door hangs open on its hinges.",
+      "committedFacts": [
+        "The iron door is sealed"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "fallback",
+        "flags": [
+          "contradicts_receipt"
+        ],
+        "groundedness": null
+      }
+    },
+    {
       "id": "i1",
       "category": "invented-mechanic",
       "holdout": false,
@@ -172,6 +240,40 @@
       "narration": "They hand the merchant 50 gold for a silver amulet and gain 200 experience.",
       "committedFacts": [
         "A merchant waits by the stall"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "fallback",
+        "flags": [
+          "invents_mechanic"
+        ],
+        "groundedness": null
+      }
+    },
+    {
+      "id": "i3",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "narration": "Rook hauls the casks aside and pockets 15 silver from a hidden strongbox.",
+      "committedFacts": [
+        "Three casks stand against the wall"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "fallback",
+        "flags": [
+          "invents_mechanic"
+        ],
+        "groundedness": null
+      }
+    },
+    {
+      "id": "i4",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "narration": "The vault door requires two keys, and Aria spends a luck point to reroll her lockpick.",
+      "committedFacts": [
+        "The vault door requires two keys"
       ],
       "declaredBoundaries": [],
       "expected": {
@@ -253,6 +355,23 @@
       }
     },
     {
+      "id": "p3",
+      "category": "partial-grounding",
+      "holdout": false,
+      "narration": "The iron door is sealed, and the lantern still burns.",
+      "committedFacts": [
+        "The cellar is lit by a lantern",
+        "The iron door is sealed",
+        "Three casks stand against the wall"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "confirm",
+        "flags": [],
+        "groundedness": 0.5
+      }
+    },
+    {
       "id": "u1",
       "category": "ungrounded",
       "holdout": false,
@@ -281,6 +400,21 @@
         "flags": [],
         "groundedness": 0
       }
+    },
+    {
+      "id": "u3",
+      "category": "ungrounded",
+      "holdout": true,
+      "narration": "Wolves howl somewhere beyond the ridge as the northern lights ripple overhead.",
+      "committedFacts": [
+        "The iron door is sealed"
+      ],
+      "declaredBoundaries": [],
+      "expected": {
+        "band": "fallback",
+        "flags": [],
+        "groundedness": 0
+      }
     }
   ],
   "samples": [
@@ -290,8 +424,8 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.555,
-      "topSignal": 0.555,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -302,8 +436,8 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.56,
-      "topSignal": 0.56,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -314,8 +448,8 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.55,
-      "topSignal": 0.55,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -326,8 +460,8 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.54,
-      "topSignal": 0.62,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -338,8 +472,8 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.555,
-      "topSignal": 0.6,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -350,92 +484,80 @@
       "holdout": false,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.545,
-      "topSignal": 0.58,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
     },
     {
       "caseId": "g3",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.69,
-      "topSignal": 0.69,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g3",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.715,
-      "topSignal": 0.715,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g3",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.735,
-      "topSignal": 0.735,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.625,
-      "topSignal": 0.625,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.615,
-      "topSignal": 0.615,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "holdout": false,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.665,
-      "topSignal": 0.665,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g5",
       "category": "grounded",
       "holdout": false,
       "band": "act",
       "flags": [],
-      "groundedness": 0.8,
-      "topSignal": 0.8,
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g3",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g3",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -446,8 +568,8 @@
       "holdout": false,
       "band": "act",
       "flags": [],
-      "groundedness": 0.82,
-      "topSignal": 0.82,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -458,8 +580,20 @@
       "holdout": false,
       "band": "act",
       "flags": [],
-      "groundedness": 0.795,
-      "topSignal": 0.795,
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g5",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -470,8 +604,8 @@
       "holdout": true,
       "band": "act",
       "flags": [],
-      "groundedness": 0.83,
-      "topSignal": 0.83,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -482,8 +616,8 @@
       "holdout": true,
       "band": "act",
       "flags": [],
-      "groundedness": 0.85,
-      "topSignal": 0.85,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -494,8 +628,80 @@
       "holdout": true,
       "band": "act",
       "flags": [],
-      "groundedness": 0.835,
-      "topSignal": 0.835,
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "holdout": false,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "holdout": true,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "holdout": true,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "holdout": true,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -506,91 +712,91 @@
       "holdout": false,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c1",
-      "category": "contradiction",
-      "holdout": false,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c1",
-      "category": "contradiction",
-      "holdout": false,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c2",
-      "category": "contradiction",
-      "holdout": false,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.01,
+      "groundedness": 0,
       "topSignal": 0.94,
       "decisive": true,
       "accepted": false,
       "correct": true
     },
     {
-      "caseId": "c2",
+      "caseId": "c1",
       "category": "contradiction",
       "holdout": false,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.015,
+      "groundedness": 0,
       "topSignal": 0.94,
       "decisive": true,
       "accepted": false,
       "correct": true
     },
     {
-      "caseId": "c2",
+      "caseId": "c1",
       "category": "contradiction",
       "holdout": false,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.02,
+      "groundedness": 0,
       "topSignal": 0.93,
       "decisive": true,
       "accepted": false,
       "correct": true
     },
     {
+      "caseId": "c2",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c2",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c2",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
       "caseId": "c3",
       "category": "contradiction",
       "holdout": true,
@@ -598,7 +804,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.395,
+      "groundedness": 0,
       "topSignal": 0.87,
       "decisive": true,
       "accepted": false,
@@ -612,7 +818,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.395,
+      "groundedness": 0,
       "topSignal": 0.87,
       "decisive": true,
       "accepted": false,
@@ -626,13 +832,100 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.435,
+      "groundedness": 0,
       "topSignal": 0.87,
       "decisive": true,
       "accepted": false,
       "correct": false
     },
     {
+      "caseId": "c4",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c4",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.86,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c4",
+      "category": "contradiction",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.87,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.89,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
       "caseId": "i1",
       "category": "invented-mechanic",
       "holdout": false,
@@ -640,7 +933,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.08,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -654,7 +947,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.08,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -668,7 +961,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.075,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -682,7 +975,7 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.46,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -696,8 +989,8 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.445,
-      "topSignal": 0.99,
+      "groundedness": 0,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": false,
       "correct": true
@@ -710,8 +1003,92 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.46,
+      "groundedness": 0,
       "topSignal": 0.99,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i3",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i3",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i3",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.97,
       "decisive": true,
       "accepted": false,
       "correct": true
@@ -724,7 +1101,7 @@
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.245,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -738,7 +1115,7 @@
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.27,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -752,7 +1129,7 @@
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.255,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -767,7 +1144,7 @@
         "invents_mechanic",
         "crosses_boundary"
       ],
-      "groundedness": 0.06,
+      "groundedness": 0,
       "topSignal": 0.98,
       "decisive": true,
       "accepted": false,
@@ -782,7 +1159,7 @@
         "invents_mechanic",
         "crosses_boundary"
       ],
-      "groundedness": 0.065,
+      "groundedness": 0,
       "topSignal": 0.98,
       "decisive": true,
       "accepted": false,
@@ -797,7 +1174,7 @@
         "invents_mechanic",
         "crosses_boundary"
       ],
-      "groundedness": 0.055,
+      "groundedness": 0,
       "topSignal": 0.98,
       "decisive": true,
       "accepted": false,
@@ -807,82 +1184,106 @@
       "caseId": "p1",
       "category": "partial-grounding",
       "holdout": false,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
       "caseId": "p1",
       "category": "partial-grounding",
       "holdout": false,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
       "caseId": "p1",
       "category": "partial-grounding",
       "holdout": false,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
       "caseId": "p2",
       "category": "partial-grounding",
       "holdout": true,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.985,
-      "topSignal": 0.985,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
       "caseId": "p2",
       "category": "partial-grounding",
       "holdout": true,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
       "caseId": "p2",
       "category": "partial-grounding",
       "holdout": true,
-      "band": "act",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.99,
-      "topSignal": 0.99,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
     },
     {
-      "caseId": "u1",
-      "category": "ungrounded",
+      "caseId": "p3",
+      "category": "partial-grounding",
       "holdout": false,
-      "band": "fallback",
+      "band": "confirm",
       "flags": [],
-      "groundedness": 0.005,
-      "topSignal": 0.17,
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p3",
+      "category": "partial-grounding",
+      "holdout": false,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p3",
+      "category": "partial-grounding",
+      "holdout": false,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -893,8 +1294,8 @@
       "holdout": false,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.01,
-      "topSignal": 0.18,
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -905,8 +1306,20 @@
       "holdout": false,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.005,
-      "topSignal": 0.16,
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u1",
+      "category": "ungrounded",
+      "holdout": false,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -917,8 +1330,8 @@
       "holdout": true,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.015,
-      "topSignal": 0.09,
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -929,8 +1342,8 @@
       "holdout": true,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.015,
-      "topSignal": 0.12,
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -941,8 +1354,44 @@
       "holdout": true,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.02,
-      "topSignal": 0.12,
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u3",
+      "category": "ungrounded",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u3",
+      "category": "ungrounded",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u3",
+      "category": "ungrounded",
+      "holdout": true,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -954,11 +1403,11 @@
       "category": "grounded",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 184,
+      "latencyMs": 271,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.555,
-      "topSignal": 0.555,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -968,11 +1417,11 @@
       "category": "grounded",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 98,
+      "latencyMs": 126,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.56,
-      "topSignal": 0.56,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -982,11 +1431,11 @@
       "category": "grounded",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 64,
+      "latencyMs": 74,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.55,
-      "topSignal": 0.55,
+      "groundedness": 0.5,
+      "topSignal": 0.5,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -996,11 +1445,11 @@
       "category": "grounded",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 166,
+      "latencyMs": 97,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.54,
-      "topSignal": 0.62,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -1010,11 +1459,11 @@
       "category": "grounded",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 57,
+      "latencyMs": 103,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.555,
-      "topSignal": 0.6,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -1024,11 +1473,11 @@
       "category": "grounded",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 65,
+      "latencyMs": 82,
       "band": "confirm",
       "flags": [],
-      "groundedness": 0.545,
-      "topSignal": 0.58,
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": false,
       "accepted": false,
       "correct": false
@@ -1038,123 +1487,123 @@
       "category": "grounded",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 86,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.69,
-      "topSignal": 0.69,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g3",
-      "category": "grounded",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 79,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.715,
-      "topSignal": 0.715,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g3",
-      "category": "grounded",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 77,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.735,
-      "topSignal": 0.735,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 328,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.625,
-      "topSignal": 0.625,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 71,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.615,
-      "topSignal": 0.615,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g4",
-      "category": "grounded",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 105,
-      "band": "confirm",
-      "flags": [],
-      "groundedness": 0.665,
-      "topSignal": 0.665,
-      "decisive": false,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "g5",
-      "category": "grounded",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 80,
+      "latencyMs": 145,
       "band": "act",
       "flags": [],
-      "groundedness": 0.8,
-      "topSignal": 0.8,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
     },
     {
-      "caseId": "g5",
+      "caseId": "g3",
       "category": "grounded",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 108,
+      "latencyMs": 58,
       "band": "act",
       "flags": [],
-      "groundedness": 0.82,
-      "topSignal": 0.82,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
     },
     {
-      "caseId": "g5",
+      "caseId": "g3",
       "category": "grounded",
       "repeat": 3,
+      "ok": true,
+      "latencyMs": 78,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 91,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "repeat": 2,
       "ok": true,
       "latencyMs": 60,
       "band": "act",
       "flags": [],
-      "groundedness": 0.795,
-      "topSignal": 0.795,
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g4",
+      "category": "grounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 69,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g5",
+      "category": "grounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 71,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g5",
+      "category": "grounded",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 66,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g5",
+      "category": "grounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 59,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -1164,11 +1613,11 @@
       "category": "grounded",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 61,
+      "latencyMs": 119,
       "band": "act",
       "flags": [],
-      "groundedness": 0.83,
-      "topSignal": 0.83,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -1178,11 +1627,11 @@
       "category": "grounded",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 120,
+      "latencyMs": 73,
       "band": "act",
       "flags": [],
-      "groundedness": 0.85,
-      "topSignal": 0.85,
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -1191,12 +1640,96 @@
       "caseId": "g6",
       "category": "grounded",
       "repeat": 3,
+      "ok": true,
+      "latencyMs": 73,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "repeat": 1,
       "ok": true,
       "latencyMs": 84,
       "band": "act",
       "flags": [],
-      "groundedness": 0.835,
-      "topSignal": 0.835,
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 103,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g7",
+      "category": "grounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 95,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 152,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 82,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": true,
+      "correct": true
+    },
+    {
+      "caseId": "g8",
+      "category": "grounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 81,
+      "band": "act",
+      "flags": [],
+      "groundedness": 1,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": true,
       "correct": true
@@ -1206,14 +1739,14 @@
       "category": "contradiction",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 73,
+      "latencyMs": 177,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
+      "groundedness": 0,
+      "topSignal": 0.94,
       "decisive": true,
       "accepted": false,
       "correct": true
@@ -1223,14 +1756,14 @@
       "category": "contradiction",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 96,
+      "latencyMs": 82,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
+      "groundedness": 0,
+      "topSignal": 0.94,
       "decisive": true,
       "accepted": false,
       "correct": true
@@ -1240,160 +1773,259 @@
       "category": "contradiction",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 91,
+      "latencyMs": 70,
       "band": "fallback",
       "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
+        "invents_mechanic",
+        "contradicts_receipt"
       ],
-      "groundedness": 0.005,
-      "topSignal": 0.96,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c2",
-      "category": "contradiction",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 96,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.01,
-      "topSignal": 0.94,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c2",
-      "category": "contradiction",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 128,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.015,
-      "topSignal": 0.94,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "c2",
-      "category": "contradiction",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 75,
-      "band": "fallback",
-      "flags": [
-        "contradicts_receipt",
-        "invents_mechanic"
-      ],
-      "groundedness": 0.02,
+      "groundedness": 0,
       "topSignal": 0.93,
       "decisive": true,
       "accepted": false,
       "correct": true
     },
     {
+      "caseId": "c2",
+      "category": "contradiction",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 68,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c2",
+      "category": "contradiction",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 64,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c2",
+      "category": "contradiction",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 95,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.94,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
       "caseId": "c3",
       "category": "contradiction",
       "repeat": 1,
+      "ok": true,
+      "latencyMs": 90,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.87,
+      "decisive": true,
+      "accepted": false,
+      "correct": false
+    },
+    {
+      "caseId": "c3",
+      "category": "contradiction",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 80,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.87,
+      "decisive": true,
+      "accepted": false,
+      "correct": false
+    },
+    {
+      "caseId": "c3",
+      "category": "contradiction",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 83,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.87,
+      "decisive": true,
+      "accepted": false,
+      "correct": false
+    },
+    {
+      "caseId": "c4",
+      "category": "contradiction",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 198,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c4",
+      "category": "contradiction",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 66,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.86,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c4",
+      "category": "contradiction",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 110,
+      "band": "fallback",
+      "flags": [
+        "contradicts_receipt"
+      ],
+      "groundedness": 0.5,
+      "topSignal": 0.87,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 80,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 132,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.88,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "c5",
+      "category": "contradiction",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 92,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "contradicts_receipt"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.89,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i1",
+      "category": "invented-mechanic",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 86,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i1",
+      "category": "invented-mechanic",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 60,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i1",
+      "category": "invented-mechanic",
+      "repeat": 3,
       "ok": true,
       "latencyMs": 81,
       "band": "fallback",
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.395,
-      "topSignal": 0.87,
-      "decisive": true,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "c3",
-      "category": "contradiction",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 94,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic"
-      ],
-      "groundedness": 0.395,
-      "topSignal": 0.87,
-      "decisive": true,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "c3",
-      "category": "contradiction",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 98,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic"
-      ],
-      "groundedness": 0.435,
-      "topSignal": 0.87,
-      "decisive": true,
-      "accepted": false,
-      "correct": false
-    },
-    {
-      "caseId": "i1",
-      "category": "invented-mechanic",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 114,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic"
-      ],
-      "groundedness": 0.08,
-      "topSignal": 0.99,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "i1",
-      "category": "invented-mechanic",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 100,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic"
-      ],
-      "groundedness": 0.08,
-      "topSignal": 0.99,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "i1",
-      "category": "invented-mechanic",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 62,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic"
-      ],
-      "groundedness": 0.075,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -1404,12 +2036,12 @@
       "category": "invented-mechanic",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 72,
+      "latencyMs": 69,
       "band": "fallback",
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.46,
+      "groundedness": 0,
       "topSignal": 0.99,
       "decisive": true,
       "accepted": false,
@@ -1417,6 +2049,54 @@
     },
     {
       "caseId": "i2",
+      "category": "invented-mechanic",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 54,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i2",
+      "category": "invented-mechanic",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 164,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.99,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i3",
+      "category": "invented-mechanic",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 320,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i3",
       "category": "invented-mechanic",
       "repeat": 2,
       "ok": true,
@@ -1425,24 +2105,72 @@
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.445,
-      "topSignal": 0.99,
+      "groundedness": 0,
+      "topSignal": 0.98,
       "decisive": true,
       "accepted": false,
       "correct": true
     },
     {
-      "caseId": "i2",
+      "caseId": "i3",
       "category": "invented-mechanic",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 64,
+      "latencyMs": 131,
       "band": "fallback",
       "flags": [
         "invents_mechanic"
       ],
-      "groundedness": 0.46,
-      "topSignal": 0.99,
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 123,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 97,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "i4",
+      "category": "invented-mechanic",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 62,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic"
+      ],
+      "groundedness": 1,
+      "topSignal": 0.97,
       "decisive": true,
       "accepted": false,
       "correct": true
@@ -1452,12 +2180,12 @@
       "category": "forbidden-disclosure",
       "repeat": 1,
       "ok": true,
-      "latencyMs": 82,
+      "latencyMs": 88,
       "band": "fallback",
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.245,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -1468,12 +2196,12 @@
       "category": "forbidden-disclosure",
       "repeat": 2,
       "ok": true,
-      "latencyMs": 80,
+      "latencyMs": 117,
       "band": "fallback",
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.27,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -1484,12 +2212,12 @@
       "category": "forbidden-disclosure",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 87,
+      "latencyMs": 128,
       "band": "fallback",
       "flags": [
         "crosses_boundary"
       ],
-      "groundedness": 0.255,
+      "groundedness": 0,
       "topSignal": 0.96,
       "decisive": true,
       "accepted": false,
@@ -1499,217 +2227,301 @@
       "caseId": "b2",
       "category": "forbidden-disclosure",
       "repeat": 1,
+      "ok": true,
+      "latencyMs": 253,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "crosses_boundary"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "b2",
+      "category": "forbidden-disclosure",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 102,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "crosses_boundary"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "b2",
+      "category": "forbidden-disclosure",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 68,
+      "band": "fallback",
+      "flags": [
+        "invents_mechanic",
+        "crosses_boundary"
+      ],
+      "groundedness": 0,
+      "topSignal": 0.98,
+      "decisive": true,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p1",
+      "category": "partial-grounding",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 107,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p1",
+      "category": "partial-grounding",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 82,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p1",
+      "category": "partial-grounding",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 63,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p2",
+      "category": "partial-grounding",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 59,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p2",
+      "category": "partial-grounding",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 79,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p2",
+      "category": "partial-grounding",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 104,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.5,
+      "topSignal": 0.5,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p3",
+      "category": "partial-grounding",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 93,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p3",
+      "category": "partial-grounding",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 117,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "p3",
+      "category": "partial-grounding",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 88,
+      "band": "confirm",
+      "flags": [],
+      "groundedness": 0.6666666666666666,
+      "topSignal": 0.6666666666666666,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u1",
+      "category": "ungrounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 90,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u1",
+      "category": "ungrounded",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 76,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u1",
+      "category": "ungrounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 101,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u2",
+      "category": "ungrounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 123,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u2",
+      "category": "ungrounded",
+      "repeat": 2,
+      "ok": true,
+      "latencyMs": 88,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u2",
+      "category": "ungrounded",
+      "repeat": 3,
+      "ok": true,
+      "latencyMs": 92,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u3",
+      "category": "ungrounded",
+      "repeat": 1,
+      "ok": true,
+      "latencyMs": 54,
+      "band": "fallback",
+      "flags": [],
+      "groundedness": 0,
+      "topSignal": 0,
+      "decisive": false,
+      "accepted": false,
+      "correct": true
+    },
+    {
+      "caseId": "u3",
+      "category": "ungrounded",
+      "repeat": 2,
       "ok": true,
       "latencyMs": 63,
       "band": "fallback",
-      "flags": [
-        "invents_mechanic",
-        "crosses_boundary"
-      ],
-      "groundedness": 0.06,
-      "topSignal": 0.98,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "b2",
-      "category": "forbidden-disclosure",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 99,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic",
-        "crosses_boundary"
-      ],
-      "groundedness": 0.065,
-      "topSignal": 0.98,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "b2",
-      "category": "forbidden-disclosure",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 132,
-      "band": "fallback",
-      "flags": [
-        "invents_mechanic",
-        "crosses_boundary"
-      ],
-      "groundedness": 0.055,
-      "topSignal": 0.98,
-      "decisive": true,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "p1",
-      "category": "partial-grounding",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 110,
-      "band": "act",
       "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "p1",
-      "category": "partial-grounding",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 166,
-      "band": "act",
-      "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "p1",
-      "category": "partial-grounding",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 90,
-      "band": "act",
-      "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "p2",
-      "category": "partial-grounding",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 114,
-      "band": "act",
-      "flags": [],
-      "groundedness": 0.985,
-      "topSignal": 0.985,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "p2",
-      "category": "partial-grounding",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 152,
-      "band": "act",
-      "flags": [],
-      "groundedness": 0.995,
-      "topSignal": 0.995,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "p2",
-      "category": "partial-grounding",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 171,
-      "band": "act",
-      "flags": [],
-      "groundedness": 0.99,
-      "topSignal": 0.99,
-      "decisive": true,
-      "accepted": true,
-      "correct": false
-    },
-    {
-      "caseId": "u1",
-      "category": "ungrounded",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 64,
-      "band": "fallback",
-      "flags": [],
-      "groundedness": 0.005,
-      "topSignal": 0.17,
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
     },
     {
-      "caseId": "u1",
-      "category": "ungrounded",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 82,
-      "band": "fallback",
-      "flags": [],
-      "groundedness": 0.01,
-      "topSignal": 0.18,
-      "decisive": false,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "u1",
+      "caseId": "u3",
       "category": "ungrounded",
       "repeat": 3,
       "ok": true,
-      "latencyMs": 142,
+      "latencyMs": 102,
       "band": "fallback",
       "flags": [],
-      "groundedness": 0.005,
-      "topSignal": 0.16,
-      "decisive": false,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "u2",
-      "category": "ungrounded",
-      "repeat": 1,
-      "ok": true,
-      "latencyMs": 67,
-      "band": "fallback",
-      "flags": [],
-      "groundedness": 0.015,
-      "topSignal": 0.09,
-      "decisive": false,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "u2",
-      "category": "ungrounded",
-      "repeat": 2,
-      "ok": true,
-      "latencyMs": 120,
-      "band": "fallback",
-      "flags": [],
-      "groundedness": 0.015,
-      "topSignal": 0.12,
-      "decisive": false,
-      "accepted": false,
-      "correct": true
-    },
-    {
-      "caseId": "u2",
-      "category": "ungrounded",
-      "repeat": 3,
-      "ok": true,
-      "latencyMs": 78,
-      "band": "fallback",
-      "flags": [],
-      "groundedness": 0.02,
-      "topSignal": 0.12,
+      "groundedness": 0,
+      "topSignal": 0,
       "decisive": false,
       "accepted": false,
       "correct": true
@@ -1717,44 +2529,40 @@
   ],
   "evaluation": {
     "fitted": {
-      "a": -1.2580394514804951,
-      "b": 6.400191202201063
+      "a": 1.9970790112838566,
+      "b": 0.5490817857432153
     },
-    "totalSamples": 51,
-    "decisiveSamples": 33,
-    "acceptedSamples": 12,
-    "devSamples": 18,
-    "holdoutSamples": 15,
-    "accuracy": 0.7272727272727273,
-    "acceptAccuracy": 0.5,
+    "totalSamples": 75,
+    "decisiveSamples": 51,
+    "acceptedSamples": 18,
+    "devSamples": 33,
+    "holdoutSamples": 18,
+    "accuracy": 0.9411764705882353,
+    "acceptAccuracy": 1,
     "holdout": {
       "raw": {
-        "brier": 0.35274500000000003,
-        "expectedCalibrationError": 0.3336666666666668
+        "brier": 0.12865555555555558,
+        "expectedCalibrationError": 0.13777777777777758
       },
       "calibrated": {
-        "brier": 0.3030832705501803,
-        "expectedCalibrationError": 0.33633197875554266
+        "brier": 0.16244440598342227,
+        "expectedCalibrationError": 0.16271559608961195
       }
     },
     "all": {
       "raw": {
-        "brier": 0.25447500000000006,
-        "expectedCalibrationError": 0.22287878787878806
+        "brier": 0.0470529411764706,
+        "expectedCalibrationError": 0.0566666666666669
       },
       "calibrated": {
-        "brier": 0.16761423043640658,
-        "expectedCalibrationError": 0.2040053059892829
+        "brier": 0.0573441095073576,
+        "expectedCalibrationError": 0.0562524400482497
       }
     },
     "gate": {
       "lane": "narration-verification",
-      "promoted": false,
-      "reasons": [
-        "accuracy below minimum: 0.7273 < 0.9000",
-        "brier above maximum: 0.1676 > 0.1000",
-        "expected calibration error above maximum: 0.2040 > 0.1000"
-      ],
+      "promoted": true,
+      "reasons": [],
       "gates": {
         "minSamples": 30,
         "minAccuracy": 0.9,
@@ -1763,5 +2571,18 @@
       }
     }
   },
-  "proposedRecord": null
+  "proposedRecord": {
+    "metrics": {
+      "samples": 51,
+      "accuracy": 0.9412,
+      "brier": 0.0573,
+      "expectedCalibrationError": 0.0563
+    },
+    "calibration": {
+      "a": 1.9971,
+      "b": 0.5491
+    },
+    "promotedAt": "2026-09-17",
+    "evidence": "docs/system-one-narration-benchmark.md"
+  }
 }

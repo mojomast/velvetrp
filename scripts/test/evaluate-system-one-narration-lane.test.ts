@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   composeNarrationVerification,
+  narrationContradictionKey,
+  narrationReflectionKey,
   NARRATION_CONTRADICTS_RECEIPT_KEY,
   NARRATION_CROSSES_BOUNDARY_KEY,
-  NARRATION_GROUNDEDNESS_KEY,
   NARRATION_INVENTS_MECHANIC_KEY,
 } from "../../server/src/agent/systemOneNarration.js";
 import type { SystemOneAnswer } from "../../server/src/provider/systemOneCompletion.js";
@@ -20,20 +21,18 @@ import {
 
 const thresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
 const hazard = (noul: number): SystemOneAnswer => ({ type: "noul", noul });
-const grounded = (score: number): SystemOneAnswer => ({
-  type: "score",
-  score,
-  confidence: 0.9,
-  legend: { 0: "ungrounded", 1: "partly grounded", 2: "fully grounded" },
-  probabilities: { 0: 0.05, 1: 0.15, 2: 0.8 },
-});
 
-const groundedAnswers = (): Record<string, SystemOneAnswer> => ({
-  [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.05),
-  [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05),
-  [NARRATION_CROSSES_BOUNDARY_KEY]: hazard(0.05),
-  [NARRATION_GROUNDEDNESS_KEY]: grounded(2),
-});
+const groundedAnswers = (factCount: number): Record<string, SystemOneAnswer> => {
+  const answers: Record<string, SystemOneAnswer> = {
+    [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05),
+    [NARRATION_CROSSES_BOUNDARY_KEY]: hazard(0.05),
+  };
+  for (let index = 0; index < factCount; index += 1) {
+    answers[narrationReflectionKey(index)] = hazard(0.9);
+    answers[narrationContradictionKey(index)] = hazard(0.05);
+  }
+  return answers;
+};
 
 const sample = (overrides: Partial<NarrationBenchmarkSample>): NarrationBenchmarkSample => ({
   caseId: "x",
@@ -59,40 +58,46 @@ test("corpus covers at least eight cases across at least three categories with u
 
 test("grades a composed verdict against its labelled expectation", () => {
   const groundedCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "g1")!;
-  const composed = composeNarrationVerification(groundedAnswers(), thresholds);
+  const composed = composeNarrationVerification(groundedAnswers(groundedCase.committedFacts.length), thresholds, { factCount: groundedCase.committedFacts.length });
   assert.equal(gradeNarrationVerdict(composed, groundedCase.expected), true);
 
   const contradictionCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "c1")!;
   // A clean verdict must not pass a hazard label, and a flagged verdict must not pass a clean label.
   assert.equal(gradeNarrationVerdict(composed, contradictionCase.expected), false);
-  const flagged = composeNarrationVerification({ [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.95) }, thresholds);
+  const flagged = composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, { factCount: 1 });
   assert.equal(gradeNarrationVerdict(flagged, contradictionCase.expected), true);
   assert.equal(gradeNarrationVerdict(flagged, groundedCase.expected), false);
 });
 
-test("grades the partial-grounding label on normalized groundedness", () => {
+test("grades the partial-grounding label on computed coverage", () => {
   const partialCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "p1")!;
-  const partly = composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(1) }, thresholds);
+  const factCount = partialCase.committedFacts.length;
+  const partly = composeNarrationVerification({
+    [narrationReflectionKey(0)]: hazard(0.9),
+    [narrationReflectionKey(1)]: hazard(0.1),
+  }, thresholds, { factCount });
   assert.equal(partly.band, "confirm");
+  assert.equal(partly.groundedness, 0.5);
   assert.equal(gradeNarrationVerdict(partly, partialCase.expected), true);
-  const fully = composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(2) }, thresholds);
+  const fully = composeNarrationVerification(groundedAnswers(factCount), thresholds, { factCount });
   assert.equal(gradeNarrationVerdict(fully, partialCase.expected), false);
 });
 
 test("projects a decisive sample only when the lane accepts or flags", () => {
   const benchmarkCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "g1")!;
-  const accepted = toNarrationSample(benchmarkCase, composeNarrationVerification(groundedAnswers(), thresholds));
+  const factCount = benchmarkCase.committedFacts.length;
+  const accepted = toNarrationSample(benchmarkCase, composeNarrationVerification(groundedAnswers(factCount), thresholds, { factCount }));
   assert.equal(accepted.decisive, true);
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.correct, true);
 
   const flaggedCase = NARRATION_BENCHMARK_CORPUS.find((entry) => entry.id === "c1")!;
-  const flagged = toNarrationSample(flaggedCase, composeNarrationVerification({ [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.95) }, thresholds));
+  const flagged = toNarrationSample(flaggedCase, composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.95) }, thresholds, { factCount: 1 }));
   assert.equal(flagged.decisive, true);
   assert.equal(flagged.accepted, false);
   assert.equal(flagged.correct, true);
 
-  const deferred = toNarrationSample(benchmarkCase, composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(0) }, thresholds));
+  const deferred = toNarrationSample(benchmarkCase, composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.1) }, thresholds, { factCount }));
   assert.equal(deferred.decisive, false);
   assert.equal(deferred.correct, false);
 });

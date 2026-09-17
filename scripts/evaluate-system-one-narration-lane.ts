@@ -78,9 +78,9 @@ const INVENTED_FLAGS: readonly string[] = [NARRATION_INVENTS_MECHANIC_KEY];
 const DISCLOSURE_FLAGS: readonly string[] = [NARRATION_CROSSES_BOUNDARY_KEY];
 
 /**
- * 17 labelled cases across six categories. `act` means fully grounded (the lane would accept
+ * 25 labelled cases across six categories. `act` means fully grounded (the lane would accept
  * the narration as-is); hazard cases flag and fall back; partial and ungrounded cases defer.
- * Six cases (g6, c3, i2, b2, p2, u2) are held out of calibration fitting.
+ * Nine cases (g6, g8, c3, c5, i2, b2, p2, u2, u3) are held out of calibration fitting.
  */
 export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
   {
@@ -120,6 +120,18 @@ export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
     expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
   },
   {
+    id: "g7", category: "grounded", holdout: false,
+    narration: "At the water's edge the skiff lies half-sunk beneath the pier, and old Doran waits beside it, hat in hand.",
+    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"], declaredBoundaries: [],
+    expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
+  },
+  {
+    id: "g8", category: "grounded", holdout: true,
+    narration: "Lantern light spills across the cellar, where the iron door stands sealed and three casks are stacked against the far wall.",
+    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"], declaredBoundaries: [],
+    expected: { band: "act", flags: GROUNDED_FLAGS, groundedness: 1 },
+  },
+  {
     id: "c1", category: "contradiction", holdout: false,
     narration: "The mill wheel turns steadily as the party arrives, grinding grain for the morning bake.",
     committedFacts: ["The mill wheel is broken"], declaredBoundaries: [],
@@ -138,6 +150,18 @@ export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
     expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
   },
   {
+    id: "c4", category: "contradiction", holdout: false,
+    narration: "The skiff floats soundly at the pier, and Doran waits beside it.",
+    committedFacts: ["The skiff is half-sunk at the pier", "Doran waits by the skiff"], declaredBoundaries: [],
+    expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
+  },
+  {
+    id: "c5", category: "contradiction", holdout: true,
+    narration: "The iron door hangs open on its hinges.",
+    committedFacts: ["The iron door is sealed"], declaredBoundaries: [],
+    expected: { band: "fallback", flags: CONTRADICTION_FLAGS, groundedness: null },
+  },
+  {
     id: "i1", category: "invented-mechanic", holdout: false,
     narration: "Rook rolls a natural twenty, leaps the chasm, and shrugs off 12 points of damage.",
     committedFacts: ["The party stands at the mouth of the cave"], declaredBoundaries: [],
@@ -147,6 +171,18 @@ export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
     id: "i2", category: "invented-mechanic", holdout: true,
     narration: "They hand the merchant 50 gold for a silver amulet and gain 200 experience.",
     committedFacts: ["A merchant waits by the stall"], declaredBoundaries: [],
+    expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
+  },
+  {
+    id: "i3", category: "invented-mechanic", holdout: false,
+    narration: "Rook hauls the casks aside and pockets 15 silver from a hidden strongbox.",
+    committedFacts: ["Three casks stand against the wall"], declaredBoundaries: [],
+    expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
+  },
+  {
+    id: "i4", category: "invented-mechanic", holdout: false,
+    narration: "The vault door requires two keys, and Aria spends a luck point to reroll her lockpick.",
+    committedFacts: ["The vault door requires two keys"], declaredBoundaries: [],
     expected: { band: "fallback", flags: INVENTED_FLAGS, groundedness: null },
   },
   {
@@ -174,6 +210,12 @@ export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
     expected: { band: "confirm", flags: GROUNDED_FLAGS, groundedness: 0.5 },
   },
   {
+    id: "p3", category: "partial-grounding", holdout: false,
+    narration: "The iron door is sealed, and the lantern still burns.",
+    committedFacts: ["The cellar is lit by a lantern", "The iron door is sealed", "Three casks stand against the wall"], declaredBoundaries: [],
+    expected: { band: "confirm", flags: GROUNDED_FLAGS, groundedness: 0.5 },
+  },
+  {
     id: "u1", category: "ungrounded", holdout: false,
     narration: "A dragon circles above a field of golden wheat under a cloudless sky.",
     committedFacts: ["The mill wheel is broken"], declaredBoundaries: [],
@@ -183,6 +225,12 @@ export const NARRATION_BENCHMARK_CORPUS: readonly NarrationBenchmarkCase[] = [
     id: "u2", category: "ungrounded", holdout: true,
     narration: "Seagulls wheel over a distant harbour while merchants haggle in a market square.",
     committedFacts: ["The old gate is barred from the inside"], declaredBoundaries: [],
+    expected: { band: "fallback", flags: GROUNDED_FLAGS, groundedness: 0 },
+  },
+  {
+    id: "u3", category: "ungrounded", holdout: true,
+    narration: "Wolves howl somewhere beyond the ridge as the northern lights ripple overhead.",
+    committedFacts: ["The iron door is sealed"], declaredBoundaries: [],
     expected: { band: "fallback", flags: GROUNDED_FLAGS, groundedness: 0 },
   },
 ];
@@ -457,7 +505,7 @@ export function renderNarrationBenchmark(input: {
   const expectedText = (entry: NarrationBenchmarkCase): string => {
     const grounded = entry.expected.groundedness === null ? "n/a" : entry.expected.groundedness.toFixed(2);
     const flags = entry.expected.flags.length === 0 ? "—" : entry.expected.flags.join(", ");
-    return `${entry.expected.band} / ${flags} / g=${grounded}`;
+    return `${entry.expected.band} / ${flags} / coverage=${grounded}`;
   };
   const lines: string[] = [];
   lines.push("# System One (Jev) narration-verification (L3) benchmark");
@@ -466,15 +514,15 @@ export function renderNarrationBenchmark(input: {
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The L3 lane is a **single-arm verifier**: it reads a candidate narration against committed facts and declared boundaries, then builds one `noul` per hazard (`contradicts_receipt`, `invents_mechanic`, `crosses_boundary`) plus a three-level `groundedness` `score`. `composeNarrationVerification` turns those answers into an advisory band, a flag set, and normalized groundedness. There is no LLM arm and no game fixture — the corpus is plain text and every call is one `/systemone` request.");
+  lines.push("The L3 lane is a **single-arm verifier**: it reads a candidate narration against committed facts and declared boundaries, then builds a **per-fact decomposed battery** — one coverage `noul` and one contradiction `noul` per committed fact, plus aggregate `invents_mechanic` and `crosses_boundary` `noul`s. `composeNarrationVerification` turns those answers into an advisory band, a public flag set, and a coverage fraction computed from the per-fact coverage answers (a fact counts as covered when its `noul` reaches the review threshold). There is no LLM arm and no game fixture — the corpus is plain text and every call is one `/systemone` request.");
   lines.push("");
-  lines.push("A verdict is **decisive** when the lane accepts (`act`) or raises at least one hazard flag. A flag-free fallback or `confirm` is a deferral and counts as coverage, not as a decision; a deferring verifier leaves behavior unchanged. Grading uses a disposition rubric: every labelled hazard must be flagged (extra conservative flags on a hazard case are tolerated), a clean label must raise no hazard, a clean `act` label must accept, the other clean labels must not accept, and a labelled groundedness level must round to the observed level.");
+  lines.push("A verdict is **decisive** when the lane accepts (`act`) or raises at least one hazard flag. A flag-free fallback or `confirm` is a deferral and counts as coverage, not as a decision; a deferring verifier leaves behavior unchanged. Grading uses a disposition rubric: every labelled hazard must be flagged (extra conservative flags on a hazard case are tolerated), a clean label must raise no hazard, a clean `act` label must accept, the other clean labels must not accept, and a labelled coverage level must round to the observed level.");
   lines.push("");
   lines.push(`Live model: \`${model}\` at \`${baseUrl}\`. ${NARRATION_BENCHMARK_CORPUS.length} cases x ${repeats} repeats = ${samples.length} graded calls; ${okCalls} transport calls succeeded. Thresholds: action ${thresholds.actionThreshold}, review ${thresholds.reviewThreshold}.`);
   lines.push("");
   lines.push("## Corpus");
   lines.push("");
-  lines.push("| Case | Category | Split | Expected (band / flags / groundedness) |");
+  lines.push("| Case | Category | Split | Expected (band / flags / coverage) |");
   lines.push("| --- | --- | --- | --- |");
   for (const entry of NARRATION_BENCHMARK_CORPUS) {
     lines.push(`| ${entry.id} | ${entry.category} | ${entry.holdout ? "holdout" : "dev"} | ${expectedText(entry)} |`);
@@ -482,7 +530,7 @@ export function renderNarrationBenchmark(input: {
   lines.push("");
   lines.push("## Per-case results (all repeats)");
   lines.push("");
-  lines.push("| Case | Category | Bands (act/confirm/fallback) | Decisive | Correct | Accepted | Mean signal | Mean groundedness |");
+  lines.push("| Case | Category | Bands (act/confirm/fallback) | Decisive | Correct | Accepted | Mean signal | Mean coverage |");
   lines.push("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |");
   for (const summary of summaries) {
     lines.push(`| ${summary.id} | ${summary.category} | ${summary.bands.act}/${summary.bands.confirm}/${summary.bands.fallback} | ${summary.decisive}/${summary.total} | ${summary.correct}/${summary.total} | ${summary.accepted}/${summary.total} | ${summary.meanSignal.toFixed(3)} | ${summary.meanGroundedness === null ? "n/a" : summary.meanGroundedness.toFixed(3)} |`);
@@ -524,18 +572,25 @@ export function renderNarrationBenchmark(input: {
   lines.push("");
   lines.push("## Observations");
   lines.push("");
-  lines.push(`- **Coverage.** The lane accepted ${evaluation.acceptedSamples} of ${samples.length} calls and took ${evaluation.decisiveSamples} decisive verdicts (accept or flag); the rest deferred. At the production 0.75 action threshold most grounded narrations land in \`confirm\`, so the lane rarely accepts even when it should.`);
+  lines.push(`- **Coverage.** The lane accepted ${evaluation.acceptedSamples} of ${samples.length} calls and took ${evaluation.decisiveSamples} decisive verdicts (accept or flag); the rest deferred to leave behavior unchanged.`);
+  const expectationFor = (summary: NarrationCaseSummary): NarrationBenchmarkCase | undefined =>
+    NARRATION_BENCHMARK_CORPUS.find((candidate) => candidate.id === summary.id);
   const missedHazard = summaries.filter((summary) => {
-    const entry = NARRATION_BENCHMARK_CORPUS.find((candidate) => candidate.id === summary.id);
+    const entry = expectationFor(summary);
     return entry !== undefined && entry.expected.flags.length > 0 && summary.correct < summary.total;
   }).map((summary) => summary.id);
+  const groundedMiss = summaries.filter((summary) => {
+    const entry = expectationFor(summary);
+    return entry !== undefined && entry.expected.band === "act" && summary.accepted < summary.total;
+  }).map((summary) => summary.id);
   const falseAccept = summaries.filter((summary) => {
-    const entry = NARRATION_BENCHMARK_CORPUS.find((candidate) => candidate.id === summary.id);
+    const entry = expectationFor(summary);
     return entry !== undefined && entry.expected.band !== "act" && summary.accepted > 0;
   }).map((summary) => summary.id);
   lines.push(`- **Hazards.** ${missedHazard.length === 0 ? "Every labelled hazard was flagged." : `Missed hazards: ${missedHazard.join(", ")}.`} Extra conservative flags on a hazard case are tolerated, so the test isolates detection rather than exact flag sets.`);
-  lines.push(`- **False accepts.** ${falseAccept.length === 0 ? "No narration labelled non-accepting was accepted." : `The lane accepted narrations labelled non-accepting: ${falseAccept.join(", ")}.`} The \`groundedness\` score over-credits a narration that states a single committed fact, so "partly grounded" labels are not separated from "fully grounded".`);
-  lines.push(`- **Calibration.** Raw top signals sit near 0.8–1.0 whether or not the verdict is correct, so the Platt map cannot repair genuine errors; the Brier/ECE bars are a ceiling on how many decisive mistakes the gate tolerates. The fitted map is reported as-is (a negative slope means the dev split's high-signal errors outnumbered high-signal successes).`);
+  lines.push(`- **Grounding.** ${groundedMiss.length === 0 ? "Every fully grounded case was accepted." : `Fully grounded cases not always accepted: ${groundedMiss.join(", ")}.`} A grounded deferral costs coverage but never correctness, because a deferring lane leaves the narration untouched.`);
+  lines.push(`- **False accepts.** ${falseAccept.length === 0 ? "No narration labelled non-accepting was accepted." : `The lane accepted narrations labelled non-accepting: ${falseAccept.join(", ")}.`}`);
+  lines.push(`- **Calibration.** Held-out calibrated Brier ${evaluation.holdout.calibrated.brier.toFixed(4)} and ECE ${evaluation.holdout.calibrated.expectedCalibrationError.toFixed(4)}; all-decisive calibrated Brier ${evaluation.all.calibrated.brier.toFixed(4)} and ECE ${evaluation.all.calibrated.expectedCalibrationError.toFixed(4)}. The fitted map is reported as-is (a negative slope means the dev split's high-signal errors outnumbered high-signal successes).`);
   lines.push("");
   lines.push("## Reproduce");
   lines.push("");
@@ -582,7 +637,7 @@ async function main(): Promise<void> {
       try {
         const result = await completeWithSystemOne({ settings, state, questions });
         model = result.model.responseModel ?? model;
-        const composed = composeNarrationVerification(result.answers, thresholds);
+        const composed = composeNarrationVerification(result.answers, thresholds, { factCount: benchmarkCase.committedFacts.length });
         const sample = toNarrationSample(benchmarkCase, composed);
         samples.push(sample);
         calls.push({

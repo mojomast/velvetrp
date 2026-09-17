@@ -28,10 +28,15 @@ test("reports exactly the recorded lanes as promoted", () => {
   assert.equal(router.record?.evidence, "docs/system-one-router-benchmark.md");
   assert.equal(router.gate?.promoted, true);
 
-  const promoted = SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).promoted);
-  assert.deepEqual([...promoted].sort(), ["cost-router", "speaker-routing"]);
+  const narration = lanePromotionStatus("narration-verification");
+  assert.equal(narration.promoted, true);
+  assert.equal(narration.record?.evidence, "docs/system-one-narration-benchmark.md");
+  assert.equal(narration.gate?.promoted, true);
 
-  const others = SYSTEM_ONE_LANES.filter((lane) => lane !== "speaker-routing" && lane !== "cost-router");
+  const promoted = SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).promoted);
+  assert.deepEqual([...promoted].sort(), ["cost-router", "narration-verification", "speaker-routing"]);
+
+  const others = SYSTEM_ONE_LANES.filter((lane) => lane !== "speaker-routing" && lane !== "cost-router" && lane !== "narration-verification");
   for (const lane of others) {
     const status = lanePromotionStatus(lane);
     assert.equal(status.promoted, false, `${lane} must be unpromoted`);
@@ -62,8 +67,9 @@ test("renders a deterministic promotion section with not-recorded lanes", () => 
   assert.match(first, /- Calibration: a=2\.5732, b=1\.3973/);
   assert.match(first, /- Gate: pass/);
   assert.match(first, /^\| cost-router \| yes \| 2026-09-17 \| docs\/system-one-router-benchmark\.md \| pass \|$/m);
+  assert.match(first, /^\| narration-verification \| yes \| 2026-09-17 \| docs\/system-one-narration-benchmark\.md \| pass \|$/m);
 
-  const recorded = new Set<string>(["speaker-routing", "cost-router"]);
+  const recorded = new Set<string>(["speaker-routing", "cost-router", "narration-verification"]);
   for (const lane of SYSTEM_ONE_LANES.filter((entry) => !recorded.has(entry))) {
     assert.match(
       first,

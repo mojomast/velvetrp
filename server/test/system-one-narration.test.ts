@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildNarrationQuestions,
   composeNarrationVerification,
+  narrationContradictionKey,
+  narrationReflectionKey,
   narrationVerificationState,
   NARRATION_CONTRADICTS_RECEIPT_KEY,
   NARRATION_CROSSES_BOUNDARY_KEY,
-  NARRATION_GROUNDEDNESS_KEY,
-  NARRATION_GROUNDEDNESS_LEVELS,
   NARRATION_INVENTS_MECHANIC_KEY,
   type NarrationVerificationInput,
 } from "../src/agent/systemOneNarration.js";
@@ -21,28 +21,28 @@ const input: NarrationVerificationInput = {
 };
 
 const hazard = (noul: number): SystemOneAnswer => ({ type: "noul", noul });
-const grounded = (score: number): SystemOneAnswer => ({
-  type: "score",
-  score,
-  confidence: 0.9,
-  legend: { 0: "ungrounded", 1: "partly grounded", 2: "fully grounded" },
-  probabilities: { 0: 0.05, 1: 0.15, 2: 0.8 },
+
+const cleanAnswers = (): Record<string, SystemOneAnswer> => ({
+  [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05),
+  [NARRATION_CROSSES_BOUNDARY_KEY]: hazard(0.05),
+  [narrationReflectionKey(0)]: hazard(0.9),
+  [narrationReflectionKey(1)]: hazard(0.9),
+  [narrationContradictionKey(0)]: hazard(0.05),
+  [narrationContradictionKey(1)]: hazard(0.05),
 });
 
 describe("System One narration verification battery", () => {
-  it("builds one noul per hazard plus a three-level groundedness score", () => {
+  it("builds one coverage and one contradiction noul per fact plus the aggregate hazards", () => {
     const questions = buildNarrationQuestions(input);
     expect(Object.keys(questions)).toEqual([
-      NARRATION_CONTRADICTS_RECEIPT_KEY,
       NARRATION_INVENTS_MECHANIC_KEY,
       NARRATION_CROSSES_BOUNDARY_KEY,
-      NARRATION_GROUNDEDNESS_KEY,
+      narrationReflectionKey(0),
+      narrationContradictionKey(0),
+      narrationReflectionKey(1),
+      narrationContradictionKey(1),
     ]);
-    expect(questions[NARRATION_CONTRADICTS_RECEIPT_KEY]).toMatchObject({ type: "noul" });
-    expect(questions[NARRATION_INVENTS_MECHANIC_KEY]).toMatchObject({ type: "noul" });
-    expect(questions[NARRATION_CROSSES_BOUNDARY_KEY]).toMatchObject({ type: "noul" });
-    expect(questions[NARRATION_GROUNDEDNESS_KEY]).toMatchObject({ type: "score" });
-    expect((questions[NARRATION_GROUNDEDNESS_KEY] as { criteria: string[] }).criteria).toEqual([...NARRATION_GROUNDEDNESS_LEVELS]);
+    for (const question of Object.values(questions)) expect(question).toMatchObject({ type: "noul" });
   });
 
   it("embeds committed facts and declared boundaries in the question guidance", () => {
@@ -51,32 +51,27 @@ describe("System One narration verification battery", () => {
     expect(rendered).toContain("The mill wheel is broken");
     expect(rendered).toContain("Aria holds the brass key");
     expect(rendered).toContain("Do not depict self-harm");
-    expect(rendered).toContain("compatible atmosphere");
+    expect(rendered).toContain("merely omits");
   });
 
-  it("acts when nothing is flagged and groundedness is confidently high", () => {
-    const answers = {
-      [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.1),
-      [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05),
-      [NARRATION_CROSSES_BOUNDARY_KEY]: hazard(0.05),
-      [NARRATION_GROUNDEDNESS_KEY]: grounded(2),
-    };
-    expect(composeNarrationVerification(answers, thresholds)).toEqual({
+  it("acts when every fact is reflected and nothing is flagged", () => {
+    expect(composeNarrationVerification(cleanAnswers(), thresholds)).toEqual({
       band: "act",
       flags: [],
       groundedness: 1,
-      topSignal: 1,
+      topSignal: 0.9,
     });
   });
 
-  it("flags a contradiction at the action threshold and keeps the band non-act", () => {
+  it("flags a per-fact contradiction at the action threshold and keeps the band non-act", () => {
     const answers = {
-      [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.9),
-      [NARRATION_GROUNDEDNESS_KEY]: grounded(2),
+      [narrationReflectionKey(0)]: hazard(0.05),
+      [narrationReflectionKey(1)]: hazard(0.9),
+      [narrationContradictionKey(0)]: hazard(0.9),
+      [narrationContradictionKey(1)]: hazard(0.05),
     };
-    const composed = composeNarrationVerification(answers, thresholds);
+    const composed = composeNarrationVerification(answers, thresholds, { factCount: 2 });
     expect(composed.flags).toEqual([NARRATION_CONTRADICTS_RECEIPT_KEY]);
-    expect(composed.band).not.toBe("act");
     expect(composed.band).toBe("fallback");
   });
 
@@ -95,43 +90,57 @@ describe("System One narration verification battery", () => {
     expect(empty).not.toThrow();
     expect(empty()).toEqual({ band: "fallback", flags: [], groundedness: null, topSignal: null });
 
-    const partial = composeNarrationVerification({ [NARRATION_CONTRADICTS_RECEIPT_KEY]: { type: "choice", choice: "x", confidence: 0.9, probabilities: { x: 1 } } }, thresholds);
+    const partial = composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: { type: "choice", choice: "x", confidence: 0.9, probabilities: { x: 1 } } }, thresholds);
     expect(partial).toEqual({ band: "fallback", flags: [], groundedness: null, topSignal: null });
   });
 
-  it("normalizes groundedness over the declared levels and nulls it when absent", () => {
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(0) }, thresholds).groundedness).toBe(0);
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(1) }, thresholds).groundedness).toBe(0.5);
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(2) }, thresholds).groundedness).toBe(1);
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(9) }, thresholds).groundedness).toBe(1);
+  it("computes coverage from the per-fact reflection nouls", () => {
+    const partly = composeNarrationVerification({
+      [narrationReflectionKey(0)]: hazard(0.9),
+      [narrationReflectionKey(1)]: hazard(0.1),
+    }, thresholds, { factCount: 2 });
+    expect(partly.groundedness).toBe(0.5);
+    expect(partly.band).toBe("confirm");
+
+    const ungrounded = composeNarrationVerification({
+      [narrationReflectionKey(0)]: hazard(0.1),
+      [narrationReflectionKey(1)]: hazard(0.1),
+    }, thresholds, { factCount: 2 });
+    expect(ungrounded.groundedness).toBe(0);
+    expect(ungrounded.band).toBe("fallback");
+
+    // A missing reflection answer for a declared fact counts against coverage.
+    const missing = composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.9) }, thresholds, { factCount: 2 });
+    expect(missing.groundedness).toBe(0.5);
+
+    const inferred = composeNarrationVerification({ [narrationReflectionKey(0)]: hazard(0.9) }, thresholds);
+    expect(inferred.groundedness).toBe(1);
+    expect(inferred.band).toBe("act");
+
     expect(composeNarrationVerification({}, thresholds).groundedness).toBeNull();
+    expect(composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.05) }, thresholds).groundedness).toBeNull();
   });
 
-  it("honors the thresholds when banding hazards and groundedness", () => {
+  it("honors the thresholds when banding hazards and coverage", () => {
     const strict = { actionThreshold: 0.6, reviewThreshold: 0.4 };
-    expect(composeNarrationVerification({ [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.6) }, strict).flags).toEqual([NARRATION_CONTRADICTS_RECEIPT_KEY]);
+    expect(composeNarrationVerification({ [narrationContradictionKey(0)]: hazard(0.6) }, strict).flags).toEqual([NARRATION_CONTRADICTS_RECEIPT_KEY]);
 
     const moderateHazard = composeNarrationVerification({ [NARRATION_INVENTS_MECHANIC_KEY]: hazard(0.6) }, thresholds);
     expect(moderateHazard.flags).toEqual([]);
     expect(moderateHazard.band).toBe("confirm");
 
-    const moderateGrounding = composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(1) }, thresholds);
-    expect(moderateGrounding.band).toBe("confirm");
-
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(1) }, strict).band).toBe("confirm");
-    expect(composeNarrationVerification({ [NARRATION_GROUNDEDNESS_KEY]: grounded(0) }, strict).band).toBe("fallback");
+    const moderateCoverage = composeNarrationVerification({
+      [narrationReflectionKey(0)]: hazard(0.9),
+      [narrationReflectionKey(1)]: hazard(0.1),
+    }, thresholds);
+    expect(moderateCoverage.band).toBe("confirm");
   });
 
   it("is pure: identical inputs produce identical outputs and inputs are not mutated", () => {
-    const answers: Record<string, SystemOneAnswer> = {
-      [NARRATION_CONTRADICTS_RECEIPT_KEY]: hazard(0.2),
-      [NARRATION_GROUNDEDNESS_KEY]: grounded(2),
-    };
+    const answers = cleanAnswers();
     const before = JSON.parse(JSON.stringify({ input, answers }));
 
-    const firstQuestions = buildNarrationQuestions(input);
-    const secondQuestions = buildNarrationQuestions(input);
-    expect(firstQuestions).toEqual(secondQuestions);
+    expect(buildNarrationQuestions(input)).toEqual(buildNarrationQuestions(input));
 
     const first = composeNarrationVerification(answers, thresholds);
     const second = composeNarrationVerification(answers, thresholds);

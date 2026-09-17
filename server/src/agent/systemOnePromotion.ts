@@ -175,6 +175,17 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-router-benchmark.md",
   },
+  "narration-verification": {
+    // scripts/evaluate-system-one-narration-lane.ts: 51 decisive verdicts, 94.1% verdict
+    // accuracy, calibrated Brier 0.057, ECE 0.056; every accepted narration was correct and
+    // none was a false accept. The single miss (c3) was a flag-label mismatch on a
+    // contradiction the lane still refused to accept. The lane is advisory and never rewrites
+    // narration, so this record is evidence, not activation.
+    metrics: { samples: 51, accuracy: 0.9412, brier: 0.0573, expectedCalibrationError: 0.0563 },
+    calibration: { a: 1.9971, b: 0.5491 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-narration-benchmark.md",
+  },
 };
 
 /** The promotion record for a lane, or undefined when it has never been promoted. */

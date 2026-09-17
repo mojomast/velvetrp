@@ -5,6 +5,7 @@ import { orchestrateCampaignDmBeat } from "../src/agent/campaignDmOrchestrator.j
 import { DM_SCENE_DESCRIPTION_PREFIX } from "../src/agent/dmNarration.js";
 import { defaultSystemOneSettings } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
+import { narrationReflectionKey } from "../src/agent/systemOneNarration.js";
 import type { SystemOneDirectorDependency } from "../src/agent/systemOneDirector.js";
 import type { AdventureAgentDependencies } from "../src/agent/adventureOrchestrator.js";
 import { dmDependencies, dmFixture } from "./fixtures/dmCampaign.js";
@@ -51,7 +52,7 @@ describe("System One narration verification shadow lane", () => {
     expect(result.narration).toBeTruthy();
     // One planning Director shadow plus one narration verification call.
     expect(caller.calls).toHaveLength(2);
-    const narrationCall = caller.calls.find((call) => "contradicts_receipt" in call.questions)!;
+    const narrationCall = caller.calls.find((call) => narrationReflectionKey(0) in call.questions)!;
     expect(narrationCall).toBeDefined();
 
     const rows = narrationVerificationRows();
