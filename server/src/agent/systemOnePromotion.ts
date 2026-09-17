@@ -166,6 +166,15 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-benchmark.md",
   },
+  "cost-router": {
+    // scripts/evaluate-system-one-router-lane.ts: 45 acted decisions, 100% handler
+    // accuracy, raw ECE 0.057 -> calibrated ECE 0.003 (held-out ECE 0.003). The lane has
+    // no active handler-selection path yet, so this record is evidence, not activation.
+    metrics: { samples: 45, accuracy: 1, brier: 0.0001, expectedCalibrationError: 0.0031 },
+    calibration: { a: 2.2177, b: 0.9611 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-router-benchmark.md",
+  },
 };
 
 /** The promotion record for a lane, or undefined when it has never been promoted. */

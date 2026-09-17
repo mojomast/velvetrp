@@ -14,8 +14,11 @@ runtime promotion record yet — it waits for live shadow data with negative exa
 surrounding tooling includes a **Platt calibration module**, a **promotion-gate module**, a
 **decision-record read API**, a **settings UI**, a **shadow-decision report CLI**, and a
 [before/after benefit report](system-one-benefit-report.md). The **L3 narration/receipt
-verification** and **L7 cost/quality router** are **wired in shadow (record-only)**.
-**Everything remains disabled by default.** This document remains
+verification** and **L7 cost/quality router** are **wired in shadow (record-only)**; each
+now has a [narration](system-one-narration-benchmark.md) and
+[router](system-one-router-benchmark.md) evaluation — the router passes its gate and
+carries a record (no activation path yet), while narration is **not ready** and needs a
+battery redesign. **Everything remains disabled by default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
@@ -358,6 +361,11 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Composition.** Produces an observation only. High contradiction probability flags
   for deterministic replacement (already implemented for travel) or GM review. It never
   rewrites narration and never becomes story truth.
+- **Evaluation.** [System One narration benchmark](system-one-narration-benchmark.md)
+  runs the battery on a labeled corpus with Brier/ECE and the promotion gate; it is
+  **NOT READY** (accuracy 0.727, Brier 0.168, ECE 0.204) because the `groundedness` score
+  under-credits multi-fact grounded narration and over-credits single-fact narration. The
+  battery needs a redesign before a promotion record may be added.
 - **Risk.** Must not be represented as a content-safety guarantee. See
   [Privacy and safety](#failure-privacy-and-safety).
 
@@ -443,6 +451,11 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   cheaper or human path, never bypass a required safety check.
 - **Authority.** Selects *which* handler runs, never *what* it does. It cannot skip
   authorization, candidate binding, confirmation, or receipts.
+- **Evaluation.** [System One cost-router benchmark](system-one-router-benchmark.md)
+  runs the battery on a labeled corpus with Brier/ECE and the promotion gate; it passes
+  on the calibrated signal (45 acted, 100% handler accuracy, raw ECE 0.057 → calibrated
+  0.003) and carries a promotion record. No active handler-selection path is wired yet, so
+  the lane remains record-only despite the passing gate.
 - **Risk.** Routing can silently change system behavior. It must be observable, logged
   per decision, and default to the status quo on any uncertainty.
 

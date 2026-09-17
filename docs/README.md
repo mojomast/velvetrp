@@ -60,6 +60,8 @@ Documents are grouped by their primary role. Normative documents describe curren
 - [System One Director (L1) calibration](system-one-director-calibration.md) - Generated live calibration of the Director selector against the provider-free oracle, with coverage, Brier/ECE, and the promotion-gate verdict.
 - [System One (Jev) Director-lane benchmark](system-one-director-benchmark.md) - Generated Jev-vs-DeepSeek results for the Director lane, including the gated lane that would ship, with latency, cost, and oracle accuracy.
 - [System One (Jev) before-and-after benefit report](system-one-benefit-report.md) - Consolidated measured benefit of the Jev lanes: per-decision latency and cost savings, reliability, and quality versus the OpenAI-compatible path.
+- [System One (Jev) cost-router benchmark](system-one-router-benchmark.md) - Generated live evaluation of the L7 handler-routing lane against a labeled corpus, with calibration and the promotion-gate verdict.
+- [System One (Jev) narration benchmark](system-one-narration-benchmark.md) - Generated live evaluation of the L3 narration-verification lane against a labeled corpus, with calibration and the (not ready) promotion-gate verdict.
 - [AI dungeon master design](ai-dungeon-master.md) - Implemented human/AI director controls, bounded provider phases, campaign preparation, research, authority and secret boundaries, and current limitations.
 - [RPG roadmap](ROADMAP.md) - Current milestone sequencing plus preserved milestone history. Planned behavior is not a shipped contract.
 - [Harness Wars campaign report](harness-wars-campaign-report.md) - Recorded campaign hydration outcomes, canon inventory, and provider probes; not a runtime contract.

@@ -170,14 +170,11 @@ describe("System One promotion gate", () => {
     }
   });
 
-  it("promotes only lanes with a recorded, passing gate", () => {
-    // Room routing is the first promoted lane; nothing else may act yet.
+  it("promotes exactly the lanes with a recorded, passing gate", () => {
     expect(promotionRecord("speaker-routing")).toMatchObject({ evidence: "docs/system-one-benchmark.md" });
-    expect(isLanePromoted("speaker-routing")).toBe(true);
-    for (const lane of SYSTEM_ONE_LANES) {
-      if (lane === "speaker-routing") continue;
-      expect(isLanePromoted(lane), `${lane} must stay unpromoted`).toBe(false);
-    }
+    expect(promotionRecord("cost-router")).toMatchObject({ evidence: "docs/system-one-router-benchmark.md" });
+    const promoted = SYSTEM_ONE_LANES.filter((lane) => isLanePromoted(lane));
+    expect([...promoted].sort()).toEqual(["cost-router", "speaker-routing"]);
   });
 
   it("has a default gate for every System One lane", () => {
