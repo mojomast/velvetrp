@@ -1,4 +1,5 @@
 import type { SystemOneLane } from "../types.js";
+import type { PlattCalibration } from "./systemOneCalibration.js";
 
 /**
  * Measured calibration for one System One lane on a frozen holdout.
@@ -135,4 +136,50 @@ export function assertPromoted(result: SystemOnePromotionResult): void {
       `System One lane "${result.lane}" is not ready for promotion: ${result.reasons.join("; ")}`,
     );
   }
+}
+
+/**
+ * Frozen evidence that a lane cleared its gate on a measured evaluation.
+ *
+ * A record is a snapshot, not a guarantee: it names the evidence document and the
+ * calibration map that produced the calibrated metrics. Lanes without a record cannot
+ * act — the runtime records their decisions but never lets them change behavior.
+ */
+export interface SystemOnePromotionRecord {
+  metrics: CalibrationMetrics;
+  /** The Platt map that produced the calibrated metrics, to mirror in settings. */
+  calibration: PlattCalibration | null;
+  promotedAt: string;
+  evidence: string;
+}
+
+/**
+ * Measured, promoted lanes. Each entry is re-derivable by rerunning the named evidence
+ * command; adding one is the deliberate act that lets a lane leave shadow mode.
+ */
+export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemOnePromotionRecord>> = {
+  "speaker-routing": {
+    // scripts/benchmark-system-one-lanes.ts: 90 acted decisions, exact-set accuracy 100%,
+    // raw ECE 0.119 -> calibrated ECE 0.003 (held-out archive ECE 0.001).
+    metrics: { samples: 90, accuracy: 1, brier: 0, expectedCalibrationError: 0.0033 },
+    calibration: { a: 2.5732, b: 1.3973 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-benchmark.md",
+  },
+};
+
+/** The promotion record for a lane, or undefined when it has never been promoted. */
+export function promotionRecord(lane: SystemOneLane): SystemOnePromotionRecord | undefined {
+  return SYSTEM_ONE_PROMOTION_RECORDS[lane];
+}
+
+/**
+ * Whether a lane may leave shadow mode. A lane is promoted only when it has a record and
+ * that record still clears the lane's gate. The runtime checks this before acting, so an
+ * unpromoted lane records its decisions but never changes behavior.
+ */
+export function isLanePromoted(lane: SystemOneLane): boolean {
+  const record = promotionRecord(lane);
+  if (!record) return false;
+  return evaluatePromotionGate(lane, record.metrics).promoted;
 }

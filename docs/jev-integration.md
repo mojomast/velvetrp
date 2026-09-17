@@ -1,19 +1,21 @@
 # Jev (TypeSafe System One) integration
 
-Status: design plus **W0 scaffolding and the first lane**. The transport lane, strict
-schemas, second settings profile, feature flag, confidence-policy module, fake adapter,
-and settings/preflight HTTP routes are implemented and tested. The **L5 room-routing
-lane is wired** behind the flag, setting, and key, with confidence gating to the
-existing LLM/deterministic paths, plus **shadow mode**, a **lane-scoped budget**, and an
-**immutable decision-record sidecar**. The **L1 Director selector is also wired in
-shadow mode**, and the surrounding tooling now includes a **probability-calibration
-grader (Brier/ECE)**, a **decision-record read API**, a **settings UI**, and a
-**shadow-decision report CLI**. The **L3 narration/receipt verification** and **L7
-cost/quality router** are implemented and **wired in shadow (record-only)** in the
-Director narration and roleplay room-turn paths, with a **promotion-gate module** and a
-first [live Director calibration](system-one-director-calibration.md) that currently
-reports **not ready** at the default thresholds; **everything remains disabled by
-default.** This document remains
+Status: design plus **W0 scaffolding and the first promoted lane**. The transport lane,
+strict schemas, second settings profile, feature flag, confidence-policy module, fake
+adapter, and settings/preflight HTTP routes are implemented and tested. The **L5
+room-routing lane is the first promoted lane**: it is wired behind the flag, setting, and
+key, and changes behavior only when it is out of shadow mode **and** carries a recorded,
+passing promotion (`server/src/agent/systemOnePromotion.ts` `isLanePromoted`); otherwise it
+records only. It has confidence gating to the existing LLM/deterministic paths, a
+lane-scoped budget, and an immutable decision-record sidecar. The **L1 Director selector is
+wired in shadow mode**; its [calibration](system-one-director-calibration.md) passes on a
+frozen provider-free corpus once the fitted confidence map is applied, but it has no
+runtime promotion record yet — it waits for live shadow data with negative examples. The
+surrounding tooling includes a **Platt calibration module**, a **promotion-gate module**, a
+**decision-record read API**, a **settings UI**, a **shadow-decision report CLI**, and a
+[before/after benefit report](system-one-benefit-report.md). The **L3 narration/receipt
+verification** and **L7 cost/quality router** are **wired in shadow (record-only)**.
+**Everything remains disabled by default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
 [provider configuration](provider-configuration.md), or milestone status in the
@@ -388,11 +390,14 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Composition.** `act` uses the Jev selection; `confirm`/`fallback` returns the
   recorded decision without applying it, so `selectRoomSpeakers` continues to the LLM
   path and then `fallbackRoomSpeakers`. A Jev error also returns `null`.
-- **Toggle and shadow.** The lane runs only when `FEATURE_SYSTEM_ONE`,
+- **Toggle and promotion.** The lane runs only when `FEATURE_SYSTEM_ONE`,
   `SystemOneSettings.enabled`, and a usable key are all present; the route resolves it in
-  `server/src/routes/roleplay/interactions.ts`. `SystemOneSettings.shadow` runs the
-  battery and records the decision while leaving routing unchanged (`fallback_used: true`).
-  Usage is recorded under the `room_routing_system_one` kind.
+  `server/src/routes/roleplay/interactions.ts`. It changes routing only when it is **both**
+  out of shadow mode **and** carries a recorded, passing promotion
+  (`server/src/agent/systemOnePromotion.ts` `isLanePromoted`). Otherwise it records the
+  would-be decision and leaves routing unchanged (`fallback_used: true`). Room routing is the
+  first promoted lane (evidence: the benchmark below). Usage is recorded under the
+  `room_routing_system_one` kind.
 - **Budget.** Each dispatch reserves against the lane's own budget
   (`server/src/agent/systemOneBudget.ts`) before shipping and settles from reported
   usage; a denied reserve, like any lane failure, falls back without dispatching.

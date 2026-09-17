@@ -1,6 +1,6 @@
 # System One (Jev) room-routing benchmark
 
-Generated 2026-09-17T02:48:09.957Z by `scripts/benchmark-system-one-lanes.ts`.
+Generated 2026-09-17T03:15:47.510Z by `scripts/benchmark-system-one-lanes.ts`.
 
 ## What this measures
 
@@ -17,7 +17,7 @@ model path. Both are graded against the same labelled expected speaker set.
 | Price in / out (USD per million) | 0.042 / 0 | 0.07784 / 0.15568 |
 | Confidence thresholds (action / review) | 0.75 / 0.5 | n/a (always answers) |
 
-Battery: 20 scenarios x 3 repeats = 60 calls per arm.
+Battery: 20 scenarios x 5 repeats = 100 calls per arm.
 Costs for the DeepSeek arm are computed at OpenRouter's published V4 Flash rate for calculation parity
 with the router deployment, per operator instruction.
 
@@ -25,28 +25,28 @@ with the router deployment, per operator instruction.
 
 | Metric | Jev | DeepSeek (LLM) | Gated lane |
 | --- | ---: | ---: | ---: |
-| Calls | 60 | 60 | 60 |
-| Success rate | 100.0% | 95.0% | 100.0% |
+| Calls | 100 | 100 | 100 |
+| Success rate | 100.0% | 92.0% | 100.0% |
 | Deferral rate (no action taken) | 10.0% | 0.0% | 0.0% |
-| Exact-set accuracy | 90.0% | 80.0% | 90.0% |
-| Micro precision | 90.0% | 87.5% | 95.0% |
-| Micro recall | 90.0% | 93.3% | 100.0% |
-| Micro F1 | 90.0% | 89.4% | 96.7% |
-| Latency mean | 123 ms | 1514 ms | 353 ms |
-| Latency p50 | 110 ms | 1459 ms | 125 ms |
-| Latency p95 | 206 ms | 2498 ms | 2207 ms |
-| Input tokens (total) | 45144 | 8397 | 41544 |
-| Output tokens (total) | 6204 | 5842 | 6819 |
-| Input tokens (mean/call) | 752.4 | 139.9 | 692.4 |
-| Output tokens (mean/call) | 103.4 | 97.4 | 113.7 |
-| Total cost | $0.00189605 | $0.00156311 | $0.00196860 |
-| Cost / call | $0.00003160 | $0.00002605 | $0.00003281 |
-| Cost / 1,000 calls | $0.0316 | $0.0261 | $0.0328 |
-| Arm agreement | 80.0% | — | — |
+| Exact-set accuracy | 90.0% | 81.0% | 91.0% |
+| Micro precision | 90.0% | 86.5% | 95.5% |
+| Micro recall | 90.0% | 91.0% | 100.0% |
+| Micro F1 | 90.0% | 88.0% | 97.0% |
+| Latency mean | 117 ms | 1541 ms | 338 ms |
+| Latency p50 | 100 ms | 1381 ms | 109 ms |
+| Latency p95 | 238 ms | 3010 ms | 2012 ms |
+| Input tokens (total) | 75240 | 13553 | 69093 |
+| Output tokens (total) | 10342 | 9697 | 11179 |
+| Input tokens (mean/call) | 752.4 | 135.5 | 690.9 |
+| Output tokens (mean/call) | 103.4 | 97.0 | 111.8 |
+| Total cost | $0.00316008 | $0.00256459 | $0.00324082 |
+| Cost / call | $0.00003160 | $0.00002565 | $0.00003241 |
+| Cost / 1,000 calls | $0.0316 | $0.0256 | $0.0324 |
+| Arm agreement | 83.0% | — | — |
 
 The **gated lane** is the production behavior with the toggle on: Jev answers when a participant clears
 the action threshold, otherwise the LLM path runs, otherwise the deterministic fallback. This battery resolved
-as Jev 54, LLM 6, fallback 0.
+as Jev 90, LLM 9, fallback 1.
 
 ## Per-scenario results
 
@@ -61,28 +61,49 @@ threshold (confirm/fallback) and the lane would hand off to the LLM or determini
 | b4 | Captain, your orders? | Aria | Aria | act | Aria | Aria (system-one) | yes / yes / yes |
 | b5 | Engineer, can you fix the coupling? | Rowan | Rowan | act | Rowan | Rowan (system-one) | yes / yes / yes |
 | b6 | Aria and Rowan, meet me in the medbay. | Aria, Rowan | Rowan, Aria | act | — (error) | Rowan, Aria (system-one) | yes / no / yes |
-| b7 | Both of you, get to the airlock. | Aria, Rowan | Aria, Rowan | act | Rowan, Mira | Aria, Rowan (system-one) | yes / no / yes |
+| b7 | Both of you, get to the airlock. | Aria, Rowan | Aria, Rowan | act | Aria, Rowan | Aria, Rowan (system-one) | yes / yes / yes |
 | b8 | Everyone, brace for impact. | Aria, Rowan, Mira | Aria, Rowan, Mira | act | Aria, Rowan, Mira | Aria, Rowan, Mira (system-one) | yes / yes / yes |
 | b9 | What's our status? | Aria | — | defer | Aria, Rowan | Aria, Rowan (llm) | no / no / no |
 | t1 | Bram, another round! | Bram | Bram | act | Bram | Bram (system-one) | yes / yes / yes |
 | t2 | Sela, play something cheerful. | Sela | Sela | act | Sela | Sela (system-one) | yes / yes / yes |
 | t3 | Kade, watch the door. | Kade | Kade | act | Kade | Kade (system-one) | yes / yes / yes |
 | t4 | Innkeeper, we need rooms. | Bram | Bram | act | Bram | Bram (system-one) | yes / yes / yes |
-| t5 | Sela and Kade, what do you two think? | Sela, Kade | Sela, Kade | act | Sela, Kade | Sela, Kade (system-one) | yes / yes / yes |
+| t5 | Sela and Kade, what do you two think? | Sela, Kade | Kade, Sela | act | Sela, Kade | Kade, Sela (system-one) | yes / yes / yes |
 | t6 | Everyone, listen up. | Bram, Sela, Kade | Bram, Sela, Kade | act | Bram, Sela, Kade | Bram, Sela, Kade (system-one) | yes / yes / yes |
 | a1 | Ivo, where is the ledger? | Ivo | Ivo | act | Ivo | Ivo (system-one) | yes / yes / yes |
 | a2 | Nia, fetch the map. | Nia | Nia | act | Nia | Nia (system-one) | yes / yes / yes |
 | a3 | Warden, lock the vault. | Oren | Oren | act | Oren | Oren (system-one) | yes / yes / yes |
 | a4 | Archivist, is this shelf cursed? | Ivo | Ivo | act | Ivo | Ivo (system-one) | yes / yes / yes |
-| a5 | What did we find last night? | Ivo | — | defer | Ivo, Nia | Ivo, Nia (llm) | no / no / no |
+| a5 | What did we find last night? | Ivo | — | defer | — (error) | Ivo (fallback) | no / no / yes |
+
+## Promotion gate — `speaker-routing`
+
+Scored on the 90 decisions the Jev lane actually took: exact-set accuracy 100.0%, calibrated Brier 0.0000, calibrated ECE 0.0033.
+
+**PROMOTE**
+
+All gates passed.
+
+A passing gate is what the runtime checks before letting the lane act; until then it records only.
+
+### Calibration (fit on bridge/tavern, scored on the held-out archive)
+
+| Split | Signal | Brier | ECE |
+| --- | --- | ---: | ---: |
+| all acted (90) | raw | 0.0189 | 0.1191 |
+| all acted (90) | calibrated | 0.0000 | 0.0033 |
+| held-out archive (20) | raw | 0.0077 | 0.0820 |
+| held-out archive (20) | calibrated | 0.0000 | 0.0007 |
+
+Map: `sigmoid(a * logit(p) + b)` with a = 2.5732, b = 1.3973.
 
 ## Observations
 
-- **Reliability.** Jev returned a schema-valid answer on 100.0% of calls with no text parsing; the raw LLM path returned a usable JSON array on only 95.0%. Its failures were dominated by non-JSON replies (`room routing request failed: 400`, 3x); in production those throw and the route falls back deterministically.
-- **Confidence gating.** Jev deferred on 10.0% of calls rather than guess. The gated lane resolved 54/60 calls with Jev, 6 with the LLM, and 0 with the deterministic fallback.
-- **Latency.** Jev p50 is 110 ms vs 1459 ms (about 13.3x faster).
-- **Tokens.** Jev uses the most input tokens (752/call) because it asks one question per participant with full criteria; the LLM prompt is smaller (140/call) but its production output is capped at 512 tokens.
-- **Cost.** Per call, Jev costs $0.00003160 vs $0.00002605 (0.8x). Jev is cheaper than the LLM only if its larger per-call input is outweighed by the LLM's output rate, and free Jev output makes it competitive for multi-question batteries.
+- **Reliability.** Jev returned a schema-valid answer on 100.0% of calls with no text parsing; the raw LLM path returned a usable JSON array on only 92.0%. Its failures were dominated by non-JSON replies (`room routing request failed: 400`, 5x); in production those throw and the route falls back deterministically.
+- **Confidence gating.** Jev deferred on 10.0% of calls rather than guess. The gated lane resolved 90/100 calls with Jev, 9 with the LLM, and 1 with the deterministic fallback.
+- **Latency.** Jev p50 is 100 ms vs 1381 ms (about 13.8x faster).
+- **Tokens.** Jev uses the most input tokens (752/call) because it asks one question per participant with full criteria; the LLM prompt is smaller (136/call) but its production output is capped at 512 tokens.
+- **Cost.** Per call, Jev costs $0.00003160 vs $0.00002565 (0.8x). Jev is cheaper than the LLM only if its larger per-call input is outweighed by the LLM's output rate, and free Jev output makes it competitive for multi-question batteries.
 - **Accuracy.** Named, role, and group turns are handled well: Jev's per-participant `noul`s select multiple speakers and the shared `ensureGroupSpeakers` post-pass expands "both"/"everyone" turns in both arms. The remaining misses are no-addressee turns where Jev defers to the LLM and the LLM over-selects (e.g. it adds a second speaker when only the primary is expected); the deterministic single-primary rule would have been correct there.
 
 ## Reproduce

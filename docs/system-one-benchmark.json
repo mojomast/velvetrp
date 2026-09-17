@@ -535,10 +535,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 247,
+      "latencyMs": 248,
       "inputTokens": 748,
       "outputTokens": 103,
       "costUsd": 0.000031416,
+      "predictedProbability": 0.95,
       "selectedNames": [
         "Aria"
       ],
@@ -556,71 +557,7 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1999,
-      "inputTokens": 145,
-      "outputTokens": 84,
-      "costUsd": 0.00002436392,
-      "selectedNames": [
-        "Aria"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b1",
-      "arm": "lane",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 249,
-      "inputTokens": 748,
-      "outputTokens": 103,
-      "costUsd": 0.000031416,
-      "selectedNames": [
-        "Aria"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b1",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 139,
-      "inputTokens": 748,
-      "outputTokens": 103,
-      "costUsd": 0.000031416,
-      "selectedNames": [
-        "Aria"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b1",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1270,
+      "latencyMs": 1888,
       "inputTokens": 145,
       "outputTokens": 14,
       "costUsd": 0.000013466320000000002,
@@ -638,11 +575,11 @@
     {
       "scenarioId": "b1",
       "arm": "lane",
-      "repeat": 2,
+      "repeat": 1,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 177,
+      "latencyMs": 121,
       "inputTokens": 748,
       "outputTokens": 103,
       "costUsd": 0.000031416,
@@ -660,13 +597,14 @@
     {
       "scenarioId": "b1",
       "arm": "jev",
-      "repeat": 3,
+      "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 123,
+      "latencyMs": 149,
       "inputTokens": 748,
       "outputTokens": 103,
       "costUsd": 0.000031416,
+      "predictedProbability": 0.95,
       "selectedNames": [
         "Aria"
       ],
@@ -681,13 +619,78 @@
     {
       "scenarioId": "b1",
       "arm": "llm",
-      "repeat": 3,
+      "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1036,
+      "latencyMs": 1347,
       "inputTokens": 145,
-      "outputTokens": 62,
-      "costUsd": 0.00002093896,
+      "outputTokens": 50,
+      "costUsd": 0.0000190708,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 80,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 180,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1234,
+      "inputTokens": 145,
+      "outputTokens": 69,
+      "costUsd": 0.00002202872,
       "selectedNames": [
         "Aria"
       ],
@@ -706,7 +709,137 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 150,
+      "latencyMs": 62,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 77,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 950,
+      "inputTokens": 145,
+      "outputTokens": 15,
+      "costUsd": 0.000013622000000000001,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 114,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 72,
+      "inputTokens": 748,
+      "outputTokens": 103,
+      "costUsd": 0.000031416,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1201,
+      "inputTokens": 145,
+      "outputTokens": 55,
+      "costUsd": 0.000019849200000000003,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b1",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 101,
       "inputTokens": 748,
       "outputTokens": 103,
       "costUsd": 0.000031416,
@@ -727,10 +860,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 151,
+      "latencyMs": 101,
       "inputTokens": 752,
       "outputTokens": 104,
       "costUsd": 0.000031584,
+      "predictedProbability": 0.97,
       "selectedNames": [
         "Rowan"
       ],
@@ -748,71 +882,7 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1464,
-      "inputTokens": 149,
-      "outputTokens": 63,
-      "costUsd": 0.000021406,
-      "selectedNames": [
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b2",
-      "arm": "lane",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 186,
-      "inputTokens": 752,
-      "outputTokens": 104,
-      "costUsd": 0.000031584,
-      "selectedNames": [
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b2",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 83,
-      "inputTokens": 752,
-      "outputTokens": 104,
-      "costUsd": 0.000031584,
-      "selectedNames": [
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b2",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1099,
+      "latencyMs": 1254,
       "inputTokens": 149,
       "outputTokens": 79,
       "costUsd": 0.000023896880000000004,
@@ -830,11 +900,76 @@
     {
       "scenarioId": "b2",
       "arm": "lane",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 94,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "jev",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 111,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "predictedProbability": 0.97,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1456,
+      "inputTokens": 149,
+      "outputTokens": 76,
+      "costUsd": 0.000023429840000000003,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "lane",
       "repeat": 2,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 213,
+      "latencyMs": 219,
       "inputTokens": 752,
       "outputTokens": 104,
       "costUsd": 0.000031584,
@@ -855,10 +990,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 209,
+      "latencyMs": 115,
       "inputTokens": 752,
       "outputTokens": 104,
       "costUsd": 0.000031584,
+      "predictedProbability": 0.97,
       "selectedNames": [
         "Rowan"
       ],
@@ -876,10 +1012,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1241,
+      "latencyMs": 1296,
       "inputTokens": 149,
-      "outputTokens": 56,
-      "costUsd": 0.00002031624,
+      "outputTokens": 31,
+      "costUsd": 0.00001642424,
       "selectedNames": [
         "Rowan"
       ],
@@ -898,7 +1034,137 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 156,
+      "latencyMs": 68,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 58,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "predictedProbability": 0.97,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1287,
+      "inputTokens": 149,
+      "outputTokens": 88,
+      "costUsd": 0.000025298,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 137,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 121,
+      "inputTokens": 752,
+      "outputTokens": 104,
+      "costUsd": 0.000031584,
+      "predictedProbability": 0.97,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1236,
+      "inputTokens": 149,
+      "outputTokens": 67,
+      "costUsd": 0.000022028720000000003,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b2",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 85,
       "inputTokens": 752,
       "outputTokens": 104,
       "costUsd": 0.000031584,
@@ -919,7 +1185,51 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 84,
+      "latencyMs": 87,
+      "inputTokens": 749,
+      "outputTokens": 104,
+      "costUsd": 0.000031458,
+      "predictedProbability": 0.91,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1430,
+      "inputTokens": 146,
+      "outputTokens": 66,
+      "costUsd": 0.000021639520000000003,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "lane",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 76,
       "inputTokens": 749,
       "outputTokens": 104,
       "costUsd": 0.000031458,
@@ -936,14 +1246,36 @@
     },
     {
       "scenarioId": "b3",
-      "arm": "llm",
-      "repeat": 1,
+      "arm": "jev",
+      "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1244,
+      "latencyMs": 65,
+      "inputTokens": 749,
+      "outputTokens": 104,
+      "costUsd": 0.000031458,
+      "predictedProbability": 0.91,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1157,
       "inputTokens": 146,
-      "outputTokens": 46,
-      "costUsd": 0.000018525920000000003,
+      "outputTokens": 28,
+      "costUsd": 0.000015723680000000002,
       "selectedNames": [
         "Mira"
       ],
@@ -958,7 +1290,72 @@
     {
       "scenarioId": "b3",
       "arm": "lane",
-      "repeat": 1,
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 101,
+      "inputTokens": 749,
+      "outputTokens": 104,
+      "costUsd": 0.000031458,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 61,
+      "inputTokens": 749,
+      "outputTokens": 104,
+      "costUsd": 0.000031458,
+      "predictedProbability": 0.89,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1119,
+      "inputTokens": 146,
+      "outputTokens": 21,
+      "costUsd": 0.000014633920000000002,
+      "selectedNames": [
+        "Mira"
+      ],
+      "expectedNames": [
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b3",
+      "arm": "lane",
+      "repeat": 3,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
@@ -980,13 +1377,14 @@
     {
       "scenarioId": "b3",
       "arm": "jev",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
-      "latencyMs": 88,
+      "latencyMs": 101,
       "inputTokens": 749,
       "outputTokens": 104,
       "costUsd": 0.000031458,
+      "predictedProbability": 0.9,
       "selectedNames": [
         "Mira"
       ],
@@ -1001,13 +1399,13 @@
     {
       "scenarioId": "b3",
       "arm": "llm",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1482,
+      "latencyMs": 877,
       "inputTokens": 146,
-      "outputTokens": 65,
-      "costUsd": 0.000021483840000000002,
+      "outputTokens": 18,
+      "costUsd": 0.000014166880000000002,
       "selectedNames": [
         "Mira"
       ],
@@ -1022,11 +1420,11 @@
     {
       "scenarioId": "b3",
       "arm": "lane",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 78,
+      "latencyMs": 113,
       "inputTokens": 749,
       "outputTokens": 104,
       "costUsd": 0.000031458,
@@ -1044,13 +1442,14 @@
     {
       "scenarioId": "b3",
       "arm": "jev",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
-      "latencyMs": 65,
+      "latencyMs": 206,
       "inputTokens": 749,
       "outputTokens": 104,
       "costUsd": 0.000031458,
+      "predictedProbability": 0.91,
       "selectedNames": [
         "Mira"
       ],
@@ -1065,13 +1464,13 @@
     {
       "scenarioId": "b3",
       "arm": "llm",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1355,
+      "latencyMs": 1201,
       "inputTokens": 146,
-      "outputTokens": 13,
-      "costUsd": 0.000013388480000000001,
+      "outputTokens": 22,
+      "costUsd": 0.000014789600000000002,
       "selectedNames": [
         "Mira"
       ],
@@ -1086,11 +1485,11 @@
     {
       "scenarioId": "b3",
       "arm": "lane",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 199,
+      "latencyMs": 359,
       "inputTokens": 749,
       "outputTokens": 104,
       "costUsd": 0.000031458,
@@ -1111,10 +1510,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 70,
+      "latencyMs": 90,
       "inputTokens": 746,
       "outputTokens": 103,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.79,
       "selectedNames": [
         "Aria"
       ],
@@ -1132,10 +1532,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1389,
+      "latencyMs": 1822,
       "inputTokens": 143,
-      "outputTokens": 110,
-      "costUsd": 0.000028255920000000003,
+      "outputTokens": 138,
+      "costUsd": 0.00003261496,
       "selectedNames": [
         "Aria"
       ],
@@ -1154,7 +1554,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 63,
+      "latencyMs": 118,
       "inputTokens": 746,
       "outputTokens": 103,
       "costUsd": 0.000031332,
@@ -1175,10 +1575,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 194,
+      "latencyMs": 93,
       "inputTokens": 746,
       "outputTokens": 103,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.79,
       "selectedNames": [
         "Aria"
       ],
@@ -1196,10 +1597,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1668,
+      "latencyMs": 1230,
       "inputTokens": 143,
-      "outputTokens": 129,
-      "costUsd": 0.000031213840000000005,
+      "outputTokens": 73,
+      "costUsd": 0.000022495760000000003,
       "selectedNames": [
         "Aria"
       ],
@@ -1218,7 +1619,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 99,
+      "latencyMs": 90,
       "inputTokens": 746,
       "outputTokens": 103,
       "costUsd": 0.000031332,
@@ -1239,10 +1640,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 98,
+      "latencyMs": 66,
       "inputTokens": 746,
       "outputTokens": 103,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.79,
       "selectedNames": [
         "Aria"
       ],
@@ -1260,75 +1662,206 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1283,
+      "latencyMs": 1068,
       "inputTokens": 143,
-      "outputTokens": 91,
-      "costUsd": 0.000025298,
-      "selectedNames": [
-        "Aria"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b4",
-      "arm": "lane",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 164,
-      "inputTokens": 746,
-      "outputTokens": 103,
-      "costUsd": 0.000031332,
-      "selectedNames": [
-        "Aria"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b5",
-      "arm": "jev",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 62,
-      "inputTokens": 751,
-      "outputTokens": 104,
-      "costUsd": 0.000031542000000000004,
-      "selectedNames": [
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b5",
-      "arm": "llm",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1550,
-      "inputTokens": 147,
-      "outputTokens": 70,
+      "outputTokens": 72,
       "costUsd": 0.000022340080000000002,
       "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 96,
+      "inputTokens": 746,
+      "outputTokens": 103,
+      "costUsd": 0.000031332,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 153,
+      "inputTokens": 746,
+      "outputTokens": 103,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.81,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1927,
+      "inputTokens": 143,
+      "outputTokens": 152,
+      "costUsd": 0.00003479448,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 73,
+      "inputTokens": 746,
+      "outputTokens": 103,
+      "costUsd": 0.000031332,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 81,
+      "inputTokens": 746,
+      "outputTokens": 103,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.77,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1570,
+      "inputTokens": 143,
+      "outputTokens": 140,
+      "costUsd": 0.000032926320000000005,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b4",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 109,
+      "inputTokens": 746,
+      "outputTokens": 103,
+      "costUsd": 0.000031332,
+      "selectedNames": [
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "jev",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 92,
+      "inputTokens": 751,
+      "outputTokens": 104,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.86,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1307,
+      "inputTokens": 147,
+      "outputTokens": 105,
+      "costUsd": 0.000027788880000000006,
+      "selectedNames": [
         "Rowan"
       ],
       "expectedNames": [
@@ -1346,7 +1879,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 415,
+      "latencyMs": 276,
       "inputTokens": 751,
       "outputTokens": 104,
       "costUsd": 0.000031542000000000004,
@@ -1367,10 +1900,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 147,
+      "latencyMs": 238,
       "inputTokens": 751,
       "outputTokens": 104,
       "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.87,
       "selectedNames": [
         "Rowan"
       ],
@@ -1388,7 +1922,7 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1543,
+      "latencyMs": 1311,
       "inputTokens": 147,
       "outputTokens": 82,
       "costUsd": 0.000024208240000000003,
@@ -1410,7 +1944,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 61,
+      "latencyMs": 65,
       "inputTokens": 751,
       "outputTokens": 104,
       "costUsd": 0.000031542000000000004,
@@ -1431,10 +1965,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 151,
+      "latencyMs": 72,
       "inputTokens": 751,
       "outputTokens": 104,
       "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.86,
       "selectedNames": [
         "Rowan"
       ],
@@ -1452,10 +1987,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1305,
+      "latencyMs": 1436,
       "inputTokens": 147,
-      "outputTokens": 72,
-      "costUsd": 0.00002265144,
+      "outputTokens": 71,
+      "costUsd": 0.000022495760000000003,
       "selectedNames": [
         "Rowan"
       ],
@@ -1474,7 +2009,137 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 93,
+      "latencyMs": 106,
+      "inputTokens": 751,
+      "outputTokens": 104,
+      "costUsd": 0.000031542000000000004,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 148,
+      "inputTokens": 751,
+      "outputTokens": 104,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.88,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1293,
+      "inputTokens": 147,
+      "outputTokens": 74,
+      "costUsd": 0.0000229628,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 137,
+      "inputTokens": 751,
+      "outputTokens": 104,
+      "costUsd": 0.000031542000000000004,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 188,
+      "inputTokens": 751,
+      "outputTokens": 104,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.86,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1576,
+      "inputTokens": 147,
+      "outputTokens": 75,
+      "costUsd": 0.00002311848,
+      "selectedNames": [
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b5",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 112,
       "inputTokens": 751,
       "outputTokens": 104,
       "costUsd": 0.000031542000000000004,
@@ -1495,10 +2160,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 187,
+      "latencyMs": 89,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
+      "predictedProbability": 0.88,
       "selectedNames": [
         "Rowan",
         "Aria"
@@ -1519,7 +2185,7 @@
       "ok": false,
       "deferred": false,
       "error": "room routing request failed: 400",
-      "latencyMs": 248,
+      "latencyMs": 253,
       "inputTokens": 0,
       "outputTokens": 0,
       "costUsd": 0,
@@ -1540,7 +2206,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 128,
+      "latencyMs": 107,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
@@ -1563,10 +2229,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 195,
+      "latencyMs": 81,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
+      "predictedProbability": 0.87,
       "selectedNames": [
         "Rowan",
         "Aria"
@@ -1587,7 +2254,7 @@
       "ok": false,
       "deferred": false,
       "error": "room routing request failed: 400",
-      "latencyMs": 256,
+      "latencyMs": 254,
       "inputTokens": 0,
       "outputTokens": 0,
       "costUsd": 0,
@@ -1608,7 +2275,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 121,
+      "latencyMs": 208,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
@@ -1631,10 +2298,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 83,
+      "latencyMs": 87,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
+      "predictedProbability": 0.88,
       "selectedNames": [
         "Rowan",
         "Aria"
@@ -1655,7 +2323,7 @@
       "ok": false,
       "deferred": false,
       "error": "room routing request failed: 400",
-      "latencyMs": 255,
+      "latencyMs": 253,
       "inputTokens": 0,
       "outputTokens": 0,
       "costUsd": 0,
@@ -1676,7 +2344,145 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 164,
+      "latencyMs": 87,
+      "inputTokens": 754,
+      "outputTokens": 104,
+      "costUsd": 0.000031668,
+      "selectedNames": [
+        "Rowan",
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 136,
+      "inputTokens": 754,
+      "outputTokens": 104,
+      "costUsd": 0.000031668,
+      "predictedProbability": 0.88,
+      "selectedNames": [
+        "Rowan",
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": false,
+      "deferred": false,
+      "error": "room routing request failed: 400",
+      "latencyMs": 254,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 199,
+      "inputTokens": 754,
+      "outputTokens": 104,
+      "costUsd": 0.000031668,
+      "selectedNames": [
+        "Rowan",
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 96,
+      "inputTokens": 754,
+      "outputTokens": 104,
+      "costUsd": 0.000031668,
+      "predictedProbability": 0.88,
+      "selectedNames": [
+        "Rowan",
+        "Aria"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": false,
+      "deferred": false,
+      "error": "room routing request failed: 400",
+      "latencyMs": 254,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b6",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 76,
       "inputTokens": 754,
       "outputTokens": 104,
       "costUsd": 0.000031668,
@@ -1699,7 +2505,55 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 78,
+      "latencyMs": 183,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.8,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 3010,
+      "inputTokens": 148,
+      "outputTokens": 360,
+      "costUsd": 0.00006756512,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "lane",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 110,
       "inputTokens": 751,
       "outputTokens": 103,
       "costUsd": 0.000031542000000000004,
@@ -1718,14 +2572,38 @@
     },
     {
       "scenarioId": "b7",
-      "arm": "llm",
-      "repeat": 1,
+      "arm": "jev",
+      "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 2553,
+      "latencyMs": 126,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.75,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2299,
       "inputTokens": 148,
-      "outputTokens": 312,
-      "costUsd": 0.000060092480000000006,
+      "outputTokens": 284,
+      "costUsd": 0.00005573344,
       "selectedNames": [
         "Rowan",
         "Mira"
@@ -1742,81 +2620,11 @@
     {
       "scenarioId": "b7",
       "arm": "lane",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 128,
-      "inputTokens": 751,
-      "outputTokens": 103,
-      "costUsd": 0.000031542000000000004,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b7",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 63,
-      "inputTokens": 751,
-      "outputTokens": 103,
-      "costUsd": 0.000031542000000000004,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b7",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 2796,
-      "inputTokens": 148,
-      "outputTokens": 320,
-      "costUsd": 0.00006133792000000001,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "b7",
-      "arm": "lane",
       "repeat": 2,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 174,
+      "latencyMs": 71,
       "inputTokens": 751,
       "outputTokens": 103,
       "costUsd": 0.000031542000000000004,
@@ -1839,6 +2647,194 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
+      "latencyMs": 101,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.69,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2625,
+      "inputTokens": 148,
+      "outputTokens": 337,
+      "costUsd": 0.00006398448000000001,
+      "selectedNames": [
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 0.5,
+      "f1": 0.5
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 76,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 101,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.72,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 3269,
+      "inputTokens": 148,
+      "outputTokens": 434,
+      "costUsd": 0.00007908544000000001,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 74,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 76,
+      "inputTokens": 751,
+      "outputTokens": 103,
+      "costUsd": 0.000031542000000000004,
+      "predictedProbability": 0.79,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": false,
+      "deferred": false,
+      "error": "room routing response was not a JSON array",
+      "latencyMs": 4288,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b7",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
       "latencyMs": 111,
       "inputTokens": 751,
       "outputTokens": 103,
@@ -1857,62 +2853,16 @@
       "f1": 1
     },
     {
-      "scenarioId": "b7",
-      "arm": "llm",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 2281,
-      "inputTokens": 148,
-      "outputTokens": 274,
-      "costUsd": 0.00005417664000000001,
-      "selectedNames": [
-        "Rowan",
-        "Mira"
-      ],
-      "expectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "exact": false,
-      "precision": 0.5,
-      "recall": 0.5,
-      "f1": 0.5
-    },
-    {
-      "scenarioId": "b7",
-      "arm": "lane",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 78,
-      "inputTokens": 751,
-      "outputTokens": 103,
-      "costUsd": 0.000031542000000000004,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
       "scenarioId": "b8",
       "arm": "jev",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 145,
+      "latencyMs": 102,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
+      "predictedProbability": 0.89,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -1934,10 +2884,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1569,
+      "latencyMs": 1366,
       "inputTokens": 144,
-      "outputTokens": 117,
-      "costUsd": 0.000029423520000000002,
+      "outputTokens": 104,
+      "costUsd": 0.000027399680000000003,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -1960,7 +2910,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 104,
+      "latencyMs": 109,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
@@ -1985,10 +2935,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 100,
+      "latencyMs": 373,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
+      "predictedProbability": 0.81,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -2010,10 +2961,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1845,
+      "latencyMs": 1460,
       "inputTokens": 144,
-      "outputTokens": 128,
-      "costUsd": 0.000031136,
+      "outputTokens": 65,
+      "costUsd": 0.000021328160000000004,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -2036,7 +2987,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 133,
+      "latencyMs": 147,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
@@ -2061,10 +3012,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 84,
+      "latencyMs": 106,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
+      "predictedProbability": 0.86,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -2086,10 +3038,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1433,
+      "latencyMs": 1714,
       "inputTokens": 144,
-      "outputTokens": 58,
-      "costUsd": 0.000020238400000000003,
+      "outputTokens": 149,
+      "costUsd": 0.000034405280000000006,
       "selectedNames": [
         "Aria",
         "Rowan",
@@ -2112,7 +3064,161 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 138,
+      "latencyMs": 58,
+      "inputTokens": 747,
+      "outputTokens": 103,
+      "costUsd": 0.000031374,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 124,
+      "inputTokens": 747,
+      "outputTokens": 103,
+      "costUsd": 0.000031374,
+      "predictedProbability": 0.87,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1392,
+      "inputTokens": 144,
+      "outputTokens": 77,
+      "costUsd": 0.00002319632,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 80,
+      "inputTokens": 747,
+      "outputTokens": 103,
+      "costUsd": 0.000031374,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 171,
+      "inputTokens": 747,
+      "outputTokens": 103,
+      "costUsd": 0.000031374,
+      "predictedProbability": 0.85,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1576,
+      "inputTokens": 144,
+      "outputTokens": 129,
+      "costUsd": 0.00003129168,
+      "selectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "expectedNames": [
+        "Aria",
+        "Rowan",
+        "Mira"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "b8",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 90,
       "inputTokens": 747,
       "outputTokens": 103,
       "costUsd": 0.000031374,
@@ -2137,10 +3243,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": true,
-      "latencyMs": 118,
+      "latencyMs": 281,
       "inputTokens": 746,
       "outputTokens": 106,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.53,
       "selectedNames": [],
       "expectedNames": [
         "Aria"
@@ -2156,10 +3263,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1497,
+      "latencyMs": 1332,
       "inputTokens": 143,
-      "outputTokens": 78,
-      "costUsd": 0.000023274160000000002,
+      "outputTokens": 98,
+      "costUsd": 0.00002638776,
       "selectedNames": [
         "Aria",
         "Rowan"
@@ -2179,7 +3286,202 @@
       "ok": true,
       "deferred": false,
       "laneKind": "llm",
-      "latencyMs": 2207,
+      "latencyMs": 1835,
+      "inputTokens": 143,
+      "outputTokens": 141,
+      "costUsd": 0.000033082,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "jev",
+      "repeat": 2,
+      "ok": true,
+      "deferred": true,
+      "latencyMs": 72,
+      "inputTokens": 746,
+      "outputTokens": 106,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.59,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1877,
+      "inputTokens": 143,
+      "outputTokens": 150,
+      "costUsd": 0.000034483119999999997,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "llm",
+      "latencyMs": 2012,
+      "inputTokens": 143,
+      "outputTokens": 112,
+      "costUsd": 0.000028567280000000005,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": true,
+      "latencyMs": 395,
+      "inputTokens": 746,
+      "outputTokens": 106,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.57,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1579,
+      "inputTokens": 143,
+      "outputTokens": 94,
+      "costUsd": 0.000025765040000000004,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "llm",
+      "latencyMs": 1196,
+      "inputTokens": 143,
+      "outputTokens": 54,
+      "costUsd": 0.000019537840000000004,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": true,
+      "latencyMs": 103,
+      "inputTokens": 746,
+      "outputTokens": 106,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.58,
+      "selectedNames": [],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1679,
+      "inputTokens": 143,
+      "outputTokens": 115,
+      "costUsd": 0.000029034320000000002,
+      "selectedNames": [
+        "Aria",
+        "Rowan"
+      ],
+      "expectedNames": [
+        "Aria"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "b9",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "llm",
+      "latencyMs": 2100,
       "inputTokens": 143,
       "outputTokens": 160,
       "costUsd": 0.00003603992,
@@ -2198,13 +3500,14 @@
     {
       "scenarioId": "b9",
       "arm": "jev",
-      "repeat": 2,
+      "repeat": 5,
       "ok": true,
       "deferred": true,
-      "latencyMs": 84,
+      "latencyMs": 95,
       "inputTokens": 746,
       "outputTokens": 106,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.63,
       "selectedNames": [],
       "expectedNames": [
         "Aria"
@@ -2217,13 +3520,13 @@
     {
       "scenarioId": "b9",
       "arm": "llm",
-      "repeat": 2,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1990,
+      "latencyMs": 2054,
       "inputTokens": 143,
-      "outputTokens": 213,
-      "costUsd": 0.000044290960000000004,
+      "outputTokens": 210,
+      "costUsd": 0.00004382392000000001,
       "selectedNames": [
         "Aria",
         "Rowan"
@@ -2239,78 +3542,14 @@
     {
       "scenarioId": "b9",
       "arm": "lane",
-      "repeat": 2,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
       "laneKind": "llm",
-      "latencyMs": 2075,
+      "latencyMs": 1570,
       "inputTokens": 143,
-      "outputTokens": 169,
-      "costUsd": 0.00003744104,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": false,
-      "precision": 0.5,
-      "recall": 1,
-      "f1": 0.6666666666666666
-    },
-    {
-      "scenarioId": "b9",
-      "arm": "jev",
-      "repeat": 3,
-      "ok": true,
-      "deferred": true,
-      "latencyMs": 61,
-      "inputTokens": 746,
       "outputTokens": 106,
-      "costUsd": 0.000031332,
-      "selectedNames": [],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": false,
-      "precision": 0,
-      "recall": 0,
-      "f1": 0
-    },
-    {
-      "scenarioId": "b9",
-      "arm": "llm",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 2105,
-      "inputTokens": 143,
-      "outputTokens": 202,
-      "costUsd": 0.000042578480000000004,
-      "selectedNames": [
-        "Aria",
-        "Rowan"
-      ],
-      "expectedNames": [
-        "Aria"
-      ],
-      "exact": false,
-      "precision": 0.5,
-      "recall": 1,
-      "f1": 0.6666666666666666
-    },
-    {
-      "scenarioId": "b9",
-      "arm": "lane",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "llm",
-      "latencyMs": 1466,
-      "inputTokens": 143,
-      "outputTokens": 95,
-      "costUsd": 0.000025920720000000002,
+      "costUsd": 0.0000276332,
       "selectedNames": [
         "Aria",
         "Rowan"
@@ -2329,10 +3568,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 62,
+      "latencyMs": 235,
       "inputTokens": 762,
       "outputTokens": 106,
       "costUsd": 0.00003200400000000001,
+      "predictedProbability": 0.92,
       "selectedNames": [
         "Bram"
       ],
@@ -2350,10 +3590,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1486,
+      "latencyMs": 1688,
       "inputTokens": 148,
-      "outputTokens": 80,
-      "costUsd": 0.000023974720000000004,
+      "outputTokens": 92,
+      "costUsd": 0.00002584288,
       "selectedNames": [
         "Bram"
       ],
@@ -2372,7 +3612,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 110,
+      "latencyMs": 105,
       "inputTokens": 762,
       "outputTokens": 106,
       "costUsd": 0.00003200400000000001,
@@ -2393,10 +3633,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 148,
+      "latencyMs": 128,
       "inputTokens": 762,
       "outputTokens": 106,
       "costUsd": 0.00003200400000000001,
+      "predictedProbability": 0.91,
       "selectedNames": [
         "Bram"
       ],
@@ -2414,10 +3655,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1453,
+      "latencyMs": 1602,
       "inputTokens": 148,
-      "outputTokens": 58,
-      "costUsd": 0.00002054976,
+      "outputTokens": 110,
+      "costUsd": 0.000028645120000000003,
       "selectedNames": [
         "Bram"
       ],
@@ -2436,31 +3677,162 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
+      "latencyMs": 107,
+      "inputTokens": 762,
+      "outputTokens": 106,
+      "costUsd": 0.00003200400000000001,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 78,
+      "inputTokens": 762,
+      "outputTokens": 106,
+      "costUsd": 0.00003200400000000001,
+      "predictedProbability": 0.91,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1442,
+      "inputTokens": 148,
+      "outputTokens": 113,
+      "costUsd": 0.000029112160000000003,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 171,
+      "inputTokens": 762,
+      "outputTokens": 106,
+      "costUsd": 0.00003200400000000001,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 82,
+      "inputTokens": 762,
+      "outputTokens": 106,
+      "costUsd": 0.00003200400000000001,
+      "predictedProbability": 0.92,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1525,
+      "inputTokens": 148,
+      "outputTokens": 104,
+      "costUsd": 0.000027711040000000006,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 182,
+      "inputTokens": 762,
+      "outputTokens": 106,
+      "costUsd": 0.00003200400000000001,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t1",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
       "latencyMs": 81,
       "inputTokens": 762,
       "outputTokens": 106,
       "costUsd": 0.00003200400000000001,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t1",
-      "arm": "jev",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 86,
-      "inputTokens": 762,
-      "outputTokens": 106,
-      "costUsd": 0.00003200400000000001,
+      "predictedProbability": 0.92,
       "selectedNames": [
         "Bram"
       ],
@@ -2475,13 +3847,13 @@
     {
       "scenarioId": "t1",
       "arm": "llm",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1235,
+      "latencyMs": 1755,
       "inputTokens": 148,
-      "outputTokens": 70,
-      "costUsd": 0.000022417920000000002,
+      "outputTokens": 115,
+      "costUsd": 0.000029423520000000002,
       "selectedNames": [
         "Bram"
       ],
@@ -2496,11 +3868,11 @@
     {
       "scenarioId": "t1",
       "arm": "lane",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 100,
+      "latencyMs": 117,
       "inputTokens": 762,
       "outputTokens": 106,
       "costUsd": 0.00003200400000000001,
@@ -2521,7 +3893,51 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 93,
+      "latencyMs": 94,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1126,
+      "inputTokens": 149,
+      "outputTokens": 54,
+      "costUsd": 0.00002000488,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "lane",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 188,
       "inputTokens": 763,
       "outputTokens": 106,
       "costUsd": 0.000032046,
@@ -2538,14 +3954,36 @@
     },
     {
       "scenarioId": "t2",
-      "arm": "llm",
-      "repeat": 1,
+      "arm": "jev",
+      "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1739,
+      "latencyMs": 73,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.96,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1133,
       "inputTokens": 149,
-      "outputTokens": 87,
-      "costUsd": 0.000025142320000000006,
+      "outputTokens": 70,
+      "costUsd": 0.000022495760000000003,
       "selectedNames": [
         "Sela"
       ],
@@ -2560,19 +3998,301 @@
     {
       "scenarioId": "t2",
       "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 142,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 62,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.96,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1381,
+      "inputTokens": 149,
+      "outputTokens": 42,
+      "costUsd": 0.000018136720000000003,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 78,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 94,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.96,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1426,
+      "inputTokens": 149,
+      "outputTokens": 72,
+      "costUsd": 0.000022807120000000005,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 113,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 105,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1359,
+      "inputTokens": 149,
+      "outputTokens": 33,
+      "costUsd": 0.000016735600000000003,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t2",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 99,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "jev",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 91,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.82,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1228,
+      "inputTokens": 149,
+      "outputTokens": 60,
+      "costUsd": 0.00002093896,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "lane",
       "repeat": 1,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
+      "latencyMs": 90,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "jev",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
       "latencyMs": 66,
       "inputTokens": 763,
       "outputTokens": 106,
       "costUsd": 0.000032046,
+      "predictedProbability": 0.82,
       "selectedNames": [
-        "Sela"
+        "Kade"
       ],
       "expectedNames": [
-        "Sela"
+        "Kade"
       ],
       "exact": true,
       "precision": 1,
@@ -2580,41 +4300,20 @@
       "f1": 1
     },
     {
-      "scenarioId": "t2",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 115,
-      "inputTokens": 763,
-      "outputTokens": 106,
-      "costUsd": 0.000032046,
-      "selectedNames": [
-        "Sela"
-      ],
-      "expectedNames": [
-        "Sela"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t2",
+      "scenarioId": "t3",
       "arm": "llm",
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1299,
+      "latencyMs": 1028,
       "inputTokens": 149,
-      "outputTokens": 62,
-      "costUsd": 0.000021250320000000004,
+      "outputTokens": 58,
+      "costUsd": 0.000020627600000000002,
       "selectedNames": [
-        "Sela"
+        "Kade"
       ],
       "expectedNames": [
-        "Sela"
+        "Kade"
       ],
       "exact": true,
       "precision": 1,
@@ -2622,9 +4321,204 @@
       "f1": 1
     },
     {
-      "scenarioId": "t2",
+      "scenarioId": "t3",
       "arm": "lane",
       "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 142,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 75,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.82,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1136,
+      "inputTokens": 149,
+      "outputTokens": 69,
+      "costUsd": 0.000022340080000000002,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 179,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 90,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.82,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1143,
+      "inputTokens": 149,
+      "outputTokens": 59,
+      "costUsd": 0.000020783280000000003,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 106,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 107,
+      "inputTokens": 763,
+      "outputTokens": 106,
+      "costUsd": 0.000032046,
+      "predictedProbability": 0.82,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1273,
+      "inputTokens": 149,
+      "outputTokens": 71,
+      "costUsd": 0.00002265144,
+      "selectedNames": [
+        "Kade"
+      ],
+      "expectedNames": [
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t3",
+      "arm": "lane",
+      "repeat": 5,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
@@ -2633,10 +4527,10 @@
       "outputTokens": 106,
       "costUsd": 0.000032046,
       "selectedNames": [
-        "Sela"
+        "Kade"
       ],
       "expectedNames": [
-        "Sela"
+        "Kade"
       ],
       "exact": true,
       "precision": 1,
@@ -2644,20 +4538,151 @@
       "f1": 1
     },
     {
-      "scenarioId": "t2",
+      "scenarioId": "t4",
+      "arm": "jev",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 182,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "predictedProbability": 0.89,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "llm",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1444,
+      "inputTokens": 150,
+      "outputTokens": 76,
+      "costUsd": 0.00002350768,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "lane",
+      "repeat": 1,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 60,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "jev",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 89,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "predictedProbability": 0.9,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1235,
+      "inputTokens": 150,
+      "outputTokens": 89,
+      "costUsd": 0.00002553152,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 110,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
       "arm": "jev",
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 206,
-      "inputTokens": 763,
+      "latencyMs": 87,
+      "inputTokens": 764,
       "outputTokens": 106,
-      "costUsd": 0.000032046,
+      "costUsd": 0.000032088,
+      "predictedProbability": 0.89,
       "selectedNames": [
-        "Sela"
+        "Bram"
       ],
       "expectedNames": [
-        "Sela"
+        "Bram"
       ],
       "exact": true,
       "precision": 1,
@@ -2665,20 +4690,20 @@
       "f1": 1
     },
     {
-      "scenarioId": "t2",
+      "scenarioId": "t4",
       "arm": "llm",
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1219,
-      "inputTokens": 149,
-      "outputTokens": 74,
-      "costUsd": 0.000023118480000000004,
+      "latencyMs": 1869,
+      "inputTokens": 150,
+      "outputTokens": 148,
+      "costUsd": 0.00003471664000000001,
       "selectedNames": [
-        "Sela"
+        "Bram"
       ],
       "expectedNames": [
-        "Sela"
+        "Bram"
       ],
       "exact": true,
       "precision": 1,
@@ -2686,21 +4711,21 @@
       "f1": 1
     },
     {
-      "scenarioId": "t2",
+      "scenarioId": "t4",
       "arm": "lane",
       "repeat": 3,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 236,
-      "inputTokens": 763,
+      "latencyMs": 86,
+      "inputTokens": 764,
       "outputTokens": 106,
-      "costUsd": 0.000032046,
+      "costUsd": 0.000032088,
       "selectedNames": [
-        "Sela"
+        "Bram"
       ],
       "expectedNames": [
-        "Sela"
+        "Bram"
       ],
       "exact": true,
       "precision": 1,
@@ -2708,19 +4733,152 @@
       "f1": 1
     },
     {
-      "scenarioId": "t3",
+      "scenarioId": "t4",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 98,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "predictedProbability": 0.89,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1484,
+      "inputTokens": 150,
+      "outputTokens": 93,
+      "costUsd": 0.00002615424,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 75,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 95,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "predictedProbability": 0.88,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2505,
+      "inputTokens": 150,
+      "outputTokens": 279,
+      "costUsd": 0.00005511072000000001,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t4",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 120,
+      "inputTokens": 764,
+      "outputTokens": 106,
+      "costUsd": 0.000032088,
+      "selectedNames": [
+        "Bram"
+      ],
+      "expectedNames": [
+        "Bram"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
       "arm": "jev",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 101,
-      "inputTokens": 763,
+      "latencyMs": 127,
+      "inputTokens": 768,
       "outputTokens": 106,
-      "costUsd": 0.000032046,
+      "costUsd": 0.000032256,
+      "predictedProbability": 0.9,
       "selectedNames": [
-        "Kade"
+        "Kade",
+        "Sela"
       ],
       "expectedNames": [
+        "Sela",
         "Kade"
       ],
       "exact": true,
@@ -2729,19 +4887,21 @@
       "f1": 1
     },
     {
-      "scenarioId": "t3",
+      "scenarioId": "t5",
       "arm": "llm",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1291,
-      "inputTokens": 149,
-      "outputTokens": 57,
-      "costUsd": 0.000020471920000000004,
+      "latencyMs": 1228,
+      "inputTokens": 154,
+      "outputTokens": 44,
+      "costUsd": 0.00001883728,
       "selectedNames": [
+        "Sela",
         "Kade"
       ],
       "expectedNames": [
+        "Sela",
         "Kade"
       ],
       "exact": true,
@@ -2750,410 +4910,21 @@
       "f1": 1
     },
     {
-      "scenarioId": "t3",
+      "scenarioId": "t5",
       "arm": "lane",
       "repeat": 1,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
       "latencyMs": 102,
-      "inputTokens": 763,
+      "inputTokens": 768,
       "outputTokens": 106,
-      "costUsd": 0.000032046,
+      "costUsd": 0.000032256,
       "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 111,
-      "inputTokens": 763,
-      "outputTokens": 106,
-      "costUsd": 0.000032046,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1105,
-      "inputTokens": 149,
-      "outputTokens": 52,
-      "costUsd": 0.000019693520000000002,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "lane",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 75,
-      "inputTokens": 763,
-      "outputTokens": 106,
-      "costUsd": 0.000032046,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "jev",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 111,
-      "inputTokens": 763,
-      "outputTokens": 106,
-      "costUsd": 0.000032046,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "llm",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1156,
-      "inputTokens": 149,
-      "outputTokens": 74,
-      "costUsd": 0.000023118480000000004,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t3",
-      "arm": "lane",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 100,
-      "inputTokens": 763,
-      "outputTokens": 106,
-      "costUsd": 0.000032046,
-      "selectedNames": [
-        "Kade"
-      ],
-      "expectedNames": [
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "jev",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 117,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "llm",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1281,
-      "inputTokens": 150,
-      "outputTokens": 50,
-      "costUsd": 0.00001946,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "lane",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 121,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "jev",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 197,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 2001,
-      "inputTokens": 150,
-      "outputTokens": 136,
-      "costUsd": 0.00003284848,
-      "selectedNames": [
-        "Bram",
+        "Kade",
         "Sela"
       ],
       "expectedNames": [
-        "Bram"
-      ],
-      "exact": false,
-      "precision": 0.5,
-      "recall": 1,
-      "f1": 0.6666666666666666
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "lane",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 141,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "jev",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 74,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "llm",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1548,
-      "inputTokens": 150,
-      "outputTokens": 117,
-      "costUsd": 0.000029890560000000002,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t4",
-      "arm": "lane",
-      "repeat": 3,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 131,
-      "inputTokens": 764,
-      "outputTokens": 106,
-      "costUsd": 0.000032088,
-      "selectedNames": [
-        "Bram"
-      ],
-      "expectedNames": [
-        "Bram"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t5",
-      "arm": "jev",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 73,
-      "inputTokens": 768,
-      "outputTokens": 106,
-      "costUsd": 0.000032256,
-      "selectedNames": [
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
-        "Sela",
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t5",
-      "arm": "llm",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1346,
-      "inputTokens": 154,
-      "outputTokens": 67,
-      "costUsd": 0.000022417920000000002,
-      "selectedNames": [
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
-        "Sela",
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t5",
-      "arm": "lane",
-      "repeat": 1,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 122,
-      "inputTokens": 768,
-      "outputTokens": 108,
-      "costUsd": 0.000032256,
-      "selectedNames": [
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
         "Sela",
         "Kade"
       ],
@@ -3168,10 +4939,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 199,
+      "latencyMs": 65,
       "inputTokens": 768,
       "outputTokens": 106,
       "costUsd": 0.000032256,
+      "predictedProbability": 0.91,
       "selectedNames": [
         "Kade",
         "Sela"
@@ -3191,7 +4963,7 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1343,
+      "latencyMs": 1506,
       "inputTokens": 154,
       "outputTokens": 69,
       "costUsd": 0.00002272928,
@@ -3215,9 +4987,9 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 99,
+      "latencyMs": 64,
       "inputTokens": 768,
-      "outputTokens": 106,
+      "outputTokens": 108,
       "costUsd": 0.000032256,
       "selectedNames": [
         "Kade",
@@ -3238,10 +5010,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 137,
+      "latencyMs": 67,
       "inputTokens": 768,
       "outputTokens": 106,
       "costUsd": 0.000032256,
+      "predictedProbability": 0.9,
       "selectedNames": [
         "Kade",
         "Sela"
@@ -3261,10 +5034,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1439,
+      "latencyMs": 1186,
       "inputTokens": 154,
-      "outputTokens": 66,
-      "costUsd": 0.00002226224,
+      "outputTokens": 73,
+      "costUsd": 0.000023352000000000003,
       "selectedNames": [
         "Sela",
         "Kade"
@@ -3285,7 +5058,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 125,
+      "latencyMs": 208,
       "inputTokens": 768,
       "outputTokens": 106,
       "costUsd": 0.000032256,
@@ -3303,15 +5076,158 @@
       "f1": 1
     },
     {
+      "scenarioId": "t5",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 56,
+      "inputTokens": 768,
+      "outputTokens": 108,
+      "costUsd": 0.000032256,
+      "predictedProbability": 0.9,
+      "selectedNames": [
+        "Kade",
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1084,
+      "inputTokens": 154,
+      "outputTokens": 61,
+      "costUsd": 0.000021483840000000002,
+      "selectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 109,
+      "inputTokens": 768,
+      "outputTokens": 106,
+      "costUsd": 0.000032256,
+      "selectedNames": [
+        "Kade",
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 124,
+      "inputTokens": 768,
+      "outputTokens": 106,
+      "costUsd": 0.000032256,
+      "predictedProbability": 0.91,
+      "selectedNames": [
+        "Kade",
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 952,
+      "inputTokens": 154,
+      "outputTokens": 40,
+      "costUsd": 0.00001821456,
+      "selectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t5",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 106,
+      "inputTokens": 768,
+      "outputTokens": 106,
+      "costUsd": 0.000032256,
+      "selectedNames": [
+        "Kade",
+        "Sela"
+      ],
+      "expectedNames": [
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
       "scenarioId": "t6",
       "arm": "jev",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 96,
+      "latencyMs": 148,
       "inputTokens": 761,
       "outputTokens": 106,
       "costUsd": 0.000031962,
+      "predictedProbability": 0.73,
       "selectedNames": [
         "Bram",
         "Sela",
@@ -3333,10 +5249,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1578,
+      "latencyMs": 1682,
       "inputTokens": 147,
-      "outputTokens": 79,
-      "costUsd": 0.000023741200000000002,
+      "outputTokens": 95,
+      "costUsd": 0.000026232080000000004,
       "selectedNames": [
         "Bram",
         "Sela",
@@ -3359,7 +5275,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 295,
+      "latencyMs": 91,
       "inputTokens": 761,
       "outputTokens": 106,
       "costUsd": 0.000031962,
@@ -3382,88 +5298,90 @@
       "scenarioId": "t6",
       "arm": "jev",
       "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 107,
-      "inputTokens": 761,
-      "outputTokens": 106,
-      "costUsd": 0.000031962,
-      "selectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t6",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1331,
-      "inputTokens": 147,
-      "outputTokens": 81,
-      "costUsd": 0.000024052560000000005,
-      "selectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t6",
-      "arm": "lane",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 63,
-      "inputTokens": 761,
-      "outputTokens": 106,
-      "costUsd": 0.000031962,
-      "selectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "expectedNames": [
-        "Bram",
-        "Sela",
-        "Kade"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "t6",
-      "arm": "jev",
-      "repeat": 3,
       "ok": true,
       "deferred": false,
       "latencyMs": 80,
       "inputTokens": 761,
       "outputTokens": 106,
       "costUsd": 0.000031962,
+      "predictedProbability": 0.72,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1270,
+      "inputTokens": 147,
+      "outputTokens": 71,
+      "costUsd": 0.000022495760000000003,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 97,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 90,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "predictedProbability": 0.75,
       "selectedNames": [
         "Bram",
         "Sela",
@@ -3485,10 +5403,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1664,
+      "latencyMs": 1305,
       "inputTokens": 147,
-      "outputTokens": 119,
-      "costUsd": 0.000029968400000000003,
+      "outputTokens": 103,
+      "costUsd": 0.000027477520000000004,
       "selectedNames": [
         "Bram",
         "Sela",
@@ -3511,7 +5429,161 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 116,
+      "latencyMs": 152,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 164,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "predictedProbability": 0.75,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1545,
+      "inputTokens": 147,
+      "outputTokens": 73,
+      "costUsd": 0.000022807120000000005,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 94,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 100,
+      "inputTokens": 761,
+      "outputTokens": 106,
+      "costUsd": 0.000031962,
+      "predictedProbability": 0.72,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1451,
+      "inputTokens": 147,
+      "outputTokens": 128,
+      "costUsd": 0.00003136952,
+      "selectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "expectedNames": [
+        "Bram",
+        "Sela",
+        "Kade"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "t6",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 105,
       "inputTokens": 761,
       "outputTokens": 106,
       "costUsd": 0.000031962,
@@ -3536,10 +5608,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 203,
+      "latencyMs": 81,
       "inputTokens": 745,
       "outputTokens": 99,
       "costUsd": 0.00003129,
+      "predictedProbability": 0.95,
       "selectedNames": [
         "Ivo"
       ],
@@ -3557,10 +5630,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1424,
+      "latencyMs": 850,
       "inputTokens": 148,
-      "outputTokens": 60,
-      "costUsd": 0.000020861120000000004,
+      "outputTokens": 41,
+      "costUsd": 0.0000179032,
       "selectedNames": [
         "Ivo"
       ],
@@ -3579,7 +5652,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 74,
+      "latencyMs": 56,
       "inputTokens": 745,
       "outputTokens": 99,
       "costUsd": 0.00003129,
@@ -3600,10 +5673,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 82,
+      "latencyMs": 122,
       "inputTokens": 745,
       "outputTokens": 99,
       "costUsd": 0.00003129,
+      "predictedProbability": 0.96,
       "selectedNames": [
         "Ivo"
       ],
@@ -3621,10 +5695,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1313,
+      "latencyMs": 1291,
       "inputTokens": 148,
-      "outputTokens": 68,
-      "costUsd": 0.000022106560000000003,
+      "outputTokens": 76,
+      "costUsd": 0.000023352000000000003,
       "selectedNames": [
         "Ivo"
       ],
@@ -3643,7 +5717,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 77,
+      "latencyMs": 65,
       "inputTokens": 745,
       "outputTokens": 99,
       "costUsd": 0.00003129,
@@ -3664,10 +5738,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 87,
+      "latencyMs": 88,
       "inputTokens": 745,
       "outputTokens": 99,
       "costUsd": 0.00003129,
+      "predictedProbability": 0.95,
       "selectedNames": [
         "Ivo"
       ],
@@ -3685,10 +5760,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1282,
+      "latencyMs": 1278,
       "inputTokens": 148,
-      "outputTokens": 94,
-      "costUsd": 0.00002615424,
+      "outputTokens": 65,
+      "costUsd": 0.000021639520000000003,
       "selectedNames": [
         "Ivo"
       ],
@@ -3704,6 +5779,71 @@
       "scenarioId": "a1",
       "arm": "lane",
       "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 123,
+      "inputTokens": 745,
+      "outputTokens": 99,
+      "costUsd": 0.00003129,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a1",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 118,
+      "inputTokens": 745,
+      "outputTokens": 99,
+      "costUsd": 0.00003129,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a1",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1164,
+      "inputTokens": 148,
+      "outputTokens": 73,
+      "costUsd": 0.000022884960000000003,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a1",
+      "arm": "lane",
+      "repeat": 4,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
@@ -3723,15 +5863,81 @@
       "f1": 1
     },
     {
+      "scenarioId": "a1",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 96,
+      "inputTokens": 745,
+      "outputTokens": 99,
+      "costUsd": 0.00003129,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a1",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1363,
+      "inputTokens": 148,
+      "outputTokens": 58,
+      "costUsd": 0.00002054976,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a1",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 99,
+      "inputTokens": 745,
+      "outputTokens": 99,
+      "costUsd": 0.00003129,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
       "scenarioId": "a2",
       "arm": "jev",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 105,
+      "latencyMs": 87,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.94,
       "selectedNames": [
         "Nia"
       ],
@@ -3749,10 +5955,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1459,
+      "latencyMs": 1430,
       "inputTokens": 147,
-      "outputTokens": 73,
-      "costUsd": 0.000022807120000000005,
+      "outputTokens": 83,
+      "costUsd": 0.00002436392,
       "selectedNames": [
         "Nia"
       ],
@@ -3771,7 +5977,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 58,
+      "latencyMs": 98,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
@@ -3792,6 +5998,115 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
+      "latencyMs": 106,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.94,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1242,
+      "inputTokens": 147,
+      "outputTokens": 60,
+      "costUsd": 0.000020783280000000003,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "lane",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 144,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 125,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.94,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1627,
+      "inputTokens": 147,
+      "outputTokens": 79,
+      "costUsd": 0.000023741200000000002,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
       "latencyMs": 136,
       "inputTokens": 744,
       "outputTokens": 99,
@@ -3809,57 +6124,15 @@
     },
     {
       "scenarioId": "a2",
-      "arm": "llm",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "latencyMs": 1591,
-      "inputTokens": 147,
-      "outputTokens": 117,
-      "costUsd": 0.000029657040000000004,
-      "selectedNames": [
-        "Nia"
-      ],
-      "expectedNames": [
-        "Nia"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "a2",
-      "arm": "lane",
-      "repeat": 2,
-      "ok": true,
-      "deferred": false,
-      "laneKind": "system-one",
-      "latencyMs": 94,
-      "inputTokens": 744,
-      "outputTokens": 99,
-      "costUsd": 0.000031248,
-      "selectedNames": [
-        "Nia"
-      ],
-      "expectedNames": [
-        "Nia"
-      ],
-      "exact": true,
-      "precision": 1,
-      "recall": 1,
-      "f1": 1
-    },
-    {
-      "scenarioId": "a2",
       "arm": "jev",
-      "repeat": 3,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
-      "latencyMs": 75,
+      "latencyMs": 81,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.94,
       "selectedNames": [
         "Nia"
       ],
@@ -3874,13 +6147,13 @@
     {
       "scenarioId": "a2",
       "arm": "llm",
-      "repeat": 3,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1689,
+      "latencyMs": 918,
       "inputTokens": 147,
-      "outputTokens": 63,
-      "costUsd": 0.000021250320000000004,
+      "outputTokens": 56,
+      "costUsd": 0.000020160560000000005,
       "selectedNames": [
         "Nia"
       ],
@@ -3895,7 +6168,7 @@
     {
       "scenarioId": "a2",
       "arm": "lane",
-      "repeat": 3,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
@@ -3915,15 +6188,81 @@
       "f1": 1
     },
     {
+      "scenarioId": "a2",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 101,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.95,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1551,
+      "inputTokens": 147,
+      "outputTokens": 69,
+      "costUsd": 0.000022184400000000004,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a2",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 243,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "selectedNames": [
+        "Nia"
+      ],
+      "expectedNames": [
+        "Nia"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
       "scenarioId": "a3",
       "arm": "jev",
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 110,
+      "latencyMs": 118,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.91,
       "selectedNames": [
         "Oren"
       ],
@@ -3941,10 +6280,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1491,
+      "latencyMs": 1284,
       "inputTokens": 147,
-      "outputTokens": 61,
-      "costUsd": 0.00002093896,
+      "outputTokens": 80,
+      "costUsd": 0.000023896880000000004,
       "selectedNames": [
         "Oren"
       ],
@@ -3963,7 +6302,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 531,
+      "latencyMs": 89,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
@@ -3984,10 +6323,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 153,
+      "latencyMs": 88,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.9,
       "selectedNames": [
         "Oren"
       ],
@@ -4005,10 +6345,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1426,
+      "latencyMs": 1380,
       "inputTokens": 147,
-      "outputTokens": 61,
-      "costUsd": 0.00002093896,
+      "outputTokens": 107,
+      "costUsd": 0.00002810024,
       "selectedNames": [
         "Oren"
       ],
@@ -4027,7 +6367,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 165,
+      "latencyMs": 134,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
@@ -4048,10 +6388,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 61,
+      "latencyMs": 106,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.9,
       "selectedNames": [
         "Oren"
       ],
@@ -4069,7 +6410,7 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1588,
+      "latencyMs": 1547,
       "inputTokens": 147,
       "outputTokens": 97,
       "costUsd": 0.000026543440000000003,
@@ -4091,7 +6432,137 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 163,
+      "latencyMs": 266,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 90,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.91,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1768,
+      "inputTokens": 147,
+      "outputTokens": 100,
+      "costUsd": 0.00002701048,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 76,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 101,
+      "inputTokens": 744,
+      "outputTokens": 99,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.89,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1363,
+      "inputTokens": 147,
+      "outputTokens": 128,
+      "costUsd": 0.00003136952,
+      "selectedNames": [
+        "Oren"
+      ],
+      "expectedNames": [
+        "Oren"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a3",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 134,
       "inputTokens": 744,
       "outputTokens": 99,
       "costUsd": 0.000031248,
@@ -4112,10 +6583,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 235,
+      "latencyMs": 103,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.87,
       "selectedNames": [
         "Ivo"
       ],
@@ -4133,10 +6605,10 @@
       "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1732,
+      "latencyMs": 1625,
       "inputTokens": 148,
-      "outputTokens": 95,
-      "costUsd": 0.000026309920000000005,
+      "outputTokens": 108,
+      "costUsd": 0.00002833376,
       "selectedNames": [
         "Ivo"
       ],
@@ -4155,7 +6627,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 82,
+      "latencyMs": 122,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
@@ -4176,10 +6648,11 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 167,
+      "latencyMs": 137,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.87,
       "selectedNames": [
         "Ivo"
       ],
@@ -4197,10 +6670,10 @@
       "repeat": 2,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1689,
+      "latencyMs": 1606,
       "inputTokens": 148,
-      "outputTokens": 90,
-      "costUsd": 0.00002553152,
+      "outputTokens": 92,
+      "costUsd": 0.00002584288,
       "selectedNames": [
         "Ivo"
       ],
@@ -4219,7 +6692,7 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 116,
+      "latencyMs": 80,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
@@ -4240,10 +6713,11 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 126,
+      "latencyMs": 138,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
+      "predictedProbability": 0.87,
       "selectedNames": [
         "Ivo"
       ],
@@ -4261,10 +6735,10 @@
       "repeat": 3,
       "ok": true,
       "deferred": false,
-      "latencyMs": 1569,
+      "latencyMs": 1744,
       "inputTokens": 148,
-      "outputTokens": 79,
-      "costUsd": 0.00002381904,
+      "outputTokens": 119,
+      "costUsd": 0.000030046240000000003,
       "selectedNames": [
         "Ivo"
       ],
@@ -4283,7 +6757,138 @@
       "ok": true,
       "deferred": false,
       "laneKind": "system-one",
-      "latencyMs": 93,
+      "latencyMs": 76,
+      "inputTokens": 746,
+      "outputTokens": 99,
+      "costUsd": 0.000031332,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "jev",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 123,
+      "inputTokens": 746,
+      "outputTokens": 99,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.88,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "llm",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2460,
+      "inputTokens": 148,
+      "outputTokens": 277,
+      "costUsd": 0.000054643680000000005,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "lane",
+      "repeat": 4,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 92,
+      "inputTokens": 746,
+      "outputTokens": 99,
+      "costUsd": 0.000031332,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "jev",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 78,
+      "inputTokens": 746,
+      "outputTokens": 99,
+      "costUsd": 0.000031332,
+      "predictedProbability": 0.89,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "llm",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 1439,
+      "inputTokens": 148,
+      "outputTokens": 103,
+      "costUsd": 0.000027555360000000004,
+      "selectedNames": [
+        "Ivo",
+        "Nia"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "a4",
+      "arm": "lane",
+      "repeat": 5,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "system-one",
+      "latencyMs": 87,
       "inputTokens": 746,
       "outputTokens": 99,
       "costUsd": 0.000031332,
@@ -4304,10 +6909,11 @@
       "repeat": 1,
       "ok": true,
       "deferred": true,
-      "latencyMs": 202,
+      "latencyMs": 282,
       "inputTokens": 744,
       "outputTokens": 102,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.51,
       "selectedNames": [],
       "expectedNames": [
         "Ivo"
@@ -4321,12 +6927,74 @@
       "scenarioId": "a5",
       "arm": "llm",
       "repeat": 1,
+      "ok": false,
+      "deferred": false,
+      "error": "room routing response was not a JSON array",
+      "latencyMs": 4396,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "lane",
+      "repeat": 1,
       "ok": true,
       "deferred": false,
-      "latencyMs": 2020,
+      "laneKind": "fallback",
+      "latencyMs": 3827,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": true,
+      "precision": 1,
+      "recall": 1,
+      "f1": 1
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "jev",
+      "repeat": 2,
+      "ok": true,
+      "deferred": true,
+      "latencyMs": 74,
+      "inputTokens": 744,
+      "outputTokens": 102,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.52,
+      "selectedNames": [],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "llm",
+      "repeat": 2,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2453,
       "inputTokens": 147,
-      "outputTokens": 187,
-      "costUsd": 0.00004055464000000001,
+      "outputTokens": 241,
+      "costUsd": 0.000048961360000000006,
       "selectedNames": [
         "Ivo",
         "Nia"
@@ -4342,14 +7010,79 @@
     {
       "scenarioId": "a5",
       "arm": "lane",
-      "repeat": 1,
+      "repeat": 2,
       "ok": true,
       "deferred": false,
       "laneKind": "llm",
-      "latencyMs": 2441,
+      "latencyMs": 3319,
       "inputTokens": 147,
-      "outputTokens": 233,
-      "costUsd": 0.00004771592,
+      "outputTokens": 437,
+      "costUsd": 0.00007947464000000001,
+      "selectedNames": [
+        "Nia",
+        "Ivo"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "jev",
+      "repeat": 3,
+      "ok": true,
+      "deferred": true,
+      "latencyMs": 156,
+      "inputTokens": 744,
+      "outputTokens": 102,
+      "costUsd": 0.000031248,
+      "predictedProbability": 0.5,
+      "selectedNames": [],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "llm",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "latencyMs": 2636,
+      "inputTokens": 147,
+      "outputTokens": 294,
+      "costUsd": 0.00005721240000000001,
+      "selectedNames": [
+        "Ivo",
+        "Nia"
+      ],
+      "expectedNames": [
+        "Ivo"
+      ],
+      "exact": false,
+      "precision": 0.5,
+      "recall": 1,
+      "f1": 0.6666666666666666
+    },
+    {
+      "scenarioId": "a5",
+      "arm": "lane",
+      "repeat": 3,
+      "ok": true,
+      "deferred": false,
+      "laneKind": "llm",
+      "latencyMs": 2675,
+      "inputTokens": 147,
+      "outputTokens": 281,
+      "costUsd": 0.00005518856000000001,
       "selectedNames": [
         "Ivo",
         "Nia"
@@ -4365,13 +7098,14 @@
     {
       "scenarioId": "a5",
       "arm": "jev",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": true,
-      "latencyMs": 200,
+      "latencyMs": 142,
       "inputTokens": 744,
       "outputTokens": 102,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.53,
       "selectedNames": [],
       "expectedNames": [
         "Ivo"
@@ -4384,13 +7118,13 @@
     {
       "scenarioId": "a5",
       "arm": "llm",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
-      "latencyMs": 2498,
+      "latencyMs": 3279,
       "inputTokens": 147,
-      "outputTokens": 253,
-      "costUsd": 0.000050829520000000007,
+      "outputTokens": 440,
+      "costUsd": 0.00007994168,
       "selectedNames": [
         "Ivo",
         "Nia"
@@ -4406,14 +7140,14 @@
     {
       "scenarioId": "a5",
       "arm": "lane",
-      "repeat": 2,
+      "repeat": 4,
       "ok": true,
       "deferred": false,
       "laneKind": "llm",
-      "latencyMs": 3002,
+      "latencyMs": 1835,
       "inputTokens": 147,
-      "outputTokens": 330,
-      "costUsd": 0.00006281688000000001,
+      "outputTokens": 217,
+      "costUsd": 0.000045225040000000004,
       "selectedNames": [
         "Ivo",
         "Nia"
@@ -4429,13 +7163,14 @@
     {
       "scenarioId": "a5",
       "arm": "jev",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": true,
-      "latencyMs": 109,
+      "latencyMs": 80,
       "inputTokens": 744,
       "outputTokens": 102,
       "costUsd": 0.000031248,
+      "predictedProbability": 0.5,
       "selectedNames": [],
       "expectedNames": [
         "Ivo"
@@ -4448,36 +7183,34 @@
     {
       "scenarioId": "a5",
       "arm": "llm",
-      "repeat": 3,
-      "ok": true,
+      "repeat": 5,
+      "ok": false,
       "deferred": false,
-      "latencyMs": 2826,
-      "inputTokens": 147,
-      "outputTokens": 308,
-      "costUsd": 0.000059391920000000004,
-      "selectedNames": [
-        "Ivo",
-        "Nia"
-      ],
+      "error": "room routing response was not a JSON array",
+      "latencyMs": 4115,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0,
+      "selectedNames": [],
       "expectedNames": [
         "Ivo"
       ],
       "exact": false,
-      "precision": 0.5,
-      "recall": 1,
-      "f1": 0.6666666666666666
+      "precision": 0,
+      "recall": 0,
+      "f1": 0
     },
     {
       "scenarioId": "a5",
       "arm": "lane",
-      "repeat": 3,
+      "repeat": 5,
       "ok": true,
       "deferred": false,
       "laneKind": "llm",
-      "latencyMs": 2418,
+      "latencyMs": 2850,
       "inputTokens": 147,
-      "outputTokens": 250,
-      "costUsd": 0.00005036248,
+      "outputTokens": 369,
+      "costUsd": 0.00006888840000000001,
       "selectedNames": [
         "Ivo",
         "Nia"
@@ -4490,5 +7223,50 @@
       "recall": 1,
       "f1": 0.6666666666666666
     }
-  ]
+  ],
+  "routingGate": {
+    "lane": "speaker-routing",
+    "promoted": true,
+    "reasons": [],
+    "gates": {
+      "minSamples": 30,
+      "minAccuracy": 0.9,
+      "maxBrier": 0.1,
+      "maxExpectedCalibrationError": 0.1
+    }
+  },
+  "actedAccuracy": 1,
+  "actedSamples": 90,
+  "calibration": {
+    "fitted": {
+      "a": 2.5732414767433904,
+      "b": 1.3972970064979224
+    },
+    "rawReport": {
+      "count": 90,
+      "brier": 0.01889333333333333,
+      "expectedCalibrationError": 0.11911111111111126,
+      "bins": 10
+    },
+    "calibratedAll": {
+      "count": 90,
+      "brier": 0.00004422063887757149,
+      "expectedCalibrationError": 0.003342937592205608,
+      "bins": 10
+    },
+    "holdoutRaw": {
+      "count": 20,
+      "brier": 0.007700000000000001,
+      "expectedCalibrationError": 0.08200000000000013,
+      "bins": 10
+    },
+    "holdoutCalibrated": {
+      "count": 20,
+      "brier": 8.810709717924522e-7,
+      "expectedCalibrationError": 0.0006925184733791445,
+      "bins": 10
+    },
+    "devSamples": 70,
+    "holdoutSamples": 20
+  }
 }

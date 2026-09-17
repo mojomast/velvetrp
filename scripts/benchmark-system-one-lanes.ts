@@ -22,6 +22,9 @@ import { defaultHarnessSettings, defaultProviderSettings, defaultSystemOneSettin
 import { ensureGroupSpeakers, fallbackRoomSpeakers, selectRoomSpeakers } from "../server/src/llm.js";
 import { getPromptPreset } from "../server/src/presets.js";
 import { completeWithSystemOne, type SystemOneCompletionResult, type SystemOneJsonValue } from "../server/src/provider/systemOneCompletion.js";
+import { applyCalibration, fitPlattCalibration, type PlattCalibration } from "../server/src/agent/systemOneCalibration.js";
+import { evaluatePromotionGate } from "../server/src/agent/systemOnePromotion.js";
+import { gradeCalibration } from "../server/test/evals/dmGraders.js";
 import type { Character, Message, TokenUsage } from "../server/src/types.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -61,6 +64,8 @@ interface RawCall {
   precision: number;
   recall: number;
   f1: number;
+  /** The composed confidence for lanes that report one, for calibration. */
+  predictedProbability?: number | null;
   /** For the gated lane arm: which underlying path produced the selection. */
   laneKind?: "system-one" | "llm" | "fallback" | "error";
 }
@@ -228,6 +233,7 @@ async function main(): Promise<void> {
           scenarioId: scenario.id, arm: "jev", repeat, ok: true, deferred: composed.band !== "act",
           latencyMs: Math.max(0, Math.round(performance.now() - jevStart)),
           inputTokens: cost.input, outputTokens: cost.output, costUsd: cost.cost,
+          predictedProbability: composed.topSignal,
           selectedNames, expectedNames: scenario.expectedNames, ...grade(selectedNames, scenario.expectedNames),
         });
       } catch (error) {
@@ -309,13 +315,34 @@ async function main(): Promise<void> {
   }
   process.stdout.write("\n");
 
-  const report = renderReport({ scenarios, calls, repeats, jevSettings, llmProvider, thresholds });
+  // Calibration and the promotion gate are scored on the decisions the Jev lane actually took.
+  // The bridge/tavern scenarios fit the map; the archive scenarios are held out, so the
+  // reported calibration is out of sample.
+  const jevActed = calls.filter((row) => row.arm === "jev" && row.ok && !row.deferred && typeof row.predictedProbability === "number");
+  const toPoints = (rows: RawCall[]) => rows.map((row) => ({ predictedProbability: row.predictedProbability as number, correct: row.exact }));
+  const isHoldout = (id: string) => id.startsWith("a");
+  const devActed = jevActed.filter((row) => !isHoldout(row.scenarioId));
+  const holdoutActed = jevActed.filter((row) => isHoldout(row.scenarioId));
+  const rawReport = gradeCalibration(toPoints(jevActed), 10);
+  const fitted = fitPlattCalibration(toPoints(devActed));
+  const calibrate = (map: PlattCalibration) => toPoints(jevActed).map((point) => ({ predictedProbability: applyCalibration(point.predictedProbability, map), correct: point.correct }));
+  const calibratedAll = gradeCalibration(calibrate(fitted), 10);
+  const holdoutRaw = gradeCalibration(toPoints(holdoutActed), 10);
+  const holdoutCalibrated = gradeCalibration(toPoints(holdoutActed).map((point) => ({ predictedProbability: applyCalibration(point.predictedProbability, fitted), correct: point.correct })), 10);
+  const actedAccuracy = jevActed.length === 0 ? 0 : jevActed.filter((row) => row.exact).length / jevActed.length;
+  const routingGate = evaluatePromotionGate("speaker-routing", {
+    samples: jevActed.length, accuracy: actedAccuracy, brier: calibratedAll.brier, expectedCalibrationError: calibratedAll.expectedCalibrationError,
+  });
+  const calibration = { fitted, rawReport, calibratedAll, holdoutRaw, holdoutCalibrated, devSamples: devActed.length, holdoutSamples: holdoutActed.length };
+
+  const report = renderReport({ scenarios, calls, repeats, jevSettings, llmProvider, thresholds, routingGate, actedAccuracy, actedSamples: jevActed.length, calibration });
   const outPath = path.resolve(ROOT, process.env.BENCH_OUT ?? "docs/system-one-benchmark.md");
   await writeFile(outPath, report, "utf8");
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
+  console.log(`promotion gate: promoted=${routingGate.promoted}${routingGate.reasons.length ? ` reasons=${routingGate.reasons.join("; ")}` : ""}`);
 
   // Also emit machine-readable raw data next to the report.
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ scenarios, calls }, null, 2), "utf8");
+  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ scenarios, calls, routingGate, actedAccuracy, actedSamples: jevActed.length, calibration }, null, 2), "utf8");
 }
 
 interface Summary {
@@ -372,8 +399,20 @@ function renderReport(input: {
   jevSettings: ReturnType<typeof defaultSystemOneSettings>;
   llmProvider: ReturnType<typeof defaultProviderSettings>;
   thresholds: { actionThreshold: number; reviewThreshold: number };
+  routingGate: ReturnType<typeof evaluatePromotionGate>;
+  actedAccuracy: number;
+  actedSamples: number;
+  calibration: {
+    fitted: PlattCalibration;
+    rawReport: ReturnType<typeof gradeCalibration>;
+    calibratedAll: ReturnType<typeof gradeCalibration>;
+    holdoutRaw: ReturnType<typeof gradeCalibration>;
+    holdoutCalibrated: ReturnType<typeof gradeCalibration>;
+    devSamples: number;
+    holdoutSamples: number;
+  };
 }): string {
-  const { scenarios, calls, repeats, jevSettings, llmProvider, thresholds } = input;
+  const { scenarios, calls, repeats, jevSettings, llmProvider, thresholds, routingGate, actedAccuracy, actedSamples, calibration } = input;
   const jev = summarize(calls.filter((row) => row.arm === "jev"));
   const llm = summarize(calls.filter((row) => row.arm === "llm"));
   const lane = summarize(calls.filter((row) => row.arm === "lane"));
@@ -471,6 +510,28 @@ function renderReport(input: {
     const laneRow = calls.find((row) => row.arm === "lane" && row.scenarioId === scenario.id)!;
     lines.push(`| ${scenario.id} | ${scenario.message} | ${scenario.expectedNames.join(", ")} | ${jevRow.selectedNames.join(", ") || "—"} | ${jevRow.deferred ? "defer" : "act"} | ${llmRow.selectedNames.join(", ") || "—"}${llmRow.ok ? "" : " (error)"} | ${laneRow.selectedNames.join(", ") || "—"}${laneRow.laneKind ? ` (${laneRow.laneKind})` : ""} | ${jevRow.exact ? "yes" : "no"} / ${llmRow.exact ? "yes" : "no"} / ${laneRow.exact ? "yes" : "no"} |`);
   }
+  lines.push("");
+  lines.push("## Promotion gate — `speaker-routing`");
+  lines.push("");
+  lines.push(`Scored on the ${actedSamples} decisions the Jev lane actually took: exact-set accuracy ${pct(actedAccuracy)}, calibrated Brier ${calibration.calibratedAll.brier.toFixed(4)}, calibrated ECE ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)}.`);
+  lines.push("");
+  lines.push(`**${routingGate.promoted ? "PROMOTE" : "NOT READY"}**`);
+  lines.push("");
+  if (routingGate.reasons.length === 0) lines.push("All gates passed.");
+  else for (const reason of routingGate.reasons) lines.push(`- ${reason}`);
+  lines.push("");
+  lines.push("A passing gate is what the runtime checks before letting the lane act; until then it records only.");
+  lines.push("");
+  lines.push("### Calibration (fit on bridge/tavern, scored on the held-out archive)");
+  lines.push("");
+  lines.push("| Split | Signal | Brier | ECE |");
+  lines.push("| --- | --- | ---: | ---: |");
+  lines.push(`| all acted (${actedSamples}) | raw | ${calibration.rawReport.brier.toFixed(4)} | ${calibration.rawReport.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| all acted (${actedSamples}) | calibrated | ${calibration.calibratedAll.brier.toFixed(4)} | ${calibration.calibratedAll.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| held-out archive (${calibration.holdoutSamples}) | raw | ${calibration.holdoutRaw.brier.toFixed(4)} | ${calibration.holdoutRaw.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| held-out archive (${calibration.holdoutSamples}) | calibrated | ${calibration.holdoutCalibrated.brier.toFixed(4)} | ${calibration.holdoutCalibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push("");
+  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}.`);
   lines.push("");
   lines.push("## Observations");
   lines.push("");

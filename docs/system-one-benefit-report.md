@@ -18,8 +18,9 @@ Jev replaces a multi-second LLM decision call with a single ~0.1 s typed-decisio
   and Jev output tokens are free.
 - **A typical turn** does both decisions: that is about **2.3 s saved per turn**, or roughly
   **3.9 minutes per 100-turn session**. Per 1,000 decisions each lane saves about 19.5 minutes.
-- The gates are still **shadow-only**; these are measured, reproducible benefits of the
-  configured behavior, not yet enabled in production.
+- Room routing is **promoted and active when configured**; the Director lane is still
+  **shadow-only**. Both are disabled by default, and these are measured, reproducible
+  benefits of the configured behavior.
 
 ## What "before" and "after" mean
 
@@ -110,8 +111,10 @@ free). Net, the two lanes together come out slightly ahead — but the honest he
 ## What this is and is not
 
 - Measured, reproducible, and provider-backed (`api.typesafe.ai` and the router), not estimated.
-- **Not yet live.** Both lanes are wired in shadow mode; they record decisions and do not change
-  behavior until explicitly promoted. These numbers are the value of the configured behavior.
+- **Room routing is now active when configured.** It is the first promoted lane: with
+  `FEATURE_SYSTEM_ONE` + `enabled` + a usable key + `shadow: false`, it serves the turn
+  (verified live). The Director lane is still shadow-only and its numbers are the value of the
+  configured behavior once promoted.
 - The Director numbers are sensitive to the operating threshold: at the conservative default
   (0.75) Jev defers on nearly every state and buys reliability but little speed. The benefit
   appears at the calibrated **0.60** operating point.

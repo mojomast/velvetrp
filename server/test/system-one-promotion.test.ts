@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SYSTEM_ONE_LANE_GATES,
+  SYSTEM_ONE_PROMOTION_RECORDS,
   assertPromoted,
   evaluatePromotionGate,
+  isLanePromoted,
+  promotionRecord,
 } from "../src/agent/systemOnePromotion.js";
 import type { CalibrationMetrics, SystemOneLaneGate } from "../src/agent/systemOnePromotion.js";
 import { SYSTEM_ONE_LANES } from "../src/types.js";
@@ -155,6 +158,26 @@ describe("System One promotion gate", () => {
   it("throws RangeError for an invalid gate override", () => {
     expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minSamples: -1 })).toThrow(RangeError);
     expect(() => evaluatePromotionGate("director-selection", passingMetrics, { ...gate, minAccuracy: 1.5 })).toThrow(RangeError);
+  });
+
+  it("records measured promotions that still clear their own gate", () => {
+    for (const lane of SYSTEM_ONE_LANES) {
+      const record = SYSTEM_ONE_PROMOTION_RECORDS[lane];
+      if (!record) continue;
+      expect(record.evidence).toMatch(/\.md$/);
+      expect(record.promotedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(evaluatePromotionGate(lane, record.metrics).promoted, `${lane} record must clear its gate`).toBe(true);
+    }
+  });
+
+  it("promotes only lanes with a recorded, passing gate", () => {
+    // Room routing is the first promoted lane; nothing else may act yet.
+    expect(promotionRecord("speaker-routing")).toMatchObject({ evidence: "docs/system-one-benchmark.md" });
+    expect(isLanePromoted("speaker-routing")).toBe(true);
+    for (const lane of SYSTEM_ONE_LANES) {
+      if (lane === "speaker-routing") continue;
+      expect(isLanePromoted(lane), `${lane} must stay unpromoted`).toBe(false);
+    }
   });
 
   it("has a default gate for every System One lane", () => {

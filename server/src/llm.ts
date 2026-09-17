@@ -19,6 +19,7 @@ import type { SystemOneCaller } from "./provider/systemOneCompletion.js";
 import { buildRoomRoutingQuestions, composeRoomRoutingSelection } from "./agent/systemOneRoomRouting.js";
 import { calibrateTopSignal } from "./agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agent/systemOnePolicy.js";
+import { isLanePromoted } from "./agent/systemOnePromotion.js";
 import { estimateTurnTokens } from "./agent/turnBudget.js";
 import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
 import type { SystemOneConfidenceThresholds, SystemOneSettings } from "./types.js";
@@ -171,6 +172,9 @@ async function trySystemOneRoomRouting(input: {
     const usage = result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null;
     systemOneLaneBudgets.settle("speaker-routing", usage ?? { inputTokens: 0, outputTokens: 0 });
     const composed = composeRoomRoutingSelection(projection, result.answers, thresholds, maxSpeakers);
+    // A lane changes behavior only when it is both out of shadow mode and has a recorded,
+    // passing promotion. Otherwise it still records the would-be decision.
+    const active = !systemOne.settings.shadow && isLanePromoted("speaker-routing");
     const decision: SystemOneRoomRoutingDecision = {
       lane: "speaker-routing",
       provider: "typesafe",
@@ -181,12 +185,12 @@ async function trySystemOneRoomRouting(input: {
       answers: result.answers,
       selection: { method: composed.method, speakerIds: composed.speakerIds, topSignal: calibrateTopSignal(composed.topSignal, systemOne.settings.confidenceCalibration["speaker-routing"]) },
       confidenceBand: composed.band,
-      fallbackUsed: systemOne.settings.shadow || composed.band !== "act",
-      shadow: systemOne.settings.shadow,
+      fallbackUsed: !active || composed.band !== "act",
+      shadow: !active,
       usage,
       latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
     };
-    if (systemOne.settings.shadow) return { kind: "shadow", decision };
+    if (!active) return { kind: "shadow", decision };
     if (composed.band !== "act" || composed.speakerIds.length === 0) return { kind: "shadow", decision };
     return {
       kind: "selection",
