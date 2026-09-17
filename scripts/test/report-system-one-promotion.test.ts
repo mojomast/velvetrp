@@ -33,10 +33,15 @@ test("reports exactly the recorded lanes as promoted", () => {
   assert.equal(narration.record?.evidence, "docs/system-one-narration-benchmark.md");
   assert.equal(narration.gate?.promoted, true);
 
-  const promoted = SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).promoted);
-  assert.deepEqual([...promoted].sort(), ["cost-router", "narration-verification", "speaker-routing"]);
+  const director = lanePromotionStatus("director-selection");
+  assert.equal(director.promoted, true);
+  assert.equal(director.record?.evidence, "docs/system-one-director-calibration.md");
+  assert.equal(director.gate?.promoted, true);
 
-  const others = SYSTEM_ONE_LANES.filter((lane) => lane !== "speaker-routing" && lane !== "cost-router" && lane !== "narration-verification");
+  const promoted = SYSTEM_ONE_LANES.filter((lane) => lanePromotionStatus(lane).promoted);
+  assert.deepEqual([...promoted].sort(), ["cost-router", "director-selection", "narration-verification", "speaker-routing"]);
+
+  const others = SYSTEM_ONE_LANES.filter((lane) => lane !== "speaker-routing" && lane !== "cost-router" && lane !== "narration-verification" && lane !== "director-selection");
   for (const lane of others) {
     const status = lanePromotionStatus(lane);
     assert.equal(status.promoted, false, `${lane} must be unpromoted`);
@@ -68,8 +73,9 @@ test("renders a deterministic promotion section with not-recorded lanes", () => 
   assert.match(first, /- Gate: pass/);
   assert.match(first, /^\| cost-router \| yes \| 2026-09-17 \| docs\/system-one-router-benchmark\.md \| pass \|$/m);
   assert.match(first, /^\| narration-verification \| yes \| 2026-09-17 \| docs\/system-one-narration-benchmark\.md \| pass \|$/m);
+  assert.match(first, /^\| director-selection \| yes \| 2026-09-17 \| docs\/system-one-director-calibration\.md \| pass \|$/m);
 
-  const recorded = new Set<string>(["speaker-routing", "cost-router", "narration-verification"]);
+  const recorded = new Set<string>(["speaker-routing", "cost-router", "narration-verification", "director-selection"]);
   for (const lane of SYSTEM_ONE_LANES.filter((entry) => !recorded.has(entry))) {
     assert.match(
       first,

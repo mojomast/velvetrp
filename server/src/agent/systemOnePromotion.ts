@@ -186,6 +186,17 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-narration-benchmark.md",
   },
+  "director-selection": {
+    // scripts/evaluate-system-one-director.ts: 36 acted decisions, 100% acceptable and 100%
+    // exact, calibrated Brier ~0, ECE 0.0059 (held-out calibrated ECE 0.0035). The frozen
+    // corpus has no acted errors — the server only advertises authorized beats and the model
+    // defers on every mixed state — so this is a promotion candidate, not a stress-tested
+    // guarantee. No active Director path is wired, so the record is evidence, not activation.
+    metrics: { samples: 36, accuracy: 1, brier: 0, expectedCalibrationError: 0.0059 },
+    calibration: { a: 2.5661, b: 3.299 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-director-calibration.md",
+  },
 };
 
 /** The promotion record for a lane, or undefined when it has never been promoted. */

@@ -318,6 +318,12 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   live planning and the would-be decision is recorded immutably; it never settles, orders,
   or executes anything, and any failure is swallowed. Active Director selection is
   deliberately not enabled yet.
+- **Evaluation.** [System One Director calibration](system-one-director-calibration.md) runs
+  the six-state corpus and the promotion gate on the calibrated signal; at the selected 0.60
+  threshold it acts on 36/60 samples with **100% acceptable and 100% exact** accuracy, so it
+  carries a promotion record. The corpus has no acted errors (the server only advertises
+  authorized beats and the model defers on mixed states), so the record is an evidence-only
+  snapshot, not a stress-tested guarantee, and no active Director path is wired.
 - **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;
   `fallback` uses the deterministic rule and provider-free oracle. The raw model is
   systematically **under-confident** (correct decisions at ~0.6), so the evaluation fits
