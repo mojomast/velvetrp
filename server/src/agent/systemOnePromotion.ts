@@ -197,6 +197,21 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-director-calibration.md",
   },
+  "adventure-selection": {
+    // scripts/evaluate-system-one-adventure-lane.ts: 90 live calls over a 30-case hand-labeled
+    // projection corpus. The model named a candidate on 54 calls and all 54 picks were
+    // acceptable at every swept threshold; the raw signals (0.42-0.69) sat below the server
+    // default 0.75, the same systematic under-confidence the Director lane measured. At the
+    // sweep's recommended action threshold 0.40 (which also requires reviewThreshold <= 0.40)
+    // the gate passes: 54 acted, 100% accuracy, calibrated Brier 0.0002, ECE 0.0109. The
+    // threshold is selected on the same corpus that scores it and the acted subset has no
+    // errors, so this is a promotion candidate, not proof. The server default stays 0.75/0.5,
+    // and no adventure path is wired, so the record is evidence, not activation.
+    metrics: { samples: 54, accuracy: 1, brier: 0.0002, expectedCalibrationError: 0.0109 },
+    calibration: { a: 1.6042, b: 4.0926 },
+    promotedAt: "2026-09-17",
+    evidence: "docs/system-one-adventure-benchmark.md",
+  },
   "memory-reranking": {
     // scripts/evaluate-system-one-rerank-lane.ts: 81 live reranks over the Plan 3 recall
     // oracle, 30 decisive (band act), 100% decisive case accuracy, raw ECE 0.135 -> calibrated

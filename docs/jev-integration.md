@@ -20,8 +20,13 @@ now has a [narration](system-one-narration-benchmark.md) and
 both pass their gates, carry records, and still have no activation path (the narration
 verifier is advisory and never rewrites prose). The **L4 memory-reranking primitive** now
 has a [memory-reranking benchmark](system-one-rerank-benchmark.md): it passes its lane
-gate and carries an evidence-only record, and it is not wired into recall. **Everything
-remains disabled by
+gate and carries an evidence-only record, and it is not wired into recall. The **L2
+adventure-selection** and **L6 guardrails** primitives now exist with
+[adventure](system-one-adventure-benchmark.md) and
+[guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
+gate only at a sweep-recommended 0.40 action threshold and carries an evidence-only record,
+while guardrails is **not ready** on its strict gate and carries none. Neither is wired into
+a request path. **Everything remains disabled by
 default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
@@ -358,6 +363,24 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `fallback` uses the existing deterministic selection.
 - **Authority.** The deterministic command bridge and Zod argument validation are
   unchanged. Jev only chooses an id; the server still executes and receipts it.
+- **Shape (primitive shipped).** `server/src/agent/systemOneAdventure.ts` builds a
+  `supported` noul ("does the declaration clearly describe committing one of these?"), a
+  per-candidate relevance `score`, and one aggregate `best_candidate` choice over the exact
+  ids plus `none_of_these`. `composeAdventureSelection` requires the choice to name an
+  advertised candidate and conservatively combines the choice's probability for that option
+  with the `supported` probability (their minimum), so a confident pick cannot outrun the
+  "does anything match?" gate. It is **not wired** into adventure turns.
+- **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
+  runs 30 labeled declaration states x 3 repeats (90 live calls). The model named a candidate
+  on 54 calls and every one of those 54 picks was acceptable at every swept threshold, but the
+  raw signals (0.42-0.69) sat below the server default action threshold 0.75: at 0.75 only 6
+  calls acted, so the gate reported insufficient samples. A threshold sweep recommends **0.40**
+  (which also requires `reviewThreshold <= 0.40`), where the gate passes with 54 acted, 100%
+  accuracy, calibrated Brier 0.0002, and ECE 0.0109 — so the lane carries an evidence-only
+  record. The threshold is selected on the same corpus that scores it, the corpus is a
+  hand-labeled projection rather than a repository fixture, and the acted subset has no
+  errors, so the record is a promotion candidate, not proof; the server default stays
+  0.75/0.5 and no adventure path is wired.
 
 ### L3 — Advisory narration and receipt verification
 
@@ -478,6 +501,21 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   configured thresholds.
 - **Composition.** Advisory to the existing deterministic sanitization, which remains
   authoritative. A low-confidence answer never blocks; it defers to the existing check.
+- **Shape (primitive shipped).** `server/src/agent/systemOneGuardrails.ts` builds one
+  `noul` per hazard (`override_attempt`, `boundary_crossing`, `disclosure_request`,
+  `self_harm_signal`) plus a four-level severity `score`, and composes with precedence
+  support > block > review > pass. A block requires the action threshold, so a low-confidence
+  hazard can only ever recommend review, and a self-harm signal routes to support rather than
+  a block. It is **not wired** into the policy path and never blocks, rewrites, or sanitizes.
+- **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
+  40 labeled messages x 3 repeats (120 live calls, 63 acted). Every hazard-category message
+  reached block or support, but acted accuracy was **90.5%**, below the strict `guardrails`
+  gate (accuracy >= 0.95), driven by false positives on a debatable "hint about the traitor"
+  case and an out-of-character meta question. There is **no promotion record**; the lane
+  stays evidence-only. Honesty: the deterministic policy checks are a permissive stub
+  (`checkUserMessage` is allow/deny only, `checkCharacter` always allows, and routes sanitize
+  before checking, so marker rejection is currently unreachable), so this lane must not be
+  described as comprehensive moderation or a content-safety guarantee.
 - **Risk.** This changes the documented scope of the policy stub. It requires explicit
   doc updates and must not be described as comprehensive moderation.
 

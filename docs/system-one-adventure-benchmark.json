@@ -1,0 +1,2774 @@
+{
+  "model": "jev-1.13.0",
+  "baseUrl": "https://api.typesafe.ai/v1",
+  "repeats": 3,
+  "thresholds": {
+    "actionThreshold": 0.75,
+    "reviewThreshold": 0.5
+  },
+  "corpus": [
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "declaration": "I walk up the road to the mill.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-01",
+          "digest": "d001d001d001d001d001d001d001d001d001d001d001d001d001d001d001d001",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "travel:harbor-02",
+          "digest": "d002d002d002d002d002d002d002d002d002d002d002d002d002d002d002d002",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        }
+      ],
+      "expected": {
+        "preferred": "travel:mill-01",
+        "acceptable": [
+          "travel:mill-01"
+        ]
+      }
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "declaration": "We head down the switchbacks to the harbor.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-03",
+          "digest": "d003d003d003d003d003d003d003d003d003d003d003d003d003d003d003d003",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "travel:harbor-04",
+          "digest": "d004d004d004d004d004d004d004d004d004d004d004d004d004d004d004d004",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        }
+      ],
+      "expected": {
+        "preferred": "travel:harbor-04",
+        "acceptable": [
+          "travel:harbor-04"
+        ]
+      }
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "declaration": "I haul myself over the mill wall.",
+      "candidates": [
+        {
+          "candidateId": "check:climb-05",
+          "digest": "d005d005d005d005d005d005d005d005d005d005d005d005d005d005d005d005",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Easy difficulty, normal"
+        },
+        {
+          "candidateId": "check:stealth-06",
+          "digest": "d006d006d006d006d006d006d006d006d006d006d006d006d006d006d006d006",
+          "kind": "exact_srd_check.select",
+          "label": "Dexterity (Stealth), Medium difficulty, normal"
+        }
+      ],
+      "expected": {
+        "preferred": "check:climb-05",
+        "acceptable": [
+          "check:climb-05"
+        ]
+      }
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "declaration": "I buy a coil of rope from Harbor Supplies and count out the two gold.",
+      "candidates": [
+        {
+          "candidateId": "shop:buy-rope-07",
+          "digest": "d007d007d007d007d007d007d007d007d007d007d007d007d007d007d007d007",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        },
+        {
+          "candidateId": "shop:sell-ring-08",
+          "digest": "d008d008d008d008d008d008d008d008d008d008d008d008d008d008d008d008",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Sell the silver ring to Harbor Supplies for 5 gp"
+        }
+      ],
+      "expected": {
+        "preferred": "shop:buy-rope-07",
+        "acceptable": [
+          "shop:buy-rope-07"
+        ]
+      }
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "declaration": "I sign the harbormaster's ledger and accept the harbor quest.",
+      "candidates": [
+        {
+          "candidateId": "quest:accept-harbor-09",
+          "digest": "d009d009d009d009d009d009d009d009d009d009d009d009d009d009d009d009",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "Accept the harbor quest"
+        },
+        {
+          "candidateId": "quest:claim-harbor-10",
+          "digest": "d010d010d010d010d010d010d010d010d010d010d010d010d010d010d010d010",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "Claim the harbor quest reward"
+        }
+      ],
+      "expected": {
+        "preferred": "quest:accept-harbor-09",
+        "acceptable": [
+          "quest:accept-harbor-09"
+        ]
+      }
+    },
+    {
+      "id": "direct-progression-level",
+      "category": "direct-match",
+      "holdout": false,
+      "declaration": "The training is done; I advance to level 3.",
+      "candidates": [
+        {
+          "candidateId": "level:advance-11",
+          "digest": "d011d011d011d011d011d011d011d011d011d011d011d011d011d011d011d011",
+          "kind": "exact_progression_apply.select",
+          "label": "Advance to level 3"
+        }
+      ],
+      "expected": {
+        "preferred": "level:advance-11",
+        "acceptable": [
+          "level:advance-11"
+        ]
+      }
+    },
+    {
+      "id": "ambig-rest-long-short",
+      "category": "ambiguous",
+      "holdout": false,
+      "declaration": "We make camp for the night and take a long rest by the mill.",
+      "candidates": [
+        {
+          "candidateId": "rest:long-12",
+          "digest": "d012d012d012d012d012d012d012d012d012d012d012d012d012d012d012d012",
+          "kind": "exact_rest.select",
+          "label": "Take a long rest"
+        },
+        {
+          "candidateId": "rest:short-13",
+          "digest": "d013d013d013d013d013d013d013d013d013d013d013d013d013d013d013d013",
+          "kind": "exact_rest.select",
+          "label": "Take a short rest"
+        }
+      ],
+      "expected": {
+        "preferred": "rest:long-12",
+        "acceptable": [
+          "rest:long-12"
+        ]
+      }
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "declaration": "We take the north road to the old watchtower.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-14",
+          "digest": "d014d014d014d014d014d014d014d014d014d014d014d014d014d014d014d014",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "travel:harbor-15",
+          "digest": "d015d015d015d015d015d015d015d015d015d015d015d015d015d015d015d015",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        },
+        {
+          "candidateId": "travel:watchtower-16",
+          "digest": "d016d016d016d016d016d016d016d016d016d016d016d016d016d016d016d016",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the old watchtower"
+        }
+      ],
+      "expected": {
+        "preferred": "travel:watchtower-16",
+        "acceptable": [
+          "travel:watchtower-16"
+        ]
+      }
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "declaration": "I set out for the mill, whichever road looks quicker.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-east-17",
+          "digest": "d017d017d017d017d017d017d017d017d017d017d017d017d017d017d017d017",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill by the east road"
+        },
+        {
+          "candidateId": "travel:mill-west-18",
+          "digest": "d018d018d018d018d018d018d018d018d018d018d018d018d018d018d018d018",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill by the west road"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null,
+          "travel:mill-east-17",
+          "travel:mill-west-18"
+        ]
+      }
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "declaration": "I trace the rune and cast Mending Light on Bryn's cracked shield.",
+      "candidates": [
+        {
+          "candidateId": "power:mending-bryn-19",
+          "digest": "d019d019d019d019d019d019d019d019d019d019d019d019d019d019d019d019",
+          "kind": "exact_power_use.select",
+          "label": "Cast Mending Light on Bryn"
+        },
+        {
+          "candidateId": "power:mending-wheel-20",
+          "digest": "d020d020d020d020d020d020d020d020d020d020d020d020d020d020d020d020",
+          "kind": "exact_power_use.select",
+          "label": "Cast Mending Light on the mill wheel"
+        }
+      ],
+      "expected": {
+        "preferred": "power:mending-bryn-19",
+        "acceptable": [
+          "power:mending-bryn-19"
+        ]
+      }
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "declaration": "I hurl a fire bolt at the bandit on the ridge.",
+      "candidates": [
+        {
+          "candidateId": "combat:firebolt-wolf-21",
+          "digest": "d021d021d021d021d021d021d021d021d021d021d021d021d021d021d021d021",
+          "kind": "exact_combat_power.select",
+          "label": "Cast fire bolt on the wolf"
+        },
+        {
+          "candidateId": "combat:firebolt-bandit-22",
+          "digest": "d022d022d022d022d022d022d022d022d022d022d022d022d022d022d022d022",
+          "kind": "exact_combat_power.select",
+          "label": "Cast fire bolt on the bandit"
+        }
+      ],
+      "expected": {
+        "preferred": "combat:firebolt-bandit-22",
+        "acceptable": [
+          "combat:firebolt-bandit-22"
+        ]
+      }
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "declaration": "I hand the silver ring across the counter and take the five gold.",
+      "candidates": [
+        {
+          "candidateId": "shop:buy-rope-23",
+          "digest": "d023d023d023d023d023d023d023d023d023d023d023d023d023d023d023d023",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        },
+        {
+          "candidateId": "shop:sell-ring-24",
+          "digest": "d024d024d024d024d024d024d024d024d024d024d024d024d024d024d024d024",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Sell the silver ring to Harbor Supplies for 5 gp"
+        }
+      ],
+      "expected": {
+        "preferred": "shop:sell-ring-24",
+        "acceptable": [
+          "shop:sell-ring-24"
+        ]
+      }
+    },
+    {
+      "id": "ambig-consumable-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "declaration": "Aster is bleeding badly; I force a healing potion down her throat.",
+      "candidates": [
+        {
+          "candidateId": "consumable:heal-aster-25",
+          "digest": "d025d025d025d025d025d025d025d025d025d025d025d025d025d025d025d025",
+          "kind": "exact_combat_consumable.select",
+          "label": "Use one healing potion on Aster"
+        },
+        {
+          "candidateId": "consumable:heal-bryn-26",
+          "digest": "d026d026d026d026d026d026d026d026d026d026d026d026d026d026d026d026",
+          "kind": "exact_combat_consumable.select",
+          "label": "Use one healing potion on Bryn"
+        }
+      ],
+      "expected": {
+        "preferred": "consumable:heal-aster-25",
+        "acceptable": [
+          "consumable:heal-aster-25"
+        ]
+      }
+    },
+    {
+      "id": "multi-check-vs-travel-trap",
+      "category": "multi-family",
+      "holdout": false,
+      "declaration": "I put my shoulder to the mill gate and force it open.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-27",
+          "digest": "d027d027d027d027d027d027d027d027d027d027d027d027d027d027d027d027",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "check:force-gate-28",
+          "digest": "d028d028d028d028d028d028d028d028d028d028d028d028d028d028d028d028",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Easy difficulty, normal — force the mill gate"
+        }
+      ],
+      "expected": {
+        "preferred": "check:force-gate-28",
+        "acceptable": [
+          "check:force-gate-28"
+        ]
+      }
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "declaration": "I take up the oars and row across the bay.",
+      "candidates": [
+        {
+          "candidateId": "travel:harbor-29",
+          "digest": "d029d029d029d029d029d029d029d029d029d029d029d029d029d029d029d029",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        },
+        {
+          "candidateId": "check:row-30",
+          "digest": "d030d030d030d030d030d030d030d030d030d030d030d030d030d030d030d030",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Medium difficulty, normal — row across the bay"
+        }
+      ],
+      "expected": {
+        "preferred": "check:row-30",
+        "acceptable": [
+          "check:row-30"
+        ]
+      }
+    },
+    {
+      "id": "multi-quest-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "declaration": "I sign the harbormaster's ledger and take on the harbor quest.",
+      "candidates": [
+        {
+          "candidateId": "quest:accept-harbor-31",
+          "digest": "d031d031d031d031d031d031d031d031d031d031d031d031d031d031d031d031",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "Accept the harbor quest"
+        },
+        {
+          "candidateId": "travel:harbor-32",
+          "digest": "d032d032d032d032d032d032d032d032d032d032d032d032d032d032d032d032",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        }
+      ],
+      "expected": {
+        "preferred": "quest:accept-harbor-31",
+        "acceptable": [
+          "quest:accept-harbor-31"
+        ]
+      }
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "declaration": "I count out two gold and pay Harbor Supplies for the rope.",
+      "candidates": [
+        {
+          "candidateId": "shop:buy-rope-33",
+          "digest": "d033d033d033d033d033d033d033d033d033d033d033d033d033d033d033d033",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        },
+        {
+          "candidateId": "item:equip-key-34",
+          "digest": "d034d034d034d034d034d034d034d034d034d034d034d034d034d034d034d034",
+          "kind": "exact_inventory_action.select",
+          "label": "Equip the bronze key"
+        }
+      ],
+      "expected": {
+        "preferred": "shop:buy-rope-33",
+        "acceptable": [
+          "shop:buy-rope-33"
+        ]
+      }
+    },
+    {
+      "id": "multi-power-vs-rest",
+      "category": "multi-family",
+      "holdout": true,
+      "declaration": "We camp at the mill and I take a long rest.",
+      "candidates": [
+        {
+          "candidateId": "rest:long-35",
+          "digest": "d035d035d035d035d035d035d035d035d035d035d035d035d035d035d035d035",
+          "kind": "exact_rest.select",
+          "label": "Take a long rest"
+        },
+        {
+          "candidateId": "power:mending-wheel-36",
+          "digest": "d036d036d036d036d036d036d036d036d036d036d036d036d036d036d036d036",
+          "kind": "exact_power_use.select",
+          "label": "Cast Mending Light on the mill wheel"
+        }
+      ],
+      "expected": {
+        "preferred": "rest:long-35",
+        "acceptable": [
+          "rest:long-35"
+        ]
+      }
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "declaration": "I fling a fire bolt at the wolf.",
+      "candidates": [
+        {
+          "candidateId": "combat:firebolt-wolf-37",
+          "digest": "d037d037d037d037d037d037d037d037d037d037d037d037d037d037d037d037",
+          "kind": "exact_combat_power.select",
+          "label": "Cast fire bolt on the wolf"
+        },
+        {
+          "candidateId": "power:mending-bryn-38",
+          "digest": "d038d038d038d038d038d038d038d038d038d038d038d038d038d038d038d038",
+          "kind": "exact_power_use.select",
+          "label": "Cast Mending Light on Bryn"
+        }
+      ],
+      "expected": {
+        "preferred": "combat:firebolt-wolf-37",
+        "acceptable": [
+          "combat:firebolt-wolf-37"
+        ]
+      }
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "declaration": "Which road leads to the mill, and is there time to rest?",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-39",
+          "digest": "d039d039d039d039d039d039d039d039d039d039d039d039d039d039d039d039",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "rest:long-40",
+          "digest": "d040d040d040d040d040d040d040d040d040d040d040d040d040d040d040d040",
+          "kind": "exact_rest.select",
+          "label": "Take a long rest"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "declaration": "If the wall were lower, I would climb it.",
+      "candidates": [
+        {
+          "candidateId": "check:climb-41",
+          "digest": "d041d041d041d041d041d041d041d041d041d041d041d041d041d041d041d041",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Easy difficulty, normal"
+        },
+        {
+          "candidateId": "travel:mill-42",
+          "digest": "d042d042d042d042d042d042d042d042d042d042d042d042d042d042d042d042",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "declaration": "I equip the bronze key and buy rope from Harbor Supplies.",
+      "candidates": [
+        {
+          "candidateId": "item:equip-key-43",
+          "digest": "d043d043d043d043d043d043d043d043d043d043d043d043d043d043d043d043",
+          "kind": "exact_inventory_action.select",
+          "label": "Equip the bronze key"
+        },
+        {
+          "candidateId": "shop:buy-rope-44",
+          "digest": "d044d044d044d044d044d044d044d044d044d044d044d044d044d044d044d044",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "declaration": "Should I mend the wheel now, or rest first?",
+      "candidates": [
+        {
+          "candidateId": "rest:short-45",
+          "digest": "d045d045d045d045d045d045d045d045d045d045d045d045d045d045d045d045",
+          "kind": "exact_rest.select",
+          "label": "Take a short rest"
+        },
+        {
+          "candidateId": "power:mending-wheel-46",
+          "digest": "d046d046d046d046d046d046d046d046d046d046d046d046d046d046d046d046",
+          "kind": "exact_power_use.select",
+          "label": "Cast Mending Light on the mill wheel"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "declaration": "I cast fireball at the goblins.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-47",
+          "digest": "d047d047d047d047d047d047d047d047d047d047d047d047d047d047d047d047",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "check:climb-48",
+          "digest": "d048d048d048d048d048d048d048d048d048d048d048d048d048d048d048d048",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Easy difficulty, normal"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "declaration": "I ride for Greyhold.",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-49",
+          "digest": "d049d049d049d049d049d049d049d049d049d049d049d049d049d049d049d049",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "travel:harbor-50",
+          "digest": "d050d050d050d050d050d050d050d050d050d050d050d050d050d050d050d050",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the harbor"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "declaration": "I draw my grandfather's sword.",
+      "candidates": [
+        {
+          "candidateId": "item:equip-key-51",
+          "digest": "d051d051d051d051d051d051d051d051d051d051d051d051d051d051d051d051",
+          "kind": "exact_inventory_action.select",
+          "label": "Equip the bronze key"
+        },
+        {
+          "candidateId": "shop:buy-rope-52",
+          "digest": "d052d052d052d052d052d052d052d052d052d052d052d052d052d052d052d052",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "declaration": "I attack the wolf with my sword.",
+      "candidates": [],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "declaration": "Lovely weather for the harvest, isn't it?",
+      "candidates": [
+        {
+          "candidateId": "travel:mill-53",
+          "digest": "d053d053d053d053d053d053d053d053d053d053d053d053d053d053d053d053",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        },
+        {
+          "candidateId": "rest:long-54",
+          "digest": "d054d054d054d054d054d054d054d054d054d054d054d054d054d054d054d054",
+          "kind": "exact_rest.select",
+          "label": "Take a long rest"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "declaration": "I greet the innkeeper and ask how business has been.",
+      "candidates": [
+        {
+          "candidateId": "shop:buy-rope-55",
+          "digest": "d055d055d055d055d055d055d055d055d055d055d055d055d055d055d055d055",
+          "kind": "exact_vendor_commerce.select",
+          "label": "Buy rope from Harbor Supplies for 2 gp"
+        },
+        {
+          "candidateId": "quest:accept-harbor-56",
+          "digest": "d056d056d056d056d056d056d056d056d056d056d056d056d056d056d056d056",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "Accept the harbor quest"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "declaration": "I tell Bryn the one about the miller's cat.",
+      "candidates": [
+        {
+          "candidateId": "check:climb-57",
+          "digest": "d057d057d057d057d057d057d057d057d057d057d057d057d057d057d057d057",
+          "kind": "exact_srd_check.select",
+          "label": "Strength (Athletics), Easy difficulty, normal"
+        },
+        {
+          "candidateId": "travel:mill-58",
+          "digest": "d058d058d058d058d058d058d058d058d058d058d058d058d058d058d058d058",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel to the mill"
+        }
+      ],
+      "expected": {
+        "preferred": null,
+        "acceptable": [
+          null
+        ]
+      }
+    }
+  ],
+  "samples": 90,
+  "failures": [],
+  "readouts": [
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.56,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.55,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.79,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.79,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.78,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.49,
+      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-progression-level",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "level:advance-11",
+      "acceptable": [
+        "level:advance-11"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
+    },
+    {
+      "id": "direct-progression-level",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "level:advance-11",
+      "acceptable": [
+        "level:advance-11"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.62,
+      "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
+    },
+    {
+      "id": "direct-progression-level",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "level:advance-11",
+      "acceptable": [
+        "level:advance-11"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
+    },
+    {
+      "id": "ambig-rest-long-short",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-12",
+      "acceptable": [
+        "rest:long-12"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.55,
+      "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
+    },
+    {
+      "id": "ambig-rest-long-short",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-12",
+      "acceptable": [
+        "rest:long-12"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
+    },
+    {
+      "id": "ambig-rest-long-short",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-12",
+      "acceptable": [
+        "rest:long-12"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.56,
+      "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:watchtower-16",
+      "acceptable": [
+        "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:watchtower-16",
+      "acceptable": [
+        "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.59,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:watchtower-16",
+      "acceptable": [
+        "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-travel-two-roads",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null,
+        "travel:mill-east-17",
+        "travel:mill-west-18"
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.65,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.66,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.66,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-consumable-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "consumable:heal-aster-25",
+      "acceptable": [
+        "consumable:heal-aster-25"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
+    },
+    {
+      "id": "ambig-consumable-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "consumable:heal-aster-25",
+      "acceptable": [
+        "consumable:heal-aster-25"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
+    },
+    {
+      "id": "ambig-consumable-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "consumable:heal-aster-25",
+      "acceptable": [
+        "consumable:heal-aster-25"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.62,
+      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
+    },
+    {
+      "id": "multi-check-vs-travel-trap",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:force-gate-28",
+      "acceptable": [
+        "check:force-gate-28"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-check-vs-travel-trap",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:force-gate-28",
+      "acceptable": [
+        "check:force-gate-28"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-check-vs-travel-trap",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:force-gate-28",
+      "acceptable": [
+        "check:force-gate-28"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.46,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+    },
+    {
+      "id": "multi-quest-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-31",
+      "acceptable": [
+        "quest:accept-harbor-31"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
+    },
+    {
+      "id": "multi-quest-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-31",
+      "acceptable": [
+        "quest:accept-harbor-31"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
+    },
+    {
+      "id": "multi-quest-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-31",
+      "acceptable": [
+        "quest:accept-harbor-31"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.8,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.76,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.78,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-power-vs-rest",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-35",
+      "acceptable": [
+        "rest:long-35"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
+    },
+    {
+      "id": "multi-power-vs-rest",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-35",
+      "acceptable": [
+        "rest:long-35"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
+    },
+    {
+      "id": "multi-power-vs-rest",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-35",
+      "acceptable": [
+        "rest:long-35"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-question",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-hypothetical",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-two-actions",
+      "category": "unsupported",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unsupported-choice-question",
+      "category": "unsupported",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-fireball",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-destination",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-sword",
+      "category": "unadvertised",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "unadvertised-no-candidates",
+      "category": "unadvertised",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-weather",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-innkeeper",
+      "category": "small-talk",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "smalltalk-joke",
+      "category": "small-talk",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    }
+  ],
+  "calibration": {
+    "fitted": {
+      "a": 2.865935839582888,
+      "b": 1.7227243465974076
+    },
+    "devSamples": 6,
+    "holdoutSamples": 0,
+    "allRaw": {
+      "samples": 6,
+      "accuracy": 1,
+      "brier": 0.047099999999999996,
+      "expectedCalibrationError": 0.21666666666666665
+    },
+    "allCalibrated": {
+      "samples": 6,
+      "accuracy": 1,
+      "brier": 0.00002170699077755302,
+      "expectedCalibrationError": 0.004550232808257171
+    },
+    "holdoutRaw": {
+      "samples": 0,
+      "accuracy": 0,
+      "brier": 0,
+      "expectedCalibrationError": 0
+    },
+    "holdoutCalibrated": {
+      "samples": 0,
+      "accuracy": 0,
+      "brier": 0,
+      "expectedCalibrationError": 0
+    }
+  },
+  "gate": {
+    "lane": "adventure-selection",
+    "promoted": false,
+    "reasons": [
+      "insufficient samples: 6 < 30"
+    ],
+    "gates": {
+      "minSamples": 30,
+      "minAccuracy": 0.9,
+      "maxBrier": 0.1,
+      "maxExpectedCalibrationError": 0.1
+    }
+  },
+  "sweep": {
+    "grid": [
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75
+    ],
+    "points": [
+      {
+        "threshold": 0.35,
+        "acted": 54,
+        "total": 54,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.4,
+        "acted": 54,
+        "total": 54,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.45,
+        "acted": 49,
+        "total": 54,
+        "coverage": 0.9074074074074074,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.5,
+        "acted": 47,
+        "total": 54,
+        "coverage": 0.8703703703703703,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.55,
+        "acted": 36,
+        "total": 54,
+        "coverage": 0.6666666666666666,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.6,
+        "acted": 25,
+        "total": 54,
+        "coverage": 0.46296296296296297,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.65,
+        "acted": 12,
+        "total": 54,
+        "coverage": 0.2222222222222222,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.7,
+        "acted": 6,
+        "total": 54,
+        "coverage": 0.1111111111111111,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.75,
+        "acted": 6,
+        "total": 54,
+        "coverage": 0.1111111111111111,
+        "actedAccuracy": 1
+      }
+    ],
+    "devPoints": [
+      {
+        "threshold": 0.35,
+        "acted": 36,
+        "total": 36,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.4,
+        "acted": 36,
+        "total": 36,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.45,
+        "acted": 34,
+        "total": 36,
+        "coverage": 0.9444444444444444,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.5,
+        "acted": 33,
+        "total": 36,
+        "coverage": 0.9166666666666666,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.55,
+        "acted": 26,
+        "total": 36,
+        "coverage": 0.7222222222222222,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.6,
+        "acted": 17,
+        "total": 36,
+        "coverage": 0.4722222222222222,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.65,
+        "acted": 9,
+        "total": 36,
+        "coverage": 0.25,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.7,
+        "acted": 6,
+        "total": 36,
+        "coverage": 0.16666666666666666,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.75,
+        "acted": 6,
+        "total": 36,
+        "coverage": 0.16666666666666666,
+        "actedAccuracy": 1
+      }
+    ],
+    "holdoutPoints": [
+      {
+        "threshold": 0.35,
+        "acted": 18,
+        "total": 18,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.4,
+        "acted": 18,
+        "total": 18,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.45,
+        "acted": 15,
+        "total": 18,
+        "coverage": 0.8333333333333334,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.5,
+        "acted": 14,
+        "total": 18,
+        "coverage": 0.7777777777777778,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.55,
+        "acted": 10,
+        "total": 18,
+        "coverage": 0.5555555555555556,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.6,
+        "acted": 8,
+        "total": 18,
+        "coverage": 0.4444444444444444,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.65,
+        "acted": 3,
+        "total": 18,
+        "coverage": 0.16666666666666666,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.7,
+        "acted": 0,
+        "total": 18,
+        "coverage": 0,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.75,
+        "acted": 0,
+        "total": 18,
+        "coverage": 0,
+        "actedAccuracy": 0
+      }
+    ],
+    "selection": {
+      "selected": {
+        "threshold": 0.4,
+        "acted": 54,
+        "total": 54,
+        "coverage": 1,
+        "actedAccuracy": 1
+      },
+      "points": [
+        {
+          "threshold": 0.35,
+          "acted": 54,
+          "total": 54,
+          "coverage": 1,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.4,
+          "acted": 54,
+          "total": 54,
+          "coverage": 1,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.45,
+          "acted": 49,
+          "total": 54,
+          "coverage": 0.9074074074074074,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.5,
+          "acted": 47,
+          "total": 54,
+          "coverage": 0.8703703703703703,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.55,
+          "acted": 36,
+          "total": 54,
+          "coverage": 0.6666666666666666,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.6,
+          "acted": 25,
+          "total": 54,
+          "coverage": 0.46296296296296297,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.65,
+          "acted": 12,
+          "total": 54,
+          "coverage": 0.2222222222222222,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.7,
+          "acted": 6,
+          "total": 54,
+          "coverage": 0.1111111111111111,
+          "actedAccuracy": 1
+        },
+        {
+          "threshold": 0.75,
+          "acted": 6,
+          "total": 54,
+          "coverage": 0.1111111111111111,
+          "actedAccuracy": 1
+        }
+      ],
+      "reasons": [
+        "filtered 4 of 9 threshold(s) for failing actedAccuracy >= 0.9 with at least 30 acted decisions",
+        "selected greatest-coverage threshold 0.4 (coverage 1) meeting actedAccuracy >= 0.9 with at least 30 acted decisions"
+      ]
+    },
+    "defaultVerdict": {
+      "threshold": 0.75,
+      "calibration": {
+        "fitted": {
+          "a": 2.865935839582888,
+          "b": 1.7227243465974076
+        },
+        "devSamples": 6,
+        "holdoutSamples": 0,
+        "allRaw": {
+          "samples": 6,
+          "accuracy": 1,
+          "brier": 0.047099999999999996,
+          "expectedCalibrationError": 0.21666666666666665
+        },
+        "allCalibrated": {
+          "samples": 6,
+          "accuracy": 1,
+          "brier": 0.00002170699077755302,
+          "expectedCalibrationError": 0.004550232808257171
+        },
+        "holdoutRaw": {
+          "samples": 0,
+          "accuracy": 0,
+          "brier": 0,
+          "expectedCalibrationError": 0
+        },
+        "holdoutCalibrated": {
+          "samples": 0,
+          "accuracy": 0,
+          "brier": 0,
+          "expectedCalibrationError": 0
+        }
+      },
+      "gate": {
+        "lane": "adventure-selection",
+        "promoted": false,
+        "reasons": [
+          "insufficient samples: 6 < 30"
+        ],
+        "gates": {
+          "minSamples": 30,
+          "minAccuracy": 0.9,
+          "maxBrier": 0.1,
+          "maxExpectedCalibrationError": 0.1
+        }
+      },
+      "proposedRecord": null
+    },
+    "recommendedVerdict": {
+      "threshold": 0.4,
+      "calibration": {
+        "fitted": {
+          "a": 1.6041563910262062,
+          "b": 4.092572644161457
+        },
+        "devSamples": 36,
+        "holdoutSamples": 18,
+        "allRaw": {
+          "samples": 54,
+          "accuracy": 1,
+          "brier": 0.17740370370370376,
+          "expectedCalibrationError": 0.41037037037037055
+        },
+        "allCalibrated": {
+          "samples": 54,
+          "accuracy": 1,
+          "brier": 0.00015858933095437295,
+          "expectedCalibrationError": 0.0108538680497553
+        },
+        "holdoutRaw": {
+          "samples": 18,
+          "accuracy": 1,
+          "brier": 0.19650555555555552,
+          "expectedCalibrationError": 0.43500000000000005
+        },
+        "holdoutCalibrated": {
+          "samples": 18,
+          "accuracy": 1,
+          "brier": 0.00020953352541887868,
+          "expectedCalibrationError": 0.012533547949162838
+        }
+      },
+      "gate": {
+        "lane": "adventure-selection",
+        "promoted": true,
+        "reasons": [],
+        "gates": {
+          "minSamples": 30,
+          "minAccuracy": 0.9,
+          "maxBrier": 0.1,
+          "maxExpectedCalibrationError": 0.1
+        }
+      },
+      "proposedRecord": {
+        "metrics": {
+          "samples": 54,
+          "accuracy": 1,
+          "brier": 0.00015858933095437295,
+          "expectedCalibrationError": 0.0108538680497553
+        },
+        "calibration": {
+          "a": 1.6041563910262062,
+          "b": 4.092572644161457
+        },
+        "promotedAt": "2026-09-17",
+        "evidence": "docs/system-one-adventure-benchmark.md"
+      }
+    }
+  },
+  "proposedRecord": {
+    "metrics": {
+      "samples": 54,
+      "accuracy": 1,
+      "brier": 0.00015858933095437295,
+      "expectedCalibrationError": 0.0108538680497553
+    },
+    "calibration": {
+      "a": 1.6041563910262062,
+      "b": 4.092572644161457
+    },
+    "promotedAt": "2026-09-17",
+    "evidence": "docs/system-one-adventure-benchmark.md"
+  }
+}
