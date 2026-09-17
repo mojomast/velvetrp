@@ -301,18 +301,25 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Shape (shadow shipped).** The server already issues opaque `CampaignDmCandidate[]`
   with digests (`campaignDmRepo.ts` `snapshot`). Because Jev evaluates each question
   independently and cannot emit an ordered list, ordering is composed in code from
-  per-candidate signals. `server/src/agent/systemOneDirector.ts` builds two atomic
-  questions per candidate — `progress` ("is committing this a good, meaningful next
-  step now?") and a priority `score` — plus a `hold` `noul` and an aggregate
-  `best_candidate` `choice`. It composes grounded candidates (progress at the action
-  threshold, ordered by priority) → hold → best-pick → defer, and with **no advertised
-  candidates it forces a hold** (the only possible action). Because Director beats mutate
-  campaign state, the aggregate pick must clear the **action** threshold, not the review
-  threshold. An atomic `legal` question was tried and removed: the advertised set is
-  already server-authorized, so re-asking legality only added model hedging without
-  changing decisions. `progress` deliberately grades a "meaningful next step" rather than
-  "story-objective progress", so a consequential mechanical beat (e.g. `encounter-start`)
-  is not penalized for not advancing plot.
+  per-candidate signals. `server/src/agent/systemOneDirector.ts` builds three atomic
+  questions per candidate — a `progress` `noul` ("is committing this a good, meaningful
+  next step now?"), a priority `score`, and a `transition` `noul` ("is this a safe,
+  low-risk way to keep the world moving?") issued only for candidates flagged
+  `pacing: true` (ambient-beat/advance-time) — plus a `hold` `noul` and an aggregate
+  `best_candidate` `choice`. It composes in order: with **no advertised candidates it
+  forces a hold** (the only possible action); otherwise grounded `progress` candidates
+  (at the action threshold, ordered by priority) → a confident `hold` → a grounded
+  `transition` fallback → the aggregate `best_candidate` pick → defer. The transition
+  fallback fires only when **every advertised candidate is pacing** (no mechanical
+  candidate is available), so it can never displace a preferred mechanical beat, and it
+  ranks below a confident hold. Because Director beats mutate campaign state, the
+  aggregate pick must clear the **action** threshold, not the review threshold. An atomic
+  `legal` question was tried and removed: the advertised set is already server-authorized,
+  so re-asking legality only added model hedging without changing decisions. `progress`
+  deliberately grades a "meaningful next step" rather than "story-objective progress", so
+  a consequential mechanical beat (e.g. `encounter-start`) is not penalized for not
+  advancing plot, and the criteria now treat a safe, low-risk transition as a valid next
+  step while still rejecting premature, redundant, or unsafe beats.
 - **Shadow.** `planCampaignDmBeat` accepts an optional `getSystemOneDirector` dependency.
   When it resolves (flag + `enabled` + the `director-selection` lane mode `shadow` + usable key) the battery runs beside the
   live planning and the would-be decision is recorded immutably; it never settles, orders,
@@ -320,8 +327,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   deliberately not enabled yet.
 - **Evaluation.** [System One Director calibration](system-one-director-calibration.md) runs
   the six-state corpus and the promotion gate on the calibrated signal; at the selected 0.60
-  threshold it acts on 36/60 samples with **100% acceptable and 100% exact** accuracy, so it
-  carries a promotion record. The corpus has no acted errors (the server only advertises
+  threshold it acts on ~39/60 samples (run-to-run variance is a few decisions) with **100%
+  acceptable and 100% exact** accuracy, so it carries a promotion record. The corpus has no acted errors (the server only advertises
   authorized beats and the model defers on mixed states), so the record is an evidence-only
   snapshot, not a stress-tested guarantee, and no active Director path is wired.
 - **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;

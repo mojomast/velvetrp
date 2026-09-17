@@ -46,6 +46,7 @@ async function recordDirectorShadowDecision(work: DmPlanningWork, director: Syst
   if (systemOneLaneMode(director.settings, "director-selection") === "off") return;
   const projection = work.candidates.map((candidate) => ({
     candidateId: candidate.candidateId, digest: candidate.digest, action: candidate.action, label: candidate.label,
+    pacing: candidate.action === "ambient-beat" || candidate.action === "advance-time",
   }));
   const questions = buildDirectorQuestions(projection);
   const state = canonicalAgentJson({ private_context: work.context, candidates: projection } as never);

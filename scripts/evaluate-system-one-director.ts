@@ -49,6 +49,7 @@ function plan(fixture: Fixture, key: string): DirectorCandidateProjection[] {
   const work = fixture.repo.claimDmPlanning("local-owner", run.runId, "eval", "eval");
   return (work?.candidates ?? []).map((candidate) => ({
     candidateId: candidate.candidateId, digest: candidate.digest, action: candidate.action, label: candidate.label,
+    pacing: candidate.action === "ambient-beat" || candidate.action === "advance-time",
   }));
 }
 
@@ -224,7 +225,7 @@ function render(input: {
   if (negatives.acted === 0) {
     lines.push("No acted decisions were collected, so the calibrated gate could not be scored at all.");
   } else if (negatives.incorrect === 0) {
-    lines.push(`None of the ${negatives.acted} acted decisions was unacceptable, and ${negatives.inexact} of ${negatives.acted} was not the exact preferred beat. The server candidate generator only advertises authorized beats, so an acted error requires the model to pick a wrong advertised beat or to act when a player decision is required; the live model defers on every mixed state, so this corpus does not stress-test the calibrated gate. A pass here is a promotion **candidate**, not proof.`);
+    lines.push(`None of the ${negatives.acted} acted decisions was unacceptable, and ${negatives.inexact} of ${negatives.acted} was not the exact preferred beat. The server candidate generator only advertises authorized beats and these frozen states contain no trap, so an acted error requires the model to pick a wrong advertised beat or to act when a player decision is required — neither occurs here. This corpus does not stress-test the calibrated gate, so a pass is a promotion **candidate**, not proof.`);
   } else {
     lines.push(`${negatives.incorrect} of ${negatives.acted} acted decisions were unacceptable (${((negatives.incorrect / negatives.acted) * 100).toFixed(1)}%)${negatives.lowestIncorrectSignal === null ? "" : `, the lowest-signal wrong pick at ${negatives.lowestIncorrectSignal.toFixed(3)}`}, so the calibrated gate is scored against real errors.`);
   }

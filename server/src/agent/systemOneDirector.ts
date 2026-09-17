@@ -14,6 +14,12 @@ export interface DirectorCandidateProjection {
   digest: string;
   action: string;
   label: string;
+  /**
+   * True for a pacing beat (an ambient moment or a bounded time step) that keeps the world
+   * moving without advancing the story. Only pacing candidates get a `transition` question,
+   * so the transition fallback can never displace a preferred mechanical beat. Defaults to false.
+   */
+  pacing?: boolean;
 }
 
 export const DIRECTOR_HOLD_KEY = "hold";
@@ -21,17 +27,19 @@ export const DIRECTOR_BEST_KEY = "best_candidate";
 export const DIRECTOR_NONE = "none_of_these";
 export const DIRECTOR_PROGRESS_PREFIX = "progress:";
 export const DIRECTOR_PRIORITY_PREFIX = "priority:";
+export const DIRECTOR_TRANSITION_PREFIX = "transition:";
 
 /** Ordered priority levels for the per-candidate `score` question. */
 const DIRECTOR_PRIORITY_LEVELS = ["low priority", "medium priority", "high priority"] as const;
 const DIRECTOR_MAX_BEATS = 3;
 
 /**
- * Builds the Director decision battery. Each advertised candidate gets two atomic
- * questions: `progress:` ("is committing this a good, meaningful next step now?") and
- * a priority `score`. A `hold` noul covers "a player decision is genuinely required",
- * and an aggregate `best_candidate` choice names the single beat to commit when the
- * atomic signals are not decisive. Independent answers are composed in code.
+ * Builds the Director decision battery. Each advertised candidate gets three atomic
+ * questions: `progress:` ("is committing this a good, meaningful next step now?"), a
+ * `transition:` noul ("is this a safe, low-risk way to keep the world moving even without
+ * advancing the story?"), and a priority `score`. A `hold` noul covers "a player decision
+ * is genuinely required", and an aggregate `best_candidate` choice names the single beat to
+ * commit when the atomic signals are not decisive. Independent answers are composed in code.
  *
  * The design is evidence-led. The original single "is this supported?" noul conflated
  * legality, relevance, and immediacy, and hedged (0.53-0.73) on states whose only legal
@@ -40,7 +48,12 @@ const DIRECTOR_MAX_BEATS = 3;
  * is server-authorized, so re-asking legality only added hedging (a legal `encounter-start`
  * scored 0.51) without changing decisions; (2) `progress` grades a "meaningful next step"
  * rather than specifically "story-objective progress", so a consequential mechanical beat
- * like starting a prepared encounter is not penalized for not advancing plot.
+ * like starting a prepared encounter is not penalized for not advancing plot. A third change
+ * came from live shadow data: in richer campaign states the model scored transition beats
+ * (ambient-beat, advance-time) around 0.11 because the criteria named "let time pass or add
+ * ambiance" as not-progress, so the lane deferred on states where the provider committed a
+ * transition. The criteria now treat a safe low-risk transition as a valid next step while
+ * still rejecting premature, redundant, or unsafe beats.
  */
 export function buildDirectorQuestions(candidates: readonly DirectorCandidateProjection[]): SystemOneQuestions {
   const questions: SystemOneQuestions = {
@@ -58,8 +71,8 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
       type: "noul",
       instructions: `Is committing this advertised beat a good, meaningful next step for the Director right now? Candidate: ${candidate.label} (${candidate.action}).`,
       criteria: {
-        true: "Committing it now would reveal, resolve, start, or otherwise meaningfully change the situation",
-        false: "Committing it now would be premature, would only let time pass or add ambiance, or should wait for a player decision",
+        true: "Committing it now would reveal, resolve, start, or otherwise meaningfully change the situation, or is a safe low-risk transition that keeps the world moving while play waits",
+        false: "Committing it now would be premature, redundant, or unsafe, or should wait for a player decision",
       },
     };
     questions[`${DIRECTOR_PRIORITY_PREFIX}${candidate.candidateId}`] = {
@@ -67,6 +80,16 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
       instructions: `How strong and relevant a next beat is this candidate? Candidate: ${candidate.label} (${candidate.action}).`,
       criteria: [...DIRECTOR_PRIORITY_LEVELS],
     };
+    if (candidate.pacing === true) {
+      questions[`${DIRECTOR_TRANSITION_PREFIX}${candidate.candidateId}`] = {
+        type: "noul",
+        instructions: `Is committing this advertised pacing beat a safe, low-risk way to keep the world moving right now, even though it does not advance the story? Candidate: ${candidate.label} (${candidate.action}).`,
+        criteria: {
+          true: "Committing it now is safe and keeps the world moving without forcing a player decision",
+          false: "Committing it now is unsafe, premature, redundant, or the world should instead wait for a player decision",
+        },
+      };
+    }
   }
   const criteria: Record<string, string | null> = {};
   for (const candidate of candidates) criteria[candidate.candidateId] = `${candidate.label} (${candidate.action})`;
@@ -79,7 +102,7 @@ export function buildDirectorQuestions(candidates: readonly DirectorCandidatePro
   return questions;
 }
 
-export type DirectorMethod = "hold" | "candidates" | "best-pick" | "defer";
+export type DirectorMethod = "hold" | "candidates" | "transition" | "best-pick" | "defer";
 
 export interface DirectorComposition {
   band: SystemOneBand;
@@ -118,9 +141,11 @@ function normalizedPriority(answers: Record<string, SystemOneAnswer>, key: strin
  * 1. Candidates whose `progress` answer clears the action threshold are ordered by
  *    priority score and capped at the beat limit.
  * 2. If none are grounded, a confident `hold` holds the beat (`act`, no selections).
- * 3. Otherwise the aggregate `best_candidate` choice rescues one candidate when it
+ * 3. Otherwise candidates whose `transition` answer clears the action threshold are
+ *    ordered by priority and committed as a low-risk way to keep the world moving.
+ * 4. Otherwise the aggregate `best_candidate` choice rescues one candidate when it
  *    clears the action threshold.
- * 4. Otherwise the lane defers; the caller keeps its existing behavior.
+ * 5. Otherwise the lane defers; the caller keeps its existing behavior.
  */
 export function composeDirectorSelection(
   candidates: readonly DirectorCandidateProjection[],
@@ -155,6 +180,28 @@ export function composeDirectorSelection(
   // best-pick, but never a grounded, meaningful candidate above.
   if (holdSignal !== null && bandForConfidence(holdSignal, thresholds) === "act") {
     return { band: "act", method: "hold", hold: true, selections: [], topSignal: holdSignal };
+  }
+
+  // No candidate can advance the story (every advertised beat is a pacing beat) and a
+  // player decision is not required now, so a grounded low-risk transition keeps the world
+  // moving. Requiring every candidate to be pacing means a transition can never displace a
+  // preferred mechanical beat; it is a fallback below `progress` and below a confident hold.
+  const onlyPacing = candidates.every((candidate) => candidate.pacing === true);
+  const transitioned = !onlyPacing ? [] : scored
+    .filter((entry) => entry.candidate.pacing === true)
+    .flatMap((entry) => {
+      const transition = noulSignal(answers, `${DIRECTOR_TRANSITION_PREFIX}${entry.candidate.candidateId}`);
+      return transition === null ? [] : [{ entry, transition }];
+    })
+    .filter((candidate) => bandForConfidence(candidate.transition, thresholds) === "act")
+    .sort((left, right) => (right.entry.priority - left.entry.priority) || (right.transition - left.transition))
+    .slice(0, maxBeats);
+  if (transitioned.length > 0) {
+    return {
+      band: "act", method: "transition", hold: false,
+      selections: transitioned.map(({ entry }) => ({ candidateId: entry.candidate.candidateId, digest: entry.candidate.digest })),
+      topSignal: transitioned[0]!.transition,
+    };
   }
 
   // Director beats mutate campaign state, so the aggregate pick must clear the action
