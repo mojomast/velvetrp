@@ -7,7 +7,9 @@ lane is wired** behind the flag, setting, and key, with confidence gating to the
 existing LLM/deterministic paths, plus **shadow mode**, a **lane-scoped budget**, and an
 **immutable decision-record sidecar**. The **L1 Director selector is also wired in
 shadow mode**, and the surrounding tooling now includes a **probability-calibration
-grader (Brier/ECE)**, a **decision-record read API**, and a **settings UI**;
+grader (Brier/ECE)**, a **decision-record read API**, a **settings UI**, and a
+**shadow-decision report CLI**. The **L3 narration/receipt verification** and **L7
+cost/quality router** primitives are implemented as pure, tested, **unwired** modules;
 **everything remains disabled by default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
@@ -329,6 +331,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `noul` "does it invent a mechanic or outcome not present in the facts?",
   `noul` "does it cross a declared character or content boundary?", and `score`
   "groundedness".
+- **Shape (primitive shipped).** `server/src/agent/systemOneNarration.ts` builds the
+  battery (three contrastive hazard `noul`s plus a groundedness `score`) and composes a
+  `NarrationVerification { band, flags, groundedness, topSignal }` in code. It is a pure
+  module with unit tests and is **not yet wired** into the narration path.
 - **Composition.** Produces an observation only. High contradiction probability flags
   for deterministic replacement (already implemented for travel) or GM review. It never
   rewrites narration and never becomes story truth.
@@ -403,6 +409,11 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   (`deterministic` / `cheap-generation` / `frontier-generation` / `human-review`), a
   `score` for request complexity, and a `noul` for "is the deterministic path
   sufficient?". This is the vendor intent-routing and confidence-gated routing pattern.
+- **Shape (primitive shipped).** `server/src/agent/systemOneRouter.ts` builds the
+  handler `choice`, complexity `score`, and deterministic-sufficiency `noul`, and
+  composes a `RouterDecision`. It is a pure module with unit tests and is **not yet
+  wired** to any handler. Its safety gate routes `requiresHumanDecision`/`safetySensitive`
+  requests to `human-review` unconditionally.
 - **Composition.** `act` routes to the chosen handler; `confirm` and `fallback` use the
   currently configured handler, so the router can only ever change behavior toward a
   cheaper or human path, never bypass a required safety check.

@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["hydrate-campaign.ts", "run-reviewed-adventure.ts", "evaluate-campaign-memory.ts", "evaluate-agent-knowledge.ts", "evaluate-live-director-grounding.ts", "benchmark-system-one-lanes.ts", "test/**/*.ts"]
+  "include": ["hydrate-campaign.ts", "run-reviewed-adventure.ts", "evaluate-campaign-memory.ts", "evaluate-agent-knowledge.ts", "evaluate-live-director-grounding.ts", "benchmark-system-one-lanes.ts", "report-system-one-decisions.ts", "test/**/*.ts"]
 }
