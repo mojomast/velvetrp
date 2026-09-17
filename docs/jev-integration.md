@@ -391,13 +391,27 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Where.** Between recall candidate selection and context packing
   (`docs/campaign-memory.md`, `server/src/context.ts`).
 - **Shape.** State is the query plus a bounded shortlist of already-authorized
-  candidates. One `score` per candidate ("relevance to the query") and one `noul`
-  ("does this candidate answer the query?").
-- **Composition.** Fuse the model score with the existing deterministic rank using
-  code-owned weights; do not replace the deterministic rank. All existing query, hit,
-  whole-entry, and byte caps are unchanged.
+  candidates. The battery is one relevance `score` per candidate on a four-level scale
+  (`irrelevant`, `loosely related`, `relevant`, `directly relevant`) and one `answers`
+  `noul` per candidate ("does this item actually answer the query?"), with the query and
+  the candidate text embedded in each question so every judgment is against the same
+  authority.
+- **Shape (primitive shipped).** `server/src/agent/systemOneRerank.ts` builds that
+  per-candidate relevance `score` and `answers` `noul` battery and composes the order in
+  code with `composeRerankOrder`. Fusion is `fused = deterministic * rankScore + model *
+  relevance` under code-owned default weights
+  `DEFAULT_RERANK_WEIGHTS = { deterministic: 0.5, model: 0.5 }`, where `rankScore` is `1`
+  for rank 0 and `0` for the worst rank. The lane never drops a candidate, and ties break
+  by deterministic rank, so an all-equal model response reproduces the deterministic order
+  exactly. It is **not wired** into recall and has no evaluation or promotion record yet.
+- **Composition.** Fuses the model relevance with the existing deterministic rank using
+  code-owned weights; the deterministic rank is never replaced outright, and an absent or
+  malformed model response reproduces it. The advisory `band` derives from the strongest
+  `answers` `noul` (act/confirm/fallback). All existing query, hit, whole-entry, and byte
+  caps are unchanged.
 - **Authority.** Recall authorizes before ranking; the model never sees or influences
-  authorization. A no-match query can still return no memory.
+  authorization, and the lane only reorders the already-authorized shortlist. A no-match
+  query can still return no memory.
 
 ### L5 — Routing and intent
 
