@@ -17,6 +17,7 @@ import type {
 import { buildProviderHeaders, canUseProvider, canUseSystemOne } from "./provider/providerTransport.js";
 import type { SystemOneCaller } from "./provider/systemOneCompletion.js";
 import { buildRoomRoutingQuestions, composeRoomRoutingSelection } from "./agent/systemOneRoomRouting.js";
+import { calibrateTopSignal } from "./agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION, type SystemOneBand } from "./agent/systemOnePolicy.js";
 import { estimateTurnTokens } from "./agent/turnBudget.js";
 import { systemOneLaneBudgets } from "./agent/systemOneBudget.js";
@@ -178,7 +179,7 @@ async function trySystemOneRoomRouting(input: {
       state,
       questions,
       answers: result.answers,
-      selection: { method: composed.method, speakerIds: composed.speakerIds, topSignal: composed.topSignal },
+      selection: { method: composed.method, speakerIds: composed.speakerIds, topSignal: calibrateTopSignal(composed.topSignal, systemOne.settings.confidenceCalibration["speaker-routing"]) },
       confidenceBand: composed.band,
       fallbackUsed: systemOne.settings.shadow || composed.band !== "act",
       shadow: systemOne.settings.shadow,

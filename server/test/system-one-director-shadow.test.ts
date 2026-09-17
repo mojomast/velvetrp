@@ -45,6 +45,28 @@ describe("System One Director shadow lane", () => {
     expect(committed?.state).not.toBe("planning");
   });
 
+  it("records the calibrated confidence rather than the raw signal", async () => {
+    const { fixture, run } = await openForShadow();
+    const caller = createFakeSystemOneCaller();
+    const settings = {
+      ...defaultSystemOneSettings(), enabled: true, shadow: true, apiKey: "test-key",
+      confidenceCalibration: {
+        ...defaultSystemOneSettings().confidenceCalibration,
+        "director-selection": { a: 2.5, b: 3.3 },
+      },
+    };
+    await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {
+      ...dmDependencies(), getSystemOneDirector: async () => ({ settings, caller }),
+    });
+
+    const db = database();
+    const row = db.prepare("SELECT selection_json FROM system_one_decisions_v1 WHERE lane='director-selection' ORDER BY created_at DESC LIMIT 1").get() as { selection_json: string };
+    db.close();
+    // The fake battery grounds every candidate at a raw 0.9; the map raises it toward 1.
+    const selection = JSON.parse(row.selection_json) as { topSignal: number | null };
+    expect(selection.topSignal).toBeGreaterThan(0.99);
+  });
+
   it("ignores a failing shadow hook and still settles planning", async () => {
     const { fixture, run } = await openForShadow();
     await orchestrateCampaignDmBeat(fixture.repo, "local-owner", run.runId, {

@@ -23,6 +23,7 @@ function makeSettings(overrides: Partial<SystemOneSettingsValue> = {}): SystemOn
     pricing: { promptPerMillion: 0.042, completionPerMillion: 0 },
     budget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null, maxRequestsPerWindow: 60, rateWindowMs: 60_000 },
     confidencePolicy: Object.fromEntries(lanes.map((lane) => [lane, { actionThreshold: 0.75, reviewThreshold: 0.5 }])) as SystemOneSettingsValue["confidencePolicy"],
+    confidenceCalibration: Object.fromEntries(lanes.map((lane) => [lane, { a: 1, b: 0 }])) as SystemOneSettingsValue["confidenceCalibration"],
     updatedAt: "",
     ...overrides,
   };

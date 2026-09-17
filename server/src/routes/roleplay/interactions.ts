@@ -27,6 +27,7 @@ import type { RoomRoutingSystemOne, SystemOneRoomRoutingDecision } from "../../l
 import { canUseSystemOne } from "../../provider/providerTransport.js";
 import { callSystemOne, type SystemOneCaller } from "../../provider/systemOneCompletion.js";
 import { buildRouterQuestions, composeRouterDecision, type RouterHandler, type RouterRequestProjection } from "../../agent/systemOneRouter.js";
+import { calibrateTopSignal } from "../../agent/systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "../../agent/systemOnePolicy.js";
 import { readRpgFeatureFlags } from "../../features.js";
 import {
@@ -116,7 +117,7 @@ export async function recordRouterShadowDecision(
         handler: decision.handler,
         complexity: decision.complexity,
         deterministicSufficient: decision.deterministicSufficient,
-        topSignal: decision.topSignal,
+        topSignal: calibrateTopSignal(decision.topSignal, lane.settings.confidenceCalibration["cost-router"]),
         reason: decision.reason,
       },
       confidenceBand: decision.band,

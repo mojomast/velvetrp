@@ -56,6 +56,19 @@ export function applyCalibration(probability: number, calibration: PlattCalibrat
   return sigmoid(calibration.a * logit(probability) + calibration.b);
 }
 
+/**
+ * Applies a calibration to an optional emitted signal; `null` passes through unchanged.
+ * The identity map short-circuits so the default path returns the exact raw value.
+ */
+export function calibrateTopSignal(
+  topSignal: number | null,
+  calibration: PlattCalibration,
+): number | null {
+  if (topSignal === null) return null;
+  if (calibration.a === 1 && calibration.b === 0) return topSignal;
+  return applyCalibration(topSignal, calibration);
+}
+
 export interface PlattFitOptions {
   /** Gradient-descent steps. Default 2,000. */
   iterations?: number;

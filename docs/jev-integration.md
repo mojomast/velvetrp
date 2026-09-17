@@ -211,7 +211,8 @@ independent profile.
 
 - New `SystemOneSettings` (server `types.ts`): `enabled`, `providerType` (literal
   `system-one`), `baseUrl`, `model`, `apiKey`, `requestTimeoutSeconds`, `pricing`,
-  `budget`, and `confidencePolicy` (per-lane thresholds).
+  `budget`, `confidencePolicy` (per-lane thresholds), and `confidenceCalibration`
+  (per-lane monotonic Platt map applied to the recorded confidence only).
 - Persistence mirrors `settingsRepo.ts:readProvider` / `updateProviderSettings`:
   `readSystemOne`, `getPublicSystemOne`, `updateSystemOne`, with the key never
   returned publicly. Manual clamping matches the existing style.
@@ -672,6 +673,7 @@ above into a measured number before any lane is enabled.
 | `requestTimeoutSeconds` | setting | bounded | Mirrors existing provider clamp style |
 | `budget.*` | setting | bounded | Lane-specific, never shared |
 | `confidencePolicy.<lane>.*` | setting | conservative | `reviewThreshold`/`actionThreshold` |
+| `confidenceCalibration.<lane>.*` | setting | identity | Platt `{ a, b }` on recorded confidence; never changes the band |
 
 Any new environment variable must be added to the `docs/operations.md` environment
 table and both `.env.example` files, or the documentation-drift test will fail.

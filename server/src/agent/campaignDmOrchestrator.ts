@@ -9,6 +9,7 @@ import { DM_AGGREGATE_TOKEN_CAP, DM_NARRATION_COMPLETION_MAX_TOKENS, DM_NARRATIO
   DM_PLANNING_PROMPT_MAX_BYTES, DM_PROVIDER_DEADLINE_MS, estimatePromptTokens,
   type CampaignDmRepository, type DmPlanningWork, type DmProviderUsage } from "../repo/campaignDmRepo.js";
 import { buildDirectorQuestions, composeDirectorSelection, type SystemOneDirectorDependency } from "./systemOneDirector.js";
+import { calibrateTopSignal } from "./systemOneCalibration.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
 import { buildNarrationQuestions, composeNarrationVerification, narrationVerificationState, type NarrationVerificationInput } from "./systemOneNarration.js";
 import type { AdventureAgentDependencies } from "./adventureOrchestrator.js";
@@ -57,7 +58,8 @@ async function recordDirectorShadowDecision(work: DmPlanningWork, director: Syst
     state,
     questions,
     answers: result.answers,
-    selection: { method: composed.method, hold: composed.hold, selections: composed.selections, topSignal: composed.topSignal },
+    // The recorded confidence is calibrated for observability; the band above is decided on raw signals.
+    selection: { method: composed.method, hold: composed.hold, selections: composed.selections, topSignal: calibrateTopSignal(composed.topSignal, director.settings.confidenceCalibration["director-selection"]) },
     confidenceBand: composed.band,
     fallbackUsed: true,
     shadow: true,
@@ -105,7 +107,7 @@ async function recordNarrationShadowDecision(runId: string, narration: string, c
     state,
     questions,
     answers: result.answers,
-    selection: { band: composed.band, flags: composed.flags, groundedness: composed.groundedness, topSignal: composed.topSignal },
+    selection: { band: composed.band, flags: composed.flags, groundedness: composed.groundedness, topSignal: calibrateTopSignal(composed.topSignal, director.settings.confidenceCalibration["narration-verification"]) },
     confidenceBand: composed.band,
     fallbackUsed: true,
     shadow: true,

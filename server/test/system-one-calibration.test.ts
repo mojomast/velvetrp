@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCalibration,
+  calibrateTopSignal,
   fitPlattCalibration,
   logit,
   sigmoid,
@@ -32,6 +33,12 @@ describe("System One Platt calibration", () => {
       sample(0.95, false), sample(0.9, false), sample(0.92, false), sample(0.88, false),
     ]);
     expect(applyCalibration(0.9, calibration)).toBeLessThan(0.9);
+  });
+
+  it("passes a null signal through and calibrates a present one", () => {
+    expect(calibrateTopSignal(null, { a: 2, b: 1 })).toBeNull();
+    expect(calibrateTopSignal(0.6, { a: 1, b: 0 })).toBeCloseTo(0.6, 6);
+    expect(calibrateTopSignal(0.6, { a: 2, b: 1 })).toBeGreaterThan(0.6);
   });
 
   it("round-trips through the logit and logistic functions", () => {

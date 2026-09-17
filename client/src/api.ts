@@ -3112,6 +3112,12 @@ export interface SystemOneConfidenceThresholds {
   reviewThreshold: number;
 }
 
+/** A monotonic Platt map `sigmoid(a * logit(p) + b)`; `{ a: 1, b: 0 }` is the identity. */
+export interface SystemOneCalibration {
+  a: number;
+  b: number;
+}
+
 export interface SystemOneSettings {
   id: "system-one";
   providerType: "system-one";
@@ -3124,6 +3130,7 @@ export interface SystemOneSettings {
   pricing: { promptPerMillion: number | null; completionPerMillion: number | null };
   budget: { maxTotalTokens: number; maxEstimatedCostUsd: number | null; maxRequestsPerWindow: number; rateWindowMs: number };
   confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  confidenceCalibration: Record<SystemOneLane, SystemOneCalibration>;
   updatedAt: string;
 }
 
@@ -3151,6 +3158,7 @@ export function updateSystemOne(patch: {
   pricing?: Partial<SystemOneSettings["pricing"]>;
   budget?: Partial<SystemOneSettings["budget"]>;
   confidencePolicy?: Partial<Record<SystemOneLane, Partial<SystemOneConfidenceThresholds>>>;
+  confidenceCalibration?: Partial<Record<SystemOneLane, Partial<SystemOneCalibration>>>;
 }): Promise<SystemOneSettings> {
   return request<SystemOneSettings>("/provider/system-one", {
     method: "PUT",

@@ -17,6 +17,10 @@ describe("PromptSettings provider preflight", () => {
         "speaker-routing": { actionThreshold: 0.75, reviewThreshold: 0.5 },
         guardrails: { actionThreshold: 0.75, reviewThreshold: 0.5 },
         "cost-router": { actionThreshold: 0.75, reviewThreshold: 0.5 } },
+      confidenceCalibration: {
+        "director-selection": { a: 1, b: 0 }, "adventure-selection": { a: 1, b: 0 },
+        "narration-verification": { a: 1, b: 0 }, "memory-reranking": { a: 1, b: 0 },
+        "speaker-routing": { a: 1, b: 0 }, guardrails: { a: 1, b: 0 }, "cost-router": { a: 1, b: 0 } },
       updatedAt: "",
     });
     const preflight = vi.spyOn(api, "preflightProviderCapabilities").mockResolvedValue({ model: "test", ok: false,

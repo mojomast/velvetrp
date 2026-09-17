@@ -188,6 +188,10 @@ export function readSystemOne(db: DatabaseDriver.Database): SystemOneSettings {
         lane,
         { ...defaults.confidencePolicy[lane], ...(parsed.confidencePolicy?.[lane] ?? {}) },
       ])) as SystemOneSettings["confidencePolicy"],
+      confidenceCalibration: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
+        lane,
+        { ...defaults.confidenceCalibration[lane], ...(parsed.confidenceCalibration?.[lane] ?? {}) },
+      ])) as SystemOneSettings["confidenceCalibration"],
     };
   } catch {
     return defaults;
@@ -213,6 +217,10 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
       lane,
       { ...current.confidencePolicy[lane], ...(patch.confidencePolicy?.[lane] ?? {}) },
     ])) as SystemOneSettings["confidencePolicy"],
+    confidenceCalibration: Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => [
+      lane,
+      { ...current.confidenceCalibration[lane], ...(patch.confidenceCalibration?.[lane] ?? {}) },
+    ])) as SystemOneSettings["confidenceCalibration"],
   };
   if (patch.enabled !== undefined) next.enabled = patch.enabled;
   if (patch.shadow !== undefined) next.shadow = patch.shadow;
@@ -254,6 +262,14 @@ export async function updateSystemOneSettings(patch: UpdateSystemOneInput): Prom
       const review = clampNullableNumber(thresholds.reviewThreshold, 0, 1) ?? 0;
       return [lane, { actionThreshold: action, reviewThreshold: Math.min(review, action) }];
     })) as SystemOneSettings["confidencePolicy"];
+  }
+  if (patch.confidenceCalibration) {
+    next.confidenceCalibration = Object.fromEntries(SYSTEM_ONE_LANES.map((lane) => {
+      const calibration = next.confidenceCalibration[lane];
+      const a = clampNullableNumber(calibration.a, 0, 1_000) ?? 1;
+      const b = clampNullableNumber(calibration.b, -1_000, 1_000) ?? 0;
+      return [lane, { a, b }];
+    })) as SystemOneSettings["confidenceCalibration"];
   }
   next.updatedAt = now();
   db.prepare(

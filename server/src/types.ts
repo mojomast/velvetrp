@@ -387,6 +387,19 @@ export interface SystemOneConfidenceThresholds {
   reviewThreshold: number;
 }
 
+/**
+ * A monotonic Platt calibration map applied to a lane's emitted confidence:
+ * `sigmoid(a * logit(p) + b)`. `{ a: 1, b: 0 }` is the identity. Fitted out of band by
+ * the lane evaluation, then persisted here; it never changes which band a decision lands
+ * in (thresholds compare the raw signal), only the confidence a decision reports.
+ */
+export interface SystemOneCalibration {
+  /** Logistic slope; 1 is the identity. */
+  a: number;
+  /** Logistic intercept; 0 is the identity. */
+  b: number;
+}
+
 export interface SystemOneBudgetSettings {
   maxTotalTokens: number;
   maxEstimatedCostUsd: number | null;
@@ -408,6 +421,7 @@ export interface SystemOneSettings {
   pricing: ProviderPricing;
   budget: SystemOneBudgetSettings;
   confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  confidenceCalibration: Record<SystemOneLane, SystemOneCalibration>;
   updatedAt: string;
 }
 
@@ -423,6 +437,7 @@ export interface PublicSystemOneSettings {
   pricing: ProviderPricing;
   budget: SystemOneBudgetSettings;
   confidencePolicy: Record<SystemOneLane, SystemOneConfidenceThresholds>;
+  confidenceCalibration: Record<SystemOneLane, SystemOneCalibration>;
   updatedAt: string;
 }
 
@@ -436,6 +451,7 @@ export interface UpdateSystemOneInput {
   pricing?: Partial<ProviderPricing>;
   budget?: Partial<SystemOneBudgetSettings>;
   confidencePolicy?: Partial<Record<SystemOneLane, Partial<SystemOneConfidenceThresholds>>>;
+  confidenceCalibration?: Partial<Record<SystemOneLane, Partial<SystemOneCalibration>>>;
 }
 
 export interface UsageSummary {

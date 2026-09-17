@@ -4,6 +4,7 @@ import type {
   PublicProviderSettings,
   PublicSystemOneSettings,
   SamplerSettings,
+  SystemOneCalibration,
   SystemOneConfidenceThresholds,
   SystemOneLane,
   SystemOneSettings,
@@ -77,6 +78,15 @@ export function defaultSystemOneConfidencePolicy(): Record<SystemOneLane, System
   ) as Record<SystemOneLane, SystemOneConfidenceThresholds>;
 }
 
+/** The identity calibration: a lane reports its raw confidence until a fitted map is applied. */
+export const DEFAULT_SYSTEM_ONE_CALIBRATION: SystemOneCalibration = { a: 1, b: 0 };
+
+export function defaultSystemOneConfidenceCalibration(): Record<SystemOneLane, SystemOneCalibration> {
+  return Object.fromEntries(
+    SYSTEM_ONE_LANES.map((lane) => [lane, { ...DEFAULT_SYSTEM_ONE_CALIBRATION }]),
+  ) as Record<SystemOneLane, SystemOneCalibration>;
+}
+
 export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
   return {
     id: "system-one",
@@ -90,6 +100,7 @@ export function defaultSystemOneSettings(updatedAt = now()): SystemOneSettings {
     pricing: { promptPerMillion: 0.042, completionPerMillion: 0 },
     budget: { maxTotalTokens: 65_536, maxEstimatedCostUsd: null, maxRequestsPerWindow: 60, rateWindowMs: 60_000 },
     confidencePolicy: defaultSystemOneConfidencePolicy(),
+    confidenceCalibration: defaultSystemOneConfidenceCalibration(),
     updatedAt,
   };
 }
@@ -107,6 +118,7 @@ export function toPublicSystemOne(settings: SystemOneSettings): PublicSystemOneS
     pricing: settings.pricing,
     budget: settings.budget,
     confidencePolicy: settings.confidencePolicy,
+    confidenceCalibration: settings.confidenceCalibration,
     updatedAt: settings.updatedAt,
   };
 }

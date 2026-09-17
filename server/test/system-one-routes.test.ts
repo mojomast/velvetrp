@@ -48,7 +48,7 @@ describe("System One provider api", () => {
     expect(response.statusCode).toBe(200);
     expect(Object.keys(body)).toEqual([
       "id", "providerType", "enabled", "shadow", "baseUrl", "model", "hasApiKey", "requestTimeoutSeconds",
-      "pricing", "budget", "confidencePolicy", "updatedAt",
+      "pricing", "budget", "confidencePolicy", "confidenceCalibration", "updatedAt",
     ]);
     expect(body.id).toBe("system-one");
     expect(body.enabled).toBe(false);
@@ -61,6 +61,8 @@ describe("System One provider api", () => {
       "director-selection", "adventure-selection", "narration-verification", "memory-reranking",
       "speaker-routing", "guardrails", "cost-router",
     ]);
+    expect(Object.keys(body.confidenceCalibration)).toEqual(Object.keys(body.confidencePolicy));
+    expect(body.confidenceCalibration["director-selection"]).toEqual({ a: 1, b: 0 });
     expect(body).not.toHaveProperty("apiKey");
     await app.close();
   });
@@ -78,6 +80,7 @@ describe("System One provider api", () => {
         pricing: { promptPerMillion: 1 },
         budget: { maxTotalTokens: 5, rateWindowMs: 10 },
         confidencePolicy: { guardrails: { actionThreshold: 0.9, reviewThreshold: 0.95 } },
+        confidenceCalibration: { "director-selection": { a: 2.5, b: 3.3 } },
       },
     });
     expect(put.statusCode).toBe(200);
@@ -88,6 +91,7 @@ describe("System One provider api", () => {
       requestTimeoutSeconds: 120,
       budget: { maxTotalTokens: 5, rateWindowMs: 1_000 },
       confidencePolicy: { guardrails: { actionThreshold: 0.9, reviewThreshold: 0.9 } },
+      confidenceCalibration: { "director-selection": { a: 2.5, b: 3.3 } },
     });
     expect(JSON.stringify(put.json())).not.toMatch(/top-secret/);
     await app.close();
