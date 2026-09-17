@@ -110,14 +110,24 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   provider disagreements produced 14 proposals: **2 confirmed and 12 proposed**. Confirmed fixtures
   were written to `server/test/fixtures/system-one-harvested/{adventure-selection,guardrails}.json`;
   the Director proposals remain a review queue.
-- **Re-evaluation.** The adventure benchmark then ran 93 live calls over 30 frozen cases plus the 1
-  confirmed harvested case, production-shaped (no `uid` decorrelator). At the server default 0.75,
-  6 calls acted; at the sweep's recommended 0.40 the gate passed with 54 acted, 100% accuracy,
-  calibrated Brier 0.0002 and ECE 0.0107 (held-out 0.0121). The harvested case still defers in 3/3
-  repeats: a **stable coverage miss** the corpus now records instead of hiding, which is the point
-  of the loop. The promotion record was re-derived from this run.
-- **Stability.** Across all 31 cases and 93 repeats, decision agreement was 100% with 0 conflicted
-  cases; mean per-case signal standard deviation was 0.0096 and the maximum 0.0205. A separate live
+- **Re-evaluation.** The adventure benchmark then ran 129 live calls over 30 frozen cases plus 13
+  harvested cases (1 human-confirmed, 12 agent-reviewed from synthetic play), production-shaped
+  (no `uid` decorrelator). At the server default 0.75, 6 calls acted; at the sweep's recommended
+  0.40 the gate passed with 57 acted, 100% accuracy, calibrated Brier 0.0001 and ECE 0.0105
+  (held-out 0.0109). All 13 harvested cases defer in this run, so the acted subset stays
+  human-labeled; the human drop-my-longsword case is still a **stable coverage miss** the corpus
+  records instead of hiding, which is the point of the loop. The promotion record was re-derived
+  from this run.
+- **First synthetic harvest pass.** A five-persona synthetic batch (harness per
+  [synthetic player simulation](synthetic-player-simulation.md)) drove ~24 real turns and produced
+  23 adventure-selection shadow decisions. A conservative agent review labelled 12 of them (11
+  correct deferrals plus one historical mis-pick, against 1 rest commit) and left 11 proposed; the
+  fixture now holds 13 cases (1 human-confirmed + 12 agent-reviewed). Because all 13 defer in the
+  current lane, they add coverage and stability rather than scored labels. Two follow-ups surfaced:
+  provider narration asserted a short rest and a purchase that no receipt establishes, and the
+  lane's 32-candidate union cap can crowd out advertised quest-lifecycle rows on check-heavy turns.
+- **Stability.** Across all 43 cases and 129 repeats, decision agreement was 100% with 0 conflicted
+  cases; mean per-case signal standard deviation was 0.0117 and the maximum 0.0287. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard
   deviation of 0.0015, in line with the vendor's published jev-1.13 figure (~0.0098 mean).
 - **Guardrails re-run.** The L6 guardrails benchmark re-ran the same way: production-shaped, 171

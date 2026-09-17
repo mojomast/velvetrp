@@ -397,16 +397,19 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   tools; travel records an explicit advisory binding string because it is not digest-bound. A
   lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
-  runs 30 labeled declaration states plus 1 confirmed harvested live case x 3 repeats (93 live
-  calls, production-shaped: no `uid` decorrelator; the vendor decorrelator is reserved for
-  dedicated stability probes). The model named a candidate on 54 calls and every one of those 54
-  picks was acceptable, but at the server default action threshold 0.75 only 6 calls acted, so the
-  gate reported insufficient samples. A threshold sweep recommends **0.40** (which also requires
-  `reviewThreshold <= 0.40`), where the gate passes with 54 acted, 100% accuracy, calibrated
-  Brier 0.0002, and ECE 0.0107 (held-out 0.0121) — so the lane carries an evidence-only record.
-  Decision stability was 100% (0 of 31 cases conflicted; mean per-case signal std dev 0.0096). The
+  runs 30 labeled declaration states plus 13 harvested cases (1 human-confirmed, 12 agent-reviewed
+  from synthetic play) x 3 repeats (129 live calls, production-shaped: no `uid` decorrelator; the
+  vendor decorrelator is reserved for dedicated stability probes). The model named a candidate on
+  57 calls and every one of those 57 picks was acceptable, but at the server default action
+  threshold 0.75 only 6 calls acted, so the gate reported insufficient samples. A threshold sweep
+  recommends **0.40** (which also requires `reviewThreshold <= 0.40`), where the gate passes with
+  57 acted, 100% accuracy, calibrated Brier 0.0001, and ECE 0.0105 (held-out 0.0109) — so the lane
+  carries an evidence-only record. Decision stability was 100% (0 of 43 cases conflicted; mean
+  per-case signal std dev 0.0117). All 13 harvested cases defer in this run, so the acted subset
+  remains human-labeled and the synthetic cases add coverage rather than scored labels. The
   threshold is selected on the same corpus that scores it and the acted subset has no errors, so
-  the record is a promotion candidate, not proof; the server default stays 0.75/0.5. The harvested
+  the record is a promotion candidate, not proof; the server default stays 0.75/0.5. The human
+  harvested
   case is the live
   deferral against a declaration ("drop my longsword") whose server binding was an `unequip`
   candidate; the lane still defers on it in 3/3 repeats, which is a stable coverage miss rather

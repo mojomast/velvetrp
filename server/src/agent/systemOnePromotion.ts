@@ -341,19 +341,21 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
   "adventure-selection": {
     // scripts/evaluate-system-one-adventure-lane.ts, re-derived under the production-shaped gate
     // protocol (no `uid` decorrelator; the vendor decorrelator is reserved for dedicated stability
-    // probes): 93 live calls over 30 frozen hand-labeled cases plus 1 confirmed harvested live
-    // case, at 3 same-state repeats. The lane named a candidate on 54 calls and all 54 picks were
-    // acceptable; at the sweep's recommended action threshold 0.40 (which also requires
-    // reviewThreshold <= 0.40) the gate passes: 54 acted, 100% accuracy, calibrated Brier 0.0002,
-    // ECE 0.0107 (held-out 0.0121). Decision stability was 100% (0/31 conflicted cases; mean
-    // per-case signal std dev 0.0096, max 0.0205). The harvested live case is a stable miss: the
-    // lane defers on "drop my longsword" although the server bound an unequip candidate, 3/3
-    // repeats. The threshold is selected on the same corpus that scores it and the acted subset
-    // has no errors, so this is a promotion candidate, not proof; the server default stays
-    // 0.75/0.5. The lane is wired in shadow (record-only) into fresh adventure turns, so the
-    // record is evidence, not activation.
-    metrics: { samples: 54, accuracy: 1, brier: 0.0002, expectedCalibrationError: 0.0107 },
-    calibration: { a: 1.5751, b: 4.1066 },
+    // probes): 129 live calls over 30 frozen hand-labeled cases plus 13 harvested cases (1
+    // human-confirmed, 12 agent-reviewed from synthetic play), at 3 same-state repeats. The lane
+    // named a candidate on 57 calls and all 57 picks were acceptable; at the sweep's recommended
+    // action threshold 0.40 (which also requires reviewThreshold <= 0.40) the gate passes: 57
+    // acted, 100% accuracy, calibrated Brier 0.0001, ECE 0.0105 (held-out 0.0109). Decision
+    // stability was 100% (0/43 conflicted cases; mean per-case signal std dev 0.0117, max 0.0287).
+    // All 13 harvested cases defer in this run, so the acted subset remains entirely human-labeled
+    // and the synthetic cases add coverage, not scored labels; the human drop-my-longsword case is
+    // a stable miss (the lane defers although the server bound an unequip candidate, 3/3 repeats).
+    // The threshold is selected on the same corpus that scores it and the acted subset has no
+    // errors, so this is a promotion candidate, not proof; the server default stays 0.75/0.5. The
+    // lane is wired in shadow (record-only) into fresh adventure turns, so the record is evidence,
+    // not activation.
+    metrics: { samples: 57, accuracy: 1, brier: 0.0001, expectedCalibrationError: 0.0105 },
+    calibration: { a: 1.1887, b: 4.2943 },
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-adventure-benchmark.md",
   },
