@@ -51,7 +51,6 @@ import {
 } from "../server/src/agent/systemOnePromotion.js";
 import type { HarvestProposal } from "../server/src/agent/systemOneHarvest.js";
 import {
-  stabilityUid,
   summarizeStability,
   type StabilitySample,
   type StabilitySummary,
@@ -670,8 +669,11 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("## Decision stability");
   lines.push("");
   lines.push("Repeated draws of the same case should produce the same disposition. `decision` is the composed");
-  lines.push("disposition; every repeat carries a deterministic throwaway `uid` in the request state so the");
-  lines.push("draws are decorrelated.");
+  lines.push("disposition; every repeat keeps the production-shaped request (no `uid`), so these are same-state");
+  lines.push("draws of the exact request the gate scores. A uid-decorrelated probe moved the selected threshold");
+  lines.push("from 0.60 to 0.30 and produced a degenerate negative-slope calibration map (calibrated ECE 0.1344 >");
+  lines.push("0.10), so the protocol decision is that gate measurements mirror production and the vendor");
+  lines.push("decorrelator is reserved for dedicated stability probes.");
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("| --- | ---: |");
@@ -815,6 +817,19 @@ function parseFlag(args: readonly string[], name: string): string | null {
   return null;
 }
 
+/**
+ * The request state a gate run sends for one message: the bounded review input production sends
+ * (`message` plus any declared boundaries already in scope; the eval keeps the field present even
+ * when empty, exactly as its question view does). It deliberately carries no `uid` decorrelator —
+ * gate runs must mirror the production request, and the vendor decorrelator is reserved for
+ * dedicated stability probes (see the Decision stability section of the report).
+ */
+export function guardrailsRequestState(
+  view: { message: string; declaredBoundaries?: readonly string[] },
+): { message: string; declaredBoundaries: string[] } {
+  return { message: view.message, declaredBoundaries: [...(view.declaredBoundaries ?? [])] };
+}
+
 export function parseGuardrailsArgs(args: readonly string[]): { repeats: number; out: string } {
   const repeatRaw = Number(parseFlag(args, "--repeat") ?? "3");
   const repeats = Math.max(1, Math.min(25, Number.isFinite(repeatRaw) ? Math.floor(repeatRaw) : 3));
@@ -859,16 +874,16 @@ async function main(): Promise<void> {
       ? { message: testCase.message, declaredBoundaries: testCase.declaredBoundaries }
       : { message: testCase.message };
     const questions = buildGuardrailQuestions(view);
+    // Gate runs mirror the production request, which carries no `uid`: a uid decorrelator was
+    // measured on the Director lane to move the selected threshold and produce a degenerate
+    // calibration map, so this lane keeps the same-state production draw and reserves the vendor
+    // decorrelator for dedicated stability probes. Stability samples are still collected per repeat.
+    const state = guardrailsRequestState(view);
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       try {
         const result = await completeWithSystemOne({
           settings,
-          state: {
-            message: view.message,
-            declaredBoundaries: [...(view.declaredBoundaries ?? [])],
-            // Throwaway decorrelator for repeated draws (vendor consistency-cookbook trick).
-            uid: stabilityUid(PROMOTION_LANE, testCase.id, repeat),
-          },
+          state,
           questions,
         });
         model = result.model.responseModel ?? model;

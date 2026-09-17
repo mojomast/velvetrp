@@ -20,6 +20,7 @@ import {
 import {
   ADVENTURE_DEFAULT_ACTION_THRESHOLD,
   ADVENTURE_THRESHOLD_GRID,
+  adventureRequestState,
   adventureStabilitySamples,
   adventureThresholdSamples,
   evaluateAdventureReadouts,
@@ -514,6 +515,27 @@ test("parses repeat and out flags with safe defaults", () => {
   assert.equal(parseAdventureArgs(["--repeat", "3.9"]).repeats, 3);
 });
 
+test("sends the production-shaped request state with no uid decorrelator", () => {
+  const testCase = evalCase({
+    candidates: [
+      { candidateId: "a", digest: "a".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+      { candidateId: "b", digest: "b".repeat(64), kind: "exact_srd_check.select", label: "Strength (Athletics), Easy difficulty, normal" },
+    ],
+  });
+  const state = adventureRequestState(testCase);
+  assert.deepEqual(state, { declaration: "I walk to the mill.", candidateCount: 2 });
+  assert.equal(Object.keys(state).length, 2, "the request state carries only the production fields");
+  assert.ok(!("uid" in state), "gate runs mirror the production request, which carries no uid decorrelator");
+
+  // Removing the decorrelator does not remove stability sampling: both repeat draws still roll up.
+  const stability = summarizeAdventureStability([
+    readout({ id: testCase.id, candidateId: "a" }),
+    readout({ id: testCase.id, candidateId: "a", topSignal: 0.7 }),
+  ]);
+  assert.equal(stability.repeats, 2, "stability samples are still collected per repeat");
+  assert.equal(stability.conflictCases, 0);
+});
+
 test("renders the benchmark report with the sweep, honesty, and reproduce sections", () => {
   const first = ADVENTURE_EVAL_CASES[0]!;
   const readouts = [
@@ -541,6 +563,9 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(!report.includes("unwired"), "the wiring-status prose must not claim the lane is unwired");
   assert.ok(report.includes("## Corpus and per-case results"));
   assert.ok(report.includes("## Decision stability"));
+  assert.ok(report.includes("production-shaped request (no `uid`)"), "the stability prose explains the same-state production draw");
+  assert.ok(report.includes("reserved for dedicated stability probes"));
+  assert.ok(!report.includes("carries a deterministic throwaway `uid`"), "the report must not claim a uid decorrelator");
   assert.ok(report.includes("## Threshold sweep"));
   assert.ok(report.includes("No threshold qualified"));
   assert.ok(report.includes("Server default"));

@@ -111,44 +111,46 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   were written to `server/test/fixtures/system-one-harvested/{adventure-selection,guardrails}.json`;
   the Director proposals remain a review queue.
 - **Re-evaluation.** The adventure benchmark then ran 93 live calls over 30 frozen cases plus the 1
-  confirmed harvested case, with the vendor `uid` decorrelator in each request state. At the server
-  default 0.75, 18 calls acted; at the sweep's recommended 0.55 the gate passed with 54 acted, 100%
-  accuracy, calibrated Brier 0.0001 and ECE 0.0092 (held-out 0.0117). The harvested case still defers
-  in 3/3 repeats: a **stable coverage miss** the corpus now records instead of hiding, which is the
-  point of the loop. The promotion record was re-derived from this run.
+  confirmed harvested case, production-shaped (no `uid` decorrelator). At the server default 0.75,
+  6 calls acted; at the sweep's recommended 0.40 the gate passed with 54 acted, 100% accuracy,
+  calibrated Brier 0.0002 and ECE 0.0107 (held-out 0.0121). The harvested case still defers in 3/3
+  repeats: a **stable coverage miss** the corpus now records instead of hiding, which is the point
+  of the loop. The promotion record was re-derived from this run.
 - **Stability.** Across all 31 cases and 93 repeats, decision agreement was 100% with 0 conflicted
-  cases; mean per-case signal standard deviation was 0.0135 and the maximum 0.0531. A separate live
+  cases; mean per-case signal standard deviation was 0.0096 and the maximum 0.0205. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard
   deviation of 0.0015, in line with the vendor's published jev-1.13 figure (~0.0098 mean).
-- **Guardrails re-run.** The L6 guardrails benchmark re-ran the same way: 171 calls over 56
-  frozen cases plus the confirmed benign harvested case, 75 acted at 100% accuracy, calibrated
-  ECE 0.0023, and 100% decision stability (0 of 57 cases conflicted; mean signal std dev 0.0027).
-  Its promotion record was re-derived from that run.
+- **Guardrails re-run.** The L6 guardrails benchmark re-ran the same way: production-shaped, 171
+  calls over 56 frozen cases plus the confirmed benign harvested case, 75 acted at 100% accuracy,
+  calibrated ECE 0.0022, and 100% decision stability (0 of 57 cases conflicted; mean signal std dev
+  0.0031). Its promotion record was re-derived from that run.
 - **Director re-measurement.** The Director calibration was re-derived with the stability
   instrumentation: at the documented `--repeat 10` protocol it acts on 41 samples with 100%
   acceptable and 100% exact accuracy, calibrated ECE 0.0069 (held-out 0.0054), and 100% decision
   stability (0 of 6 scenarios conflicted). Two sensitivities were found and are recorded instead
   of hidden: at `--repeat 8` the acted count falls to 29, below the 30-sample gate, and adding
   the vendor `uid` decorrelator moved the selected threshold from 0.60 to 0.30 with a degenerate
-  negative-slope Platt map (calibrated ECE 0.1344 > 0.10). The Director gate run therefore keeps
-  the production-shaped request, while the adventure and guardrails runs stay uid-decorrelated.
+  negative-slope Platt map (calibrated ECE 0.1344 > 0.10). The gate protocol now uses the
+  production-shaped request for every lane; the vendor decorrelator is reserved for dedicated
+  stability probes.
   This is the first concrete case for gate v2's bootstrap lower bounds and coverage floors: a
   point-estimate gate on 30-40 acted samples swings between pass and fail on measurement-condition
   noise alone.
-- **Director harvest pass.** The first agent-reviewed harvest added 9 confirmed live cases (all
-  pacing-only empty-world states where the shadow Director held and the provider committed an
-  `ambient-beat`; the review marked 3 Director picks correct, 6 holds incorrect, and left 2
-  ambiguous cases proposed). With the harvested cases merged, the benchmark passes with 94 acted,
-  100% acceptable/exact, calibrated ECE 0.0068 and 100% stability (0 of 15 scenarios conflicted).
-  Provenance matters: 81 of those 94 acted samples rest on agent-reviewed labels, so the Director
-  promotion record stays on the human-only measurement until a human confirms the fixture. The
-  gain is coverage, not proof: the corpus now records the exact failure mode the shadow log
-  exposed instead of hiding it.
+- **Director harvest pass.** The first harvest pass added 9 confirmed live cases, agent-reviewed and
+  confirmed by the user on 2026-09-17 (all pacing-only empty-world states where the shadow Director
+  held and the provider committed an `ambient-beat`; the review marked 3 Director picks correct, 6
+  holds incorrect, and left 2 ambiguous cases proposed). With the harvested cases merged, the
+  benchmark passes with 94 acted, 100% acceptable/exact, calibrated ECE 0.0068 and 100% stability
+  (0 of 15 scenarios conflicted). The Director promotion record still uses the frozen-only
+  measurement so one state family cannot dominate it; the diverse-play harvest is expected to
+  supersede this fixture. The gain is coverage, not proof: the corpus now records the exact failure
+  mode the shadow log exposed instead of hiding it.
 - **A decorrelation caveat.** Adding the `uid` field coincided with higher raw signals than the
   pre-loop runs (18 acted at 0.75 versus 6), which moved the recommended threshold from 0.40 to 0.55.
   The vendor cookbook states that this measurement design "cannot separate sensitivity to the
-  irrelevant field from variation that would occur on identical requests", so the pre-loop and
-  post-loop thresholds are different measurement conditions, not an improvement or a regression.
+  irrelevant field from variation that would occur on identical requests". The protocol now runs
+  gate measurements production-shaped (no `uid`), which is why the re-derived thresholds returned
+  to the pre-loop values; the decorrelator is reserved for dedicated stability probes.
 
 ## Promotion gate v2
 
@@ -157,7 +159,7 @@ The current gate (`evaluatePromotionGate`) checks `minSamples`, `minAccuracy`, `
 snapshot against the lane's current gate, so changing a gate constant already invalidates a record.
 Everything below is planned unless marked implemented; the order is priority order.
 
-1. **A static, never-tuned holdout per lane.** L2's 0.55 action threshold was selected on the same
+1. **A static, never-tuned holdout per lane.** L2's 0.40 action threshold was selected on the same
    corpus that scores it, and the benchmark says so explicitly. Gate v2 reserves a holdout never
    used for threshold selection, criteria tuning, or calibration fitting.
 2. **Bootstrap confidence intervals, gating on the lower bound (adopted).** A point estimate over
@@ -181,7 +183,8 @@ Everything below is planned unless marked implemented; the order is priority ord
    asymmetry (`minAccuracy 0.95`, Brier/ECE 0.05).
 5. **Self-consistency from the vendor cookbooks (measured by L2, L6, and L1; gating planned).** The
    adventure-selection evaluation now reports repeat agreement, conflict cases, and signal variance
-   through `summarizeStability` and `stabilityUid`. Gating should add raw agreement, policy agreement
+   through `summarizeStability` (same-state repeats; `stabilityUid` is reserved for dedicated
+   probes). Gating should add raw agreement, policy agreement
    with an explicit uncertain outcome, per-question probability standard deviation, and the conflict
    count. The vendor's self-consistency measurements for `jev-1.13` report a mean per-question
    standard deviation near **0.0098** and **99.2%** policy agreement at a 0.60 uncertain threshold
@@ -237,7 +240,9 @@ around.
   disposition to `block`. Today a high severity with no flagged hazard can only recommend `review`.
 - **A fresh throwaway `uid` per repeat.** The vendor cookbooks add a new `uid` to every repeated
   call so the draws are decorrelated. `stabilityUid(lane, caseId, repeat)` builds that
-  deterministically, so a repeat reproduces across runs while staying distinct within one run.
+  deterministically, and it is reserved for dedicated stability probes: gate measurements use the
+  production-shaped request, because a measured `uid` perturbation moved the Director's selected
+  threshold and produced a degenerate calibration map (see the first measured loop pass).
 
 ## Commands
 

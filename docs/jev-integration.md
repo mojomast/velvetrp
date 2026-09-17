@@ -25,7 +25,7 @@ the adventure planning recall path. The **L2
 adventure-selection** and **L6 guardrails** primitives now exist with
 [adventure](system-one-adventure-benchmark.md) and
 [guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
-gate only at a sweep-recommended 0.55 action threshold and carries an evidence-only record,
+gate only at a sweep-recommended 0.40 action threshold and carries an evidence-only record,
 and guardrails passes its strict gate after a measurement-driven criteria redesign and carries
 an evidence-only record. Both are now wired in **shadow (record-only)**: adventure-selection
 records one decision per fresh adventure turn, and guardrails records one per room turn; neither
@@ -398,15 +398,16 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
   runs 30 labeled declaration states plus 1 confirmed harvested live case x 3 repeats (93 live
-  calls, with a per-repeat `uid` decorrelator as the vendor consistency cookbooks recommend).
-  The model named a candidate on 54 calls and every one of those 54 picks was acceptable, but at
-  the server default action threshold 0.75 only 18 calls acted, so the gate reported insufficient
-  samples. A threshold sweep recommends **0.55** (which also requires `reviewThreshold <= 0.55`),
-  where the gate passes with 54 acted, 100% accuracy, calibrated Brier 0.0001, and ECE 0.0092
-  (held-out 0.0117) — so the lane carries an evidence-only record. Decision stability was 100%
-  (0 of 31 cases conflicted; mean per-case signal std dev 0.0135). The threshold is selected on
-  the same corpus that scores it and the acted subset has no errors, so the record is a promotion
-  candidate, not proof; the server default stays 0.75/0.5. The harvested case is the live
+  calls, production-shaped: no `uid` decorrelator; the vendor decorrelator is reserved for
+  dedicated stability probes). The model named a candidate on 54 calls and every one of those 54
+  picks was acceptable, but at the server default action threshold 0.75 only 6 calls acted, so the
+  gate reported insufficient samples. A threshold sweep recommends **0.40** (which also requires
+  `reviewThreshold <= 0.40`), where the gate passes with 54 acted, 100% accuracy, calibrated
+  Brier 0.0002, and ECE 0.0107 (held-out 0.0121) — so the lane carries an evidence-only record.
+  Decision stability was 100% (0 of 31 cases conflicted; mean per-case signal std dev 0.0096). The
+  threshold is selected on the same corpus that scores it and the acted subset has no errors, so
+  the record is a promotion candidate, not proof; the server default stays 0.75/0.5. The harvested
+  case is the live
   deferral against a declaration ("drop my longsword") whose server binding was an `unequip`
   candidate; the lane still defers on it in 3/3 repeats, which is a stable coverage miss rather
   than a flake, and the authoritative provider path still commits the correct action.
@@ -549,8 +550,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   list mirrored into `selection.flags` for the review queue, and never blocks, rewrites,
   sanitizes, or influences routing/generation/fallbacks; a lane failure is swallowed.
 - **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
-  56 frozen labeled messages plus 1 confirmed harvested live case x 3 repeats (171 live calls
-  with a per-repeat `uid` decorrelator, 75 acted). The first 40-case run acted at
+  56 frozen labeled messages plus 1 confirmed harvested live case x 3 repeats (171 live calls,
+  production-shaped: no `uid` decorrelator, 75 acted). The first 40-case run acted at
   **90.5%** and missed the strict gate; every error was a false positive on fiction or meta
   questions (a hint request about the traitor and an out-of-character question about an NPC
   read as disclosure demands, in-character villain dialogue read as an override attempt, and a
@@ -560,8 +561,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   instructions, unrevealed setup) rather than asking about the shared fiction, and severity
   judges the real user's behavior rather than fictional drama. On the expanded corpus every
   hazard-category message reached block or support with **100%** acted accuracy, calibrated
-  Brier ~0, and ECE 0.0023 (held-out 0.0027), with **100%** decision stability (0 of 57 cases
-  conflicted), so the lane carries an evidence-only promotion record. The harvested live case
+  Brier ~0, and ECE 0.0022 (held-out 0.0023), with **100%** decision stability (0 of 57 cases
+  conflicted; mean signal std dev 0.0031), so the lane carries an evidence-only promotion record. The harvested live case
   is a benign "Who should inspect the signal?" message the lane passes 3/3. The acted subset
   has no errors, so the calibration tail is untested. Honesty: the
   deterministic policy checks are a permissive stub (`checkUserMessage` is allow/deny only,

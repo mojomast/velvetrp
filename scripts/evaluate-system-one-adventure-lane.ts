@@ -67,7 +67,6 @@ import {
 } from "../server/src/agent/systemOneThreshold.js";
 import type { HarvestProposal } from "../server/src/agent/systemOneHarvest.js";
 import {
-  stabilityUid,
   summarizeStability,
   type StabilitySample,
   type StabilitySummary,
@@ -902,7 +901,11 @@ export function renderAdventureBenchmark(input: {
   lines.push("");
   lines.push("Repeated draws of the same case should produce the same decision. `decision` is the candidate each");
   lines.push("call named (the composed pick, or the raw pick recovered from a deferral), else `defer`; every");
-  lines.push("repeat carries a deterministic throwaway `uid` in the request state so the draws are decorrelated.");
+  lines.push("repeat keeps the production-shaped request (no `uid`), so these are same-state draws of the exact");
+  lines.push("request the gate scores. A uid-decorrelated probe moved the selected threshold from 0.60 to 0.30");
+  lines.push("and produced a degenerate negative-slope calibration map (calibrated ECE 0.1344 > 0.10), so the");
+  lines.push("protocol decision is that gate measurements mirror production and the vendor decorrelator is");
+  lines.push("reserved for dedicated stability probes.");
   lines.push("");
   lines.push("| Metric | Value |");
   lines.push("| --- | ---: |");
@@ -1074,6 +1077,18 @@ function parseFlag(args: readonly string[], name: string): string | null {
   return null;
 }
 
+/**
+ * The request state a gate run sends for one case: the declaration and the advertised candidate
+ * count, mirroring the production shadow request. It deliberately carries no `uid` decorrelator —
+ * gate runs must mirror the production request, and the vendor decorrelator is reserved for
+ * dedicated stability probes (see the Decision stability section of the report).
+ */
+export function adventureRequestState(
+  testCase: Pick<AdventureEvalCase, "declaration" | "candidates">,
+): { declaration: string; candidateCount: number } {
+  return { declaration: testCase.declaration, candidateCount: testCase.candidates.length };
+}
+
 export function parseAdventureArgs(args: readonly string[]): { repeats: number; out: string } {
   const repeatRaw = Number(parseFlag(args, "--repeat") ?? "3");
   const repeats = Math.max(1, Math.min(25, Number.isFinite(repeatRaw) ? Math.floor(repeatRaw) : 3));
@@ -1114,16 +1129,16 @@ async function main(): Promise<void> {
 
   for (const testCase of cases) {
     const questions = buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates);
+    // Gate runs mirror the production request, which carries no `uid`: a uid decorrelator was
+    // measured on the Director lane to move the selected threshold and produce a degenerate
+    // calibration map, so this lane keeps the same-state production draw and reserves the vendor
+    // decorrelator for dedicated stability probes. Stability samples are still collected per repeat.
+    const state = adventureRequestState(testCase);
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       try {
         const result = await completeWithSystemOne({
           settings,
-          state: {
-            declaration: testCase.declaration,
-            candidateCount: testCase.candidates.length,
-            // Throwaway decorrelator for repeated draws (vendor consistency-cookbook trick).
-            uid: stabilityUid(PROMOTION_LANE, testCase.id, repeat),
-          },
+          state,
           questions,
         });
         model = result.model.responseModel ?? model;

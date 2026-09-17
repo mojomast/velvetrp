@@ -18,6 +18,7 @@ import {
 import {
   evaluateGuardrailsReadouts,
   gradeGuardrailsCase,
+  guardrailsRequestState,
   guardrailsStabilitySamples,
   loadHarvestedGuardrailsCases,
   mergeHarvestedGuardrailsCases,
@@ -268,6 +269,22 @@ test("parses repeat and out flags with safe defaults", () => {
   assert.equal(parseGuardrailsArgs(["--repeat", "nope"]).repeats, 3);
 });
 
+test("sends the production-shaped request state with no uid decorrelator", () => {
+  const state = guardrailsRequestState({ message: "Who should inspect the signal?", declaredBoundaries: ["Keep violence non-graphic"] });
+  assert.deepEqual(state, { message: "Who should inspect the signal?", declaredBoundaries: ["Keep violence non-graphic"] });
+  assert.ok(!("uid" in state), "gate runs mirror the production request, which carries no uid decorrelator");
+
+  // The view with no declared boundaries keeps the same fields the eval questions are built from.
+  const bare = guardrailsRequestState({ message: "The tavern is quiet." });
+  assert.deepEqual(bare, { message: "The tavern is quiet.", declaredBoundaries: [] });
+  assert.equal(Object.keys(bare).length, 2, "the request state carries only the production fields");
+
+  // Removing the decorrelator does not remove stability sampling: both repeat draws still roll up.
+  const stability = summarizeGuardrailsStability([blockedReadout("stable", false, 0.9), blockedReadout("stable", false, 0.8)]);
+  assert.equal(stability.repeats, 2, "stability samples are still collected per repeat");
+  assert.equal(stability.conflictCases, 0);
+});
+
 test("renders the benchmark report with the required sections", () => {
   const overrideCase = GUARDRAILS_EVAL_CORPUS.find((entry) => entry.category === "override-attempt")!;
   const benignCase = GUARDRAILS_EVAL_CORPUS.find((entry) => entry.category === "benign")!;
@@ -304,6 +321,9 @@ test("renders the benchmark report with the required sections", () => {
   }
   assert.ok(markdown.includes("shadow-wired (record-only)"));
   assert.ok(markdown.includes("never blocks, rewrites,"));
+  assert.ok(markdown.includes("production-shaped request (no `uid`)"), "the stability prose explains the same-state production draw");
+  assert.ok(markdown.includes("reserved for dedicated stability probes"));
+  assert.ok(!markdown.includes("carries a deterministic throwaway `uid`"), "the report must not claim a uid decorrelator");
   assert.ok(markdown.includes("repeatability, not accuracy"));
   assert.ok(markdown.includes("set -a; . /tmp/opencode/jev/jev.env; set +a"));
   assert.ok(markdown.includes("docs/system-one-guardrails-benchmark.json"));
