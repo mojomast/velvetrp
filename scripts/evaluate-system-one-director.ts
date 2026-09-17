@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * Runs the L1 Director selector against the provider-free candidate oracle using the
- * real System One (Jev) adapter, grades the predicted probabilities with Brier/ECE,
- * and evaluates the director-selection promotion gate.
+ * real System One (Jev) adapter, sweeps the action threshold over a dev/holdout split,
+ * grades predicted probabilities with Brier/ECE, and evaluates the promotion gate.
  *
- * This is an opt-in live evaluation: TYPESAFE_API_KEY must be exported. It uses a
- * throwaway data directory and never touches an existing store.
+ * Opt-in live evaluation: TYPESAFE_API_KEY must be exported. It uses a throwaway data
+ * directory and never touches an existing store.
  *
  * Usage:
- *   TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-director.ts [--out docs/system-one-director-calibration.md]
+ *   TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-director.ts [--repeat 8] [--out docs/system-one-director-calibration.md]
  */
 import { mkdtempSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
@@ -20,8 +20,11 @@ import {
   buildDirectorQuestions, composeDirectorSelection, type DirectorCandidateProjection,
 } from "../server/src/agent/systemOneDirector.js";
 import { evaluatePromotionGate } from "../server/src/agent/systemOnePromotion.js";
+import {
+  aggregateThresholdSamples, selectActionThreshold, type ThresholdPoint, type ThresholdSample,
+} from "../server/src/agent/systemOneThreshold.js";
 import { defaultSystemOneSettings } from "../server/src/defaults.js";
-import { completeWithSystemOne } from "../server/src/provider/systemOneCompletion.js";
+import { completeWithSystemOne, type SystemOneAnswer } from "../server/src/provider/systemOneCompletion.js";
 import { gradeCalibration } from "../server/test/evals/dmGraders.js";
 import type { DmCalibrationPoint } from "../server/test/evals/dmEvalTypes.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
@@ -32,11 +35,13 @@ if (!KEY) {
   console.error("TYPESAFE_API_KEY is required for the live Director calibration.");
   process.exit(1);
 }
-// Each run gets a fresh throwaway store so repeated evaluations never collide.
 process.env.VELVET_DATA_DIR ??= mkdtempSync(path.join(tmpdir(), "velvet-system-one-director-eval-"));
 
-type Fixture = Awaited<ReturnType<typeof dmFixture>>;
+const DEFAULT_THRESHOLD = 0.75;
+const THRESHOLD_GRID = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90];
 const DIRECTOR_SECRET = "SECRET_GM_ONLY:the-mayor-is-the-traitor";
+
+type Fixture = Awaited<ReturnType<typeof dmFixture>>;
 
 function plan(fixture: Fixture, key: string): DirectorCandidateProjection[] {
   fixture.repo.setDmControl("local-owner", fixture.campaign.id, { mode: "ai", expectedRevision: 0, idempotencyKey: `${key}-ai` });
@@ -77,77 +82,96 @@ interface Scenario {
   id: string;
   projection: DirectorCandidateProjection[];
   expected: string;
+  /** Held out from threshold selection so the selected threshold is validated out of sample. */
+  holdout: boolean;
 }
 
-interface LiveOutcome {
-  id: string;
-  expected: string;
-  actions: string[];
+interface Readout {
   method: string;
   selectedAction: string | null;
   topSignal: number;
-  correct: boolean;
-  /** Whether the lane actually acted; a deferral hands off to the existing deterministic path. */
   acted: boolean;
+  correct: boolean;
 }
 
-async function runLive(scenario: Scenario, settings: ReturnType<typeof defaultSystemOneSettings>): Promise<{ outcome: LiveOutcome; point: DmCalibrationPoint; model: string }> {
-  const { projection } = scenario;
-  const questions = buildDirectorQuestions(projection);
-  const result = await completeWithSystemOne({ settings, state: { scenario: scenario.id }, questions });
-  const composed = composeDirectorSelection(projection, result.answers, settings.confidencePolicy["director-selection"]);
+function readout(scenario: Scenario, answers: Record<string, SystemOneAnswer>, thresholds: { actionThreshold: number; reviewThreshold: number }): Readout {
+  const composed = composeDirectorSelection(scenario.projection, answers, thresholds);
   const selected = composed.selections[0];
-  const selectedAction = selected ? projection.find((candidate) => candidate.candidateId === selected.candidateId)?.action ?? null : null;
+  const selectedAction = selected ? scenario.projection.find((candidate) => candidate.candidateId === selected.candidateId)?.action ?? null : null;
   const correct = scenario.expected === "hold" ? composed.hold : selectedAction === scenario.expected;
-  const topSignal = composed.topSignal ?? 0;
-  return {
-    outcome: {
-      id: scenario.id, expected: scenario.expected,
-      actions: [...new Set(projection.map((candidate) => candidate.action))].sort(),
-      method: composed.method, selectedAction, topSignal, correct,
-      acted: composed.band === "act",
-    },
-    point: { predictedProbability: topSignal, correct },
-    model: result.model.responseModel ?? settings.model,
-  };
+  return { method: composed.method, selectedAction, topSignal: composed.topSignal ?? 0, acted: composed.band === "act", correct };
 }
 
-function render(outcomes: readonly LiveOutcome[], report: ReturnType<typeof gradeCalibration>, gate: ReturnType<typeof evaluatePromotionGate>, model: string): string {
-  const acted = outcomes.filter((outcome) => outcome.acted);
-  const deferred = outcomes.filter((outcome) => !outcome.acted);
-  const coverage = outcomes.length === 0 ? 0 : acted.length / outcomes.length;
-  const accuracy = acted.length === 0 ? 0 : acted.filter((outcome) => outcome.correct).length / acted.length;
+function actionsOf(scenario: Scenario): string[] {
+  return [...new Set(scenario.projection.map((candidate) => candidate.action))].sort();
+}
+
+function table(points: readonly ThresholdPoint[]): string[] {
+  const lines = ["| Action threshold | Acted | Coverage | Acted accuracy |", "| ---: | ---: | ---: | ---: |"];
+  for (const point of points) {
+    lines.push(`| ${point.threshold.toFixed(2)} | ${point.acted}/${point.total} | ${(point.coverage * 100).toFixed(1)}% | ${point.acted === 0 ? "n/a" : `${(point.actedAccuracy * 100).toFixed(1)}%`} |`);
+  }
+  return lines;
+}
+
+function render(input: {
+  scenarios: readonly Scenario[];
+  repeats: number;
+  model: string;
+  defaultOutcomes: Readout[];
+  allPoints: ThresholdPoint[];
+  devPoints: ThresholdPoint[];
+  holdoutPoints: ThresholdPoint[];
+  selected: ReturnType<typeof selectActionThreshold>;
+  gate: ReturnType<typeof evaluatePromotionGate>;
+  samples: number;
+}): string {
+  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples } = input;
+  const selectedThreshold = selected.selected?.threshold;
+  const holdoutAtSelected = selectedThreshold === undefined ? undefined : holdoutPoints.find((point) => point.threshold === selectedThreshold);
   const lines: string[] = [];
   lines.push("# System One Director (L1) calibration");
   lines.push("");
   lines.push(`Generated ${new Date().toISOString()} by \`scripts/evaluate-system-one-director.ts\` using the live System One adapter.`);
   lines.push("");
-  lines.push("The L1 selector builds a per-candidate support `noul`, a priority `score`, a `hold` `noul`, and an aggregate `best_candidate` `choice`, then composes hold → grounded-by-priority → best-pick → defer. Correctness is graded against the provider-free candidate oracle (the exact advertised action set per state).");
+  lines.push("The L1 selector builds a per-candidate support `noul`, a priority `score`, a `hold` `noul`, and an aggregate `best_candidate` `choice`, then composes hold → grounded-by-priority → best-pick → defer. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold, not the review threshold. Correctness is graded against the provider-free candidate oracle using a single intended action per state.");
   lines.push("");
-  lines.push(`Live model: \`${model}\`. Samples: ${outcomes.length}.`);
+  lines.push(`Live model: \`${model}\`. ${scenarios.length} scenarios x ${repeats} repeats = ${samples} sampled decisions per threshold.`);
   lines.push("");
-  lines.push("## Scenarios");
+  lines.push(`## Scenarios at the default threshold (${DEFAULT_THRESHOLD})`);
   lines.push("");
   lines.push("| Scenario | Oracle actions | Expected | Method | Selected | Top signal | Acted | Correct |");
   lines.push("| --- | --- | --- | --- | --- | ---: | :---: | :---: |");
-  for (const outcome of outcomes) {
-    lines.push(`| ${outcome.id} | ${outcome.actions.join(", ") || "—"} | ${outcome.expected} | ${outcome.method} | ${outcome.selectedAction ?? (outcome.method === "hold" ? "hold" : "—")} | ${outcome.topSignal.toFixed(3)} | ${outcome.acted ? "yes" : "defer"} | ${outcome.correct ? "yes" : "no"} |`);
+  scenarios.forEach((scenario, index) => {
+    const outcome = defaultOutcomes[index]!;
+    lines.push(`| ${scenario.id} | ${actionsOf(scenario).join(", ") || "—"} | ${scenario.expected} | ${outcome.method} | ${outcome.selectedAction ?? (outcome.method === "hold" ? "hold" : "—")} | ${outcome.topSignal.toFixed(3)} | ${outcome.acted ? "yes" : "defer"} | ${outcome.acted ? (outcome.correct ? "yes" : "no") : "n/a"} |`);
+  });
+  lines.push("");
+  lines.push("## Threshold sweep (all samples)");
+  lines.push("");
+  lines.push(...table(allPoints));
+  lines.push("");
+  lines.push("## Threshold selection");
+  lines.push("");
+  lines.push(`Selection is made on the **development split only** (${scenarios.filter((scenario) => !scenario.holdout).map((scenario) => scenario.id).join(", ") || "none"}), then validated on the held-out split (${scenarios.filter((scenario) => scenario.holdout).map((scenario) => scenario.id).join(", ") || "none"}).`);
+  lines.push("");
+  if (selected.selected) {
+    lines.push(`Selected action threshold: **${selected.selected.threshold.toFixed(2)}** (dev coverage ${(selected.selected.coverage * 100).toFixed(1)}%, dev acted accuracy ${(selected.selected.actedAccuracy * 100).toFixed(1)}% over ${selected.selected.acted} acted decisions).`);
+    if (holdoutAtSelected) {
+      lines.push(`Held-out coverage ${(holdoutAtSelected.coverage * 100).toFixed(1)}%, held-out acted accuracy ${holdoutAtSelected.acted === 0 ? "n/a" : `${(holdoutAtSelected.actedAccuracy * 100).toFixed(1)}%`} over ${holdoutAtSelected.acted} acted decisions.`);
+    }
+  } else {
+    lines.push("No threshold qualified on the development split.");
   }
+  if (selected.reasons.length > 0) for (const reason of selected.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push("## Calibration");
+  lines.push("## Development sweep");
   lines.push("");
-  lines.push("Calibration is measured only on decisions the lane actually acted on. A deferral is not a committed prediction: it hands off to the existing deterministic path and is reported as a coverage signal, not scored as a miss.");
+  lines.push(...table(devPoints));
   lines.push("");
-  lines.push("| Metric | Value |");
-  lines.push("| --- | ---: |");
-  lines.push(`| Scenarios | ${outcomes.length} |`);
-  lines.push(`| Acted samples | ${report.count} |`);
-  lines.push(`| Coverage | ${(coverage * 100).toFixed(1)}% |`);
-  lines.push(`| Deferrals | ${deferred.length} (${outcomes.length === 0 ? "0.0" : ((deferred.length / outcomes.length) * 100).toFixed(1)}%) |`);
-  lines.push(`| Accuracy vs oracle (acted) | ${report.count === 0 ? "n/a" : `${(accuracy * 100).toFixed(1)}%`} |`);
-  lines.push(`| Brier score (acted) | ${report.count === 0 ? "n/a" : report.brier.toFixed(4)} |`);
-  lines.push(`| Expected calibration error (acted) | ${report.count === 0 ? "n/a" : report.expectedCalibrationError.toFixed(4)} |`);
-  lines.push(`| Bins | ${report.bins} |`);
+  lines.push("## Holdout sweep");
+  lines.push("");
+  lines.push(...table(holdoutPoints));
   lines.push("");
   lines.push("## Promotion gate — `director-selection`");
   lines.push("");
@@ -156,13 +180,15 @@ function render(outcomes: readonly LiveOutcome[], report: ReturnType<typeof grad
   if (gate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of gate.reasons) lines.push(`- ${reason}`);
   lines.push("");
-  lines.push("The gate is a ceiling on confidence, not a guarantee: sample counts and holdout choice still matter, and a not-ready lane keeps its deterministic fallback.");
+  lines.push("The gate is a ceiling on confidence, not a guarantee: sample counts and holdout choice still matter, and a not-ready lane keeps its deterministic fallback. Calibration is scored only on acted decisions; deferrals are coverage, not misses.");
   lines.push("");
   return lines.join("\n");
 }
 
 async function main(): Promise<void> {
   const outIndex = process.argv.indexOf("--out");
+  const repeatIndex = process.argv.indexOf("--repeat");
+  const repeats = Math.max(1, Math.min(25, Number(repeatIndex >= 0 ? process.argv[repeatIndex + 1] : "8") || 8));
   const outPath = path.resolve(ROOT, outIndex >= 0 ? (process.argv[outIndex + 1] ?? "docs/system-one-director-calibration.md") : "docs/system-one-director-calibration.md");
   const settings = { ...defaultSystemOneSettings(), apiKey: KEY };
 
@@ -172,34 +198,66 @@ async function main(): Promise<void> {
   const gmOnly = await readState("gm-only", { gmOnly: true });
 
   const scenarios: Scenario[] = [
-    { id: "empty-world", projection: empty, expected: "ambient-beat" },
-    { id: "story-graph", projection: graph, expected: "reveal-node" },
-    { id: "encounter-prep", projection: prepared, expected: "encounter-start" },
-    { id: "gm-only", projection: gmOnly, expected: "hold" },
+    { id: "empty-world", projection: empty, expected: "ambient-beat", holdout: false },
+    { id: "story-graph", projection: graph, expected: "reveal-node", holdout: true },
+    { id: "encounter-prep", projection: prepared, expected: "encounter-start", holdout: false },
+    { id: "gm-only", projection: gmOnly, expected: "hold", holdout: true },
   ];
 
-  const outcomes: LiveOutcome[] = [];
-  const points: DmCalibrationPoint[] = [];
+  const samples: ThresholdSample[] = [];
+  const devSamples: ThresholdSample[] = [];
+  const holdoutSamples: ThresholdSample[] = [];
+  const defaultOutcomes: Readout[] = scenarios.map(() => ({ method: "defer", selectedAction: null, topSignal: 0, acted: false, correct: false }));
+  const firstAnswers: Array<Record<string, SystemOneAnswer> | undefined> = scenarios.map(() => undefined);
   let model = settings.model;
-  for (const scenario of scenarios) {
-    const { outcome, point, model: responseModel } = await runLive(scenario, settings);
-    outcomes.push(outcome);
-    if (outcome.acted) points.push(point);
-    model = responseModel;
-    console.log(`${scenario.id}: method=${outcome.method} selected=${outcome.selectedAction ?? "hold"} signal=${outcome.topSignal.toFixed(3)} acted=${outcome.acted} correct=${outcome.correct}`);
-  }
 
-  const report = gradeCalibration(points, 10);
-  const acted = outcomes.filter((outcome) => outcome.acted);
-  const accuracy = acted.length === 0 ? 0 : acted.filter((outcome) => outcome.correct).length / acted.length;
+  for (const [index, scenario] of scenarios.entries()) {
+    for (let repeat = 0; repeat < repeats; repeat += 1) {
+      const questions = buildDirectorQuestions(scenario.projection);
+      const result = await completeWithSystemOne({ settings, state: { scenario: scenario.id, repeat }, questions });
+      model = result.model.responseModel ?? model;
+      if (repeat === 0) {
+        firstAnswers[index] = result.answers;
+        defaultOutcomes[index] = readout(scenario, result.answers, { actionThreshold: DEFAULT_THRESHOLD, reviewThreshold: 0.5 });
+      }
+      for (const threshold of THRESHOLD_GRID) {
+        const outcome = readout(scenario, result.answers, { actionThreshold: threshold, reviewThreshold: Math.min(0.5, threshold) });
+        const sample: ThresholdSample = { threshold, acted: outcome.acted, correct: outcome.correct, predictedProbability: outcome.topSignal };
+        samples.push(sample);
+        (scenario.holdout ? holdoutSamples : devSamples).push(sample);
+      }
+    }
+    process.stdout.write(".");
+  }
+  process.stdout.write("\n");
+
+  const allPoints = aggregateThresholdSamples(samples, THRESHOLD_GRID);
+  const devPoints = aggregateThresholdSamples(devSamples, THRESHOLD_GRID);
+  const holdoutPoints = aggregateThresholdSamples(holdoutSamples, THRESHOLD_GRID);
+  const selected = selectActionThreshold(devSamples, { thresholds: THRESHOLD_GRID, minAccuracy: 0.9, minActed: 4, targetCoverage: 0.4 });
+
+  // The promotion gate is evaluated at the selected threshold, not the default, so it
+  // reflects the configuration we would actually ship.
+  const selectedThreshold = selected.selected?.threshold ?? DEFAULT_THRESHOLD;
+  const gateThresholds = { actionThreshold: selectedThreshold, reviewThreshold: Math.min(0.5, selectedThreshold) };
+  const gateOutcomes = scenarios
+    .map((scenario, index) => ({ scenario, answers: firstAnswers[index] }))
+    .filter((entry): entry is { scenario: Scenario; answers: Record<string, SystemOneAnswer> } => entry.answers !== undefined)
+    .map(({ scenario, answers }) => readout(scenario, answers, gateThresholds));
+  const actedOutcomes = gateOutcomes.filter((outcome) => outcome.acted);
+  const actedPoints: DmCalibrationPoint[] = actedOutcomes.map((outcome) => ({ predictedProbability: outcome.topSignal, correct: outcome.correct }));
+  const report = gradeCalibration(actedPoints, 10);
+  const accuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.correct).length / actedOutcomes.length;
   const gate = evaluatePromotionGate("director-selection", {
-    samples: report.count, accuracy, brier: report.brier, expectedCalibrationError: report.expectedCalibrationError,
+    samples: actedOutcomes.length, accuracy, brier: report.brier, expectedCalibrationError: report.expectedCalibrationError,
   });
 
-  const markdown = render(outcomes, report, gate, model);
+  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats });
   await writeFile(outPath, markdown, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, outcomes, report, gate }, null, 2), "utf8");
-  console.log(`accuracy=${(accuracy * 100).toFixed(1)}% brier=${report.brier.toFixed(4)} ece=${report.expectedCalibrationError.toFixed(4)} promoted=${gate.promoted}`);
+  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate }, null, 2), "utf8");
+
+  console.log(`selected threshold: ${selected.selected ? selected.selected.threshold.toFixed(2) : "none"} (dev coverage ${selected.selected ? (selected.selected.coverage * 100).toFixed(1) : 0}%, dev accuracy ${selected.selected ? (selected.selected.actedAccuracy * 100).toFixed(1) : 0}%)`);
+  console.log(`gate: promoted=${gate.promoted}${gate.reasons.length ? ` reasons=${gate.reasons.join("; ")}` : ""}`);
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

@@ -123,9 +123,11 @@ export function composeDirectorSelection(
     };
   }
 
+  // Director beats mutate campaign state, so the aggregate pick must clear the same
+  // action threshold as a grounded candidate; a mere review-level pick defers instead.
   const best = answers[DIRECTOR_BEST_KEY];
   const bestTop = best && best.type === "choice" ? topProbability(best.probabilities) : null;
-  if (best && best.type === "choice" && best.choice !== DIRECTOR_NONE && byId.has(best.choice) && bestTop !== null && bestTop >= thresholds.reviewThreshold) {
+  if (best && best.type === "choice" && best.choice !== DIRECTOR_NONE && byId.has(best.choice) && bestTop !== null && bestTop >= thresholds.actionThreshold) {
     const selected = byId.get(best.choice)!;
     return { band: "act", method: "best-pick", hold: false, selections: [{ candidateId: selected.candidateId, digest: selected.digest }], topSignal: bestTop };
   }

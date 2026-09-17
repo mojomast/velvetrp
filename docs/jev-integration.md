@@ -297,7 +297,9 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   per-candidate signals. `server/src/agent/systemOneDirector.ts` builds one `noul`
   ("is this candidate a legal, grounded next beat?") and one `score` (priority) per
   candidate, plus a `hold` `noul` and an aggregate `best_candidate` `choice`, then
-  composes hold → grounded-ordered-by-priority → best-pick → defer.
+  composes hold → grounded-ordered-by-priority → best-pick → defer. Because Director
+  beats mutate campaign state, the aggregate pick must clear the **action** threshold,
+  not the review threshold.
 - **Shadow.** `planCampaignDmBeat` accepts an optional `getSystemOneDirector` dependency.
   When it resolves (flag + `enabled` + `shadow` + usable key) the battery runs beside the
   live planning and the would-be decision is recorded immutably; it never settles, orders,

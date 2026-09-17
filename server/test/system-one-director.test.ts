@@ -54,7 +54,7 @@ describe("System One Director selector", () => {
     const answers: Record<string, SystemOneAnswer> = {
       [DIRECTOR_HOLD_KEY]: support("hold", 0.3),
       [`supported:${candidates[0]!.candidateId}`]: support("a", 0.4),
-      [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.7, probabilities: { [candidates[0]!.candidateId]: 0.7, [candidates[1]!.candidateId]: 0.2, [candidates[2]!.candidateId]: 0.05, [DIRECTOR_NONE]: 0.05 } },
+      [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.8, probabilities: { [candidates[0]!.candidateId]: 0.8, [candidates[1]!.candidateId]: 0.12, [candidates[2]!.candidateId]: 0.04, [DIRECTOR_NONE]: 0.04 } },
     };
     expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({
       band: "act", method: "best-pick", selections: [{ candidateId: candidates[0]!.candidateId, digest: candidates[0]!.digest }],

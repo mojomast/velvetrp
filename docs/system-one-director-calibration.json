@@ -1,69 +1,391 @@
 {
   "model": "jev-1.13.0",
-  "outcomes": [
+  "repeats": 10,
+  "allPoints": [
     {
-      "id": "empty-world",
-      "expected": "ambient-beat",
-      "actions": [
-        "advance-time",
-        "ambient-beat"
-      ],
-      "method": "defer",
-      "selectedAction": null,
-      "topSignal": 0.71,
-      "correct": false,
-      "acted": false
+      "threshold": 0.3,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.25
     },
     {
-      "id": "story-graph",
-      "expected": "reveal-node",
-      "actions": [
-        "advance-time",
-        "ambient-beat",
-        "reveal-node"
-      ],
-      "method": "defer",
-      "selectedAction": null,
-      "topSignal": 0.59,
-      "correct": false,
-      "acted": false
+      "threshold": 0.35,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.25
     },
     {
-      "id": "encounter-prep",
-      "expected": "encounter-start",
-      "actions": [
-        "encounter-start"
-      ],
-      "method": "best-pick",
-      "selectedAction": "encounter-start",
-      "topSignal": 0.59,
-      "correct": true,
-      "acted": true
+      "threshold": 0.4,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.25
     },
     {
-      "id": "gm-only",
-      "expected": "hold",
-      "actions": [],
-      "method": "defer",
-      "selectedAction": null,
-      "topSignal": 0.58,
-      "correct": false,
-      "acted": false
+      "threshold": 0.45,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.25
+    },
+    {
+      "threshold": 0.5,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.25
+    },
+    {
+      "threshold": 0.55,
+      "acted": 40,
+      "total": 40,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.6,
+      "acted": 21,
+      "total": 40,
+      "coverage": 0.525,
+      "actedAccuracy": 0.47619047619047616
+    },
+    {
+      "threshold": 0.65,
+      "acted": 20,
+      "total": 40,
+      "coverage": 0.5,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.7,
+      "acted": 9,
+      "total": 40,
+      "coverage": 0.225,
+      "actedAccuracy": 0.2222222222222222
+    },
+    {
+      "threshold": 0.75,
+      "acted": 0,
+      "total": 40,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.8,
+      "acted": 0,
+      "total": 40,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.85,
+      "acted": 0,
+      "total": 40,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.9,
+      "acted": 0,
+      "total": 40,
+      "coverage": 0,
+      "actedAccuracy": 0
     }
   ],
-  "report": {
-    "count": 1,
-    "brier": 0.16810000000000003,
-    "expectedCalibrationError": 0.41000000000000003,
-    "bins": 10
+  "devPoints": [
+    {
+      "threshold": 0.3,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.35,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.4,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.45,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.5,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.55,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.6,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.65,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.7,
+      "acted": 9,
+      "total": 20,
+      "coverage": 0.45,
+      "actedAccuracy": 0.2222222222222222
+    },
+    {
+      "threshold": 0.75,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.8,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.85,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.9,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    }
+  ],
+  "holdoutPoints": [
+    {
+      "threshold": 0.3,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.35,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.4,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.45,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.5,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.55,
+      "acted": 20,
+      "total": 20,
+      "coverage": 1,
+      "actedAccuracy": 0.5
+    },
+    {
+      "threshold": 0.6,
+      "acted": 1,
+      "total": 20,
+      "coverage": 0.05,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.65,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.7,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.75,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.8,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.85,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    },
+    {
+      "threshold": 0.9,
+      "acted": 0,
+      "total": 20,
+      "coverage": 0,
+      "actedAccuracy": 0
+    }
+  ],
+  "selected": {
+    "selected": null,
+    "points": [
+      {
+        "threshold": 0.3,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.35,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.4,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.45,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.5,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.55,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0.5
+      },
+      {
+        "threshold": 0.6,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0.5
+      },
+      {
+        "threshold": 0.65,
+        "acted": 20,
+        "total": 20,
+        "coverage": 1,
+        "actedAccuracy": 0.5
+      },
+      {
+        "threshold": 0.7,
+        "acted": 9,
+        "total": 20,
+        "coverage": 0.45,
+        "actedAccuracy": 0.2222222222222222
+      },
+      {
+        "threshold": 0.75,
+        "acted": 0,
+        "total": 20,
+        "coverage": 0,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.8,
+        "acted": 0,
+        "total": 20,
+        "coverage": 0,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.85,
+        "acted": 0,
+        "total": 20,
+        "coverage": 0,
+        "actedAccuracy": 0
+      },
+      {
+        "threshold": 0.9,
+        "acted": 0,
+        "total": 20,
+        "coverage": 0,
+        "actedAccuracy": 0
+      }
+    ],
+    "reasons": [
+      "filtered 13 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions",
+      "no threshold reached actedAccuracy >= 0.9 with at least 4 acted decisions"
+    ]
   },
   "gate": {
     "lane": "director-selection",
     "promoted": false,
     "reasons": [
-      "insufficient samples: 1 < 30",
-      "brier above maximum: 0.1681 > 0.1000",
-      "expected calibration error above maximum: 0.4100 > 0.1000"
+      "insufficient samples: 0 < 30",
+      "accuracy below minimum: 0.0000 < 0.9000"
     ],
     "gates": {
       "minSamples": 30,
