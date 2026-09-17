@@ -19,6 +19,7 @@ import { generatedCampaignContentProviderSchema } from "@velvet/contracts";
 import {
   buildDirectorQuestions, composeDirectorSelection, type DirectorCandidateProjection,
 } from "../server/src/agent/systemOneDirector.js";
+import { applyCalibration, fitPlattCalibration, type PlattCalibration } from "../server/src/agent/systemOneCalibration.js";
 import { evaluatePromotionGate } from "../server/src/agent/systemOnePromotion.js";
 import {
   aggregateThresholdSamples, selectActionThreshold, type ThresholdPoint, type ThresholdSample,
@@ -26,7 +27,6 @@ import {
 import { defaultSystemOneSettings } from "../server/src/defaults.js";
 import { completeWithSystemOne, type SystemOneAnswer } from "../server/src/provider/systemOneCompletion.js";
 import { gradeCalibration } from "../server/test/evals/dmGraders.js";
-import type { DmCalibrationPoint } from "../server/test/evals/dmEvalTypes.js";
 import { dmFixture } from "../server/test/fixtures/dmCampaign.js";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
@@ -100,6 +100,17 @@ interface Readout {
   exact: boolean;
 }
 
+interface CalibrationMetrics { brier: number; expectedCalibrationError: number }
+interface CalibrationReport {
+  fitted: PlattCalibration;
+  devSamples: number;
+  holdoutSamples: number;
+  /** Fit on development, scored on the held-out split: the unbiased estimate. */
+  holdout: { raw: CalibrationMetrics; calibrated: CalibrationMetrics };
+  /** Scored over every collected decision with the development-fit map. */
+  all: { raw: CalibrationMetrics; calibrated: CalibrationMetrics };
+}
+
 function readout(scenario: Scenario, answers: Record<string, SystemOneAnswer>, thresholds: { actionThreshold: number; reviewThreshold: number }): Readout {
   const composed = composeDirectorSelection(scenario.projection, answers, thresholds);
   const selected = composed.selections[0];
@@ -134,8 +145,10 @@ function render(input: {
   gate: ReturnType<typeof evaluatePromotionGate>;
   samples: number;
   exactAccuracy: number;
+  gateStats: Array<{ id: string; acted: number; total: number; accuracy: number; meanPredicted: number }>;
+  calibration: CalibrationReport;
 }): string {
-  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples, exactAccuracy } = input;
+  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples, exactAccuracy, gateStats, calibration } = input;
   const selectedThreshold = selected.selected?.threshold;
   const holdoutAtSelected = selectedThreshold === undefined ? undefined : holdoutPoints.find((point) => point.threshold === selectedThreshold);
   const lines: string[] = [];
@@ -184,6 +197,27 @@ function render(input: {
   lines.push("");
   lines.push(...table(holdoutPoints));
   lines.push("");
+  lines.push("## Per-scenario at the selected threshold");
+  lines.push("");
+  lines.push("| Scenario | Acted | Coverage | Acted accuracy | Mean predicted |");
+  lines.push("| --- | ---: | ---: | ---: | ---: |");
+  for (const stat of gateStats) {
+    lines.push(`| ${stat.id} | ${stat.acted}/${stat.total} | ${((stat.acted / stat.total) * 100).toFixed(1)}% | ${stat.acted === 0 ? "n/a" : `${(stat.accuracy * 100).toFixed(1)}%`} | ${stat.acted === 0 ? "n/a" : stat.meanPredicted.toFixed(3)} |`);
+  }
+  lines.push("");
+  lines.push("## Calibration (fit on development, scored on holdout)");
+  lines.push("");
+  lines.push(`Fitted a monotonic Platt map on ${calibration.devSamples} acted development decision(s).`);
+  lines.push("");
+  lines.push("| Split | Signal | Brier | ECE |");
+  lines.push("| --- | --- | ---: | ---: |");
+  lines.push(`| held-out (${calibration.holdoutSamples} acted) | raw | ${calibration.holdout.raw.brier.toFixed(4)} | ${calibration.holdout.raw.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| held-out (${calibration.holdoutSamples} acted) | calibrated | ${calibration.holdout.calibrated.brier.toFixed(4)} | ${calibration.holdout.calibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| all collected | raw | ${calibration.all.raw.brier.toFixed(4)} | ${calibration.all.raw.expectedCalibrationError.toFixed(4)} |`);
+  lines.push(`| all collected | calibrated | ${calibration.all.calibrated.brier.toFixed(4)} | ${calibration.all.calibrated.expectedCalibrationError.toFixed(4)} |`);
+  lines.push("");
+  lines.push(`Map: \`sigmoid(a * logit(p) + b)\` with a = ${calibration.fitted.a.toFixed(4)}, b = ${calibration.fitted.b.toFixed(4)}. The held-out row is the unbiased estimate; because this frozen corpus has no errors, the fit is provisional until the corpus is larger and includes error cases.`);
+  lines.push("");
   lines.push("## Promotion gate — `director-selection`");
   lines.push("");
   lines.push(`**${gate.promoted ? "PROMOTE" : "NOT READY"}**`);
@@ -193,7 +227,9 @@ function render(input: {
   lines.push("");
   lines.push(`Exact (preferred-action) accuracy among acted decisions: ${(exactAccuracy * 100).toFixed(1)}%. The gate uses acceptable accuracy, which counts a legal non-regression beat as a pass.`);
   lines.push("");
-  lines.push("The gate is a ceiling on confidence, not a guarantee: sample counts and holdout choice still matter, and a not-ready lane keeps its deterministic fallback. Calibration is scored only on acted decisions; deferrals are coverage, not misses.");
+  lines.push("The gate scores the **calibrated** signal over every collected decision (the lane would ship with the calibration map); the held-out row above is the unbiased calibration estimate. Calibration is scored only on acted decisions, so deferrals are coverage, not misses.");
+  lines.push("");
+  lines.push("The gate is a ceiling on confidence, not a guarantee: sample counts and holdout choice still matter, and a not-ready lane keeps its deterministic fallback. A frozen corpus with no error cases cannot stress-test calibration; treat a pass as a promotion candidate until shadow data with negative examples exists.");
   lines.push("");
   return lines.join("\n");
 }
@@ -207,13 +243,34 @@ async function main(): Promise<void> {
 
   const empty = await readState("empty-world", {});
   const graph = await readState("story-graph", { setup: (fixture) => fixture.graph() });
+  const revealed = await readState("story-graph-revealed", {
+    setup: (fixture) => {
+      fixture.graph("story-revealed");
+      const revision = fixture.repo.getCampaignStory("local-owner", fixture.campaign.id)!.revision;
+      fixture.repo.executeStorylineCommand("local-owner", "story-revealed", { kind: "reveal-node", targetId: "gate", data: {}, expectedRevision: revision, idempotencyKey: "revealed-gate" });
+    },
+  });
   const prepared = await readState("encounter-prep", { setup: (fixture) => fixture.prepare() });
+  const active = await readState("encounter-active", {
+    setup: (fixture) => {
+      // An enemy-only encounter makes the enemy the deterministic current combatant, so the
+      // state always advertises `enemy-turn` (an ally would be id-order dependent).
+      const encounter = fixture.repo.createEncounter("local-owner", fixture.campaign.id, {
+        sessionId: fixture.session.id, name: "Solo ambush",
+        combatants: [{ kind: "enemy", template: fixture.enemy, team: "enemies" }],
+        idempotencyKey: "active-enemy-only",
+      }).encounter;
+      fixture.repo.startEncounter("local-owner", encounter.encounterId, { expectedRevision: encounter.revision, idempotencyKey: "active-enemy-start" });
+    },
+  });
   const gmOnly = await readState("gm-only", { gmOnly: true });
 
   const scenarios: Scenario[] = [
     { id: "empty-world", projection: empty, preferred: "ambient-beat", acceptable: ["advance-time"], holdout: false },
-    { id: "story-graph", projection: graph, preferred: "reveal-node", acceptable: ["ambient-beat", "advance-time"], holdout: true },
+    { id: "story-graph", projection: graph, preferred: "reveal-node", acceptable: ["ambient-beat", "advance-time"], holdout: false },
     { id: "encounter-prep", projection: prepared, preferred: "encounter-start", holdout: false },
+    { id: "story-graph-revealed", projection: revealed, preferred: "reveal-clue", acceptable: ["ambient-beat", "advance-time"], holdout: true },
+    { id: "encounter-active", projection: active, preferred: "enemy-turn", holdout: true },
     { id: "gm-only", projection: gmOnly, preferred: "hold", holdout: true },
   ];
 
@@ -253,19 +310,48 @@ async function main(): Promise<void> {
   // reflects the configuration we would actually ship.
   const selectedThreshold = selected.selected?.threshold ?? DEFAULT_THRESHOLD;
   const gateThresholds = { actionThreshold: selectedThreshold, reviewThreshold: Math.min(0.5, selectedThreshold) };
-  const gateOutcomes = collected.map(({ scenario, answers }) => readout(scenario, answers, gateThresholds));
+  const gateOutcomes = collected.map(({ scenario, answers }) => ({ id: scenario.id, ...readout(scenario, answers, gateThresholds) }));
   const actedOutcomes = gateOutcomes.filter((outcome) => outcome.acted);
-  const actedPoints: DmCalibrationPoint[] = actedOutcomes.map((outcome) => ({ predictedProbability: outcome.topSignal, correct: outcome.correct }));
-  const report = gradeCalibration(actedPoints, 10);
+  const gateStats = scenarios.map((scenario) => {
+    const outcomes = gateOutcomes.filter((outcome) => outcome.id === scenario.id);
+    const acted = outcomes.filter((outcome) => outcome.acted);
+    return {
+      id: scenario.id,
+      acted: acted.length,
+      total: outcomes.length,
+      accuracy: acted.length === 0 ? 0 : acted.filter((outcome) => outcome.correct).length / acted.length,
+      meanPredicted: acted.length === 0 ? 0 : acted.reduce((sum, outcome) => sum + outcome.topSignal, 0) / acted.length,
+    };
+  });
   const accuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.correct).length / actedOutcomes.length;
   const exactAccuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.exact).length / actedOutcomes.length;
+
+  // Fit the calibration map on the development split and score it on the held-out split, so
+  // the reported improvement is out of sample. The same map produces the calibrated signal
+  // the gate scores over every collected decision. An empty split yields the identity map.
+  const allOutcomes = collected.map(({ scenario, answers }) => ({ holdout: scenario.holdout, ...readout(scenario, answers, gateThresholds) }));
+  const devActed = allOutcomes.filter((outcome) => !outcome.holdout && outcome.acted);
+  const holdoutActed = allOutcomes.filter((outcome) => outcome.holdout && outcome.acted);
+  const fitted = fitPlattCalibration(devActed.map((outcome) => ({ predictedProbability: outcome.topSignal, correct: outcome.correct })));
+  const metrics = (outcomes: ReadonlyArray<{ topSignal: number; correct: boolean }>, calibrated: boolean): CalibrationMetrics => {
+    const graded = gradeCalibration(outcomes.map((outcome) => ({ predictedProbability: calibrated ? applyCalibration(outcome.topSignal, fitted) : outcome.topSignal, correct: outcome.correct })), 10);
+    return { brier: graded.brier, expectedCalibrationError: graded.expectedCalibrationError };
+  };
+  const calibration: CalibrationReport = {
+    fitted,
+    devSamples: devActed.length,
+    holdoutSamples: holdoutActed.length,
+    holdout: { raw: metrics(holdoutActed, false), calibrated: metrics(holdoutActed, true) },
+    all: { raw: metrics(actedOutcomes, false), calibrated: metrics(actedOutcomes, true) },
+  };
+  // The lane ships with the calibration map, so the gate scores the calibrated signal.
   const gate = evaluatePromotionGate("director-selection", {
-    samples: actedOutcomes.length, accuracy, brier: report.brier, expectedCalibrationError: report.expectedCalibrationError,
+    samples: actedOutcomes.length, accuracy, brier: calibration.all.calibrated.brier, expectedCalibrationError: calibration.all.calibrated.expectedCalibrationError,
   });
 
-  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats, exactAccuracy });
+  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats, exactAccuracy, gateStats, calibration });
   await writeFile(outPath, markdown, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate, exactAccuracy }, null, 2), "utf8");
+  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate, exactAccuracy, gateStats, calibration }, null, 2), "utf8");
 
   console.log(`selected threshold: ${selected.selected ? selected.selected.threshold.toFixed(2) : "none"} (dev coverage ${selected.selected ? (selected.selected.coverage * 100).toFixed(1) : 0}%, dev accuracy ${selected.selected ? (selected.selected.actedAccuracy * 100).toFixed(1) : 0}%)`);
   console.log(`acted: ${actedOutcomes.length} acceptable=${(accuracy * 100).toFixed(1)}% exact=${(exactAccuracy * 100).toFixed(1)}%`);

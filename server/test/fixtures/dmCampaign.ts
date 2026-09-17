@@ -28,8 +28,8 @@ export async function dmFixture(dnd = false, repositoryOptions: Pick<CreateRepos
   const enemy=definitions.find(d=>d.reference.definitionId===(dnd?"srd-5.1:enemy-template:goblin":"velvet:mechanics:enemy-template:gloam-mite"))!.reference as any;
   const prepare=()=>repo.createEncounter("local-owner",campaign.id,{sessionId:session.id,name:"Prepared ambush",
     combatants:[{kind:"actor",actorId,team:"allies"},{kind:"enemy",template:enemy,team:"enemies"}],idempotencyKey:"prepare"}).encounter;
-  const graph=()=>repo.createCampaignStorylineGraph("local-owner",campaign.id,{expectedRevision:repo.getCampaignStory('local-owner',campaign.id)!.revision,idempotencyKey:"story",storyline:{
-    storylineId:"story",title:"Journey",summary:"A public quest",nodes:[
+  const graph=(storylineId="story")=>repo.createCampaignStorylineGraph("local-owner",campaign.id,{expectedRevision:repo.getCampaignStory('local-owner',campaign.id)!.revision,idempotencyKey:`story-${storylineId}`,storyline:{
+    storylineId,title:"Journey",summary:"A public quest",nodes:[
       {nodeId:"gate",title:"The gate",description:"A stone gate blocks the road.",gmNotes:"SECRET_GATE",revealThreshold:0},
       {nodeId:"finale",title:"SECRET_FINALE_TITLE",description:"The road is open.",gmNotes:"SECRET_FINALE",revealThreshold:1}],
     edges:[{edgeId:"next",kind:"requires",fromNodeId:"gate",toNodeId:"finale"}],plotPoints:[],

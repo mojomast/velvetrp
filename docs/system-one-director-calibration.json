@@ -4,185 +4,185 @@
   "allPoints": [
     {
       "threshold": 0.3,
-      "acted": 40,
-      "total": 40,
+      "acted": 60,
+      "total": 60,
       "coverage": 1,
-      "actedAccuracy": 0.75
+      "actedAccuracy": 0.8333333333333334
     },
     {
       "threshold": 0.35,
-      "acted": 40,
-      "total": 40,
+      "acted": 60,
+      "total": 60,
       "coverage": 1,
-      "actedAccuracy": 0.75
+      "actedAccuracy": 0.8333333333333334
     },
     {
       "threshold": 0.4,
-      "acted": 40,
-      "total": 40,
+      "acted": 60,
+      "total": 60,
       "coverage": 1,
-      "actedAccuracy": 0.75
+      "actedAccuracy": 0.8333333333333334
     },
     {
       "threshold": 0.45,
-      "acted": 40,
-      "total": 40,
+      "acted": 60,
+      "total": 60,
       "coverage": 1,
-      "actedAccuracy": 0.725
+      "actedAccuracy": 0.8166666666666667
     },
     {
       "threshold": 0.5,
-      "acted": 30,
-      "total": 40,
-      "coverage": 0.75,
-      "actedAccuracy": 0.6666666666666666
+      "acted": 58,
+      "total": 60,
+      "coverage": 0.9666666666666667,
+      "actedAccuracy": 0.8275862068965517
     },
     {
       "threshold": 0.55,
-      "acted": 30,
-      "total": 40,
-      "coverage": 0.75,
-      "actedAccuracy": 0.9
+      "acted": 48,
+      "total": 60,
+      "coverage": 0.8,
+      "actedAccuracy": 0.9583333333333334
     },
     {
       "threshold": 0.6,
-      "acted": 28,
-      "total": 40,
-      "coverage": 0.7,
+      "acted": 35,
+      "total": 60,
+      "coverage": 0.5833333333333334,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 12,
-      "total": 40,
+      "acted": 18,
+      "total": 60,
       "coverage": 0.3,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.7,
-      "acted": 10,
-      "total": 40,
-      "coverage": 0.25,
+      "acted": 11,
+      "total": 60,
+      "coverage": 0.18333333333333332,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.75,
       "acted": 10,
-      "total": 40,
-      "coverage": 0.25,
+      "total": 60,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.8,
       "acted": 10,
-      "total": 40,
-      "coverage": 0.25,
+      "total": 60,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.85,
       "acted": 10,
-      "total": 40,
-      "coverage": 0.25,
+      "total": 60,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.9,
       "acted": 10,
-      "total": 40,
-      "coverage": 0.25,
+      "total": 60,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     }
   ],
   "devPoints": [
     {
       "threshold": 0.3,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
-      "actedAccuracy": 0.5
+      "actedAccuracy": 0.6666666666666666
     },
     {
       "threshold": 0.35,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
-      "actedAccuracy": 0.5
+      "actedAccuracy": 0.6666666666666666
     },
     {
       "threshold": 0.4,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
-      "actedAccuracy": 0.5
+      "actedAccuracy": 0.6666666666666666
     },
     {
       "threshold": 0.45,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
-      "actedAccuracy": 0.45
+      "actedAccuracy": 0.6333333333333333
     },
     {
       "threshold": 0.5,
-      "acted": 20,
-      "total": 20,
-      "coverage": 1,
-      "actedAccuracy": 0.5
+      "acted": 28,
+      "total": 30,
+      "coverage": 0.9333333333333333,
+      "actedAccuracy": 0.6428571428571429
     },
     {
       "threshold": 0.55,
-      "acted": 20,
-      "total": 20,
-      "coverage": 1,
-      "actedAccuracy": 0.85
+      "acted": 22,
+      "total": 30,
+      "coverage": 0.7333333333333333,
+      "actedAccuracy": 0.9090909090909091
     },
     {
       "threshold": 0.6,
-      "acted": 18,
-      "total": 20,
-      "coverage": 0.9,
+      "acted": 17,
+      "total": 30,
+      "coverage": 0.5666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 2,
-      "total": 20,
-      "coverage": 0.1,
+      "acted": 5,
+      "total": 30,
+      "coverage": 0.16666666666666666,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.7,
-      "acted": 0,
-      "total": 20,
-      "coverage": 0,
-      "actedAccuracy": 0
+      "acted": 1,
+      "total": 30,
+      "coverage": 0.03333333333333333,
+      "actedAccuracy": 1
     },
     {
       "threshold": 0.75,
       "acted": 0,
-      "total": 20,
+      "total": 30,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.8,
       "acted": 0,
-      "total": 20,
+      "total": 30,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.85,
       "acted": 0,
-      "total": 20,
+      "total": 30,
       "coverage": 0,
       "actedAccuracy": 0
     },
     {
       "threshold": 0.9,
       "acted": 0,
-      "total": 20,
+      "total": 30,
       "coverage": 0,
       "actedAccuracy": 0
     }
@@ -190,209 +190,206 @@
   "holdoutPoints": [
     {
       "threshold": 0.3,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.35,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.4,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.45,
-      "acted": 20,
-      "total": 20,
+      "acted": 30,
+      "total": 30,
       "coverage": 1,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.5,
-      "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "acted": 30,
+      "total": 30,
+      "coverage": 1,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.55,
-      "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "acted": 26,
+      "total": 30,
+      "coverage": 0.8666666666666667,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.6,
-      "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "acted": 18,
+      "total": 30,
+      "coverage": 0.6,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.65,
-      "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "acted": 13,
+      "total": 30,
+      "coverage": 0.43333333333333335,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.7,
       "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "total": 30,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.75,
       "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "total": 30,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.8,
       "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "total": 30,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.85,
       "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "total": 30,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     },
     {
       "threshold": 0.9,
       "acted": 10,
-      "total": 20,
-      "coverage": 0.5,
+      "total": 30,
+      "coverage": 0.3333333333333333,
       "actedAccuracy": 1
     }
   ],
   "selected": {
     "selected": {
       "threshold": 0.6,
-      "acted": 18,
-      "total": 20,
-      "coverage": 0.9,
+      "acted": 17,
+      "total": 30,
+      "coverage": 0.5666666666666667,
       "actedAccuracy": 1
     },
     "points": [
       {
         "threshold": 0.3,
-        "acted": 20,
-        "total": 20,
+        "acted": 30,
+        "total": 30,
         "coverage": 1,
-        "actedAccuracy": 0.5
+        "actedAccuracy": 0.6666666666666666
       },
       {
         "threshold": 0.35,
-        "acted": 20,
-        "total": 20,
+        "acted": 30,
+        "total": 30,
         "coverage": 1,
-        "actedAccuracy": 0.5
+        "actedAccuracy": 0.6666666666666666
       },
       {
         "threshold": 0.4,
-        "acted": 20,
-        "total": 20,
+        "acted": 30,
+        "total": 30,
         "coverage": 1,
-        "actedAccuracy": 0.5
+        "actedAccuracy": 0.6666666666666666
       },
       {
         "threshold": 0.45,
-        "acted": 20,
-        "total": 20,
+        "acted": 30,
+        "total": 30,
         "coverage": 1,
-        "actedAccuracy": 0.45
+        "actedAccuracy": 0.6333333333333333
       },
       {
         "threshold": 0.5,
-        "acted": 20,
-        "total": 20,
-        "coverage": 1,
-        "actedAccuracy": 0.5
+        "acted": 28,
+        "total": 30,
+        "coverage": 0.9333333333333333,
+        "actedAccuracy": 0.6428571428571429
       },
       {
         "threshold": 0.55,
-        "acted": 20,
-        "total": 20,
-        "coverage": 1,
-        "actedAccuracy": 0.85
+        "acted": 22,
+        "total": 30,
+        "coverage": 0.7333333333333333,
+        "actedAccuracy": 0.9090909090909091
       },
       {
         "threshold": 0.6,
-        "acted": 18,
-        "total": 20,
-        "coverage": 0.9,
+        "acted": 17,
+        "total": 30,
+        "coverage": 0.5666666666666667,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 2,
-        "total": 20,
-        "coverage": 0.1,
+        "acted": 5,
+        "total": 30,
+        "coverage": 0.16666666666666666,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.7,
-        "acted": 0,
-        "total": 20,
-        "coverage": 0,
-        "actedAccuracy": 0
+        "acted": 1,
+        "total": 30,
+        "coverage": 0.03333333333333333,
+        "actedAccuracy": 1
       },
       {
         "threshold": 0.75,
         "acted": 0,
-        "total": 20,
+        "total": 30,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.8,
         "acted": 0,
-        "total": 20,
+        "total": 30,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.85,
         "acted": 0,
-        "total": 20,
+        "total": 30,
         "coverage": 0,
         "actedAccuracy": 0
       },
       {
         "threshold": 0.9,
         "acted": 0,
-        "total": 20,
+        "total": 30,
         "coverage": 0,
         "actedAccuracy": 0
       }
     ],
     "reasons": [
-      "filtered 12 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions",
+      "filtered 10 of 13 threshold(s) for failing actedAccuracy >= 0.9 with at least 4 acted decisions",
       "selected highest threshold 0.6 reaching coverage >= 0.4 while meeting actedAccuracy >= 0.9 with at least 4 acted decisions"
     ]
   },
   "gate": {
     "lane": "director-selection",
-    "promoted": false,
-    "reasons": [
-      "insufficient samples: 28 < 30",
-      "expected calibration error above maximum: 0.2386 > 0.1000"
-    ],
+    "promoted": true,
+    "reasons": [],
     "gates": {
       "minSamples": 30,
       "minAccuracy": 0.9,
@@ -400,5 +397,77 @@
       "maxExpectedCalibrationError": 0.1
     }
   },
-  "exactAccuracy": 1
+  "exactAccuracy": 1,
+  "gateStats": [
+    {
+      "id": "empty-world",
+      "acted": 7,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.6299999999999999
+    },
+    {
+      "id": "story-graph",
+      "acted": 0,
+      "total": 10,
+      "accuracy": 0,
+      "meanPredicted": 0
+    },
+    {
+      "id": "encounter-prep",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.647
+    },
+    {
+      "id": "story-graph-revealed",
+      "acted": 0,
+      "total": 10,
+      "accuracy": 0,
+      "meanPredicted": 0
+    },
+    {
+      "id": "encounter-active",
+      "acted": 8,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 0.635
+    },
+    {
+      "id": "gm-only",
+      "acted": 10,
+      "total": 10,
+      "accuracy": 1,
+      "meanPredicted": 1
+    }
+  ],
+  "calibration": {
+    "fitted": {
+      "a": 2.529461424820175,
+      "b": 3.350834813903912
+    },
+    "devSamples": 17,
+    "holdoutSamples": 18,
+    "holdout": {
+      "raw": {
+        "brier": 0.059411111111111116,
+        "expectedCalibrationError": 0.1622222222222222
+      },
+      "calibrated": {
+        "brier": 0.00003575539437621553,
+        "expectedCalibrationError": 0.003893743433321717
+      }
+    },
+    "all": {
+      "raw": {
+        "brier": 0.0938342857142857,
+        "expectedCalibrationError": 0.2582857142857143
+      },
+      "calibrated": {
+        "brier": 0.00005450095135372729,
+        "expectedCalibrationError": 0.006071448717059114
+      }
+    }
+  }
 }

@@ -312,13 +312,17 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   or executes anything, and any failure is swallowed. Active Director selection is
   deliberately not enabled yet.
 - **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;
-  `fallback` uses the deterministic rule and provider-free oracle.
+  `fallback` uses the deterministic rule and provider-free oracle. The raw model is
+  systematically **under-confident** (correct decisions at ~0.6), so the evaluation fits
+  the monotonic `systemOneCalibration.ts` Platt map on the development split and reports
+  the held-out calibration; the promoted signal is the calibrated one.
 - **Authority.** The existing digest check in `settleDmPlanning` still rejects any
   selection that does not match an advertised candidate.
 - **Risk.** Ordered composition is the hardest mapping; validate against the existing
   oracle before enabling anything but shadow mode. The calibration graders
   (`server/test/evals/dmGraders.ts` `brierScore` / `expectedCalibrationError`) are the
-  measurement path.
+  measurement path. A green gate on a frozen corpus with no error cases is a promotion
+  **candidate**, not proof: collect shadow data with negative examples before enabling.
 
 ### L2 — Adventure exact-candidate selection
 
