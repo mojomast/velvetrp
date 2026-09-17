@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServer, type Server } from "node:http";
@@ -13,13 +13,65 @@ import type { Repository } from "../src/repo/campaign/index.js";
 
 const tmpDirs: string[] = [];
 
+/**
+ * Temp data directories end with `-<owning pid>-<mkdtemp suffix>`. Each test file installs a
+ * full starter catalog (~10 MB), so a crashed or killed run would otherwise leak its data
+ * directory into `TMPDIR` forever and slowly fill a small temp filesystem.
+ */
+const OWNED_TEMP_DIRECTORY = /^.+-(?<pid>\d+)-[A-Za-z0-9]{6}$/;
+
+function ownerAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM means the process exists but belongs to someone else; treat it as alive.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * Removes temp directories whose owning process is gone. A directory is deleted only when its
+ * name carries a PID that is no longer alive, so a concurrently running forked test can never
+ * lose its live data directory, and PID reuse can only leave a stale directory behind, never
+ * delete a live one. Safe to call from every test process.
+ */
+export function reapStaleTestDirectories(root = tmpdir()): number {
+  let removed = 0;
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return 0;
+  }
+  for (const name of entries) {
+    const pid = Number(OWNED_TEMP_DIRECTORY.exec(name)?.groups?.pid);
+    if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid || ownerAlive(pid)) continue;
+    const target = path.join(root, name);
+    try {
+      if (!statSync(target).isDirectory()) continue;
+      rmSync(target, { recursive: true, force: true });
+      removed += 1;
+    } catch {
+      // The owner or another reaper removed it first; nothing left to do.
+    }
+  }
+  return removed;
+}
+
 export function makeTmpDir(prefix = "velvet-test-"): string {
-  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  const dir = mkdtempSync(path.join(tmpdir(), `${prefix}${process.pid}-`));
   tmpDirs.push(dir);
   return dir;
 }
 
+let reapedStaleDirectories = false;
+
 export function makeTmpDataDir(): string {
+  if (!reapedStaleDirectories) {
+    reapedStaleDirectories = true;
+    reapStaleTestDirectories();
+  }
   const dir = makeTmpDir();
   process.env.VELVET_DATA_DIR = dir;
   closeRepo();

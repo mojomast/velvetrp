@@ -181,6 +181,7 @@ If `<source-dir>/velvet.sqlite` exists, live E2E clones it with the SQLite onlin
 | Wrong or empty data appears | Print the service working directory and explicit `VELVET_DATA_DIR`; check whether both root `data` and `server/data` exist. Stop before moving anything. |
 | Startup reports a schema mismatch | Stop Velvet, delete `velvet.sqlite` and its WAL/SHM sidecars, then restart to create the current development schema. |
 | `SQLITE_BUSY` or lock errors | Ensure only intended Velvet processes use the database and that backup tooling uses SQLite online backup while live. The configured busy timeout is 5 seconds. |
+| Server tests fail intermittently with `ENOSPC` or a `SQLITE_FULL`-style error | Check free space in `TMPDIR`: each server test file installs an ~10 MB starter catalog, and a nearly full temp filesystem fails whichever file writes next. Point `TMPDIR` at a filesystem with room, or delete stale `velvet-test-*` directories. `server/test/helpers.ts` names its temp data directories with the owning PID and reaps directories whose owner is gone, so a killed run no longer leaks space forever. |
 | Client loads but API calls 404 | Configure the static origin to proxy `/api` to loopback port 8787. `VELVET_API_URL` affects Vite development only. |
 | API is unreachable | Check `HOST`, `PORT`, process logs, and `/api/health`. Keep the listener on `127.0.0.1`. |
 | RPG UI/routes are absent | Query `/api/rpg/v1/features`; use exact lowercase `true` and satisfy campaign -> mechanics -> combat dependencies. |

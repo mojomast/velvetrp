@@ -186,7 +186,7 @@ describe("character progression",()=>{
       expect(applied.receipt.appliedLevels.map((level)=>level.level)).toEqual([2,3]);
       repo.close();
     }
-  });
+  }, 180_000); // The authored-class sweep is the heaviest single test; fork contention can exceed the shared 90s budget.
   it("uses only exact levels referenced by the selected class in a multi-class pack",()=>{const catalog=catalogFixture("velvet:multi-class",value=>{const klass=structuredClone(value.definitions.find((definition)=>definition.reference.kind==="class")!) as any;klass.reference.definitionId="velvet:multi-class:class:other";klass.name="Other Class";klass.mechanics.levelRefs=[];
     const sourceLevels=value.definitions.filter((definition)=>definition.reference.kind==="class-level") as any[];for(const source of sourceLevels){const level=structuredClone(source);level.reference.definitionId=`velvet:multi-class:level:other-${source.mechanics.level}`;level.name=`Other ${source.mechanics.level}`;level.mechanics.classRef=structuredClone(klass.reference);if(source.mechanics.level===1)level.mechanics.abilityRefs=[structuredClone(value.definitions.find((definition)=>definition.reference.kind==="ability"&&definition.reference.definitionId.endsWith("beacon-step"))!.reference)];klass.mechanics.levelRefs.push(level.reference);value.definitions.push(level);}value.definitions.push(klass);});
     const {repo,id}=finalized("xp",catalog);const known=repo.getCharacterProgression("local-owner",id)!.knownAbilities.map((reference)=>reference.definitionId);expect(known).not.toContain("velvet:mechanics:ability:beacon-step");repo.close();});

@@ -11,7 +11,9 @@ const scores = Object.fromEntries(SRD_5_1_CHARACTER_BUILDER_ATTRIBUTE_IDS.map((i
 
 function fixture() {
   let sequence = 0;
-  const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `aware-${++sequence}` } });
+  // Pin the RNG: the default crypto RNG can let the goblin win initiative and drop a hero
+  // before their turn, which removes the full action set this test asserts on.
+  const repo = createRepository({ clock: { now: () => new Date(AT) }, ids: { nextId: () => `aware-${++sequence}` }, rng: { integer: (minimum: number) => minimum } });
   const campaign = repo.createCampaign(OWNER, { name: "Agent awareness" });
   repo.installSrdStarterCatalog(OWNER);
   repo.configureSrdStarterCatalog(OWNER, campaign.id, { expectedRevision: 0, idempotencyKey: "pins" });

@@ -53,7 +53,7 @@
 - The deterministic E2E server RNG (`e2e/support/deterministic-server.ts`) is intentionally narrow and throws on unexpected ranges; extend it explicitly when new dice ranges are consumed.
 - E2E specs must use explicit `process.env.NAME` access, never dynamic `process.env[key]`, or the environment-classification drift guard fails.
 - Content changes require republishing: `npm run build --workspace @velvet/contracts && node --import tsx scripts/publish-srd-starter.ts --write`, then rebuild contracts before running server tests.
-- Full-suite flakes: `test/tactical-map-repo.test.ts` and `test/dnd5e-agent-combat-awareness.test.ts` occasionally fail under full parallel load and pass with `npm run test:server:serial -- <file>` and on re-run. Do not treat those as regressions.
+- Full-suite flakes: `test/tactical-map-repo.test.ts` and `test/dnd5e-agent-combat-awareness.test.ts` occasionally failed under full parallel load. The root cause was the shared `TMPDIR`, not cross-test state: each server test file installs an ~10 MB starter catalog, a killed run left its data directory behind, and a nearly full temp filesystem then failed whichever file wrote next with `ENOSPC`/`SQLITE_FULL`. `server/test/helpers.ts` now names temp data directories with the owning PID and reaps directories whose owner is gone, so killed runs cannot accumulate. If a flake recurs, check free space in `TMPDIR` before treating it as a regression.
 
 ## Next Task
 
