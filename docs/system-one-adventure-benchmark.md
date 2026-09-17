@@ -1,10 +1,10 @@
 # System One (Jev) L2 adventure-selection benchmark
 
-Generated 2026-09-17T14:21:01.952Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
+Generated 2026-09-17T15:35:26.061Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
 
 ## What this measures
 
-The L2 lane is an **advisory, unwired exact-candidate selector**. `buildAdventureSelectionQuestions`
+The L2 lane is an **advisory exact-candidate selector, wired in shadow (record-only)**. `buildAdventureSelectionQuestions`
 builds one fusion-free single battery over the union of the turn's advertised candidates: a
 `supported` noul ("does the declaration clearly describe committing exactly one advertised
 candidate?"), one per-candidate relevance `score`, and one aggregate `best_candidate`
@@ -12,7 +12,10 @@ candidate?"), one per-candidate relevance `score`, and one aggregate `best_candi
 `composeAdventureSelection` requires the aggregate choice to name an advertised candidate and
 combines the chosen option's probability with the `supported` noul as the minimum of the two
 independent claims; `act` selects, `confirm` records a lower-confidence selection, and anything
-below defers. The composition is recorded for evaluation only — no runtime path consumes it.
+below defers. The lane is **wired in shadow (record-only)** behind the `FEATURE_SYSTEM_ONE` feature flag,
+the enabled setting, a usable key, and a non-`off` lane mode: it records one immutable shadow decision
+per fresh adventure turn that advertises candidates and never selects, orders, or commits anything. An
+`active` lane mode is still record-only because no promoted active path exists.
 
 The lane **never adds, drops, or authorizes a candidate**: candidate ids and digests are already
 server-issued, selection is exact-candidate only, and the existing digest re-validation and
@@ -35,7 +38,7 @@ That sweep reports a **recommended action threshold**; it does not change the se
 | --- | --- |
 | Model | jev-1.13.0 |
 | Base URL | https://api.typesafe.ai/v1 |
-| Lane | `adventure-selection` (advisory, unwired shadow; no active path) |
+| Lane | `adventure-selection` (advisory, shadow-wired record-only; no promoted active path) |
 | Confidence thresholds (action / review) | 0.75 / 0.5 |
 | Action-threshold sweep grid | 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75 |
 | Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |
@@ -95,12 +98,12 @@ so `Acted` and `Coverage` are over named calls, not over every graded call.
 | ---: | ---: | ---: | ---: |
 | 0.35 | 54/54 | 100.0% | 100.0% |
 | 0.40 | 54/54 | 100.0% | 100.0% |
-| 0.45 | 49/54 | 90.7% | 100.0% |
-| 0.50 | 47/54 | 87.0% | 100.0% |
-| 0.55 | 36/54 | 66.7% | 100.0% |
-| 0.60 | 25/54 | 46.3% | 100.0% |
+| 0.45 | 48/54 | 88.9% | 100.0% |
+| 0.50 | 48/54 | 88.9% | 100.0% |
+| 0.55 | 37/54 | 68.5% | 100.0% |
+| 0.60 | 24/54 | 44.4% | 100.0% |
 | 0.65 | 12/54 | 22.2% | 100.0% |
-| 0.70 | 6/54 | 11.1% | 100.0% |
+| 0.70 | 8/54 | 14.8% | 100.0% |
 | 0.75 | 6/54 | 11.1% | 100.0% |
 
 Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy 100.0% over 54 acted).
@@ -113,10 +116,10 @@ Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy
 | ---: | ---: | ---: | ---: |
 | 0.35 | 36/36 | 100.0% | 100.0% |
 | 0.40 | 36/36 | 100.0% | 100.0% |
-| 0.45 | 34/36 | 94.4% | 100.0% |
+| 0.45 | 33/36 | 91.7% | 100.0% |
 | 0.50 | 33/36 | 91.7% | 100.0% |
 | 0.55 | 26/36 | 72.2% | 100.0% |
-| 0.60 | 17/36 | 47.2% | 100.0% |
+| 0.60 | 18/36 | 50.0% | 100.0% |
 | 0.65 | 9/36 | 25.0% | 100.0% |
 | 0.70 | 6/36 | 16.7% | 100.0% |
 | 0.75 | 6/36 | 16.7% | 100.0% |
@@ -134,12 +137,12 @@ Fit the monotonic Platt map on the acted development decisions at the server def
 
 | Split / signal | Accuracy | Brier | ECE |
 | --- | ---: | ---: | ---: |
-| all acted, raw (6) | 100.0% | 0.0471 | 0.2167 |
+| all acted, raw (6) | 100.0% | 0.0477 | 0.2183 |
 | all acted, calibrated (6) | 100.0% | 0.0000 | 0.0046 |
 | held-out acted, raw (0) | n/a | 0.0000 | 0.0000 |
 | held-out acted, calibrated (0) | n/a | 0.0000 | 0.0000 |
 
-Map: `sigmoid(a * logit(p) + b)` with a = 2.8659, b = 1.7227 (fit on 6 development acted decision(s); held out 0).
+Map: `sigmoid(a * logit(p) + b)` with a = 2.8706, b = 1.7321 (fit on 6 development acted decision(s); held out 0).
 
 ## Promotion gate — `adventure-selection`
 
@@ -170,12 +173,12 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
   "metrics": {
     "samples": 54,
     "accuracy": 1,
-    "brier": 0.00015858933095437295,
-    "expectedCalibrationError": 0.0108538680497553
+    "brier": 0.00015647571628271253,
+    "expectedCalibrationError": 0.010857201797694449
   },
   "calibration": {
-    "a": 1.6041563910262062,
-    "b": 4.092572644161457
+    "a": 1.5718582266592334,
+    "b": 4.107817024026977
   },
   "promotedAt": "2026-09-17",
   "evidence": "docs/system-one-adventure-benchmark.md"
@@ -184,9 +187,9 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
 
 ## Observations
 
-- **Coverage.** 6 of 90 graded calls acted (6 act / 41 confirm / 43 fallback); the rest deferred. 36 of 84 deferral(s) were in the acceptable set.
+- **Coverage.** 6 of 90 graded calls acted (6 act / 42 confirm / 42 fallback); the rest deferred. 36 of 84 deferral(s) were in the acceptable set.
 - **Decisive accuracy.** Among acted decisions, 6/6 (100.0%) were in the acceptable set and 6/6 (100.0%) matched the single preferred call.
-- **Under-confidence.** 54 readout(s) named a candidate; 48 named one but deferred, with signals 0.42–0.69, and 48 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
+- **Under-confidence.** 54 readout(s) named a candidate; 48 named one but deferred, with signals 0.42–0.70, and 48 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
 - **Acted errors.** No acted decision fell outside its case's acceptable set.
 - **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0046. The acted subset has no observed errors, so the calibration tail is untested.
 
@@ -198,8 +201,10 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
 - The recommended threshold is selected on the same labeled corpus that scores its verdict, so
   that verdict is **descriptive, not a held-out guarantee**; the Platt map is still fit on
   development acted decisions only. The server default stays until the parent decides otherwise.
-- The lane is **unwired**: composition is recorded for evaluation only, and any promotion record
-  this run justifies is evidence, not activation.
+- The lane is **wired in shadow (record-only)**: it records one immutable decision per fresh
+  adventure turn that advertises candidates and never selects, orders, or commits. Any promotion
+  record this run justifies is evidence, not activation; an `active` lane mode still stays
+  record-only until a promoted active path exists.
 - Decisive accuracy is an **asserted-subset figure**: it counts membership in the case's
   acceptable set, which is a judgment call. Exact-preferred agreement and the per-case table are
   reported alongside it, and the gate is scored only on acted decisions.

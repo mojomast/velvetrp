@@ -6,9 +6,11 @@
  * `disclosure_request`, `self_harm_signal`) plus one four-level severity `score`.
  * `composeGuardrailDecision` turns those answers into an advisory band and disposition with
  * precedence `support > block > review > pass`; a block requires the action threshold, so a
- * low-confidence hazard can only recommend review. The lane is advisory and unwired: the
- * deterministic checks in `server/src/policy.ts` remain authoritative and this lane never
- * blocks, rewrites, or sanitizes anything by itself.
+ * low-confidence hazard can only recommend review. The lane is shadow-wired (record-only)
+ * behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable key, and a non-`off` lane mode:
+ * the room-turn route records one immutable decision per turn and the lane never blocks,
+ * rewrites, sanitizes, or influences routing/generation/fallbacks. The deterministic checks
+ * in `server/src/policy.ts` remain authoritative and are a permissive stub.
  *
  * This script grades the composition against a frozen, hand-labelled corpus of user messages,
  * fits a Platt map on the acted development readouts, scores Brier/ECE on the held-out acted
@@ -369,9 +371,13 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("so a low-confidence hazard can only ever recommend review, and a self-harm signal routes to support");
   lines.push("rather than a block.");
   lines.push("");
-  lines.push("The lane is **advisory, unwired, and never blocks anything by itself**: it does not rewrite, sanitize,");
-  lines.push("or refuse a message, and the deterministic checks in `server/src/policy.ts` remain authoritative. It");
-  lines.push("has no active path yet, so this run is evidence for a promotion candidate, not an activated behavior.");
+  lines.push("The lane is **shadow-wired (record-only)** behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable");
+  lines.push("key, and a non-`off` lane mode: each `POST /api/sessions/:id/room-turn` records one immutable `guardrails`");
+  lines.push("decision over the raw user content (`state` and `flags` mirror the hazards for the review queue).");
+  lines.push("It **never blocks, rewrites, sanitizes, or influences routing, generation, or fallbacks**, and the");
+  lines.push("deterministic checks in `server/src/policy.ts` remain authoritative. An `active` lane mode is still");
+  lines.push("record-only because no promoted active path exists, so this run is evidence for a promotion candidate,");
+  lines.push("not an activated behavior.");
   lines.push("");
   lines.push("An `act` decision (support or block) is the only one that asserts confidence, so only acted calls enter");
   lines.push("calibration and the promotion gate. A `review`/`confirm` or `pass`/`fallback` is a deferral: coverage,");
@@ -460,7 +466,7 @@ export function renderGuardrailsBenchmark(input: {
     lines.push(JSON.stringify(proposedRecord, null, 2));
     lines.push("```");
   } else {
-    lines.push("No promotion record is proposed: the lane keeps its record-only shadow behavior until the failing gates clear.");
+    lines.push("No promotion record is proposed: the lane stays shadow-wired (record-only) and keeps recording decisions that never influence behavior.");
   }
   lines.push("");
   lines.push("## Observations");
@@ -496,12 +502,17 @@ export function renderGuardrailsBenchmark(input: {
   lines.push("");
   lines.push("## Honesty notes");
   lines.push("");
-  lines.push("- **Advisory and unwired.** This lane never blocks, rewrites, or sanitizes anything by itself. The");
-  lines.push("  deterministic checks in `server/src/policy.ts` remain authoritative, and they are a permissive stub:");
-  lines.push("  they return allow/deny only (no review or support), `checkCharacter` always allows, and on the HTTP");
-  lines.push("  routes sanitization runs before the check, so `prompt-injection-marker` rejection is currently");
-  lines.push("  unreachable. The stub context is why a passing guardrails gate is a candidate for wiring, not a");
-  lines.push("  moderation or content-safety guarantee.");
+  lines.push("- **Shadow-wired and record-only.** `POST /api/sessions/:id/room-turn` calls");
+  lines.push("  `recordGuardrailShadowDecision` when `FEATURE_SYSTEM_ONE` is on, the System One setting is enabled, a");
+  lines.push("  usable key is configured, and the `guardrails` lane mode is not `off`. It persists one immutable");
+  lines.push("  `guardrails` decision per turn over the raw user content, with `state` and `flags` mirroring the hazards");
+  lines.push("  for the review queue, and it never blocks, rewrites, sanitizes, or influences routing, generation,");
+  lines.push("  fallbacks, or the response. An `active` lane mode is still record-only because no promoted active path");
+  lines.push("  exists. The deterministic checks in `server/src/policy.ts` remain authoritative, and they are a");
+  lines.push("  permissive stub: they return allow/deny only (no review or support), `checkCharacter` always allows,");
+  lines.push("  and on the HTTP routes sanitization runs before the check, so `prompt-injection-marker` rejection is");
+  lines.push("  currently unreachable. The stub context is why a passing guardrails gate is a promotion candidate,");
+  lines.push("  not a moderation or content-safety guarantee.");
   lines.push(`- **Hand-labelled corpus.** The ${GUARDRAILS_EVAL_CORPUS.length} messages and ${holdoutCases} held-out cases are hand-labelled;`);
   lines.push("  \"expected\" is the labeller's judgment, borderline cases carry an explicit `acceptable` set, and the");
   lines.push("  corpus cannot cover the full tail of production messages.");

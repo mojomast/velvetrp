@@ -293,7 +293,8 @@ test("renders the benchmark report with the required sections", () => {
   ]) {
     assert.ok(markdown.includes(heading), `missing section: ${heading}`);
   }
-  assert.ok(markdown.includes("never blocks"));
+  assert.ok(markdown.includes("shadow-wired (record-only)"));
+  assert.ok(markdown.includes("never blocks, rewrites,"));
   assert.ok(markdown.includes("set -a; . /tmp/opencode/jev/jev.env; set +a"));
   assert.ok(markdown.includes("docs/system-one-guardrails-benchmark.json"));
 });

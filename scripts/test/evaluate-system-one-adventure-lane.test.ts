@@ -509,7 +509,9 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(report.startsWith("# System One (Jev) L2 adventure-selection benchmark"));
   assert.ok(report.includes("## What this measures"));
   assert.ok(report.includes("never adds, drops, or authorizes a candidate"));
-  assert.ok(report.includes("advisory, unwired exact-candidate selector"));
+  assert.ok(report.includes("advisory exact-candidate selector, wired in shadow (record-only)"));
+  assert.ok(report.includes("`active` lane mode is still record-only"));
+  assert.ok(!report.includes("unwired"), "the wiring-status prose must not claim the lane is unwired");
   assert.ok(report.includes("## Corpus and per-case results"));
   assert.ok(report.includes("## Threshold sweep"));
   assert.ok(report.includes("No threshold qualified"));

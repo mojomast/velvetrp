@@ -1,17 +1,23 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   AGENT_TOOL_REGISTRY_VERSION, POST_V38_AGENT_TOOL_REGISTRY_VERSION, agentRequestObjectSchema, canonicalAgentJson, resourceIdSchema,
   projectExactCandidateForProvider,providerSafeExactCandidateListSchema,
-    type AdventureInventoryCandidate,type AdventureCommerceCandidate,type AdventurePowerCandidate,type AdventureRestCandidate,type AdventureCombatConsumableCandidate,type AdventureCombatPowerCandidate,type AdventureQuestLifecycleCandidate,type AdventureProgressionCandidate,type AdventureProgressionRead,type AgentJsonObject,type PrivateAdventureTurn,
+    type AdventureInventoryCandidate,type AdventureCommerceCandidate,type AdventurePowerCandidate,type AdventureRestCandidate,type AdventureCombatConsumableCandidate,type AdventureCombatPowerCandidate,type AdventureQuestLifecycleCandidate,type AdventureProgressionCandidate,type AdventureProgressionRead,type AgentJsonObject,type PrivateAdventureTurn,type ProviderCandidateLabel,type ProviderSafeExactCandidate,
 } from "@velvet/contracts";
 import { assembleCampaignAgentContext, campaignContextBasketText, type CampaignAgentAudience,
   type CampaignAgentContextSnapshot } from "../context.js";
 import { getPromptPreset } from "../presets.js";
-import { completeWithProvider, type CompletionMessage, type ProviderCompletionInput,
-  type ProviderCompletionResult } from "../provider/index.js";
+import { callSystemOne, completeWithProvider, type CompletionMessage, type ProviderCompletionInput,
+  type ProviderCompletionResult, type SystemOneCaller } from "../provider/index.js";
+import { canUseSystemOne } from "../provider/providerTransport.js";
+import { readRpgFeatureFlags } from "../features.js";
+import { systemOneLaneMode } from "../defaults.js";
 import type { Repository } from "../repo/index.js";
-import { getHarnessSettings, getProviderSettings } from "../repo/index.js";
-import type { HarnessSettings, ProviderSettings } from "../types.js";
+import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
+import type { HarnessSettings, ProviderSettings, SystemOneSettings } from "../types.js";
+import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
+import { calibrateTopSignal } from "./systemOneCalibration.js";
+import { buildAdventureSelectionQuestions, composeAdventureSelection, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
 import { ADVENTURE_TOOL_LIMITATIONS, executeAdventureRead, parseAdventureToolArguments,
   selectAdventureTools, type AdventureToolName, type ProviderSafeQuestObjectiveCandidate, type SelectedAdventureTool } from "./toolRegistry.js";
 import { adventurePlanningMessages } from "./adventurePrompt.js";
@@ -24,6 +30,12 @@ const digest = (...parts: string[]) => createHash("sha256").update(parts.join("\
 const key = (prefix: string, ...parts: string[]) => `${prefix}:${digest(...parts)}`;
 const id = (prefix: string, ...parts: string[]) => resourceIdSchema.parse(`${prefix}:${digest(...parts)}`);
 
+/** An injected adventure-selection shadow lane; absent when the feature, setting, key, or lane mode is off. */
+export interface SystemOneAdventureDependency {
+  settings: SystemOneSettings;
+  caller: SystemOneCaller;
+}
+
 export interface AdventureAgentDependencies {
   complete(input: ProviderCompletionInput): Promise<ProviderCompletionResult>;
   getProvider(): Promise<ProviderSettings>;
@@ -31,6 +43,8 @@ export interface AdventureAgentDependencies {
   now(): Date;
   /** Optional System One Director shadow hook; absent disables the lane entirely. */
   getSystemOneDirector?: () => Promise<import("./systemOneDirector.js").SystemOneDirectorDependency | undefined>;
+  /** Optional System One adventure-selection shadow hook; absent disables the lane entirely. */
+  getSystemOneAdventure?: () => Promise<SystemOneAdventureDependency | undefined>;
 }
 
 const productionDependencies: AdventureAgentDependencies = {
@@ -38,7 +52,131 @@ const productionDependencies: AdventureAgentDependencies = {
   getProvider: getProviderSettings,
   getHarness: getHarnessSettings,
   now: () => new Date(),
+  getSystemOneAdventure: resolveSystemOneAdventure,
 };
+
+/**
+ * Resolves the adventure-selection lane when the feature, setting, and key are on and the lane
+ * mode is not `off`. Even an `active` mode stays record-only here: the orchestrator has no
+ * promoted active path for the lane, so it always records a shadow decision.
+ */
+export async function resolveSystemOneAdventure(): Promise<SystemOneAdventureDependency | undefined> {
+  if (!readRpgFeatureFlags().systemOne) return undefined;
+  const settings = await getSystemOneSettings();
+  if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  if (systemOneLaneMode(settings, "adventure-selection") === "off") return undefined;
+  return { settings, caller: callSystemOne };
+}
+
+/** Upper bound on the advertised exact-candidate union projected into one shadow battery. */
+export const ADVENTURE_SHADOW_CANDIDATE_CAP = 32;
+
+/** One digest-bound advertised candidate row as the provider sees it, with its server-issued label. */
+type ShadowLabeledCandidate = { candidateId: string; digest: string; semanticLabel: ProviderCandidateLabel };
+
+/** Flattens a digest-bound family's provider-facing labeled row into the lane's string label. */
+function labeledShadowCandidate(toolName: string, candidate: ShadowLabeledCandidate): AdventureSelectionCandidate {
+  const label = candidate.semanticLabel;
+  return { candidateId: candidate.candidateId, digest: candidate.digest, kind: toolName,
+    label: `${label.action}: ${label.source}${label.target ? ` → ${label.target}` : ""}` };
+}
+
+/** Projects one digest-bound family, preserving the provider's advertised row order. */
+function labeledShadowCandidates(toolName: string, candidates: readonly ShadowLabeledCandidate[]): AdventureSelectionCandidate[] {
+  return candidates.map((candidate) => labeledShadowCandidate(toolName, candidate));
+}
+
+/**
+ * Projects one travel row. Travel is bound by `candidateId` + `kind` + `version` instead of a
+ * digest, so the recorded binding is an explicit advisory marker string: the shadow record is
+ * evidence only and is never re-validated or executed.
+ */
+function travelShadowCandidate(candidate: ProviderSafeExactCandidate): AdventureSelectionCandidate {
+  const origin = candidate.semanticLabel?.source ?? candidate.label.origin;
+  const destination = candidate.semanticLabel?.target ?? candidate.label.destination;
+  return {
+    candidateId: candidate.candidateId,
+    digest: `advisory-not-a-digest:${candidate.candidateId}:${candidate.kind}:${candidate.version}`,
+    kind: "exact_actor_travel.select",
+    label: origin && destination ? `Travel: ${origin} → ${destination}` : `Travel route option ${candidate.label.routeOption}`,
+  };
+}
+
+/**
+ * Builds the bounded union of advertised exact candidates the L2 battery reasons over. Families
+ * are ordered exactly as the provider's own candidate table advertises them, empty families are
+ * skipped, and the union is capped. Each row keeps the real advertised `candidateId` and the
+ * exact selection tool that would commit it; digest-bound families keep their real digest.
+ */
+export function adventureShadowCandidateUnion(families: {
+  travel: readonly ProviderSafeExactCandidate[];
+  questObjective: readonly ShadowLabeledCandidate[];
+  srdCheck: readonly ShadowLabeledCandidate[];
+  inventory: readonly ShadowLabeledCandidate[];
+  commerce: readonly ShadowLabeledCandidate[];
+  power: readonly ShadowLabeledCandidate[];
+  rest: readonly ShadowLabeledCandidate[];
+  combatConsumable: readonly ShadowLabeledCandidate[];
+  combatPower: readonly ShadowLabeledCandidate[];
+  questLifecycle: readonly ShadowLabeledCandidate[];
+  progression: readonly ShadowLabeledCandidate[];
+}): AdventureSelectionCandidate[] {
+  return [
+    ...families.travel.map(travelShadowCandidate),
+    ...labeledShadowCandidates("exact_quest_objective.select", families.questObjective),
+    ...labeledShadowCandidates("exact_srd_check.select", families.srdCheck),
+    ...labeledShadowCandidates("exact_inventory_action.select", families.inventory),
+    ...labeledShadowCandidates("exact_vendor_commerce.select", families.commerce),
+    ...labeledShadowCandidates("exact_power_use.select", families.power),
+    ...labeledShadowCandidates("exact_rest.select", families.rest),
+    ...labeledShadowCandidates("exact_combat_consumable.select", families.combatConsumable),
+    ...labeledShadowCandidates("exact_combat_power.select", families.combatPower),
+    ...labeledShadowCandidates("exact_quest_lifecycle.select", families.questLifecycle),
+    ...labeledShadowCandidates("exact_progression_apply.select", families.progression),
+  ].slice(0, ADVENTURE_SHADOW_CANDIDATE_CAP);
+}
+
+/**
+ * Runs the L2 adventure exact-candidate battery beside the live turn and records the would-be
+ * decision immutably. It never selects, orders, or commits anything; a lane failure, a malformed
+ * answer, or a failed record write is swallowed so shadow evaluation cannot affect the turn.
+ */
+export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
+  candidates: readonly AdventureSelectionCandidate[], lane: SystemOneAdventureDependency): Promise<void> {
+  try {
+    if (systemOneLaneMode(lane.settings, "adventure-selection") === "off") return;
+    if (candidates.length === 0) return;
+    const questions = buildAdventureSelectionQuestions(turn.declaration, candidates);
+    const state = canonicalAgentJson({ declaration: turn.declaration, candidates } as never);
+    const startedAt = performance.now();
+    const result = await lane.caller({ settings: lane.settings, state, questions });
+    const composed = composeAdventureSelection(candidates, result.answers, lane.settings.confidencePolicy["adventure-selection"]);
+    recordSystemOneDecision({
+      decisionId: randomUUID(),
+      lane: "adventure-selection",
+      campaignId: turn.campaignId,
+      sessionId: turn.sessionId,
+      turnId: turn.turnId,
+      provider: "typesafe",
+      model: result.model.responseModel ?? lane.settings.model,
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state,
+      questions,
+      answers: result.answers,
+      // The recorded confidence is calibrated for observability; the band is decided on raw signals.
+      selection: { method: composed.method, selection: composed.selection,
+        topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["adventure-selection"]) },
+      confidenceBand: composed.band,
+      fallbackUsed: true,
+      shadow: true,
+      usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Shadow evaluation is advisory and must never affect the turn.
+  }
+}
 
 export type AdventureAgentResult = {
   turn: PrivateAdventureTurn;
@@ -493,6 +631,14 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
       legalActionDigest:candidate.digest},label:{action:candidate.kind,source:candidate.label,target:candidate.targetLabel,cost:null,
         consequence:"Execute only this server-issued combat action."}})),
   ];
+  // The L2 shadow lane reasons over the exact same advertised rows the provider sees, minus the
+  // non-candidate attribute/combat-action families, capped and bound to advertised tools only.
+  const advertisedToolNames = new Set<string>(selected.map((tool) => tool.name));
+  const shadowCandidates = adventureShadowCandidateUnion({
+    travel: providerTravel, questObjective: modelQuest, srdCheck: providerChecks, inventory: providerInventory,
+    commerce: providerCommerce, power: providerPowers, rest: providerRests, combatConsumable: providerConsumables,
+    combatPower: providerCombatPowers, questLifecycle: providerQuestLifecycle, progression: providerProgression,
+  }).filter((candidate) => advertisedToolNames.has(candidate.kind));
   const messages = adventurePlanningMessages({
     authorityContext: basketText,
     candidateContext:adventureCandidateContext(candidateOptions),
@@ -620,6 +766,18 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
         idempotencyKey:key("agent-decision",turn.turnId,String(recovery.round))});
       return orchestrateAdventureTurn(repository,turn.turnId,dependencies,signal);
     }catch{safeEnemyFallback(repository,snapshot,turn.turnId);return{turn:privateTurn(repository,turn.turnId),outcome:"fallback",limitations:ADVENTURE_TOOL_LIMITATIONS};}
+  }
+
+  // Every recovery and resume path has returned above, so this is a fresh planning dispatch.
+  // The adventure-selection shadow is advisory: it never selects, orders, or commits a
+  // candidate, and a lane failure is swallowed so it cannot affect the turn.
+  if (shadowCandidates.length > 0 && dependencies.getSystemOneAdventure) {
+    try {
+      const lane = await dependencies.getSystemOneAdventure();
+      if (lane) await recordAdventureShadowDecision(turn, shadowCandidates, lane);
+    } catch {
+      // Shadow evaluation is advisory and must never affect the turn.
+    }
   }
 
   while (true) {

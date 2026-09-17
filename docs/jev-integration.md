@@ -26,7 +26,9 @@ adventure-selection** and **L6 guardrails** primitives now exist with
 [guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
 gate only at a sweep-recommended 0.40 action threshold and carries an evidence-only record,
 and guardrails passes its strict gate after a measurement-driven criteria redesign and carries
-an evidence-only record. Neither is wired into a request path. **Everything remains disabled by
+an evidence-only record. Both are now wired in **shadow (record-only)**: adventure-selection
+records one decision per fresh adventure turn, and guardrails records one per room turn; neither
+has an active path. **Everything remains disabled by
 default.** This document remains
 the design and evaluation plan and does not override runtime code, shared Zod
 contracts, the [API reference](api.md), [repository architecture](repo-architecture.md),
@@ -369,7 +371,13 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   ids plus `none_of_these`. `composeAdventureSelection` requires the choice to name an
   advertised candidate and conservatively combines the choice's probability for that option
   with the `supported` probability (their minimum), so a confident pick cannot outrun the
-  "does anything match?" gate. It is **not wired** into adventure turns.
+  "does anything match?" gate. It is **wired in shadow (record-only)** into fresh adventure
+  turns behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable key, and a non-`off`
+  `adventure-selection` lane mode; an `active` mode is still record-only because no promoted
+  active path exists. The candidate union is projected from the same advertised rows the
+  provider sees (minus attribute/combat-action families), capped at 32 and bound to advertised
+  tools; travel records an explicit advisory binding string because it is not digest-bound. A
+  lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
   runs 30 labeled declaration states x 3 repeats (90 live calls). The model named a candidate
   on 54 calls and every one of those 54 picks was acceptable at every swept threshold, but the
@@ -380,7 +388,10 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   record. The threshold is selected on the same corpus that scores it, the corpus is a
   hand-labeled projection rather than a repository fixture, and the acted subset has no
   errors, so the record is a promotion candidate, not proof; the server default stays
-  0.75/0.5 and no adventure path is wired.
+  0.75/0.5. A live shadow turn on the demo server recorded a deferral against a declaration
+  ("drop my longsword") whose server binding was an `unequip` candidate — the model recognized
+  the commitment (supported ~0.48) but declined to equate the two labels, and the authoritative
+  provider path still committed the correct action; that semantic gap is a known limitation.
 
 ### L3 — Advisory narration and receipt verification
 
@@ -506,7 +517,12 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   `self_harm_signal`) plus a four-level severity `score`, and composes with precedence
   support > block > review > pass. A block requires the action threshold, so a low-confidence
   hazard can only ever recommend review, and a self-harm signal routes to support rather than
-  a block. It is **not wired** into the policy path and never blocks, rewrites, or sanitizes.
+  a block. It is **wired in shadow (record-only)** into the room-turn route behind
+  `FEATURE_SYSTEM_ONE`, the enabled setting, a usable key, and a non-`off` `guardrails` lane
+  mode; an `active` mode is still record-only because no promoted active path exists. It
+  reviews the raw user content, records one immutable decision per room turn with the hazard
+  list mirrored into `selection.flags` for the review queue, and never blocks, rewrites,
+  sanitizes, or influences routing/generation/fallbacks; a lane failure is swallowed.
 - **Evaluation.** [System One guardrails benchmark](system-one-guardrails-benchmark.md) runs
   56 labeled messages x 3 repeats (168 live calls, 75 acted). The first 40-case run acted at
   **90.5%** and missed the strict gate; every error was a false positive on fiction or meta
@@ -523,7 +539,9 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   deterministic policy checks are a permissive stub (`checkUserMessage` is allow/deny only,
   `checkCharacter` always allows, and routes sanitize before checking, so marker rejection is
   currently unreachable), so this lane must not be described as comprehensive moderation or a
-  content-safety guarantee, and it remains advisory and unwired as described above.
+  content-safety guarantee; it remains advisory and shadow-wired as described above. A live
+  room turn on the demo server recorded a benign message as `fallback`/`pass` with `shadow: 1`,
+  confirming the wiring end to end.
 - **Risk.** This changes the documented scope of the policy stub. It requires explicit
   doc updates and must not be described as comprehensive moderation.
 

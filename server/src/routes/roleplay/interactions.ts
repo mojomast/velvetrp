@@ -28,6 +28,7 @@ import { canUseSystemOne } from "../../provider/providerTransport.js";
 import { callSystemOne, type SystemOneCaller } from "../../provider/systemOneCompletion.js";
 import { buildRouterQuestions, composeRouterDecision, type RouterHandler, type RouterRequestProjection } from "../../agent/systemOneRouter.js";
 import { calibrateTopSignal } from "../../agent/systemOneCalibration.js";
+import { buildGuardrailQuestions, composeGuardrailDecision } from "../../agent/systemOneGuardrails.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "../../agent/systemOnePolicy.js";
 import { readRpgFeatureFlags } from "../../features.js";
 import { systemOneLaneMode } from "../../defaults.js";
@@ -47,6 +48,15 @@ async function resolveRoomRoutingSystemOne(): Promise<RoomRoutingSystemOne | und
   if (!readRpgFeatureFlags().systemOne) return undefined;
   const settings = await getSystemOneSettings();
   if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  return { settings, caller: callSystemOne };
+}
+
+/** Resolves the optional guardrails shadow lane from the flag, setting, key, and lane mode. */
+async function resolveGuardrailsSystemOne(): Promise<{ settings: SystemOneSettings; caller: SystemOneCaller } | undefined> {
+  if (!readRpgFeatureFlags().systemOne) return undefined;
+  const settings = await getSystemOneSettings();
+  if (!settings.enabled || !canUseSystemOne(settings)) return undefined;
+  if (systemOneLaneMode(settings, "guardrails") === "off") return undefined;
   return { settings, caller: callSystemOne };
 }
 
@@ -122,6 +132,72 @@ export async function recordRouterShadowDecision(
         reason: decision.reason,
       },
       confidenceBand: decision.band,
+      fallbackUsed: true,
+      shadow: true,
+      usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
+      latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      createdAt: new Date().toISOString(),
+    });
+  } catch {
+    // Advisory shadow recording: never affects routing, generation, or the response.
+  }
+}
+
+/** One record-only guardrail review of raw room-turn content. */
+export interface GuardrailShadowInput {
+  /** The raw user content before sanitization, so injection markers stay visible to the model. */
+  content: string;
+  sessionId?: string | null;
+  campaignId?: string | null;
+  turnId?: string | null;
+  /** Declared boundaries already in scope at the call site, when the route has them. */
+  declaredBoundaries?: readonly string[];
+}
+
+/**
+ * Records a record-only guardrails shadow decision. It builds the L6 guardrail battery over
+ * the raw user content, asks the injected caller, composes against the lane's confidence
+ * policy, and persists one immutable `guardrails` row. It is advisory: it never blocks,
+ * rewrites, or sanitizes anything, never throws, and never influences routing, generation,
+ * fallbacks, or the response. The deterministic policy checks remain authoritative.
+ */
+export async function recordGuardrailShadowDecision(
+  settings: SystemOneSettings,
+  caller: SystemOneCaller,
+  input: GuardrailShadowInput,
+): Promise<void> {
+  try {
+    if (systemOneLaneMode(settings, "guardrails") === "off") return;
+    const boundaries = (input.declaredBoundaries ?? []).map((line) => line.trim()).filter(Boolean);
+    const state = boundaries.length > 0
+      ? { message: input.content, declaredBoundaries: boundaries }
+      : { message: input.content };
+    const questions = buildGuardrailQuestions(state);
+    const startedAt = performance.now();
+    const result = await caller({ settings, state, questions });
+    const composition = composeGuardrailDecision(result.answers, settings.confidencePolicy["guardrails"]);
+    recordSystemOneDecision({
+      decisionId: randomUUID(),
+      lane: "guardrails",
+      campaignId: input.campaignId ?? null,
+      sessionId: input.sessionId ?? null,
+      turnId: input.turnId ?? null,
+      provider: "typesafe",
+      model: result.model.responseModel ?? settings.model,
+      confidencePolicyVersion: SYSTEM_ONE_CONFIDENCE_POLICY_VERSION,
+      state,
+      questions,
+      answers: result.answers,
+      // The recorded confidence is calibrated for observability; the band is decided on raw signals.
+      selection: {
+        disposition: composition.disposition,
+        hazards: composition.hazards,
+        signals: composition.signals,
+        topSignal: calibrateTopSignal(composition.topSignal, settings.confidenceCalibration["guardrails"]),
+        severity: composition.severity,
+        flags: composition.hazards,
+      },
+      confidenceBand: composition.band,
       fallbackUsed: true,
       shadow: true,
       usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
@@ -272,6 +348,18 @@ export const roleplayInteractionRoutes: FastifyPluginAsync = async (app) => {
         } catch {
           // Advisory shadow routing: never affects routing, generation, fallbacks, or the response.
         }
+      }
+      // The guardrails lane reviews the raw content so injection markers stay visible to the model.
+      try {
+        const guardrailsSystemOne = await resolveGuardrailsSystemOne();
+        if (guardrailsSystemOne) {
+          await recordGuardrailShadowDecision(guardrailsSystemOne.settings, guardrailsSystemOne.caller, {
+            content: rawContent,
+            sessionId: session.id,
+          });
+        }
+      } catch {
+        // Advisory shadow guardrails: never affects routing, generation, fallbacks, or the response.
       }
 
       const userMessage = await addMessage(session.id, "user", content);

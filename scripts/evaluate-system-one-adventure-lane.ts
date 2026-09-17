@@ -18,7 +18,10 @@
  * named at a fixed grid of lower bars and reports a recommended action threshold. The lane's
  * shipped threshold remains the server default; the recommendation is an evaluation finding.
  *
- * The lane is advisory and unwired: composition is recorded for evaluation only. It never adds,
+ * The lane is wired in shadow (record-only) behind the `FEATURE_SYSTEM_ONE` flag, the enabled
+ * setting, a usable key, and a non-`off` lane mode. It records one immutable shadow decision per
+ * fresh adventure turn that advertises candidates and never selects, orders, or commits anything;
+ * an `active` lane mode stays record-only because no promoted active path exists. It never adds,
  * drops, or authorizes a candidate; ids and digests are already server-issued, and the existing
  * digest re-validation and command bridge remain authoritative.
  *
@@ -579,7 +582,7 @@ export function renderAdventureBenchmark(input: {
   lines.push("");
   lines.push("## What this measures");
   lines.push("");
-  lines.push("The L2 lane is an **advisory, unwired exact-candidate selector**. `buildAdventureSelectionQuestions`");
+  lines.push("The L2 lane is an **advisory exact-candidate selector, wired in shadow (record-only)**. `buildAdventureSelectionQuestions`");
   lines.push("builds one fusion-free single battery over the union of the turn's advertised candidates: a");
   lines.push("`supported` noul (\"does the declaration clearly describe committing exactly one advertised");
   lines.push("candidate?\"), one per-candidate relevance `score`, and one aggregate `best_candidate`");
@@ -587,7 +590,10 @@ export function renderAdventureBenchmark(input: {
   lines.push("`composeAdventureSelection` requires the aggregate choice to name an advertised candidate and");
   lines.push("combines the chosen option's probability with the `supported` noul as the minimum of the two");
   lines.push("independent claims; `act` selects, `confirm` records a lower-confidence selection, and anything");
-  lines.push("below defers. The composition is recorded for evaluation only — no runtime path consumes it.");
+  lines.push("below defers. The lane is **wired in shadow (record-only)** behind the `FEATURE_SYSTEM_ONE` feature flag,");
+  lines.push("the enabled setting, a usable key, and a non-`off` lane mode: it records one immutable shadow decision");
+  lines.push("per fresh adventure turn that advertises candidates and never selects, orders, or commits anything. An");
+  lines.push("`active` lane mode is still record-only because no promoted active path exists.");
   lines.push("");
   lines.push("The lane **never adds, drops, or authorizes a candidate**: candidate ids and digests are already");
   lines.push("server-issued, selection is exact-candidate only, and the existing digest re-validation and");
@@ -610,7 +616,7 @@ export function renderAdventureBenchmark(input: {
   lines.push("| --- | --- |");
   lines.push(`| Model | ${model} |`);
   lines.push(`| Base URL | ${baseUrl} |`);
-  lines.push(`| Lane | \`${PROMOTION_LANE}\` (advisory, unwired shadow; no active path) |`);
+  lines.push(`| Lane | \`${PROMOTION_LANE}\` (advisory, shadow-wired record-only; no promoted active path) |`);
   lines.push(`| Confidence thresholds (action / review) | ${thresholds.actionThreshold} / ${thresholds.reviewThreshold} |`);
   lines.push(`| Action-threshold sweep grid | ${sweep.grid.map((value) => value.toFixed(2)).join(", ")} |`);
   lines.push("| Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |");
@@ -754,8 +760,10 @@ export function renderAdventureBenchmark(input: {
   lines.push("- The recommended threshold is selected on the same labeled corpus that scores its verdict, so");
   lines.push("  that verdict is **descriptive, not a held-out guarantee**; the Platt map is still fit on");
   lines.push("  development acted decisions only. The server default stays until the parent decides otherwise.");
-  lines.push("- The lane is **unwired**: composition is recorded for evaluation only, and any promotion record");
-  lines.push("  this run justifies is evidence, not activation.");
+  lines.push("- The lane is **wired in shadow (record-only)**: it records one immutable decision per fresh");
+  lines.push("  adventure turn that advertises candidates and never selects, orders, or commits. Any promotion");
+  lines.push("  record this run justifies is evidence, not activation; an `active` lane mode still stays");
+  lines.push("  record-only until a promoted active path exists.");
   lines.push("- Decisive accuracy is an **asserted-subset figure**: it counts membership in the case's");
   lines.push("  acceptable set, which is a judgment call. Exact-preferred agreement and the per-case table are");
   lines.push("  reported alongside it, and the gate is scored only on acted decisions.");

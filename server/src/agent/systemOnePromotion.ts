@@ -205,8 +205,9 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     // sweep's recommended action threshold 0.40 (which also requires reviewThreshold <= 0.40)
     // the gate passes: 54 acted, 100% accuracy, calibrated Brier 0.0002, ECE 0.0109. The
     // threshold is selected on the same corpus that scores it and the acted subset has no
-    // errors, so this is a promotion candidate, not proof. The server default stays 0.75/0.5,
-    // and no adventure path is wired, so the record is evidence, not activation.
+    // errors, so this is a promotion candidate, not proof. The server default stays 0.75/0.5.
+    // The lane is wired in shadow (record-only) into fresh adventure turns, so the record is
+    // evidence, not activation.
     metrics: { samples: 54, accuracy: 1, brier: 0.0002, expectedCalibrationError: 0.0109 },
     calibration: { a: 1.6042, b: 4.0926 },
     promotedAt: "2026-09-17",
@@ -234,8 +235,9 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     // measurement (override addresses the assistant itself, disclosure demands protected
     // material rather than story hints, severity judges the real user rather than fictional
     // drama), and the expanded corpus then caught every hazard with no benign/fiction
-    // escalation. The acted subset has no errors, so the calibration tail is untested. No
-    // policy path is wired, so this record is evidence, not activation.
+    // escalation. The acted subset has no errors, so the calibration tail is untested. The lane
+    // is wired in shadow (record-only) into the room-turn route, so the record is evidence, not
+    // activation.
     metrics: { samples: 75, accuracy: 1, brier: 0, expectedCalibrationError: 0.0022 },
     calibration: { a: 2.1254, b: 0.655 },
     promotedAt: "2026-09-17",
