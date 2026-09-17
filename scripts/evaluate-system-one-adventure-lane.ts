@@ -18,6 +18,10 @@
  * named at a fixed grid of lower bars and reports a recommended action threshold. The lane's
  * shipped threshold remains the server default; the recommendation is an evaluation finding.
  *
+ * The run also merges confirmed harvested cases from the parent-owned fixture when one exists (so
+ * live-derived labels join the gate with their provenance flagged) and reports a decision-stability
+ * roll-up (repeat agreement, conflicts, signal variance) beside accuracy.
+ *
  * The lane is wired in shadow (record-only) behind the `FEATURE_SYSTEM_ONE` flag, the enabled
  * setting, a usable key, and a non-`off` lane mode. It records one immutable shadow decision per
  * fresh adventure turn that advertises candidates and never selects, orders, or commits anything;
@@ -30,7 +34,7 @@
  * Usage:
  *   TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-adventure-lane.ts [--repeat 3] [--out docs/system-one-adventure-benchmark.md]
  */
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -61,6 +65,13 @@ import {
   type ThresholdSample,
   type ThresholdSelection,
 } from "../server/src/agent/systemOneThreshold.js";
+import type { HarvestProposal } from "../server/src/agent/systemOneHarvest.js";
+import {
+  stabilityUid,
+  summarizeStability,
+  type StabilitySample,
+  type StabilitySummary,
+} from "../server/src/agent/systemOneStability.js";
 import { DEFAULT_SYSTEM_ONE_THRESHOLDS, defaultSystemOneSettings } from "../server/src/defaults.js";
 import { completeWithSystemOne, type SystemOneAnswer } from "../server/src/provider/systemOneCompletion.js";
 import type { SystemOneConfidenceThresholds } from "../server/src/types.js";
@@ -76,6 +87,12 @@ const DEFAULT_OUT = "docs/system-one-adventure-benchmark.md";
 const PROMOTION_LANE = "adventure-selection" as const;
 const EVIDENCE = DEFAULT_OUT;
 const LANE_GATE = DEFAULT_SYSTEM_ONE_LANE_GATES[PROMOTION_LANE];
+
+/** The parent-owned confirmed-harvest fixture; absent until a harvest run writes one. */
+export const HARVEST_FIXTURE = "server/test/fixtures/system-one-harvested/adventure-selection.json";
+const HARVEST_FIXTURE_PATH = path.resolve(ROOT, HARVEST_FIXTURE);
+/** Harvested case ids carry this prefix so the report can mark live-derived labels. */
+export const HARVEST_ID_PREFIX = "harvested:";
 
 /**
  * The server default action threshold (`DEFAULT_SYSTEM_ONE_THRESHOLDS.actionThreshold`, currently
@@ -453,9 +470,227 @@ export function evaluateAdventureReadouts(
   };
 }
 
+/** One `StabilitySample` per graded call: the pick the call named (composed or recovered), else `defer`. */
+export function adventureStabilitySamples(readouts: readonly AdventureReadout[]): StabilitySample[] {
+  return readouts.map((readout) => ({
+    caseId: readout.id,
+    decision: readout.candidateId ?? "defer",
+    signal: readout.topSignal,
+  }));
+}
+
+/**
+ * Repeatability roll-up over the graded calls. Pure. Stability is repeatability, not accuracy: a
+ * case that defers on every repeat is stable and still a coverage miss.
+ */
+export function summarizeAdventureStability(readouts: readonly AdventureReadout[]): StabilitySummary {
+  return summarizeStability(adventureStabilitySamples(readouts));
+}
+
+/** How a corpus row entered this run: the frozen projection corpus or a confirmed live harvest. */
+export type AdventureCaseProvenance = "frozen" | "harvested";
+
+/** The parent-owned confirmed-harvest fixture shape (`version: 1`). Proposals are validated defensively. */
+export interface AdventureHarvestFixture {
+  version: number;
+  lane: string;
+  generatedAt: string;
+  proposals: HarvestProposal[];
+}
+
+/** The cases a confirmed harvest contributes, and how many confirmed proposals could not be mapped. */
+export interface HarvestedAdventureMerge {
+  cases: AdventureEvalCase[];
+  /** Confirmed proposals for this lane found in the input. */
+  confirmed: number;
+  /** Confirmed proposals skipped because their state or expected value was unusable. */
+  skipped: number;
+}
+
+/** The merged harvest plus whether the fixture existed and why it may have been unusable. */
+export interface HarvestedAdventureCases extends HarvestedAdventureMerge {
+  /** True when the fixture file existed (even if malformed). */
+  present: boolean;
+  /** A clear warning when the fixture existed but was unusable; null when it loaded or was absent. */
+  warning: string | null;
+}
+
+/** What the report needs to show the gate included live-derived labels. */
+export interface AdventureHarvestReport {
+  fixture: string;
+  present: boolean;
+  confirmed: number;
+  skipped: number;
+  /** Merged harvested cases that actually ran. */
+  cases: number;
+  warning: string | null;
+}
+
+const EMPTY_HARVEST: AdventureHarvestReport = {
+  fixture: HARVEST_FIXTURE,
+  present: false,
+  confirmed: 0,
+  skipped: 0,
+  cases: 0,
+  warning: null,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** The lane-relevant slice of a proposal, defensively validated from parsed JSON. */
+interface HarvestedProposalShape {
+  proposalId: string;
+  lane: string;
+  status: string;
+  state: unknown;
+  expected: unknown;
+}
+
+function harvestProposalShape(value: unknown): HarvestedProposalShape | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.proposalId !== "string" || !value.proposalId.trim()) return null;
+  if (typeof value.lane !== "string" || typeof value.status !== "string") return null;
+  return {
+    proposalId: value.proposalId,
+    lane: value.lane,
+    status: value.status,
+    state: value.state,
+    expected: value.expected ?? null,
+  };
+}
+
+function harvestedCandidates(value: unknown): AdventureSelectionCandidate[] | null {
+  if (!Array.isArray(value)) return null;
+  const candidates: AdventureSelectionCandidate[] = [];
+  for (const entry of value) {
+    const record = isRecord(entry) ? entry : null;
+    if (!record
+      || typeof record.candidateId !== "string" || !record.candidateId.trim()
+      || typeof record.digest !== "string" || !record.digest.trim()
+      || typeof record.kind !== "string" || !record.kind.trim()
+      || typeof record.label !== "string" || !record.label.trim()) return null;
+    candidates.push({ candidateId: record.candidateId, digest: record.digest, kind: record.kind, label: record.label });
+  }
+  return candidates;
+}
+
+/**
+ * Maps one confirmed adventure-selection proposal onto a corpus case, or null when its state or
+ * expected value is unusable. `expected = { candidateId: null }` is a confirmed defer label and
+ * becomes a defer-expected case; a non-null id must name an advertised candidate. Harvested
+ * digests are the recorded advisory bindings (travel rows are not digest-bound), so these cases
+ * are evidence only and are never re-validated or executed.
+ */
+function adventureCaseFromHarvest(proposal: HarvestedProposalShape): AdventureEvalCase | null {
+  const state = isRecord(proposal.state) ? proposal.state : null;
+  if (!state || typeof state.declaration !== "string" || !state.declaration.trim()) return null;
+  const candidates = harvestedCandidates(state.candidates);
+  if (candidates === null) return null;
+  const expected = isRecord(proposal.expected) ? proposal.expected : null;
+  if (!expected || !("candidateId" in expected)) return null;
+  const candidateId = expected.candidateId;
+  if (candidateId !== null && typeof candidateId !== "string") return null;
+  if (candidateId !== null && !candidates.some((candidate) => candidate.candidateId === candidateId)) return null;
+  return {
+    id: `${HARVEST_ID_PREFIX}${proposal.proposalId.slice(0, 12)}`,
+    category: "harvested",
+    declaration: state.declaration.trim(),
+    candidates,
+    expected: { preferred: candidateId, acceptable: [candidateId] },
+    holdout: false,
+  };
+}
+
+/**
+ * Merges confirmed adventure-selection proposals from a parsed fixture. Non-confirmed and
+ * foreign-lane proposals are ignored; confirmed proposals with a null or malformed expected value
+ * (or an unusable state) are counted in `skipped`. Duplicate ids keep the first case.
+ */
+export function mergeHarvestedAdventureCases(proposals: readonly unknown[]): HarvestedAdventureMerge {
+  const cases: AdventureEvalCase[] = [];
+  const seen = new Set<string>();
+  let confirmed = 0;
+  let skipped = 0;
+  for (const value of proposals) {
+    const proposal = harvestProposalShape(value);
+    if (!proposal || proposal.lane !== PROMOTION_LANE || proposal.status !== "confirmed") continue;
+    confirmed += 1;
+    const testCase = adventureCaseFromHarvest(proposal);
+    if (!testCase || seen.has(testCase.id)) {
+      skipped += 1;
+      continue;
+    }
+    seen.add(testCase.id);
+    cases.push(testCase);
+  }
+  return { cases, confirmed, skipped };
+}
+
+/**
+ * Parses the parent-owned harvest fixture text. A malformed fixture never throws: it yields zero
+ * cases and a clear warning the caller can print and report.
+ */
+export function parseHarvestedAdventureCases(text: string): HarvestedAdventureCases {
+  const unusable = (warning: string): HarvestedAdventureCases => ({
+    cases: [],
+    confirmed: 0,
+    skipped: 0,
+    present: true,
+    warning,
+  });
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    return unusable(`harvested fixture is not valid JSON: ${messageOf(error)}`);
+  }
+  if (!isRecord(value) || !Array.isArray(value.proposals)) {
+    return unusable("harvested fixture must be an object with a proposals array");
+  }
+  if (value.version !== 1) {
+    return unusable(`unsupported harvested fixture version: ${String(value.version)}`);
+  }
+  if (value.lane !== PROMOTION_LANE) {
+    return unusable(`harvested fixture lane is ${String(value.lane)}, expected ${PROMOTION_LANE}`);
+  }
+  return { ...mergeHarvestedAdventureCases(value.proposals), present: true, warning: null };
+}
+
+/**
+ * Reads the confirmed harvest fixture. Absence is normal (no harvest yet) and yields zero cases
+ * with no warning; any other read or parse failure is reported as a warning and skipped so the
+ * live benchmark never fails because of the fixture.
+ */
+export async function loadHarvestedAdventureCases(filePath: string = HARVEST_FIXTURE_PATH): Promise<HarvestedAdventureCases> {
+  let text: string;
+  try {
+    text = await readFile(filePath, "utf8");
+  } catch (error) {
+    if (isRecord(error) && error.code === "ENOENT") {
+      return { cases: [], confirmed: 0, skipped: 0, present: false, warning: null };
+    }
+    return {
+      cases: [],
+      confirmed: 0,
+      skipped: 0,
+      present: true,
+      warning: `harvested fixture could not be read: ${messageOf(error)}`,
+    };
+  }
+  return parseHarvestedAdventureCases(text);
+}
+
 export interface AdventureCaseSummary {
   id: string;
   category: AdventureEvalCategory;
+  /** `harvested` rows are confirmed live-derived labels included in the run and the gate. */
+  provenance: AdventureCaseProvenance;
   holdout: boolean;
   /** The case's single preferred call, or null when it should defer. */
   expected: string | null;
@@ -472,12 +707,13 @@ export interface AdventureCaseSummary {
   meanSignal: number;
 }
 
-/** Per-case roll-up over repeats, for the report table. */
+/** Per-case roll-up over repeats, for the report table. `cases` defaults to the frozen corpus. */
 export function summarizeAdventureCases(
   readouts: readonly AdventureReadout[],
   failures: readonly { id: string }[] = [],
+  cases: readonly AdventureEvalCase[] = ADVENTURE_EVAL_CASES,
 ): AdventureCaseSummary[] {
-  return ADVENTURE_EVAL_CASES.map((testCase) => {
+  return cases.map((testCase) => {
     const rows = readouts.filter((readout) => readout.id === testCase.id);
     const bands: Record<SystemOneBand, number> = { act: 0, confirm: 0, fallback: 0 };
     const selections: Record<string, number> = {};
@@ -495,6 +731,7 @@ export function summarizeAdventureCases(
     return {
       id: testCase.id,
       category: testCase.category,
+      provenance: testCase.id.startsWith(HARVEST_ID_PREFIX) ? "harvested" : "frozen",
       holdout: testCase.holdout,
       expected: testCase.expected.preferred,
       calls: rows.length,
@@ -546,11 +783,20 @@ export function renderAdventureBenchmark(input: {
   evaluation: AdventureEvaluation;
   proposedRecord: SystemOnePromotionRecord | null;
   out: string;
+  /** The cases this run evaluated: the frozen corpus plus any merged harvested cases. */
+  cases?: readonly AdventureEvalCase[];
+  /** Confirmed-harvest provenance for the report; omit when no fixture was considered. */
+  harvest?: AdventureHarvestReport;
 }): string {
   const { generatedAt, model, baseUrl, repeats, thresholds, readouts, failures, evaluation, proposedRecord, out } = input;
+  const cases = input.cases ?? ADVENTURE_EVAL_CASES;
+  const harvest = input.harvest ?? EMPTY_HARVEST;
   const { calibration, gate, sweep } = evaluation;
-  const summaries = summarizeAdventureCases(readouts, failures);
-  const totalCalls = ADVENTURE_EVAL_CASES.length * repeats;
+  const summaries = summarizeAdventureCases(readouts, failures, cases);
+  const totalCalls = cases.length * repeats;
+  const stability = summarizeAdventureStability(readouts);
+  const stabilityConflicts = stability.cases.filter((entry) => entry.conflicted);
+  const stdText = (value: number | null): string => (value === null ? "n/a" : value.toFixed(4));
   const jsonPath = out.replace(/\.md$/, ".json");
   const bands: Record<SystemOneBand, number> = { act: 0, confirm: 0, fallback: 0 };
   for (const readout of readouts) bands[readout.band] += 1;
@@ -561,7 +807,7 @@ export function renderAdventureBenchmark(input: {
   const deferralsAcceptable = deferrals.filter((readout) => readout.correct).length;
   const actedMisses = acted.filter((readout) => !readout.correct);
   const actedAlternatives = acted.filter((readout) => !readout.selectedCorrect && readout.correct);
-  const holdout = ADVENTURE_EVAL_CASES.filter((testCase) => testCase.holdout).length;
+  const holdout = cases.filter((testCase) => testCase.holdout).length;
   const namedReadouts = readouts.filter(
     (readout): readout is AdventureReadout & { candidateId: string; topSignal: number } =>
       readout.candidateId !== null && readout.topSignal !== null && Number.isFinite(readout.topSignal),
@@ -621,19 +867,30 @@ export function renderAdventureBenchmark(input: {
   lines.push(`| Action-threshold sweep grid | ${sweep.grid.map((value) => value.toFixed(2)).join(", ")} |`);
   lines.push("| Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |");
   lines.push(`| Repeats | ${repeats} |`);
-  lines.push(`| Corpus | ${ADVENTURE_EVAL_CASES.length} declarations x ${repeats} repeats = ${totalCalls} calls |`);
-  lines.push(`| Holdout | ${holdout} case(s) held out of the Platt fit (${ADVENTURE_EVAL_CASES.length - holdout} development) |`);
+  lines.push(`| Corpus | ${cases.length} declarations x ${repeats} repeats = ${totalCalls} calls |`);
+  lines.push(`| Holdout | ${holdout} case(s) held out of the Platt fit (${cases.length - holdout} development) |`);
+  lines.push(`| Harvested cases | ${harvest.cases} confirmed merged, ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
   lines.push("");
+  if (harvest.warning) {
+    lines.push(`> **Harvest warning:** ${harvest.warning} Those proposals are skipped; the run continues.`);
+    lines.push("");
+  }
   lines.push("## Corpus and per-case results");
   lines.push("");
-  lines.push("| Case | Category | Split | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |");
-  lines.push("| --- | --- | :---: | --- | ---: | ---: | ---: | ---: | ---: | --- |");
+  if (harvest.cases > 0 || harvest.confirmed > 0) {
+    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: confirmed live-derived labels from`);
+    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). They run through the same composition,`);
+    lines.push("calibration, and threshold logic as the frozen corpus, so the gate metrics below include them.");
+    lines.push("");
+  }
+  lines.push("| Case | Category | Split | Provenance | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |");
+  lines.push("| --- | --- | :---: | :---: | --- | ---: | ---: | ---: | ---: | ---: | --- |");
   for (const summary of summaries) {
     const outcomes = Object.entries(summary.selections)
       .sort(([left], [right]) => (left === "defer" ? -1 : right === "defer" ? 1 : left.localeCompare(right)))
       .map(([outcome, count]) => `${outcome} ${count}`)
       .join(", ");
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`);
+    lines.push(`| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${summary.provenance} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`);
   }
   lines.push("");
   if (failures.length > 0) {
@@ -641,6 +898,29 @@ export function renderAdventureBenchmark(input: {
     for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
     lines.push("");
   }
+  lines.push("## Decision stability");
+  lines.push("");
+  lines.push("Repeated draws of the same case should produce the same decision. `decision` is the candidate each");
+  lines.push("call named (the composed pick, or the raw pick recovered from a deferral), else `defer`; every");
+  lines.push("repeat carries a deterministic throwaway `uid` in the request state so the draws are decorrelated.");
+  lines.push("");
+  lines.push("| Metric | Value |");
+  lines.push("| --- | ---: |");
+  lines.push(`| Mean agreement | ${stability.cases.length === 0 ? "n/a" : pct(stability.meanAgreement)} |`);
+  lines.push(`| Conflict cases | ${stability.conflictCases} of ${stability.cases.length} (${pct(stability.conflictRate)}) |`);
+  lines.push(`| Mean signal std dev | ${stdText(stability.meanSignalStdDev)} |`);
+  lines.push(`| Max signal std dev | ${stdText(stability.maxSignalStdDev)} |`);
+  lines.push("");
+  if (stabilityConflicts.length > 0) {
+    lines.push("Conflicted cases:");
+    for (const entry of stabilityConflicts.slice(0, 10)) {
+      lines.push(`- \`${entry.caseId}\` (agreement ${pct(entry.agreement)}): ${entry.decisions.join(" / ")}`);
+    }
+    lines.push("");
+  }
+  lines.push("Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still");
+  lines.push("a coverage miss, and a conflicted case may still have every individual pick labeled acceptable.");
+  lines.push("");
   lines.push("## Threshold sweep");
   lines.push("");
   lines.push(`The lane composes at the server default action threshold **${defaultThresholdText}**. The sweep re-scores the`);
@@ -767,6 +1047,9 @@ export function renderAdventureBenchmark(input: {
   lines.push("- Decisive accuracy is an **asserted-subset figure**: it counts membership in the case's");
   lines.push("  acceptable set, which is a judgment call. Exact-preferred agreement and the per-case table are");
   lines.push("  reported alongside it, and the gate is scored only on acted decisions.");
+  lines.push("- **Decision stability is repeatability, not accuracy**: a consistently deferred case is stable and");
+  lines.push("  still a coverage miss. Harvested rows are live-derived labels and are flagged as such in the");
+  lines.push("  corpus table so a reviewer can see the gate includes them.");
   lines.push(`- The \`${PROMOTION_LANE}\` gate is the base lane gate (accuracy >= ${LANE_GATE.minAccuracy}, Brier/ECE <= ${LANE_GATE.maxBrier}). The verdict above is reported as measured, including any failures.`);
   lines.push("- Only schema-valid calls produce compositions; transport failures are reported separately and");
   lines.push("  never counted as acted samples.");
@@ -811,18 +1094,36 @@ async function main(): Promise<void> {
   const thresholds = settings.confidencePolicy[PROMOTION_LANE];
   const promotedAt = new Date().toISOString().slice(0, 10);
 
+  const harvest = await loadHarvestedAdventureCases();
+  if (harvest.warning) console.warn(`harvested fixture warning: ${harvest.warning}`);
+  const harvestReport: AdventureHarvestReport = {
+    fixture: HARVEST_FIXTURE,
+    present: harvest.present,
+    confirmed: harvest.confirmed,
+    skipped: harvest.skipped,
+    cases: harvest.cases.length,
+    warning: harvest.warning,
+  };
+  const cases = [...ADVENTURE_EVAL_CASES, ...harvest.cases];
+
   const readouts: AdventureReadout[] = [];
   const failures: AdventureBenchmarkFailure[] = [];
   let model = settings.model;
-  console.log(`evaluating ${ADVENTURE_EVAL_CASES.length} adventure declarations x ${repeats} repeats against ${settings.model}`);
+  console.log(`evaluating ${cases.length} adventure declarations (${harvest.cases.length} harvested) x ${repeats} repeats against ${settings.model}`);
+  console.log(`harvested cases: ${harvest.cases.length}${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
 
-  for (const testCase of ADVENTURE_EVAL_CASES) {
+  for (const testCase of cases) {
     const questions = buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates);
     for (let repeat = 1; repeat <= repeats; repeat += 1) {
       try {
         const result = await completeWithSystemOne({
           settings,
-          state: { declaration: testCase.declaration, candidateCount: testCase.candidates.length },
+          state: {
+            declaration: testCase.declaration,
+            candidateCount: testCase.candidates.length,
+            // Throwaway decorrelator for repeated draws (vendor consistency-cookbook trick).
+            uid: stabilityUid(PROMOTION_LANE, testCase.id, repeat),
+          },
           questions,
         });
         model = result.model.responseModel ?? model;
@@ -847,6 +1148,7 @@ async function main(): Promise<void> {
   }
 
   const evaluation = evaluateAdventureReadouts(readouts, promotedAt, thresholds.actionThreshold);
+  const stability = summarizeAdventureStability(readouts);
   const report = renderAdventureBenchmark({
     generatedAt: new Date().toISOString(),
     model,
@@ -858,6 +1160,8 @@ async function main(): Promise<void> {
     evaluation,
     proposedRecord: evaluation.proposedRecord,
     out,
+    cases,
+    harvest: harvestReport,
   });
   await writeFile(outPath, report, "utf8");
   await writeFile(outPath.replace(/\.md$/, ".json"), `${JSON.stringify({
@@ -865,10 +1169,13 @@ async function main(): Promise<void> {
     baseUrl: settings.baseUrl,
     repeats,
     thresholds,
-    corpus: ADVENTURE_EVAL_CASES,
-    samples: ADVENTURE_EVAL_CASES.length * repeats,
+    corpus: cases,
+    samples: cases.length * repeats,
+    harvestedCases: harvest.cases.length,
+    harvest: harvestReport,
     failures,
     readouts,
+    stability,
     calibration: evaluation.calibration,
     gate: evaluation.gate,
     sweep: evaluation.sweep,
@@ -881,6 +1188,7 @@ async function main(): Promise<void> {
   console.log(`gate default: ${evaluation.gate.promoted ? "PROMOTE" : "NOT READY"}${evaluation.gate.reasons.length ? ` (${evaluation.gate.reasons.join("; ")})` : ""}`);
   console.log(`gate recommended: ${recommended ? `${recommended.gate.promoted ? "PROMOTE" : "NOT READY"}${recommended.gate.reasons.length ? ` (${recommended.gate.reasons.join("; ")})` : ""}` : "n/a"}`);
   console.log(`brier: default ${evaluation.calibration.allCalibrated.brier.toFixed(4)}${recommended ? ` -> recommended ${recommended.calibration.allCalibrated.brier.toFixed(4)}` : ""}`);
+  console.log(`stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`);
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 

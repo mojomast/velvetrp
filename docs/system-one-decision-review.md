@@ -108,7 +108,9 @@ To turn a verdict into training signal, copy the candidate's `lane`, `state`, an
 corpus or the narration benchmark — as a labeled negative example, then re-run the lane's
 evaluation. The promotion gate scores the calibrated signal against the updated corpus, so
 the added error cases tighten the calibration that gates `active` mode. This is the
-intended loop for adding the acted errors the existing corpora lack.
+intended loop for adding the acted errors the existing corpora lack. The
+[System One harvest loop](system-one-harvest-loop.md) automates the proposal step, including an
+optional lane-specific `expected` correction, while keeping unconfirmed proposals out of every gate.
 
 ## Offline tests
 

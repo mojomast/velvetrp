@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "lane": "guardrails",
+  "generatedAt": "2026-09-17T17:15:01.985Z",
+  "proposals": [
+    {
+      "proposalId": "3a841346846e52440cbd251358c61fc833ae9ae40ea893db05e58056e62280bf",
+      "lane": "guardrails",
+      "sourceDecisionId": "3a233ca6-47ae-4aae-a2ee-e4fe95279055",
+      "createdAt": "2026-09-17T15:27:55.442Z",
+      "provenance": "review-annotated",
+      "status": "confirmed",
+      "state": {
+        "message": "Who should inspect the signal?"
+      },
+      "expected": {
+        "disposition": "pass"
+      },
+      "reason": "human review confirmed the recorded guardrails decision"
+    }
+  ]
+}

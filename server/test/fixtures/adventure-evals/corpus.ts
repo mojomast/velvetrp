@@ -19,14 +19,15 @@ import type { AdventureSelectionCandidate } from "../../../src/agent/systemOneAd
  */
 export const ADVENTURE_EVAL_CORPUS_VERSION = "adventure-evals-v1" as const;
 
-/** The distinct failure modes the L2 lane must separate. */
+/** The distinct failure modes the L2 lane must separate, plus live-derived harvested cases. */
 export type AdventureEvalCategory =
   | "direct-match"
   | "ambiguous"
   | "multi-family"
   | "unsupported"
   | "unadvertised"
-  | "small-talk";
+  | "small-talk"
+  | "harvested";
 
 /** One hand-labeled declaration projected against the candidates a turn advertised. */
 export interface AdventureEvalCase {

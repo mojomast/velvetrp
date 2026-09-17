@@ -198,18 +198,20 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
     evidence: "docs/system-one-director-calibration.md",
   },
   "adventure-selection": {
-    // scripts/evaluate-system-one-adventure-lane.ts: 90 live calls over a 30-case hand-labeled
-    // projection corpus. The model named a candidate on 54 calls and all 54 picks were
-    // acceptable at every swept threshold; the raw signals (0.42-0.69) sat below the server
-    // default 0.75, the same systematic under-confidence the Director lane measured. At the
-    // sweep's recommended action threshold 0.40 (which also requires reviewThreshold <= 0.40)
-    // the gate passes: 54 acted, 100% accuracy, calibrated Brier 0.0002, ECE 0.0109. The
-    // threshold is selected on the same corpus that scores it and the acted subset has no
-    // errors, so this is a promotion candidate, not proof. The server default stays 0.75/0.5.
-    // The lane is wired in shadow (record-only) into fresh adventure turns, so the record is
-    // evidence, not activation.
-    metrics: { samples: 54, accuracy: 1, brier: 0.0002, expectedCalibrationError: 0.0109 },
-    calibration: { a: 1.6042, b: 4.0926 },
+    // scripts/evaluate-system-one-adventure-lane.ts, re-derived after the first harvest-loop pass:
+    // 93 live calls over 30 frozen hand-labeled cases plus 1 confirmed harvested live case, at 3
+    // repeats with the vendor's uid decorrelator in state. The lane named a candidate on 54 calls
+    // and all 54 picks were acceptable; at the sweep's recommended action threshold 0.55 (which
+    // also requires reviewThreshold <= 0.55) the gate passes: 54 acted, 100% accuracy, calibrated
+    // Brier 0.0001, ECE 0.0092 (held-out 0.0117). Decision stability was 100% (0/31 conflicted
+    // cases; mean per-case signal std dev 0.0135, max 0.0531). The harvested live case is a
+    // stable miss: the lane defers on "drop my longsword" although the server bound an unequip
+    // candidate, 3/3 repeats. The threshold is selected on the same corpus that scores it and the
+    // acted subset has no errors, so this is a promotion candidate, not proof; the server default
+    // stays 0.75/0.5. The lane is wired in shadow (record-only) into fresh adventure turns, so
+    // the record is evidence, not activation.
+    metrics: { samples: 54, accuracy: 1, brier: 0.0001, expectedCalibrationError: 0.0092 },
+    calibration: { a: 2.5171, b: 3.0141 },
     promotedAt: "2026-09-17",
     evidence: "docs/system-one-adventure-benchmark.md",
   },

@@ -119,7 +119,7 @@ describe("System One adventure-selection shadow lane", () => {
       campaignId: shadow.result.turn.campaignId, sessionId: shadow.result.turn.sessionId });
     // The model reasoned over exactly the persisted state, and the union is the advertised bounded set.
     expect(caller.calls[0]!.state).toEqual(decision.state);
-    const state = JSON.parse(decision.state as string) as { declaration: string; candidates: Array<Record<string, unknown>> };
+    const state = decision.state as { declaration: string; candidates: Array<Record<string, unknown>> };
     expect(state.declaration).toBe("I complete the gate quest.");
     expect(state.candidates.length).toBeGreaterThan(0);
     expect(state.candidates.length).toBeLessThanOrEqual(32);

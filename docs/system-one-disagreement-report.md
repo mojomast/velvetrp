@@ -86,7 +86,9 @@ Director-only disagreement detector over the same immutable decision log. Use th
 together: run the disagreement report to find divergent cases, then copy the candidate
 into the Director calibration corpus and re-run
 `scripts/evaluate-system-one-director.ts` so the promotion gate scores the calibrated
-signal against the updated corpus.
+signal against the updated corpus. The [System One harvest loop](system-one-harvest-loop.md)
+describes how reviewed divergences become provenance-tagged corpus proposals once a human
+confirms them.
 
 ## Privacy
 

@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   ADVENTURE_BEST_KEY,
@@ -17,12 +20,17 @@ import {
 import {
   ADVENTURE_DEFAULT_ACTION_THRESHOLD,
   ADVENTURE_THRESHOLD_GRID,
+  adventureStabilitySamples,
   adventureThresholdSamples,
   evaluateAdventureReadouts,
   gradeAdventureCase,
+  loadHarvestedAdventureCases,
+  mergeHarvestedAdventureCases,
   parseAdventureArgs,
+  parseHarvestedAdventureCases,
   renderAdventureBenchmark,
   summarizeAdventureCases,
+  summarizeAdventureStability,
   type AdventureReadout,
 } from "../evaluate-system-one-adventure-lane.js";
 
@@ -86,6 +94,25 @@ const rawChoice = (value: string, top: number): SystemOneAnswer => ({
   choice: value,
   confidence: top,
   probabilities: { [value]: top, [ADVENTURE_NONE]: Math.max(0, 1 - top) },
+});
+
+/** A synthetic confirmed-harvest proposal; the merge validates it defensively at runtime. */
+const harvestProposal = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  proposalId: "1".repeat(64),
+  lane: "adventure-selection",
+  sourceDecisionId: "decision-1",
+  createdAt: "2026-09-17T00:00:00.000Z",
+  provenance: "review-annotated",
+  status: "confirmed",
+  state: {
+    declaration: "I walk to the mill.",
+    candidates: [
+      { candidateId: "harvest:travel", digest: "c".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+    ],
+  },
+  expected: { candidateId: "harvest:travel" },
+  reason: "human review confirmed the recorded adventure-selection decision",
+  ...overrides,
 });
 
 test("the frozen corpus covers every category and tool family with unique ids and digests", () => {
@@ -513,6 +540,7 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(report.includes("`active` lane mode is still record-only"));
   assert.ok(!report.includes("unwired"), "the wiring-status prose must not claim the lane is unwired");
   assert.ok(report.includes("## Corpus and per-case results"));
+  assert.ok(report.includes("## Decision stability"));
   assert.ok(report.includes("## Threshold sweep"));
   assert.ok(report.includes("No threshold qualified"));
   assert.ok(report.includes("Server default"));
@@ -521,6 +549,7 @@ test("renders the benchmark report with the sweep, honesty, and reproduce sectio
   assert.ok(report.includes("**NOT READY**"));
   assert.ok(report.includes("## Honesty notes"));
   assert.ok(report.includes("asserted-subset figure"));
+  assert.ok(report.includes("repeatability, not accuracy"));
   assert.ok(report.includes("set -a; . /tmp/opencode/jev/jev.env; set +a"));
   assert.ok(report.includes("docs/system-one-adventure-benchmark.json"));
   assert.ok(!report.includes("### Proposed `adventure-selection` promotion record"), "no record when no threshold qualifies");
@@ -558,4 +587,150 @@ test("no candidate list defers by construction", () => {
   assert.equal(graded.selected, null);
   assert.equal(graded.candidateId, null);
   assert.equal(graded.correct, true);
+});
+
+test("rolls up decision stability over synthetic readouts", () => {
+  const summary = summarizeAdventureStability([
+    readout({ id: "stable", candidateId: "a", topSignal: 0.8 }),
+    readout({ id: "stable", candidateId: "a", topSignal: 0.6 }),
+    readout({ id: "conflicted", candidateId: "a", topSignal: 0.8 }),
+    readout({ id: "conflicted", candidateId: "b", topSignal: 0.7 }),
+    readout({ id: "deferred", candidateId: null, topSignal: null, selected: null, selectedCorrect: true, deferred: true, correct: true }),
+    readout({ id: "deferred", candidateId: null, topSignal: null, selected: null, selectedCorrect: true, deferred: true, correct: true }),
+  ]);
+
+  assert.equal(summary.cases.length, 3);
+  assert.equal(summary.repeats, 6);
+  assert.equal(summary.conflictCases, 1);
+  assert.ok(Math.abs(summary.conflictRate - 1 / 3) < 1e-9, `conflict rate ${summary.conflictRate}`);
+  assert.ok(Math.abs(summary.meanAgreement - 2.5 / 3) < 1e-9, `mean agreement ${summary.meanAgreement}`);
+
+  const stable = summary.cases[0]!;
+  assert.equal(stable.agreement, 1);
+  assert.equal(stable.conflicted, false);
+  assert.deepEqual(stable.decisions, ["a"]);
+  assert.ok(stable.signalStdDev !== null && Math.abs(stable.signalStdDev - 0.1) < 1e-9);
+
+  const conflicted = summary.cases[1]!;
+  assert.equal(conflicted.agreement, 0.5);
+  assert.deepEqual(conflicted.decisions, ["a", "b"]);
+  assert.ok(conflicted.signalStdDev !== null && Math.abs(conflicted.signalStdDev - 0.05) < 1e-9);
+
+  const deferred = summary.cases[2]!;
+  assert.deepEqual(deferred.decisions, ["defer"], "a null named candidate is a deferral decision");
+  assert.equal(deferred.agreement, 1, "a consistently deferred case is stable");
+  assert.equal(deferred.signalStdDev, null);
+
+  assert.ok(summary.meanSignalStdDev !== null && Math.abs(summary.meanSignalStdDev - 0.075) < 1e-9);
+  assert.ok(summary.maxSignalStdDev !== null && Math.abs(summary.maxSignalStdDev - 0.1) < 1e-9);
+
+  assert.deepEqual(adventureStabilitySamples([readout({ candidateId: null, topSignal: null })]), [
+    { caseId: "case", decision: "defer", signal: null },
+  ]);
+});
+
+test("merges confirmed harvested proposals and skips unusable labels", () => {
+  const merged = mergeHarvestedAdventureCases([
+    harvestProposal({ proposalId: "1".repeat(64) }),
+    harvestProposal({ proposalId: `${"1".repeat(12)}${"b".repeat(52)}` }), // same id prefix as the first
+    harvestProposal({ proposalId: "3".repeat(64), expected: null }),
+    harvestProposal({ proposalId: "4".repeat(64), expected: { candidateId: 42 } }),
+    harvestProposal({ proposalId: "5".repeat(64), expected: { candidateId: "not-advertised" } }),
+    harvestProposal({ proposalId: "6".repeat(64), expected: { candidateId: null }, state: { declaration: "I look around.", candidates: [] } }),
+    harvestProposal({ proposalId: "7".repeat(64), lane: "director-selection" }),
+    harvestProposal({ proposalId: "8".repeat(64), status: "proposed" }),
+    harvestProposal({ proposalId: "9".repeat(64), state: "not-an-object" }),
+  ]);
+
+  assert.equal(merged.confirmed, 7, "confirmed adventure proposals are counted before skips");
+  assert.equal(merged.cases.length, 2);
+  assert.equal(merged.skipped, 5, "duplicate, null, malformed, unadvertised, and unusable state are skipped");
+
+  const primary = merged.cases.find((entry) => entry.id === `harvested:${"1".repeat(12)}`);
+  assert.ok(primary);
+  assert.equal(primary.category, "harvested");
+  assert.equal(primary.declaration, "I walk to the mill.");
+  assert.equal(primary.candidates.length, 1);
+  assert.deepEqual(primary.expected, { preferred: "harvest:travel", acceptable: ["harvest:travel"] });
+  assert.equal(primary.holdout, false, "harvested cases are development cases");
+
+  const defer = merged.cases.find((entry) => entry.id === `harvested:${"6".repeat(12)}`);
+  assert.ok(defer);
+  assert.deepEqual(defer.expected, { preferred: null, acceptable: [null] });
+  assert.equal(defer.candidates.length, 0);
+});
+
+test("treats an absent or malformed harvest fixture as zero cases without failing", async () => {
+  const missing = await loadHarvestedAdventureCases(path.join(tmpdir(), `velvet-adventure-harvest-missing-${process.pid}.json`));
+  assert.deepEqual(
+    { cases: missing.cases.length, present: missing.present, warning: missing.warning },
+    { cases: 0, present: false, warning: null },
+  );
+
+  const notJson = parseHarvestedAdventureCases("{not json");
+  assert.equal(notJson.cases.length, 0);
+  assert.equal(notJson.present, true);
+  assert.ok(notJson.warning?.includes("not valid JSON"));
+
+  const noProposals = parseHarvestedAdventureCases(JSON.stringify({ version: 1, lane: "adventure-selection", generatedAt: "2026-09-17T00:00:00.000Z" }));
+  assert.equal(noProposals.cases.length, 0);
+  assert.ok(noProposals.warning?.includes("proposals"));
+
+  const wrongVersion = parseHarvestedAdventureCases(JSON.stringify({ version: 2, lane: "adventure-selection", generatedAt: "x", proposals: [] }));
+  assert.equal(wrongVersion.cases.length, 0);
+  assert.ok(wrongVersion.warning?.includes("version"));
+
+  const wrongLane = parseHarvestedAdventureCases(JSON.stringify({ version: 1, lane: "guardrails", generatedAt: "x", proposals: [harvestProposal()] }));
+  assert.equal(wrongLane.cases.length, 0);
+  assert.ok(wrongLane.warning?.includes("guardrails"));
+
+  const fixture = { version: 1, lane: "adventure-selection", generatedAt: "2026-09-17T00:00:00.000Z", proposals: [harvestProposal()] };
+  const parsed = parseHarvestedAdventureCases(JSON.stringify(fixture));
+  assert.equal(parsed.warning, null);
+  assert.equal(parsed.cases.length, 1);
+
+  const directory = await mkdtemp(path.join(tmpdir(), "velvet-adventure-harvest-"));
+  try {
+    const file = path.join(directory, "adventure-selection.json");
+    await writeFile(file, JSON.stringify(fixture), "utf8");
+    const loaded = await loadHarvestedAdventureCases(file);
+    assert.equal(loaded.present, true);
+    assert.equal(loaded.warning, null);
+    assert.equal(loaded.cases.length, 1);
+    assert.equal(loaded.cases[0]?.category, "harvested");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("renders harvested provenance and counts harvested cases separately", () => {
+  const merged = mergeHarvestedAdventureCases([harvestProposal()]);
+  const cases = [...ADVENTURE_EVAL_CASES, ...merged.cases];
+  const evaluation = evaluateAdventureReadouts([], "2026-09-17");
+  const report = renderAdventureBenchmark({
+    generatedAt: "2026-09-17T00:00:00.000Z",
+    model: "jev-test",
+    baseUrl: "https://example.test/v1",
+    repeats: 1,
+    thresholds,
+    readouts: [],
+    failures: [],
+    evaluation,
+    proposedRecord: null,
+    out: "docs/system-one-adventure-benchmark.md",
+    cases,
+    harvest: {
+      fixture: "server/test/fixtures/system-one-harvested/adventure-selection.json",
+      present: true,
+      confirmed: 1,
+      skipped: 0,
+      cases: 1,
+      warning: null,
+    },
+  });
+  assert.ok(report.includes(`harvested:${"1".repeat(12)}`));
+  assert.ok(report.includes("| dev | harvested | harvest:travel |"), "the corpus table marks harvested provenance");
+  assert.ok(report.includes("Harvested cases"));
+  assert.ok(report.includes("confirmed live-derived labels"));
+  assert.ok(!report.includes("Harvest warning"), "a clean fixture produces no warning");
 });

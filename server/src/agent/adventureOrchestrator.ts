@@ -147,7 +147,10 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     if (systemOneLaneMode(lane.settings, "adventure-selection") === "off") return;
     if (candidates.length === 0) return;
     const questions = buildAdventureSelectionQuestions(turn.declaration, candidates);
-    const state = canonicalAgentJson({ declaration: turn.declaration, candidates } as never);
+    // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
+    // shape back); digests are derived from the value by the decision repo, so no canonicalization
+    // is needed here.
+    const state = { declaration: turn.declaration, candidates } as never;
     const startedAt = performance.now();
     const result = await lane.caller({ settings: lane.settings, state, questions });
     const composed = composeAdventureSelection(candidates, result.answers, lane.settings.confidencePolicy["adventure-selection"]);

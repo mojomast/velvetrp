@@ -24,7 +24,7 @@ gate and carries an evidence-only record, and it is not wired into recall. The *
 adventure-selection** and **L6 guardrails** primitives now exist with
 [adventure](system-one-adventure-benchmark.md) and
 [guardrails](system-one-guardrails-benchmark.md) benchmarks: adventure-selection passes its
-gate only at a sweep-recommended 0.40 action threshold and carries an evidence-only record,
+gate only at a sweep-recommended 0.55 action threshold and carries an evidence-only record,
 and guardrails passes its strict gate after a measurement-driven criteria redesign and carries
 an evidence-only record. Both are now wired in **shadow (record-only)**: adventure-selection
 records one decision per fresh adventure turn, and guardrails records one per room turn; neither
@@ -379,19 +379,19 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   tools; travel records an explicit advisory binding string because it is not digest-bound. A
   lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
-  runs 30 labeled declaration states x 3 repeats (90 live calls). The model named a candidate
-  on 54 calls and every one of those 54 picks was acceptable at every swept threshold, but the
-  raw signals (0.42-0.69) sat below the server default action threshold 0.75: at 0.75 only 6
-  calls acted, so the gate reported insufficient samples. A threshold sweep recommends **0.40**
-  (which also requires `reviewThreshold <= 0.40`), where the gate passes with 54 acted, 100%
-  accuracy, calibrated Brier 0.0002, and ECE 0.0109 — so the lane carries an evidence-only
-  record. The threshold is selected on the same corpus that scores it, the corpus is a
-  hand-labeled projection rather than a repository fixture, and the acted subset has no
-  errors, so the record is a promotion candidate, not proof; the server default stays
-  0.75/0.5. A live shadow turn on the demo server recorded a deferral against a declaration
-  ("drop my longsword") whose server binding was an `unequip` candidate — the model recognized
-  the commitment (supported ~0.48) but declined to equate the two labels, and the authoritative
-  provider path still committed the correct action; that semantic gap is a known limitation.
+  runs 30 labeled declaration states plus 1 confirmed harvested live case x 3 repeats (93 live
+  calls, with a per-repeat `uid` decorrelator as the vendor consistency cookbooks recommend).
+  The model named a candidate on 54 calls and every one of those 54 picks was acceptable, but at
+  the server default action threshold 0.75 only 18 calls acted, so the gate reported insufficient
+  samples. A threshold sweep recommends **0.55** (which also requires `reviewThreshold <= 0.55`),
+  where the gate passes with 54 acted, 100% accuracy, calibrated Brier 0.0001, and ECE 0.0092
+  (held-out 0.0117) — so the lane carries an evidence-only record. Decision stability was 100%
+  (0 of 31 cases conflicted; mean per-case signal std dev 0.0135). The threshold is selected on
+  the same corpus that scores it and the acted subset has no errors, so the record is a promotion
+  candidate, not proof; the server default stays 0.75/0.5. The harvested case is the live
+  deferral against a declaration ("drop my longsword") whose server binding was an `unequip`
+  candidate; the lane still defers on it in 3/3 repeats, which is a stable coverage miss rather
+  than a flake, and the authoritative provider path still commits the correct action.
 
 ### L3 — Advisory narration and receipt verification
 

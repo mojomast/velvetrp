@@ -1,0 +1,257 @@
+# System One harvest loop
+
+Status: design plus the implemented core. The harvest projection
+(`server/src/agent/systemOneHarvest.ts`), stability measurement
+(`server/src/agent/systemOneStability.ts`), and harvest CLI (`scripts/harvest-system-one-negatives.ts`)
+are implemented and unit-tested, and the adventure-selection evaluation merges confirmed cases from
+`server/test/fixtures/system-one-harvested/adventure-selection.json` when that fixture exists. The
+review-CLI correction form and every **gate v2** change below are **planned, not shipped**. The
+first loop pass has run against the demo shadow log; see
+[First measured loop pass](#first-measured-loop-pass). The
+[decision review](system-one-decision-review.md) and [Director disagreement
+report](system-one-disagreement-report.md) are the current read-only paths; [Jev
+integration](jev-integration.md) remains the design authority. Everything stays disabled by default.
+
+## Why the loop exists
+
+Every promoted lane passes on a frozen corpus with almost no acted errors. The L1 Director corpus
+has no trap state and the model defers on every mixed state; the L2 adventure corpus acted 54 times
+with no unacceptable pick (it now also carries one confirmed live case the lane still defers on, a
+stable coverage miss); the advisory lanes' acted subsets have no observed errors. A passing gate
+there is a **promotion candidate, not proof**: it cannot distinguish a calibrated lane from one that
+has merely never been wrong, and it leaves the calibration tail untested.
+
+Live shadow decisions are the missing material. A lane in `shadow` records each would-be decision
+immutably in `system_one_decisions_v1` while the deterministic or generative path stays
+authoritative, so the log accumulates what the frozen corpora lack: live states, candidate sets,
+deferrals, and disagreements. The loop turns *reviewed* live decisions into labelled corpus cases so
+the next evaluation is error-rich; it never edits the decision log, calls a provider, or changes lane
+authority.
+
+## Sources
+
+Four kinds of evidence can propose a case; only a human verdict may confirm a label, and the
+provider comparison is the one narrow exception, recorded as a *proposed* label.
+
+**Human annotations.** `scripts/review-system-one-decisions.ts` renders the queue of `act` decisions
+(plus flagged `fallback` decisions with `--include-flagged`), ordered uncertain-first by the
+recorded calibrated signal, and applies an annotations file mapping each decision id to `correct` or
+`incorrect`. The harvest annotation type adds an optional, lane-specific `expected` correction (a
+`selections` array for the Director, a `candidateId` for adventure selection, a `disposition` for
+guardrails). `correct` confirms the recorded outcome; `incorrect` without a usable `expected` stays
+`proposed` ("wrong, but the right answer is still unknown"); `incorrect` with a valid `expected` is
+`confirmed`. The review CLI still parses string verdicts only; the harvest CLI's `--annotations` file
+accepts both that shorthand and the extended `{ verdict, expected?, note? }` form, and entries whose
+shape is invalid are counted as skipped rather than applied.
+
+**Provider disagreements.** For the Director alone, `scripts/report-system-one-disagreements.ts`
+compares the shadow lane's ordered would-be selection against the authoritative
+`dm_runs.proposal_json` composition through `compareDirectorAuthority`. A divergence is a
+deterministic detector, not a verdict: the provider may be right, or both may be defensible. The
+proposal records the provider composition as the `expected` label with `provider-disagreement`
+provenance and status `proposed` — the explicit exception where the comparison is the proposed label.
+
+**Stability conflicts.** `systemOneStability.ts` groups repeated evaluations of the same state by
+case and reports raw agreement (the share of repeats producing the most common decision), the
+distinct decisions, whether the case conflicted, and the per-question signal mean and standard
+deviation; it aggregates mean agreement, conflict count, conflict rate, and mean/max signal standard
+deviation. A decision that flips between repeats would give the same game state different outcomes,
+so it is dangerous to activate even when each draw looks correct. Stability is a review signal, not
+a label.
+
+**Shadow deferrals worth reviewing.** `--include-flagged` surfaces `fallback` decisions carrying
+hazard flags, and the shadow report (`scripts/report-system-one-decisions.ts`) summarizes recorded
+bands per lane. Reviewing why a lane deferred on a case it should have acted on is as valuable as
+reviewing an acted mistake: it produces a case whose `expected` correction can confirm an act.
+
+**The labelling rule.** A human verdict, not the provider, is the only thing that turns a proposal
+into a training label, except where the Director disagreement comparison is explicitly being used as
+the proposed label. Even then the proposal stays `proposed` until a human confirms it, and
+unconfirmed proposals never score in a gate.
+
+## Pipeline and provenance
+
+```
+annotate -> scripts/harvest-system-one-negatives.ts --annotations
+  -> proposals (status proposed|confirmed; provenance review-annotated|provider-disagreement)
+  -> human review -> --write-fixture -> server/test/fixtures/system-one-harvested/<lane>.json
+  -> lane eval merges confirmed cases -> re-run -> updated promotion record
+```
+
+`buildHarvestProposals` is implemented. It projects one proposal per reviewable decision, keeps
+`confirmed` over `proposed` for the same state, keeps the earliest otherwise, and returns a stable
+lane/created-at/proposal-id order, so re-harvesting the same state is idempotent. Proposal identity is
+a digest of lane, state digest, expectation, and provenance. `summarizeHarvest` reports the split by
+lane and provenance, and `confirmedHarvestProposals` is the only accessor an evaluation may use:
+unconfirmed proposals are excluded from scoring, so an unreviewed correction never becomes a label.
+
+Confirmed proposals carry their provenance, source decision id, original state, and expectation into
+the fixture, so a reviewer can see which came from live data and how each was labelled.
+`--write-fixture` writes the confirmed-only fixture for one lane, sorted by proposal id so repeated
+runs are idempotent; the adventure-selection evaluation already merges those cases and tags them
+`harvested:`. The decision log is never rewritten in place; proposal and fixture files are generated,
+reviewable artifacts.
+
+## First measured loop pass
+
+The loop ran end to end against the demo shadow log on 2026-09-17:
+
+- **Harvest.** 19 Director decisions, 1 adventure-selection decision, and 1 guardrails decision were
+  read. Two human annotations (a confirmed guardrails `pass`, and a corrected adventure deferral
+  whose `expected` is the `unequip` candidate the server had bound) plus 12 deduplicated Director
+  provider disagreements produced 14 proposals: **2 confirmed and 12 proposed**. Confirmed fixtures
+  were written to `server/test/fixtures/system-one-harvested/{adventure-selection,guardrails}.json`;
+  the Director proposals remain a review queue.
+- **Re-evaluation.** The adventure benchmark then ran 93 live calls over 30 frozen cases plus the 1
+  confirmed harvested case, with the vendor `uid` decorrelator in each request state. At the server
+  default 0.75, 18 calls acted; at the sweep's recommended 0.55 the gate passed with 54 acted, 100%
+  accuracy, calibrated Brier 0.0001 and ECE 0.0092 (held-out 0.0117). The harvested case still defers
+  in 3/3 repeats: a **stable coverage miss** the corpus now records instead of hiding, which is the
+  point of the loop. The promotion record was re-derived from this run.
+- **Stability.** Across all 31 cases and 93 repeats, decision agreement was 100% with 0 conflicted
+  cases; mean per-case signal standard deviation was 0.0135 and the maximum 0.0531. A separate live
+  probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard
+  deviation of 0.0015, in line with the vendor's published jev-1.13 figure (~0.0098 mean).
+- **A decorrelation caveat.** Adding the `uid` field coincided with higher raw signals than the
+  pre-loop runs (18 acted at 0.75 versus 6), which moved the recommended threshold from 0.40 to 0.55.
+  The vendor cookbook states that this measurement design "cannot separate sensitivity to the
+  irrelevant field from variation that would occur on identical requests", so the pre-loop and
+  post-loop thresholds are different measurement conditions, not an improvement or a regression.
+
+## Promotion gate v2
+
+The current gate (`evaluatePromotionGate`) checks `minSamples`, `minAccuracy`, `maxBrier`, and
+`maxExpectedCalibrationError` on a recorded metric snapshot, and `isLanePromoted` re-checks that
+snapshot against the lane's current gate, so changing a gate constant already invalidates a record.
+Everything below is planned unless marked implemented; the order is priority order.
+
+1. **A static, never-tuned holdout per lane.** L2's 0.55 action threshold was selected on the same
+   corpus that scores it, and the benchmark says so explicitly. Gate v2 reserves a holdout never
+   used for threshold selection, criteria tuning, or calibration fitting.
+2. **Bootstrap confidence intervals, gating on the lower bound.** A point estimate over tens of
+   acted samples cannot tell a 0.95 lane from a 1.00 lane, so the gate should require the lower bound
+   of an accuracy and calibration bootstrap to clear the bar.
+3. **Acted-coverage and false-act floors.** "Defer everything" currently shrinks the acted subset
+   until it either fails `minSamples` or passes on a handful of easy cases. Gate v2 adds a coverage
+   floor plus a ceiling on false acts, so a lane must both act and be right.
+4. **Asymmetric safety gates for guardrails and narration.** Missing a hazard is worse than flagging
+   benign fiction. Gate v2 separates the hazard false-negative ceiling from the benign
+   false-positive ceiling instead of one `minAccuracy`, and keeps `support` outside the block
+   ceiling. Today only the guardrails/cost-router bars are stricter (`minAccuracy 0.95`, Brier/ECE
+   0.05).
+5. **Self-consistency from the vendor cookbooks (measured by L2; gating planned).** The
+   adventure-selection evaluation now reports repeat agreement, conflict cases, and signal variance
+   through `summarizeStability` and `stabilityUid`. Gating should add raw agreement, policy agreement
+   with an explicit uncertain outcome, per-question probability standard deviation, and the conflict
+   count. The vendor's self-consistency measurements for `jev-1.13` report a mean per-question
+   standard deviation near **0.0098** and **99.2%** policy agreement at a 0.60 uncertain threshold
+   (TypeSafe documentation, reviewed 2026-09-16); those are vendor reference points, not numbers
+   measured here.
+6. **Pinned model version, corpus version, and record expiry.** A record currently names only
+   metrics, the Platt map, `promotedAt`, and the evidence path. Gate v2 adds the pinned model and
+   corpus versions plus an expiry, so `isLanePromoted` refuses a stale record after drift.
+7. **A live drift gate with automatic demotion.** Rolling reviewed metrics from shadow decisions
+   (accuracy, disagreement rate, conflict rate) should be compared with the record, and crossing a
+   bound should demote the lane to shadow automatically instead of waiting for a human.
+8. **Optional band-on-calibrated-confidence.** The runtime records the calibrated `topSignal` for
+   observability while the band is decided on raw signals, so thresholds are not comparable across
+   lanes. Banding on the calibrated signal would make a threshold mean a comparable reliability; it
+   stays optional until each lane's calibration is stable.
+
+## Model-version and integration cautions (Jev 1.13)
+
+The vendor's published [Jev 1.13 jaggedness
+page](https://docs.typesafe.ai/model-jaggedness/jev-1.13) (reviewed 2026-09-16) names failure modes
+that apply directly to these lanes. Treat them as integration constraints, not defects to tune
+around.
+
+- **Literal reading.** The model reads requests literally and does not map informal player phrasing
+  onto a canonical mechanic. Our live "drop my longsword" case is exactly this edge: the model
+  recognized the commitment (supported ~0.48) but declined to equate it with the `unequip`
+  candidate, so the lane deferred while the authoritative provider path committed the correct
+  action. Keep labels literal, accept deferral as a valid outcome, and never tune labels to match
+  model semantics.
+- **Adversarial content is not treated as hostile by default.** Our guardrail batteries embed the
+  bounded message in the question instructions today (`systemOneGuardrails.ts`), which can frame
+  content as hostile. Prefer structured state with path references once the request schemas accept
+  them, and never describe the lane as moderation: the deterministic policy checks stay
+  authoritative.
+- **Context rot.** Irrelevant candidates cost accuracy. This is directly relevant to the L2
+  candidate-union cap (32): widening the union for coverage trades accuracy, so keep the advertised
+  set tight and measure before raising the cap.
+- **Contradictory instructions versus criteria.** Keep one authority per question and one property
+  per question; instructions and criteria that disagree produce unstable judgments.
+- **No numeric precision.** The model is not a calculator. Keep arithmetic, thresholding, weighting,
+  and score normalization in code (`systemOnePolicy.ts` and the lane composition functions).
+
+## Vendor-aligned battery direction (planned, not shipped)
+
+- **Structured instructions and criteria.** Use the vendor's named instruction fields (`question`,
+  `focus`, `compare`, `inspect`) and per-option contrastive criteria (`what`, `not_for`, `examples`)
+  once the request schemas accept them. The repo's [question design
+  conventions](jev-integration.md#question-design-conventions) already require contrastive criteria;
+  today's wire shape is a string `instructions` plus type-specific `criteria`.
+- **Guardrails severity as harm.** Reframe the severity question as "how much harm would complying
+  do?" following the vendor's [LLM guardrails
+  cookbook](https://docs.typesafe.ai/cookbooks/llm_guardrails), and let severity upgrade a `review`
+  disposition to `block`. Today a high severity with no flagged hazard can only recommend `review`.
+- **A fresh throwaway `uid` per repeat.** The vendor cookbooks add a new `uid` to every repeated
+  call so the draws are decorrelated. `stabilityUid(lane, caseId, repeat)` builds that
+  deterministically, so a repeat reproduces across runs while staying distinct within one run.
+
+## Commands
+
+All review and report commands are read-only, need no provider credentials, and select a world
+through `VELVET_DATA_DIR`.
+
+```bash
+# Review acted decisions and apply human verdicts (existing).
+VELVET_DATA_DIR=.velvet/<world> npx tsx scripts/review-system-one-decisions.ts --lane director-selection \
+  --max-signal 0.7 --limit 20 --annotations annotations.json --out docs/system-one-review-sheet.md
+# Deterministic Director disagreement queue (existing).
+VELVET_DATA_DIR=.velvet/<world> npx tsx scripts/report-system-one-disagreements.ts --limit 50
+```
+
+The harvest CLI builds proposals from annotations (and, for the Director, the disagreement rows) and
+writes the confirmed-only fixture a lane evaluation merges:
+
+```bash
+# Build and inspect proposals, then write the confirmed fixture for one lane.
+VELVET_DATA_DIR=.velvet/<world> npx tsx scripts/harvest-system-one-negatives.ts --disagreements \
+  --annotations annotations.json --out proposals.json
+VELVET_DATA_DIR=.velvet/<world> npx tsx scripts/harvest-system-one-negatives.ts --lane adventure-selection \
+  --annotations annotations.json --write-fixture
+```
+
+Per-lane evaluations are live (provider-credentialed) and regenerate their evidence documents:
+
+```bash
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-director.ts         # docs/system-one-director-calibration.md
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-adventure-lane.ts  # docs/system-one-adventure-benchmark.md
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-narration-lane.ts  # docs/system-one-narration-benchmark.md
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-rerank-lane.ts     # docs/system-one-rerank-benchmark.md
+TYPESAFE_API_KEY=... npx tsx scripts/benchmark-system-one-lanes.ts          # docs/system-one-benchmark.md
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-guardrails-lane.ts # docs/system-one-guardrails-benchmark.md
+TYPESAFE_API_KEY=... npx tsx scripts/evaluate-system-one-router-lane.ts     # docs/system-one-router-benchmark.md
+```
+
+Confirmed fixtures live at `server/test/fixtures/system-one-harvested/<lane>.json`; the
+adventure-selection evaluation merges them today, then the promotion record is updated from the new
+run. Generated benchmark documents are script outputs: regenerate them with the commands above, never
+edit them by hand.
+
+## Limitations and non-claims
+
+- Human labelling is the bottleneck and it is subjective; the verdict and any `expected` correction
+  are judgment calls.
+- Proposals from provider disagreements are not ground truth: the authoritative composition is the
+  provider's decision, not a measured better answer.
+- Stability is not accuracy. A lane can be perfectly self-consistent and still consistently wrong;
+  self-consistency narrows the risk of outcome flipping, not of error.
+- A green gate on harvested cases is still a promotion candidate, not proof. Harvested cases are
+  few, human-labelled, and drawn from whatever live traffic happened to occur; the holdout,
+  coverage, and drift work above limits that.
+- Harvesting covers three lanes today (`director-selection`, `adventure-selection`, `guardrails`),
+  and only adventure-selection merges a fixture so far; other lanes need a lane-specific expectation.
+- Nothing here enables a lane: every lane stays disabled by default, a promoted lane still needs
+  `active` plus `isLanePromoted`, and the deterministic fallback remains the authority on failure.
