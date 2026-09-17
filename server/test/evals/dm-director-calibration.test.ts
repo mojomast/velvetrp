@@ -6,6 +6,8 @@ import {
   DIRECTOR_BEST_KEY,
   DIRECTOR_HOLD_KEY,
   DIRECTOR_NONE,
+  DIRECTOR_PRIORITY_PREFIX,
+  DIRECTOR_PROGRESS_PREFIX,
   type DirectorCandidateProjection,
 } from "../../src/agent/systemOneDirector.js";
 import { defaultSystemOneSettings } from "../../src/defaults.js";
@@ -112,9 +114,9 @@ async function runSelector(spec: SelectorSpec): Promise<ScenarioOutcome> {
 
   const answers: Record<string, SystemOneAnswer> = { [DIRECTOR_HOLD_KEY]: noul(UNSUPPORTED_SIGNAL) };
   for (const candidate of projection) {
-    const grounded = spec.method === "candidates" && candidate === winner;
-    answers[`supported:${candidate.candidateId}`] = noul(grounded ? support : UNSUPPORTED_SIGNAL);
-    answers[`priority:${candidate.candidateId}`] = priority(grounded ? 2 : 1);
+    const progressive = spec.method === "candidates" && candidate === winner;
+    answers[`${DIRECTOR_PROGRESS_PREFIX}${candidate.candidateId}`] = noul(progressive ? support : UNSUPPORTED_SIGNAL);
+    answers[`${DIRECTOR_PRIORITY_PREFIX}${candidate.candidateId}`] = priority(progressive ? 2 : 1);
   }
   if (spec.method === "hold") answers[DIRECTOR_HOLD_KEY] = noul(support);
   if (spec.method === "best-pick") {
@@ -181,11 +183,11 @@ describe("Director selector calibration through the provider-free oracle", () =>
       expect(value).toBeGreaterThanOrEqual(0);
       expect(value).toBeLessThanOrEqual(1);
     }
-    // Five confident hits at 0.9 plus one confident miss at 0.95:
-    // Brier = (5 * 0.01 + 0.9025) / 6 = 0.15875.
-    expect(report.brier).toBeCloseTo(0.15875, 12);
-    // All six land in the top bin: mean predicted 5.45 / 6, hit rate 5 / 6 -> ECE = 0.075.
-    expect(report.expectedCalibrationError).toBeCloseTo(0.075, 12);
+    // Four hits at 0.9, one forced-hold hit at 1.0, and one confident miss at 0.95:
+    // Brier = (4 * 0.01 + 0 + 0.9025) / 6 = 0.1570833.
+    expect(report.brier).toBeCloseTo(0.15708333, 8);
+    // All six land in the top bin: mean predicted (3.6 + 1.0 + 0.95) / 6, hit rate 5 / 6 -> ECE = 0.0916667.
+    expect(report.expectedCalibrationError).toBeCloseTo(0.09166667, 8);
     expect(report.bins).toBe(10);
   });
 

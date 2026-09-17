@@ -5,6 +5,8 @@ import {
   DIRECTOR_BEST_KEY,
   DIRECTOR_HOLD_KEY,
   DIRECTOR_NONE,
+  DIRECTOR_PRIORITY_PREFIX,
+  DIRECTOR_PROGRESS_PREFIX,
   type DirectorCandidateProjection,
 } from "../src/agent/systemOneDirector.js";
 import type { SystemOneAnswer } from "../src/provider/systemOneCompletion.js";
@@ -17,32 +19,41 @@ const candidates: DirectorCandidateProjection[] = [
   { candidateId: "dm-candidate:time", digest: "c".repeat(64), action: "advance-time", label: "Let time pass" },
 ];
 
-const support = (id: string, noul: number): SystemOneAnswer => ({ type: "noul", noul });
-const priority = (id: string, score: number): SystemOneAnswer => ({ type: "score", score, confidence: 0.8, legend: { 0: "low", 1: "medium", 2: "high" }, probabilities: { 0: 0.1, 1: 0.2, 2: 0.7 } });
+const noul = (value: number): SystemOneAnswer => ({ type: "noul", noul: value });
+const priority = (score: number): SystemOneAnswer => ({ type: "score", score, confidence: 0.8, legend: { 0: "low", 1: "medium", 2: "high" }, probabilities: { 0: 0.1, 1: 0.2, 2: 0.7 } });
+const progress = (id: string, value: number) => [`${DIRECTOR_PROGRESS_PREFIX}${id}`, noul(value)] as const;
+const prio = (id: string, score: number) => [`${DIRECTOR_PRIORITY_PREFIX}${id}`, priority(score)] as const;
 
 describe("System One Director selector", () => {
-  it("builds a hold noul, a support noul and a priority score per candidate, plus a best choice", () => {
+  it("builds a hold noul, a progress noul and a priority score per candidate, plus a best choice", () => {
     const questions = buildDirectorQuestions(candidates);
     expect(questions[DIRECTOR_HOLD_KEY]).toMatchObject({ type: "noul" });
-    expect(questions[`supported:${candidates[0]!.candidateId}`]).toMatchObject({ type: "noul" });
-    expect(questions[`priority:${candidates[0]!.candidateId}`]).toMatchObject({ type: "score" });
+    expect(questions[`${DIRECTOR_PROGRESS_PREFIX}${candidates[0]!.candidateId}`]).toMatchObject({ type: "noul" });
+    expect(questions[`${DIRECTOR_PRIORITY_PREFIX}${candidates[0]!.candidateId}`]).toMatchObject({ type: "score" });
     expect(questions[DIRECTOR_BEST_KEY]).toMatchObject({ type: "choice" });
   });
 
-  it("holds when the hold answer is confident", () => {
-    const answers = { [DIRECTOR_HOLD_KEY]: support("hold", 0.9), [`supported:${candidates[0]!.candidateId}`]: support("x", 0.95) };
+  it("holds when the hold answer is confident and no candidate can advance", () => {
+    const answers: Record<string, SystemOneAnswer> = {
+      [DIRECTOR_HOLD_KEY]: noul(0.9),
+      ...Object.fromEntries(candidates.map((candidate) => progress(candidate.candidateId, 0.2))),
+    };
     expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [] });
+  });
+
+  it("forces a hold when there are no advertised candidates", () => {
+    expect(composeDirectorSelection([], {}, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [], topSignal: 1 });
   });
 
   it("orders grounded candidates by priority and caps the beat", () => {
     const answers: Record<string, SystemOneAnswer> = {
-      [DIRECTOR_HOLD_KEY]: support("hold", 0.2),
-      [`supported:${candidates[0]!.candidateId}`]: support("a", 0.9),
-      [`supported:${candidates[1]!.candidateId}`]: support("b", 0.85),
-      [`supported:${candidates[2]!.candidateId}`]: support("c", 0.8),
-      [`priority:${candidates[0]!.candidateId}`]: priority("a", 1),
-      [`priority:${candidates[1]!.candidateId}`]: priority("b", 2),
-      [`priority:${candidates[2]!.candidateId}`]: priority("c", 1.5),
+      [DIRECTOR_HOLD_KEY]: noul(0.2),
+      ...Object.fromEntries(candidates.map((candidate) => progress(candidate.candidateId, 0.9))),
+      ...Object.fromEntries([
+        prio(candidates[0]!.candidateId, 1),
+        prio(candidates[1]!.candidateId, 2),
+        prio(candidates[2]!.candidateId, 1.5),
+      ]),
     };
     const composed = composeDirectorSelection(candidates, answers, thresholds, 2);
     expect(composed).toMatchObject({ band: "act", method: "candidates", hold: false });
@@ -50,10 +61,19 @@ describe("System One Director selector", () => {
     expect(composed.selections[0]).toEqual({ candidateId: candidates[1]!.candidateId, digest: candidates[1]!.digest });
   });
 
+  it("lets a confident hold outrank the aggregate best-pick", () => {
+    const answers: Record<string, SystemOneAnswer> = {
+      [DIRECTOR_HOLD_KEY]: noul(0.9),
+      ...Object.fromEntries(candidates.map((candidate) => progress(candidate.candidateId, 0.2))),
+      [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.9, probabilities: { [candidates[0]!.candidateId]: 0.9, [DIRECTOR_NONE]: 0.1 } },
+    };
+    expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({ band: "act", method: "hold", hold: true, selections: [] });
+  });
+
   it("rescues a single candidate from the best choice when none are grounded", () => {
     const answers: Record<string, SystemOneAnswer> = {
-      [DIRECTOR_HOLD_KEY]: support("hold", 0.3),
-      [`supported:${candidates[0]!.candidateId}`]: support("a", 0.4),
+      [DIRECTOR_HOLD_KEY]: noul(0.3),
+      ...Object.fromEntries([progress(candidates[0]!.candidateId, 0.3)]),
       [DIRECTOR_BEST_KEY]: { type: "choice", choice: candidates[0]!.candidateId, confidence: 0.8, probabilities: { [candidates[0]!.candidateId]: 0.8, [candidates[1]!.candidateId]: 0.12, [candidates[2]!.candidateId]: 0.04, [DIRECTOR_NONE]: 0.04 } },
     };
     expect(composeDirectorSelection(candidates, answers, thresholds)).toMatchObject({
@@ -63,8 +83,8 @@ describe("System One Director selector", () => {
 
   it("defers when nothing is confident", () => {
     const answers: Record<string, SystemOneAnswer> = {
-      [DIRECTOR_HOLD_KEY]: support("hold", 0.4),
-      [`supported:${candidates[0]!.candidateId}`]: support("a", 0.45),
+      [DIRECTOR_HOLD_KEY]: noul(0.4),
+      ...Object.fromEntries([progress(candidates[0]!.candidateId, 0.45)]),
       [DIRECTOR_BEST_KEY]: { type: "choice", choice: DIRECTOR_NONE, confidence: 0.3, probabilities: { [DIRECTOR_NONE]: 0.6, [candidates[0]!.candidateId]: 0.4 } },
     };
     const composed = composeDirectorSelection(candidates, answers, thresholds);

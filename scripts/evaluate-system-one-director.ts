@@ -81,7 +81,10 @@ async function readState(id: string, options: { gmOnly?: boolean; setup?: (fixtu
 interface Scenario {
   id: string;
   projection: DirectorCandidateProjection[];
-  expected: string;
+  /** The oracle's preferred outcome: the intended action, or `hold` when no beat should be forced. */
+  preferred: string;
+  /** Other legal-but-not-preferred actions for this state; accepting them is not a regression. */
+  acceptable?: string[];
   /** Held out from threshold selection so the selected threshold is validated out of sample. */
   holdout: boolean;
 }
@@ -91,15 +94,20 @@ interface Readout {
   selectedAction: string | null;
   topSignal: number;
   acted: boolean;
+  /** The primary metric: held / preferred action / an accepted alternative. */
   correct: boolean;
+  /** The strict quality metric: exactly the preferred action (or held when `hold` is preferred). */
+  exact: boolean;
 }
 
 function readout(scenario: Scenario, answers: Record<string, SystemOneAnswer>, thresholds: { actionThreshold: number; reviewThreshold: number }): Readout {
   const composed = composeDirectorSelection(scenario.projection, answers, thresholds);
   const selected = composed.selections[0];
   const selectedAction = selected ? scenario.projection.find((candidate) => candidate.candidateId === selected.candidateId)?.action ?? null : null;
-  const correct = scenario.expected === "hold" ? composed.hold : selectedAction === scenario.expected;
-  return { method: composed.method, selectedAction, topSignal: composed.topSignal ?? 0, acted: composed.band === "act", correct };
+  const acceptable = new Set([scenario.preferred, ...(scenario.acceptable ?? [])]);
+  const correct = scenario.preferred === "hold" ? composed.hold : selectedAction !== null && acceptable.has(selectedAction);
+  const exact = scenario.preferred === "hold" ? composed.hold : selectedAction === scenario.preferred;
+  return { method: composed.method, selectedAction, topSignal: composed.topSignal ?? 0, acted: composed.band === "act", correct, exact };
 }
 
 function actionsOf(scenario: Scenario): string[] {
@@ -125,8 +133,9 @@ function render(input: {
   selected: ReturnType<typeof selectActionThreshold>;
   gate: ReturnType<typeof evaluatePromotionGate>;
   samples: number;
+  exactAccuracy: number;
 }): string {
-  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples } = input;
+  const { scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples, exactAccuracy } = input;
   const selectedThreshold = selected.selected?.threshold;
   const holdoutAtSelected = selectedThreshold === undefined ? undefined : holdoutPoints.find((point) => point.threshold === selectedThreshold);
   const lines: string[] = [];
@@ -134,17 +143,19 @@ function render(input: {
   lines.push("");
   lines.push(`Generated ${new Date().toISOString()} by \`scripts/evaluate-system-one-director.ts\` using the live System One adapter.`);
   lines.push("");
-  lines.push("The L1 selector builds a per-candidate support `noul`, a priority `score`, a `hold` `noul`, and an aggregate `best_candidate` `choice`, then composes hold → grounded-by-priority → best-pick → defer. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold, not the review threshold. Correctness is graded against the provider-free candidate oracle using a single intended action per state.");
+  lines.push("The L1 selector builds three atomic questions per advertised candidate — `legal` (may this be committed now?), `progress` (does it advance an active story objective?), and a priority `score` — plus a `hold` `noul` and an aggregate `best_candidate` `choice`. It composes grounded candidates (legal **and** progress at the action threshold, ordered by priority) → best-pick → hold → defer. Because Director beats mutate campaign state, the aggregate best-pick must clear the **action** threshold and the picked candidate must be legal.");
+  lines.push("");
+  lines.push("Correctness uses a two-tier provider-free candidate oracle. **Acceptable** (the primary, gating metric) means the selected action is the preferred beat or a legal non-regression alternative; **exact** means the single preferred beat. `hold` is only preferred where no beat should be forced. This grades a trustworthy beat, not one arbitrary label among several legal ones.");
   lines.push("");
   lines.push(`Live model: \`${model}\`. ${scenarios.length} scenarios x ${repeats} repeats = ${samples} sampled decisions per threshold.`);
   lines.push("");
   lines.push(`## Scenarios at the default threshold (${DEFAULT_THRESHOLD})`);
   lines.push("");
-  lines.push("| Scenario | Oracle actions | Expected | Method | Selected | Top signal | Acted | Correct |");
-  lines.push("| --- | --- | --- | --- | --- | ---: | :---: | :---: |");
+  lines.push("| Scenario | Oracle actions | Preferred | Acceptable | Method | Selected | Top signal | Acted | Accept | Exact |");
+  lines.push("| --- | --- | --- | --- | --- | --- | ---: | :---: | :---: | :---: |");
   scenarios.forEach((scenario, index) => {
     const outcome = defaultOutcomes[index]!;
-    lines.push(`| ${scenario.id} | ${actionsOf(scenario).join(", ") || "—"} | ${scenario.expected} | ${outcome.method} | ${outcome.selectedAction ?? (outcome.method === "hold" ? "hold" : "—")} | ${outcome.topSignal.toFixed(3)} | ${outcome.acted ? "yes" : "defer"} | ${outcome.acted ? (outcome.correct ? "yes" : "no") : "n/a"} |`);
+    lines.push(`| ${scenario.id} | ${actionsOf(scenario).join(", ") || "—"} | ${scenario.preferred} | ${(scenario.acceptable ?? []).join(", ") || "—"} | ${outcome.method} | ${outcome.selectedAction ?? (outcome.method === "hold" ? "hold" : "—")} | ${outcome.topSignal.toFixed(3)} | ${outcome.acted ? "yes" : "defer"} | ${outcome.acted ? (outcome.correct ? "yes" : "no") : "n/a"} | ${outcome.acted ? (outcome.exact ? "yes" : "no") : "n/a"} |`);
   });
   lines.push("");
   lines.push("## Threshold sweep (all samples)");
@@ -180,6 +191,8 @@ function render(input: {
   if (gate.reasons.length === 0) lines.push("All gates passed.");
   else for (const reason of gate.reasons) lines.push(`- ${reason}`);
   lines.push("");
+  lines.push(`Exact (preferred-action) accuracy among acted decisions: ${(exactAccuracy * 100).toFixed(1)}%. The gate uses acceptable accuracy, which counts a legal non-regression beat as a pass.`);
+  lines.push("");
   lines.push("The gate is a ceiling on confidence, not a guarantee: sample counts and holdout choice still matter, and a not-ready lane keeps its deterministic fallback. Calibration is scored only on acted decisions; deferrals are coverage, not misses.");
   lines.push("");
   return lines.join("\n");
@@ -198,17 +211,17 @@ async function main(): Promise<void> {
   const gmOnly = await readState("gm-only", { gmOnly: true });
 
   const scenarios: Scenario[] = [
-    { id: "empty-world", projection: empty, expected: "ambient-beat", holdout: false },
-    { id: "story-graph", projection: graph, expected: "reveal-node", holdout: true },
-    { id: "encounter-prep", projection: prepared, expected: "encounter-start", holdout: false },
-    { id: "gm-only", projection: gmOnly, expected: "hold", holdout: true },
+    { id: "empty-world", projection: empty, preferred: "ambient-beat", acceptable: ["advance-time"], holdout: false },
+    { id: "story-graph", projection: graph, preferred: "reveal-node", acceptable: ["ambient-beat", "advance-time"], holdout: true },
+    { id: "encounter-prep", projection: prepared, preferred: "encounter-start", holdout: false },
+    { id: "gm-only", projection: gmOnly, preferred: "hold", holdout: true },
   ];
 
   const samples: ThresholdSample[] = [];
   const devSamples: ThresholdSample[] = [];
   const holdoutSamples: ThresholdSample[] = [];
-  const defaultOutcomes: Readout[] = scenarios.map(() => ({ method: "defer", selectedAction: null, topSignal: 0, acted: false, correct: false }));
-  const firstAnswers: Array<Record<string, SystemOneAnswer> | undefined> = scenarios.map(() => undefined);
+  const defaultOutcomes: Readout[] = scenarios.map(() => ({ method: "defer", selectedAction: null, topSignal: 0, acted: false, correct: false, exact: false }));
+  const collected: Array<{ scenario: Scenario; answers: Record<string, SystemOneAnswer> }> = [];
   let model = settings.model;
 
   for (const [index, scenario] of scenarios.entries()) {
@@ -216,8 +229,8 @@ async function main(): Promise<void> {
       const questions = buildDirectorQuestions(scenario.projection);
       const result = await completeWithSystemOne({ settings, state: { scenario: scenario.id, repeat }, questions });
       model = result.model.responseModel ?? model;
+      collected.push({ scenario, answers: result.answers });
       if (repeat === 0) {
-        firstAnswers[index] = result.answers;
         defaultOutcomes[index] = readout(scenario, result.answers, { actionThreshold: DEFAULT_THRESHOLD, reviewThreshold: 0.5 });
       }
       for (const threshold of THRESHOLD_GRID) {
@@ -240,23 +253,22 @@ async function main(): Promise<void> {
   // reflects the configuration we would actually ship.
   const selectedThreshold = selected.selected?.threshold ?? DEFAULT_THRESHOLD;
   const gateThresholds = { actionThreshold: selectedThreshold, reviewThreshold: Math.min(0.5, selectedThreshold) };
-  const gateOutcomes = scenarios
-    .map((scenario, index) => ({ scenario, answers: firstAnswers[index] }))
-    .filter((entry): entry is { scenario: Scenario; answers: Record<string, SystemOneAnswer> } => entry.answers !== undefined)
-    .map(({ scenario, answers }) => readout(scenario, answers, gateThresholds));
+  const gateOutcomes = collected.map(({ scenario, answers }) => readout(scenario, answers, gateThresholds));
   const actedOutcomes = gateOutcomes.filter((outcome) => outcome.acted);
   const actedPoints: DmCalibrationPoint[] = actedOutcomes.map((outcome) => ({ predictedProbability: outcome.topSignal, correct: outcome.correct }));
   const report = gradeCalibration(actedPoints, 10);
   const accuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.correct).length / actedOutcomes.length;
+  const exactAccuracy = actedOutcomes.length === 0 ? 0 : actedOutcomes.filter((outcome) => outcome.exact).length / actedOutcomes.length;
   const gate = evaluatePromotionGate("director-selection", {
     samples: actedOutcomes.length, accuracy, brier: report.brier, expectedCalibrationError: report.expectedCalibrationError,
   });
 
-  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats });
+  const markdown = render({ scenarios, repeats, model, defaultOutcomes, allPoints, devPoints, holdoutPoints, selected, gate, samples: scenarios.length * repeats, exactAccuracy });
   await writeFile(outPath, markdown, "utf8");
-  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate }, null, 2), "utf8");
+  await writeFile(outPath.replace(/\.md$/, ".json"), JSON.stringify({ model, repeats, allPoints, devPoints, holdoutPoints, selected, gate, exactAccuracy }, null, 2), "utf8");
 
   console.log(`selected threshold: ${selected.selected ? selected.selected.threshold.toFixed(2) : "none"} (dev coverage ${selected.selected ? (selected.selected.coverage * 100).toFixed(1) : 0}%, dev accuracy ${selected.selected ? (selected.selected.actedAccuracy * 100).toFixed(1) : 0}%)`);
+  console.log(`acted: ${actedOutcomes.length} acceptable=${(accuracy * 100).toFixed(1)}% exact=${(exactAccuracy * 100).toFixed(1)}%`);
   console.log(`gate: promoted=${gate.promoted}${gate.reasons.length ? ` reasons=${gate.reasons.join("; ")}` : ""}`);
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }

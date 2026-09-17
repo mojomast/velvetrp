@@ -294,12 +294,18 @@ boundary. All batteries use the conventions in [Question design](#question-desig
 - **Shape (shadow shipped).** The server already issues opaque `CampaignDmCandidate[]`
   with digests (`campaignDmRepo.ts` `snapshot`). Because Jev evaluates each question
   independently and cannot emit an ordered list, ordering is composed in code from
-  per-candidate signals. `server/src/agent/systemOneDirector.ts` builds one `noul`
-  ("is this candidate a legal, grounded next beat?") and one `score` (priority) per
-  candidate, plus a `hold` `noul` and an aggregate `best_candidate` `choice`, then
-  composes hold → grounded-ordered-by-priority → best-pick → defer. Because Director
-  beats mutate campaign state, the aggregate pick must clear the **action** threshold,
-  not the review threshold.
+  per-candidate signals. `server/src/agent/systemOneDirector.ts` builds two atomic
+  questions per candidate — `progress` ("is committing this a good, meaningful next
+  step now?") and a priority `score` — plus a `hold` `noul` and an aggregate
+  `best_candidate` `choice`. It composes grounded candidates (progress at the action
+  threshold, ordered by priority) → hold → best-pick → defer, and with **no advertised
+  candidates it forces a hold** (the only possible action). Because Director beats mutate
+  campaign state, the aggregate pick must clear the **action** threshold, not the review
+  threshold. An atomic `legal` question was tried and removed: the advertised set is
+  already server-authorized, so re-asking legality only added model hedging without
+  changing decisions. `progress` deliberately grades a "meaningful next step" rather than
+  "story-objective progress", so a consequential mechanical beat (e.g. `encounter-start`)
+  is not penalized for not advancing plot.
 - **Shadow.** `planCampaignDmBeat` accepts an optional `getSystemOneDirector` dependency.
   When it resolves (flag + `enabled` + `shadow` + usable key) the battery runs beside the
   live planning and the would-be decision is recorded immutably; it never settles, orders,
