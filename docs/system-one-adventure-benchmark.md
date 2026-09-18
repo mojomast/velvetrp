@@ -1,6 +1,6 @@
 # System One (Jev) L2 adventure-selection benchmark
 
-Generated 2026-09-18T03:57:45.900Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
+Generated 2026-09-18T20:03:50.367Z by `scripts/evaluate-system-one-adventure-lane.ts` using the live System One adapter.
 
 ## What this measures
 
@@ -43,16 +43,16 @@ That sweep reports a **recommended action threshold**; it does not change the se
 | Action-threshold sweep grid | 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75 |
 | Battery | single fusion-free battery: 1 `supported` noul + 1 `relevance:<candidateId>` score per candidate + 1 `best_candidate` choice |
 | Repeats | 3 |
-| Corpus | 116 declarations x 3 repeats = 348 calls |
-| Holdout | 9 case(s) held out of the Platt fit (107 development) |
-| Harvested cases | 86 merged (1 human-confirmed + 85 agent-reviewed), 0 skipped — `server/test/fixtures/system-one-harvested/adventure-selection.json` |
-| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 85 agent-reviewed harvested case(s) are scored but not gated |
+| Corpus | 122 declarations x 3 repeats = 366 calls |
+| Holdout | 9 case(s) held out of the Platt fit (113 development) |
+| Harvested cases | 92 merged (1 human-confirmed + 91 agent-reviewed), 0 skipped — `server/test/fixtures/system-one-harvested/adventure-selection.json` |
+| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 91 agent-reviewed harvested case(s) are scored but not gated |
 
 ## Corpus and per-case results
 
-86 of 116 case(s) are **harvested** rows: status-confirmed live-derived labels from
+92 of 122 case(s) are **harvested** rows: status-confirmed live-derived labels from
 `server/test/fixtures/system-one-harvested/adventure-selection.json` (0 confirmed proposal(s) skipped). The review split is 1
-human-confirmed (`review-annotated`, gate-eligible) versus 85 agent-reviewed (`agent-review`). All of them
+human-confirmed (`review-annotated`, gate-eligible) versus 91 agent-reviewed (`agent-review`). All of them
 run through the same composition and appear in the per-case table, but the agent-reviewed rows are
 **not promotion evidence**: calibration, the dev/holdout split, the threshold sweep, the gate, and
 any proposed record cover only the frozen corpus plus the human-confirmed rows, and the
@@ -113,6 +113,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:30e85dce62a7 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:38c1efae5452 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:38f48e37c916 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
+| harvested:3ac1630d0dc9 | harvested | dev | harvested (agent) | quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:3b8fd99efe8a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:3d1b3a8ec7b5 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:3d2cb0327352 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -130,6 +131,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:649f071cf0e1 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:66711ff7099e | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:6ef5508ce70e | harvested | dev | harvested (agent) | check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:70699991a6e3 | harvested | dev | harvested (agent) | quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:74cbab9ca6f0 | harvested | dev | harvested (agent) | check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:787b57d44cdc | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:7bc78db301fd | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -149,16 +151,19 @@ agent-reviewed rows are summarized separately below.
 | harvested:ad383d4f9924 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:adbcb3b5ee1a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:b1446f731e6d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
+| harvested:b1e4dfc2f2e2 | harvested | dev | harvested (agent) | check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:b2c96f78d1fb | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:b3538e6d452a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:b526e0c137af | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:b6b97efce41a | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:b763a4206cef | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
+| harvested:b9821f5ea65f | harvested | dev | harvested (agent) | f4324e1c-ec9c-4c07-b6eb-a111af1e495d | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:baf07348c6f2 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:bc60e8e5ff63 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:bf4eacd2676f | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:c3e16ca55a84 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:c6487802fc34 | harvested | dev | harvested (agent) | check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
+| harvested:ccc2d2cf0d15 | harvested | dev | harvested (agent) | quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:d00089bb4860 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:da7b70b651ce | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:db0272898001 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -172,6 +177,7 @@ agent-reviewed rows are summarized separately below.
 | harvested:eac8cb0df78d | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:ee122c33b2f2 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:f1959cc7da5e | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
+| harvested:f2733fc20223 | harvested | dev | harvested (agent) | power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941 | 3 | 0 | 0/3 | 0/3 | 0 | defer 3 |
 | harvested:f37ba9fb92bf | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:f5fc508589e4 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
 | harvested:ff86af2cbc48 | harvested | dev | harvested (agent) | defer | 3 | 0 | 3/3 | 3/3 | 0 | defer 3 |
@@ -179,7 +185,7 @@ agent-reviewed rows are summarized separately below.
 
 ### Agent-reviewed harvested cases (not gated)
 
-85 merged case(s) came from **agent review** (`agent-review` provenance), not a human
+91 merged case(s) came from **agent review** (`agent-review` provenance), not a human
 verdict. They ran through the same composition and are scored in the per-case table above
 (provenance `harvested (agent)`), but they are **not promotion evidence**: the project rule is that
 promotion records re-derive only from human-confirmed labels, so the calibration fit, the
@@ -189,12 +195,12 @@ stability roll-up.
 
 | Agent-reviewed metric | Value |
 | --- | ---: |
-| Cases | 85 |
-| Graded calls | 255 |
+| Cases | 91 |
+| Graded calls | 273 |
 | Acted calls | 0 |
 | Acted accuracy | n/a |
-| Exact preferred | 231/255 |
-| Asserted-subset correctness | 90.6% |
+| Exact preferred | 231/273 |
+| Asserted-subset correctness | 84.6% |
 
 ## Decision stability
 
@@ -209,9 +215,9 @@ reserved for dedicated stability probes.
 | Metric | Value |
 | --- | ---: |
 | Mean agreement | 100.0% |
-| Conflict cases | 0 of 116 (0.0%) |
-| Mean signal std dev | 0.0127 |
-| Max signal std dev | 0.0492 |
+| Conflict cases | 0 of 122 (0.0%) |
+| Mean signal std dev | 0.0110 |
+| Max signal std dev | 0.0464 |
 
 Honesty: stability is repeatability, not accuracy; a consistently deferred case is stable and still
 a coverage miss, and a conflicted case may still have every individual pick labeled acceptable.
@@ -233,12 +239,12 @@ so `Acted` and `Coverage` are over named calls, not over every graded call.
 | ---: | ---: | ---: | ---: |
 | 0.35 | 54/54 | 100.0% | 100.0% |
 | 0.40 | 54/54 | 100.0% | 100.0% |
-| 0.45 | 50/54 | 92.6% | 100.0% |
-| 0.50 | 46/54 | 85.2% | 100.0% |
-| 0.55 | 36/54 | 66.7% | 100.0% |
-| 0.60 | 24/54 | 44.4% | 100.0% |
+| 0.45 | 51/54 | 94.4% | 100.0% |
+| 0.50 | 47/54 | 87.0% | 100.0% |
+| 0.55 | 38/54 | 70.4% | 100.0% |
+| 0.60 | 21/54 | 38.9% | 100.0% |
 | 0.65 | 11/54 | 20.4% | 100.0% |
-| 0.70 | 7/54 | 13.0% | 100.0% |
+| 0.70 | 8/54 | 14.8% | 100.0% |
 | 0.75 | 6/54 | 11.1% | 100.0% |
 
 Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy 100.0% over 54 acted).
@@ -251,10 +257,10 @@ Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy
 | ---: | ---: | ---: | ---: |
 | 0.35 | 36/36 | 100.0% | 100.0% |
 | 0.40 | 36/36 | 100.0% | 100.0% |
-| 0.45 | 34/36 | 94.4% | 100.0% |
-| 0.50 | 33/36 | 91.7% | 100.0% |
-| 0.55 | 25/36 | 69.4% | 100.0% |
-| 0.60 | 16/36 | 44.4% | 100.0% |
+| 0.45 | 35/36 | 97.2% | 100.0% |
+| 0.50 | 32/36 | 88.9% | 100.0% |
+| 0.55 | 28/36 | 77.8% | 100.0% |
+| 0.60 | 13/36 | 36.1% | 100.0% |
 | 0.65 | 8/36 | 22.2% | 100.0% |
 | 0.70 | 6/36 | 16.7% | 100.0% |
 | 0.75 | 6/36 | 16.7% | 100.0% |
@@ -263,35 +269,35 @@ Selected recommended action threshold: **0.40** (coverage 100.0%, acted accuracy
 
 | Configuration | Threshold | Gate | Samples | Accuracy | Brier | ECE |
 | --- | ---: | :---: | ---: | ---: | ---: | ---: |
-| Server default | 0.75 | NOT READY | 6 | 100.0% | 0.0000 | 0.0044 |
-| Recommended | 0.40 | PROMOTE | 54 | 100.0% | 0.0002 | 0.0110 |
+| Server default | 0.75 | NOT READY | 6 | 100.0% | 0.0000 | 0.0045 |
+| Recommended | 0.40 | PROMOTE | 54 | 100.0% | 0.0002 | 0.0107 |
 
 ## Calibration
 
 Fit the monotonic Platt map on the acted development decisions at the server default threshold (0.75) and scored it out of sample on the held-out cases. The recommended-threshold calibration is in the sweep above and the JSON sidecar.
 
-Gate scope: these rows cover the frozen corpus plus human-confirmed harvested cases only. The 85 agent-reviewed harvested case(s) are summarized separately and excluded from the fit and the scores.
+Gate scope: these rows cover the frozen corpus plus human-confirmed harvested cases only. The 91 agent-reviewed harvested case(s) are summarized separately and excluded from the fit and the scores.
 
 | Split / signal | Accuracy | Brier | ECE |
 | --- | ---: | ---: | ---: |
-| all acted, raw (6) | 100.0% | 0.0448 | 0.2117 |
-| all acted, calibrated (6) | 100.0% | 0.0000 | 0.0044 |
+| all acted, raw (6) | 100.0% | 0.0470 | 0.2167 |
+| all acted, calibrated (6) | 100.0% | 0.0000 | 0.0045 |
 | held-out acted, raw (0) | n/a | 0.0000 | 0.0000 |
 | held-out acted, calibrated (0) | n/a | 0.0000 | 0.0000 |
 
-Map: `sigmoid(a * logit(p) + b)` with a = 2.8577, b = 1.6676 (fit on 6 development acted decision(s); held out 0).
+Map: `sigmoid(a * logit(p) + b)` with a = 2.8677, b = 1.7148 (fit on 6 development acted decision(s); held out 0).
 
 ## Promotion gate — `adventure-selection`
 
 The server default action threshold remains **0.75**; a recommended threshold is an evaluation
 finding for the parent to configure, not an automatic change. The record below is proposed from the
 recommended-threshold verdict, because that is the configuration the evidence supports.
-Gate scope: frozen corpus plus human-confirmed harvested cases only. The 85 agent-reviewed
+Gate scope: frozen corpus plus human-confirmed harvested cases only. The 91 agent-reviewed
 harvested case(s) never enter these verdicts or the proposed record.
 
 ### Recommended-threshold verdict (0.40)
 
-Metrics scored on the calibrated acted signal at this threshold: samples 54, accuracy 100.0%, Brier 0.0002, ECE 0.0110.
+Metrics scored on the calibrated acted signal at this threshold: samples 54, accuracy 100.0%, Brier 0.0002, ECE 0.0107.
 
 **PROMOTE**
 
@@ -299,7 +305,7 @@ All gates passed.
 
 ### Server-default verdict (0.75)
 
-Metrics scored on the calibrated acted signal at the composed default threshold: samples 6, accuracy 100.0%, Brier 0.0000, ECE 0.0044.
+Metrics scored on the calibrated acted signal at the composed default threshold: samples 6, accuracy 100.0%, Brier 0.0000, ECE 0.0045.
 
 **NOT READY**
 
@@ -313,12 +319,12 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
   "metrics": {
     "samples": 54,
     "accuracy": 1,
-    "brier": 0.00016048429761933696,
-    "expectedCalibrationError": 0.01095177174707429
+    "brier": 0.00015129038782363846,
+    "expectedCalibrationError": 0.010742207560977879
   },
   "calibration": {
-    "a": 1.5883740171132819,
-    "b": 4.096146415280828
+    "a": 1.5429558676309463,
+    "b": 4.128660792995287
   },
   "promotedAt": "2026-09-18",
   "evidence": "docs/system-one-adventure-benchmark.md"
@@ -327,11 +333,11 @@ Metrics scored on the calibrated acted signal at the composed default threshold:
 
 ## Observations
 
-- **Coverage.** 6 of 348 graded calls acted (6 act / 49 confirm / 293 fallback); the rest deferred. 267 of 342 deferral(s) were in the acceptable set.
+- **Coverage.** 6 of 366 graded calls acted (6 act / 55 confirm / 305 fallback); the rest deferred. 267 of 360 deferral(s) were in the acceptable set.
 - **Decisive accuracy.** Among acted decisions, 6/6 (100.0%) were in the acceptable set and 6/6 (100.0%) matched the single preferred call.
-- **Under-confidence.** 81 readout(s) named a candidate; 75 named one but deferred, with signals 0.21–0.71, and 66 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
+- **Under-confidence.** 99 readout(s) named a candidate; 93 named one but deferred, with signals 0.21–0.70, and 84 of those named picks were acceptable. The raw model is right but under the 0.75 bar — the same systematic under-confidence the L1 Director lane measured. The sweep recommendation is the lever; the server default stays 0.75.
 - **Acted errors.** No acted decision fell outside its case's acceptable set.
-- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0044. The acted subset has no observed errors, so the calibration tail is untested.
+- **Calibration.** Held-out calibrated Brier 0.0000 and ECE 0.0000; all-acted calibrated Brier 0.0000 and ECE 0.0045. The acted subset has no observed errors, so the calibration tail is untested.
 
 ## Honesty notes
 

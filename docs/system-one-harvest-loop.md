@@ -147,6 +147,23 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   provider committing a Survival check outside the lane's advertised sample and a narration that
   played a rest scene with no receipt — both recorded as advertisement/narration divergences rather
   than label changes.
+- **Fourth wave (SRD world, advertisement-guided).** The first v2 synthetic batch (harness per
+  [synthetic player simulation](synthetic-player-simulation.md#first-measured-v2-batch-2026-09-18))
+  ran 12 live turns in the reviewed SRD 5.1 world `.velvet/synth-srd-1` ("The Last Harbor Light")
+  with advertisement reading, reachability re-targeting and menu-aligned generation live. Advertised
+  share rose from 30 of 94 turns (32%) to 10 of 12 (83%) and band `act` from 6 of 94 (6%) to 5 of
+  12 (42%); six target swaps moved unreachable cells (commerce, combat consumable, power, quest
+  objective) onto families the world actually advertised, and the world advertised six families in
+  12 turns (travel, SRD check, inventory, power, quest lifecycle, quest objective). Agent review
+  labelled all six acted decisions correct and judged all seven deferrals reasonable, so the wave
+  produced six confirmed cases (`agent-review`) and no new errors; the fixture now holds **92 cases
+  (1 human-confirmed + 91 agent-reviewed)**. The lane still defers on every agent-reviewed case in
+  the production-shaped evaluation, so they add coverage and stability rather than scored labels:
+  stability is 100% (0 of 122 cases conflicted), the gated record is unchanged at 54 acted/100%
+  with Brier 0.0002 and ECE 0.0107 at the recommended 0.40, and the agent subset scores 231/273
+  exact preferred. Two follow-ups recorded rather than fixed: the reviewer flagged near-duplicate
+  declaration motifs across personas (diversity check due), and SRD checks are declaration-driven,
+  so a scheduler that keeps only the previous turn's menu under-reports them — keep a recent union.
 - **Reliability finding.** Planning budget denials hard-failed ~9% of executed turns because the
   conservative prompt estimate over-counts measured tokens; denials now degrade to deterministic
   fallback narration (see [provider hardening](provider-hardening.md)) and the harness records a

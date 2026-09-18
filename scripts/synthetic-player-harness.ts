@@ -27,6 +27,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 // -------------------------------------------------------------------------------------------------
@@ -66,6 +67,11 @@ export const FAMILY_TOOL_KINDS: Readonly<Record<MechanicFamily, string>> = {
   progression: "exact_progression_apply.select",
 };
 
+/** Reverse of `FAMILY_TOOL_KINDS`: tool kind -> family. Unknown kinds are simply absent. */
+export const KIND_TO_FAMILY: Readonly<Record<string, MechanicFamily>> = Object.freeze(
+  Object.fromEntries(MECHANIC_FAMILIES.map(family => [FAMILY_TOOL_KINDS[family], family])) as Record<string, MechanicFamily>,
+);
+
 export const FAILURE_MODES = [
   "direct",
   "ambiguous",
@@ -76,6 +82,13 @@ export const FAILURE_MODES = [
   "literal-edge",
 ] as const;
 export type FailureMode = (typeof FAILURE_MODES)[number];
+
+/** Failure modes that deliberately aim off the advertised menu. */
+export const OFF_MENU_FAILURE_MODES = ["unsupported", "unadvertised", "literal-edge"] as const;
+
+export function isOffMenuFailureMode(value: FailureMode): boolean {
+  return (OFF_MENU_FAILURE_MODES as readonly FailureMode[]).includes(value);
+}
 
 export const EFFORTS = ["low", "high"] as const;
 export type Effort = (typeof EFFORTS)[number];
@@ -864,17 +877,21 @@ export type CoverageReport = {
   targets: CoverageTargets;
   planned: CoverageMatrix;
   achieved: CoverageMatrix;
+  advertised: CoverageMatrix;
+  acted: CoverageMatrix;
   remaining: CoverageMatrix;
   totals: {
     target: number;
     planned: number;
     achieved: number;
+    advertisedTotal: number;
+    actedTotal: number;
     remaining: number;
     satisfiedCells: number;
     totalCells: number;
   };
   exhausted: boolean;
-  byFamily: Record<MechanicFamily, { target: number; planned: number; achieved: number }>;
+  byFamily: Record<MechanicFamily, { target: number; planned: number; achieved: number; advertised: number; acted: number }>;
   byFailureMode: Record<FailureMode, { target: number; planned: number; achieved: number }>;
 };
 
@@ -933,6 +950,8 @@ export class CoverageScheduler {
   readonly #totalTarget: number;
   readonly #planned = new Map<string, number>();
   readonly #achieved = new Map<string, number>();
+  readonly #advertised = new Map<string, number>();
+  readonly #acted = new Map<string, number>();
 
   constructor(options: CoverageSchedulerOptions = {}) {
     this.targets = options.targets ?? COVERAGE_TARGETS;
@@ -962,6 +981,18 @@ export class CoverageScheduler {
     return total;
   }
 
+  get totalAdvertised(): number {
+    let total = 0;
+    for (const value of this.#advertised.values()) total += value;
+    return total;
+  }
+
+  get totalActed(): number {
+    let total = 0;
+    for (const value of this.#acted.values()) total += value;
+    return total;
+  }
+
   get exhausted(): boolean {
     return this.totalPlanned >= this.#totalTarget;
   }
@@ -987,16 +1018,19 @@ export class CoverageScheduler {
     return false;
   }
 
-  /** Reserves and returns the next weighted cell, or `null` when every cell target is met. */
-  next(rng: SeededRng): CoverageCell | null {
-    const candidates: { cell: CoverageCell; weight: number }[] = [];
-    for (const family of MECHANIC_FAMILIES) {
-      for (const mode of FAILURE_MODES) {
-        const cell: CoverageCell = { family, failureMode: mode };
-        if (this.remainingFor(cell) <= 0) continue;
-        candidates.push({ cell, weight: coverageWeight(this.#persona, cell, { baseFamilyWeight: this.#baseFamilyWeight, biasFamilyWeight: this.#biasFamilyWeight }) });
-      }
-    }
+  /**
+   * Reserves and returns the next weighted cell, or `null` when every cell target is met. When
+   * `advertisedFamilies` is non-empty, remaining cells from those families are preferred; if the
+   * menu has no remaining cell the global weighted choice is used so probe turns still draw from
+   * the whole matrix.
+   */
+  next(rng: SeededRng, options: { advertisedFamilies?: readonly MechanicFamily[] } = {}): CoverageCell | null {
+    const advertisedFamilies = options.advertisedFamilies;
+    const advertised = advertisedFamilies !== undefined && advertisedFamilies.length > 0
+      ? new Set(advertisedFamilies)
+      : null;
+    let candidates = this.#collectCandidates(advertised);
+    if (candidates.length === 0) candidates = this.#collectCandidates(null);
     if (candidates.length === 0) return null;
     let total = 0;
     for (const candidate of candidates) total += candidate.weight;
@@ -1014,43 +1048,89 @@ export class CoverageScheduler {
     return chosen.cell;
   }
 
+  #collectCandidates(advertised: ReadonlySet<MechanicFamily> | null): { cell: CoverageCell; weight: number }[] {
+    const candidates: { cell: CoverageCell; weight: number }[] = [];
+    for (const family of MECHANIC_FAMILIES) {
+      if (advertised !== null && !advertised.has(family)) continue;
+      for (const mode of FAILURE_MODES) {
+        const cell: CoverageCell = { family, failureMode: mode };
+        if (this.remainingFor(cell) <= 0) continue;
+        candidates.push({ cell, weight: coverageWeight(this.#persona, cell, { baseFamilyWeight: this.#baseFamilyWeight, biasFamilyWeight: this.#biasFamilyWeight }) });
+      }
+    }
+    return candidates;
+  }
+
+  /** Releases one reserved slot so a later `next` can reuse the cell (floor 0). */
+  release(cell: CoverageCell): void {
+    const key = cellKey(cell.family, cell.failureMode);
+    const planned = this.#planned.get(key) ?? 0;
+    if (planned > 0) this.#planned.set(key, planned - 1);
+  }
+
   /** Records an executed declaration for the cell. */
   record(cell: CoverageCell): void {
     const key = cellKey(cell.family, cell.failureMode);
     this.#achieved.set(key, (this.#achieved.get(key) ?? 0) + 1);
   }
 
+  /** Records an executed turn whose family the server advertised to the lane. */
+  recordAdvertised(cell: CoverageCell): void {
+    const key = cellKey(cell.family, cell.failureMode);
+    this.#advertised.set(key, (this.#advertised.get(key) ?? 0) + 1);
+  }
+
+  /** Records an executed turn whose lane pick names a row of the cell's family. */
+  recordActed(cell: CoverageCell): void {
+    const key = cellKey(cell.family, cell.failureMode);
+    this.#acted.set(key, (this.#acted.get(key) ?? 0) + 1);
+  }
+
   report(): CoverageReport {
     const planned = emptyCoverageMatrix();
     const achieved = emptyCoverageMatrix();
+    const advertised = emptyCoverageMatrix();
+    const acted = emptyCoverageMatrix();
     const remaining = emptyCoverageMatrix();
     const byFamily = {} as CoverageReport["byFamily"];
     const byFailureMode = {} as CoverageReport["byFailureMode"];
     let plannedTotal = 0;
     let achievedTotal = 0;
+    let advertisedTotal = 0;
+    let actedTotal = 0;
     let remainingTotal = 0;
     let satisfiedCells = 0;
     for (const family of MECHANIC_FAMILIES) {
       let targetTotal = 0;
       let familyPlanned = 0;
       let familyAchieved = 0;
+      let familyAdvertised = 0;
+      let familyActed = 0;
       for (const mode of FAILURE_MODES) {
         const target = this.targets[family][mode];
         const cellPlanned = this.#planned.get(cellKey(family, mode)) ?? 0;
         const cellAchieved = this.#achieved.get(cellKey(family, mode)) ?? 0;
+        const cellAdvertised = this.#advertised.get(cellKey(family, mode)) ?? 0;
+        const cellActed = this.#acted.get(cellKey(family, mode)) ?? 0;
         const cellRemaining = Math.max(0, target - cellPlanned);
         planned[family][mode] = cellPlanned;
         achieved[family][mode] = cellAchieved;
+        advertised[family][mode] = cellAdvertised;
+        acted[family][mode] = cellActed;
         remaining[family][mode] = cellRemaining;
         targetTotal += target;
         familyPlanned += cellPlanned;
         familyAchieved += cellAchieved;
+        familyAdvertised += cellAdvertised;
+        familyActed += cellActed;
         plannedTotal += cellPlanned;
         achievedTotal += cellAchieved;
+        advertisedTotal += cellAdvertised;
+        actedTotal += cellActed;
         remainingTotal += cellRemaining;
         if (cellPlanned >= target) satisfiedCells += 1;
       }
-      byFamily[family] = { target: targetTotal, planned: familyPlanned, achieved: familyAchieved };
+      byFamily[family] = { target: targetTotal, planned: familyPlanned, achieved: familyAchieved, advertised: familyAdvertised, acted: familyActed };
     }
     for (const mode of FAILURE_MODES) {
       let targetTotal = 0;
@@ -1067,11 +1147,15 @@ export class CoverageScheduler {
       targets: this.targets,
       planned,
       achieved,
+      advertised,
+      acted,
       remaining,
       totals: {
         target: this.#totalTarget,
         planned: plannedTotal,
         achieved: achievedTotal,
+        advertisedTotal,
+        actedTotal,
         remaining: remainingTotal,
         satisfiedCells,
         totalCells: COVERAGE_CELL_COUNT,
@@ -1080,6 +1164,121 @@ export class CoverageScheduler {
       byFamily,
       byFailureMode,
     };
+  }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Advertisement reader: what the server actually offered the lane for one executed turn
+// -------------------------------------------------------------------------------------------------
+
+export type TurnAdvertisementSnapshot = {
+  /** Deduped selection tool kinds, in advertised order. */
+  kinds: string[];
+  /** Families derived from `kinds`, deduped, in advertised order. */
+  families: MechanicFamily[];
+  /** Deduped player-facing labels, in advertised order. */
+  labels: string[];
+  band: string | null;
+  method: string | null;
+  selectedKind: string | null;
+};
+
+/**
+ * Pure parser for one `system_one_decisions_v1` adventure-selection row. The request JSON carries
+ * `{ state: { candidates: [{ candidateId, kind, label }] } }`; the selection JSON carries
+ * `{ method, selection: { candidateId } | null }`. Kind and label lists are deduped while keeping
+ * advertised order, and the selected candidate id resolves to its advertised kind. Malformed JSON
+ * (in the request, or in a present selection) yields null so callers can fail soft.
+ */
+export function parseAdventureDecisionRow(row: {
+  requestJson: string;
+  selectionJson: string | null;
+  confidenceBand: string | null;
+}): TurnAdvertisementSnapshot | null {
+  let request: unknown;
+  try {
+    request = JSON.parse(row.requestJson);
+  } catch {
+    return null;
+  }
+  if (!isPlainObject(request)) return null;
+  const state = request["state"];
+  if (!isPlainObject(state)) return null;
+  const rawCandidates = state["candidates"];
+  if (!Array.isArray(rawCandidates)) return null;
+
+  const candidates: { candidateId: string | null; kind: string }[] = [];
+  const kinds: string[] = [];
+  const families: MechanicFamily[] = [];
+  const labels: string[] = [];
+  for (const raw of rawCandidates) {
+    if (!isPlainObject(raw)) continue;
+    const kind = raw["kind"];
+    if (typeof kind !== "string" || kind.length === 0) continue;
+    const candidateId = typeof raw["candidateId"] === "string" && raw["candidateId"].length > 0 ? raw["candidateId"] : null;
+    const label = typeof raw["label"] === "string" && raw["label"].length > 0 ? raw["label"] : null;
+    candidates.push({ candidateId, kind });
+    if (!kinds.includes(kind)) kinds.push(kind);
+    const family = KIND_TO_FAMILY[kind];
+    if (family !== undefined && !families.includes(family)) families.push(family);
+    if (label !== null && !labels.includes(label)) labels.push(label);
+  }
+
+  let method: string | null = null;
+  let selectedKind: string | null = null;
+  if (row.selectionJson !== null) {
+    let selection: unknown;
+    try {
+      selection = JSON.parse(row.selectionJson);
+    } catch {
+      return null;
+    }
+    if (isPlainObject(selection)) {
+      const rawMethod = selection["method"];
+      if (typeof rawMethod === "string" && rawMethod.length > 0) method = rawMethod;
+      const pick = selection["selection"];
+      if (isPlainObject(pick)) {
+        const candidateId = pick["candidateId"];
+        if (typeof candidateId === "string") {
+          const match = candidates.find(candidate => candidate.candidateId === candidateId);
+          if (match !== undefined) selectedKind = match.kind;
+        }
+      }
+    }
+  }
+
+  return { kinds, families, labels, band: row.confidenceBand, method, selectedKind };
+}
+
+/**
+ * Read-only advertisement lookup for one executed turn: opens `<dataDir>/velvet.sqlite` with
+ * `node:sqlite` in read-only mode, takes the newest adventure-selection row for the turn, and
+ * delegates to `parseAdventureDecisionRow`. Every failure (missing file, missing table, no row,
+ * unreadable data) returns null and never throws into a run.
+ */
+export function readTurnAdvertisements(dataDir: string, turnId: string): TurnAdvertisementSnapshot | null {
+  let database: DatabaseSync | null = null;
+  try {
+    database = new DatabaseSync(path.join(dataDir, "velvet.sqlite"), { readOnly: true });
+    const row = database
+      .prepare("SELECT request_json, selection_json, confidence_band FROM system_one_decisions_v1 WHERE lane = 'adventure-selection' AND turn_id = ? ORDER BY created_at DESC LIMIT 1")
+      .get(turnId);
+    if (row === undefined) return null;
+    return parseAdventureDecisionRow({
+      requestJson: typeof row["request_json"] === "string" ? row["request_json"] : "",
+      selectionJson: typeof row["selection_json"] === "string" ? row["selection_json"] : null,
+      confidenceBand: typeof row["confidence_band"] === "string" ? row["confidence_band"] : null,
+    });
+  } catch {
+    return null;
+  } finally {
+    if (database !== null) {
+      try {
+        database.close();
+      } catch {
+        // The connection is already unusable; the read-only lookup still fails soft.
+      }
+    }
   }
 }
 
@@ -1220,6 +1419,8 @@ export type GeneratorPromptInput = {
   allowedNoise: readonly SurfaceNoiseName[];
   requiredNoise: readonly SurfaceNoiseName[];
   referenceBudget: number;
+  /** Player-facing labels the server advertised on the previous turn; ids/digests never appear. */
+  advertisedOptions?: readonly string[];
 };
 
 export type GenerationRequest = GeneratorPromptInput & {
@@ -1250,12 +1451,22 @@ export function buildGeneratorMessages(input: GeneratorPromptInput): { system: s
       return `${index + 1}. [${turn.turnId}] ${truncateText(turn.declaration, 400)}${narration}`;
     }).join("\n")
     : "(no completed turns yet)";
+  // Advertised options are player-facing labels only. Off-menu cells must avoid invoking them;
+  // every other cell must clearly invoke one. The lines never carry ids, digests, revisions,
+  // provider details, or harness vocabulary.
+  const advertisedOptions = input.advertisedOptions ?? [];
+  const advertisedLine = advertisedOptions.length === 0
+    ? null
+    : isOffMenuFailureMode(input.target.failureMode)
+      ? `The game currently offers these options: ${advertisedOptions.join(", ")}. This turn is deliberately off-menu: do not clearly invoke any of the listed options.`
+      : `The game currently offers these options: ${advertisedOptions.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`;
   const user = [
     "Transcript (completed declarations and latest narrations, oldest first):",
     transcriptLines,
     "",
     `Sheet summary (public labels only): ${input.sheetSummary}`,
     `Target this turn: family=${input.target.family} (tool ${FAMILY_TOOL_KINDS[input.target.family]}) failureMode=${input.target.failureMode}; effort=${input.effort}.`,
+    ...(advertisedLine !== null ? [advertisedLine] : []),
     `Write the next declaration and an optional OOC aside.${input.referenceBudget > 0 ? ` Reference up to ${input.referenceBudget} transcript anchors when useful.` : ""}`,
     "Do not name hidden ids. Do not resolve outcomes.",
     `Allowed surface noise: ${input.allowedNoise.join(", ")}.`,
@@ -1486,8 +1697,19 @@ export type HarnessTurnRecord = {
   receipts: { commandId: string; proposalId: string }[];
   narration: { status: string; text: string | null; source: string | null } | null;
   error: string | null;
+  /** What the server actually advertised to the lane for this turn; null when unknown/unreadable. */
+  advertisements: TurnAdvertisementSnapshot | null;
+  /** The pre-swap planned cell, set only when re-targeting replaced this turn's target. */
+  plannedTarget?: CoverageCell;
   /** Status/outcome trail for a turn that did not end `done`; omitted on successful turns. */
   events?: TurnEventCode[];
+};
+
+/** One re-targeting record: the planned cell released and the advertised-family cell reserved. */
+export type HarnessTargetSwap = {
+  turnIndex: number;
+  from: CoverageCell;
+  to: CoverageCell;
 };
 
 export type HarnessManifest = {
@@ -1503,9 +1725,11 @@ export type HarnessManifest = {
   mode: "dry-run" | "live";
   generator: GeneratorIdentity;
   gameProvider: { model: string };
-  world: { campaignId: string | null; sessionId: string | null; actorId: string | null; dataDir: string | null };
+  world: { campaignId: string | null; sessionId: string | null; actorId: string | null; dataDir: string | null; contentProfile: string | null };
   sessions: SyntheticSessionRecord[];
   turns: HarnessTurnRecord[];
+  /** Re-targeting records, in turn order; empty when every planned cell stayed on plan. */
+  targetSwaps: HarnessTargetSwap[];
   coverage: CoverageReport;
   state: HarnessRunState;
   notes: string[];
@@ -2243,6 +2467,13 @@ export type HarnessSessionInput = {
   notes: readonly string[];
   referenceBudget: number;
   transcriptWindow: number;
+  /**
+   * Optional read-only advertisement reader. Defaults to `readTurnAdvertisements` when `dataDir`
+   * is non-null, and to no reader (null snapshots) otherwise.
+   */
+  readAdvertisements?: (turnId: string) => TurnAdvertisementSnapshot | null;
+  /** Content profile token the run exercised (trimmed; empty/whitespace becomes null). */
+  contentProfile?: string | null;
 };
 
 function emptyTurnRecord(plan: PlannedTurn, persona: PersonaDefinition, idempotencyKey: string): HarnessTurnRecord {
@@ -2268,6 +2499,7 @@ function emptyTurnRecord(plan: PlannedTurn, persona: PersonaDefinition, idempote
     receipts: [],
     narration: null,
     error: null,
+    advertisements: null,
   };
 }
 
@@ -2299,10 +2531,65 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
   let state: HarnessRunState = input.mode === "dry-run" ? "planned" : "complete";
   const promptHash = createHash("sha256");
   const contractHash = createHash("sha256");
+  const contentProfile = input.contentProfile?.trim() || null;
+  const dataDir = input.dataDir;
+  const readAdvertisements = input.readAdvertisements
+    ?? (dataDir !== null ? (turnId: string) => readTurnAdvertisements(dataDir, turnId) : null);
+  const targetSwaps: HarnessTargetSwap[] = [];
+  let previousAdvertisements: TurnAdvertisementSnapshot | null = null;
+  let pendingPlannedTarget: CoverageCell | undefined;
+  const latestAdvertisements = (): TurnAdvertisementSnapshot | null => previousAdvertisements;
 
-  for (const planned of plan.turns) {
+  /**
+   * Reads the finished turn's advertisement snapshot, records it on the turn, and feeds the
+   * advertised/acted counters. A missing snapshot leaves the counters untouched.
+   */
+  const processAdvertisements = (record: HarnessTurnRecord, executed: CoverageCell): void => {
+    if (readAdvertisements === null) return;
+    const snapshot = readAdvertisements(record.turnId ?? "");
+    record.advertisements = snapshot;
+    previousAdvertisements = snapshot;
+    if (snapshot === null) return;
+    if (snapshot.families.includes(executed.family)) plan.scheduler.recordAdvertised(executed);
+    const selectedFamily = snapshot.selectedKind === null ? null : KIND_TO_FAMILY[snapshot.selectedKind] ?? null;
+    if (selectedFamily !== null && selectedFamily === executed.family) plan.scheduler.recordActed(executed);
+  };
+
+  /**
+   * Advertisement-guided re-targeting: when the upcoming planned cell's family is not on the
+   * advertised menu and a remaining cell in an advertised family exists, release the planned
+   * cell and reserve the reachable one. The swap is keyed off a run-scoped RNG derived from the
+   * run seed and the upcoming turn index, so a replay of the same decisions is deterministic.
+   */
+  const retargetNextTurn = (nextIndex: number): void => {
+    const snapshot = latestAdvertisements();
+    if (snapshot === null || snapshot.families.length === 0) return;
+    const upcoming = plan.turns[nextIndex];
+    if (upcoming === undefined) return;
+    if (snapshot.families.includes(upcoming.target.family)) return;
+    const reachable = snapshot.families.some(family =>
+      FAILURE_MODES.some(mode => plan.scheduler.remainingFor({ family, failureMode: mode }) > 0));
+    if (!reachable) return;
+    const original: CoverageCell = { ...upcoming.target };
+    plan.scheduler.release(original);
+    const swapRng = createRng(`${input.runSeed}:retarget:${upcoming.turnIndex}`);
+    const replacement = plan.scheduler.next(swapRng, { advertisedFamilies: snapshot.families });
+    if (replacement === null) return;
+    upcoming.target = replacement;
+    upcoming.toolKind = FAMILY_TOOL_KINDS[replacement.family];
+    pendingPlannedTarget = original;
+    targetSwaps.push({ turnIndex: upcoming.turnIndex, from: original, to: { ...replacement } });
+  };
+
+  for (let planIndex = 0; planIndex < plan.turns.length; planIndex += 1) {
+    const planned = plan.turns[planIndex] as PlannedTurn;
     const idempotencyKey = deriveIdempotencyKey(input.runId, planned.turnIndex);
     const record = emptyTurnRecord(planned, input.persona, idempotencyKey);
+    if (pendingPlannedTarget !== undefined) {
+      record.plannedTarget = pendingPlannedTarget;
+      pendingPlannedTarget = undefined;
+    }
+    const latest = latestAdvertisements();
     const base: GeneratorPromptInput = {
       persona: input.persona,
       runId: input.runId,
@@ -2316,6 +2603,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       allowedNoise: planned.allowedNoise,
       requiredNoise: planned.requiredNoise,
       referenceBudget: input.referenceBudget,
+      ...(latest !== null && latest.labels.length > 0
+        ? { advertisedOptions: [...latest.labels] }
+        : {}),
     };
     const request = buildGenerationRequest(base);
     promptHash.update(stableStringify(request.messages, 0));
@@ -2367,6 +2657,8 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     if (input.mode === "dry-run") {
       record.outcome = "planned";
       turns.push(record);
+      processAdvertisements(record, planned.target);
+      retargetNextTurn(planIndex + 1);
       continue;
     }
 
@@ -2392,6 +2684,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
         record.error = "ambiguous turn failure: no automatic retry; run marked uncertain";
         notes.push(`turn ${planned.turnIndex}: ambiguous failure; run marked uncertain and stopped without retry`);
         turns.push(record);
+        processAdvertisements(record, planned.target);
         state = "uncertain";
         break;
       }
@@ -2411,11 +2704,13 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
         }];
       }
       turns.push(record);
+      processAdvertisements(record, planned.target);
       if (outcome.terminalOutcome === "error") {
         notes.push(`turn ${planned.turnIndex}: terminal error; run stopped`);
         state = "failed";
         break;
       }
+      retargetNextTurn(planIndex + 1);
     } catch (error) {
       const uncertain = error instanceof SessionTurnError ? error.uncertain : true;
       record.error = errorMessage(error);
@@ -2450,6 +2745,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       sessionId: input.sessionId,
       actorId: input.actorId,
       dataDir: input.dataDir,
+      contentProfile,
     },
     sessions: [{
       sessionTag,
@@ -2462,6 +2758,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
       contractDigest: contractHash.digest("hex"),
     }],
     turns,
+    targetSwaps,
     coverage: plan.scheduler.report(),
     state,
     notes,
@@ -2487,6 +2784,8 @@ export type HarnessCliOptions = {
   sheetSummary: string | null;
   baseUrl: string;
   maxConfirmationRounds: number;
+  dataDir: string | null;
+  contentProfile: string | null;
   help: boolean;
 };
 
@@ -2515,6 +2814,8 @@ export function harnessUsage(): string {
     "  --sheet-summary <text>   Public sheet labels for the prompt (default a placeholder).",
     "  --api-base-url <url>     Velvet server URL; defaults to VELVET_API_URL or http://127.0.0.1:8787.",
     "  --max-confirmation-rounds <n>  Confirmation batches handled per turn (default 5).",
+    "  --data-dir <path>        SQLite data directory for read-only advertisement reads (default VELVET_DATA_DIR).",
+    "  --content-profile <token>  Content profile the run exercised, recorded in the manifest (default null).",
     "  --dry-run                Use the deterministic fake generator; never touch the network.",
     "  --help, -h               Print this text.",
     "",
@@ -2556,6 +2857,8 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   let sheetSummary: string | null = null;
   let baseUrl = env.VELVET_API_URL?.trim() || "http://127.0.0.1:8787";
   let maxConfirmationRounds = 5;
+  let dataDir: string | null = env.VELVET_DATA_DIR?.trim() || null;
+  let contentProfile: string | null = null;
   let help = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -2650,6 +2953,18 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
         index = taken.nextIndex;
         break;
       }
+      case "--data-dir": {
+        const taken = takeValue(argv, index, inline, flag);
+        dataDir = taken.value;
+        index = taken.nextIndex;
+        break;
+      }
+      case "--content-profile": {
+        const taken = takeValue(argv, index, inline, flag);
+        contentProfile = taken.value;
+        index = taken.nextIndex;
+        break;
+      }
       case "--dry-run": {
         if (inline !== null) throw new Error("--dry-run does not take a value");
         dryRun = true;
@@ -2674,7 +2989,7 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   }
   if (!(["http:", "https:"] as string[]).includes(parsedBase.protocol)) throw new Error("--api-base-url must be an HTTP(S) URL");
   baseUrl = parsedBase.toString().replace(/\/+$/, "");
-  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, help };
+  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, help };
 }
 
 export type HarnessCliIo = {
@@ -2711,6 +3026,10 @@ export function renderManifestSummary(manifest: HarnessManifest): string[] {
   }
   const totals = manifest.coverage.totals;
   lines.push(`coverage: planned ${totals.planned}/${totals.target}, achieved ${totals.achieved}/${totals.target}, remaining ${totals.remaining}, satisfied cells ${totals.satisfiedCells}/${totals.totalCells}`);
+  const turnCount = manifest.turns.length;
+  const share = (count: number): string => turnCount === 0 ? "n/a" : `${Math.round((count / turnCount) * 100)}%`;
+  lines.push(`advertised: ${totals.advertisedTotal}/${turnCount} (${share(totals.advertisedTotal)})`);
+  lines.push(`acted: ${totals.actedTotal}/${turnCount} (${share(totals.actedTotal)})`);
   return lines;
 }
 
@@ -2758,7 +3077,7 @@ export async function runHarnessCli(
       temperature: (generatorConfig as GeneratorEnvConfig).temperature,
     };
   const generateTurn = dryRun ? createFakeGenerator() : createLiveGenerator(generatorConfig as GeneratorEnvConfig, io.fetchImpl);
-  const dataDir = env.VELVET_DATA_DIR?.trim() || null;
+  const dataDir = options.dataDir;
   const startedAt = new Date().toISOString();
   const gitCommit = readGitCommit(process.cwd());
 
@@ -2814,6 +3133,7 @@ export async function runHarnessCli(
       campaignId: options.campaignId,
       actorId: options.actorId,
       dataDir,
+      contentProfile: options.contentProfile,
       syntheticTag: sessionTag,
       notes,
       referenceBudget: 3,

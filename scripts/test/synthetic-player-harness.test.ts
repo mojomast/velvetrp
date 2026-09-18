@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import {
   ABBREVIATIONS,
@@ -10,7 +14,9 @@ import {
   FAILURE_MODES,
   FAMILY_TOOL_KINDS,
   HARNESS_VERSION,
+  KIND_TO_FAMILY,
   MECHANIC_FAMILIES,
+  OFF_MENU_FAILURE_MODES,
   PERSONAS,
   PERSONA_ARCHETYPES,
   PERSONA_LIST,
@@ -50,11 +56,13 @@ import {
   noiseTrailingQuestionOoc,
   noiseTypo,
   noiseUppercaseFirst,
+  parseAdventureDecisionRow,
   parseHarnessArgs,
   parseSseBlock,
   parseSseText,
   parseTurnContractJson,
   planRun,
+  readTurnAdvertisements,
   renderManifestSummary,
   requestInit,
   requiredNoiseFor,
@@ -66,9 +74,14 @@ import {
   stableStringify,
   transcriptSlice,
   validateTurnContract,
+  type CoverageTargets,
+  type FailureMode,
+  type GenerationRequest,
   type GeneratorPromptInput,
   type HarnessManifest,
   type HarnessSessionInput,
+  type MechanicFamily,
+  type TurnAdvertisementSnapshot,
   type TurnContractContext,
 } from "../synthetic-player-harness.js";
 
@@ -1294,8 +1307,20 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
     sheetSummary: null,
     baseUrl: "http://127.0.0.1:8787",
     maxConfirmationRounds: 5,
+    dataDir: null,
+    contentProfile: null,
     help: false,
   });
+  // `--data-dir` overrides the VELVET_DATA_DIR default; without the flag the env value survives.
+  assert.equal(parseHarnessArgs(["--data-dir", "/tmp/velvet"], { VELVET_DATA_DIR: "/env/velvet" }).dataDir, "/tmp/velvet");
+  assert.equal(parseHarnessArgs([], { VELVET_DATA_DIR: "/env/velvet" }).dataDir, "/env/velvet");
+  assert.equal(parseHarnessArgs(["--data-dir", "/tmp/velvet"], {}).dataDir, "/tmp/velvet");
+  assert.throws(() => parseHarnessArgs(["--data-dir"], {}), /--data-dir requires a value/);
+  // The content profile is caller-supplied only; absent stays null.
+  assert.equal(parseHarnessArgs(["--content-profile", "velvet-starter"], {}).contentProfile, "velvet-starter");
+  assert.equal(parseHarnessArgs(["--content-profile=srd-5.1"], {}).contentProfile, "srd-5.1");
+  assert.equal(parseHarnessArgs([], {}).contentProfile, null);
+  assert.throws(() => parseHarnessArgs(["--content-profile"], {}), /--content-profile requires a value/);
   const parsed = parseHarnessArgs([
     "--turns=3",
     "--personas", "explorer.v1,impatient",
@@ -1363,4 +1388,307 @@ test("CLI live mode requires campaign, session, and actor ids", async () => {
     /live mode requires --campaign-id, --session-id, --actor-id/,
   );
   assert.ok(lines.every(line => !line.includes("network disabled")));
+});
+
+// -------------------------------------------------------------------------------------------------
+// Advertisement reader, coverage accounting, and re-targeting
+// -------------------------------------------------------------------------------------------------
+
+const TRAVEL_LABEL = "Travel: Market → Harbor";
+
+function travelAdvertisement(): TurnAdvertisementSnapshot {
+  return {
+    kinds: ["exact_actor_travel.select"],
+    families: ["travel"],
+    labels: [TRAVEL_LABEL],
+    band: "act",
+    method: "choice",
+    selectedKind: "exact_actor_travel.select",
+  };
+}
+
+/** Four reachable cells for seed `t204`: the planned order is on-menu / off-menu testable. */
+function advertisementTargets(): CoverageTargets {
+  const zeros = defaultCoverageTargets(0);
+  const matrix = {} as Record<MechanicFamily, Record<FailureMode, number>>;
+  for (const family of MECHANIC_FAMILIES) {
+    matrix[family] = {} as Record<FailureMode, number>;
+    for (const mode of FAILURE_MODES) matrix[family][mode] = zeros[family][mode];
+  }
+  matrix["combat-consumable"]["unsupported"] = 1;
+  matrix["rest"]["direct"] = 1;
+  matrix["travel"]["direct"] = 1;
+  matrix["travel"]["unadvertised"] = 1;
+  return matrix;
+}
+
+function advertisementRunInput(overrides: Partial<HarnessSessionInput> = {}): HarnessSessionInput {
+  return makeDryRunInput({
+    runSeed: "t204",
+    turns: 3,
+    targets: advertisementTargets(),
+    readAdvertisements: () => travelAdvertisement(),
+    ...overrides,
+  });
+}
+
+test("KIND_TO_FAMILY is the exact reverse of FAMILY_TOOL_KINDS", () => {
+  for (const family of MECHANIC_FAMILIES) {
+    assert.equal(KIND_TO_FAMILY[FAMILY_TOOL_KINDS[family]], family);
+  }
+  assert.equal(Object.keys(KIND_TO_FAMILY).length, MECHANIC_FAMILIES.length);
+  assert.equal(KIND_TO_FAMILY["exact_unknown.select"], undefined);
+});
+
+test("parseAdventureDecisionRow dedupes advertised kinds/labels and resolves the selection", () => {
+  const requestJson = JSON.stringify({
+    state: {
+      declaration: "I head to the harbor.",
+      candidates: [
+        { candidateId: "c1", digest: "d1", kind: "exact_actor_travel.select", label: "Travel: Market → Harbor" },
+        { candidateId: "c2", digest: "d2", kind: "exact_rest.select", label: "Rest at the inn" },
+        { candidateId: "c3", digest: "d3", kind: "exact_actor_travel.select", label: "Travel: Market → Harbor" },
+        { candidateId: "c4", digest: "d4", kind: "exact_unknown.select", label: "Mystery option" },
+      ],
+    },
+    model: "m",
+    questions: {},
+  });
+
+  const snapshot = parseAdventureDecisionRow({
+    requestJson,
+    selectionJson: JSON.stringify({ method: "choice", selection: { candidateId: "c2", digest: "d2" } }),
+    confidenceBand: "act",
+  });
+  assert.ok(snapshot);
+  assert.deepEqual(snapshot.kinds, ["exact_actor_travel.select", "exact_rest.select", "exact_unknown.select"]);
+  assert.deepEqual(snapshot.families, ["travel", "rest"], "unknown kinds contribute no family");
+  assert.deepEqual(snapshot.labels, ["Travel: Market → Harbor", "Rest at the inn", "Mystery option"]);
+  assert.equal(snapshot.band, "act");
+  assert.equal(snapshot.method, "choice");
+  assert.equal(snapshot.selectedKind, "exact_rest.select");
+
+  const deferred = parseAdventureDecisionRow({
+    requestJson,
+    selectionJson: JSON.stringify({ method: "defer", selection: null }),
+    confidenceBand: null,
+  });
+  assert.ok(deferred);
+  assert.equal(deferred.method, "defer");
+  assert.equal(deferred.selectedKind, null);
+  assert.equal(deferred.band, null);
+
+  const unknownPick = parseAdventureDecisionRow({
+    requestJson,
+    selectionJson: JSON.stringify({ method: "choice", selection: { candidateId: "c9" } }),
+    confidenceBand: "fallback",
+  });
+  assert.ok(unknownPick);
+  assert.equal(unknownPick.selectedKind, null);
+  assert.equal(unknownPick.band, "fallback");
+
+  assert.equal(parseAdventureDecisionRow({ requestJson: "not json", selectionJson: null, confidenceBand: null }), null);
+  assert.equal(parseAdventureDecisionRow({ requestJson: "[1,2]", selectionJson: null, confidenceBand: null }), null);
+  assert.equal(parseAdventureDecisionRow({ requestJson: JSON.stringify({ state: {} }), selectionJson: null, confidenceBand: null }), null);
+  assert.equal(parseAdventureDecisionRow({ requestJson, selectionJson: "not json", confidenceBand: null }), null);
+});
+
+test("readTurnAdvertisements reads the newest adventure-selection row and fails soft", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "velvet-advert-"));
+  const emptyDir = await mkdtemp(join(tmpdir(), "velvet-advert-empty-"));
+  try {
+    const database = new DatabaseSync(join(dir, "velvet.sqlite"));
+    database.exec(`CREATE TABLE system_one_decisions_v1 (
+      decision_id TEXT PRIMARY KEY,
+      lane TEXT NOT NULL,
+      turn_id TEXT,
+      request_json TEXT NOT NULL,
+      selection_json TEXT NOT NULL,
+      confidence_band TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    const insert = database.prepare(
+      "INSERT INTO system_one_decisions_v1 (decision_id, lane, turn_id, request_json, selection_json, confidence_band, created_at) VALUES (?,?,?,?,?,?,?)",
+    );
+    const rowJson = (candidateId: string, kind: string, label: string): string => JSON.stringify({
+      state: { declaration: "I move.", candidates: [{ candidateId, digest: "d", kind, label }] },
+      model: "m",
+      questions: {},
+    });
+    insert.run("decision:1", "adventure-selection", "turn-1", rowJson("c1", "exact_rest.select", "Old rest row"), JSON.stringify({ method: "choice", selection: { candidateId: "c1" } }), "act", "2026-01-01T00:00:00.000Z");
+    insert.run("decision:2", "adventure-selection", "turn-1", rowJson("c2", "exact_actor_travel.select", "Newer travel row"), JSON.stringify({ method: "defer", selection: null }), "fallback", "2026-01-02T00:00:00.000Z");
+    insert.run("decision:3", "adventure-selection", "turn-2", rowJson("c3", "exact_actor_travel.select", "Other turn"), JSON.stringify({ method: "choice", selection: { candidateId: "c3" } }), "act", "2026-01-03T00:00:00.000Z");
+    database.close();
+
+    const newest = readTurnAdvertisements(dir, "turn-1");
+    assert.ok(newest);
+    assert.deepEqual(newest.labels, ["Newer travel row"]);
+    assert.deepEqual(newest.families, ["travel"]);
+    assert.equal(newest.method, "defer");
+    assert.equal(newest.selectedKind, null);
+    assert.equal(newest.band, "fallback");
+
+    assert.equal(readTurnAdvertisements(dir, "turn-9"), null, "no row for the turn");
+    assert.equal(readTurnAdvertisements(join(dir, "missing"), "turn-1"), null, "missing database file");
+
+    const empty = new DatabaseSync(join(emptyDir, "velvet.sqlite"));
+    empty.exec("CREATE TABLE unrelated (x)");
+    empty.close();
+    assert.equal(readTurnAdvertisements(emptyDir, "turn-1"), null, "missing decisions table");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await rm(emptyDir, { recursive: true, force: true });
+  }
+});
+
+test("scheduler prefers advertised families, falls back, and release restores capacity", () => {
+  const scheduler = new CoverageScheduler({ targets: defaultCoverageTargets(1), persona: PERSONAS.explorer });
+  const rng = createRng("advertised");
+  for (let index = 0; index < FAILURE_MODES.length; index += 1) {
+    const cell = scheduler.next(rng, { advertisedFamilies: ["travel"] });
+    assert.ok(cell);
+    assert.equal(cell.family, "travel", "prefers a remaining advertised-family cell");
+  }
+  const fallbackCell = scheduler.next(rng, { advertisedFamilies: ["travel"] });
+  assert.ok(fallbackCell);
+  assert.notEqual(fallbackCell.family, "travel", "falls back to the global choice when no advertised cell remains");
+
+  const release = new CoverageScheduler({ targets: defaultCoverageTargets(1), persona: PERSONAS.explorer });
+  const reserved = release.next(createRng("release"), { advertisedFamilies: ["rest"] });
+  assert.ok(reserved);
+  assert.equal(release.plannedFor(reserved), 1);
+  assert.equal(release.remainingFor(reserved), 0);
+  release.release(reserved);
+  assert.equal(release.plannedFor(reserved), 0);
+  assert.equal(release.remainingFor(reserved), 1, "release restores capacity");
+  release.release(reserved);
+  assert.equal(release.plannedFor(reserved), 0, "release floors at zero");
+
+  const emptyMenu = new CoverageScheduler({ targets: defaultCoverageTargets(1), persona: PERSONAS.explorer });
+  const plain = new CoverageScheduler({ targets: defaultCoverageTargets(1), persona: PERSONAS.explorer });
+  assert.deepEqual(
+    emptyMenu.next(createRng("deterministic"), { advertisedFamilies: [] }),
+    plain.next(createRng("deterministic")),
+    "an empty menu keeps the original weighted choice",
+  );
+});
+
+test("advertised options shape the generator prompt by failure mode", () => {
+  const labels = ["Travel: Market → Harbor", "Rest at the inn"];
+  const onMenu = buildGeneratorMessages(promptInput({
+    target: { family: "travel", failureMode: "ambiguous" },
+    advertisedOptions: labels,
+  }));
+  assert.ok(onMenu.user.includes(
+    `The game currently offers these options: ${labels.join(", ")}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
+  ));
+  assert.ok(!onMenu.user.includes("deliberately off-menu"));
+
+  for (const mode of OFF_MENU_FAILURE_MODES) {
+    const offMenu = buildGeneratorMessages(promptInput({
+      target: { family: "travel", failureMode: mode },
+      advertisedOptions: labels,
+    }));
+    assert.ok(offMenu.user.includes(`The game currently offers these options: ${labels.join(", ")}.`));
+    assert.ok(offMenu.user.includes("This turn is deliberately off-menu: do not clearly invoke any of the listed options."));
+    assert.ok(!offMenu.user.includes("clearly invokes one of them"));
+  }
+
+  const withoutOptions = buildGeneratorMessages(promptInput());
+  assert.ok(!withoutOptions.user.includes("The game currently offers these options:"));
+  assert.ok(!withoutOptions.user.includes("deliberately off-menu"));
+});
+
+test("advertisement-guided run re-targets toward the menu and counts advertised/acted", async () => {
+  const requests: GenerationRequest[] = [];
+  const fake = createFakeGenerator();
+  const manifest = await runHarnessSession(advertisementRunInput({
+    generateTurn: request => {
+      requests.push(request);
+      return fake(request);
+    },
+  }));
+
+  assert.equal(manifest.turns.length, 3);
+  assert.deepEqual(manifest.turns.map(turn => turn.target), [
+    { family: "combat-consumable", failureMode: "unsupported" },
+    { family: "travel", failureMode: "direct" },
+    { family: "travel", failureMode: "unadvertised" },
+  ]);
+  assert.equal(manifest.turns[0]?.plannedTarget, undefined, "an on-plan turn carries no pre-swap cell");
+  assert.deepEqual(manifest.turns[1]?.plannedTarget, { family: "rest", failureMode: "direct" });
+  assert.equal(manifest.turns[1]?.toolKind, FAMILY_TOOL_KINDS.travel);
+  assert.deepEqual(manifest.targetSwaps, [{
+    turnIndex: 1,
+    from: { family: "rest", failureMode: "direct" },
+    to: { family: "travel", failureMode: "direct" },
+  }]);
+  for (const turn of manifest.turns) assert.deepEqual(turn.advertisements, travelAdvertisement());
+
+  assert.equal(manifest.coverage.totals.advertisedTotal, 2);
+  assert.equal(manifest.coverage.totals.actedTotal, 2);
+  assert.equal(manifest.coverage.advertised.travel.direct, 1);
+  assert.equal(manifest.coverage.advertised.travel.unadvertised, 1);
+  assert.equal(manifest.coverage.advertised["combat-consumable"].unsupported, 0, "the off-menu probe is not advertised");
+  assert.equal(manifest.coverage.acted.travel.direct, 1);
+  assert.equal(manifest.coverage.acted.travel.unadvertised, 1);
+  assert.equal(manifest.coverage.byFamily.travel.advertised, 2);
+  assert.equal(manifest.coverage.byFamily.travel.acted, 2);
+
+  assert.equal(requests.length, 3);
+  assert.equal(requests[0]?.target.family, "combat-consumable");
+  assert.equal(requests[0]?.advertisedOptions, undefined, "the first turn has no prior menu");
+  assert.deepEqual(requests[1]?.advertisedOptions, [TRAVEL_LABEL]);
+  assert.ok(requests[1]?.messages.user.includes(
+    `The game currently offers these options: ${TRAVEL_LABEL}. Write the declaration in natural player language so it clearly invokes one of them; do not quote this list or mention mechanics.`,
+  ));
+  assert.deepEqual(requests[2]?.advertisedOptions, [TRAVEL_LABEL]);
+  assert.ok(requests[2]?.messages.user.includes("This turn is deliberately off-menu: do not clearly invoke any of the listed options."));
+  assert.ok(!(requests[2]?.messages.user.includes("clearly invokes one of them") ?? true));
+});
+
+test("advertisement-guided run keeps the planned cell when no advertised cell is reachable", async () => {
+  const manifest = await runHarnessSession(advertisementRunInput({
+    // `srd-check` has no coverage target in this matrix, so its menu rows are all unreachable.
+    readAdvertisements: () => ({
+      kinds: ["exact_srd_check.select"],
+      families: ["srd-check"],
+      labels: ["Investigate the runes"],
+      band: "confirm",
+      method: "defer",
+      selectedKind: null,
+    }),
+  }));
+  assert.deepEqual(manifest.targetSwaps, [], "no reachable advertised cell, so the plan is kept");
+  assert.deepEqual(manifest.turns.map(turn => turn.target), [
+    { family: "combat-consumable", failureMode: "unsupported" },
+    { family: "rest", failureMode: "direct" },
+    { family: "travel", failureMode: "unadvertised" },
+  ]);
+  assert.equal(manifest.turns[1]?.plannedTarget, undefined);
+  assert.equal(manifest.coverage.totals.advertisedTotal, 0);
+  assert.equal(manifest.coverage.totals.actedTotal, 0, "a defer names no acted family");
+});
+
+test("renderManifestSummary includes the advertisement totals", async () => {
+  const manifest = await runHarnessSession(advertisementRunInput());
+  const summary = renderManifestSummary(manifest);
+  assert.ok(summary.some(line => line.includes("advertised: 2/3 (67%)")), summary.join("\n"));
+  assert.ok(summary.some(line => line.includes("acted: 2/3 (67%)")), summary.join("\n"));
+});
+
+test("manifest records the content profile when supplied and null when omitted", async () => {
+  const omitted = await runHarnessSession(makeDryRunInput());
+  assert.equal(omitted.world.contentProfile, null);
+  assert.ok(serializeManifest(omitted).includes('"contentProfile": null'));
+
+  const supplied = await runHarnessSession(makeDryRunInput({ contentProfile: "velvet-starter" }));
+  assert.equal(supplied.world.contentProfile, "velvet-starter");
+  assert.ok(serializeManifest(supplied).includes('"contentProfile": "velvet-starter"'));
+
+  const trimmed = await runHarnessSession(makeDryRunInput({ contentProfile: "  srd-5.1  " }));
+  assert.equal(trimmed.world.contentProfile, "srd-5.1");
+
+  const blank = await runHarnessSession(makeDryRunInput({ contentProfile: "   " }));
+  assert.equal(blank.world.contentProfile, null, "whitespace-only profile becomes null");
 });

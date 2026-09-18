@@ -1,11 +1,11 @@
 # Synthetic player simulation
 
-Status: research and design, nothing implemented. This document proposes a persona-driven
-synthetic-play harness that generates error-rich declarations through the existing HTTP
-adventure-turn API so the [System One harvest loop](system-one-harvest-loop.md) can accumulate
-coverage before the product has real players. Claims are marked **sourced** (with a link) or
-**proposed**; proposed numbers are internal design targets, not measurements. Nothing here
-enables a lane, writes a fixture, or re-weights a promotion record. External links checked 2026-09-17.
+Status: design plus the implemented v1 harness (`scripts/synthetic-player-harness.ts`, 41 tests)
+and a measured coverage audit of its first five batches. The v2 changes below
+(advertisement-guided play, world capability accounting, acted coverage) are **in progress**.
+Claims are marked **sourced** (with a link) or **proposed**; proposed numbers are internal design
+targets, not measurements. Nothing here enables a lane, writes a fixture, or re-weights a promotion
+record. External links checked 2026-09-17; audit measured 2026-09-18.
 
 ## Why synthetic players
 
@@ -51,6 +51,130 @@ sees it: the failure modes below are the product.
 | Unsupported actions | "I drop my longsword." | the live `unequip` literal-reading edge |
 | Variable pacing | long roleplay turns alternating with one-word ones | burstiness; threshold stability |
 | Confirmation behavior | sometimes approve, sometimes reject | confirmation-path coverage |
+
+## Measured coverage audit (2026-09-18)
+
+The first five batches (22 runs, 98 requested turns, 94 with a recorded L2 decision) were audited
+against what the server **actually advertised** to the lane — `system_one_decisions_v1.request_json`,
+`state.candidates[]`, the cap-limited union the lane reasons over — rather than what the harness
+targeted. The result changes the generation strategy.
+
+| Family | Targeted | Family advertised | Lane picked that family |
+| --- | ---: | ---: | ---: |
+| commerce | 17 | **0** | 0 |
+| rest | 12 | 2 | 1 |
+| travel | 10 | **0** | 0 |
+| power | 10 | 9 | 1 |
+| progression | 9 | **0** | 0 |
+| combat power | 9 | **0** | 0 |
+| combat consumable | 8 | **0** | 0 |
+| SRD check | 8 | 8 | 2 |
+| quest lifecycle | 7 | 7 | 2 |
+| quest objective | 6 | 2 | 0 |
+| inventory | 2 | 2 | 0 |
+| **Total** | **98** | **30 of 94** | **6** |
+
+The lane deferred on **88 of 94** turns. The design's coverage matrix recorded 52 of 77 cells as
+non-zero, but that counter counts a *declared target*, not an advertised or acted state, so it
+overstates family coverage. Two root causes, both measured:
+
+1. **World capability gap.** The demo world the batches ran against (`.velvet/emberwake-reach-run2`)
+   has **0 locations, 0 connections, 0 shop definitions, 0 travel destinations, 0 NPCs** — travel
+   and commerce are anatomically impossible there; no declaration can advertise them. The seeded
+   Baie-Comeau worlds carry 17 locations, 22 connections, 13 NPCs, 1 shop definition and 1 travel
+   destination, and are the right coverage substrate.
+2. **Target-blind generation.** The generator saw persona, transcript and sheet, but never the
+   advertised menu, so a turn aimed at a family the current state does not offer is a guaranteed
+   deferral. Only 30 of 94 targeted turns even had the family advertised; the remaining 64 spent a
+   coverage slot on a state the world could not produce.
+
+**Measured world capability (probes, 2026-09-18).** Family coverage is a property of the world,
+not just the harness:
+
+| World | Advertised families observed | Structures / notes |
+| --- | --- | --- |
+| `.velvet/emberwake-reach-run2` (canary) | SRD check, power, quest lifecycle, inventory, quest objective (partial), rest (conditional on spent resources) | 0 locations, 0 connections, 0 shops, 0 travel destinations, 0 NPCs — travel and commerce are impossible here |
+| `.velvet/synth-baie-comeau-2` (fresh seed, current schema) | travel, inventory, quest lifecycle, quest objective | 17 locations, 23 connections, 13 NPCs, 1 shop, 2 encounters; `velvet:mechanics-starter` content, so no SRD check or power families; rest did **not** advertise at health 11/12 |
+| `.velvet/synth-srd-1` (reviewed SRD adventure, current schema) | SRD check (24 rows from one check-flavored declaration), travel, inventory, power, quest lifecycle, quest objective | 3 locations, 2 connections, 1 NPC, SRD fighter with hit dice; goblin encounter available; `srd-5.1:starter` pinned |
+
+The worlds are complementary and the primary/secondary split follows the user's SRD 5.1 focus:
+`.velvet/synth-srd-1` is the primary synthetic arm (SRD checks, powers, rest, inventory, quests,
+travel, plus the goblin encounter for combat families), while `.velvet/synth-baie-comeau-2`
+supplies the platform-mechanics minority (travel, commerce, quest lifecycle, quest objective) that
+the SRD world cannot. Combat families still need an encounter-active state in either world.
+
+## Generation strategy v2: advertisement-guided play (in progress)
+
+The fix is to close the loop between what the world offers and what the generator writes, and to
+account for coverage honestly. The v1 harness already reads the bootstrap, follows the normal
+gameplay loop, and tags sessions; v2 adds:
+
+1. **World capability matrix.** Before a batch, classify each family for the run's world as
+   `advertisable`, `conditional`, or `impossible` from world content (locations, connections, shop
+   bindings, travel destinations, NPC presence, encounter support). Family-coverage turns are spent
+   only on `advertisable` families; `impossible` families are exercised solely as deliberate
+   off-menu probes, and the capability matrix is pinned in the run manifest. The manifest also
+   carries the campaign's declared **content profile** (`srd-5.1`, `velvet-starter`, …), so every
+   corpus and evaluation result can name the rules content that produced it.
+2. **Advertisement reading.** After each submitted turn, the harness reads that turn's lane decision
+   (read-only SQLite at the run's `VELVET_DATA_DIR`) and records the advertised kinds and
+   player-facing labels, the lane band, and the selected kind. This is scheduler feedback; the
+   persona generator receives only the labels — the same menu a player reads in narration — never
+   candidate ids, digests, or revisions.
+3. **Probe, align, verify.** When the advertised menu is unknown (first turn, or after state
+   changed), the planned declaration is the probe. Otherwise the generator is told the advertised
+   labels and must write a natural declaration that clearly invokes one of them — except for cells
+   whose failure mode is deliberately off-menu (`unsupported`, `unadvertised`, some `ambiguous`),
+   which must avoid them. Verification happens after the turn: advertised family set, band, pick.
+4. **Acted coverage accounting.** Manifests carry four matrices — planned (cells reserved),
+   declared (turns executed), advertised (the turn's family was on the menu), acted (the lane picked
+   a row of that family). A menu cell counts as covered only when acted; off-menu modes count on
+   declared intent. The summary prints advertised and acted shares, so a batch's yield is visible
+   without re-deriving it from the decision log.
+5. **Re-targeting.** When the next planned cell's family is not advertised but a remaining cell's
+   family is, the scheduler swaps to the reachable cell and records the swap in the manifest, so a
+   session fills real coverage instead of deferring on repeat.
+6. **Deliberate off-target share.** A pre-registered fraction (proposed 20%) of turns stays aimed
+   off-menu even when the family is advertised; those negatives are the tail the gate needs and are
+   never counted as family coverage.
+7. **World rotation.** One world per run, pinned; campaigns used for a family's coverage must list
+   that family as advertisable in their capability row, and the corpus records which world each case
+   came from. The lane's home canary world stays the integration target; coverage batches run on
+   capable worlds.
+
+Proposed yield targets for a menu-cell batch: advertised share ≥ 0.7, acted share ≥ 0.5 (the rest
+honest deferrals worth reviewing), off-menu share 15–25%. These are design targets, not
+measurements; the first v2 batch exists to replace them with numbers.
+
+### First measured v2 batch (2026-09-18)
+
+Three personas (explorer, rules-tinkerer, achiever) × 4 turns, run against `.velvet/synth-srd-1`
+("The Last Harbor Light", `srd-5.1:starter`), with the advertisement reader, re-targeting and
+prompt alignment all live:
+
+| Measure | v1 (22 runs) | first v2 batch (3 runs) |
+| --- | ---: | ---: |
+| Turns with a decision | 94 | 12 |
+| Targeted family advertised | 30 (32%) | **10 (83%)** |
+| Lane band `act` | 6 (6%) | **5 (42%)** |
+| Picked the target family | 6 (6%) | **4 (33%)** |
+| Target swaps | — | 6 |
+
+The swaps moved six unreachable cells (commerce ×3, combat consumable, power, quest objective)
+onto families the world actually advertised (quest lifecycle ×2, quest objective ×2, inventory,
+power); no swap consumed a turn on a guaranteed deferral. Acts landed on power, quest lifecycle,
+quest objective ×2 and travel. The advertised menus across all turns were travel, SRD check,
+inventory, power, quest lifecycle and quest objective — six families in a 12-turn session, versus
+four in the entire v1 run. The one lane-origin SRD check execution in the world was the manual
+probe; batch acts landed on families that are advisory by design (the active orchestrator commits
+checks and rests only).
+
+Two tuning notes from the run, both expected but worth recording: `srd-check` is
+declaration-driven (a check-flavored declaration advertised 24 check rows, the batch's generic
+declarations fewer), so a future scheduler pass should keep the recent union of advertised
+families rather than only the previous turn's; and the weighted matrix spends only about one in
+seven menu cells on `direct`, which gated the acted count more than the lane did — `direct` cells
+should be weighted up when the goal is harvest volume rather than matrix balance.
 
 ## Method survey
 
@@ -166,20 +290,24 @@ cells are target declaration counts per generation campaign. All numbers **propo
 
 ### Provenance: the `synthetic-player` session tag
 
-- Synthetic sessions mint resource IDs under a literal prefix,
-  `synthetic-player.<personaId>.<seed>.<sessionIndex>` (dots are legal in resource IDs). Every
-  lane records `session_id` unchanged, so `system_one_decisions_v1` already carries the tag and
-  needs no schema change.
+- Synthetic runs mint a literal tag, `synthetic-player.<personaId>.<seed>.<sessionIndex>`
+  (dots are legal in resource IDs). As implemented, the tag appears in the harness's generated
+  contracts and run manifests; it is **not** written to `system_one_decisions_v1`, because the
+  turn API takes the real room session id and the decision log stores that unchanged. The
+  manifest plus the run's `dataDir` are therefore the authoritative synthetic record: the manifest
+  lists every turn id the run submitted, and a decision is synthetic when its turn id appears in a
+  manifest. This is what the harvest tooling should join on, not a session-id prefix.
 - The tag is deliberately **orthogonal to harvest provenance**. `review-annotated`,
-  `agent-review`, and `provider-disagreement` say *who labelled*; the tag says *where the state
-  came from*. A synthetic decision can be human-confirmed and still be synthetic.
-- Proposed harvest changes: `HarvestProposal` gains `synthetic: boolean` (derived from the
-  session id) and proposal identity includes it, so a synthetic case can never alias a live one
-  with the same state. The CLI gains `--exclude-synthetic`, `--synthetic-only`, and a summary
-  split; the default includes synthetic proposals but marks them.
-- The prefix is a convention, not an authentication boundary. The run manifest is the
-  authoritative record; a prefixed proposal with no matching manifest entry is treated as live
-  until reviewed.
+  `agent-review`, and `provider-disagreement` say *who labelled*; the manifest says *where the
+  state came from*. A synthetic decision can be human-confirmed and still be synthetic.
+- Proposed harvest changes: `HarvestProposal` gains `synthetic: boolean` (derived by matching the
+  decision's turn id against the manifests for the same `dataDir`/campaign) and proposal identity
+  includes it, so a synthetic case can never alias a live one with the same state. The CLI gains
+  `--exclude-synthetic`, `--synthetic-only`, and a summary split; the default includes synthetic
+  proposals but marks them.
+- A world used only for synthetic play (its own `VELVET_DATA_DIR`, recorded in every manifest) is
+  synthetic by construction even before the manifest join; the join remains what makes a claim
+  auditable.
 
 ### Reproducibility
 
@@ -241,8 +369,8 @@ play, or predictive validity, and repeated optimization against the judge overfi
 ## Harvest integration (proposed)
 
 ```
-synthetic harness (tagged sessions, manifests)
-  -> shadow lanes record decisions in system_one_decisions_v1 (session_id carries the tag)
+synthetic harness (run tags in contracts + manifests)
+  -> shadow lanes record decisions in system_one_decisions_v1 (real room session id; turn ids join to manifests)
   -> harvest CLI: default include-and-mark | --exclude-synthetic | --synthetic-only
   -> proposals carry synthetic: true + source manifest digest; human review is unchanged
   -> --write-fixture writes them flagged synthetic: true; lane evals may merge for coverage
@@ -250,7 +378,9 @@ synthetic harness (tagged sessions, manifests)
 ```
 
 - **Decisions.** No new table and no schema change: the log already stores `campaignId`,
-  `sessionId`, and `turnId`, and stays immutable. The tag and manifest are the only additions.
+  `sessionId`, and `turnId`, and stays immutable. The manifest (which records every submitted turn
+  id, plus the run's `dataDir`) is the only addition the synthetic flag needs; the session id in
+  the log stays the real room id and is not the synthetic marker.
 - **Labels.** Annotation rules do not change. A human confirming a synthetic case still produces
   `review-annotated` (or `agent-review`) provenance; the synthetic flag travels beside it and is
   part of the proposal identity.
