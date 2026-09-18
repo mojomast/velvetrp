@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import DatabaseDriver from "better-sqlite3";
+import path from "node:path";
 import { buildApp } from "../src/app.js";
 import {
+  listLaneCommittedSystemOneDecisionIds,
+  listRecentSystemOneDecisionsWithLaneCommits,
   listSystemOneDecisionsByLane,
   recordSystemOneDecision,
   summarizeSystemOneDecisions,
@@ -12,9 +16,9 @@ process.env.NODE_ENV = "test";
 useTmpDataDir();
 
 const PROJECTED_KEYS = [
-  "campaignId", "confidenceBand", "confidencePolicyVersion", "createdAt", "decisionId", "fallbackUsed",
-  "latencyMs", "lane", "model", "provider", "questionsDigest", "requestDigest", "sessionId", "shadow",
-  "stateDigest", "turnId",
+  "campaignId", "committedByLane", "confidenceBand", "confidencePolicyVersion", "createdAt", "decisionId",
+  "fallbackUsed", "latencyMs", "lane", "model", "provider", "questionsDigest", "requestDigest", "sessionId",
+  "shadow", "stateDigest", "turnId",
 ].sort();
 
 function decision(overrides: Partial<RecordSystemOneDecisionInput> = {}): RecordSystemOneDecisionInput {
@@ -60,6 +64,27 @@ function seedThree(): void {
     usage: null,
     createdAt: "2035-01-01T00:00:03.000Z",
   }));
+}
+
+/**
+ * Seeds one lane-origin check execution row linking `decisionId`. The read join only consumes the
+ * execution's link columns, so this fixture connection skips the campaign graph foreign keys a full
+ * lane commit would build.
+ */
+function seedLaneExecution(decisionId: string, suffix: string): void {
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  db.pragma("foreign_keys = OFF");
+  db.prepare(`INSERT INTO adventure_check_executions_v54
+    (command_id,candidate_id,campaign_id,turn_id,origin,provider_call_id,provider_tool_call_id,round_number,
+      provider_request_digest,provider_response_digest,system_one_decision_id,selection_json,selection_digest,
+      revision_before,revision_after,rolls_json,public_result_json,result_digest,occurred_at)
+    VALUES(?,?,?,?,'lane',NULL,NULL,NULL,NULL,NULL,?,?,?,0,1,?,?,?,?)`).run(
+    `check-command:${suffix}`, `check-candidate:${suffix}`, `campaign:${suffix}`, `turn:${suffix}`, decisionId,
+    JSON.stringify({ candidateId: `check-candidate:${suffix}` }), "a".repeat(64),
+    JSON.stringify([{ value: 12, kept: true }]), JSON.stringify({ outcome: "success" }), "b".repeat(64),
+    "2035-01-01T00:00:00.000Z",
+  );
+  db.close();
 }
 
 describe("System One decision read api", () => {
@@ -138,16 +163,61 @@ describe("System One decision read api", () => {
     const body = response.json();
     expect(body).toEqual({
       total: 3,
-      byLane: [{ lane: "guardrails", count: 1 }, { lane: "speaker-routing", count: 2 }],
+      byLane: [
+        { lane: "guardrails", count: 1, laneCommits: 0 },
+        { lane: "speaker-routing", count: 2, laneCommits: 0 },
+      ],
       byBand: [{ band: "act", count: 1 }, { band: "confirm", count: 1 }, { band: "fallback", count: 1 }],
       fallbackUsed: 2,
       shadow: 1,
+      laneCommits: 0,
+      shadowLaneCommits: 0,
       meanLatencyMs: 200,
       totalInputTokens: 150,
       totalOutputTokens: 15,
     });
     expect(body.fallbackUsed / body.total).toBeCloseTo(2 / 3);
     expect(body.shadow / body.total).toBeCloseTo(1 / 3);
+    await app.close();
+  });
+
+  it("marks lane-origin commits from the execution join and counts them per lane", async () => {
+    seedThree();
+    recordSystemOneDecision(decision({
+      decisionId: "decision:advisory", lane: "adventure-selection", shadow: true,
+      createdAt: "2035-01-01T00:00:04.000Z",
+    }));
+    // Two executions linked to the same decision must count as one committed decision.
+    seedLaneExecution("decision:2", "commit:1");
+    seedLaneExecution("decision:2", "commit:2");
+    const app = buildApp();
+
+    const listed = await app.inject({ method: "GET", url: "/api/provider/system-one/decisions" });
+    expect(listed.statusCode).toBe(200);
+    const decisions = (listed.json() as { decisions: Array<Record<string, unknown>> }).decisions;
+    const byId = new Map(decisions.map((entry) => [entry.decisionId, entry]));
+    expect(decisions.map((entry) => entry.decisionId)).toEqual(["decision:advisory", "decision:3", "decision:2", "decision:1"]);
+    // decision:2 was recorded advisory (shadow: true) and then committed by a lane-origin execution.
+    expect(byId.get("decision:2")).toMatchObject({ shadow: true, committedByLane: true });
+    // A plain advisory decision with no execution row stays shadow-only.
+    expect(byId.get("decision:advisory")).toMatchObject({ shadow: true, committedByLane: false });
+    expect(byId.get("decision:1")).toMatchObject({ shadow: false, committedByLane: false });
+
+    const summaryResponse = await app.inject({ method: "GET", url: "/api/provider/system-one/decisions/summary" });
+    expect(summaryResponse.statusCode).toBe(200);
+    const summary = summaryResponse.json();
+    expect(summary).toMatchObject({ total: 4, shadow: 2, laneCommits: 1, shadowLaneCommits: 1 });
+    expect(summary.byLane).toEqual([
+      { lane: "adventure-selection", count: 1, laneCommits: 0 },
+      { lane: "guardrails", count: 1, laneCommits: 0 },
+      { lane: "speaker-routing", count: 2, laneCommits: 1 },
+    ]);
+
+    // The repository join itself reports the same evidence and stays additive.
+    expect(listLaneCommittedSystemOneDecisionIds(["decision:1", "decision:2", "decision:3"]))
+      .toEqual(new Set(["decision:2"]));
+    expect(listRecentSystemOneDecisionsWithLaneCommits(10).find((record) => record.decisionId === "decision:2")?.committedByLane)
+      .toBe(true);
     await app.close();
   });
 
@@ -161,7 +231,7 @@ describe("System One decision read api", () => {
 
     const summary = summarizeSystemOneDecisions(1);
     expect(summary.total).toBe(1);
-    expect(summary.byLane).toEqual([{ lane: "guardrails", count: 1 }]);
+    expect(summary.byLane).toEqual([{ lane: "guardrails", count: 1, laneCommits: 0 }]);
     expect(summarizeSystemOneDecisions(0).total).toBe(1);
   });
 });

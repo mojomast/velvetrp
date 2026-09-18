@@ -274,7 +274,10 @@ test("contract validation reports every bad shape with a clear error", () => {
   expectContractError(validContract({ intended: { family: "travel", failureMode: "ambiguous", extra: 1 } }), /unknown field "intended.extra"/);
   expectContractError(validContract({ intended: null }), /"intended" must be an object/);
   expectContractError(validContract({ noise: ["lowercase", "lowercase"] }), /"noise" repeats "lowercase"/);
-  expectContractError(validContract({ noise: ["lowercase", "shouting"] }), /"noise\[1\]" is not a known surface noise/);
+  // Unknown perturbation names are advisory: the harness drops and records them instead of failing.
+  const droppedNoise = validateTurnContract(validContract({ noise: ["lowercase", "shouting"] }));
+  assert.deepEqual(droppedNoise.noise, ["lowercase"]);
+  assert.deepEqual(droppedNoise.noiseDropped, ["shouting"]);
   expectContractError(validContract({ noise: "lowercase" }), /"noise" must be an array/);
   expectContractError(validContract({ references: [""] }), /"references\[0\]" must be a nonblank string/);
   expectContractError(validContract({ references: ["a", "a"] }), /"references" repeats "a"/);
@@ -657,13 +660,12 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
   assert.equal(validateTurnContract(await truncatedGenerator(request)).declaration, "I look at the ferry wreck.");
   assert.equal(truncatedCalls, 2);
 
-  // A strict-contract violation (for example a noise name the harness does not implement) is
-  // also retried once; the model tends to invent perturbation names.
+  // A strict-contract violation (for example an invalid effort) is retried once.
   let contractCalls = 0;
   const contractFetch = (async () => {
     contractCalls += 1;
     const payload = contractCalls === 1
-      ? { ...validContract(), noise: ["not-a-real-noise"] }
+      ? { ...validContract(), declaration: "" }
       : validContract();
     return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: JSON.stringify(payload) }, finish_reason: "stop" }] }), { status: 200 });
   }) as typeof fetch;

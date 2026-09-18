@@ -9,7 +9,7 @@ import {
 import {
   getPublicSystemOneSettings,
   getSystemOneSettings,
-  listRecentSystemOneDecisions,
+  listRecentSystemOneDecisionsWithLaneCommits,
   summarizeSystemOneDecisions,
   updateSystemOneSettings,
   type SystemOneDecisionRecord,
@@ -31,7 +31,7 @@ function projectDecision(record: SystemOneDecisionRecord): {
   provider: string; model: string; confidencePolicyVersion: string;
   requestDigest: string; questionsDigest: string; stateDigest: string;
   confidenceBand: SystemOneDecisionRecord["confidenceBand"];
-  fallbackUsed: boolean; shadow: boolean; latencyMs: number; createdAt: string;
+  fallbackUsed: boolean; shadow: boolean; committedByLane: boolean; latencyMs: number; createdAt: string;
 } {
   return {
     decisionId: record.decisionId,
@@ -48,6 +48,7 @@ function projectDecision(record: SystemOneDecisionRecord): {
     confidenceBand: record.confidenceBand,
     fallbackUsed: record.fallbackUsed,
     shadow: record.shadow,
+    committedByLane: record.committedByLane === true,
     latencyMs: record.latencyMs,
     createdAt: record.createdAt,
   };
@@ -80,7 +81,7 @@ export const roleplaySystemOneRoutes: FastifyPluginAsync = async (app) => {
       }
       limit = Math.min(DECISIONS_MAX_LIMIT, parsed);
     }
-    return reply.send({ decisions: listRecentSystemOneDecisions(limit).map(projectDecision) });
+    return reply.send({ decisions: listRecentSystemOneDecisionsWithLaneCommits(limit).map(projectDecision) });
   });
 
   app.get("/provider/system-one/decisions/summary", async (_request, reply) => {

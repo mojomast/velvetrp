@@ -18,6 +18,10 @@ function formatBoolean(value: boolean): string {
   return value ? "yes" : "no";
 }
 
+function formatLaneCommit(value: boolean | undefined): string {
+  return value === undefined ? EMPTY : formatBoolean(value);
+}
+
 /**
  * Renders a read-only System One shadow report from an aggregate summary and a
  * window of recent decisions. Pure formatting: it never touches raw decision
@@ -35,10 +39,14 @@ export function buildSystemOneShadowReport(
   lines.push("");
   lines.push(`- Total decisions: ${summary.total}`);
   lines.push(`- Shadow decisions: ${summary.shadow} (${formatPercent(summary.shadow, summary.total)})`);
+  lines.push(`- Lane commits: ${summary.laneCommits} (${formatPercent(summary.laneCommits, summary.total)})`);
+  lines.push(`- Shadow decisions with a lane commit: ${summary.shadowLaneCommits} (${formatPercent(summary.shadowLaneCommits, summary.total)})`);
   lines.push(`- Fallback used: ${summary.fallbackUsed} (${formatPercent(summary.fallbackUsed, summary.total)})`);
   lines.push(`- Mean latency: ${formatLatency(summary.meanLatencyMs)} ms`);
   lines.push(`- Total input tokens: ${summary.totalInputTokens}`);
   lines.push(`- Total output tokens: ${summary.totalOutputTokens}`);
+  lines.push("");
+  lines.push("Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'` linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.");
   lines.push("");
 
   lines.push("## Per-lane breakdown");
@@ -46,10 +54,10 @@ export function buildSystemOneShadowReport(
   if (summary.byLane.length === 0) {
     lines.push("_No decisions recorded._");
   } else {
-    lines.push("| Lane | Decisions | Share |");
-    lines.push("| --- | ---: | ---: |");
+    lines.push("| Lane | Decisions | Share | Lane commits |");
+    lines.push("| --- | ---: | ---: | ---: |");
     for (const entry of summary.byLane) {
-      lines.push(`| ${entry.lane} | ${entry.count} | ${formatPercent(entry.count, summary.total)} |`);
+      lines.push(`| ${entry.lane} | ${entry.count} | ${formatPercent(entry.count, summary.total)} | ${entry.laneCommits} |`);
     }
   }
   lines.push("");
@@ -72,12 +80,13 @@ export function buildSystemOneShadowReport(
   if (recent.length === 0) {
     lines.push("_No decisions recorded._");
   } else {
-    lines.push("| Lane | Band | Fallback | Shadow | Latency (ms) | Created at |");
-    lines.push("| --- | --- | --- | --- | ---: | --- |");
+    lines.push("| Lane | Band | Fallback | Shadow | Lane commit | Latency (ms) | Created at |");
+    lines.push("| --- | --- | --- | --- | --- | ---: | --- |");
     for (const record of recent) {
       lines.push(
         `| ${record.lane} | ${record.confidenceBand} | ${formatBoolean(record.fallbackUsed)}`
-        + ` | ${formatBoolean(record.shadow)} | ${formatLatency(record.latencyMs)} | ${record.createdAt} |`,
+        + ` | ${formatBoolean(record.shadow)} | ${formatLaneCommit(record.committedByLane)}`
+        + ` | ${formatLatency(record.latencyMs)} | ${record.createdAt} |`,
       );
     }
   }

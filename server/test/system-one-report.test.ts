@@ -36,8 +36,8 @@ function record(overrides: Partial<SystemOneDecisionRecord> = {}): SystemOneDeci
 const summary: SystemOneDecisionSummary = {
   total: 4,
   byLane: [
-    { lane: "guardrails", count: 1 },
-    { lane: "speaker-routing", count: 3 },
+    { lane: "guardrails", count: 1, laneCommits: 0 },
+    { lane: "speaker-routing", count: 3, laneCommits: 2 },
   ],
   byBand: [
     { band: "act", count: 2 },
@@ -46,6 +46,8 @@ const summary: SystemOneDecisionSummary = {
   ],
   fallbackUsed: 2,
   shadow: 3,
+  laneCommits: 2,
+  shadowLaneCommits: 2,
   meanLatencyMs: 187.625,
   totalInputTokens: 350,
   totalOutputTokens: 35,
@@ -54,29 +56,46 @@ const summary: SystemOneDecisionSummary = {
 describe("buildSystemOneShadowReport", () => {
   it("renders totals, tables, rates and tokens", () => {
     const output = buildSystemOneShadowReport(summary, [
-      record({ decisionId: "decision:1", lane: "speaker-routing", confidenceBand: "act", fallbackUsed: false, shadow: true }),
-      record({ decisionId: "decision:2", lane: "guardrails", confidenceBand: "fallback", fallbackUsed: true, shadow: false, latencyMs: 300 }),
+      record({ decisionId: "decision:1", lane: "speaker-routing", confidenceBand: "act", fallbackUsed: false, shadow: true,
+        committedByLane: true }),
+      record({ decisionId: "decision:2", lane: "guardrails", confidenceBand: "fallback", fallbackUsed: true, shadow: false,
+        committedByLane: false, latencyMs: 300 }),
     ]);
 
     expect(output).toContain("# System One shadow decision report");
     expect(output).toContain("Total decisions: 4");
     expect(output).toContain("Shadow decisions: 3 (75.0%)");
+    expect(output).toContain("Lane commits: 2 (50.0%)");
+    expect(output).toContain("Shadow decisions with a lane commit: 2 (50.0%)");
     expect(output).toContain("Fallback used: 2 (50.0%)");
     expect(output).toContain("Mean latency: 187.6 ms");
     expect(output).toContain("Total input tokens: 350");
     expect(output).toContain("Total output tokens: 35");
+    // The report names the authoritative commit evidence: the execution row, not the decision row.
+    expect(output).toContain(
+      "Lane commit evidence is the authoritative `adventure_check_executions_v54` row with `origin='lane'`"
+      + " linked by `system_one_decision_id`; a decision row with `shadow: true` was only recorded as advisory.",
+    );
 
     expect(output).toContain("## Per-lane breakdown");
-    expect(output).toContain("| speaker-routing | 3 | 75.0% |");
+    expect(output).toContain("| speaker-routing | 3 | 75.0% | 2 |");
+    expect(output).toContain("| guardrails | 1 | 25.0% | 0 |");
     expect(output).toContain("## Per-band breakdown");
     expect(output).toContain("| act | 2 | 50.0% |");
     expect(output).toContain("| confirm | 1 | 25.0% |");
     expect(output).toContain("| fallback | 1 | 25.0% |");
 
     expect(output).toContain("## Recent decisions");
-    expect(output).toContain("| Lane | Band | Fallback | Shadow | Latency (ms) | Created at |");
-    expect(output).toContain("| speaker-routing | act | no | yes | 120.5 | 2035-01-01T00:00:01.000Z |");
-    expect(output).toContain("| guardrails | fallback | yes | no | 300.0 | 2035-01-01T00:00:01.000Z |");
+    expect(output).toContain("| Lane | Band | Fallback | Shadow | Lane commit | Latency (ms) | Created at |");
+    // A shadow decision with a lane commit reads as recorded advisory but actually committed.
+    expect(output).toContain("| speaker-routing | act | no | yes | yes | 120.5 | 2035-01-01T00:00:01.000Z |");
+    expect(output).toContain("| guardrails | fallback | yes | no | no | 300.0 | 2035-01-01T00:00:01.000Z |");
+  });
+
+  it("renders the lane-commit flag as unknown when the record was not joined", () => {
+    const output = buildSystemOneShadowReport(summary, [record({ decisionId: "decision:1", shadow: true })]);
+
+    expect(output).toContain("| speaker-routing | act | no | yes | — | 120.5 | 2035-01-01T00:00:01.000Z |");
   });
 
   it("never emits raw decision payloads", () => {
@@ -106,6 +125,8 @@ describe("buildSystemOneShadowReport", () => {
         ],
         fallbackUsed: 0,
         shadow: 0,
+        laneCommits: 0,
+        shadowLaneCommits: 0,
         meanLatencyMs: 0,
         totalInputTokens: 0,
         totalOutputTokens: 0,
@@ -115,6 +136,8 @@ describe("buildSystemOneShadowReport", () => {
 
     expect(output).toContain("Total decisions: 0");
     expect(output).toContain("Shadow decisions: 0 (0.0%)");
+    expect(output).toContain("Lane commits: 0 (0.0%)");
+    expect(output).toContain("Shadow decisions with a lane commit: 0 (0.0%)");
     expect(output).toContain("Fallback used: 0 (0.0%)");
     expect(output).toContain("Mean latency: 0.0 ms");
     expect(output).toContain("_No decisions recorded._");

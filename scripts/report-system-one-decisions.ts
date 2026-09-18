@@ -21,7 +21,7 @@ import type {
   SystemOnePromotionRecord,
   SystemOnePromotionResult,
 } from "../server/src/agent/systemOnePromotion.js";
-import { closeRepo, listRecentSystemOneDecisions, summarizeSystemOneDecisions } from "../server/src/repo/index.js";
+import { closeRepo, listRecentSystemOneDecisionsWithLaneCommits, summarizeSystemOneDecisions } from "../server/src/repo/index.js";
 import type { SystemOneDecisionRecord, SystemOneDecisionSummary } from "../server/src/repo/index.js";
 import { resolveDataDir } from "../server/src/repo/db/connection.js";
 import { SYSTEM_ONE_LANES } from "../server/src/types.js";
@@ -155,11 +155,18 @@ export function buildPromotionReport(): string {
   return buildPromotionSection(allLanePromotionStatuses());
 }
 
-function readDecisions(limit: number, databasePath: string): { summary: SystemOneDecisionSummary; recent: SystemOneDecisionRecord[] } {
+/**
+ * Reads the bounded decision window plus the read-only lane-commit join. Exported so the report
+ * test can seed a decision and a lane-origin execution row without spawning the CLI.
+ */
+export function readDecisions(
+  limit: number,
+  databasePath: string,
+): { summary: SystemOneDecisionSummary; recent: SystemOneDecisionRecord[] } {
   try {
     return {
       summary: summarizeSystemOneDecisions(limit),
-      recent: listRecentSystemOneDecisions(limit),
+      recent: listRecentSystemOneDecisionsWithLaneCommits(limit),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -576,6 +576,8 @@ export type TurnContract = {
   ooc?: string;
   intended: { family: MechanicFamily; failureMode: FailureMode };
   noise: SurfaceNoiseName[];
+  /** Names the generator declared that this harness does not implement (recorded, never applied). */
+  noiseDropped: string[];
   references: string[];
 };
 
@@ -614,7 +616,7 @@ const CONTRACT_REQUIRED_KEYS = [
   "noise",
   "references",
 ] as const;
-const CONTRACT_OPTIONAL_KEYS = ["ooc"] as const;
+const CONTRACT_OPTIONAL_KEYS = ["ooc", "noiseDropped"] as const;
 
 /** Strict, fail-closed validation with every problem reported, not just the first. */
 export function validateTurnContract(value: unknown, context: TurnContractContext = {}): TurnContract {
@@ -677,13 +679,24 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
   }
 
   const noise: SurfaceNoiseName[] = [];
+  const noiseDropped: string[] = [];
+  const rawDropped = value["noiseDropped"];
+  if (rawDropped !== undefined) {
+    if (!Array.isArray(rawDropped) || rawDropped.some((entry) => typeof entry !== "string")) {
+      issues.push('"noiseDropped" must be an array of strings');
+    } else {
+      noiseDropped.push(...rawDropped);
+    }
+  }
   const rawNoise = value["noise"];
   if (!Array.isArray(rawNoise)) {
     issues.push('"noise" must be an array of surface-noise names');
   } else {
     for (const [index, entry] of rawNoise.entries()) {
-      if (!isSurfaceNoiseName(entry)) issues.push(`"noise[${index}]" is not a known surface noise`);
-      else if (noise.includes(entry)) issues.push(`"noise" repeats "${entry}"`);
+      if (!isSurfaceNoiseName(entry)) {
+        const dropped = typeof entry === "string" ? entry : JSON.stringify(entry);
+        if (!noiseDropped.includes(dropped)) noiseDropped.push(dropped);
+      } else if (noise.includes(entry)) issues.push(`"noise" repeats "${entry}"`);
       else noise.push(entry);
     }
   }
@@ -742,6 +755,7 @@ export function validateTurnContract(value: unknown, context: TurnContractContex
     ...(ooc ? { ooc } : {}),
     intended: { family: family as MechanicFamily, failureMode: failureMode as FailureMode },
     noise,
+    noiseDropped,
     references,
   };
 }
@@ -1460,6 +1474,8 @@ export type HarnessTurnRecord = {
   declaration: string;
   ooc: string | null;
   noiseDeclared: SurfaceNoiseName[];
+  /** Declared perturbation names the harness does not implement (recorded, never applied). */
+  noiseDropped: string[];
   noiseApplied: SurfaceNoiseName[];
   references: string[];
   idempotencyKey: string;
@@ -2241,6 +2257,7 @@ function emptyTurnRecord(plan: PlannedTurn, persona: PersonaDefinition, idempote
     declaration: "",
     ooc: null,
     noiseDeclared: [],
+    noiseDropped: [],
     noiseApplied: [],
     references: [],
     idempotencyKey,
@@ -2335,6 +2352,7 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     record.declaration = materialized.declaration;
     record.ooc = materialized.ooc;
     record.noiseDeclared = [...materialized.contract.noise];
+    record.noiseDropped = [...materialized.contract.noiseDropped];
     record.noiseApplied = [...materialized.applied];
     record.references = [...materialized.contract.references];
     contractHash.update(stableStringify({

@@ -21,6 +21,14 @@ export interface SystemOneDecisionRecord {
   confidenceBand: "act" | "confirm" | "fallback";
   fallbackUsed: boolean; shadow: boolean; usage: unknown | null;
   latencyMs: number; createdAt: string;
+  /**
+   * True when an `adventure_check_executions_v54` row with `origin='lane'` links this decision as
+   * `system_one_decision_id`. Only joined reads (`listRecentSystemOneDecisionsWithLaneCommits`,
+   * `summarizeSystemOneDecisions`) populate it; undefined means the read did not join. The
+   * insert-only decision log cannot rewrite `shadow`, so this flag is the read-side proof of a
+   * lane commit.
+   */
+  committedByLane?: boolean;
 }
 
 interface SystemOneDecisionRow {
@@ -36,10 +44,14 @@ interface SystemOneDecisionRow {
 
 export interface SystemOneDecisionSummary {
   total: number;
-  byLane: Array<{ lane: string; count: number }>;
+  byLane: Array<{ lane: string; count: number; laneCommits: number }>;
   byBand: Array<{ band: "act" | "confirm" | "fallback"; count: number }>;
   fallbackUsed: number;
   shadow: number;
+  /** Decisions in the window with at least one lane-origin check execution. */
+  laneCommits: number;
+  /** Shadow (recorded advisory) decisions in the window that still have a lane-origin execution. */
+  shadowLaneCommits: number;
   meanLatencyMs: number;
   totalInputTokens: number;
   totalOutputTokens: number;
@@ -127,6 +139,51 @@ export function listRecentSystemOneDecisions(limit: number): SystemOneDecisionRe
   return rows.map(toRecord);
 }
 
+/** Conservative SQLite parameter bound for the read-only lane-commit join. */
+const LANE_COMMIT_ID_BATCH = 400;
+
+/**
+ * Read-only join against the authoritative lane-commit evidence. Returns the subset of the
+ * supplied decision ids that appear as `system_one_decision_id` on an
+ * `adventure_check_executions_v54` row with `origin='lane'`. The insert-only decision log cannot
+ * rewrite `shadow` once a lane actually commits, so this join is how operators see that a decision
+ * recorded as advisory acted. Degrades to an empty set when the execution table is absent; inserts
+ * nothing and mutates nothing.
+ */
+export function listLaneCommittedSystemOneDecisionIds(decisionIds: readonly string[]): Set<string> {
+  const unique = [...new Set(decisionIds)].filter((decisionId) => decisionId.length > 0);
+  const committed = new Set<string>();
+  if (unique.length === 0) return committed;
+  const db = getRepositoryDatabase();
+  try {
+    for (let offset = 0; offset < unique.length; offset += LANE_COMMIT_ID_BATCH) {
+      const batch = unique.slice(offset, offset + LANE_COMMIT_ID_BATCH);
+      const rows = db.prepare(`SELECT DISTINCT system_one_decision_id AS decision_id
+        FROM adventure_check_executions_v54
+        WHERE origin='lane' AND system_one_decision_id IN (${batch.map(() => "?").join(",")})`)
+        .all(...batch) as Array<{ decision_id: string }>;
+      for (const row of rows) committed.add(row.decision_id);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/no such table/i.test(message)) return new Set();
+    throw error;
+  }
+  return committed;
+}
+
+/**
+ * `listRecentSystemOneDecisions` plus the lane-commit flag from the read-only execution join.
+ * A decision with `committedByLane: true` was recorded in the decision log (possibly `shadow: true`)
+ * and then committed by a lane-origin check execution; the execution row is the authoritative
+ * evidence.
+ */
+export function listRecentSystemOneDecisionsWithLaneCommits(limit: number): SystemOneDecisionRecord[] {
+  const decisions = listRecentSystemOneDecisions(limit);
+  const committed = listLaneCommittedSystemOneDecisionIds(decisions.map((record) => record.decisionId));
+  return decisions.map((record) => ({ ...record, committedByLane: committed.has(record.decisionId) }));
+}
+
 /** One Director decision paired with the authoritative provider composition for its turn. */
 export interface DirectorDecisionAuthority {
   decision: SystemOneDecisionRecord;
@@ -187,10 +244,14 @@ export function listDirectorDecisionsWithAuthority(limit: number): DirectorDecis
 /** Aggregates a bounded window of recent decisions for the read-only System One summary route. */
 export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSummary {
   const decisions = listRecentSystemOneDecisions(clampLimit(limit));
+  const committedIds = listLaneCommittedSystemOneDecisionIds(decisions.map((record) => record.decisionId));
   const laneCounts = new Map<string, number>();
+  const laneCommitCounts = new Map<string, number>();
   const bandCounts = new Map<SystemOneDecisionRecord["confidenceBand"], number>();
   let fallbackUsed = 0;
   let shadow = 0;
+  let laneCommits = 0;
+  let shadowLaneCommits = 0;
   let latencyTotal = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -199,6 +260,11 @@ export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSum
     bandCounts.set(record.confidenceBand, (bandCounts.get(record.confidenceBand) ?? 0) + 1);
     if (record.fallbackUsed) fallbackUsed += 1;
     if (record.shadow) shadow += 1;
+    if (committedIds.has(record.decisionId)) {
+      laneCommits += 1;
+      laneCommitCounts.set(record.lane, (laneCommitCounts.get(record.lane) ?? 0) + 1);
+      if (record.shadow) shadowLaneCommits += 1;
+    }
     latencyTotal += record.latencyMs;
     const tokens = usageTokens(record.usage);
     totalInputTokens += tokens.input;
@@ -207,11 +273,13 @@ export function summarizeSystemOneDecisions(limit = 1_000): SystemOneDecisionSum
   return {
     total: decisions.length,
     byLane: [...laneCounts.entries()]
-      .map(([lane, count]) => ({ lane, count }))
+      .map(([lane, count]) => ({ lane, count, laneCommits: laneCommitCounts.get(lane) ?? 0 }))
       .sort((left, right) => left.lane.localeCompare(right.lane)),
     byBand: CONFIDENCE_BANDS.map((band) => ({ band, count: bandCounts.get(band) ?? 0 })),
     fallbackUsed,
     shadow,
+    laneCommits,
+    shadowLaneCommits,
     meanLatencyMs: decisions.length === 0 ? 0 : latencyTotal / decisions.length,
     totalInputTokens,
     totalOutputTokens,
