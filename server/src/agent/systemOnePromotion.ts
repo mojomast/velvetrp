@@ -341,24 +341,25 @@ export const SYSTEM_ONE_PROMOTION_RECORDS: Partial<Record<SystemOneLane, SystemO
   "adventure-selection": {
     // scripts/evaluate-system-one-adventure-lane.ts, re-derived under the production-shaped gate
     // protocol (no `uid` decorrelator; the vendor decorrelator is reserved for dedicated stability
-    // probes): 258 live calls over 30 frozen hand-labeled cases plus 56 harvested cases (1
-    // human-confirmed drop-my-longsword, 55 agent-reviewed from synthetic play), at 3 same-state
+    // probes): 348 live calls over 30 frozen hand-labeled cases plus 86 harvested cases (1
+    // human-confirmed drop-my-longsword, 85 agent-reviewed from synthetic play), at 3 same-state
     // repeats. The promotion gate, calibration fit and threshold sweep use only frozen and
     // human-confirmed cases; agent-reviewed cases are scored and reported separately and can never
     // re-derive this record. The lane named a candidate on 54 calls and all 54 picks were
     // acceptable; at the sweep's recommended action threshold 0.40 (which also requires
     // reviewThreshold <= 0.40) the gate passes: 54 acted, 100% accuracy, calibrated Brier 0.0002,
-    // ECE 0.0110 (held-out 0.0130). Decision stability was 100% (0/86 conflicted cases; mean
-    // per-case signal std dev 0.0136, max 0.0497). The human drop-my-longsword case is a stable
-    // miss (the lane defers although the server bound an unequip candidate, 3/3 repeats); the 55
-    // agent-reviewed cases scored 92.7% on the asserted subset and 0 acted this run, so they add
+    // ECE 0.0110 (held-out 0.0128). Decision stability was 100% (0/116 conflicted cases; mean
+    // per-case signal std dev 0.0127, max 0.0492). The human drop-my-longsword case is a stable
+    // miss (the lane defers although the server bound an unequip candidate, 3/3 repeats); the 85
+    // agent-reviewed cases scored 90.6% on the asserted subset and 0 acted this run, so they add
     // coverage rather than gated labels. The threshold is selected on the same corpus that scores
     // it and the acted subset has no errors, so this is a promotion candidate, not proof; the
-    // server default stays 0.75/0.5. The lane is wired in shadow (record-only) into fresh adventure
-    // turns, so the record is evidence, not activation.
+    // server default stays 0.75/0.5. The promoted lane is live for exact_srd_check.select commits
+    // under an active lane mode (first canary 2026-09-18) and shadow for every other family, so
+    // the record remains the evidence base for that path.
     metrics: { samples: 54, accuracy: 1, brier: 0.0002, expectedCalibrationError: 0.011 },
-    calibration: { a: 1.6181, b: 4.0879 },
-    promotedAt: "2026-09-17",
+    calibration: { a: 1.5884, b: 4.0961 },
+    promotedAt: "2026-09-18",
     evidence: "docs/system-one-adventure-benchmark.md",
   },
   "memory-reranking": {

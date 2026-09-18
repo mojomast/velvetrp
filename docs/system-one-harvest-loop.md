@@ -138,14 +138,21 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   to produce. To keep promotion evidence human-based, the adventure evaluator now gates frozen +
   human-confirmed cases only and reports agent-reviewed cases separately; a promotion record is
   never re-derived from agent labels. The split run returns the gate to 0.40 with 54 acted at 100%
-  accuracy, Brier 0.0002 and ECE 0.0110, and 100% stability (0 of 86 cases conflicted); the 55
-  agent-reviewed cases scored 92.7% on their asserted subset with none acting. A third synthetic-run
-  finding was reliability rather than coverage: planning budget denials hard-failed ~9% of executed
-  turns because the conservative prompt estimate over-counts measured tokens; denials now degrade
-  to deterministic fallback narration (see [provider hardening](provider-hardening.md)) and the
-  harness records a failure trail in its manifests.
-- **Stability.** Across all 43 cases and 129 repeats, decision agreement was 100% with 0 conflicted
-  cases; mean per-case signal standard deviation was 0.0117 and the maximum 0.0287. A separate live
+  accuracy, Brier 0.0002 and ECE 0.0110, and 100% stability (0 of 116 cases conflicted); the 85
+  agent-reviewed cases scored 90.6% on their asserted subset with none acting.
+- **Third wave (canary and batch 3).** Thirty more reviewed decisions raised the fixture to 86
+  cases (1 human + 85 agent-reviewed; 29 correct, one genuine mismap where an explicit rest
+  declaration drew a Second Wind power pick). Four turns committed through the live
+  `origin='lane'` check path and all four matched their declarations. The review also caught the
+  provider committing a Survival check outside the lane's advertised sample and a narration that
+  played a rest scene with no receipt — both recorded as advertisement/narration divergences rather
+  than label changes.
+- **Reliability finding.** Planning budget denials hard-failed ~9% of executed turns because the
+  conservative prompt estimate over-counts measured tokens; denials now degrade to deterministic
+  fallback narration (see [provider hardening](provider-hardening.md)) and the harness records a
+  failure trail in its manifests.
+- **Stability.** Across all 116 cases and 348 repeats, decision agreement was 100% with 0 conflicted
+  cases; mean per-case signal standard deviation was 0.0127 and the maximum 0.0492. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard
   deviation of 0.0015, in line with the vendor's published jev-1.13 figure (~0.0098 mean).
 - **Guardrails re-run.** The L6 guardrails benchmark re-ran the same way: production-shaped, 171

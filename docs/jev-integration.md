@@ -413,17 +413,17 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   tools; travel records an explicit advisory binding string because it is not digest-bound. A
   lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
-  runs 30 labeled declaration states plus 56 harvested cases (1 human-confirmed, 55 agent-reviewed
-  from synthetic play) x 3 repeats (258 live calls, production-shaped: no `uid` decorrelator; the
+  runs 30 labeled declaration states plus 86 harvested cases (1 human-confirmed, 85 agent-reviewed
+  from synthetic play) x 3 repeats (348 live calls, production-shaped: no `uid` decorrelator; the
   vendor decorrelator is reserved for dedicated stability probes). The promotion gate, calibration
-  fit and threshold sweep use only frozen and human-confirmed cases; the 55 agent-reviewed cases
-  (165 calls) are scored and reported separately and can never re-derive the record. The model
+  fit and threshold sweep use only frozen and human-confirmed cases; the 85 agent-reviewed cases
+  (255 calls) are scored and reported separately and can never re-derive the record. The model
   named a candidate on 54 calls and every one of those 54 picks was acceptable, but at the server
   default action threshold 0.75 only 6 calls acted, so the gate reported insufficient samples. A
   threshold sweep recommends **0.40** (which also requires `reviewThreshold <= 0.40`), where the
   gate passes with 54 acted, 100% accuracy, calibrated Brier 0.0002, and ECE 0.0110 (held-out
-  0.0130) — so the lane carries an evidence-only record. Decision stability was 100% (0 of 86
-  cases conflicted; mean per-case signal std dev 0.0136). The agent-reviewed cases scored 92.7% on
+  0.0128) — so the lane carries an evidence-only record. Decision stability was 100% (0 of 116
+  cases conflicted; mean per-case signal std dev 0.0127). The agent-reviewed cases scored 90.6% on
   their asserted subset and none acted in this run, so they add coverage rather than gated labels.
   The threshold is selected on the same corpus that scores it and the acted subset has no errors,
   so the record is a promotion candidate, not proof; the server default stays 0.75/0.5. The human
