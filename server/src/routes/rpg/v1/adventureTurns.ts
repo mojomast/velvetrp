@@ -188,6 +188,32 @@ const includesAny = (text:string,values:readonly string[]) => values.some(value=
 const includesNumber = (text:string,value:number) => new RegExp(`(^|\\D)${String(value).replace("-","\\-")}(?=\\D|$)`).test(text);
 const regexEscape=(value:string)=>value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
 
+// A mechanical outcome is only grounded by a matching committed receipt, so provider prose may not
+// assert one that no receipt carries (the zero-receipt case, or a turn whose receipts lack that
+// kind). These patterns stay deliberately narrow: a missed novel phrasing falls back to grounded
+// prose, while a false positive would reject good narration. Normalization already lowercases and
+// folds arrows ("Health -> 12" becomes "health 12").
+const recoveryClaimPattern=/\brecover(?:s|ed|ing)?\s+from\s+\d+\s+to\s+\d+\b/;
+const restClaimPattern=/\b(?:(?:short|long)\s+)?rest\s+(?:completed|finished|taken|done)\b|\b(?:short|long)\s+rest\s+(?:is\s+)?(?:completed|finished|done)\b|\bfinish(?:es|ed)?\s+(?:your|the)\s+rest\b(?!\s+of\b)/;
+const vitalNumberPattern=/\b(?:health|hit points?|hp|hit dice)\b.{0,24}?\d|\d.{0,24}?\b(?:health|hit points?|hp|hit dice)\b/;
+const currencyNumberPattern=/\b(?:gold|coins?|currency|credits?)\b.{0,24}?\d|\d.{0,24}?\b(?:gold|coins?|currency|credits?)\b/;
+const levelNumberPattern=/\blevels?\b.{0,12}?\d|\d.{0,12}?\blevels?\b/;
+const dcNumberPattern=/\bdc\b.{0,12}?\d|\d.{0,12}?\bdc\b/;
+const transactionVerbPattern=/\b(?:buy|buys|bought|pay|pays|paid|purchase|purchases|purchased|sell|sells|sold|take|takes|took|taken|lift|lifts|lifted|acquire|acquires|acquired|gain|gains|gained|receive|receives|received|obtain|obtains|obtained)\b/g;
+const currencyWordPattern=/\b(?:coin|coins|gold|currency|credits?)\b/;
+// "No coin has changed hands" denies a transaction, so a negated currency mention must not count.
+const negatedCurrencyPattern=/\b(?:no|not|without|never)\s+(?:a\s+|any\s+|the\s+)?(?:coin|coins|gold|currency|credits?)\b/g;
+// A hyphenated compound reads as an object only when it is not followed by the noun it modifies
+// ("lift the brass lamp-trimmer off it" is an item; "take the well-worn path" is an adjective).
+const hyphenatedItemPattern=/\b[a-z]+-[a-z]+(?=\s+(?:off|from|onto|into|out|down|up|away|aside|back|over|under|and|then|before|after|with|to|for|in|on|at|by|near|beside|against|towards?|across|through|past|around|behind|between|as|it|them|him|her|you|your|my|his|their|our)\b|\s*$)/;
+function assertsTransactionOrAcquisition(normalized:string):boolean{
+  for(const verb of normalized.matchAll(transactionVerbPattern)){
+    const window=normalized.slice(verb.index??0,(verb.index??0)+64).replace(negatedCurrencyPattern,"");
+    if(currencyWordPattern.test(window)||hyphenatedItemPattern.test(window))return true;
+  }
+  return false;
+}
+
 function acknowledgesCurrentLocation(text:string,currentLocation:string|null):boolean{
   if(!currentLocation)return true;
   const normalized=normalizedNarration(text),location=regexEscape(normalizedNarration(currentLocation));
@@ -211,7 +237,17 @@ export function providerNarrationMatchesReceipts(text:string,values:readonly Nar
   const unsupportedCurrency=!hasKind("commerce","quest-lifecycle")&&/(?:\b(?:gain|gains|gained|receive|receives|received|lose|loses|lost|spend|spends|spent|pay|pays|paid|earn|earns|earned)\b.{0,40}\b(?:gold|coins?|currency|credits?)\b|\b\d+\s+(?:gold|coins?|credits?)\b)/.test(normalized);
   const unsupportedQuest=!hasKind("quest","quest-lifecycle")&&/(?:\bquest\b.{0,50}\b(?:accept|accepted|abandon|abandoned|advance|advanced|progress|complete|completed|reward|claimed)\b|\b(?:accept|accepted|abandon|abandoned|advance|advanced|complete|completed|claim|claimed)\b.{0,50}\bquest\b)/.test(normalized);
   const unsupportedProgression=!hasKind("progression")&&/\b(?:level(?:s|ed)?\s+up|advance(?:s|d)?\s+to\s+level|gain(?:s|ed)?\s+\d+\s+(?:xp|experience)|learn(?:s|ed)?\s+(?:a\s+)?new\s+(?:feature|ability|power))\b/.test(normalized);
-  if(unsupportedTravel||unsupportedInventory||unsupportedCurrency||unsupportedQuest||unsupportedProgression)return false;
+  const unsupportedRecovery=!hasKind("rest")&&(recoveryClaimPattern.test(normalized)||restClaimPattern.test(normalized));
+  const unsupportedVitals=!hasKind("rest","combat","combat-consumable","combat-power","power","mechanic")&&vitalNumberPattern.test(normalized);
+  const unsupportedCurrencyNumbers=!hasKind("commerce","quest-lifecycle")&&currencyNumberPattern.test(normalized);
+  const unsupportedLevelNumbers=!hasKind("progression")&&levelNumberPattern.test(normalized);
+  const unsupportedDcNumbers=!hasKind("check")&&dcNumberPattern.test(normalized);
+  // Hyphenated compounds vanish in normalizedNarration, so keep them for the acquisition check.
+  const transactionText=text.toLocaleLowerCase("en-US").replace(/[^a-z0-9-]+/g," ").trim();
+  const unsupportedTransaction=!hasKind("commerce","inventory","quest-lifecycle")&&assertsTransactionOrAcquisition(transactionText);
+  if(unsupportedTravel||unsupportedInventory||unsupportedCurrency||unsupportedQuest||unsupportedProgression
+    ||unsupportedRecovery||unsupportedVitals||unsupportedCurrencyNumbers||unsupportedLevelNumbers||unsupportedDcNumbers
+    ||unsupportedTransaction)return false;
   if(values.length===0)return true;
   const contradiction=/(movement|arrival|travel|result|outcome|action|change|damage|healing|purchase|sale|quest|progression|rest|check|attack).{0,48}(pending|unresolved|uncertain|unknown|not established|not committed|did not happen|has not happened|awaiting confirmation)/
     .test(normalized)||/(pending|unresolved|uncertain|unknown|not established|not committed|did not happen|has not happened|awaiting confirmation).{0,48}(movement|arrival|travel|result|outcome|action|change|damage|healing|purchase|sale|quest|progression|rest|check|attack)/.test(normalized);

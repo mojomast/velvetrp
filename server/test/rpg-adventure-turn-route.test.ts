@@ -427,6 +427,39 @@ describe("M2.11 adventure turn routes", () => {
       [defeatReceipt])).toBe(false);
   });
 
+  it("rejects replayed recovery and purchase claims when no matching receipt grounds them",()=>{
+    // Recorded live failures: a provider-assisted short-rest replay whose numbers were copied from a
+    // prior turn's receipt, and a narrated purchase on a turn with no commerce candidate or receipt.
+    const replayedRest=`You find a corner out of the lamplight, wedge your back against damp stone, and let the quiet do its work. No talk, no story — just breath, and the ache in your arms easing out.
+
+When you stand again, the short rest has done what you needed. Your Health recovers from 8 to 12. Your Hit Dice D10 recovers from 1 to 0.
+
+You roll your shoulders, set your grip, and step back toward the stair. The lamp-line waits, the cold below waits, and whatever's down past the third landing hasn't gone anywhere.`;
+    const narratedPurchase="You count the coin onto the board, flat, no haggling — and lift the brass lamp-trimmer off it, clasp closed, maker's mark still turned up. The stallkeeper sweeps the coin into his palm without counting it twice and says nothing more about the last man.";
+    expect(providerNarrationMatchesReceipts(replayedRest,[])).toBe(false);
+    expect(providerNarrationMatchesReceipts("The scene settles. Your Health recovers from 8 to 12. Your Hit Dice D10 recovers from 1 to 0.",[])).toBe(false);
+    expect(providerNarrationMatchesReceipts("Short rest completed. Your Health recovers from 8 to 12. Your Hit Dice D10 recovers from 1 to 0.",[])).toBe(false);
+    expect(providerNarrationMatchesReceipts(narratedPurchase,[])).toBe(false);
+    expect(providerNarrationMatchesReceipts("You count the coin onto the board and lift the brass lamp-trimmer off it, then turn to leave.",[])).toBe(false);
+    // The matching committed rest receipt still grounds the same recovery prose.
+    const restReceipt={kind:"rest",restKind:"short",restName:"Short rest",recovery:[{label:"Health",before:8,after:12},{label:"Hit Dice D10",before:1,after:0}]} as any;
+    expect(providerNarrationMatchesReceipts(replayedRest,[restReceipt])).toBe(true);
+    expect(providerNarrationMatchesReceipts("Short rest completed. Your Health recovers from 8 to 12. Your Hit Dice D10 recovers from 1 to 0.",[restReceipt])).toBe(true);
+    // A grounded turn whose receipts lack the claimed kind is rejected as well.
+    const checkReceipt={kind:"check",checkKind:"ability",ability:"Wisdom",skill:null,mode:"normal",difficulty:"Medium",rolls:[{value:10,kept:true}],
+      abilityModifier:1,proficiencyBonus:2,modifier:3,total:13,dc:15,outcome:"failure"} as any;
+    expect(providerNarrationMatchesReceipts(replayedRest,[checkReceipt])).toBe(false);
+    // Prose that denies a transaction is not a transaction claim.
+    expect(providerNarrationMatchesReceipts("The keeper sells salvage off the docks, but no coin has changed hands.",[])).toBe(true);
+    // Ordinary prose with zero receipts is untouched.
+    for(const narration of ["You take a breath and let the rain settle.","You take your weapon in hand and wait.","You gain a sense of unease.",
+      "The rest of the room stays quiet.","You finish the rest of the descent in silence.","You pay attention to the ferryman's story.",
+      "You take the well-worn path back to the landing.","You lift your gaze to the rain-bright road.",
+      "The ferryman lowers his voice while rain taps the roof."]){
+      expect(providerNarrationMatchesReceipts(narration,[]),narration).toBe(true);
+    }
+  });
+
   it("keeps travel pending when no exact legal candidate exists",async()=>{
     enable();const campaign=seed();let calls=0;
     const dependencies:AdventureAgentDependencies={complete:async(input)=>{calls+=1;if(calls===1)expect(input.tools?.some((tool)=>tool.name==="exact_actor_travel.select")).toBe(false);

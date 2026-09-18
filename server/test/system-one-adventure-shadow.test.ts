@@ -182,6 +182,12 @@ describe("adventure-selection candidate union projection", () => {
     combatConsumable: [], combatPower: [], questLifecycle: [], progression: [],
   };
 
+  /** One digest-bound advertised row for the union projection fixtures. */
+  const shadowRow = (prefix: string, index: number, action: string) => ({
+    candidateId: `${prefix}:${index}`, digest: `${prefix}:${index}`.padEnd(64, "0"),
+    semanticLabel: { action, source: `${action} ${index}`, target: null, cost: null, consequence: "Select this server-issued candidate." },
+  });
+
   it("projects a travel row with an explicit advisory binding instead of a digest", () => {
     const union = adventureShadowCandidateUnion({ ...families, travel: [{ candidateId: "travel-candidate:x", kind: "actor.travel", version: "v1",
       label: { format: "message-key-v1", key: "candidate.actor.travel.label", routeOption: 1 },
@@ -203,6 +209,56 @@ describe("adventure-selection candidate union projection", () => {
 
     expect(union).toHaveLength(ADVENTURE_SHADOW_CANDIDATE_CAP);
     expect(union[0]).toMatchObject({ candidateId: "quest-candidate:0", kind: "exact_quest_objective.select" });
+  });
+
+  it("selects round-robin so a large check family cannot crowd advertised lifecycle rows out of the cap", () => {
+    const checks = Array.from({ length: ADVENTURE_SHADOW_CANDIDATE_CAP + 8 }, (_value, index) =>
+      shadowRow("check-candidate", index, "Roll a check"));
+    const build = () => adventureShadowCandidateUnion({ ...families,
+      questObjective: [shadowRow("quest-candidate", 0, "Advance quest objective")],
+      srdCheck: checks,
+      inventory: [shadowRow("inventory-candidate", 0, "Use an item")],
+      commerce: [shadowRow("commerce-candidate", 0, "Trade with a vendor")],
+      power: [shadowRow("power-candidate", 0, "Use a power")],
+      rest: [shadowRow("rest-candidate", 0, "Take a rest")],
+      combatConsumable: [shadowRow("consumable-candidate", 0, "Use a combat consumable")],
+      combatPower: [shadowRow("combat-power-candidate", 0, "Use a combat power")],
+      questLifecycle: [shadowRow("lifecycle-candidate", 0, "Accept quest"), shadowRow("lifecycle-candidate", 1, "Abandon quest")],
+      progression: [shadowRow("progression-candidate", 0, "Apply progression")],
+    });
+
+    const union = build();
+    const repeat = build();
+
+    expect(union).toHaveLength(ADVENTURE_SHADOW_CANDIDATE_CAP);
+    // Every advertised family is represented before the check family takes its extra slots.
+    expect(new Set(union.map((candidate) => candidate.kind))).toEqual(new Set([
+      "exact_quest_objective.select", "exact_srd_check.select", "exact_inventory_action.select",
+      "exact_vendor_commerce.select", "exact_power_use.select", "exact_rest.select",
+      "exact_combat_consumable.select", "exact_combat_power.select", "exact_quest_lifecycle.select",
+      "exact_progression_apply.select",
+    ]));
+    // The lifecycle rows the old checks-first fill would have pushed past the cap survive it.
+    expect(union.filter((candidate) => candidate.kind === "exact_quest_lifecycle.select")
+      .map((candidate) => candidate.candidateId)).toEqual(["lifecycle-candidate:0", "lifecycle-candidate:1"]);
+    // Selection is deterministic and each family keeps its advertised row order.
+    expect(repeat).toEqual(union);
+    const selectedChecks = union.filter((candidate) => candidate.kind === "exact_srd_check.select");
+    expect(selectedChecks.map((candidate) => candidate.candidateId))
+      .toEqual(checks.slice(0, selectedChecks.length).map((candidate) => candidate.candidateId));
+    expect(selectedChecks.length).toBeLessThan(checks.length);
+  });
+
+  it("keeps a union at or under the cap in the advertised family and row order", () => {
+    const union = adventureShadowCandidateUnion({ ...families,
+      questObjective: [shadowRow("quest-candidate", 0, "Advance quest objective")],
+      srdCheck: [shadowRow("check-candidate", 0, "Roll a check")],
+      questLifecycle: [shadowRow("lifecycle-candidate", 0, "Accept quest")],
+    });
+
+    expect(union.map((candidate) => candidate.candidateId)).toEqual([
+      "quest-candidate:0", "check-candidate:0", "lifecycle-candidate:0",
+    ]);
   });
 });
 

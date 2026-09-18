@@ -129,9 +129,14 @@ function travelShadowCandidate(candidate: ProviderSafeExactCandidate): Adventure
 
 /**
  * Builds the bounded union of advertised exact candidates the L2 battery reasons over. Families
- * are ordered exactly as the provider's own candidate table advertises them, empty families are
- * skipped, and the union is capped. Each row keeps the real advertised `candidateId` and the
- * exact selection tool that would commit it; digest-bound families keep their real digest.
+ * and their rows keep the order the lane advertises them in, empty families are skipped, and the
+ * union is capped. Each row keeps the real advertised `candidateId` and the exact selection tool
+ * that would commit it; digest-bound families keep their real digest.
+ *
+ * The cap is filled round-robin across families: pass 0 offers every non-empty family its first
+ * advertised row before pass 1 offers anyone a second, so one large family cannot crowd another
+ * family's advertised rows out of the battery. Selected rows are emitted in advertised order, so
+ * any union at or under the cap is byte-for-byte the advertised concatenation.
  */
 export function adventureShadowCandidateUnion(families: {
   travel: readonly ProviderSafeExactCandidate[];
@@ -146,19 +151,35 @@ export function adventureShadowCandidateUnion(families: {
   questLifecycle: readonly ShadowLabeledCandidate[];
   progression: readonly ShadowLabeledCandidate[];
 }): AdventureSelectionCandidate[] {
-  return [
-    ...families.travel.map(travelShadowCandidate),
-    ...labeledShadowCandidates("exact_quest_objective.select", families.questObjective),
-    ...labeledShadowCandidates("exact_srd_check.select", families.srdCheck),
-    ...labeledShadowCandidates("exact_inventory_action.select", families.inventory),
-    ...labeledShadowCandidates("exact_vendor_commerce.select", families.commerce),
-    ...labeledShadowCandidates("exact_power_use.select", families.power),
-    ...labeledShadowCandidates("exact_rest.select", families.rest),
-    ...labeledShadowCandidates("exact_combat_consumable.select", families.combatConsumable),
-    ...labeledShadowCandidates("exact_combat_power.select", families.combatPower),
-    ...labeledShadowCandidates("exact_quest_lifecycle.select", families.questLifecycle),
-    ...labeledShadowCandidates("exact_progression_apply.select", families.progression),
-  ].slice(0, ADVENTURE_SHADOW_CANDIDATE_CAP);
+  // The advertised concatenation, kept grouped by family so each row's advertised position survives.
+  const advertised: readonly AdventureSelectionCandidate[][] = [
+    families.travel.map(travelShadowCandidate),
+    labeledShadowCandidates("exact_quest_objective.select", families.questObjective),
+    labeledShadowCandidates("exact_srd_check.select", families.srdCheck),
+    labeledShadowCandidates("exact_inventory_action.select", families.inventory),
+    labeledShadowCandidates("exact_vendor_commerce.select", families.commerce),
+    labeledShadowCandidates("exact_power_use.select", families.power),
+    labeledShadowCandidates("exact_rest.select", families.rest),
+    labeledShadowCandidates("exact_combat_consumable.select", families.combatConsumable),
+    labeledShadowCandidates("exact_combat_power.select", families.combatPower),
+    labeledShadowCandidates("exact_quest_lifecycle.select", families.questLifecycle),
+    labeledShadowCandidates("exact_progression_apply.select", families.progression),
+  ];
+  // Round-robin selection: each pass takes at most one row per family, families and rows in
+  // advertised order, until the cap is reached or every advertised row has been taken. The
+  // per-family row counts are then emitted in full advertised order.
+  const take = advertised.map(() => 0);
+  const total = advertised.reduce((count, group) => count + group.length, 0);
+  const bound = Math.min(total, ADVENTURE_SHADOW_CANDIDATE_CAP);
+  for (let picked = 0, pass = 0; picked < bound; pass += 1) {
+    for (const [family, group] of advertised.entries()) {
+      if (picked >= bound) break;
+      if (pass >= group.length) continue;
+      take[family] = pass + 1;
+      picked += 1;
+    }
+  }
+  return advertised.flatMap((group, family) => group.slice(0, take[family]!));
 }
 
 /**

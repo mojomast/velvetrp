@@ -126,6 +126,9 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   current lane, they add coverage and stability rather than scored labels. Two follow-ups surfaced:
   provider narration asserted a short rest and a purchase that no receipt establishes, and the
   lane's 32-candidate union cap can crowd out advertised quest-lifecycle rows on check-heavy turns.
+  Both findings have since been fixed: the cap now fills round-robin across advertised families
+  (small unions unchanged), and the narration gate fails closed for mechanically loaded prose on
+  zero-receipt turns (regression-tested with the recorded failures).
 - **Stability.** Across all 43 cases and 129 repeats, decision agreement was 100% with 0 conflicted
   cases; mean per-case signal standard deviation was 0.0117 and the maximum 0.0287. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard

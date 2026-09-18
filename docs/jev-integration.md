@@ -393,7 +393,8 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   turns behind `FEATURE_SYSTEM_ONE`, the enabled setting, a usable key, and a non-`off`
   `adventure-selection` lane mode; an `active` mode is still record-only because no promoted
   active path exists. The candidate union is projected from the same advertised rows the
-  provider sees (minus attribute/combat-action families), capped at 32 and bound to advertised
+  provider sees (minus attribute/combat-action families), capped at 32 by a family-diverse
+  round-robin (so a check-heavy turn cannot crowd out other advertised families) and bound to advertised
   tools; travel records an explicit advisory binding string because it is not digest-bound. A
   lane failure is swallowed and can never alter the turn.
 - **Evaluation.** [System One adventure-selection benchmark](system-one-adventure-benchmark.md)
