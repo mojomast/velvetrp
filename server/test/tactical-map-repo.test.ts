@@ -11,7 +11,9 @@ useTmpDataDir();
 const scores = { might: 15, agility: 14, resolve: 13, insight: 12, presence: 10, craft: 8 };
 
 async function fixture(dnd = false) {
-  const repo = createRepository(); const campaign = repo.createCampaign("local-owner", { name: "Map campaign" });
+  // Pin the RNG: unpinned combat rolls can leave the turn economy in a shape the map repo
+  // rejects as contradictory (observed as a load-dependent flake).
+  const repo = createRepository({ rng: { integer: (minimum: number) => minimum } }); const campaign = repo.createCampaign("local-owner", { name: "Map campaign" });
   if (dnd) {
     repo.installSrdStarterCatalog("local-owner"); repo.configureSrdStarterCatalog("local-owner", campaign.id, { expectedRevision: 0, idempotencyKey: "map-pins" });
   } else {

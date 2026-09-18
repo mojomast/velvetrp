@@ -77,6 +77,27 @@ export const CAMPAIGN_DELETE_TRIGGER_PREDECESSOR_SQL = `CREATE TRIGGER campaigns
         DELETE FROM campaign_content_catalog_selections WHERE campaign_id=OLD.id;
       END`;
 
+/**
+ * The exact adventure-check execution table published before lane-origin rows existed: every row
+ * carried provider-call provenance. A database carrying this table (and otherwise current schema)
+ * is upgraded in place to the single origin-aware shape.
+ */
+export const ADVENTURE_CHECK_EXECUTION_PREDECESSOR_SQL = `CREATE TABLE adventure_check_executions_v54 (
+  command_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
+  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, round_number INTEGER NOT NULL CHECK(round_number BETWEEN 1 AND 5),
+  selection_json TEXT NOT NULL CHECK(json_valid(selection_json) AND json_type(selection_json)='object'),
+  selection_digest TEXT NOT NULL CHECK(length(selection_digest)=64 AND selection_digest NOT GLOB '*[^0-9a-f]*'),
+  provider_request_digest TEXT NOT NULL CHECK(length(provider_request_digest)=64), provider_response_digest TEXT NOT NULL CHECK(length(provider_response_digest)=64),
+  revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
+  rolls_json TEXT NOT NULL CHECK(json_valid(rolls_json) AND json_type(rolls_json)='array' AND json_array_length(rolls_json) BETWEEN 1 AND 2),
+  public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'),
+  result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest NOT GLOB '*[^0-9a-f]*'), occurred_at TEXT NOT NULL,
+  UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
+  FOREIGN KEY(candidate_id) REFERENCES adventure_check_candidates_v54(candidate_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT,
+  FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
+)`;
+
 const currentSchemaSql = readFileSync(new URL("./currentSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./campaignDmSchema.sql", import.meta.url), "utf8")
   + "\n" + readFileSync(new URL("./recallSchema.sql", import.meta.url), "utf8")
@@ -320,6 +341,43 @@ export function upgradeCatalogAttestationLimitSchema(
   return true;
 }
 
+/**
+ * Upgrades only the complete schema whose adventure-check execution table predates lane-origin
+ * rows. The table is rebuilt in place to the single origin-aware shape, existing rows are written
+ * as `origin='provider'` with their provider provenance preserved, and the immutability triggers
+ * are recreated, so historical provider executions and their receipts upgrade without data loss.
+ */
+export function upgradeAdventureCheckExecutionOriginSchema(
+  db: DatabaseDriver.Database,
+  actual: SchemaObject[],
+  expected: SchemaObject[],
+  validate: () => void,
+): boolean {
+  const table = "adventure_check_executions_v54";
+  const predecessor = expected.map((object) => object.name === table && object.type === "table"
+    ? { ...object, sql: ADVENTURE_CHECK_EXECUTION_PREDECESSOR_SQL }
+    : object);
+  if (JSON.stringify(actual) !== JSON.stringify(predecessor)) return false;
+  if (db.inTransaction) throw new Error("adventure check execution origin upgrade requires an independent transaction");
+  const definition = expected.find((object) => object.type === "table" && object.name === table)!;
+  const tableObjects = expected.filter((object) => object.type !== "table" && object.tbl_name === table);
+  db.transaction(() => {
+    db.exec(`CREATE TEMP TABLE ${table}_upgrade AS SELECT * FROM ${table}`);
+    db.exec(`DROP TABLE ${table}`);
+    db.exec(definition.sql);
+    db.exec(`INSERT INTO ${table} (command_id,candidate_id,campaign_id,turn_id,origin,provider_call_id,provider_tool_call_id,
+      round_number,provider_request_digest,provider_response_digest,system_one_decision_id,selection_json,selection_digest,
+      revision_before,revision_after,rolls_json,public_result_json,result_digest,occurred_at)
+      SELECT command_id,candidate_id,campaign_id,turn_id,'provider',provider_call_id,provider_tool_call_id,round_number,
+      provider_request_digest,provider_response_digest,NULL,selection_json,selection_digest,revision_before,revision_after,
+      rolls_json,public_result_json,result_digest,occurred_at FROM ${table}_upgrade`);
+    db.exec(`DROP TABLE ${table}_upgrade`);
+    for (const object of tableObjects) db.exec(object.sql);
+    validate();
+  }).immediate();
+  return true;
+}
+
 export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: string): void {
   try {
     if (schemaObjects(db).length === 0) {
@@ -395,7 +453,8 @@ export function ensureCurrentSchema(db: DatabaseDriver.Database, databasePath: s
       && !upgradeCombatMarkerSchema(db, schemaObjects(db), expected, validate)
       && !upgradeCombatConditionsSchema(db, schemaObjects(db), expected, validate)
       && !upgradeAdvancementCatalogSchema(db, schemaObjects(db), expected, validate)
-      && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)) {
+      && !upgradeCatalogAttestationLimitSchema(db, schemaObjects(db), expected, validate)
+      && !upgradeAdventureCheckExecutionOriginSchema(db, schemaObjects(db), expected, validate)) {
       assertCurrentDatabase(db, databasePath);
     }
   } catch (error) {

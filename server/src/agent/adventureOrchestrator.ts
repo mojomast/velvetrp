@@ -17,6 +17,7 @@ import type { Repository } from "../repo/index.js";
 import { getHarnessSettings, getProviderSettings, getSystemOneSettings, recordSystemOneDecision } from "../repo/index.js";
 import type { HarnessSettings, ProviderSettings, SystemOneSettings } from "../types.js";
 import { SYSTEM_ONE_CONFIDENCE_POLICY_VERSION } from "./systemOnePolicy.js";
+import { isLanePromoted } from "./systemOnePromotion.js";
 import { calibrateTopSignal } from "./systemOneCalibration.js";
 import { buildAdventureSelectionQuestions, composeAdventureSelection, type AdventureSelectionCandidate } from "./systemOneAdventure.js";
 import { buildRerankQuestions, composeRerankOrder, type RerankCandidate } from "./systemOneRerank.js";
@@ -184,14 +185,32 @@ export function adventureShadowCandidateUnion(families: {
 
 /**
  * Runs the L2 adventure exact-candidate battery beside the live turn and records the would-be
- * decision immutably. It never selects, orders, or commits anything; a lane failure, a malformed
- * answer, or a failed record write is swallowed so shadow evaluation cannot affect the turn.
+ * decision immutably. It never selects, orders, or commits anything by default; a lane failure,
+ * a malformed answer, or a failed record write is swallowed so shadow evaluation cannot affect
+ * the turn.
+ *
+ * Active branch: when the lane mode is `active`, the lane is promoted, the composed band is
+ * `act`, and the composed pick is exactly an `exact_srd_check.select` candidate, the check is
+ * committed through the lane-origin repository path and the refreshed turn is returned so the
+ * caller can skip provider planning. Every other case stays record-only.
+ *
+ * Decision ordering: the lane-origin commit validates that the decision row already exists and
+ * `system_one_decisions_v1` is insert-only (update/delete/replace all abort), so a `shadow:false`
+ * row could never be retracted if the commit then failed. The only ordering that keeps
+ * "shadow=false appears only when a lane-origin execution row exists" is to record the decision
+ * as advisory first and attempt the commit afterwards. The execution row itself (`origin='lane'`
+ * with its `system_one_decision_id`) is the authoritative evidence of the commit; on success
+ * nothing further is recorded, and on failure the advisory row is the honest record while the
+ * caller keeps the unchanged provider path.
+ *
+ * Returns the refreshed turn when a lane-origin check commit succeeded, otherwise null.
  */
 export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
-  candidates: readonly AdventureSelectionCandidate[], lane: SystemOneAdventureDependency): Promise<void> {
+  candidates: readonly AdventureSelectionCandidate[], lane: SystemOneAdventureDependency,
+  repository?: Repository): Promise<PrivateAdventureTurn | null> {
   try {
-    if (systemOneLaneMode(lane.settings, "adventure-selection") === "off") return;
-    if (candidates.length === 0) return;
+    if (systemOneLaneMode(lane.settings, "adventure-selection") === "off") return null;
+    if (candidates.length === 0) return null;
     const questions = buildAdventureSelectionQuestions(turn.declaration, candidates);
     // Keep the state structured (the vendor recommends it, and the harvest loop reads the same
     // shape back); digests are derived from the value by the decision repo, so no canonicalization
@@ -200,8 +219,9 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
     const startedAt = performance.now();
     const result = await lane.caller({ settings: lane.settings, state, questions });
     const composed = composeAdventureSelection(candidates, result.answers, lane.settings.confidencePolicy["adventure-selection"]);
-    recordSystemOneDecision({
-      decisionId: randomUUID(),
+    const decisionId = randomUUID();
+    const record = (shadow: boolean): void => recordSystemOneDecision({
+      decisionId,
       lane: "adventure-selection",
       campaignId: turn.campaignId,
       sessionId: turn.sessionId,
@@ -217,14 +237,30 @@ export async function recordAdventureShadowDecision(turn: PrivateAdventureTurn,
         topSignal: calibrateTopSignal(composed.topSignal, lane.settings.confidenceCalibration["adventure-selection"]) },
       confidenceBand: composed.band,
       fallbackUsed: true,
-      shadow: true,
+      shadow,
       usage: result.usage ? { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } : null,
       latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
       createdAt: new Date().toISOString(),
     });
+    const selection = composed.selection;
+    const picked = selection === null ? undefined : candidates.find((candidate) => candidate.candidateId === selection.candidateId);
+    // The first active capability is the deterministic, confirmation-free SRD check family: only
+    // a promoted lane, an act band, and exactly `exact_srd_check.select` may commit here.
+    if (repository && systemOneLaneMode(lane.settings, "adventure-selection") === "active"
+      && isLanePromoted("adventure-selection") && composed.band === "act"
+      && selection !== null && picked?.kind === "exact_srd_check.select") {
+      // Advisory-first ordering (see the function note): the lane-origin commit needs the decision
+      // row to exist, and the row cannot be retracted or promoted afterwards, so it never claims
+      // authority before the execution row proves the commit.
+      record(true);
+      repository.executeAdventureCheckCandidateFromLane(OWNER, { turnId: turn.turnId, decisionId, selection });
+      return privateTurn(repository, turn.turnId);
+    }
+    record(true);
   } catch {
     // Shadow evaluation is advisory and must never affect the turn.
   }
+  return null;
 }
 
 /** Upper bound on the recall rows projected into one shadow rerank battery. */
@@ -883,12 +919,17 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
   }
 
   // Every recovery and resume path has returned above, so this is a fresh planning dispatch.
-  // The adventure-selection shadow is advisory: it never selects, orders, or commits a
-  // candidate, and a lane failure is swallowed so it cannot affect the turn.
+  // The adventure-selection lane is advisory unless it is promoted and active and confidently
+  // picks an `exact_srd_check.select` candidate; only then does it commit the check directly and
+  // return without provider planning. A lane failure is swallowed so it cannot affect a turn the
+  // provider would otherwise handle.
   if (shadowCandidates.length > 0 && dependencies.getSystemOneAdventure) {
     try {
       const lane = await dependencies.getSystemOneAdventure();
-      if (lane) await recordAdventureShadowDecision(turn, shadowCandidates, lane);
+      if (lane) {
+        const committed = await recordAdventureShadowDecision(turn, shadowCandidates, lane, repository);
+        if (committed) return { turn: committed, outcome: "mechanics-committed", limitations: ADVENTURE_TOOL_LIMITATIONS };
+      }
     } catch {
       // Shadow evaluation is advisory and must never affect the turn.
     }

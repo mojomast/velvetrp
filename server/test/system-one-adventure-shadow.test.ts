@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+import DatabaseDriver from "better-sqlite3";
+import path from "node:path";
 import {
   ADVENTURE_SHADOW_CANDIDATE_CAP,
   adventureShadowCandidateUnion,
@@ -10,13 +12,18 @@ import {
   type SystemOneAdventureDependency,
 } from "../src/agent/adventureOrchestrator.js";
 import {
+  ADVENTURE_BEST_KEY,
+  ADVENTURE_NONE,
+  ADVENTURE_SUPPORTED_KEY,
+} from "../src/agent/systemOneAdventure.js";
+import {
   defaultHarnessSettings,
   defaultProviderSettings,
   defaultSystemOneLaneModes,
   defaultSystemOneSettings,
 } from "../src/defaults.js";
 import { createFakeSystemOneCaller } from "../src/provider/systemOneFake.js";
-import type { SystemOneCaller } from "../src/provider/systemOneCompletion.js";
+import type { SystemOneAnswer, SystemOneCaller } from "../src/provider/systemOneCompletion.js";
 import { createRepository, listSystemOneDecisionsByLane, updateSystemOneSettings } from "../src/repo/index.js";
 import type { SystemOneSettings } from "../src/types.js";
 import { dmFixture } from "./fixtures/dmCampaign.js";
@@ -53,6 +60,31 @@ async function adventureTurn() {
 }
 
 /**
+ * A D&D fixture turn whose candidate union advertises an SRD strength check next to the public
+ * quest objective, so one turn can exercise both the check commit and the provider fallback.
+ */
+async function checkAdventureTurn() {
+  const f = await dmFixture(true);
+  f.graph();
+  f.repo.createCampaignQuest(OWNER, f.campaign.id, {
+    quest: { questId: "gate-quest", storylineId: "story", title: "gate-quest", description: null, visibility: "public", journalText: "Offered",
+      objectives: [{ objectiveId: "gate-quest-objective", description: "Complete gate-quest", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }], rewards: [] },
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-check-quest",
+  });
+  f.repo.executeQuestCommand(OWNER, "gate-quest", { kind: "accept",
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-check-accept" });
+  const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
+    sessionId: f.session.id, actorId: f.actorId, declaration: "I force the gate open with raw strength.",
+    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-check-turn" });
+  const check = f.repo.generateAdventureCheckCandidates(OWNER, created.turnId)
+    .find((value) => value.label === "Strength (Strength), Easy difficulty, normal");
+  if (!check) throw new Error("strength check candidate is unavailable");
+  const objective = f.repo.listAdventureQuestObjectiveCandidates(OWNER, created.turnId).find((value) => value.objectiveId === "gate-quest-objective");
+  if (!objective) throw new Error("gate quest objective candidate is unavailable");
+  return { f, created, check, objective };
+}
+
+/**
  * Runs one fresh-planning turn that commits the exact quest objective candidate. The optional
  * lane factory is the only difference between the shadow and baseline runs.
  */
@@ -81,6 +113,58 @@ async function runTurn(laneFactory?: () => SystemOneAdventureDependency) {
   const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
   f.repo.close();
   return { result, decisions, providerCalls, laneResolutions, advertisedTools, messageCount, candidate };
+}
+
+/**
+ * Runs one fresh D&D planning turn through the lane. The lane caller is scripted to pick the
+ * requested advertised row, and the provider completion always commits the quest objective, so a
+ * reached provider path is observable. `staleCheckOnLaneCall` simulates a concurrent check commit
+ * that advances the actor's check revision while the lane model call is in flight, which the
+ * lane-origin repository path must reject as stale.
+ */
+async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "check" | "objective"; staleCheckOnLaneCall?: boolean }) {
+  const { f, created, check, objective } = await checkAdventureTurn();
+  const picked = options.pick === "check" ? check : objective;
+  let providerCalls = 0;
+  const base = createFakeSystemOneCaller({
+    scripted: {
+      [ADVENTURE_SUPPORTED_KEY]: { type: "noul", noul: 0.9 },
+      [ADVENTURE_BEST_KEY]: { type: "choice", choice: picked.candidateId, confidence: 0.9,
+        probabilities: { [picked.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
+    },
+  });
+  const caller: SystemOneCaller = async (input) => {
+    const result = await base(input);
+    if (options.staleCheckOnLaneCall) {
+      const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+      db.prepare("INSERT INTO adventure_check_revisions_v54 VALUES(?,?,?,?)")
+        .run(f.campaign.id, f.actorId, 1, "2036-01-01T00:00:00.000Z");
+      db.close();
+    }
+    return result;
+  };
+  const dependencies: AdventureAgentDependencies = {
+    complete: async () => {
+      providerCalls += 1;
+      return { message: { role: "assistant" as const, content: null,
+        toolCalls: [{ id: "objective-call", name: "exact_quest_objective.select",
+          arguments: JSON.stringify({ candidateId: objective.candidateId, digest: objective.digest }) }] },
+        usage: null, model: { requestedModel: "fake", responseModel: "fake" } };
+    },
+    getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
+    getHarness: async () => defaultHarnessSettings(),
+    now: f.options.clock.now,
+    getSystemOneAdventure: async () => lane(caller, { laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": options.mode } }),
+  };
+  const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  const execution = db.prepare("SELECT * FROM adventure_check_executions_v54 WHERE turn_id=?").get(created.turnId) as Record<string, unknown> | undefined;
+  db.close();
+  const receipt = execution
+    ? f.repo.getAdventureCheckPublicReceipt(OWNER, f.campaign.id, String(execution.command_id)) : null;
+  f.repo.close();
+  return { result, decisions, providerCalls, calls: base.calls, execution, receipt, created, check, objective };
 }
 
 /** The turn's own public decision surface with run-local identifiers removed. */
@@ -173,6 +257,79 @@ describe("System One adventure-selection shadow lane", () => {
     expect(caller.calls).toHaveLength(0);
     expect(listSystemOneDecisionsByLane("adventure-selection", 10)).toHaveLength(0);
     f.repo.close();
+  });
+});
+
+describe("System One adventure-selection active check lane", () => {
+  // These tests boot a full repository fixture; the 30s budgets are load headroom under parallel
+  // forks, not relaxed assertions.
+  it("commits a promoted active lane check and skips provider planning", { timeout: 30_000 }, async () => {
+    const run = await runCheckLaneTurn({ mode: "active", pick: "check" });
+
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.providerCalls).toBe(0);
+    expect(run.calls).toHaveLength(1);
+    expect(run.result.turn.receiptLinks).toHaveLength(1);
+    // The lane-origin execution is the authoritative evidence of the commit.
+    expect(run.execution).toMatchObject({ origin: "lane", provider_call_id: null, provider_tool_call_id: null,
+      round_number: null, provider_request_digest: null, provider_response_digest: null });
+    expect(run.receipt).toMatchObject({ checkKind: "ability", ability: "Strength", skill: null, mode: "normal",
+      difficulty: "Easy", dc: 10 });
+    expect(run.decisions).toHaveLength(1);
+    const decision = run.decisions[0]!;
+    expect(decision).toMatchObject({ lane: "adventure-selection", confidenceBand: "act", turnId: run.result.turn.turnId });
+    expect(decision.selection).toMatchObject({ method: "choice",
+      selection: { candidateId: run.check.candidateId, digest: run.check.digest } });
+    // Ordering: the repository validates that the decision row exists before committing and the
+    // decision table is insert-only, so the row is recorded advisory-first and stays shadow:true;
+    // the lane-origin execution row, linked by system_one_decision_id, proves the commit.
+    expect(decision.shadow).toBe(true);
+    expect(run.execution!.system_one_decision_id).toBe(decision.decisionId);
+  });
+
+  it("keeps the provider path and records advisory for a promoted active lane non-check pick", { timeout: 30_000 }, async () => {
+    const run = await runCheckLaneTurn({ mode: "active", pick: "objective" });
+
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.providerCalls).toBe(1);
+    expect(run.calls).toHaveLength(1);
+    expect(run.execution).toBeUndefined();
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]).toMatchObject({ shadow: true, confidenceBand: "act" });
+    expect(run.decisions[0]!.selection).toMatchObject({ method: "choice",
+      selection: { candidateId: run.objective.candidateId, digest: run.objective.digest } });
+  });
+
+  it("falls through to the provider when the lane-origin commit rejects a stale check", { timeout: 30_000 }, async () => {
+    const run = await runCheckLaneTurn({ mode: "active", pick: "check", staleCheckOnLaneCall: true });
+
+    // The lane decide call happened, the lane-origin commit threw (stale), and the unchanged
+    // provider path still finished the turn.
+    expect(run.calls).toHaveLength(1);
+    expect(run.providerCalls).toBe(1);
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.result.turn.receiptLinks).toHaveLength(1);
+    // No lane-origin execution and no authoritative-looking decision row for the failed commit.
+    expect(run.execution).toBeUndefined();
+    expect(run.receipt).toBeNull();
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]!.shadow).toBe(true);
+    expect(run.decisions.some((decision) => !decision.shadow)).toBe(false);
+  });
+
+  it("records advisory and never executes when the lane mode is shadow", { timeout: 30_000 }, async () => {
+    const run = await runCheckLaneTurn({ mode: "shadow", pick: "check" });
+
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.providerCalls).toBe(1);
+    expect(run.calls).toHaveLength(1);
+    expect(run.execution).toBeUndefined();
+    expect(run.receipt).toBeNull();
+    expect(run.decisions).toHaveLength(1);
+    // Shadow mode is about authority, not the composed band: the active test above pins the
+    // band/selection for the same fixture. Here the invariants are a single advisory record and
+    // no lane-origin execution.
+    expect(run.decisions[0]).toMatchObject({ shadow: true });
   });
 });
 

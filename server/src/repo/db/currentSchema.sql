@@ -5318,17 +5318,24 @@ CREATE TABLE adventure_check_candidates_v54 (
 CREATE INDEX idx_adventure_check_candidates_v54_turn ON adventure_check_candidates_v54(campaign_id,turn_id,candidate_id);
 CREATE TABLE adventure_check_executions_v54 (
   command_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
-  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, round_number INTEGER NOT NULL CHECK(round_number BETWEEN 1 AND 5),
+  origin TEXT NOT NULL CHECK(origin IN('provider','lane')),
+  provider_call_id TEXT, provider_tool_call_id TEXT, round_number INTEGER CHECK(round_number BETWEEN 1 AND 5),
+  provider_request_digest TEXT CHECK(length(provider_request_digest)=64), provider_response_digest TEXT CHECK(length(provider_response_digest)=64),
+  system_one_decision_id TEXT CHECK(system_one_decision_id IS NULL OR length(system_one_decision_id) BETWEEN 1 AND 128),
   selection_json TEXT NOT NULL CHECK(json_valid(selection_json) AND json_type(selection_json)='object'),
   selection_digest TEXT NOT NULL CHECK(length(selection_digest)=64 AND selection_digest NOT GLOB '*[^0-9a-f]*'),
-  provider_request_digest TEXT NOT NULL CHECK(length(provider_request_digest)=64), provider_response_digest TEXT NOT NULL CHECK(length(provider_response_digest)=64),
   revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
   rolls_json TEXT NOT NULL CHECK(json_valid(rolls_json) AND json_type(rolls_json)='array' AND json_array_length(rolls_json) BETWEEN 1 AND 2),
   public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'),
   result_digest TEXT NOT NULL CHECK(length(result_digest)=64 AND result_digest NOT GLOB '*[^0-9a-f]*'), occurred_at TEXT NOT NULL,
+  CHECK((origin='provider' AND provider_call_id IS NOT NULL AND provider_tool_call_id IS NOT NULL AND round_number IS NOT NULL
+      AND provider_request_digest IS NOT NULL AND provider_response_digest IS NOT NULL AND system_one_decision_id IS NULL)
+    OR (origin='lane' AND provider_call_id IS NULL AND provider_tool_call_id IS NULL AND round_number IS NULL
+      AND provider_request_digest IS NULL AND provider_response_digest IS NULL AND system_one_decision_id IS NOT NULL)),
   UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
   FOREIGN KEY(candidate_id) REFERENCES adventure_check_candidates_v54(candidate_id) ON DELETE RESTRICT,
   FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT,
+  FOREIGN KEY(system_one_decision_id) REFERENCES system_one_decisions_v1(decision_id) ON DELETE RESTRICT,
   FOREIGN KEY(campaign_id,turn_id) REFERENCES adventure_turns(campaign_id,id) ON DELETE RESTRICT
 );
 CREATE TRIGGER adventure_check_revisions_v54_guard BEFORE UPDATE ON adventure_check_revisions_v54
