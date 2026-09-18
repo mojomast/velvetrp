@@ -243,6 +243,13 @@ page](https://docs.typesafe.ai/model-jaggedness/jev-1.13) (reviewed 2026-09-16) 
 that apply directly to these lanes. Treat them as integration constraints, not defects to tune
 around.
 
+- **Pin the versioned model id once thresholds are tuned.** The vendor's
+  [Models page](https://docs.typesafe.ai/models) states that aliases move when a release ships and
+  answers can change without a code change, and recommends pinning the versioned id wherever
+  thresholds were tuned against a specific version. The demo environment and persisted settings are
+  pinned to `jev-1.13.0` (verified 2026-09-18); every recorded decision stores the resolved
+  response model, so an alias move or drift is auditable rather than silent.
+
 - **Literal reading.** The model reads requests literally and does not map informal player phrasing
   onto a canonical mechanic. Our live "drop my longsword" case is exactly this edge: the model
   recognized the commitment (supported ~0.48) but declined to equate it with the `unequip`
@@ -261,6 +268,22 @@ around.
   per question; instructions and criteria that disagree produce unstable judgments.
 - **No numeric precision.** The model is not a calculator. Keep arithmetic, thresholding, weighting,
   and score normalization in code (`systemOnePolicy.ts` and the lane composition functions).
+
+## Vendor-pattern alignment (reviewed 2026-09-18)
+
+The vendor's [confidence-gated routing](https://docs.typesafe.ai/patterns/confidence-routing)
+pattern is the shipped shape of these lanes: one typed question names the action, and code picks a
+threshold per action according to consequence (their voice-banking example uses a 0.6 floor and 0.85
+for a high-stakes action). The
+[classification-using-confidence](https://docs.typesafe.ai/cookbooks/classification_using_confidence)
+cookbook adds the other half: when confidence is low, a coarser but still useful answer beats a
+forced one (39/60 useful when always naming the fine label, 48/60 when falling back one level). Our
+bands implement the same idea with a deterministic provider fallback instead of a coarser lane
+answer; falling back to the action family rather than the exact candidate is a possible refinement
+once the corpora carry errors. The [AutoResearch
+cookbook](https://docs.typesafe.ai/cookbooks/autoresearch_feature_discovery) runs an error-driven
+loop for feature discovery on a downstream model, not lane promotion, so the harvest loop is not
+duplicating a vendor capability.
 
 ## Vendor-aligned battery direction (planned, not shipped)
 
