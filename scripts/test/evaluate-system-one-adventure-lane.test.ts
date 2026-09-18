@@ -23,8 +23,10 @@ import {
   adventureRequestState,
   adventureStabilitySamples,
   adventureThresholdSamples,
+  agentHarvestedCaseIds,
   evaluateAdventureReadouts,
   gradeAdventureCase,
+  harvestBucketForProvenance,
   loadHarvestedAdventureCases,
   mergeHarvestedAdventureCases,
   parseAdventureArgs,
@@ -32,7 +34,9 @@ import {
   renderAdventureBenchmark,
   summarizeAdventureCases,
   summarizeAdventureStability,
+  summarizeAdventureSubset,
   type AdventureReadout,
+  type MergedAdventureCase,
 } from "../evaluate-system-one-adventure-lane.js";
 
 const thresholds = { actionThreshold: 0.75, reviewThreshold: 0.5 };
@@ -115,6 +119,35 @@ const harvestProposal = (overrides: Record<string, unknown> = {}): Record<string
   reason: "human review confirmed the recorded adventure-selection decision",
   ...overrides,
 });
+
+/**
+ * Merges one synthetic two-candidate proposal for the given provenance. The expected pick is
+ * `harvest:harbor`, so composing `harvest:travel` yields an acted disagreement.
+ */
+const mergedHarvestCase = (provenance: string, seed = "a"): MergedAdventureCase => {
+  const merged = mergeHarvestedAdventureCases([
+    harvestProposal({
+      proposalId: seed.repeat(64),
+      provenance,
+      state: {
+        declaration: "I walk to the mill or the harbor.",
+        candidates: [
+          { candidateId: "harvest:travel", digest: "c".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+          { candidateId: "harvest:harbor", digest: "d".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the harbor" },
+        ],
+      },
+      expected: { candidateId: "harvest:harbor" },
+    }),
+  ]).cases[0]!;
+  return merged;
+};
+
+/** A composition of one of the merged case's candidates, committed at the given signal. */
+const harvestedComposition = (candidateId: "harvest:travel" | "harvest:harbor", topSignal = 0.9): AdventureSelectionComposition =>
+  composition({
+    selection: { candidateId, digest: candidateId === "harvest:travel" ? "c".repeat(64) : "d".repeat(64) },
+    topSignal,
+  });
 
 test("the frozen corpus covers every category and tool family with unique ids and digests", () => {
   assert.equal(ADVENTURE_EVAL_CORPUS_VERSION, "adventure-evals-v1");
@@ -670,6 +703,8 @@ test("merges confirmed harvested proposals and skips unusable labels", () => {
   assert.equal(merged.confirmed, 7, "confirmed adventure proposals are counted before skips");
   assert.equal(merged.cases.length, 2);
   assert.equal(merged.skipped, 5, "duplicate, null, malformed, unadvertised, and unusable state are skipped");
+  assert.equal(merged.humanCases, 2, "review-annotated proposals merge into the human bucket");
+  assert.equal(merged.agentCases, 0, "no proposal here is agent-reviewed");
 
   const primary = merged.cases.find((entry) => entry.id === `harvested:${"1".repeat(12)}`);
   assert.ok(primary);
@@ -678,6 +713,7 @@ test("merges confirmed harvested proposals and skips unusable labels", () => {
   assert.equal(primary.candidates.length, 1);
   assert.deepEqual(primary.expected, { preferred: "harvest:travel", acceptable: ["harvest:travel"] });
   assert.equal(primary.holdout, false, "harvested cases are development cases");
+  assert.equal(primary.harvestBucket, "human", "a review-annotated proposal is human-confirmed");
 
   const defer = merged.cases.find((entry) => entry.id === `harvested:${"6".repeat(12)}`);
   assert.ok(defer);
@@ -750,12 +786,167 @@ test("renders harvested provenance and counts harvested cases separately", () =>
       confirmed: 1,
       skipped: 0,
       cases: 1,
+      humanCases: 1,
+      agentCases: 0,
       warning: null,
     },
   });
   assert.ok(report.includes(`harvested:${"1".repeat(12)}`));
-  assert.ok(report.includes("| dev | harvested | harvest:travel |"), "the corpus table marks harvested provenance");
+  assert.ok(report.includes("| dev | harvested (human) | harvest:travel |"), "the corpus table marks the human bucket");
   assert.ok(report.includes("Harvested cases"));
+  assert.ok(report.includes("| Harvested cases | 1 merged (1 human-confirmed + 0 agent-reviewed), 0 skipped"));
+  assert.ok(report.includes("| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 0 agent-reviewed harvested case(s) are scored but not gated |"));
   assert.ok(report.includes("confirmed live-derived labels"));
+  assert.ok(!report.includes("Agent-reviewed harvested cases"), "a human-only harvest renders no agent section");
   assert.ok(!report.includes("Harvest warning"), "a clean fixture produces no warning");
+});
+
+test("maps proposal provenance into gate-eligible human and non-gated agent buckets", () => {
+  assert.equal(harvestBucketForProvenance("review-annotated"), "human");
+  assert.equal(harvestBucketForProvenance("agent-review"), "agent");
+  assert.equal(harvestBucketForProvenance("provider-disagreement"), "agent", "other provenances are not human-confirmed");
+  assert.equal(harvestBucketForProvenance(undefined), "agent", "an unrecognized provenance is not human-confirmed");
+
+  const merged = mergeHarvestedAdventureCases([
+    harvestProposal({ proposalId: "a".repeat(64) }),
+    harvestProposal({ proposalId: "b".repeat(64), provenance: "agent-review" }),
+    harvestProposal({ proposalId: "c".repeat(64), provenance: "provider-disagreement" }),
+  ]);
+  assert.equal(merged.cases.length, 3);
+  assert.equal(merged.humanCases, 1);
+  assert.equal(merged.agentCases, 2);
+  const byId = new Map(merged.cases.map((entry) => [entry.id, entry]));
+  assert.equal(byId.get(`harvested:${"a".repeat(12)}`)?.harvestBucket, "human");
+  assert.equal(byId.get(`harvested:${"b".repeat(12)}`)?.harvestBucket, "agent");
+  assert.equal(byId.get(`harvested:${"c".repeat(12)}`)?.harvestBucket, "agent");
+
+  const ids = agentHarvestedCaseIds([...ADVENTURE_EVAL_CASES, ...merged.cases]);
+  assert.ok(ids.has(`harvested:${"b".repeat(12)}`), "agent-reviewed cases are excluded from the gate");
+  assert.ok(ids.has(`harvested:${"c".repeat(12)}`), "unknown provenance is not human-confirmed either");
+  assert.ok(!ids.has(`harvested:${"a".repeat(12)}`), "human-confirmed cases stay in the gate");
+  assert.ok(!ids.has(ADVENTURE_EVAL_CASES[0]!.id), "frozen cases stay in the gate");
+  assert.equal(ids.size, 2);
+});
+
+test("agent-reviewed harvested cases never influence the gate, sweep, calibration, or record", () => {
+  const frozen = [
+    ...Array.from({ length: 30 }, (_, index) => readout({ id: `dev-${index}`, holdout: false })),
+    ...Array.from({ length: 10 }, (_, index) => readout({ id: `holdout-${index}`, holdout: true })),
+  ];
+  const agentCase = mergedHarvestCase("agent-review", "b");
+  const agentReadout = gradeAdventureCase(agentCase, harvestedComposition("harvest:travel"));
+  const excludedCaseIds = agentHarvestedCaseIds([agentCase]);
+  assert.deepEqual([...excludedCaseIds], [agentCase.id]);
+
+  const withoutAgent = evaluateAdventureReadouts(frozen, "2026-09-17", ADVENTURE_DEFAULT_ACTION_THRESHOLD);
+  const withAgent = evaluateAdventureReadouts(
+    [...frozen, agentReadout],
+    "2026-09-17",
+    ADVENTURE_DEFAULT_ACTION_THRESHOLD,
+    { excludedCaseIds },
+  );
+  assert.deepEqual(withAgent, withoutAgent, "every gate-scoped field is identical with and without the agent case");
+
+  // The fixture is strong enough to matter: without the exclusion the agent error moves the numbers.
+  const mixed = evaluateAdventureReadouts([...frozen, agentReadout], "2026-09-17", ADVENTURE_DEFAULT_ACTION_THRESHOLD);
+  assert.notDeepEqual(mixed.calibration.allCalibrated, withoutAgent.calibration.allCalibrated);
+  assert.notDeepEqual(mixed.proposedRecord, withoutAgent.proposedRecord);
+
+  // It is still scored in the per-case roll-up and summarized separately.
+  const summaries = summarizeAdventureCases([...frozen, agentReadout], [], [agentCase]);
+  assert.equal(summaries.length, 1);
+  assert.equal(summaries[0]?.provenance, "harvested-agent");
+  assert.equal(summaries[0]?.calls, 1);
+  assert.equal(summaries[0]?.acted, 1);
+  assert.equal(summaries[0]?.correct, 0);
+  assert.deepEqual(summarizeAdventureSubset([...frozen, agentReadout], excludedCaseIds), {
+    cases: 1,
+    calls: 1,
+    acted: 1,
+    actedCorrect: 0,
+    actedAccuracy: 0,
+    exact: 0,
+    correct: 0,
+    accuracy: 0,
+  });
+});
+
+test("human-confirmed harvested cases do influence the gate and the proposed record", () => {
+  const frozen = [
+    ...Array.from({ length: 30 }, (_, index) => readout({ id: `dev-${index}`, holdout: false })),
+    ...Array.from({ length: 10 }, (_, index) => readout({ id: `holdout-${index}`, holdout: true })),
+  ];
+  const humanCase = mergedHarvestCase("review-annotated", "a");
+  const excludedCaseIds = agentHarvestedCaseIds([humanCase]);
+  assert.equal(excludedCaseIds.size, 0, "human-confirmed cases are never excluded from the gate");
+
+  const base = evaluateAdventureReadouts(frozen, "2026-09-17", ADVENTURE_DEFAULT_ACTION_THRESHOLD, { excludedCaseIds });
+  assert.equal(base.gate.promoted, true);
+  assert.ok(base.proposedRecord);
+
+  const wrong = () => gradeAdventureCase(humanCase, harvestedComposition("harvest:travel"));
+  const withHuman = evaluateAdventureReadouts(
+    [...frozen, wrong(), wrong(), wrong(), wrong()],
+    "2026-09-17",
+    ADVENTURE_DEFAULT_ACTION_THRESHOLD,
+    { excludedCaseIds },
+  );
+  assert.equal(withHuman.calibration.allCalibrated.samples, base.calibration.allCalibrated.samples + 4);
+  assert.ok(withHuman.calibration.allCalibrated.accuracy < base.calibration.allCalibrated.accuracy);
+  assert.equal(withHuman.gate.promoted, false, "the human-confirmed errors reach the gate");
+  assert.equal(withHuman.proposedRecord, null, "a failing gate proposes no record");
+});
+
+test("renders the human/agent split, the agent section, and the not-gated reason", () => {
+  const human = mergedHarvestCase("review-annotated", "a");
+  const agent = mergedHarvestCase("agent-review", "b");
+  const cases = [...ADVENTURE_EVAL_CASES, human, agent];
+  const readouts = [
+    gradeAdventureCase(human, harvestedComposition("harvest:travel", 0.6)),
+    gradeAdventureCase(agent, harvestedComposition("harvest:travel")),
+  ];
+  const evaluation = evaluateAdventureReadouts(readouts, "2026-09-17", ADVENTURE_DEFAULT_ACTION_THRESHOLD, {
+    excludedCaseIds: agentHarvestedCaseIds(cases),
+  });
+  const report = renderAdventureBenchmark({
+    generatedAt: "2026-09-17T00:00:00.000Z",
+    model: "jev-test",
+    baseUrl: "https://example.test/v1",
+    repeats: 1,
+    thresholds,
+    readouts,
+    failures: [],
+    evaluation,
+    proposedRecord: evaluation.proposedRecord,
+    out: "docs/system-one-adventure-benchmark.md",
+    cases,
+    harvest: {
+      fixture: "server/test/fixtures/system-one-harvested/adventure-selection.json",
+      present: true,
+      confirmed: 2,
+      skipped: 0,
+      cases: 2,
+      humanCases: 1,
+      agentCases: 1,
+      warning: null,
+    },
+  });
+
+  assert.ok(report.includes("| Harvested cases | 2 merged (1 human-confirmed + 1 agent-reviewed), 0 skipped"), "Setup rows split the buckets");
+  assert.ok(
+    report.includes("| Gate scope | frozen corpus + 1 human-confirmed harvested case(s); 1 agent-reviewed harvested case(s) are scored but not gated |"),
+    "Setup rows state the gate scope",
+  );
+  assert.ok(report.includes("The review split is 1"));
+  assert.ok(report.includes("human-confirmed (`review-annotated`, gate-eligible) versus 1 agent-reviewed"));
+  assert.ok(report.includes("| dev | harvested (human) | harvest:harbor |"), "the human row is marked in the per-case table");
+  assert.ok(report.includes("| dev | harvested (agent) | harvest:harbor |"), "the agent row is still scored in the per-case table");
+  assert.ok(report.includes("### Agent-reviewed harvested cases (not gated)"));
+  assert.ok(report.includes("not promotion evidence"));
+  assert.ok(report.includes("promotion records re-derive only from human-confirmed labels"), "the section states the reason");
+  assert.ok(report.includes("Gate scope: frozen corpus plus human-confirmed harvested cases only"));
+  assert.ok(report.includes("| Cases | 1 |"));
+  assert.ok(report.includes("| Acted calls | 1 |"));
+  assert.ok(report.includes("| Acted accuracy | 0.0% |"));
+  assert.ok(report.includes("| Exact preferred | 0/1 |"));
 });

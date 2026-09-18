@@ -129,6 +129,17 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   Both findings have since been fixed: the cap now fills round-robin across advertised families
   (small unions unchanged), and the narration gate fails closed for mechanically loaded prose on
   zero-receipt turns (regression-tested with the recorded failures).
+- **Second synthetic wave and the provenance split.** Two more batches (~50 turns) raised the
+  fixture to 56 cases (1 human-confirmed + 55 agent-reviewed). The family-diverse union visibly
+  worked: every recorded request now carries the full advertised set, so the lane can see quest
+  accepts it previously could not. Agent review labelled 43 more cases (40 correct, 3 incorrect).
+  One agent-reviewed case acts and disagrees with its label, which on the mixed corpus moved the
+  sweep to 0.35 and dropped acted accuracy to 0.95 — exactly the error-rich signal the loop exists
+  to produce. To keep promotion evidence human-based, the adventure evaluator now gates frozen +
+  human-confirmed cases only and reports agent-reviewed cases separately; a promotion record is
+  never re-derived from agent labels. The split run returns the gate to 0.40 with 54 acted at 100%
+  accuracy, Brier 0.0002 and ECE 0.0110, and 100% stability (0 of 86 cases conflicted); the 55
+  agent-reviewed cases scored 92.7% on their asserted subset with none acting.
 - **Stability.** Across all 43 cases and 129 repeats, decision agreement was 100% with 0 conflicted
   cases; mean per-case signal standard deviation was 0.0117 and the maximum 0.0287. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard

@@ -18,9 +18,13 @@
  * named at a fixed grid of lower bars and reports a recommended action threshold. The lane's
  * shipped threshold remains the server default; the recommendation is an evaluation finding.
  *
- * The run also merges confirmed harvested cases from the parent-owned fixture when one exists (so
- * live-derived labels join the gate with their provenance flagged) and reports a decision-stability
- * roll-up (repeat agreement, conflicts, signal variance) beside accuracy.
+ * The run also merges confirmed harvested cases from the parent-owned fixture when one exists. The
+ * merge splits them by review provenance: human-confirmed (`review-annotated`) cases join the frozen
+ * corpus in the gate, while agent-reviewed (`agent-review`, and any other non-human provenance)
+ * cases are still composed and scored per case but are excluded from the calibration fit, the
+ * dev/holdout split, the threshold sweep, the gate, and the proposed record; the run summarizes
+ * them separately and flags them as not gated. A decision-stability roll-up (repeat agreement,
+ * conflicts, signal variance) is reported beside accuracy.
  *
  * The lane is wired in shadow (record-only) behind the `FEATURE_SYSTEM_ONE` flag, the enabled
  * setting, a usable key, and a non-`off` lane mode. It records one immutable shadow decision per
@@ -399,6 +403,11 @@ export function proposeAdventureRecord(
 }
 
 export interface AdventureEvaluation {
+  /**
+   * The readouts the evaluation ran over: the gate scope, i.e. frozen plus human-confirmed
+   * harvested calls. Agent-reviewed harvested calls are graded and reported elsewhere but never
+   * appear here, so this object is identical with or without them.
+   */
   readouts: AdventureReadout[];
   /** The server-default calibration: fit on development acted decisions, scored on all of them. */
   calibration: AdventureCalibrationReport;
@@ -414,19 +423,40 @@ export interface AdventureEvaluation {
 }
 
 /**
+ * Gate-scope exclusions for `evaluateAdventureReadouts`. The script passes the agent-reviewed
+ * harvested case ids: those calls still run through the same composition and are scored in the
+ * per-case table, but they must never influence promotion-relevant numbers.
+ */
+export interface AdventureEvaluationOptions {
+  /**
+   * Readout ids left out of every promotion-relevant number (calibration fit, dev/holdout split,
+   * threshold sweep, gate, and proposed record). The excluded calls stay fully graded and are
+   * reported separately by the caller.
+   */
+  excludedCaseIds?: ReadonlySet<string>;
+}
+
+/**
  * Runs the pure grading, calibration, threshold sweep, and both gate verdicts over collected readouts.
  *
  * The default verdict uses the readout's composed band (existing behavior). The sweep scores the
  * candidate each call named at every grid threshold with the lane gate's own floors, then the
  * recommended verdict re-runs the gate at the selected threshold with a Platt map fit on the
  * development acted decisions at that threshold.
+ *
+ * `options.excludedCaseIds` narrows the gate input to the frozen corpus plus human-confirmed
+ * harvested cases: agent-reviewed harvested readouts are dropped before the dev/holdout split, so
+ * adding one cannot move any field of the returned evaluation.
  */
 export function evaluateAdventureReadouts(
   readouts: readonly AdventureReadout[],
   promotedAt: string,
   defaultThreshold: number = ADVENTURE_DEFAULT_ACTION_THRESHOLD,
+  options: AdventureEvaluationOptions = {},
 ): AdventureEvaluation {
-  const calibration = evaluateAdventureCalibration(readouts);
+  const excluded = options.excludedCaseIds ?? new Set<string>();
+  const gated = readouts.filter((readout) => !excluded.has(readout.id));
+  const calibration = evaluateAdventureCalibration(gated);
   const defaultGate = evaluatePromotionGate(PROMOTION_LANE, {
     samples: calibration.allCalibrated.samples,
     accuracy: calibration.allCalibrated.accuracy,
@@ -440,7 +470,7 @@ export function evaluateAdventureReadouts(
     proposedRecord: proposeAdventureRecord(defaultGate, calibration.allCalibrated, calibration.fitted, promotedAt),
   };
 
-  const samples = adventureThresholdSamples(readouts, ADVENTURE_THRESHOLD_GRID);
+  const samples = adventureThresholdSamples(gated, ADVENTURE_THRESHOLD_GRID);
   const selection = selectActionThreshold(samples, {
     thresholds: ADVENTURE_THRESHOLD_GRID,
     minAccuracy: LANE_GATE.minAccuracy,
@@ -448,12 +478,12 @@ export function evaluateAdventureReadouts(
   });
   const recommendedVerdict = selection.selected === null
     ? null
-    : thresholdVerdict(readouts, selection.selected.threshold, promotedAt);
-  const devSamples = adventureThresholdSamples(readouts.filter((readout) => !readout.holdout), ADVENTURE_THRESHOLD_GRID);
-  const holdoutSamples = adventureThresholdSamples(readouts.filter((readout) => readout.holdout), ADVENTURE_THRESHOLD_GRID);
+    : thresholdVerdict(gated, selection.selected.threshold, promotedAt);
+  const devSamples = adventureThresholdSamples(gated.filter((readout) => !readout.holdout), ADVENTURE_THRESHOLD_GRID);
+  const holdoutSamples = adventureThresholdSamples(gated.filter((readout) => readout.holdout), ADVENTURE_THRESHOLD_GRID);
 
   return {
-    readouts: [...readouts],
+    readouts: [...gated],
     calibration,
     gate: defaultGate,
     proposedRecord: recommendedVerdict?.proposedRecord ?? null,
@@ -486,8 +516,35 @@ export function summarizeAdventureStability(readouts: readonly AdventureReadout[
   return summarizeStability(adventureStabilitySamples(readouts));
 }
 
-/** How a corpus row entered this run: the frozen projection corpus or a confirmed live harvest. */
-export type AdventureCaseProvenance = "frozen" | "harvested";
+/**
+ * How a corpus row entered this run. Harvested rows split by review provenance: `harvested-human`
+ * rows are human-confirmed (`review-annotated`) and join the frozen corpus in the gate;
+ * `harvested-agent` rows are agent-reviewed (or any other non-human provenance) and are scored but
+ * never gated.
+ */
+export type AdventureCaseProvenance = "frozen" | "harvested-human" | "harvested-agent";
+
+/** Which review bucket owns a merged case's label. Only `human` is promotion evidence. */
+export type AdventureHarvestBucket = "human" | "agent";
+
+/** A corpus row: a frozen case, or a merged case that remembers its harvest review bucket. */
+export type AdventureCaseRow = AdventureEvalCase & { harvestBucket?: AdventureHarvestBucket };
+
+/** A merged harvested case whose `harvestBucket` records who reviewed its proposal. */
+export interface MergedAdventureCase extends AdventureEvalCase {
+  harvestBucket: AdventureHarvestBucket;
+}
+
+/**
+ * Maps a proposal's provenance onto the review bucket that owns its label. `review-annotated` is
+ * the only provenance that means a human confirmed the label, so it is the only bucket that feeds
+ * the promotion gate. Everything else — `agent-review` today, and any provenance the merge does
+ * not recognize — is not human-confirmed, so it lands in the agent bucket: scored in the
+ * benchmark, never gated.
+ */
+export function harvestBucketForProvenance(provenance: unknown): AdventureHarvestBucket {
+  return provenance === "review-annotated" ? "human" : "agent";
+}
 
 /** The parent-owned confirmed-harvest fixture shape (`version: 1`). Proposals are validated defensively. */
 export interface AdventureHarvestFixture {
@@ -497,13 +554,17 @@ export interface AdventureHarvestFixture {
   proposals: HarvestProposal[];
 }
 
-/** The cases a confirmed harvest contributes, and how many confirmed proposals could not be mapped. */
+/** The cases a confirmed harvest contributes, split by review bucket, and the unmapped count. */
 export interface HarvestedAdventureMerge {
-  cases: AdventureEvalCase[];
+  cases: MergedAdventureCase[];
   /** Confirmed proposals for this lane found in the input. */
   confirmed: number;
   /** Confirmed proposals skipped because their state or expected value was unusable. */
   skipped: number;
+  /** Merged cases whose proposal was human-confirmed (`review-annotated`): gate-eligible. */
+  humanCases: number;
+  /** Merged cases whose proposal was not human-confirmed: scored and reported, never gated. */
+  agentCases: number;
 }
 
 /** The merged harvest plus whether the fixture existed and why it may have been unusable. */
@@ -514,14 +575,18 @@ export interface HarvestedAdventureCases extends HarvestedAdventureMerge {
   warning: string | null;
 }
 
-/** What the report needs to show the gate included live-derived labels. */
+/** What the report needs to show how the gate included live-derived labels. */
 export interface AdventureHarvestReport {
   fixture: string;
   present: boolean;
   confirmed: number;
   skipped: number;
-  /** Merged harvested cases that actually ran. */
+  /** Total merged harvested cases that actually ran (human-confirmed + agent-reviewed). */
   cases: number;
+  /** Human-confirmed merged cases: included in the gate with the frozen corpus. */
+  humanCases: number;
+  /** Agent-reviewed merged cases: scored and reported, excluded from the gate. */
+  agentCases: number;
   warning: string | null;
 }
 
@@ -531,6 +596,8 @@ const EMPTY_HARVEST: AdventureHarvestReport = {
   confirmed: 0,
   skipped: 0,
   cases: 0,
+  humanCases: 0,
+  agentCases: 0,
   warning: null,
 };
 
@@ -547,6 +614,7 @@ interface HarvestedProposalShape {
   proposalId: string;
   lane: string;
   status: string;
+  provenance: unknown;
   state: unknown;
   expected: unknown;
 }
@@ -559,6 +627,7 @@ function harvestProposalShape(value: unknown): HarvestedProposalShape | null {
     proposalId: value.proposalId,
     lane: value.lane,
     status: value.status,
+    provenance: value.provenance,
     state: value.state,
     expected: value.expected ?? null,
   };
@@ -586,7 +655,7 @@ function harvestedCandidates(value: unknown): AdventureSelectionCandidate[] | nu
  * digests are the recorded advisory bindings (travel rows are not digest-bound), so these cases
  * are evidence only and are never re-validated or executed.
  */
-function adventureCaseFromHarvest(proposal: HarvestedProposalShape): AdventureEvalCase | null {
+function adventureCaseFromHarvest(proposal: HarvestedProposalShape): MergedAdventureCase | null {
   const state = isRecord(proposal.state) ? proposal.state : null;
   if (!state || typeof state.declaration !== "string" || !state.declaration.trim()) return null;
   const candidates = harvestedCandidates(state.candidates);
@@ -603,19 +672,24 @@ function adventureCaseFromHarvest(proposal: HarvestedProposalShape): AdventureEv
     candidates,
     expected: { preferred: candidateId, acceptable: [candidateId] },
     holdout: false,
+    harvestBucket: harvestBucketForProvenance(proposal.provenance),
   };
 }
 
 /**
  * Merges confirmed adventure-selection proposals from a parsed fixture. Non-confirmed and
  * foreign-lane proposals are ignored; confirmed proposals with a null or malformed expected value
- * (or an unusable state) are counted in `skipped`. Duplicate ids keep the first case.
+ * (or an unusable state) are counted in `skipped`. Duplicate ids keep the first case. Each merged
+ * case remembers its review bucket: `review-annotated` proposals are human-confirmed and gate
+ * with the frozen corpus, everything else is agent-bucket and scored but never gated.
  */
 export function mergeHarvestedAdventureCases(proposals: readonly unknown[]): HarvestedAdventureMerge {
-  const cases: AdventureEvalCase[] = [];
+  const cases: MergedAdventureCase[] = [];
   const seen = new Set<string>();
   let confirmed = 0;
   let skipped = 0;
+  let humanCases = 0;
+  let agentCases = 0;
   for (const value of proposals) {
     const proposal = harvestProposalShape(value);
     if (!proposal || proposal.lane !== PROMOTION_LANE || proposal.status !== "confirmed") continue;
@@ -626,9 +700,11 @@ export function mergeHarvestedAdventureCases(proposals: readonly unknown[]): Har
       continue;
     }
     seen.add(testCase.id);
+    if (testCase.harvestBucket === "human") humanCases += 1;
+    else agentCases += 1;
     cases.push(testCase);
   }
-  return { cases, confirmed, skipped };
+  return { cases, confirmed, skipped, humanCases, agentCases };
 }
 
 /**
@@ -640,6 +716,8 @@ export function parseHarvestedAdventureCases(text: string): HarvestedAdventureCa
     cases: [],
     confirmed: 0,
     skipped: 0,
+    humanCases: 0,
+    agentCases: 0,
     present: true,
     warning,
   });
@@ -672,12 +750,14 @@ export async function loadHarvestedAdventureCases(filePath: string = HARVEST_FIX
     text = await readFile(filePath, "utf8");
   } catch (error) {
     if (isRecord(error) && error.code === "ENOENT") {
-      return { cases: [], confirmed: 0, skipped: 0, present: false, warning: null };
+      return { cases: [], confirmed: 0, skipped: 0, humanCases: 0, agentCases: 0, present: false, warning: null };
     }
     return {
       cases: [],
       confirmed: 0,
       skipped: 0,
+      humanCases: 0,
+      agentCases: 0,
       present: true,
       warning: `harvested fixture could not be read: ${messageOf(error)}`,
     };
@@ -688,7 +768,10 @@ export async function loadHarvestedAdventureCases(filePath: string = HARVEST_FIX
 export interface AdventureCaseSummary {
   id: string;
   category: AdventureEvalCategory;
-  /** `harvested` rows are confirmed live-derived labels included in the run and the gate. */
+  /**
+   * Frozen, human-confirmed harvested, or agent-reviewed harvested. Only frozen and
+   * `harvested-human` rows feed the gate; `harvested-agent` rows are scored and reported.
+   */
   provenance: AdventureCaseProvenance;
   holdout: boolean;
   /** The case's single preferred call, or null when it should defer. */
@@ -706,11 +789,79 @@ export interface AdventureCaseSummary {
   meanSignal: number;
 }
 
+/**
+ * The provenance of one corpus row. Harvested rows without an explicit `human` bucket are reported
+ * as agent-reviewed: only `review-annotated` proposals are human-confirmed, so anything else
+ * (including an unrecognized provenance) is not gate-eligible.
+ */
+function caseProvenance(testCase: AdventureCaseRow): AdventureCaseProvenance {
+  if (!testCase.id.startsWith(HARVEST_ID_PREFIX)) return "frozen";
+  return testCase.harvestBucket === "human" ? "harvested-human" : "harvested-agent";
+}
+
+/**
+ * The case ids whose readouts must stay out of every promotion-relevant number: harvested cases
+ * that are not human-confirmed. Frozen cases are never included, and a harvested row without an
+ * explicit `human` bucket counts as agent-reviewed, because only `review-annotated` is
+ * human-confirmed.
+ */
+export function agentHarvestedCaseIds(cases: readonly AdventureCaseRow[]): Set<string> {
+  const ids = new Set<string>();
+  for (const testCase of cases) {
+    if (testCase.id.startsWith(HARVEST_ID_PREFIX) && testCase.harvestBucket !== "human") ids.add(testCase.id);
+  }
+  return ids;
+}
+
+function provenanceText(provenance: AdventureCaseProvenance): string {
+  if (provenance === "frozen") return "frozen";
+  return provenance === "harvested-human" ? "harvested (human)" : "harvested (agent)";
+}
+
+/** A gate-independent roll-up of one case subset; used for the non-gated agent harvest. */
+export interface AdventureSubsetSummary {
+  cases: number;
+  calls: number;
+  acted: number;
+  /** Acted calls in the acceptable set. */
+  actedCorrect: number;
+  actedAccuracy: number;
+  /** Calls that committed the exact preferred candidate (including a preferred deferral). */
+  exact: number;
+  /** Calls whose committed selection or deferral is in the acceptable set. */
+  correct: number;
+  accuracy: number;
+}
+
+/**
+ * Summarizes the readouts belonging to one case-id subset. Pure and gate-independent: the agent
+ * harvest is summarized with this so its scored behavior is visible without entering the gate.
+ */
+export function summarizeAdventureSubset(
+  readouts: readonly AdventureReadout[],
+  caseIds: ReadonlySet<string>,
+): AdventureSubsetSummary {
+  const rows = readouts.filter((readout) => caseIds.has(readout.id));
+  const acted = rows.filter((readout) => !readout.deferred);
+  const actedCorrect = acted.filter((readout) => readout.correct).length;
+  const correct = rows.filter((readout) => readout.correct).length;
+  return {
+    cases: caseIds.size,
+    calls: rows.length,
+    acted: acted.length,
+    actedCorrect,
+    actedAccuracy: acted.length === 0 ? 0 : actedCorrect / acted.length,
+    exact: rows.filter((readout) => readout.selectedCorrect).length,
+    correct,
+    accuracy: rows.length === 0 ? 0 : correct / rows.length,
+  };
+}
+
 /** Per-case roll-up over repeats, for the report table. `cases` defaults to the frozen corpus. */
 export function summarizeAdventureCases(
   readouts: readonly AdventureReadout[],
   failures: readonly { id: string }[] = [],
-  cases: readonly AdventureEvalCase[] = ADVENTURE_EVAL_CASES,
+  cases: readonly AdventureCaseRow[] = ADVENTURE_EVAL_CASES,
 ): AdventureCaseSummary[] {
   return cases.map((testCase) => {
     const rows = readouts.filter((readout) => readout.id === testCase.id);
@@ -730,7 +881,7 @@ export function summarizeAdventureCases(
     return {
       id: testCase.id,
       category: testCase.category,
-      provenance: testCase.id.startsWith(HARVEST_ID_PREFIX) ? "harvested" : "frozen",
+      provenance: caseProvenance(testCase),
       holdout: testCase.holdout,
       expected: testCase.expected.preferred,
       calls: rows.length,
@@ -783,7 +934,7 @@ export function renderAdventureBenchmark(input: {
   proposedRecord: SystemOnePromotionRecord | null;
   out: string;
   /** The cases this run evaluated: the frozen corpus plus any merged harvested cases. */
-  cases?: readonly AdventureEvalCase[];
+  cases?: readonly AdventureCaseRow[];
   /** Confirmed-harvest provenance for the report; omit when no fixture was considered. */
   harvest?: AdventureHarvestReport;
 }): string {
@@ -792,6 +943,7 @@ export function renderAdventureBenchmark(input: {
   const harvest = input.harvest ?? EMPTY_HARVEST;
   const { calibration, gate, sweep } = evaluation;
   const summaries = summarizeAdventureCases(readouts, failures, cases);
+  const agentSummary = summarizeAdventureSubset(readouts, agentHarvestedCaseIds(cases));
   const totalCalls = cases.length * repeats;
   const stability = summarizeAdventureStability(readouts);
   const stabilityConflicts = stability.cases.filter((entry) => entry.conflicted);
@@ -868,7 +1020,8 @@ export function renderAdventureBenchmark(input: {
   lines.push(`| Repeats | ${repeats} |`);
   lines.push(`| Corpus | ${cases.length} declarations x ${repeats} repeats = ${totalCalls} calls |`);
   lines.push(`| Holdout | ${holdout} case(s) held out of the Platt fit (${cases.length - holdout} development) |`);
-  lines.push(`| Harvested cases | ${harvest.cases} confirmed merged, ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
+  lines.push(`| Harvested cases | ${harvest.cases} merged (${harvest.humanCases} human-confirmed + ${harvest.agentCases} agent-reviewed), ${harvest.skipped} skipped — ${harvest.present ? `\`${harvest.fixture}\`` : "fixture absent"} |`);
+  lines.push(`| Gate scope | frozen corpus + ${harvest.humanCases} human-confirmed harvested case(s); ${harvest.agentCases} agent-reviewed harvested case(s) are scored but not gated |`);
   lines.push("");
   if (harvest.warning) {
     lines.push(`> **Harvest warning:** ${harvest.warning} Those proposals are skipped; the run continues.`);
@@ -877,9 +1030,13 @@ export function renderAdventureBenchmark(input: {
   lines.push("## Corpus and per-case results");
   lines.push("");
   if (harvest.cases > 0 || harvest.confirmed > 0) {
-    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: confirmed live-derived labels from`);
-    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). They run through the same composition,`);
-    lines.push("calibration, and threshold logic as the frozen corpus, so the gate metrics below include them.");
+    lines.push(`${harvest.cases} of ${cases.length} case(s) are **harvested** rows: status-confirmed live-derived labels from`);
+    lines.push(`\`${harvest.fixture}\` (${harvest.skipped} confirmed proposal(s) skipped). The review split is ${harvest.humanCases}`);
+    lines.push(`human-confirmed (\`review-annotated\`, gate-eligible) versus ${harvest.agentCases} agent-reviewed (\`agent-review\`). All of them`);
+    lines.push("run through the same composition and appear in the per-case table, but the agent-reviewed rows are");
+    lines.push("**not promotion evidence**: calibration, the dev/holdout split, the threshold sweep, the gate, and");
+    lines.push("any proposed record cover only the frozen corpus plus the human-confirmed rows, and the");
+    lines.push("agent-reviewed rows are summarized separately below.");
     lines.push("");
   }
   lines.push("| Case | Category | Split | Provenance | Expected | Calls | Acted | Exact | Correct | Errors | Effective outcomes |");
@@ -889,12 +1046,33 @@ export function renderAdventureBenchmark(input: {
       .sort(([left], [right]) => (left === "defer" ? -1 : right === "defer" ? 1 : left.localeCompare(right)))
       .map(([outcome, count]) => `${outcome} ${count}`)
       .join(", ");
-    lines.push(`| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${summary.provenance} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`);
+    lines.push(`| ${summary.id} | ${summary.category} | ${summary.holdout ? "holdout" : "dev"} | ${provenanceText(summary.provenance)} | ${summary.expected ?? "defer"} | ${summary.calls} | ${summary.acted} | ${summary.exact}/${summary.calls} | ${summary.correct}/${summary.calls} | ${summary.failed} | ${outcomes || "—"} |`);
   }
   lines.push("");
   if (failures.length > 0) {
     lines.push(`Adapter failures: ${failures.length}.`);
     for (const failure of failures.slice(0, 10)) lines.push(`- \`${failure.id}\` repeat ${failure.repeat}: ${failure.error}`);
+    lines.push("");
+  }
+  if (agentSummary.cases > 0) {
+    lines.push("### Agent-reviewed harvested cases (not gated)");
+    lines.push("");
+    lines.push(`${agentSummary.cases} merged case(s) came from **agent review** (\`agent-review\` provenance), not a human`);
+    lines.push("verdict. They ran through the same composition and are scored in the per-case table above");
+    lines.push("(provenance `harvested (agent)`), but they are **not promotion evidence**: the project rule is that");
+    lines.push("promotion records re-derive only from human-confirmed labels, so the calibration fit, the");
+    lines.push("dev/holdout split, the threshold sweep, the gate, and the proposed record all exclude them.");
+    lines.push("They still count in the per-case table, the overall coverage/decisive observations, and the");
+    lines.push("stability roll-up.");
+    lines.push("");
+    lines.push("| Agent-reviewed metric | Value |");
+    lines.push("| --- | ---: |");
+    lines.push(`| Cases | ${agentSummary.cases} |`);
+    lines.push(`| Graded calls | ${agentSummary.calls} |`);
+    lines.push(`| Acted calls | ${agentSummary.acted} |`);
+    lines.push(`| Acted accuracy | ${agentSummary.acted === 0 ? "n/a" : pct(agentSummary.actedAccuracy)} |`);
+    lines.push(`| Exact preferred | ${agentSummary.calls === 0 ? "n/a" : `${agentSummary.exact}/${agentSummary.calls}`} |`);
+    lines.push(`| Asserted-subset correctness | ${agentSummary.calls === 0 ? "n/a" : pct(agentSummary.accuracy)} |`);
     lines.push("");
   }
   lines.push("## Decision stability");
@@ -965,6 +1143,10 @@ export function renderAdventureBenchmark(input: {
   lines.push("## Calibration");
   lines.push("");
   lines.push(`Fit the monotonic Platt map on the acted development decisions at the server default threshold (${defaultThresholdText}) and scored it out of sample on the held-out cases. The recommended-threshold calibration is in the sweep above and the JSON sidecar.`);
+  if (agentSummary.cases > 0) {
+    lines.push("");
+    lines.push(`Gate scope: these rows cover the frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed harvested case(s) are summarized separately and excluded from the fit and the scores.`);
+  }
   lines.push("");
   lines.push("| Split / signal | Accuracy | Brier | ECE |");
   lines.push("| --- | ---: | ---: | ---: |");
@@ -980,6 +1162,10 @@ export function renderAdventureBenchmark(input: {
   lines.push(`The server default action threshold remains **${defaultThresholdText}**; a recommended threshold is an evaluation`);
   lines.push("finding for the parent to configure, not an automatic change. The record below is proposed from the");
   lines.push("recommended-threshold verdict, because that is the configuration the evidence supports.");
+  if (agentSummary.cases > 0) {
+    lines.push(`Gate scope: frozen corpus plus human-confirmed harvested cases only. The ${agentSummary.cases} agent-reviewed`);
+    lines.push("harvested case(s) never enter these verdicts or the proposed record.");
+  }
   lines.push("");
   if (recommended) {
     lines.push(`### Recommended-threshold verdict (${recommended.threshold.toFixed(2)})`);
@@ -1117,15 +1303,18 @@ async function main(): Promise<void> {
     confirmed: harvest.confirmed,
     skipped: harvest.skipped,
     cases: harvest.cases.length,
+    humanCases: harvest.humanCases,
+    agentCases: harvest.agentCases,
     warning: harvest.warning,
   };
   const cases = [...ADVENTURE_EVAL_CASES, ...harvest.cases];
+  const agentHarvestedIds = agentHarvestedCaseIds(cases);
 
   const readouts: AdventureReadout[] = [];
   const failures: AdventureBenchmarkFailure[] = [];
   let model = settings.model;
-  console.log(`evaluating ${cases.length} adventure declarations (${harvest.cases.length} harvested) x ${repeats} repeats against ${settings.model}`);
-  console.log(`harvested cases: ${harvest.cases.length}${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
+  console.log(`evaluating ${cases.length} adventure declarations (${harvest.cases.length} harvested: ${harvest.humanCases} human-confirmed, ${harvest.agentCases} agent-reviewed) x ${repeats} repeats against ${settings.model}`);
+  console.log(`harvested cases: ${harvest.cases.length} (${harvest.humanCases} human-confirmed gated, ${harvest.agentCases} agent-reviewed not gated)${harvest.skipped > 0 ? ` (${harvest.skipped} confirmed skipped)` : ""}`);
 
   for (const testCase of cases) {
     const questions = buildAdventureSelectionQuestions(testCase.declaration, testCase.candidates);
@@ -1162,8 +1351,11 @@ async function main(): Promise<void> {
     );
   }
 
-  const evaluation = evaluateAdventureReadouts(readouts, promotedAt, thresholds.actionThreshold);
+  const evaluation = evaluateAdventureReadouts(readouts, promotedAt, thresholds.actionThreshold, {
+    excludedCaseIds: agentHarvestedIds,
+  });
   const stability = summarizeAdventureStability(readouts);
+  const agentSummary = summarizeAdventureSubset(readouts, agentHarvestedIds);
   const report = renderAdventureBenchmark({
     generatedAt: new Date().toISOString(),
     model,
@@ -1187,6 +1379,12 @@ async function main(): Promise<void> {
     corpus: cases,
     samples: cases.length * repeats,
     harvestedCases: harvest.cases.length,
+    harvestedHumanCases: harvest.humanCases,
+    agentHarvestedCases: harvest.agentCases,
+    agentHarvested: {
+      ...agentSummary,
+      note: "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record",
+    },
     harvest: harvestReport,
     failures,
     readouts,
@@ -1204,6 +1402,9 @@ async function main(): Promise<void> {
   console.log(`gate recommended: ${recommended ? `${recommended.gate.promoted ? "PROMOTE" : "NOT READY"}${recommended.gate.reasons.length ? ` (${recommended.gate.reasons.join("; ")})` : ""}` : "n/a"}`);
   console.log(`brier: default ${evaluation.calibration.allCalibrated.brier.toFixed(4)}${recommended ? ` -> recommended ${recommended.calibration.allCalibrated.brier.toFixed(4)}` : ""}`);
   console.log(`stability: mean agreement ${pct(stability.meanAgreement)}, ${stability.conflictCases}/${stability.cases.length} conflicted case(s)`);
+  if (agentSummary.cases > 0) {
+    console.log(`agent-reviewed harvested (not gated): ${agentSummary.cases} case(s), ${agentSummary.calls} call(s), ${agentSummary.acted} acted, acted accuracy ${agentSummary.acted === 0 ? "n/a" : pct(agentSummary.actedAccuracy)}`);
+  }
   console.log(`wrote ${path.relative(ROOT, outPath)}`);
 }
 
