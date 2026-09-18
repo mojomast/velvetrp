@@ -5414,20 +5414,30 @@ CREATE TABLE adventure_exact_action_candidates_v56 (
 CREATE TABLE adventure_exact_action_proposal_bindings_v56 (
   proposal_id TEXT PRIMARY KEY, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE, candidate_id TEXT NOT NULL UNIQUE,
   candidate_digest TEXT NOT NULL CHECK(length(candidate_digest)=64), action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')),
-  provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL, execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  origin TEXT NOT NULL CHECK(origin IN('provider','lane')),
+  provider_call_id TEXT, provider_tool_call_id TEXT, system_one_decision_id TEXT,
+  execution_idempotency_key TEXT NOT NULL, bound_at TEXT NOT NULL,
+  CHECK((origin='provider' AND provider_call_id IS NOT NULL AND provider_tool_call_id IS NOT NULL AND system_one_decision_id IS NULL)
+    OR (origin='lane' AND provider_call_id IS NULL AND provider_tool_call_id IS NULL AND system_one_decision_id IS NOT NULL)),
   UNIQUE(campaign_id,turn_id,proposal_id), FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES tool_proposals(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
   FOREIGN KEY(candidate_id) REFERENCES adventure_exact_action_candidates_v56(candidate_id) ON DELETE RESTRICT,
-  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT
+  FOREIGN KEY(campaign_id,turn_id,provider_call_id) REFERENCES agent_provider_responses_v39(campaign_id,turn_id,provider_call_id) ON DELETE RESTRICT,
+  FOREIGN KEY(system_one_decision_id) REFERENCES system_one_decisions_v1(decision_id) ON DELETE RESTRICT
 );
 CREATE TABLE adventure_exact_action_executions_v56 (
   execution_id TEXT PRIMARY KEY, candidate_id TEXT NOT NULL UNIQUE, campaign_id TEXT NOT NULL, turn_id TEXT NOT NULL UNIQUE,
-  proposal_id TEXT NOT NULL UNIQUE, action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')), provider_call_id TEXT NOT NULL, provider_tool_call_id TEXT NOT NULL,
+  proposal_id TEXT NOT NULL UNIQUE, action_kind TEXT NOT NULL CHECK(action_kind IN('power','rest','combat-consumable','combat-power','quest-accept','quest-abandon','quest-reward','progression')),
+  origin TEXT NOT NULL CHECK(origin IN('provider','lane')),
+  provider_call_id TEXT, provider_tool_call_id TEXT, system_one_decision_id TEXT,
   command_id TEXT NOT NULL, actor_id TEXT NOT NULL, revision_before INTEGER NOT NULL, revision_after INTEGER NOT NULL CHECK(revision_after=revision_before+1),
   source_result_digest TEXT NOT NULL CHECK(length(source_result_digest)=64), public_result_json TEXT NOT NULL CHECK(json_valid(public_result_json) AND json_type(public_result_json)='object'),
   result_digest TEXT NOT NULL CHECK(length(result_digest)=64), occurred_at TEXT NOT NULL, linked_at TEXT NOT NULL,
+  CHECK((origin='provider' AND provider_call_id IS NOT NULL AND provider_tool_call_id IS NOT NULL AND system_one_decision_id IS NULL)
+    OR (origin='lane' AND provider_call_id IS NULL AND provider_tool_call_id IS NULL AND system_one_decision_id IS NOT NULL)),
   UNIQUE(campaign_id,turn_id,provider_call_id), UNIQUE(campaign_id,turn_id,provider_tool_call_id),
   FOREIGN KEY(candidate_id) REFERENCES adventure_exact_action_candidates_v56(candidate_id) ON DELETE RESTRICT,
-  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_exact_action_proposal_bindings_v56(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT
+  FOREIGN KEY(campaign_id,turn_id,proposal_id) REFERENCES adventure_exact_action_proposal_bindings_v56(campaign_id,turn_id,proposal_id) ON DELETE RESTRICT,
+  FOREIGN KEY(system_one_decision_id) REFERENCES system_one_decisions_v1(decision_id) ON DELETE RESTRICT
 );
 CREATE TRIGGER adventure_exact_action_batches_v56_update BEFORE UPDATE ON adventure_exact_action_batches_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;
 CREATE TRIGGER adventure_exact_action_batches_v56_delete BEFORE DELETE ON adventure_exact_action_batches_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END;

@@ -155,19 +155,26 @@ export function listLaneCommittedSystemOneDecisionIds(decisionIds: readonly stri
   const committed = new Set<string>();
   if (unique.length === 0) return committed;
   const db = getRepositoryDatabase();
-  try {
-    for (let offset = 0; offset < unique.length; offset += LANE_COMMIT_ID_BATCH) {
-      const batch = unique.slice(offset, offset + LANE_COMMIT_ID_BATCH);
-      const rows = db.prepare(`SELECT DISTINCT system_one_decision_id AS decision_id
-        FROM adventure_check_executions_v54
-        WHERE origin='lane' AND system_one_decision_id IN (${batch.map(() => "?").join(",")})`)
-        .all(...batch) as Array<{ decision_id: string }>;
-      for (const row of rows) committed.add(row.decision_id);
+  // Lane-origin commits live in one table per candidate family; a database may predate either.
+  const laneTables = ["adventure_check_executions_v54", "adventure_exact_action_executions_v56"];
+  for (let offset = 0; offset < unique.length; offset += LANE_COMMIT_ID_BATCH) {
+    const batch = unique.slice(offset, offset + LANE_COMMIT_ID_BATCH);
+    const placeholders = batch.map(() => "?").join(",");
+    let foundTable = false;
+    for (const table of laneTables) {
+      try {
+        const rows = db.prepare(`SELECT DISTINCT system_one_decision_id AS decision_id
+          FROM ${table}
+          WHERE origin='lane' AND system_one_decision_id IN (${placeholders})`)
+          .all(...batch) as Array<{ decision_id: string }>;
+        foundTable = true;
+        for (const row of rows) committed.add(row.decision_id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/no such table/i.test(message)) throw error;
+      }
     }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/no such table/i.test(message)) return new Set();
-    throw error;
+    if (!foundTable) return new Set();
   }
   return committed;
 }

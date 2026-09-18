@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import type DatabaseDriver from "better-sqlite3";
+import { z } from "zod";
 import {
   appendToolProposalInputSchema, applyGenerationDraftInputSchema, createAdventureTurnInputSchema,
   AGENT_TOOL_REGISTRY_VERSION, DEFAULT_AGENT_EXECUTION_LIMITS,
   createGenerationDraftInputSchema, decideToolProposalInputSchema, decideToolProposalsInputSchema, generationDraftValidationSchema,
   linkTurnReceiptInputSchema, privateAdventureTurnSchema, privateGenerationDraftSchema,
   providerCallOutcomeInputSchema, providerCallStartInputSchema, resourceIdSchema, canonicalAgentJson,
+  canonicalSha256DigestSchema, expectedRevisionSchema, idempotencyKeySchema, revisionSchema,
   reviewGenerationDraftInputSchema, stagedGenerationContentSchema, turnMutationInputSchema,
   updateTurnNarrationInputSchema, utcIsoTimestampSchema,
   type AppendToolProposalInput, type ApplyGenerationDraftInput, type CreateAdventureTurnInput,
@@ -24,6 +26,17 @@ export type { AppendToolProposalInput, ApplyGenerationDraftInput, CreateAdventur
   DecideToolProposalInput, DecideToolProposalsInput, DraftMutationInput, LinkTurnReceiptInput, ProviderCallOutcomeInput, ProviderCallStartInput,
   ReviewGenerationDraftInput, TurnMutationInput, UpdateTurnNarrationInput };
 
+/** One lane-origin rest proposal request binding an already-recorded decision to an advertised candidate. */
+export interface AppendAdventureRestProposalFromLaneInput {
+  turnId: string;
+  decisionId: string;
+  candidateId: string;
+  digest: string;
+  expectedTurnRevision: number;
+  expectedCampaignRevision: number;
+  idempotencyKey: string;
+}
+
 type Database = DatabaseDriver.Database;
 type AggregateKind = "turn" | "draft";
 type Action = "turn" | "provider" | "draft";
@@ -37,6 +50,13 @@ export interface AdventureTurnWriteRepository {
   createAdventureTurn(principalId: string, input: CreateAdventureTurnInput): PrivateAdventureTurn;
   /** Appends one bounded tool proposal. */
   appendToolProposal(principalId: string, input: AppendToolProposalInput): PrivateAdventureTurn;
+  /**
+   * Appends the normal confirmation-required rest proposal for one advertised lane candidate.
+   * The already-recorded decision and the advertised digest are validated, the binding is written
+   * with `origin='lane'` and the decision id, and mechanics still commit only through the ordinary
+   * confirmation API. Replay-safe per decision and selection.
+   */
+  appendAdventureRestProposalFromLane(principalId: string, input: AppendAdventureRestProposalFromLaneInput): PrivateAdventureTurn;
   /** Persists the exact confirmation wait command and immutable result. */
   waitForToolConfirmation(principalId: string, input: TurnMutationInput): PrivateAdventureTurn;
   /** Records one exact, non-expired proposal decision. */
@@ -71,6 +91,16 @@ export interface AdventureTurnWriteRepository {
 
 const canonical = (value: unknown): string => JSON.stringify(value, (_key, nested) => nested && typeof nested === "object" && !Array.isArray(nested)
   ? Object.fromEntries(Object.entries(nested as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right))) : nested);
+const sha256 = (value: string): string => createHash("sha256").update(value).digest("hex");
+const laneRestProposalInputSchema = z.object({
+  turnId: resourceIdSchema,
+  decisionId: resourceIdSchema,
+  candidateId: resourceIdSchema,
+  digest: canonicalSha256DigestSchema,
+  expectedTurnRevision: expectedRevisionSchema,
+  expectedCampaignRevision: revisionSchema,
+  idempotencyKey: idempotencyKeySchema,
+}).strict();
 
 /** Creates synchronous, immediate coordination transactions; provider waits and deterministic commands remain separate transactions. */
 export function createAdventureTurnWriteRepository(db: Database, context: AdventureTurnWriteContext,
@@ -256,7 +286,9 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
     || db.prepare("SELECT 1 FROM adventure_exact_action_executions_v56 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id)
     || db.prepare("SELECT 1 FROM adventure_commerce_executions_v57 WHERE campaign_id=? AND turn_id=?").get(row.campaign_id, row.id));
 
-  return {
+  // Self-reference lets the lane-origin rest proposal delegate to the single shared
+  // appendToolProposal implementation instead of forking the proposal rules.
+  const repository: AdventureTurnWriteRepository = {
     createAdventureTurn(principalId, raw) { const input = createAdventureTurnInputSchema.parse(raw); return immediate(() => {
       const synthetic = { campaign_id: input.campaignId, timeline_id: input.timelineId, session_id: input.sessionId, actor_id: input.actorId };
       authority(principalId, synthetic, input.expectedCampaignRevision, "turn");
@@ -333,18 +365,42 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
           db.prepare("INSERT INTO adventure_commerce_bindings_v57 VALUES(?,?,?,?,?,?,?,?,?)").run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,args.providerCallId,args.providerToolCallId,executionKey,at);
         }else if(["power_action","rest_action","combat_consumable_action","combat_power_action","quest_lifecycle_action","progression_action"].includes(commandType(input.toolName))){
           const args=input.arguments as Record<string,unknown>,kind=commandType(input.toolName)==="power_action"?"power":commandType(input.toolName)==="rest_action"?"rest":commandType(input.toolName)==="combat_consumable_action"?"combat-consumable":commandType(input.toolName)==="combat_power_action"?"combat-power":commandType(input.toolName)==="progression_action"?"progression":input.toolName==="quest_accept"?"quest-accept":input.toolName==="quest_abandon"?"quest-abandon":"quest-reward";
-          const candidate=db.prepare("SELECT candidate_digest,action_kind FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
+          const candidate=db.prepare("SELECT candidate_digest,action_kind,public_json,session_id,batch_id FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?")
             .get(args.candidateId,row.id)as any;
-          const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
-            AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
-              WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')=?
-                AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
-            .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,kind==="power"?"exact_power_use.select":kind==="rest"?"exact_rest.select":kind==="combat-consumable"?"exact_combat_consumable.select":kind==="combat-power"?"exact_combat_power.select":kind==="progression"?"exact_progression_apply.select":"exact_quest_lifecycle.select",args.candidateId,args.digest);
-          if(!candidate||!response||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!policy.requiresConfirmation)
-            throw new AdventureTurnConflictError("adventure action proposal is not bound to an exact provider candidate");
-          db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,
-            provider_call_id,provider_tool_call_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
-            .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,args.providerCallId,args.providerToolCallId,executionKey,at);
+          const laneDecisionId=kind==="rest"&&typeof args.systemOneDecisionId==="string"?args.systemOneDecisionId:null;
+          if(laneDecisionId){
+            // Lane-origin rest proposal: the decision must already exist and match the turn, the
+            // selection must be an advertised rest candidate whose batch projection verifies, and
+            // the derived server policy must still require confirmation. Only the ordinary
+            // confirmation API can approve the proposal; nothing commits here.
+            const batch=candidate&&db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?").get(candidate.batch_id)as any;
+            let projection:any=null;try{projection=batch&&JSON.parse(batch.projection_json);}catch{projection=null;}
+            const decision=db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(laneDecisionId)as any;
+            let publicValue:any=null;try{publicValue=candidate&&JSON.parse(candidate.public_json);}catch{publicValue=null;}
+            const derivedToolName=publicValue?.restKind==="short"?"rest_short":publicValue?.restKind==="long"?"rest_long":null;
+            if(!candidate||candidate.action_kind!=="rest"||candidate.candidate_digest!==args.digest||!batch
+              ||sha256(batch.projection_json)!==batch.projection_digest||!Array.isArray(projection?.candidates)
+              ||!projection.candidates.some((entry:any)=>entry?.candidateId===args.candidateId&&entry?.digest===args.digest)
+              ||!decision||decision.turn_id!==row.id||derivedToolName!==input.toolName
+              ||(decision.campaign_id!==null&&decision.campaign_id!==row.campaign_id)
+              ||(decision.session_id!==null&&decision.session_id!==candidate.session_id))
+              throw new AdventureTurnConflictError("adventure rest proposal is not bound to an advertised lane candidate");
+            if(!policy.requiresConfirmation)throw new AdventureTurnConflictError("adventure rest proposal requires confirmation");
+            db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'lane',NULL,NULL,?,?,?)`)
+              .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,laneDecisionId,executionKey,at);
+          }else{
+            const response=db.prepare(`SELECT 1 FROM agent_provider_responses_v39 response WHERE response.campaign_id=? AND response.turn_id=?
+              AND response.provider_call_id=? AND response.status='succeeded' AND EXISTS(SELECT 1 FROM json_each(response.response_json,'$.calls') call
+                WHERE json_extract(call.value,'$.providerToolCallId')=? AND json_extract(call.value,'$.toolName')=?
+                  AND json_extract(call.value,'$.arguments.candidateId')=? AND json_extract(call.value,'$.arguments.digest')=?)`)
+              .get(row.campaign_id,row.id,args.providerCallId,args.providerToolCallId,kind==="power"?"exact_power_use.select":kind==="rest"?"exact_rest.select":kind==="combat-consumable"?"exact_combat_consumable.select":kind==="combat-power"?"exact_combat_power.select":kind==="progression"?"exact_progression_apply.select":"exact_quest_lifecycle.select",args.candidateId,args.digest);
+            if(!candidate||!response||candidate.action_kind!==kind||candidate.candidate_digest!==args.digest||!policy.requiresConfirmation)
+              throw new AdventureTurnConflictError("adventure action proposal is not bound to an exact provider candidate");
+            db.prepare(`INSERT INTO adventure_exact_action_proposal_bindings_v56(proposal_id,campaign_id,turn_id,candidate_id,candidate_digest,action_kind,origin,
+              provider_call_id,provider_tool_call_id,system_one_decision_id,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,'provider',?,?,NULL,?,?)`)
+              .run(proposalId,row.campaign_id,row.id,args.candidateId,args.digest,kind,args.providerCallId,args.providerToolCallId,executionKey,at);
+          }
         }else if(commandType(input.toolName)==="combat_action"){
          const args=input.arguments as Record<string,unknown>;
            db.prepare(`INSERT INTO agent_combat_proposal_bindings_v39(proposal_id,campaign_id,turn_id,provider_call_id,provider_tool_call_id,encounter_id,legal_action_id,command_legal_action_id,legal_action_digest,expected_combat_revision,execution_idempotency_key,bound_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
@@ -363,6 +419,49 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
        physicalAdvance(row, row.state==="mechanics-committed"?"mechanics-committed":"proposed", "none", at);
       return finish("turn", row, principalId, "proposal-append", input, input.expectedTurnRevision, "proposed", "none", at, () => privateTurn(principalId, row.id));
     }); },
+    appendAdventureRestProposalFromLane(principalId, raw) {
+      const input = laneRestProposalInputSchema.parse(raw);
+      return immediate(() => {
+        const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
+        const candidate = db.prepare(`SELECT candidate_id,candidate_digest,action_kind,public_json,session_id,batch_id
+          FROM adventure_exact_action_candidates_v56 WHERE candidate_id=? AND turn_id=?`).get(input.candidateId, row.id) as any;
+        const batch = candidate && db.prepare("SELECT projection_json,projection_digest FROM adventure_exact_action_batches_v56 WHERE batch_id=?")
+          .get(candidate.batch_id) as any;
+        let projection: any = null; try { projection = batch && JSON.parse(batch.projection_json); } catch { projection = null; }
+        let publicValue: any = null; try { publicValue = candidate && JSON.parse(candidate.public_json); } catch { publicValue = null; }
+        const decision = db.prepare("SELECT campaign_id,session_id,turn_id FROM system_one_decisions_v1 WHERE decision_id=?").get(input.decisionId) as any;
+        if (!candidate || candidate.action_kind !== "rest" || candidate.candidate_digest !== input.digest || !batch
+          || sha256(batch.projection_json) !== batch.projection_digest || !Array.isArray(projection?.candidates)
+          || !projection.candidates.some((entry: any) => entry?.candidateId === input.candidateId && entry?.digest === input.digest)
+          || !decision || decision.turn_id !== row.id
+          || (decision.campaign_id !== null && decision.campaign_id !== row.campaign_id)
+          || (decision.session_id !== null && decision.session_id !== candidate.session_id))
+          throw new AdventureTurnConflictError("adventure rest proposal is not bound to an advertised lane candidate");
+        const existing = db.prepare("SELECT binding.* FROM adventure_exact_action_proposal_bindings_v56 binding WHERE binding.campaign_id=? AND binding.turn_id=?")
+          .get(row.campaign_id, row.id) as any;
+        if (existing) {
+          if (existing.origin === "lane" && existing.system_one_decision_id === input.decisionId
+            && existing.candidate_id === input.candidateId && existing.candidate_digest === input.digest)
+            return privateTurn(principalId, row.id);
+          throw new AdventureTurnConflictError("adventure rest proposal replay changed");
+        }
+        const restKind = publicValue?.restKind;
+        if (restKind !== "short" && restKind !== "long") throw new AdventureTurnConflictError("adventure rest candidate is unavailable");
+        // The single shared proposal implementation derives the confirmation policy, writes the
+        // origin='lane' binding through its rest branch, and advances the turn to `proposed`.
+        return repository.appendToolProposal(principalId, {
+          turnId: input.turnId,
+          toolName: restKind === "short" ? "rest_short" : "rest_long",
+          arguments: { candidateId: input.candidateId, digest: input.digest, systemOneDecisionId: input.decisionId,
+            restName: publicValue.restName, recovery: publicValue.recovery },
+          requiresConfirmation: true,
+          confirmationExpiresAt: utcIsoTimestampSchema.parse(new Date(context.clock.now().getTime() + 30 * 60_000).toISOString()),
+          expectedTurnRevision: input.expectedTurnRevision,
+          expectedCampaignRevision: input.expectedCampaignRevision,
+          idempotencyKey: input.idempotencyKey,
+        });
+      });
+    },
     waitForToolConfirmation(principalId, raw) { const input = turnMutationInputSchema.parse(raw); return immediate(() => {
       const row = turn(input.turnId); authority(principalId, row, input.expectedCampaignRevision, "turn");
       const old = replay("turn", row, principalId, "confirmation-wait", input, input.expectedTurnRevision, privateAdventureTurnSchema); if (old) return old;
@@ -602,4 +701,5 @@ export function createAdventureTurnWriteRepository(db: Database, context: Advent
       throw new AdventureTurnUnavailableError("campaign-content draft application is unavailable");
     },
   };
+  return repository;
 }

@@ -87,6 +87,22 @@ function seedLaneExecution(decisionId: string, suffix: string): void {
   db.close();
 }
 
+/** A raw lane-origin rest execution, mirroring the exact-action family's provenance shape. */
+function seedRestLaneExecution(decisionId: string, suffix: string): void {
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  db.pragma("foreign_keys = OFF");
+  db.prepare(`INSERT INTO adventure_exact_action_executions_v56
+    (execution_id,candidate_id,campaign_id,turn_id,proposal_id,action_kind,origin,provider_call_id,provider_tool_call_id,
+      system_one_decision_id,command_id,actor_id,revision_before,revision_after,source_result_digest,public_result_json,
+      result_digest,occurred_at,linked_at)
+    VALUES(?,?,?,?,?,'rest','lane',NULL,NULL,?,?,?,0,1,?,?,?,?,?)`).run(
+    `execution:${suffix}`, `rest-candidate:${suffix}`, `campaign:${suffix}`, `turn:${suffix}`, `proposal:${suffix}`, decisionId,
+    `rest-command:${suffix}`, `actor:${suffix}`, "c".repeat(64), JSON.stringify({}), "d".repeat(64),
+    "2035-01-01T00:00:00.000Z", "2035-01-01T00:00:00.000Z",
+  );
+  db.close();
+}
+
 describe("System One decision read api", () => {
   it("lists decisions newest-first with the privacy projection only", async () => {
     seedThree();
@@ -187,6 +203,12 @@ describe("System One decision read api", () => {
       decisionId: "decision:advisory", lane: "adventure-selection", shadow: true,
       createdAt: "2035-01-01T00:00:04.000Z",
     }));
+    // A rest-family lane commit must count too, not only the check-execution family.
+    recordSystemOneDecision(decision({
+      decisionId: "decision:rest", lane: "adventure-selection", shadow: true,
+      createdAt: "2035-01-01T00:00:05.000Z",
+    }));
+    seedRestLaneExecution("decision:rest", "rest:1");
     // Two executions linked to the same decision must count as one committed decision.
     seedLaneExecution("decision:2", "commit:1");
     seedLaneExecution("decision:2", "commit:2");
@@ -196,9 +218,11 @@ describe("System One decision read api", () => {
     expect(listed.statusCode).toBe(200);
     const decisions = (listed.json() as { decisions: Array<Record<string, unknown>> }).decisions;
     const byId = new Map(decisions.map((entry) => [entry.decisionId, entry]));
-    expect(decisions.map((entry) => entry.decisionId)).toEqual(["decision:advisory", "decision:3", "decision:2", "decision:1"]);
+    expect(decisions.map((entry) => entry.decisionId)).toEqual(["decision:rest", "decision:advisory", "decision:3", "decision:2", "decision:1"]);
     // decision:2 was recorded advisory (shadow: true) and then committed by a lane-origin execution.
     expect(byId.get("decision:2")).toMatchObject({ shadow: true, committedByLane: true });
+    // decision:rest was committed by the rest family's lane-origin execution table.
+    expect(byId.get("decision:rest")).toMatchObject({ shadow: true, committedByLane: true });
     // A plain advisory decision with no execution row stays shadow-only.
     expect(byId.get("decision:advisory")).toMatchObject({ shadow: true, committedByLane: false });
     expect(byId.get("decision:1")).toMatchObject({ shadow: false, committedByLane: false });
@@ -206,16 +230,16 @@ describe("System One decision read api", () => {
     const summaryResponse = await app.inject({ method: "GET", url: "/api/provider/system-one/decisions/summary" });
     expect(summaryResponse.statusCode).toBe(200);
     const summary = summaryResponse.json();
-    expect(summary).toMatchObject({ total: 4, shadow: 2, laneCommits: 1, shadowLaneCommits: 1 });
+    expect(summary).toMatchObject({ total: 5, shadow: 3, laneCommits: 2, shadowLaneCommits: 2 });
     expect(summary.byLane).toEqual([
-      { lane: "adventure-selection", count: 1, laneCommits: 0 },
+      { lane: "adventure-selection", count: 2, laneCommits: 1 },
       { lane: "guardrails", count: 1, laneCommits: 0 },
       { lane: "speaker-routing", count: 2, laneCommits: 1 },
     ]);
 
     // The repository join itself reports the same evidence and stays additive.
-    expect(listLaneCommittedSystemOneDecisionIds(["decision:1", "decision:2", "decision:3"]))
-      .toEqual(new Set(["decision:2"]));
+    expect(listLaneCommittedSystemOneDecisionIds(["decision:1", "decision:2", "decision:3", "decision:rest"]))
+      .toEqual(new Set(["decision:2", "decision:rest"]));
     expect(listRecentSystemOneDecisionsWithLaneCommits(10).find((record) => record.decisionId === "decision:2")?.committedByLane)
       .toBe(true);
     await app.close();

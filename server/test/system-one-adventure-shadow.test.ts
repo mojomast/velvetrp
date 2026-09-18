@@ -167,6 +167,105 @@ async function runCheckLaneTurn(options: { mode: "shadow" | "active"; pick: "che
   return { result, decisions, providerCalls, calls: base.calls, execution, receipt, created, check, objective };
 }
 
+/**
+ * A D&D fixture turn whose candidate union advertises a short rest next to the public quest
+ * objective, so one turn can exercise both the lane rest proposal and the provider fallback.
+ */
+async function restAdventureTurn() {
+  const f = await dmFixture(true);
+  f.graph();
+  f.repo.createCampaignQuest(OWNER, f.campaign.id, {
+    quest: { questId: "gate-quest", storylineId: "story", title: "gate-quest", description: null, visibility: "public", journalText: "Offered",
+      objectives: [{ objectiveId: "gate-quest-objective", description: "Complete gate-quest", targetProgress: 1, dependencyObjectiveIds: [], visibility: "public" }], rewards: [] },
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-rest-quest",
+  });
+  f.repo.executeQuestCommand(OWNER, "gate-quest", { kind: "accept",
+    expectedRevision: f.repo.listCampaignQuests(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-rest-accept" });
+  f.repo.changeActorResourceForActor(OWNER, f.campaign.id, f.actorId,
+    { kind: "change", resourceName: "health", amount: -5, expectedRevision: 0, idempotencyKey: "lane-rest-wound" });
+  const created = f.repo.createAdventureTurn(OWNER, { campaignId: f.campaign.id, timelineId: f.campaign.activeTimelineId,
+    sessionId: f.session.id, actorId: f.actorId, declaration: "I take a short rest.",
+    expectedCampaignRevision: f.repo.getCampaignAdministration(OWNER, f.campaign.id)!.revision, idempotencyKey: "lane-rest-turn" });
+  const rest = f.repo.generateAdventureRestCandidates(OWNER, created.turnId).find((value) => value.restKind === "short");
+  if (!rest) throw new Error("short rest candidate is unavailable");
+  const objective = f.repo.listAdventureQuestObjectiveCandidates(OWNER, created.turnId).find((value) => value.objectiveId === "gate-quest-objective");
+  if (!objective) throw new Error("gate quest objective candidate is unavailable");
+  return { f, created, rest, objective };
+}
+
+/**
+ * Runs one fresh D&D planning turn through the lane. The lane caller is scripted to pick the
+ * requested advertised row, and the provider completion always commits the quest objective, so a
+ * reached provider path is observable. `tamperRestOnLaneCall` rewrites the advertised rest batch
+ * projection while the lane model call is in flight, which the lane-origin proposal path must
+ * reject before any proposal or binding is written.
+ */
+async function runRestLaneTurn(options: { mode: "shadow" | "active"; pick: "rest" | "objective"; tamperRestOnLaneCall?: boolean }) {
+  const { f, created, rest, objective } = await restAdventureTurn();
+  const picked = options.pick === "rest" ? rest : objective;
+  let providerCalls = 0;
+  const base = createFakeSystemOneCaller({
+    scripted: {
+      [ADVENTURE_SUPPORTED_KEY]: { type: "noul", noul: 0.9 },
+      [ADVENTURE_BEST_KEY]: { type: "choice", choice: picked.candidateId, confidence: 0.9,
+        probabilities: { [picked.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
+    },
+  });
+  const caller: SystemOneCaller = async (input) => {
+    const result = await base(input);
+    if (options.tamperRestOnLaneCall) {
+      const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+      db.exec("DROP TRIGGER adventure_exact_action_batches_v56_update");
+      db.prepare("UPDATE adventure_exact_action_batches_v56 SET projection_json=? WHERE turn_id=? AND action_kind='rest'")
+        .run(JSON.stringify({ version: "v1", candidates: [] }), created.turnId);
+      db.exec("CREATE TRIGGER adventure_exact_action_batches_v56_update BEFORE UPDATE ON adventure_exact_action_batches_v56 BEGIN SELECT RAISE(ABORT,'v56 action candidates are immutable'); END");
+      db.close();
+    }
+    return result;
+  };
+  const dependencies: AdventureAgentDependencies = {
+    complete: async () => {
+      providerCalls += 1;
+      return { message: { role: "assistant" as const, content: null,
+        toolCalls: [{ id: "objective-call", name: "exact_quest_objective.select",
+          arguments: JSON.stringify({ candidateId: objective.candidateId, digest: objective.digest }) }] },
+        usage: null, model: { requestedModel: "fake", responseModel: "fake" } };
+    },
+    getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
+    getHarness: async () => defaultHarnessSettings(),
+    now: f.options.clock.now,
+    getSystemOneAdventure: async () => lane(caller, { laneModes: { ...defaultSystemOneLaneModes(), "adventure-selection": options.mode } }),
+  };
+  const result = await orchestrateAdventureTurn(f.repo, created.turnId, dependencies);
+  const decisions = listSystemOneDecisionsByLane("adventure-selection", 10);
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  const binding = db.prepare("SELECT * FROM adventure_exact_action_proposal_bindings_v56 WHERE turn_id=?")
+    .get(created.turnId) as Record<string, unknown> | undefined;
+  const execution = db.prepare("SELECT * FROM adventure_exact_action_executions_v56 WHERE turn_id=?")
+    .get(created.turnId) as Record<string, unknown> | undefined;
+  db.close();
+  return { f, created, rest, objective, result, decisions, providerCalls, calls: base.calls, binding, execution };
+}
+
+/** Approves the pending lane proposal through the normal confirmation API and re-enters the turn. */
+async function resumeRestLaneTurn(run: Awaited<ReturnType<typeof runRestLaneTurn>>) {
+  const proposal = run.result.turn.toolCalls[0]!.proposal;
+  run.f.repo.decideToolProposals(OWNER, { turnId: run.created.turnId, proposalIds: [proposal.proposalId], decision: "approved",
+    expectedTurnRevision: run.result.turn.revision, expectedCampaignRevision: run.result.turn.campaignRevision, idempotencyKey: "lane-rest-approve" });
+  const resumed = await orchestrateAdventureTurn(run.f.repo, run.created.turnId, {
+    complete: async () => { throw new Error("must not redispatch"); },
+    getProvider: async () => ({ ...defaultProviderSettings(), model: "fake-dm" }),
+    getHarness: async () => defaultHarnessSettings(), now: run.f.options.clock.now,
+  });
+  const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+  const execution = db.prepare("SELECT * FROM adventure_exact_action_executions_v56 WHERE turn_id=?")
+    .get(run.created.turnId) as Record<string, unknown> | undefined;
+  db.close();
+  const commandId = resumed.turn.receiptLinks[0]?.commandId;
+  const receipt = commandId ? run.f.repo.getAdventureRestPublicReceipt(OWNER, run.f.campaign.id, commandId) : null;
+  return { resumed, execution, receipt };
+}
+
 /** The turn's own public decision surface with run-local identifiers removed. */
 function turnProjection(result: AdventureAgentResult) {
   return {
@@ -330,6 +429,96 @@ describe("System One adventure-selection active check lane", () => {
     // band/selection for the same fixture. Here the invariants are a single advisory record and
     // no lane-origin execution.
     expect(run.decisions[0]).toMatchObject({ shadow: true });
+  });
+});
+
+describe("System One adventure-selection active rest lane", () => {
+  // These tests boot a full repository fixture; the 30s budgets are load headroom under parallel
+  // forks, not relaxed assertions.
+  it("prepares the normal confirmation-required lane rest proposal and commits only after approval", { timeout: 30_000 }, async () => {
+    const run = await runRestLaneTurn({ mode: "active", pick: "rest" });
+
+    expect(run.result.outcome).toBe("awaiting-confirmation");
+    expect(run.providerCalls).toBe(0);
+    expect(run.calls).toHaveLength(1);
+    expect(run.result.turn.state).toBe("awaiting-confirmation");
+    expect(run.result.turn.receiptLinks).toEqual([]);
+    expect(run.execution).toBeUndefined();
+    // The lane wrote only the ordinary confirmation-required proposal, bound with the lane
+    // provenance and no provider call.
+    expect(run.binding).toMatchObject({ origin: "lane", provider_call_id: null, provider_tool_call_id: null, action_kind: "rest" });
+    expect(run.result.turn.toolCalls[0]!.proposal).toMatchObject({ toolName: "rest_short",
+      policy: expect.objectContaining({ category: "rest-timing", requiresConfirmation: true }) });
+    expect(run.decisions).toHaveLength(1);
+    const decision = run.decisions[0]!;
+    expect(decision).toMatchObject({ lane: "adventure-selection", confidenceBand: "act", turnId: run.created.turnId });
+    // Advisory-first ordering keeps shadow=true; the lane-origin binding/execution is the proof.
+    expect(decision.shadow).toBe(true);
+    expect(run.binding!.system_one_decision_id).toBe(decision.decisionId);
+
+    const { resumed, execution, receipt } = await resumeRestLaneTurn(run);
+    expect(resumed.turn.receiptLinks).toHaveLength(1);
+    expect(execution).toMatchObject({ origin: "lane", system_one_decision_id: decision.decisionId,
+      provider_call_id: null, provider_tool_call_id: null, action_kind: "rest" });
+    expect(receipt).toMatchObject({ restKind: "short", restName: "Short rest" });
+    run.f.repo.close();
+  });
+
+  it("never commits a lane rest proposal without a confirmation decision", { timeout: 30_000 }, async () => {
+    const run = await runRestLaneTurn({ mode: "active", pick: "rest" });
+
+    expect(run.result.outcome).toBe("awaiting-confirmation");
+    expect(run.providerCalls).toBe(0);
+    expect(run.execution).toBeUndefined();
+    const proposalId = run.result.turn.toolCalls[0]!.proposal.proposalId;
+    expect(() => run.f.repo.executeAdventurePowerRestProposal(OWNER, run.created.turnId, proposalId)).toThrow("not executable");
+    const db = new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!, "velvet.sqlite"));
+    expect(db.prepare("SELECT count(*) count FROM adventure_exact_action_executions_v56 WHERE turn_id=?").get(run.created.turnId)).toEqual({ count: 0 });
+    expect(db.prepare("SELECT count(*) count FROM rpg_rest_receipts_v25 WHERE campaign_id=?").get(run.f.campaign.id)).toEqual({ count: 0 });
+    db.close(); run.f.repo.close();
+  });
+
+  it("falls through to the provider unchanged when the lane rest selection is tampered", { timeout: 30_000 }, async () => {
+    const run = await runRestLaneTurn({ mode: "active", pick: "rest", tamperRestOnLaneCall: true });
+
+    // The lane call happened, the lane proposal was rejected, and the unchanged provider path
+    // still finished the turn with the quest objective.
+    expect(run.calls).toHaveLength(1);
+    expect(run.providerCalls).toBe(1);
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.result.turn.receiptLinks).toHaveLength(1);
+    expect(run.binding).toBeUndefined();
+    expect(run.execution).toBeUndefined();
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]!.shadow).toBe(true);
+    expect(run.decisions.some((decision) => !decision.shadow)).toBe(false);
+    run.f.repo.close();
+  });
+
+  it("keeps the provider path for a promoted active lane non-rest pick", { timeout: 30_000 }, async () => {
+    const run = await runRestLaneTurn({ mode: "active", pick: "objective" });
+
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.providerCalls).toBe(1);
+    expect(run.calls).toHaveLength(1);
+    expect(run.binding).toBeUndefined();
+    expect(run.execution).toBeUndefined();
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]).toMatchObject({ shadow: true, confidenceBand: "act" });
+    run.f.repo.close();
+  });
+
+  it("records advisory and never prepares a lane proposal when the lane mode is shadow", { timeout: 30_000 }, async () => {
+    const run = await runRestLaneTurn({ mode: "shadow", pick: "rest" });
+
+    expect(run.result.outcome).toBe("mechanics-committed");
+    expect(run.providerCalls).toBe(1);
+    expect(run.calls).toHaveLength(1);
+    expect(run.binding).toBeUndefined();
+    expect(run.execution).toBeUndefined();
+    expect(run.decisions).toHaveLength(1);
+    expect(run.decisions[0]).toMatchObject({ shadow: true });
+    run.f.repo.close();
   });
 });
 

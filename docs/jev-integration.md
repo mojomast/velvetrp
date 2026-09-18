@@ -359,21 +359,25 @@ boundary. All batteries use the conventions in [Question design](#question-desig
   (the server only advertises authorized beats and the model defers on mixed states), so the
   record is an evidence-only snapshot, not a stress-tested guarantee, and no active Director
   path is wired.
-- **First active path (live for checks).** The check-execution table now carries an
+- **First active path (live for checks and rest).** The check-execution table now carries an
   explicit origin (`provider` | `lane`) with a `system_one_decision_id` foreign key and a migration
   that preserves existing rows, and `executeAdventureCheckCandidateFromLane` shares the provider
   path's candidate, digest, staleness and d20 rules and is replay-safe per decision and selection.
-  The lane commits an `exact_srd_check.select` pick when it is promoted, its lane mode is `active`,
-  and the composed band is `act`; the turn returns `mechanics-committed` without entering provider
-  planning, and any failure falls through to the unchanged provider path. The first canary was
-  observed live on 2026-09-18: three declarations (study a mechanism, force a gate, move quietly)
-  each produced a band-`act` check pick, an `origin='lane'` execution with a real DC-15 receipt, and
-  provider-assisted narration. One honest caveat remains: the decision log is insert-only and the
-  lane execution requires the decision row, so the decision is recorded advisory-first and the
-  `origin='lane'` execution row (linked by `system_one_decision_id`) is the authoritative commit
-  evidence — `shadow=false` is never written, and monitoring should join executions rather than
-  trust the shadow flag. Closing that gap needs an atomic decision-plus-execution seam in the
-  repository.
+  The exact-action proposal and execution tables for the rest family carry the same origin shape,
+  so a lane rest pick appends a **normal proposal** and waits on the ordinary confirmation API
+  (`awaiting-confirmation`) — the lane can never bypass confirmation — and commits with
+  `origin='lane'` only after approval. The lane commits an `exact_srd_check.select` pick when it is
+  promoted, its lane mode is `active`, and the composed band is `act`; checks commit directly and
+  rests wait for confirmation; the turn never enters provider planning, and any failure falls
+  through to the unchanged provider path. The first canary was observed live on 2026-09-18: three
+  declarations (study a mechanism, force a gate, move quietly) each produced a band-`act` check
+  pick, an `origin='lane'` execution with a real DC-15 receipt, and provider-assisted narration,
+  and a synthetic batch added a fourth. One honest caveat remains: the decision log is insert-only
+  and the lane execution requires the decision row, so the decision is recorded advisory-first and
+  the `origin='lane'` execution row (linked by `system_one_decision_id`) is the authoritative
+  commit evidence — `shadow=false` is never written, and monitoring joins executions (both the
+  check and exact-action execution tables) rather than trusting the shadow flag. Closing that gap
+  needs an atomic decision-plus-execution seam in the repository.
 - **Confidence.** `act` would compose the beat; `confirm` leaves the run in human mode;
   `fallback` uses the deterministic rule and provider-free oracle. The raw model is
   systematically **under-confident** (correct decisions at ~0.6), so the evaluation fits
