@@ -96,7 +96,7 @@ not just the harness:
 | --- | --- | --- |
 | `.velvet/emberwake-reach-run2` (canary) | SRD check, power, quest lifecycle, inventory, quest objective (partial), rest (conditional on spent resources) | 0 locations, 0 connections, 0 shops, 0 travel destinations, 0 NPCs — travel and commerce are impossible here |
 | `.velvet/synth-baie-comeau-2` (fresh seed, current schema) | travel, inventory, quest lifecycle, quest objective | 17 locations, 23 connections, 13 NPCs, 1 shop, 2 encounters; `velvet:mechanics-starter` content, so no SRD check or power families; rest did **not** advertise at health 11/12 |
-| `.velvet/synth-srd-1` (reviewed SRD adventure, current schema) | SRD check (24 rows from one check-flavored declaration), travel, inventory, power, quest lifecycle, quest objective | 3 locations, 2 connections, 1 NPC, SRD fighter with hit dice; goblin encounter available but not started; `srd-5.1:starter` pinned |
+| `.velvet/synth-srd-1` (reviewed SRD adventure, current schema) | SRD check (24 rows from one check-flavored declaration), travel, inventory, power, quest lifecycle, quest objective, rest (once the actor is wounded and has a hit die) | 3 locations, 2 connections, 1 NPC, SRD fighter with hit dice; goblin encounter available but not started; `srd-5.1:starter` pinned |
 | `.velvet/synth-srd-2` (reviewed SRD adventure, active goblin encounter) | combat power (the combat menu narrows to combat families while the encounter is active) | same reviewed world with the goblin ambush **active**; materialized with a 2020 clock so live writes stay monotonic — the fixture's default 2036 clock makes every post-materialization write fail the encounter immutability guard |
 
 The worlds are complementary and the primary/secondary split follows the user's SRD 5.1 focus:
@@ -202,6 +202,31 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   with the new harvest CLI `--merge-fixture` flag (corpus 94; 93 agent-reviewed + 1 human).
   Human-likeness on the small batch: near-duplicate share 0, distinct-1 0.67–0.68, burstiness
   0.27–0.37.
+
+### v2.2 realism controls, focus targeting, and the SRD combat gap (2026-09-18)
+
+- **Persona word budgets** (`WORD_BUDGET_BY_VERBOSITY`): terse 4–12, plain 8–20, precise 10–24,
+  florid 14–35 words, injected as one prompt line. A historical audit had measured a median
+  declaration of 77 words against the design target of 8–18; the first batches after the change
+  reported medians of 14–22 words with no long-form collapse.
+- **Motif-level repetition**: the human-likeness report gains `topRepeatedPhrases` (lowercased
+  4-gram shingles appearing in ≥2 turns, stopwords filtered, ranked and capped) and
+  `repeatedPhraseTurns`. The trigger-granularity check had measured 0.00 near-duplicate share even
+  where a human reviewer saw repeated *themes*; the new signal caught `"take a short rest" x2` in
+  its first batch.
+- **Focus targeting** (`--focus-family` + `--focus-mode`): forces the first turn of each run onto
+  one exact coverage cell (for example `combat-consumable/direct`), recording the same
+  `plannedTarget`/`targetSwaps` evidence as an advertisement-driven swap.
+- **SRD combat gap found and open.** The reviewed world's goblin wins initiative (12 vs 7). When an
+  enemy is the current combatant, `buildPlans.ts` intentionally returns no caller legal actions
+  ("enemy turns are intentionally not caller-planned in D&D"), and the adventure-turn path never
+  invokes `executeCombatEnemyTurn` (it is referenced only by the combat routes and repo). The
+  deterministic audience fallback then spends three failed attempts and writes
+  `terminalState:"failed"` on the player's turn; the direct enemy-turn route rejects with
+  `RPG_ENEMY_TURN_CONFLICT`, and `end-commands` rejects while the enemy is current, so the encounter
+  wedges (`.velvet/synth-srd-2` is in exactly this state). Battle coverage is paused until the
+  adventure path can resolve enemy turns; the misleading clock-order message on
+  `POST /encounters/:id/start-commands` is recorded as separate polish.
 
 ## Method survey
 

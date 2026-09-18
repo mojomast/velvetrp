@@ -184,6 +184,27 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   fourth-wave review asked for. Two cosmetic divergences recorded: the encounter-start failure
   message is misleading when the cause is a clock-order violation, and three combat turns aborted
   at `decision-rejected`/`awaiting-confirmation` as game outcomes the harness reported honestly.
+- **Sixth wave (realism controls and SRD rest).** A historical audit of 27 runs (118 turns) with
+  the new human-likeness report measured a median declaration of 77 words against the design
+  target of 8–18, and a trigram near-duplicate share of 0 despite a reviewer seeing repeated
+  themes. The harness now injects persona word budgets (terse 4–12, plain 8–20, precise 10–24,
+  florid 14–35) and reports motif-level repetition (`topRepeatedPhrases`, `repeatedPhraseTurns`);
+  post-change batches report 14–22 word medians, and the motif signal caught `"take a short rest"`
+  twice in its first run. `--focus-family`/`--focus-mode` force an exact cell for focused
+  campaigns. With the actor wounded and a hit die available, rest advertised and the lane acted
+  three times (signals 0.62, 0.85, 0.92) plus one quest-objective act (0.54); all four were
+  confirmed by review and merged, taking the corpus to **98 cases (1 human-confirmed + 97
+  agent-reviewed)**. The regenerated benchmark holds the gated record (54 acted/100%, Brier
+  0.0002, ECE 0.0107 at 0.40) and the agent subset carries 3 acted calls at 100% over 291 calls
+  (exact preferred 234/291, asserted 80.4%). Stability is 99.7% with the **first conflict in many
+  waves**: `harvested:b1e4dfc2f2e2` (agreement 66.7%) is the first live SRD check probe, which
+  flips between its Investigation candidate (live signal 0.55) and defer at the evaluator's 0.75
+  composition threshold — a genuinely borderline state the corpus now records rather than hides.
+- **Combat gap (open, found by the sixth wave).** Focused combat batches surfaced that the
+  adventure path never resolves D&D enemy turns, so a goblin that wins initiative wedges the
+  encounter in `failed` player turns; the reproduction, code references and consequences are in
+  [synthetic player simulation](synthetic-player-simulation.md#v22-realism-controls-focus-targeting-and-the-srd-combat-gap-2026-09-18).
+  Combat-family coverage is paused pending a bounded fix.
 - **Reliability finding.** Planning budget denials hard-failed ~9% of executed turns because the
   conservative prompt estimate over-counts measured tokens; denials now degrade to deterministic
   fallback narration (see [provider hardening](provider-hardening.md)) and the harness records a

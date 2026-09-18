@@ -17,6 +17,7 @@ import {
   FAMILY_TOOL_KINDS,
   HARNESS_VERSION,
   KIND_TO_FAMILY,
+  MAX_REPEATED_PHRASES,
   MECHANIC_FAMILIES,
   MIN_DIRECT_WEIGHT,
   OFF_MENU_FAILURE_MODES,
@@ -24,12 +25,14 @@ import {
   PERSONA_ARCHETYPES,
   PERSONA_LIST,
   PERSONA_VERSION,
+  PHRASE_STOPWORDS,
   SURFACE_NOISES,
   SYNTHETIC_TAG_PREFIX,
   SessionDriver,
   SessionTurnError,
   TRAILING_QUESTION_BANK,
   TurnContractError,
+  WORD_BUDGET_BY_VERBOSITY,
   applySurfaceNoise,
   buildConfirmRequest,
   buildGenerationRequest,
@@ -78,10 +81,12 @@ import {
   sessionIndexLabel,
   sessionTagFor,
   stableStringify,
+  tokenQuadgramSet,
   tokenTrigramSet,
   transcriptSlice,
   trigramJaccard,
   validateTurnContract,
+  type CoverageCell,
   type CoverageTargets,
   type FailureMode,
   type GenerationRequest,
@@ -89,6 +94,7 @@ import {
   type HarnessManifest,
   type HarnessSessionInput,
   type HarnessTurnRecord,
+  type HumanLikenessReport,
   type MechanicFamily,
   type SeededRng,
   type TurnAdvertisementSnapshot,
@@ -671,6 +677,24 @@ test("generator prompt carries persona, transcript, sheet, target, noise, and JS
   assert.match(messages.user, /runId=run-1/);
   assert.match(messages.user, /seed=test-0002/);
   assert.equal(buildGeneratorMessages(promptInput()).user.includes("(no completed turns yet)"), true);
+});
+
+test("generator prompt states the persona word budget for every verbosity", () => {
+  assert.deepEqual(WORD_BUDGET_BY_VERBOSITY, { terse: "4-12", plain: "8-20", florid: "14-35", precise: "10-24" });
+  assert.deepEqual(Object.keys(WORD_BUDGET_BY_VERBOSITY).sort(), ["florid", "plain", "precise", "terse"]);
+  for (const persona of PERSONA_LIST) {
+    const { system } = buildGeneratorMessages(promptInput({ persona }));
+    assert.ok(
+      system.includes(
+        `Keep the declaration to roughly ${WORD_BUDGET_BY_VERBOSITY[persona.verbosity]} words for this persona; stay in the lower half unless the failure mode or effort calls for a longer turn.`,
+      ),
+      `${persona.personaId} prompt is missing its word budget`,
+    );
+  }
+  const terse = buildGeneratorMessages(promptInput({ persona: PERSONAS.impatient })).system;
+  const florid = buildGeneratorMessages(promptInput({ persona: PERSONAS.explorer })).system;
+  assert.notEqual(terse, florid);
+  assert.ok(!terse.includes("14-35 words"), "the terse prompt does not carry the florid budget");
 });
 
 test("transcriptSlice keeps the newest turns oldest-first", () => {
@@ -1396,6 +1420,7 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
     contentProfile: null,
     menuWindow: DEFAULT_MENU_WINDOW,
     directWeight: DEFAULT_DIRECT_WEIGHT,
+    focus: null,
     help: false,
   });
   // `--data-dir` overrides the VELVET_DATA_DIR default; without the flag the env value survives.
@@ -1419,6 +1444,16 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.throws(() => parseHarnessArgs(["--direct-weight", "0.05"], {}), /--direct-weight must be a number >= 0.1/);
   assert.throws(() => parseHarnessArgs(["--direct-weight", "nope"], {}), /--direct-weight must be a number >= 0.1/);
   assert.throws(() => parseHarnessArgs(["--direct-weight"], {}), /--direct-weight requires a value/);
+  // Focused coverage flags: both or neither, each value validated.
+  assert.deepEqual(parseHarnessArgs(["--focus-family", "combat-consumable", "--focus-mode", "direct"], {}).focus, { family: "combat-consumable", failureMode: "direct" });
+  assert.deepEqual(parseHarnessArgs(["--focus-family=travel", "--focus-mode=unsupported"], {}).focus, { family: "travel", failureMode: "unsupported" });
+  assert.equal(parseHarnessArgs([], {}).focus, null);
+  assert.throws(() => parseHarnessArgs(["--focus-family", "travel"], {}), /--focus-family and --focus-mode must be used together/);
+  assert.throws(() => parseHarnessArgs(["--focus-mode", "direct"], {}), /--focus-family and --focus-mode must be used together/);
+  assert.throws(() => parseHarnessArgs(["--focus-family", "wizard", "--focus-mode", "direct"], {}), /--focus-family must be one of/);
+  assert.throws(() => parseHarnessArgs(["--focus-family", "travel", "--focus-mode", "sometimes"], {}), /--focus-mode must be one of/);
+  assert.throws(() => parseHarnessArgs(["--focus-family"], {}), /--focus-family requires a value/);
+  assert.throws(() => parseHarnessArgs(["--focus-mode"], {}), /--focus-mode requires a value/);
   const parsed = parseHarnessArgs([
     "--turns=3",
     "--personas", "explorer.v1,impatient",
@@ -1475,6 +1510,31 @@ test("CLI defaults to dry-run without API config and never touches the network",
   assert.ok(lines.some(line => line.includes("synthetic-player.explorer.test.a")));
   assert.ok(lines.some(line => line.includes('"sessionTag": "synthetic-player.explorer.test.a"')));
   assert.ok(!lines.some(line => line.includes("network disabled")));
+  assert.ok(!lines.some(line => line.startsWith("ERR ")));
+});
+
+test("CLI dry-run forwards the focus flags into the first turn", async () => {
+  const lines: string[] = [];
+  const result = await runHarnessCli([
+    "--turns", "2",
+    "--personas", "explorer",
+    "--seed", "test",
+    "--focus-family", "combat-consumable",
+    "--focus-mode", "direct",
+  ], {}, {
+    out: line => lines.push(line),
+    err: line => lines.push(`ERR ${line}`),
+    fetchImpl: (() => { throw new Error("network disabled"); }) as unknown as typeof fetch,
+  });
+  assert.equal(result, 0);
+  assert.ok(lines.some(line => line.includes("turn 0 target=combat-consumable/direct")), lines.join("\n"));
+  const manifestJson = lines.find(line => line.startsWith("{"));
+  assert.ok(manifestJson, "the manifest JSON is printed");
+  const manifest = JSON.parse(manifestJson) as HarnessManifest;
+  assert.equal(manifest.targetSwaps.length, 1);
+  assert.equal(manifest.targetSwaps[0]?.turnIndex, 0);
+  assert.deepEqual(manifest.targetSwaps[0]?.to, { family: "combat-consumable", failureMode: "direct" });
+  assert.deepEqual(manifest.turns[0]?.plannedTarget, manifest.targetSwaps[0]?.from);
   assert.ok(!lines.some(line => line.startsWith("ERR ")));
 });
 
@@ -1673,6 +1733,39 @@ test("scheduler prefers advertised families, falls back, and release restores ca
     plain.next(createRng("deterministic")),
     "an empty menu keeps the original weighted choice",
   );
+});
+
+test("scheduler reserve books a specific cell and release is its floor-zero inverse", () => {
+  const scheduler = new CoverageScheduler({ targets: defaultCoverageTargets(1), persona: PERSONAS.explorer });
+  const cell: CoverageCell = { family: "combat-consumable", failureMode: "direct" };
+  assert.equal(scheduler.plannedFor(cell), 0);
+  assert.equal(scheduler.remainingFor(cell), 1);
+  scheduler.reserve(cell);
+  assert.equal(scheduler.plannedFor(cell), 1);
+  assert.equal(scheduler.remainingFor(cell), 0);
+  assert.equal(scheduler.hasRemaining(), true, "other cells still have capacity");
+  // A forced reservation may exceed the target; release counts back down and floors at zero.
+  scheduler.reserve(cell);
+  assert.equal(scheduler.plannedFor(cell), 2);
+  scheduler.release(cell);
+  scheduler.release(cell);
+  scheduler.release(cell);
+  assert.equal(scheduler.plannedFor(cell), 0, "release floors at zero");
+  assert.equal(scheduler.remainingFor(cell), 1, "release restores capacity");
+
+  // While the cell is reserved, weighted planning never books it again.
+  scheduler.reserve(cell);
+  const rng = createRng("reserve-scan");
+  let plannedOthers = 0;
+  for (let index = 0; index < COVERAGE_CELL_COUNT; index += 1) {
+    const chosen = scheduler.next(rng);
+    if (chosen === null) break;
+    plannedOthers += 1;
+    assert.notDeepEqual(chosen, cell, "a fully reserved cell is never planned again");
+  }
+  assert.equal(plannedOthers, COVERAGE_CELL_COUNT - 1, "every other cell is planned exactly once");
+  assert.equal(scheduler.hasRemaining(), false);
+  assert.equal(scheduler.next(rng), null);
 });
 
 test("advertised options shape the generator prompt by failure mode", () => {
@@ -1876,6 +1969,115 @@ test("recent-menu union keeps earlier advertised families reachable for re-targe
   assert.ok(!renderManifestSummary(narrow).some(line => line.includes("menu window:")), "window 1 adds no note");
 });
 
+// -------------------------------------------------------------------------------------------------
+// Focused coverage
+// -------------------------------------------------------------------------------------------------
+
+/** Five target-1 cells whose two-turn plan can miss `combat-consumable/direct`, leaving it room. */
+function focusTargets(): CoverageTargets {
+  const zeros = defaultCoverageTargets(0);
+  const matrix = {} as Record<MechanicFamily, Record<FailureMode, number>>;
+  for (const family of MECHANIC_FAMILIES) {
+    matrix[family] = {} as Record<FailureMode, number>;
+    for (const mode of FAILURE_MODES) matrix[family][mode] = zeros[family][mode];
+  }
+  matrix["combat-consumable"]["direct"] = 1;
+  matrix["rest"]["direct"] = 1;
+  matrix["travel"]["direct"] = 1;
+  matrix["travel"]["unadvertised"] = 1;
+  matrix["inventory"]["ambiguous"] = 1;
+  return matrix;
+}
+
+test("focus forces the first plan turn onto the requested cell and records the swap", async () => {
+  const targets = focusTargets();
+  const focusCell: CoverageCell = { family: "combat-consumable", failureMode: "direct" };
+  const isFocus = (cell: CoverageCell | undefined): boolean =>
+    cell !== undefined && cell.family === focusCell.family && cell.failureMode === focusCell.failureMode;
+  let runSeed: string | null = null;
+  let original: CoverageCell | null = null;
+  let untouchedSecond: CoverageCell | null = null;
+  for (let index = 0; index < 64 && runSeed === null; index += 1) {
+    const candidate = `focus-${index}`;
+    const planned = planRun({ runSeed: candidate, persona: PERSONAS.explorer, turns: 2, targets }).turns;
+    const first = planned[0]?.target;
+    const second = planned[1]?.target;
+    if (first !== undefined && second !== undefined && !isFocus(first) && !isFocus(second)) {
+      runSeed = candidate;
+      original = { ...first };
+      untouchedSecond = { ...second };
+    }
+  }
+  if (runSeed === null || original === null || untouchedSecond === null) {
+    throw new Error("no seed found whose two-turn plan misses the focus cell");
+  }
+
+  const requests: GenerationRequest[] = [];
+  const fake = createFakeGenerator();
+  const manifest = await runHarnessSession(makeDryRunInput({
+    runSeed,
+    turns: 2,
+    targets,
+    focus: focusCell,
+    generateTurn: request => {
+      requests.push(request);
+      return fake(request);
+    },
+  }));
+
+  assert.deepEqual(manifest.turns.map(turn => turn.target), [focusCell, untouchedSecond]);
+  assert.equal(manifest.turns[0]?.toolKind, FAMILY_TOOL_KINDS["combat-consumable"]);
+  assert.deepEqual(manifest.turns[0]?.plannedTarget, original, "the replaced cell is recorded on the turn");
+  assert.equal(manifest.turns[1]?.plannedTarget, undefined, "only the first turn is forced");
+  assert.deepEqual(manifest.targetSwaps, [{ turnIndex: 0, from: original, to: focusCell }]);
+  assert.deepEqual(requests[0]?.target, focusCell, "the generator is asked for the focus cell on turn 0");
+  assert.deepEqual(requests[1]?.target, untouchedSecond, "later turns keep the weighted plan");
+
+  // The replaced reservation moves to the focus cell; the plan total is unchanged.
+  assert.equal(manifest.coverage.planned[original.family][original.failureMode], 0);
+  assert.equal(manifest.coverage.planned[focusCell.family][focusCell.failureMode], 1);
+  assert.equal(manifest.coverage.totals.planned, 2);
+  assert.ok(!manifest.notes.some(note => note.includes("already fully planned")));
+});
+
+test("focus still forces a fully planned cell and notes it", async () => {
+  const zeros = defaultCoverageTargets(0);
+  const targets = {} as Record<MechanicFamily, Record<FailureMode, number>>;
+  for (const family of MECHANIC_FAMILIES) {
+    targets[family] = {} as Record<FailureMode, number>;
+    for (const mode of FAILURE_MODES) targets[family][mode] = zeros[family][mode];
+  }
+  targets["combat-consumable"]["direct"] = 1;
+  targets["rest"]["direct"] = 1;
+  const focusCell: CoverageCell = { family: "combat-consumable", failureMode: "direct" };
+  let runSeed: string | null = null;
+  for (let index = 0; index < 64 && runSeed === null; index += 1) {
+    const candidate = `focus-full-${index}`;
+    const first = planRun({ runSeed: candidate, persona: PERSONAS.explorer, turns: 2, targets }).turns[0]?.target;
+    if (first !== undefined && first.family !== focusCell.family) runSeed = candidate;
+  }
+  if (runSeed === null) throw new Error("no seed found whose first turn is not the focus family");
+
+  const manifest = await runHarnessSession(makeDryRunInput({ runSeed, turns: 2, targets, focus: focusCell }));
+  assert.deepEqual(manifest.turns[0]?.target, focusCell, "the requested cell wins even when its target is met");
+  assert.equal(manifest.targetSwaps.length, 1);
+  assert.ok(
+    manifest.notes.some(note => note.includes("focus combat-consumable/direct") && note.includes("already fully planned")),
+    manifest.notes.join("\n"),
+  );
+});
+
+test("focus input rejects unknown family and failure-mode values", async () => {
+  await assert.rejects(
+    () => runHarnessSession(makeDryRunInput({ focus: { family: "wizard" } as unknown as CoverageCell })),
+    /focus\.family must be one of/,
+  );
+  await assert.rejects(
+    () => runHarnessSession(makeDryRunInput({ focus: { family: "travel", failureMode: "sometimes" } as unknown as CoverageCell })),
+    /focus\.failureMode must be one of/,
+  );
+});
+
 test("manifest records the content profile when supplied and null when omitted", async () => {
   const omitted = await runHarnessSession(makeDryRunInput());
   assert.equal(omitted.world.contentProfile, null);
@@ -1952,12 +2154,72 @@ test("computeHumanLikeness derives the pre-registered proxies from recorded decl
     distinct2: 0,
     nearDuplicateShare: 0,
     verbatimReuses: 0,
+    topRepeatedPhrases: [],
+    repeatedPhraseTurns: 0,
     oocShare: 0,
     questionShare: 0,
     noiseShare: 0,
     mixedIntentShare: 0,
     offMenuShare: 0,
   });
+});
+
+test("tokenQuadgramSet extracts lowercase phrases and drops stopword-only shingles", () => {
+  assert.equal(tokenQuadgramSet("").size, 0);
+  assert.equal(tokenQuadgramSet("one two three").size, 0, "fewer than four tokens yields no shingles");
+  assert.deepEqual(
+    [...tokenQuadgramSet("Hello, world! Hello there friend")],
+    ["hello world hello there", "world hello there friend"],
+    "lowercase alphanumeric tokens",
+  );
+  assert.equal(tokenQuadgramSet("it is in the").size, 0, "a shingle made only of stopwords is dropped");
+  const stopwordOnly = [...PHRASE_STOPWORDS].slice(0, 4).join(" ");
+  assert.equal(tokenQuadgramSet(stopwordOnly).size, 0, "the built-in stopword set filters its own shingles");
+  const mixed = tokenQuadgramSet("the smoke on the water");
+  assert.deepEqual([...mixed], ["the smoke on the", "smoke on the water"], "one content word keeps a shingle");
+});
+
+test("computeHumanLikeness surfaces repeated 4-gram motifs across turns", () => {
+  const report = computeHumanLikeness([
+    humanLikenessTurn({ turnIndex: 0, declaration: "I tally my pack and head north at dawn" }),
+    humanLikenessTurn({ turnIndex: 1, declaration: "I tally my pack and wait for the fog" }),
+    humanLikenessTurn({ turnIndex: 2, declaration: "I tally my pack before the storm rolls in" }),
+    humanLikenessTurn({ turnIndex: 3, declaration: "The water is cold and the wind is loud" }),
+  ]);
+  assert.deepEqual(report.topRepeatedPhrases, [
+    { phrase: "i tally my pack", count: 3 },
+    { phrase: "tally my pack and", count: 2 },
+  ]);
+  assert.equal(report.repeatedPhraseTurns, 3, "turns 0-2 carry the motif; turn 3 does not");
+  assert.equal(report.verbatimReuses, 0);
+});
+
+test("topRepeatedPhrases ranks by turn count, breaks ties alphabetically, and caps at five", () => {
+  const chain = "alpha bravo charlie delta echo foxtrot golf hotel india juliet";
+  const report = computeHumanLikeness([
+    humanLikenessTurn({ turnIndex: 0, declaration: chain }),
+    humanLikenessTurn({ turnIndex: 1, declaration: chain }),
+  ]);
+  assert.equal(MAX_REPEATED_PHRASES, 5);
+  assert.equal(report.topRepeatedPhrases.length, 5, "seven repeated phrases are capped at five");
+  assert.deepEqual(report.topRepeatedPhrases, [
+    { phrase: "alpha bravo charlie delta", count: 2 },
+    { phrase: "bravo charlie delta echo", count: 2 },
+    { phrase: "charlie delta echo foxtrot", count: 2 },
+    { phrase: "delta echo foxtrot golf", count: 2 },
+    { phrase: "echo foxtrot golf hotel", count: 2 },
+  ]);
+  assert.equal(report.repeatedPhraseTurns, 2);
+});
+
+test("stopword-only repeats do not register as motifs", () => {
+  const report = computeHumanLikeness([
+    humanLikenessTurn({ turnIndex: 0, declaration: "it is in the" }),
+    humanLikenessTurn({ turnIndex: 1, declaration: "it is in the" }),
+  ]);
+  assert.deepEqual(report.topRepeatedPhrases, []);
+  assert.equal(report.repeatedPhraseTurns, 0);
+  assert.equal(report.verbatimReuses, 1, "the verbatim metric still sees the reuse");
 });
 
 test("runs record the human-likeness report and print the near-duplicate share", async () => {
@@ -1968,4 +2230,26 @@ test("runs record the human-likeness report and print the near-duplicate share",
   const block = summary.filter(line => line.includes("human-likeness:") || line.includes("near-duplicate share"));
   assert.equal(block.length, 2, "the human-likeness block stays within three lines");
   assert.ok(summary.some(line => line.includes("near-duplicate share")), summary.join("\n"));
+});
+
+test("renderManifestSummary prints repeated motifs only when present", async () => {
+  const manifest = await runHarnessSession(makeDryRunInput());
+  const human: HumanLikenessReport = {
+    ...manifest.humanLikeness,
+    topRepeatedPhrases: [
+      { phrase: "smoke on the water", count: 3 },
+      { phrase: "waystone sword forms", count: 2 },
+    ],
+    repeatedPhraseTurns: 2,
+  };
+  const withMotifs = renderManifestSummary({ ...manifest, humanLikeness: human });
+  assert.ok(
+    withMotifs.some(line => line.includes('repeated motifs: "smoke on the water" x3, "waystone sword forms" x2')),
+    withMotifs.join("\n"),
+  );
+  const clean = renderManifestSummary({
+    ...manifest,
+    humanLikeness: { ...human, topRepeatedPhrases: [], repeatedPhraseTurns: 0 },
+  });
+  assert.ok(!clean.some(line => line.includes("repeated motifs")), "an empty phrase list prints no line");
 });

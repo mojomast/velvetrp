@@ -5124,6 +5124,207 @@
       "harvestBucket": "agent"
     },
     {
+      "id": "harvested:332daeb09896",
+      "category": "harvested",
+      "declaration": "I ease the crate lid open with caerful hands and lift the harbor lens otu.",
+      "candidates": [
+        {
+          "candidateId": "0f24d729-60fe-4ae6-b209-7531c1875aec",
+          "digest": "advisory-not-a-digest:0f24d729-60fe-4ae6-b209-7531c1875aec:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Breakwater Cave"
+        },
+        {
+          "candidateId": "9134133b-dc08-4bb7-89cc-f7b91bf7697c",
+          "digest": "advisory-not-a-digest:9134133b-dc08-4bb7-89cc-f7b91bf7697c:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Keeper House"
+        },
+        {
+          "candidateId": "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538",
+          "digest": "2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538559f834a6a014307",
+          "kind": "exact_quest_objective.select",
+          "label": "Advance quest objective: Restore the Harbor Light → Secure the harbor lens."
+        },
+        {
+          "candidateId": "check-candidate:08be2900da0c21b15a30cc3f067733cbe6677dcd5a37dd74",
+          "digest": "08be2900da0c21b15a30cc3f067733cbe6677dcd5a37dd748fd03d7197c3e7a5",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1139ad5d6e4a7c88246a5df027a99812ec155bb4fe919aed",
+          "digest": "1139ad5d6e4a7c88246a5df027a99812ec155bb4fe919aedb348230951210f5c",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1b8850db440751118b206030617ad1d79a2e888b9f34c03d",
+          "digest": "1b8850db440751118b206030617ad1d79a2e888b9f34c03d5acdc40a7756518f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1fca4d75611b3aa5b6d525846233d4fdf0c1b01ae10dc837",
+          "digest": "1fca4d75611b3aa5b6d525846233d4fdf0c1b01ae10dc837cd9a1589eb715e2f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:224556c56cb8ea95070c14477fe376eece4bf97384eead87",
+          "digest": "224556c56cb8ea95070c14477fe376eece4bf97384eead8731bd23aabce15ff6",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:24d5e4295e8cfb96cf0f311edcac864b906040f46b9a4c17",
+          "digest": "24d5e4295e8cfb96cf0f311edcac864b906040f46b9a4c1794770a70c9aa424d",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:2d34da0f1feaaf4f3f4b3d6b95833c454d96ab60485b9e1a",
+          "digest": "2d34da0f1feaaf4f3f4b3d6b95833c454d96ab60485b9e1acdd2b829590e5689",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:37b4e0df21d52132862d553360c7362fc10669fa1693fdc9",
+          "digest": "37b4e0df21d52132862d553360c7362fc10669fa1693fdc9c77b3a867377b447",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:39ba01742b08dd3656a475db7ba55cee3cf390c5051b3e16",
+          "digest": "39ba01742b08dd3656a475db7ba55cee3cf390c5051b3e16af41606dcdf94472",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:476317efd068b1999647c199711ad54a4251bf39dfa6dc36",
+          "digest": "476317efd068b1999647c199711ad54a4251bf39dfa6dc361ba9b561f256bd04",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:547dfdd8a26f7af1537bc94c3479d12ef63291be8586b298",
+          "digest": "547dfdd8a26f7af1537bc94c3479d12ef63291be8586b2986820b772bce86c7f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:5aa017229d567fbdda92078578427ea23b631adb5b526bf6",
+          "digest": "5aa017229d567fbdda92078578427ea23b631adb5b526bf63c848702714fbc15",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:629b2c1cbaa0593b0c177d9679e6e4bed8f3541dea6ea28b",
+          "digest": "629b2c1cbaa0593b0c177d9679e6e4bed8f3541dea6ea28b001c657ef65f4dbc",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:88fcfd684ea08e0dff4f4bf02bcc86c783e4c13c94ad5e10",
+          "digest": "88fcfd684ea08e0dff4f4bf02bcc86c783e4c13c94ad5e101ae4e0f8eb95e609",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8aea7834d7aeda05fc98a8a2dbf439e6239f7484358c6651",
+          "digest": "8aea7834d7aeda05fc98a8a2dbf439e6239f7484358c6651a6ace9f746d72314",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a0e5531f47894071e0eab74da2b06a4035b67bbe9c955d14",
+          "digest": "a0e5531f47894071e0eab74da2b06a4035b67bbe9c955d144e25c1d511d96f8c",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a251f6395279ec6616755e6bb1236b9543267e102560076c",
+          "digest": "a251f6395279ec6616755e6bb1236b9543267e102560076c5fdf520910b4e9df",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b49840ed9fdbdf0e08f831401800ab90767de27ffa5bb084",
+          "digest": "b49840ed9fdbdf0e08f831401800ab90767de27ffa5bb08445149d584c1c7f68",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b6041d42d35087122ee14e4db506940f877fb0634cfaa2d6",
+          "digest": "b6041d42d35087122ee14e4db506940f877fb0634cfaa2d6a437d7a421d4858b",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:c6865695f06eec1f136620448e6425cb4680248faac32b2c",
+          "digest": "c6865695f06eec1f136620448e6425cb4680248faac32b2ca6f6a8a869080f42",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:d1dd4f2f9fd7c16d8b5a8c982a6c71ed1612ef86d2890ef7",
+          "digest": "d1dd4f2f9fd7c16d8b5a8c982a6c71ed1612ef86d2890ef77a83230df9803dea",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:e37e8d9eed69b89b39e1dda632901580b9c120dbf664dc28",
+          "digest": "e37e8d9eed69b89b39e1dda632901580b9c120dbf664dc2890e6f8fcc6155f08",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:f2d53e180719eb7f4e94aa8a19337f9967f6696a0f44d670",
+          "digest": "f2d53e180719eb7f4e94aa8a19337f9967f6696a0f44d670606c6bcc2cb2ae41",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:f309becb0260e4f5a8336da15d1624c46839a06cedd3579a",
+          "digest": "f309becb0260e4f5a8336da15d1624c46839a06cedd3579a6fa8c9acf97eb12c",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "inventory-candidate:338ff63896118bfdcd94b0511c5bd0d567ce2c8e9e1863f1",
+          "digest": "338ff63896118bfdcd94b0511c5bd0d567ce2c8e9e1863f105654fa225af3d31",
+          "kind": "exact_inventory_action.select",
+          "label": "unequip: Longsword → hand"
+        },
+        {
+          "candidateId": "inventory-candidate:feac9ac79036965672efd8e0b2b733f0de2b7507298b38aa",
+          "digest": "feac9ac79036965672efd8e0b2b733f0de2b7507298b38aa5e22388d6f511a3f",
+          "kind": "exact_inventory_action.select",
+          "label": "drop: Acolyte Equipment"
+        },
+        {
+          "candidateId": "rest-candidate:2665ffb36fe4fe51b90ffe6f7ccd44ece31c5341da75fc36",
+          "digest": "2665ffb36fe4fe51b90ffe6f7ccd44ece31c5341da75fc36db6a84872a7b05d4",
+          "kind": "exact_rest.select",
+          "label": "Short rest: Short rest → Source actor"
+        },
+        {
+          "candidateId": "quest-abandon-candidate:90f8d849c76f2a85b498d407466683907ef0dacfe7e034ed",
+          "digest": "90f8d849c76f2a85b498d407466683907ef0dacfe7e034ed3574cf6344222bee",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "abandon: Restore the Harbor Light"
+        }
+      ],
+      "expected": {
+        "preferred": "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538",
+        "acceptable": [
+          "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538"
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
       "id": "harvested:38c1efae5452",
       "category": "harvested",
       "declaration": "Hold on, scratch that — i keep the lampl low and banked — no more showing my hand to the dark — and i walk the drag-line N. off the fourth landing the careful way. every few paces i stop and sight back along the water-cut stones i marked, and i read the ground before i trust it: bent grass, the run of the rock, which way the fold leans. first gap that shows itself gets no vote from me. i test it from cover, low, trimmer in the off hand with the long wick set and the screw half a turn past the bite and no further. only when the country agrees w/ itself — grass and stone and gap all pointing the asme way — do i commit, and if it dont, i back off and re-read the rise behind me rather than push on blind. hm, blind is what i came out here to stop being.",
@@ -8157,6 +8358,207 @@
         "preferred": null,
         "acceptable": [
           null
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
+      "id": "harvested:5b3104cae1dc",
+      "category": "harvested",
+      "declaration": "rcate can wait — i'm wounded and running thin, so i sit down in the keeper house and take a short rest to get my wind back, sword across my knees.",
+      "candidates": [
+        {
+          "candidateId": "db066547-ebcf-4663-9435-a41e76f876fd",
+          "digest": "advisory-not-a-digest:db066547-ebcf-4663-9435-a41e76f876fd:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Breakwater Cave"
+        },
+        {
+          "candidateId": "ee47f7ac-da8c-42f8-a151-28a5a4dc372a",
+          "digest": "advisory-not-a-digest:ee47f7ac-da8c-42f8-a151-28a5a4dc372a:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Keeper House"
+        },
+        {
+          "candidateId": "quest-candidate:c62be9d0e7dd510a56607cc5d59795d919eadf7af1e8bf28",
+          "digest": "c62be9d0e7dd510a56607cc5d59795d919eadf7af1e8bf289bfbeb4dea1f4a1a",
+          "kind": "exact_quest_objective.select",
+          "label": "Advance quest objective: Restore the Harbor Light → Secure the harbor lens."
+        },
+        {
+          "candidateId": "check-candidate:02ea260cb25d74a95fc486beebb524392749660b9e6c67dd",
+          "digest": "02ea260cb25d74a95fc486beebb524392749660b9e6c67dd7780e0ebacea360b",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:076e7957ab1117c1235693df485ed0c1b43aab5aece4c4a8",
+          "digest": "076e7957ab1117c1235693df485ed0c1b43aab5aece4c4a8667b2fa701381448",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:0e904242778b6e6d74071f24623190dd13056126b8f0a190",
+          "digest": "0e904242778b6e6d74071f24623190dd13056126b8f0a19026ced33ff4924811",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:196464d496d8f2e30f56caa48668ecb9a322c694737bcffd",
+          "digest": "196464d496d8f2e30f56caa48668ecb9a322c694737bcffd3efcbc2dc5252b44",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1e1e6d463a6abae4bbef651d8d373f51c15d740d540397f7",
+          "digest": "1e1e6d463a6abae4bbef651d8d373f51c15d740d540397f72a0e7ffa6014513f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:2ac95b7979b078e36cbdfb1edc6c4e0e4cbe91c93f002fde",
+          "digest": "2ac95b7979b078e36cbdfb1edc6c4e0e4cbe91c93f002fde4920bed729b2a9e2",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:2ef25a0cbe1544cdc57b528e28a8a4507caefb68229fddaf",
+          "digest": "2ef25a0cbe1544cdc57b528e28a8a4507caefb68229fddaffaf0590b54c73659",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:335056b7f8383eba370b7b39afc1d5dc7e413d94b444e6f2",
+          "digest": "335056b7f8383eba370b7b39afc1d5dc7e413d94b444e6f273c0a25082bce7ef",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:5ff659b219dbc3cdb00a75971428cc65e7040a3fff0d357a",
+          "digest": "5ff659b219dbc3cdb00a75971428cc65e7040a3fff0d357a56b35ee07b35735b",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:73a2d209cb6e551dec4bd3fbddc529bdc7689cce5e34ab3e",
+          "digest": "73a2d209cb6e551dec4bd3fbddc529bdc7689cce5e34ab3e74fdd02dcf7b495f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:7bba8cd9795272c478309b321ab5ed178789997a5cce5bf3",
+          "digest": "7bba8cd9795272c478309b321ab5ed178789997a5cce5bf395cdae9b7a057e03",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:896b275c86598202c34933868ef98564cd4a3ef792816c1d",
+          "digest": "896b275c86598202c34933868ef98564cd4a3ef792816c1dad93acfd081bc547",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8a99e4f725c83ff02414cc706304ce3ee302e794568b5034",
+          "digest": "8a99e4f725c83ff02414cc706304ce3ee302e794568b5034d98b7d285a5196d5",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8ac3f3dfa213213a79652152bbfadf0a8194e4c2db1898fd",
+          "digest": "8ac3f3dfa213213a79652152bbfadf0a8194e4c2db1898fd2284271b74821de9",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:98bbe95f8a711aec8cebb6eada3cf5b148af6031fc0dabee",
+          "digest": "98bbe95f8a711aec8cebb6eada3cf5b148af6031fc0dabeedaae4d8957a25460",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:995ab12af9115722fcccb2f40bd92c261d815cf51068a45d",
+          "digest": "995ab12af9115722fcccb2f40bd92c261d815cf51068a45d322e7f1dd6aeac5c",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a2621b083ee6dd15604662d69136b118b941eb94d1ef3f89",
+          "digest": "a2621b083ee6dd15604662d69136b118b941eb94d1ef3f89383302451cfd9cad",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a705baea12ed7e8e1b99170ad726d5309770df573ce16ea2",
+          "digest": "a705baea12ed7e8e1b99170ad726d5309770df573ce16ea2e71ac8f0b918ff54",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ab7993566fc9e3602ad06d396f61c8136852e6870786dcc5",
+          "digest": "ab7993566fc9e3602ad06d396f61c8136852e6870786dcc56d7e99723ead1289",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:af66bf0d305486ed88efd15c1af8faed7208fcc2121c2896",
+          "digest": "af66bf0d305486ed88efd15c1af8faed7208fcc2121c289673ea100567574ba9",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b997d5065b159341057f2b16db64aa22af20297dee9f8876",
+          "digest": "b997d5065b159341057f2b16db64aa22af20297dee9f8876c63587b150fc310e",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:d76308faed01526a0e94c83e366e01ce5a5533b0ae8b2b50",
+          "digest": "d76308faed01526a0e94c83e366e01ce5a5533b0ae8b2b50abf9f660cc2be889",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:e9341a6677729823460917c7d04e838c3304fa3c3773780b",
+          "digest": "e9341a6677729823460917c7d04e838c3304fa3c3773780b9c71cb0acf38b153",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:fb93b53817154ee539085bb06314692a76bf06df2c97917e",
+          "digest": "fb93b53817154ee539085bb06314692a76bf06df2c97917e4c6ee305febbf03f",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "inventory-candidate:9c5aae3af1dbf51e26ee600876b133cb84e0f1dc980c941a",
+          "digest": "9c5aae3af1dbf51e26ee600876b133cb84e0f1dc980c941a1c3d19da50db54a0",
+          "kind": "exact_inventory_action.select",
+          "label": "unequip: Longsword → hand"
+        },
+        {
+          "candidateId": "inventory-candidate:bd1ffb433cd483ac58d1afe95adba7a088d6dd13476df9e2",
+          "digest": "bd1ffb433cd483ac58d1afe95adba7a088d6dd13476df9e2b41280d503bd5977",
+          "kind": "exact_inventory_action.select",
+          "label": "drop: Acolyte Equipment"
+        },
+        {
+          "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
+          "digest": "52af720fa612243ae85c476f4c242d6d78421c410c314d2003fcba404f3ecec2",
+          "kind": "exact_rest.select",
+          "label": "Short rest: Short rest → Source actor"
+        },
+        {
+          "candidateId": "quest-abandon-candidate:b76315ed9343b738d1904138214776dd9f55d58686f6f7c9",
+          "digest": "b76315ed9343b738d1904138214776dd9f55d58686f6f7c99492a4fb30540416",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "abandon: Restore the Harbor Light"
+        }
+      ],
+      "expected": {
+        "preferred": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
+        "acceptable": [
+          "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
         ]
       },
       "holdout": false,
@@ -11265,6 +11667,207 @@
         "preferred": null,
         "acceptable": [
           null
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
+      "id": "harvested:8edfb9c0137e",
+      "category": "harvested",
+      "declaration": "no wait, forget my last idea — rest... no, i'll find a safe spot and take a short rest.",
+      "candidates": [
+        {
+          "candidateId": "a5fd6124-a56a-4f49-a560-8093ba76f874",
+          "digest": "advisory-not-a-digest:a5fd6124-a56a-4f49-a560-8093ba76f874:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Breakwater Cave"
+        },
+        {
+          "candidateId": "e37afb69-fd34-4f84-83fd-f47932c19252",
+          "digest": "advisory-not-a-digest:e37afb69-fd34-4f84-83fd-f47932c19252:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Keeper House"
+        },
+        {
+          "candidateId": "quest-candidate:76c853a11b38649d4cf87b635d730978442a925922903445",
+          "digest": "76c853a11b38649d4cf87b635d730978442a925922903445de67ff38b94a6d30",
+          "kind": "exact_quest_objective.select",
+          "label": "Advance quest objective: Restore the Harbor Light → Secure the harbor lens."
+        },
+        {
+          "candidateId": "check-candidate:0b8d44bfbc116b38b8379c5e5c631da2d601fb1a878fd49c",
+          "digest": "0b8d44bfbc116b38b8379c5e5c631da2d601fb1a878fd49c26f275477731b5b4",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1028848ac44a3c34e09f0f153325a1b04b9976119c850834",
+          "digest": "1028848ac44a3c34e09f0f153325a1b04b9976119c8508343955642d98d90169",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:1aa8a62b0665db6390df3c37d12d90c7809f4cec52ec432c",
+          "digest": "1aa8a62b0665db6390df3c37d12d90c7809f4cec52ec432c70a22c0837e8f1d2",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:265357cd5a42c18d313b744164f1b948a4c0396a2c85a43f",
+          "digest": "265357cd5a42c18d313b744164f1b948a4c0396a2c85a43f70341769e44c2f03",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:44d4c4fb6ff93b01da8388f7fed8660b593f9a2840d7824e",
+          "digest": "44d4c4fb6ff93b01da8388f7fed8660b593f9a2840d7824e08b196f985a3bbab",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:62f5363272d7e2969630aacb7ee29c5ff3dc952b1f47d348",
+          "digest": "62f5363272d7e2969630aacb7ee29c5ff3dc952b1f47d348b990576de978cfe4",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:678d7c965dc32b13a6a6a95233c1d3d6b9103e1e81f7e82e",
+          "digest": "678d7c965dc32b13a6a6a95233c1d3d6b9103e1e81f7e82ee922aba14a6d5fe3",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:7012bc0354d1eb8e60698aeaf1ed34c4acb2c09b5d8fa31a",
+          "digest": "7012bc0354d1eb8e60698aeaf1ed34c4acb2c09b5d8fa31a59ff6578583595d6",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:72dcc6350297f96b20fa5064b104ffc3f7fb2f70efa2f5d6",
+          "digest": "72dcc6350297f96b20fa5064b104ffc3f7fb2f70efa2f5d63defa4ce31056520",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:7e4f00780bda741cf61a61a94994bfd131d87f63a883d10c",
+          "digest": "7e4f00780bda741cf61a61a94994bfd131d87f63a883d10ccb81f74ef6336bf8",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8b6fc6f35433e44589cd8d7f8620ae503155ed54444d8816",
+          "digest": "8b6fc6f35433e44589cd8d7f8620ae503155ed54444d8816e6ebefbc986e8c49",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:968edd03888534645f9e3dd96ad83275f9a3868d7974c321",
+          "digest": "968edd03888534645f9e3dd96ad83275f9a3868d7974c32112ba9586fcbd70b6",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:9ba760ab491e2672e959f7b80ebbd06cbcbfe5d8eb6cec63",
+          "digest": "9ba760ab491e2672e959f7b80ebbd06cbcbfe5d8eb6cec63d576701b3a20a846",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:9e71df25a7b83a7a1afc494f8fab6d3a5e2e7e7e71211c66",
+          "digest": "9e71df25a7b83a7a1afc494f8fab6d3a5e2e7e7e71211c6640dfbe758181b932",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a8176091250fb04269d8debb7cb1d9d5427aef43ea6e43a3",
+          "digest": "a8176091250fb04269d8debb7cb1d9d5427aef43ea6e43a3280e71cfb483638d",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b0921bbe662226346da66043f3488cb2717cd64e981af284",
+          "digest": "b0921bbe662226346da66043f3488cb2717cd64e981af28449cb6597c5e71b55",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b5546e405e9c8273f693b63c8853b6ec4c875805fc3854ea",
+          "digest": "b5546e405e9c8273f693b63c8853b6ec4c875805fc3854ead84613bb3dcda34a",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:d3c0ac381eee69423dc0104d4ed849bed442d3594ca9591f",
+          "digest": "d3c0ac381eee69423dc0104d4ed849bed442d3594ca9591fbc5060d275913c91",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:d401abe388cfb85229578e87e3b7aa1863e88a3e5157537c",
+          "digest": "d401abe388cfb85229578e87e3b7aa1863e88a3e5157537c648bd25f869a1034",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:d870388f756ff4ae862ac274bd49693c9d865e387512e369",
+          "digest": "d870388f756ff4ae862ac274bd49693c9d865e387512e369766ad591febc99e3",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ea48f3ca8f8b70e0cbae2a2c127ec63ea31579fedf35b5a1",
+          "digest": "ea48f3ca8f8b70e0cbae2a2c127ec63ea31579fedf35b5a18805148b04672635",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ed225a7c22eeeb15fe47a498a33a39d3b04c6297c6150f19",
+          "digest": "ed225a7c22eeeb15fe47a498a33a39d3b04c6297c6150f196c5ce6808252fab8",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:fb9ea29e970ffff3c52daa3551ff3ace25421768fe510898",
+          "digest": "fb9ea29e970ffff3c52daa3551ff3ace25421768fe51089881d4d2be00b08b72",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:fc0163ea01eb3bb8eab8f9ec5a7889336c331bf033c144b0",
+          "digest": "fc0163ea01eb3bb8eab8f9ec5a7889336c331bf033c144b021d469143fedf5d8",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "inventory-candidate:bcb891712d60d16fa6e5a2afa51d47e6a09a6acfccb043ae",
+          "digest": "bcb891712d60d16fa6e5a2afa51d47e6a09a6acfccb043ae67d0407bfb207e39",
+          "kind": "exact_inventory_action.select",
+          "label": "unequip: Longsword → hand"
+        },
+        {
+          "candidateId": "inventory-candidate:c6213b724f2e9c26934904cea6a0d7a5c00fb1c93a6b232f",
+          "digest": "c6213b724f2e9c26934904cea6a0d7a5c00fb1c93a6b232f45eed8413652e27a",
+          "kind": "exact_inventory_action.select",
+          "label": "drop: Acolyte Equipment"
+        },
+        {
+          "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
+          "digest": "72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a94a9f8ef87091876",
+          "kind": "exact_rest.select",
+          "label": "Short rest: Short rest → Source actor"
+        },
+        {
+          "candidateId": "quest-abandon-candidate:1570e7346deca436fe853e45abe227273837682928270b93",
+          "digest": "1570e7346deca436fe853e45abe227273837682928270b936995a4ed40dc7228",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "abandon: Restore the Harbor Light"
+        }
+      ],
+      "expected": {
+        "preferred": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
+        "acceptable": [
+          "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
         ]
       },
       "holdout": false,
@@ -17679,6 +18282,201 @@
       "harvestBucket": "agent"
     },
     {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "declaration": "Hmm, actually no — I’ll attempt a short rest—rather, I’ll find cover and rest exactly long enough to treat this wound.",
+      "candidates": [
+        {
+          "candidateId": "ee651a37-d915-409b-86e1-7dec5d24845e",
+          "digest": "advisory-not-a-digest:ee651a37-d915-409b-86e1-7dec5d24845e:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Breakwater Cave"
+        },
+        {
+          "candidateId": "67889806-ea4a-4f6c-9ddf-003762712609",
+          "digest": "advisory-not-a-digest:67889806-ea4a-4f6c-9ddf-003762712609:actor.travel:v1",
+          "kind": "exact_actor_travel.select",
+          "label": "Travel: Lantern Quay → Keeper House"
+        },
+        {
+          "candidateId": "check-candidate:000ee21bfd3053b557cf2eba31a7d55ac792aa99e90799d7",
+          "digest": "000ee21bfd3053b557cf2eba31a7d55ac792aa99e90799d79dae4fedec68fd62",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Sleight of Hand (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:00b010c6b90b6c2fe8d9ba545d96f8882c6293bbc0685b46",
+          "digest": "00b010c6b90b6c2fe8d9ba545d96f8882c6293bbc0685b463cbb59724b1e2f13",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Dexterity (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:05330fbfec231259526bc6a5c698fd1c232ac10375642c4f",
+          "digest": "05330fbfec231259526bc6a5c698fd1c232ac10375642c4fb93531c050048566",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Performance (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:0efb7344379f2d02e8a3ca8dc3cc780025b5cd4749b2a003",
+          "digest": "0efb7344379f2d02e8a3ca8dc3cc780025b5cd4749b2a00303c47454962e5046",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Charisma (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:39a67d9f2e2261c632b85596a5179f13c26e9cc504c6c590",
+          "digest": "39a67d9f2e2261c632b85596a5179f13c26e9cc504c6c5908da9e03b228f6f82",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Perception (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:61044d5fb719bfa06e6cc4414e89d35d36a27bc650fd73be",
+          "digest": "61044d5fb719bfa06e6cc4414e89d35d36a27bc650fd73bec2b9af31eb37826b",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Constitution (Constitution), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:6a52a3e15728b8828af6376398464f6a73eb3b85b705f020",
+          "digest": "6a52a3e15728b8828af6376398464f6a73eb3b85b705f0202e713599cac37c6b",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Wisdom (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:6b49e6ef3d36f4227754e06b156556becc480f26c9ed3352",
+          "digest": "6b49e6ef3d36f4227754e06b156556becc480f26c9ed3352e32fc3156ce65022",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Medicine (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:7831cd89741328d86a491753dcfbb02781320a2b09372861",
+          "digest": "7831cd89741328d86a491753dcfbb02781320a2b093728619001b164ff6b3395",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Investigation (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8a112daef91690583785a2729d72ba986421f4662a34a1a8",
+          "digest": "8a112daef91690583785a2729d72ba986421f4662a34a1a8f1b1cec859ffe059",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intimidation (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8d1713c7f5390cc38e25afafa850e376181c7b7014624e26",
+          "digest": "8d1713c7f5390cc38e25afafa850e376181c7b7014624e263e33c7aced0a48b0",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Nature (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:8d88859b6658dac8fc83aeb640d98eba8672219090f7d4ab",
+          "digest": "8d88859b6658dac8fc83aeb640d98eba8672219090f7d4ab0916a6a2d7f7ca87",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Deception (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a12ef39e7f9005a04ea4c85102a26a08c55328c24d1bb4ee",
+          "digest": "a12ef39e7f9005a04ea4c85102a26a08c55328c24d1bb4eeca0a75f244f3a9d9",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Stealth (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a3269d957d4fe42dbf979aa22fa6888b998ed10e0f790abc",
+          "digest": "a3269d957d4fe42dbf979aa22fa6888b998ed10e0f790abc2b44855743b92cb0",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Intelligence (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:a3f7eabe6834f2c8a0acaa64828284f179a5bfd439d4c098",
+          "digest": "a3f7eabe6834f2c8a0acaa64828284f179a5bfd439d4c0980c89868936047d86",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Strength (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:adcf060b6765996ec74ef0d23d9b45c5db24c5898729a539",
+          "digest": "adcf060b6765996ec74ef0d23d9b45c5db24c5898729a539c521e763cb912858",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: History (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:b19b2002455bd7f35d16a0a3fa3a3275b6ccab1be43a06c3",
+          "digest": "b19b2002455bd7f35d16a0a3fa3a3275b6ccab1be43a06c33c4a59e19b25de52",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Survival (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:caac0c1569f875b31bacee75532f75e51896df1e60a47636",
+          "digest": "caac0c1569f875b31bacee75532f75e51896df1e60a47636e5b493e546059854",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Insight (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ceea2a446e4d85fa7c1d9d07f892d26f81059a9672b1ec59",
+          "digest": "ceea2a446e4d85fa7c1d9d07f892d26f81059a9672b1ec59072578399f08bc64",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Religion (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:da342db41afeb554de6368bf01419c42424841ebed05eaf5",
+          "digest": "da342db41afeb554de6368bf01419c42424841ebed05eaf5ba0f0f3f1cf7323a",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Arcana (Intelligence), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ebe76c57d1fcc2bdba6939fbb6c560f69d764d4c867606b3",
+          "digest": "ebe76c57d1fcc2bdba6939fbb6c560f69d764d4c867606b348a92bdf647afb4c",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Animal Handling (Wisdom), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:ef496c33ac6b4c4b978a137bb14bf616352ec4185c810aa5",
+          "digest": "ef496c33ac6b4c4b978a137bb14bf616352ec4185c810aa5d00f99b7ebc7c303",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Persuasion (Charisma), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:f07fc680fbca656c530a522feceb272dc270d3320701519f",
+          "digest": "f07fc680fbca656c530a522feceb272dc270d3320701519faadc314171b18b06",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Acrobatics (Dexterity), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "check-candidate:fc071a555cbe310f2c668dd6ce5e9fbf4d37a1df5a48acff",
+          "digest": "fc071a555cbe310f2c668dd6ce5e9fbf4d37a1df5a48acff984083805cbbf061",
+          "kind": "exact_srd_check.select",
+          "label": "Resolve SRD check: Athletics (Strength), Medium difficulty, normal"
+        },
+        {
+          "candidateId": "inventory-candidate:b1b76c481f10d711b96d40034cc91ff8e4bd24c34b278c1b",
+          "digest": "b1b76c481f10d711b96d40034cc91ff8e4bd24c34b278c1bd1827589a1388878",
+          "kind": "exact_inventory_action.select",
+          "label": "unequip: Longsword → hand"
+        },
+        {
+          "candidateId": "inventory-candidate:c2c04c247ef60cd0f218a8e15847ffeecf0efbbb0e74a052",
+          "digest": "c2c04c247ef60cd0f218a8e15847ffeecf0efbbb0e74a05291f8d0c0671ab706",
+          "kind": "exact_inventory_action.select",
+          "label": "drop: Acolyte Equipment"
+        },
+        {
+          "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+          "digest": "e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a187ed7afe6f98a11",
+          "kind": "exact_rest.select",
+          "label": "Short rest: Short rest → Source actor"
+        },
+        {
+          "candidateId": "quest-abandon-candidate:c8b2b63c4688154f1043f05d6db8e1f0ebc908d1eb8eef1c",
+          "digest": "c8b2b63c4688154f1043f05d6db8e1f0ebc908d1eb8eef1c4bb0573663a6253a",
+          "kind": "exact_quest_lifecycle.select",
+          "label": "abandon: Restore the Harbor Light"
+        }
+      ],
+      "expected": {
+        "preferred": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+        "acceptable": [
+          "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
       "id": "harvested:e806de3c9818",
       "category": "harvested",
       "declaration": "before i walk back to the stairwell i open my quest log and try to pick, uh, the rim-beast lead as the one i'm actually on — the fourth landing, the drags bending north off the rim. thing is i'm not sure it's listed under that name, or if the tinker's trimmer job got filed as its own separate entry, so i look for whichever lead matches the deep roads past the third landing and i select that one. if it wants an objective out of me i want the log to say what that is before i go anywhere. no price talk this trip — just the route. lamp behind me, trimmer in hand, drop line under my boots, and first thing that moves i open it and lean into the long-wick trick.",
@@ -19743,29 +20541,29 @@
       "harvestBucket": "agent"
     }
   ],
-  "samples": 372,
-  "harvestedCases": 94,
+  "samples": 384,
+  "harvestedCases": 98,
   "harvestedHumanCases": 1,
-  "agentHarvestedCases": 93,
+  "agentHarvestedCases": 97,
   "agentHarvested": {
-    "cases": 93,
-    "calls": 279,
+    "cases": 97,
+    "calls": 291,
     "acted": 3,
     "actedCorrect": 3,
     "actedAccuracy": 1,
     "exact": 234,
     "correct": 234,
-    "accuracy": 0.8387096774193549,
+    "accuracy": 0.8041237113402062,
     "note": "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record"
   },
   "harvest": {
     "fixture": "server/test/fixtures/system-one-harvested/adventure-selection.json",
     "present": true,
-    "confirmed": 94,
+    "confirmed": 98,
     "skipped": 0,
-    "cases": 94,
+    "cases": 98,
     "humanCases": 1,
-    "agentCases": 93,
+    "agentCases": 97,
     "warning": null
   },
   "failures": [],
@@ -19784,7 +20582,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.5,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
@@ -19801,15 +20599,15 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
       "id": "direct-travel-mill",
       "category": "direct-match",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
       "candidateId": "travel:mill-01",
       "acceptable": [
@@ -19818,8 +20616,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.48,
-      "reason": "deferred (fallback); expected travel:mill-01; not acceptable"
+      "topSignal": 0.56,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
       "id": "direct-travel-harbor",
@@ -19835,7 +20633,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.43,
+      "topSignal": 0.45,
       "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
     },
     {
@@ -19869,7 +20667,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.43,
+      "topSignal": 0.44,
       "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
     },
     {
@@ -19903,7 +20701,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.53,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -19920,7 +20718,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.51,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -19937,7 +20735,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.8,
+      "topSignal": 0.78,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -19954,7 +20752,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.77,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -19978,23 +20776,6 @@
       "id": "direct-quest-accept",
       "category": "direct-match",
       "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.48,
-      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
       "band": "confirm",
       "method": "choice",
       "selected": null,
@@ -20012,8 +20793,8 @@
       "id": "direct-quest-accept",
       "category": "direct-match",
       "holdout": true,
-      "band": "confirm",
-      "method": "choice",
+      "band": "fallback",
+      "method": "defer",
       "selected": null,
       "candidateId": "quest:accept-harbor-09",
       "acceptable": [
@@ -20022,8 +20803,25 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
+      "topSignal": 0.47,
+      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.48,
+      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
     },
     {
       "id": "direct-progression-level",
@@ -20039,7 +20837,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.61,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20073,7 +20871,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.65,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20107,7 +20905,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -20124,7 +20922,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -20141,7 +20939,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -20175,7 +20973,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -20249,7 +21047,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.66,
+      "topSignal": 0.67,
       "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
     },
     {
@@ -20283,8 +21081,25 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.65,
       "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.63,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
     },
     {
       "id": "ambig-combat-power-target",
@@ -20317,42 +21132,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-combat-power-target",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
-      "acceptable": [
-        "combat:firebolt-bandit-22"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.67,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
       "id": "ambig-commerce-sell",
@@ -20369,6 +21150,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.71,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.68,
       "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
@@ -20419,7 +21217,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
@@ -20453,7 +21251,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -20470,7 +21268,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -20487,8 +21285,42 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
       "id": "multi-row-vs-travel",
@@ -20508,38 +21340,21 @@
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
-      "id": "multi-row-vs-travel",
+      "id": "multi-quest-vs-travel",
       "category": "multi-family",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
-      "candidateId": "check:row-30",
+      "candidateId": "quest:accept-harbor-31",
       "acceptable": [
-        "check:row-30"
+        "quest:accept-harbor-31"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected check:row-30; not acceptable"
-    },
-    {
-      "id": "multi-row-vs-travel",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check:row-30",
-      "acceptable": [
-        "check:row-30"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.46,
-      "reason": "deferred (fallback); expected check:row-30; not acceptable"
+      "topSignal": 0.54,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
       "id": "multi-quest-vs-travel",
@@ -20572,24 +21387,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.53,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
-    },
-    {
-      "id": "multi-quest-vs-travel",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-31",
-      "acceptable": [
-        "quest:accept-harbor-31"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.58,
+      "topSignal": 0.55,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -20606,7 +21404,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.8,
       "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
@@ -20657,6 +21455,23 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
+    },
+    {
+      "id": "multi-power-vs-rest",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-35",
+      "acceptable": [
+        "rest:long-35"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
       "topSignal": 0.52,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
@@ -20674,24 +21489,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
-      "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
-    },
-    {
-      "id": "multi-power-vs-rest",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest:long-35",
-      "acceptable": [
-        "rest:long-35"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
@@ -20708,7 +21506,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
@@ -21575,23 +22373,6 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.56,
-      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:159e90a93cb6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
       "topSignal": 0.59,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
@@ -21609,7 +22390,24 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.53,
+      "topSignal": 0.63,
+      "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:159e90a93cb6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.65,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -21932,7 +22730,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.22,
+      "topSignal": 0.23,
+      "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
+    },
+    {
+      "id": "harvested:21809db95252",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365",
+      "acceptable": [
+        "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.23,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -21950,23 +22765,6 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.22,
-      "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
-    },
-    {
-      "id": "harvested:21809db95252",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365",
-      "acceptable": [
-        "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.24,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22051,7 +22849,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.42,
+      "topSignal": 0.4,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -22068,7 +22866,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.39,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -22376,6 +23174,57 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:332daeb09896",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538; not acceptable"
+    },
+    {
+      "id": "harvested:332daeb09896",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538; not acceptable"
+    },
+    {
+      "id": "harvested:332daeb09896",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected quest-candidate:2b5f4bb2e424f78e3a2099d67a3d6f33b2895b112e384538; not acceptable"
     },
     {
       "id": "harvested:38c1efae5452",
@@ -22493,7 +23342,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
     },
     {
@@ -23143,225 +23992,259 @@
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
+      "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.5700000000000001,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.73,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.67,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:6b8359ca620b",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
-      "acceptable": [
-        "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+        "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+      "topSignal": 0.51,
+      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+    },
+    {
+      "id": "harvested:5b3104cae1dc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
+      "acceptable": [
+        "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.49,
+      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+    },
+    {
+      "id": "harvested:5b3104cae1dc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
+      "acceptable": [
+        "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
       "id": "harvested:6b8359ca620b",
@@ -23394,6 +24277,23 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+    },
+    {
+      "id": "harvested:6b8359ca620b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+      "acceptable": [
+        "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
       "topSignal": 0.67,
       "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
     },
@@ -23411,23 +24311,6 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
-    },
-    {
-      "id": "harvested:6ef5508ce70e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
-      "acceptable": [
-        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
       "topSignal": 0.45,
       "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
@@ -23441,63 +24324,97 @@
       "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
       "acceptable": [
         "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.45,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.46,
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
+    },
+    {
+      "id": "harvested:6ef5508ce70e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
+      "acceptable": [
+        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:74cbab9ca6f0",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "acceptable": [
+        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
       "id": "harvested:74cbab9ca6f0",
@@ -23534,429 +24451,463 @@
       "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
-      "id": "harvested:74cbab9ca6f0",
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8edfb9c0137e",
       "category": "harvested",
       "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
       "acceptable": [
-        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+        "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
+      "topSignal": 0.56,
+      "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
-      "id": "harvested:787b57d44cdc",
+      "id": "harvested:8edfb9c0137e",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
       "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:787b57d44cdc",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:787b57d44cdc",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8726afca6973",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+        "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+      "topSignal": 0.59,
+      "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
-      "id": "harvested:8726afca6973",
+      "id": "harvested:8edfb9c0137e",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a",
       "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+        "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
-    },
-    {
-      "id": "harvested:8726afca6973",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
+      "topSignal": 0.59,
+      "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
       "id": "harvested:92970b2d312b",
@@ -24176,7 +25127,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -24193,7 +25144,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -24210,7 +25161,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.33,
+      "topSignal": 0.34,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -24329,7 +25280,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.76,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -24363,7 +25314,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.77,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -24448,7 +25399,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.24,
+      "topSignal": 0.21,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -24465,7 +25416,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.21,
+      "topSignal": 0.22,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -24550,7 +25501,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -24560,14 +25511,14 @@
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7",
+      "candidateId": null,
       "acceptable": [
         "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.37,
+      "topSignal": null,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -24839,7 +25790,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.65,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -24856,7 +25807,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.69,
+      "topSignal": 0.64,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -25094,7 +26045,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.4,
+      "topSignal": 0.41,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -25111,7 +26062,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.42,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -25124,46 +26075,12 @@
       "candidateId": "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e",
       "acceptable": [
         "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.35,
-      "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
-    },
-    {
-      "id": "harvested:ccc2d2cf0d15",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
-      "acceptable": [
-        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.3,
-      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
-    },
-    {
-      "id": "harvested:ccc2d2cf0d15",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
-      "acceptable": [
-        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.36,
-      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+      "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
       "id": "harvested:ccc2d2cf0d15",
@@ -25183,6 +26100,40 @@
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
+      "id": "harvested:ccc2d2cf0d15",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
+      "acceptable": [
+        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.34,
+      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+    },
+    {
+      "id": "harvested:ccc2d2cf0d15",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
+      "acceptable": [
+        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.33,
+      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+    },
+    {
       "id": "harvested:d00089bb4860",
       "category": "harvested",
       "holdout": false,
@@ -25589,6 +26540,57 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+      "acceptable": [
+        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
+    },
+    {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+      "acceptable": [
+        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
+    },
+    {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+      "acceptable": [
+        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
     },
     {
       "id": "harvested:e806de3c9818",
@@ -25859,7 +26861,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.28,
+      "topSignal": 0.26,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -25893,7 +26895,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.24,
+      "topSignal": 0.26,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -26111,8 +27113,8 @@
           "travel:mill-01"
         ],
         "conflicted": false,
-        "meanSignal": 0.5166666666666666,
-        "signalStdDev": 0.038586123009300734
+        "meanSignal": 0.5733333333333334,
+        "signalStdDev": 0.018856180831641232
       },
       {
         "caseId": "direct-travel-harbor",
@@ -26122,7 +27124,7 @@
           "travel:harbor-04"
         ],
         "conflicted": false,
-        "meanSignal": 0.43333333333333335,
+        "meanSignal": 0.44333333333333336,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26133,8 +27135,8 @@
           "check:climb-05"
         ],
         "conflicted": false,
-        "meanSignal": 0.5233333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.5366666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "direct-commerce-rope",
@@ -26144,8 +27146,8 @@
           "shop:buy-rope-07"
         ],
         "conflicted": false,
-        "meanSignal": 0.7866666666666667,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.7733333333333334,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "direct-quest-accept",
@@ -26155,8 +27157,8 @@
           "quest:accept-harbor-09"
         ],
         "conflicted": false,
-        "meanSignal": 0.5,
-        "signalStdDev": 0.016329931618554536
+        "meanSignal": 0.48333333333333334,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "direct-progression-level",
@@ -26166,8 +27168,8 @@
           "level:advance-11"
         ],
         "conflicted": false,
-        "meanSignal": 0.6233333333333334,
-        "signalStdDev": 0.020548046676563275
+        "meanSignal": 0.61,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "ambig-rest-long-short",
@@ -26177,8 +27179,8 @@
           "rest:long-12"
         ],
         "conflicted": false,
-        "meanSignal": 0.54,
-        "signalStdDev": 0.014142135623730963
+        "meanSignal": 0.5333333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "ambig-travel-watchtower",
@@ -26188,8 +27190,8 @@
           "travel:watchtower-16"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.61,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "ambig-travel-two-roads",
@@ -26210,8 +27212,8 @@
           "power:mending-bryn-19"
         ],
         "conflicted": false,
-        "meanSignal": 0.65,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.6566666666666667,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "ambig-combat-power-target",
@@ -26221,8 +27223,8 @@
           "combat:firebolt-bandit-22"
         ],
         "conflicted": false,
-        "meanSignal": 0.6066666666666666,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.62,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "ambig-commerce-sell",
@@ -26232,8 +27234,8 @@
           "shop:sell-ring-24"
         ],
         "conflicted": false,
-        "meanSignal": 0.69,
-        "signalStdDev": 0.016329931618554488
+        "meanSignal": 0.6933333333333334,
+        "signalStdDev": 0.012472191289246443
       },
       {
         "caseId": "ambig-consumable-target",
@@ -26243,7 +27245,7 @@
           "consumable:heal-aster-25"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
+        "meanSignal": 0.5933333333333333,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26254,8 +27256,8 @@
           "check:force-gate-28"
         ],
         "conflicted": false,
-        "meanSignal": 0.5766666666666667,
-        "signalStdDev": 0.016996731711975927
+        "meanSignal": 0.5833333333333334,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-row-vs-travel",
@@ -26265,8 +27267,8 @@
           "check:row-30"
         ],
         "conflicted": false,
-        "meanSignal": 0.45333333333333337,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.44333333333333336,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "multi-quest-vs-travel",
@@ -26276,8 +27278,8 @@
           "quest:accept-harbor-31"
         ],
         "conflicted": false,
-        "meanSignal": 0.5533333333333333,
-        "signalStdDev": 0.020548046676563226
+        "meanSignal": 0.5466666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-commerce-vs-inventory",
@@ -26287,8 +27289,8 @@
           "shop:buy-rope-33"
         ],
         "conflicted": false,
-        "meanSignal": 0.8000000000000002,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.8033333333333333,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-power-vs-rest",
@@ -26298,8 +27300,8 @@
           "rest:long-35"
         ],
         "conflicted": false,
-        "meanSignal": 0.5333333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.5366666666666667,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "multi-combat-vs-power",
@@ -26309,8 +27311,8 @@
           "combat:firebolt-wolf-37"
         ],
         "conflicted": false,
-        "meanSignal": 0.5933333333333333,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.5866666666666666,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "unsupported-question",
@@ -26496,8 +27498,8 @@
           "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0"
         ],
         "conflicted": false,
-        "meanSignal": 0.5599999999999999,
-        "signalStdDev": 0.024494897427831758
+        "meanSignal": 0.6233333333333334,
+        "signalStdDev": 0.024944382578492966
       },
       {
         "caseId": "harvested:1939fe92d69c",
@@ -26573,8 +27575,8 @@
           "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
         ],
         "conflicted": false,
-        "meanSignal": 0.22666666666666666,
-        "signalStdDev": 0.009428090415820628
+        "meanSignal": 0.22666666666666668,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:21db70ab1dba",
@@ -26595,8 +27597,8 @@
           "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
         ],
         "conflicted": false,
-        "meanSignal": 0.4033333333333333,
-        "signalStdDev": 0.016996731711975938
+        "meanSignal": 0.4000000000000001,
+        "signalStdDev": 0.008164965809277244
       },
       {
         "caseId": "harvested:22a75d63ff9d",
@@ -26665,6 +27667,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:332daeb09896",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "defer"
+        ],
+        "conflicted": false,
+        "meanSignal": null,
+        "signalStdDev": null
+      },
+      {
         "caseId": "harvested:38c1efae5452",
         "repeats": 3,
         "agreement": 1,
@@ -26694,8 +27707,8 @@
           "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
         ],
         "conflicted": false,
-        "meanSignal": 0.58,
-        "signalStdDev": 0.016329931618554488
+        "meanSignal": 0.5766666666666667,
+        "signalStdDev": 0.012472191289246433
       },
       {
         "caseId": "harvested:3b8fd99efe8a",
@@ -26830,6 +27843,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:5b3104cae1dc",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.51,
+        "signalStdDev": 0.016329931618554536
+      },
+      {
         "caseId": "harvested:62684602d7e6",
         "repeats": 3,
         "agreement": 1,
@@ -26859,8 +27883,8 @@
           "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92"
         ],
         "conflicted": false,
-        "meanSignal": 0.6566666666666667,
-        "signalStdDev": 0.0659966329107444
+        "meanSignal": 0.6266666666666666,
+        "signalStdDev": 0.018856180831641284
       },
       {
         "caseId": "harvested:66711ff7099e",
@@ -26881,8 +27905,8 @@
           "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
         ],
         "conflicted": false,
-        "meanSignal": 0.6366666666666667,
-        "signalStdDev": 0.024944382578492966
+        "meanSignal": 0.6333333333333333,
+        "signalStdDev": 0.02867441755680878
       },
       {
         "caseId": "harvested:6ef5508ce70e",
@@ -26892,7 +27916,7 @@
           "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
         ],
         "conflicted": false,
-        "meanSignal": 0.44333333333333336,
+        "meanSignal": 0.45333333333333337,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26903,8 +27927,8 @@
           "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
         ],
         "conflicted": false,
-        "meanSignal": 0.45,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.43333333333333335,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:74cbab9ca6f0",
@@ -27006,6 +28030,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:8edfb9c0137e",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.58,
+        "signalStdDev": 0.01414213562373091
+      },
+      {
         "caseId": "harvested:92970b2d312b",
         "repeats": 3,
         "agreement": 1,
@@ -27057,7 +28092,7 @@
           "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
         ],
         "conflicted": false,
-        "meanSignal": 0.35000000000000003,
+        "meanSignal": 0.36000000000000004,
         "signalStdDev": 0.014142135623730937
       },
       {
@@ -27090,8 +28125,8 @@
           "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
         ],
         "conflicted": false,
-        "meanSignal": 0.7866666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.77,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:ad383d4f9924",
@@ -27112,8 +28147,8 @@
           "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a"
         ],
         "conflicted": false,
-        "meanSignal": 0.2233333333333333,
-        "signalStdDev": 0.01247219128924647
+        "meanSignal": 0.21666666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:b1446f731e6d",
@@ -27129,13 +28164,14 @@
       {
         "caseId": "harvested:b1e4dfc2f2e2",
         "repeats": 3,
-        "agreement": 1,
+        "agreement": 0.6666666666666666,
         "decisions": [
-          "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
+          "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7",
+          "defer"
         ],
-        "conflicted": false,
-        "meanSignal": 0.37333333333333335,
-        "signalStdDev": 0.004714045207910321
+        "conflicted": true,
+        "meanSignal": 0.37,
+        "signalStdDev": 0
       },
       {
         "caseId": "harvested:b2c96f78d1fb",
@@ -27200,8 +28236,8 @@
           "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
         ],
         "conflicted": false,
-        "meanSignal": 0.6666666666666666,
-        "signalStdDev": 0.02054804667656323
+        "meanSignal": 0.6533333333333333,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:baf07348c6f2",
@@ -27255,8 +28291,8 @@
           "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
         ],
         "conflicted": false,
-        "meanSignal": 0.37666666666666665,
-        "signalStdDev": 0.020548046676563275
+        "meanSignal": 0.39666666666666667,
+        "signalStdDev": 0.0262466929133727
       },
       {
         "caseId": "harvested:ccc2d2cf0d15",
@@ -27266,8 +28302,8 @@
           "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
         ],
         "conflicted": false,
-        "meanSignal": 0.32666666666666666,
-        "signalStdDev": 0.02494438257849294
+        "meanSignal": 0.33,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:d00089bb4860",
@@ -27358,6 +28394,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:e6f52fea4ac9",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.4666666666666666,
+        "signalStdDev": 0.02357022603955158
+      },
+      {
         "caseId": "harvested:e806de3c9818",
         "repeats": 3,
         "agreement": 1,
@@ -27421,7 +28468,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.25666666666666665,
-        "signalStdDev": 0.016996731711975962
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:f37ba9fb92bf",
@@ -27468,31 +28515,31 @@
         "signalStdDev": null
       }
     ],
-    "repeats": 372,
-    "meanAgreement": 1,
-    "conflictCases": 0,
-    "conflictRate": 0,
-    "meanSignalStdDev": 0.015184945893720445,
-    "maxSignalStdDev": 0.0659966329107444
+    "repeats": 384,
+    "meanAgreement": 0.9973958333333334,
+    "conflictCases": 1,
+    "conflictRate": 0.0078125,
+    "meanSignalStdDev": 0.011056723832456046,
+    "maxSignalStdDev": 0.02867441755680878
   },
   "calibration": {
     "fitted": {
-      "a": 2.845030485189555,
-      "b": 1.630461934757368
+      "a": 2.85486165813081,
+      "b": 1.6827345515882697
     },
     "devSamples": 6,
     "holdoutSamples": 0,
     "allRaw": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.04286666666666664,
-      "expectedCalibrationError": 0.20666666666666667
+      "brier": 0.04504999999999998,
+      "expectedCalibrationError": 0.21166666666666661
     },
     "allCalibrated": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.000019678897958886905,
-      "expectedCalibrationError": 0.004326742181947729
+      "brier": 0.000021250096052062396,
+      "expectedCalibrationError": 0.0044588006231324195
     },
     "holdoutRaw": {
       "samples": 0,
@@ -27551,9 +28598,9 @@
       },
       {
         "threshold": 0.45,
-        "acted": 50,
+        "acted": 51,
         "total": 54,
-        "coverage": 0.9259259259259259,
+        "coverage": 0.9444444444444444,
         "actedAccuracy": 1
       },
       {
@@ -27565,16 +28612,16 @@
       },
       {
         "threshold": 0.55,
-        "acted": 35,
+        "acted": 36,
         "total": 54,
-        "coverage": 0.6481481481481481,
+        "coverage": 0.6666666666666666,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 24,
+        "acted": 23,
         "total": 54,
-        "coverage": 0.4444444444444444,
+        "coverage": 0.42592592592592593,
         "actedAccuracy": 1
       },
       {
@@ -27623,9 +28670,9 @@
       },
       {
         "threshold": 0.5,
-        "acted": 32,
+        "acted": 33,
         "total": 36,
-        "coverage": 0.8888888888888888,
+        "coverage": 0.9166666666666666,
         "actedAccuracy": 1
       },
       {
@@ -27681,30 +28728,30 @@
       },
       {
         "threshold": 0.45,
-        "acted": 15,
+        "acted": 16,
         "total": 18,
-        "coverage": 0.8333333333333334,
+        "coverage": 0.8888888888888888,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.5,
-        "acted": 14,
+        "acted": 13,
         "total": 18,
-        "coverage": 0.7777777777777778,
+        "coverage": 0.7222222222222222,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.55,
-        "acted": 9,
+        "acted": 10,
         "total": 18,
-        "coverage": 0.5,
+        "coverage": 0.5555555555555556,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 7,
+        "acted": 6,
         "total": 18,
-        "coverage": 0.3888888888888889,
+        "coverage": 0.3333333333333333,
         "actedAccuracy": 1
       },
       {
@@ -27754,9 +28801,9 @@
         },
         {
           "threshold": 0.45,
-          "acted": 50,
+          "acted": 51,
           "total": 54,
-          "coverage": 0.9259259259259259,
+          "coverage": 0.9444444444444444,
           "actedAccuracy": 1
         },
         {
@@ -27768,16 +28815,16 @@
         },
         {
           "threshold": 0.55,
-          "acted": 35,
+          "acted": 36,
           "total": 54,
-          "coverage": 0.6481481481481481,
+          "coverage": 0.6666666666666666,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.6,
-          "acted": 24,
+          "acted": 23,
           "total": 54,
-          "coverage": 0.4444444444444444,
+          "coverage": 0.42592592592592593,
           "actedAccuracy": 1
         },
         {
@@ -27811,22 +28858,22 @@
       "threshold": 0.75,
       "calibration": {
         "fitted": {
-          "a": 2.845030485189555,
-          "b": 1.630461934757368
+          "a": 2.85486165813081,
+          "b": 1.6827345515882697
         },
         "devSamples": 6,
         "holdoutSamples": 0,
         "allRaw": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.04286666666666664,
-          "expectedCalibrationError": 0.20666666666666667
+          "brier": 0.04504999999999998,
+          "expectedCalibrationError": 0.21166666666666661
         },
         "allCalibrated": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.000019678897958886905,
-          "expectedCalibrationError": 0.004326742181947729
+          "brier": 0.000021250096052062396,
+          "expectedCalibrationError": 0.0044588006231324195
         },
         "holdoutRaw": {
           "samples": 0,
@@ -27862,34 +28909,34 @@
       "threshold": 0.4,
       "calibration": {
         "fitted": {
-          "a": 1.5851984333650475,
-          "b": 4.104465875189656
+          "a": 1.6481215146863928,
+          "b": 4.063848017982478
         },
         "devSamples": 36,
         "holdoutSamples": 18,
         "allRaw": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.1796925925925926,
-          "expectedCalibrationError": 0.4125925925925927
+          "brier": 0.17688148148148145,
+          "expectedCalibrationError": 0.4096296296296296
         },
         "allCalibrated": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015517524838713626,
-          "expectedCalibrationError": 0.010911245718989937
+          "brier": 0.00016143672891633242,
+          "expectedCalibrationError": 0.010996328854651183
         },
         "holdoutRaw": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.20098333333333326,
-          "expectedCalibrationError": 0.44055555555555553
+          "brier": 0.20027222222222218,
+          "expectedCalibrationError": 0.4394444444444444
         },
         "holdoutCalibrated": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.00020374734346468462,
-          "expectedCalibrationError": 0.012672494760642028
+          "brier": 0.00021780280091061017,
+          "expectedCalibrationError": 0.013057718812054087
         }
       },
       "gate": {
@@ -27908,12 +28955,12 @@
         "metrics": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015517524838713626,
-          "expectedCalibrationError": 0.010911245718989937
+          "brier": 0.00016143672891633242,
+          "expectedCalibrationError": 0.010996328854651183
         },
         "calibration": {
-          "a": 1.5851984333650475,
-          "b": 4.104465875189656
+          "a": 1.6481215146863928,
+          "b": 4.063848017982478
         },
         "promotedAt": "2026-09-18",
         "evidence": "docs/system-one-adventure-benchmark.md"
@@ -27924,12 +28971,12 @@
     "metrics": {
       "samples": 54,
       "accuracy": 1,
-      "brier": 0.00015517524838713626,
-      "expectedCalibrationError": 0.010911245718989937
+      "brier": 0.00016143672891633242,
+      "expectedCalibrationError": 0.010996328854651183
     },
     "calibration": {
-      "a": 1.5851984333650475,
-      "b": 4.104465875189656
+      "a": 1.6481215146863928,
+      "b": 4.063848017982478
     },
     "promotedAt": "2026-09-18",
     "evidence": "docs/system-one-adventure-benchmark.md"

@@ -367,6 +367,19 @@ export function personaByArchetype(archetype: PersonaArchetype): PersonaDefiniti
   return PERSONAS[archetype];
 }
 
+/**
+ * Prompt-only declaration word budget per persona voice. The model is asked to stay in the lower
+ * half of its range unless the failure mode or effort calls for a longer turn. This is guidance,
+ * never validation: long declarations are accepted and never retried. `precise` is not in the
+ * design doc's table, so the rules-tinkerer voice gets the plain-to-florid middle.
+ */
+export const WORD_BUDGET_BY_VERBOSITY: Readonly<Record<Verbosity, string>> = Object.freeze({
+  terse: "4-12",
+  plain: "8-20",
+  florid: "14-35",
+  precise: "10-24",
+});
+
 // -------------------------------------------------------------------------------------------------
 // Surface noise: declared by the generator, applied here from a seed
 // -------------------------------------------------------------------------------------------------
@@ -950,8 +963,9 @@ function validateCoverageTargets(targets: CoverageTargets): void {
 
 /**
  * Weighted, deterministic slot allocator over the 11 x 7 coverage matrix. `next` reserves the
- * next cell (tracking remaining counts), `record` marks a cell as actually declared. Selection is
- * weighted by persona bias but never exceeds a cell target.
+ * next cell (tracking remaining counts), `reserve` reserves a specific cell for a forced focus
+ * turn, `record` marks a cell as actually declared. Selection is weighted by persona bias but
+ * never exceeds a cell target.
  */
 export class CoverageScheduler {
   readonly targets: CoverageTargets;
@@ -1075,6 +1089,15 @@ export class CoverageScheduler {
       }
     }
     return candidates;
+  }
+
+  /**
+   * Reserves one slot for a specific cell without consulting the target, so a forced focus cell is
+   * accounted for even when its target is already met. `release` is its inverse (with a floor of 0).
+   */
+  reserve(cell: CoverageCell): void {
+    const key = cellKey(cell.family, cell.failureMode);
+    this.#planned.set(key, (this.#planned.get(key) ?? 0) + 1);
   }
 
   /** Releases one reserved slot so a later `next` can reuse the cell (floor 0). */
@@ -1462,6 +1485,7 @@ export function buildGeneratorMessages(input: GeneratorPromptInput): { system: s
     `Mechanics interests: ${persona.mechanicsBias.join(", ")}. Voice: ${persona.verbosity}. Patience: ${persona.patience}.`,
     "You know only what the transcript and your character sheet show. Never name hidden ids, revisions, digests, provider details, or game state, and never mention being a model.",
     "State intentions in plain player language; never explain rules, never propose dice results or mechanics, never resolve outcomes, and never write the narrator's answer.",
+    `Keep the declaration to roughly ${WORD_BUDGET_BY_VERBOSITY[persona.verbosity]} words for this persona; stay in the lower half unless the failure mode or effort calls for a longer turn.`,
     "Output exactly one strict JSON turn contract and nothing else.",
   ].join("\n");
   const transcriptLines = input.transcript.length > 0
@@ -1738,6 +1762,15 @@ export type HarnessTargetSwap = {
 /** Trigram Jaccard at or above this value counts as a near-duplicate declaration. */
 export const NEAR_DUPLICATE_JACCARD = 0.7;
 
+/** Cap on `HumanLikenessReport.topRepeatedPhrases`. */
+export const MAX_REPEATED_PHRASES = 5;
+
+/** One repeated 4-gram motif: `count` is the number of distinct turns that contain it. */
+export type RepeatedPhrase = {
+  phrase: string;
+  count: number;
+};
+
 /** Pre-registered stylometric checklist computed from the declarations a run actually sent. */
 export type HumanLikenessReport = {
   turns: number;
@@ -1757,6 +1790,10 @@ export type HumanLikenessReport = {
   nearDuplicateShare: number;
   /** Declarations exactly reused from an earlier turn (trimmed comparison). */
   verbatimReuses: number;
+  /** Most common 4-gram motifs (stopword-only shingles dropped), ranked count desc then phrase asc. */
+  topRepeatedPhrases: RepeatedPhrase[];
+  /** Turns containing at least one motif that appears in two or more turns. */
+  repeatedPhraseTurns: number;
   oocShare: number;
   questionShare: number;
   noiseShare: number;
@@ -1784,6 +1821,35 @@ export function tokenTrigramSet(text: string): Set<string> {
   const shingles = new Set<string>();
   for (let index = 0; index + 2 < tokens.length; index += 1) {
     shingles.add(`${tokens[index]} ${tokens[index + 1]} ${tokens[index + 2]}`);
+  }
+  return shingles;
+}
+
+/**
+ * Small, deliberately incomplete stopword set for phrase extraction. A 4-gram made only of these
+ * tokens carries no motif ("it is in the"), so it is not a reportable phrase. One content token is
+ * enough to keep a shingle ("smoke on the water").
+ */
+export const PHRASE_STOPWORDS: ReadonlySet<string> = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "been", "but", "by", "did", "do", "does",
+  "for", "from", "had", "has", "have", "he", "her", "him", "his", "i", "if", "in", "is",
+  "it", "its", "me", "my", "no", "not", "of", "on", "or", "our", "she", "so", "that",
+  "the", "their", "them", "then", "there", "they", "this", "to", "up", "us", "was", "we",
+  "were", "what", "when", "with", "you", "your",
+]);
+
+/**
+ * Set of 4-token phrases over lowercase alphanumeric tokens, dropping shingles made up entirely of
+ * stopwords. Declarations with fewer than four tokens (including empty text) yield an empty set.
+ * Motifs repeat across turns more visibly at this width than the trigram similarity metric allows.
+ */
+export function tokenQuadgramSet(text: string): Set<string> {
+  const tokens = alphanumericTokens(text);
+  const shingles = new Set<string>();
+  for (let index = 0; index + 3 < tokens.length; index += 1) {
+    const window = tokens.slice(index, index + 4);
+    if (window.every(token => PHRASE_STOPWORDS.has(token))) continue;
+    shingles.add(window.join(" "));
   }
   return shingles;
 }
@@ -1837,6 +1903,7 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
   const unigrams: string[] = [];
   const bigrams: string[] = [];
   const trigrams: Set<string>[] = [];
+  const quadgrams: Set<string>[] = [];
   const trimmedDeclarations: string[] = [];
   for (const turn of turns) {
     const tokens = alphanumericTokens(turn.declaration);
@@ -1845,6 +1912,7 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
       bigrams.push(`${tokens[index]} ${tokens[index + 1]}`);
     }
     trigrams.push(tokenTrigramSet(turn.declaration));
+    quadgrams.push(tokenQuadgramSet(turn.declaration));
     trimmedDeclarations.push(turn.declaration.trim());
   }
   const distinct1 = unigrams.length === 0 ? 0 : new Set(unigrams).size / unigrams.length;
@@ -1882,6 +1950,27 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
     }
   }
 
+  // Motif-level repetition: count the turns each 4-gram phrase appears in, keep those in two or
+  // more turns, and rank. The per-turn sets already dedupe a phrase repeated inside one turn.
+  const phraseTurns = new Map<string, number[]>();
+  for (let index = 0; index < count; index += 1) {
+    for (const phrase of quadgrams[index] as Set<string>) {
+      const turnsWithPhrase = phraseTurns.get(phrase);
+      if (turnsWithPhrase === undefined) phraseTurns.set(phrase, [index]);
+      else turnsWithPhrase.push(index);
+    }
+  }
+  const repeatedPhrases: RepeatedPhrase[] = [];
+  for (const [phrase, turnsWithPhrase] of phraseTurns) {
+    if (turnsWithPhrase.length >= 2) repeatedPhrases.push({ phrase, count: turnsWithPhrase.length });
+  }
+  repeatedPhrases.sort((a, b) => b.count - a.count || (a.phrase < b.phrase ? -1 : a.phrase > b.phrase ? 1 : 0));
+  const topRepeatedPhrases = repeatedPhrases.slice(0, MAX_REPEATED_PHRASES);
+  const repeatedPhraseTurnIndexes = new Set<number>();
+  for (const entry of repeatedPhrases) {
+    for (const index of phraseTurns.get(entry.phrase) as number[]) repeatedPhraseTurnIndexes.add(index);
+  }
+
   const share = (numerator: number): number => count === 0 ? 0 : round3(numerator / count);
   return {
     turns: count,
@@ -1894,6 +1983,8 @@ export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): Human
     distinct2: round3(distinct2),
     nearDuplicateShare: share(nearDuplicates),
     verbatimReuses,
+    topRepeatedPhrases,
+    repeatedPhraseTurns: repeatedPhraseTurnIndexes.size,
     oocShare: share(ooc),
     questionShare: share(questions),
     noiseShare: share(noise),
@@ -2687,6 +2778,13 @@ export type HarnessSessionInput = {
   /** Multiplier for `direct` cells in the coverage plan (default 1, minimum 0.1). */
   directWeight?: number;
   /**
+   * Optional focused-coverage cell. When set, the first plan turn is forced onto this exact
+   * family/failure-mode cell: the originally planned cell is released, the focus cell is reserved
+   * for the rest of the plan, and the forced change is recorded as a turn-0 target swap. Null or
+   * absent keeps the weighted plan untouched.
+   */
+  focus?: CoverageCell | null;
+  /**
    * Optional read-only advertisement reader. Defaults to `readTurnAdvertisements` when `dataDir`
    * is non-null, and to no reader (null snapshots) otherwise.
    */
@@ -2723,6 +2821,21 @@ function emptyTurnRecord(plan: PlannedTurn, persona: PersonaDefinition, idempote
 }
 
 /**
+ * Validates an optional focus cell. Missing/null stays null; an unknown family or failure mode
+ * throws instead of silently degrading the forced turn. Exported for callers that build session
+ * input programmatically.
+ */
+export function validateFocusCell(value: unknown): CoverageCell | null {
+  if (value === undefined || value === null) return null;
+  if (!isPlainObject(value)) throw new Error("focus must be an object with family and failureMode");
+  const family = value["family"];
+  const failureMode = value["failureMode"];
+  if (!isMechanicFamily(family)) throw new Error(`focus.family must be one of ${MECHANIC_FAMILIES.join(", ")}`);
+  if (!isFailureMode(failureMode)) throw new Error(`focus.failureMode must be one of ${FAILURE_MODES.join(", ")}`);
+  return { family, failureMode };
+}
+
+/**
  * Runs one synthetic session (one manifest per run). Generation always happens here so that
  * contract validation, noise application, and manifest recording stay in one place. In dry-run
  * mode no HTTP is issued and every turn stays `planned`.
@@ -2730,6 +2843,7 @@ function emptyTurnRecord(plan: PlannedTurn, persona: PersonaDefinition, idempote
 export async function runHarnessSession(input: HarnessSessionInput): Promise<HarnessManifest> {
   if (input.mode === "live" && input.submitTurn === null) throw new Error("live mode requires a submitTurn implementation");
   if (input.mode === "live" && input.sessionId === null) throw new Error("live mode requires a bound API session id");
+  const focus = validateFocusCell(input.focus);
   const notes: string[] = [...input.notes];
   if (input.mode === "dry-run") notes.push("dry-run: no HTTP requests were issued; every turn remains planned");
   const sessionTag = input.syntheticTag === null
@@ -2759,6 +2873,30 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
   const targetSwaps: HarnessTargetSwap[] = [];
   let previousAdvertisements: TurnAdvertisementSnapshot | null = null;
   let pendingPlannedTarget: CoverageCell | undefined;
+
+  // Focused coverage: a caller-requested cell replaces whatever the weighted plan picked for the
+  // first turn. The scheduled cells are already planned, so accounting is what keeps the plan
+  // honest: the replaced cell is released, the focus cell is reserved (so a retarget cannot
+  // double-book it and the forced turn counts against its target), and the force is recorded as a
+  // turn-0 target swap. An already fully planned focus cell is still forced, with a manifest note.
+  if (focus !== null) {
+    const first = plan.turns[0];
+    if (first === undefined) {
+      notes.push(`focus ${focus.family}/${focus.failureMode} requested but the plan has no turns`);
+    } else {
+      const original: CoverageCell = { ...first.target };
+      const alreadyFullyPlanned = plan.scheduler.remainingFor(focus) <= 0;
+      plan.scheduler.release(original);
+      plan.scheduler.reserve(focus);
+      first.target = { ...focus };
+      first.toolKind = FAMILY_TOOL_KINDS[focus.family];
+      pendingPlannedTarget = original;
+      targetSwaps.push({ turnIndex: first.turnIndex, from: original, to: { ...focus } });
+      if (alreadyFullyPlanned) {
+        notes.push(`focus ${focus.family}/${focus.failureMode}: coverage target was already fully planned; turn ${first.turnIndex} forced it anyway`);
+      }
+    }
+  }
   const latestAdvertisements = (): TurnAdvertisementSnapshot | null => previousAdvertisements;
   /** Last `menuWindow` readable snapshots' families, oldest first; an unreadable snapshot clears it. */
   const menuHistory: MechanicFamily[][] = [];
@@ -3035,6 +3173,8 @@ export type HarnessCliOptions = {
   contentProfile: string | null;
   menuWindow: number;
   directWeight: number;
+  /** Forced first-turn cell; null when no focus flags were given. */
+  focus: CoverageCell | null;
   help: boolean;
 };
 
@@ -3067,6 +3207,8 @@ export function harnessUsage(): string {
     "  --content-profile <token>  Content profile the run exercised, recorded in the manifest (default null).",
     `  --menu-window <n>        Recent advertisement snapshots unioned for re-targeting (default ${DEFAULT_MENU_WINDOW}, range ${MIN_MENU_WINDOW}..${MAX_MENU_WINDOW}).`,
     `  --direct-weight <n>      Multiplier for direct-failure cells in the plan (default ${DEFAULT_DIRECT_WEIGHT}, minimum ${MIN_DIRECT_WEIGHT}).`,
+    "  --focus-family <family>  Force the first turn of every run onto this family's focus cell.",
+    "  --focus-mode <mode>      Failure mode of the focus cell; both focus flags are required together.",
     "  --dry-run                Use the deterministic fake generator; never touch the network.",
     "  --help, -h               Print this text.",
     "",
@@ -3120,6 +3262,8 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   let contentProfile: string | null = null;
   let menuWindow = DEFAULT_MENU_WINDOW;
   let directWeight = DEFAULT_DIRECT_WEIGHT;
+  let focusFamily: MechanicFamily | null = null;
+  let focusMode: FailureMode | null = null;
   let help = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -3238,6 +3382,20 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
         index = taken.nextIndex;
         break;
       }
+      case "--focus-family": {
+        const taken = takeValue(argv, index, inline, flag);
+        if (!isMechanicFamily(taken.value)) throw new Error(`--focus-family must be one of ${MECHANIC_FAMILIES.join(", ")}`);
+        focusFamily = taken.value;
+        index = taken.nextIndex;
+        break;
+      }
+      case "--focus-mode": {
+        const taken = takeValue(argv, index, inline, flag);
+        if (!isFailureMode(taken.value)) throw new Error(`--focus-mode must be one of ${FAILURE_MODES.join(", ")}`);
+        focusMode = taken.value;
+        index = taken.nextIndex;
+        break;
+      }
       case "--dry-run": {
         if (inline !== null) throw new Error("--dry-run does not take a value");
         dryRun = true;
@@ -3254,6 +3412,12 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   }
 
   if (syntheticTag !== null && runs !== 1) throw new Error("--synthetic-tag requires --runs 1");
+  if ((focusFamily === null) !== (focusMode === null)) {
+    throw new Error("--focus-family and --focus-mode must be used together");
+  }
+  const focus: CoverageCell | null = focusFamily !== null && focusMode !== null
+    ? { family: focusFamily, failureMode: focusMode }
+    : null;
   let parsedBase: URL;
   try {
     parsedBase = new URL(baseUrl);
@@ -3262,7 +3426,7 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   }
   if (!(["http:", "https:"] as string[]).includes(parsedBase.protocol)) throw new Error("--api-base-url must be an HTTP(S) URL");
   baseUrl = parsedBase.toString().replace(/\/+$/, "");
-  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, menuWindow, directWeight, help };
+  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, menuWindow, directWeight, focus, help };
 }
 
 export type HarnessCliIo = {
@@ -3311,6 +3475,10 @@ export function renderManifestSummary(manifest: HarnessManifest): string[] {
   const humanPct = (value: number): string => `${(value * 100).toFixed(1)}%`;
   lines.push(`human-likeness: ${human.turns} turns, median ${human.medianWords} words, p90 ${human.p90Words}, low-effort ${humanPct(human.lowEffortShare)}, long ${humanPct(human.longShare)}, burstiness ${human.burstiness}, distinct-1 ${human.distinct1}, distinct-2 ${human.distinct2}`);
   lines.push(`  near-duplicate share ${human.nearDuplicateShare} (max trigram Jaccard >= ${NEAR_DUPLICATE_JACCARD}), verbatim reuses ${human.verbatimReuses}, OOC ${humanPct(human.oocShare)}, questions ${humanPct(human.questionShare)}, noise ${humanPct(human.noiseShare)}, mixed intent ${humanPct(human.mixedIntentShare)}, off-menu ${humanPct(human.offMenuShare)}`);
+  if (human.topRepeatedPhrases.length > 0) {
+    const motifs = human.topRepeatedPhrases.map(entry => `"${entry.phrase}" x${entry.count}`).join(", ");
+    lines.push(`  repeated motifs: ${motifs}`);
+  }
   return lines;
 }
 
@@ -3421,6 +3589,7 @@ export async function runHarnessCli(
       transcriptWindow: 6,
       menuWindow: options.menuWindow,
       directWeight: options.directWeight,
+      focus: options.focus,
     });
 
     for (const line of renderManifestSummary(manifest)) io.out(line);
