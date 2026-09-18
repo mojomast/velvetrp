@@ -233,6 +233,15 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   the fallback resolves the enemy turn without re-running the player's declaration against the
   advanced state (a larger stream-flow change). The misleading clock-order message on
   `POST /encounters/:id/start-commands` remains open polish.
+- **Second combat gap (open): lane composition is inconsistent in combat.** Post-fix live
+  verification confirmed the enemy turn now commits (fighter HP 12→6 with the health mirror
+  synchronized, combat receipts advanced), so the wedge is gone. But a follow-up batch and manual
+  probes in the route-created fight recorded **zero** `adventure-selection` decisions on both
+  enemy-owned and player-owned turns (only `memory-reranking`), while the fixture-created first
+  fight had composed `exact_combat_power.select` acts under the same server settings and lane
+  modes. Combat-family lane coverage is therefore inconsistent and needs a composition-path
+  investigation before combat corpora can be harvested; the world and run manifests
+  (`.velvet/synth-srd-2`, `/tmp/opencode/synth-srd2-batch5`) are kept as evidence.
 
 ## Method survey
 
