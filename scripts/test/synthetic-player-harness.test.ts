@@ -656,6 +656,22 @@ test("live generator posts to the OpenAI-compatible endpoint and parses fenced J
   }, truncatedFetch);
   assert.equal(validateTurnContract(await truncatedGenerator(request)).declaration, "I look at the ferry wreck.");
   assert.equal(truncatedCalls, 2);
+
+  // A strict-contract violation (for example a noise name the harness does not implement) is
+  // also retried once; the model tends to invent perturbation names.
+  let contractCalls = 0;
+  const contractFetch = (async () => {
+    contractCalls += 1;
+    const payload = contractCalls === 1
+      ? { ...validContract(), noise: ["not-a-real-noise"] }
+      : validContract();
+    return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: JSON.stringify(payload) }, finish_reason: "stop" }] }), { status: 200 });
+  }) as typeof fetch;
+  const contractGenerator = createLiveGenerator({
+    provider: "openai-compatible", baseUrl: "http://generator.local/v1", apiKey: "k", model: "m", temperature: 0.9, maxTokens: 16, timeoutMs: 5_000,
+  }, contractFetch);
+  assert.equal(validateTurnContract(await contractGenerator(request)).declaration, "I look at the ferry wreck.");
+  assert.equal(contractCalls, 2);
 });
 
 test("fake generator echoes the harness identity and honors required noise", () => {

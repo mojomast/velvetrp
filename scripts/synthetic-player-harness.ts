@@ -1345,9 +1345,11 @@ export function createLiveGenerator(config: GeneratorEnvConfig, fetchImpl: typeo
     try {
       return parseTurnContractJson(attempt.content);
     } catch (error) {
-      // A response truncated by the token budget is unusable; retry once with a larger budget.
-      // A complete but malformed response is not retried.
-      if (attempt.finishReason !== "length") throw error;
+      // A response truncated by the token budget or one that violates the strict contract is
+      // unusable; retry once with a larger budget. A complete response that fails for any other
+      // reason is not retried.
+      const retriable = attempt.finishReason === "length" || error instanceof TurnContractError;
+      if (!retriable) throw error;
       const retried = await call(request, Math.max(config.maxTokens * 2, 3_072));
       if (retried.content === null) throw error;
       return parseTurnContractJson(retried.content);
