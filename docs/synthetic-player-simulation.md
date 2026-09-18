@@ -224,9 +224,15 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   deterministic audience fallback then spends three failed attempts and writes
   `terminalState:"failed"` on the player's turn; the direct enemy-turn route rejects with
   `RPG_ENEMY_TURN_CONFLICT`, and `end-commands` rejects while the enemy is current, so the encounter
-  wedges (`.velvet/synth-srd-2` is in exactly this state). Battle coverage is paused until the
-  adventure path can resolve enemy turns; the misleading clock-order message on
-  `POST /encounters/:id/start-commands` is recorded as separate polish.
+  wedges (`.velvet/synth-srd-2` was in exactly this state). **Fixed and gated:** the deterministic
+  fallback now detects an enemy-owned D&D turn and invokes `repository.executeCombatEnemyTurn` (the
+  authoritative server-authored lane) instead of writing a failed terminal, with a focused
+  regression test (`server/test/reviewed-adventure-enemy-turn.test.ts`) and the server quick lane
+  green (286 files, 2921 passed). Remaining, recorded uncertainties: the live encounter also needed
+  a data repair because world surgery had desynced actor health from the combatant's hit points, and
+  the fallback resolves the enemy turn without re-running the player's declaration against the
+  advanced state (a larger stream-flow change). The misleading clock-order message on
+  `POST /encounters/:id/start-commands` remains open polish.
 
 ## Method survey
 

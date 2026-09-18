@@ -200,11 +200,14 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   waves**: `harvested:b1e4dfc2f2e2` (agreement 66.7%) is the first live SRD check probe, which
   flips between its Investigation candidate (live signal 0.55) and defer at the evaluator's 0.75
   composition threshold — a genuinely borderline state the corpus now records rather than hides.
-- **Combat gap (open, found by the sixth wave).** Focused combat batches surfaced that the
-  adventure path never resolves D&D enemy turns, so a goblin that wins initiative wedges the
-  encounter in `failed` player turns; the reproduction, code references and consequences are in
+- **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
+  adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
+  encounter in `failed` player turns. The deterministic fallback now invokes
+  `executeCombatEnemyTurn` for enemy-owned D&D turns instead of writing a failed terminal, with a
+  focused regression test and the server quick lane green (286 files, 2921 passed); the
+  reproduction and remaining uncertainties are in
   [synthetic player simulation](synthetic-player-simulation.md#v22-realism-controls-focus-targeting-and-the-srd-combat-gap-2026-09-18).
-  Combat-family coverage is paused pending a bounded fix.
+  The wedged world additionally needed a data repair (actor health vs combatant hit points).
 - **Reliability finding.** Planning budget denials hard-failed ~9% of executed turns because the
   conservative prompt estimate over-counts measured tokens; denials now degrade to deterministic
   fallback narration (see [provider hardening](provider-hardening.md)) and the harness records a

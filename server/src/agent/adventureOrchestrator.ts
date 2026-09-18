@@ -613,6 +613,20 @@ export function executeDeterministicEnemyFallback(repository: Repository, snapsh
   if(recovered?.operation==="action"){
     repository.linkAgentCombatReceipt(OWNER,{turnId,encounterId:snapshot.encounter.encounterId,idempotencyKey});return;
   }
+  const current=repository.getCombatState(OWNER,snapshot.encounter.encounterId);
+  if(!current||current.campaignId!==snapshot.campaignId)return;
+  // D&D enemy turns are server-authored: buildPlans never offers caller legal actions for an
+  // enemy combatant, so the authoritative enemy command is the only lane that can advance the
+  // turn. Without it the caller-plan loop below finds nothing and wrongly fails the turn.
+  if(current.currentCombatant===snapshot.audience.combatantId&&current.legalActions.length===0
+    &&snapshot.ruleset?.id==="dnd-5e"&&typeof repository.executeCombatEnemyTurn==="function"){
+    try{repository.executeCombatEnemyTurn(OWNER,current.combatId,{expectedRevision:current.revision,idempotencyKey});}
+    catch{const committed=repository.getCombatCommandResult(OWNER,snapshot.campaignId,current.combatId,idempotencyKey);
+      // A refused enemy command never makes an enemy-owned adventure turn terminal; leave the
+      // turn open for reconciliation instead of writing agent-enemy-fallback-failed.
+      if(committed?.operation!=="action")return;}
+    repository.linkAgentCombatReceipt(OWNER,{turnId,encounterId:current.combatId,idempotencyKey});return;
+  }
   for(let attempt=0;attempt<3;attempt+=1){
     const combat=repository.getCombatState(OWNER,snapshot.encounter.encounterId);
     if(!combat||combat.campaignId!==snapshot.campaignId)break;
