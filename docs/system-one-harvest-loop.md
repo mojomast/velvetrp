@@ -164,6 +164,26 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   exact preferred. Two follow-ups recorded rather than fixed: the reviewer flagged near-duplicate
   declaration motifs across personas (diversity check due), and SRD checks are declaration-driven,
   so a scheduler that keeps only the previous turn's menu under-reports them — keep a recent union.
+- **Fifth wave (SRD combat and the merge flag).** The reviewed SRD world's goblin ambush was
+  activated (materialized with a past clock, because the fixture's default 2036 timestamps make
+  every live write fail the encounter immutability guard) and a two-persona batch ran eight turns
+  against it. The adventure lane's battery only exists when combat candidates are built: run a
+  advertised the combat power 4 of 4 turns and acted 2 of 4, while run b's rest declarations and
+  one rejected combat declaration produced no L2 battery at all, and the harness reported 0 of 4
+  rather than claiming coverage. Both combat-power acts (`Second Wind`, signals 0.96 and 0.78)
+  were confirmed by review and merged with the new
+  `scripts/harvest-system-one-negatives.ts --merge-fixture` flag, so the corpus now holds **94
+  cases (1 human-confirmed + 93 agent-reviewed)**. The regenerated benchmark: stability stays 100%
+  (0 of 124 cases conflicted) and the gated record is unchanged (54 acted/100%, Brier 0.0002,
+  ECE 0.0107 at the recommended 0.40), while the agent-reviewed subset carries acted decisions for
+  the first time — 3 acted calls at 100% over 279 calls, exact preferred 234/279, still scored but
+  never gated. Measurement aids shipped with the wave: `--menu-window` keeps a recent
+  advertised-family union for re-targeting (SRD checks are declaration-driven), `--direct-weight`
+  biases the coverage matrix toward harvest volume, and every manifest reports the human-likeness
+  proxies (near-duplicate share, distinct-1/2, burstiness, OOC/noise/mixed-intent shares) that the
+  fourth-wave review asked for. Two cosmetic divergences recorded: the encounter-start failure
+  message is misleading when the cause is a clock-order violation, and three combat turns aborted
+  at `decision-rejected`/`awaiting-confirmation` as game outcomes the harness reported honestly.
 - **Reliability finding.** Planning budget denials hard-failed ~9% of executed turns because the
   conservative prompt estimate over-counts measured tokens; denials now degrade to deterministic
   fallback narration (see [provider hardening](provider-hardening.md)) and the harness records a

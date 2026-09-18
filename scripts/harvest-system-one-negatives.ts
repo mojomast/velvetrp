@@ -2,12 +2,14 @@
 /**
  * Harvests reviewed System One shadow decisions into lane-tagged corpus proposals.
  * Read-only: it never mutates the database, and it never writes unless `--out` or
- * `--write-fixture` was requested.
+ * `--write-fixture` was requested. `--merge-fixture` is only meaningful together with
+ * `--write-fixture`: it merges the harvested proposals into an existing lane fixture instead
+ * of replacing it, so one fixture can accumulate corpus cases from more than one world.
  *
  * Usage:
  *   npx tsx scripts/harvest-system-one-negatives.ts [--lane <lane>] [--limit 1..1000]
  *     [--annotations <path.json>] [--disagreements] [--status confirmed|proposed|all]
- *     [--out <path>] [--write-fixture] [--summary]
+ *     [--out <path>] [--write-fixture] [--merge-fixture] [--summary]
  *
  * Env: VELVET_DATA_DIR overrides the resolved data directory.
  */
@@ -52,12 +54,13 @@ const REPO_ROOT = path.resolve(fileURLToPath(import.meta.url), "..", "..");
 export const USAGE =
   "usage: harvest-system-one-negatives.ts [--lane <lane>] [--limit 1..1000]"
   + " [--annotations <path.json>] [--disagreements] [--status confirmed|proposed|all]"
-  + " [--out <path>] [--write-fixture] [--summary]\n"
+  + " [--out <path>] [--write-fixture] [--merge-fixture] [--summary]\n"
   + "\n"
   + `harvestable lanes: ${HARVEST_LANES.join(", ")} (with --lane omitted, every lane is read)\n`
   + "--disagreements also reads Director authority rows (director-selection only)\n"
   + "--status defaults to all; --write-fixture forces confirmed and writes"
   + ` ${FIXTURE_DIRECTORY.replace(/\\/g, "/")}/<lane>.json (requires --lane)\n`
+  + "--merge-fixture (requires --write-fixture) merges into an existing lane fixture instead of replacing it\n"
   + "the proposals JSON goes to --out, or to stdout when neither --out, --write-fixture nor --summary is set\n";
 
 export interface HarvestCliOptions {
@@ -68,6 +71,8 @@ export interface HarvestCliOptions {
   status: HarvestStatusFilter;
   out: string | null;
   writeFixture: boolean;
+  /** Merge into an existing lane fixture instead of replacing it; requires `writeFixture`. */
+  mergeFixture: boolean;
   summary: boolean;
   /** Set only when `--help`/`-h` was requested; the pure parser never exits. */
   help?: boolean;
@@ -90,6 +95,7 @@ export function parseHarvestArgs(argv: readonly string[]): HarvestCliOptions {
   let statusProvided = false;
   let out: string | null = null;
   let writeFixture = false;
+  let mergeFixture = false;
   let summary = false;
   let help = false;
   for (let index = 0; index < argv.length; index += 1) {
@@ -125,6 +131,8 @@ export function parseHarvestArgs(argv: readonly string[]): HarvestCliOptions {
       out = path.resolve(value);
     } else if (arg === "--write-fixture") {
       writeFixture = true;
+    } else if (arg === "--merge-fixture") {
+      mergeFixture = true;
     } else if (arg === "--summary") {
       summary = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -135,14 +143,15 @@ export function parseHarvestArgs(argv: readonly string[]): HarvestCliOptions {
     }
   }
   if (help) {
-    return { lane, limit, annotations, disagreements, status, out, writeFixture, summary, help: true };
+    return { lane, limit, annotations, disagreements, status, out, writeFixture, mergeFixture, summary, help: true };
   }
+  if (mergeFixture && !writeFixture) throw new Error("--merge-fixture requires --write-fixture");
   if (writeFixture && lane === null) throw new Error("--write-fixture requires --lane <lane>");
   if (writeFixture && statusProvided && status !== "confirmed") {
     throw new Error(`--write-fixture requires a confirmed-only filter, received --status ${status}`);
   }
   if (writeFixture) status = "confirmed";
-  return { lane, limit, annotations, disagreements, status, out, writeFixture, summary };
+  return { lane, limit, annotations, disagreements, status, out, writeFixture, mergeFixture, summary };
 }
 
 export interface ParsedAnnotations {
@@ -269,6 +278,53 @@ export function buildFixtureDocument(
 
 export function serializeFixture(document: HarvestFixtureDocument): string {
   return `${JSON.stringify(document, null, 2)}\n`;
+}
+
+/**
+ * Merges harvested proposals into an existing lane fixture. Proposals are deduplicated by
+ * proposalId with the incoming document winning on a collision (a fresh harvest supersedes the
+ * corpus entry it replaces), then sorted by proposalId so the merged corpus serializes
+ * deterministically. The existing document keeps its `version` and `lane`; `generatedAt` marks
+ * when the merge happened. Merging different lanes is a caller error.
+ */
+export function mergeFixtureDocuments(
+  existing: HarvestFixtureDocument,
+  incoming: HarvestFixtureDocument,
+  generatedAt: string,
+): HarvestFixtureDocument {
+  if (existing.lane !== incoming.lane) {
+    throw new Error(`cannot merge fixtures from different lanes: ${existing.lane} and ${incoming.lane}`);
+  }
+  const byId = new Map<string, HarvestProposal>();
+  for (const proposal of existing.proposals) byId.set(proposal.proposalId, proposal);
+  for (const proposal of incoming.proposals) byId.set(proposal.proposalId, proposal);
+  const proposals = [...byId.values()].sort((left, right) => left.proposalId.localeCompare(right.proposalId));
+  return { version: existing.version, lane: existing.lane, generatedAt, proposals };
+}
+
+/**
+ * Reads one lane fixture from disk. A read or parse failure throws; a merge must never silently
+ * start over from an empty corpus because the existing fixture was unreadable.
+ */
+function readFixtureDocument(filePath: string): HarvestFixtureDocument {
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, "utf8");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`failed to read fixture ${filePath}: ${message}`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`failed to parse fixture ${filePath}: ${message}`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`fixture ${filePath} must contain a JSON object`);
+  }
+  return parsed as HarvestFixtureDocument;
 }
 
 /** Absolute path of the harvested fixture for one lane; `repoRoot` is a test seam. */
@@ -432,8 +488,12 @@ async function main(): Promise<void> {
 
   if (options.writeFixture) {
     const lane = lanes[0]!;
-    const fixture = buildFixtureDocument(lane, built, generatedAt);
+    const builtFixture = buildFixtureDocument(lane, built, generatedAt);
     const filePath = fixtureFilePath(lane);
+    const existingFixture = options.mergeFixture && existsSync(filePath) ? readFixtureDocument(filePath) : null;
+    const fixture = existingFixture === null
+      ? builtFixture
+      : mergeFixtureDocuments(existingFixture, builtFixture, generatedAt);
     // Do not let a valid-but-wrong data directory replace a reviewed corpus with an empty one.
     if (fixture.proposals.length === 0 && existsSync(filePath)) {
       let existing = 0;
@@ -444,16 +504,25 @@ async function main(): Promise<void> {
         existing = 0;
       }
       if (existing > 0) {
-        throw new Error(`refusing to replace ${filePath} (${existing} confirmed proposal(s)) with an empty fixture; remove the file deliberately or fix the data directory`);
+        throw new Error(
+          `refusing to replace ${filePath} (${existing} confirmed proposal(s)) with an empty fixture;`
+          + " remove the file deliberately, fix the data directory, or use --merge-fixture",
+        );
       }
     }
     mkdirSync(path.dirname(filePath), { recursive: true });
     writeFileSync(filePath, serializeFixture(fixture), "utf8");
-    const excluded = built.length - fixture.proposals.length;
-    process.stdout.write(
-      `wrote ${filePath} (${fixture.proposals.length} confirmed proposals`
-      + `${excluded > 0 ? `, ${excluded} not confirmed` : ""})\n`,
-    );
+    if (existingFixture !== null) {
+      const knownIds = new Set(existingFixture.proposals.map((proposal) => proposal.proposalId));
+      const added = builtFixture.proposals.filter((proposal) => !knownIds.has(proposal.proposalId)).length;
+      process.stdout.write(`wrote ${filePath} (${fixture.proposals.length} confirmed proposals, ${added} new)\n`);
+    } else {
+      const excluded = built.length - fixture.proposals.length;
+      process.stdout.write(
+        `wrote ${filePath} (${fixture.proposals.length} confirmed proposals`
+        + `${excluded > 0 ? `, ${excluded} not confirmed` : ""})\n`,
+      );
+    }
   }
   if (options.out) {
     mkdirSync(path.dirname(options.out), { recursive: true });

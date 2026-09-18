@@ -17,12 +17,14 @@ import {
   filterProposalsByStatus,
   fixtureFilePath,
   harvestAnnotationFromEntry,
+  mergeFixtureDocuments,
   parseAnnotationEntries,
   parseHarvestArgs,
   renderHarvestSummary,
   serializeFixture,
   serializeHarvestOutput,
 } from "../harvest-system-one-negatives.js";
+import type { HarvestFixtureDocument } from "../harvest-system-one-negatives.js";
 
 const NOW = "2026-09-17T00:00:00.000Z";
 
@@ -70,6 +72,30 @@ function guardrailProposals(): HarvestProposal[] {
   });
 }
 
+/** A literal fixture proposal, so merge tests can pin exact proposalIds and payloads. */
+function makeProposal(overrides: Partial<HarvestProposal> = {}): HarvestProposal {
+  return {
+    proposalId: "proposal-1",
+    lane: "guardrails",
+    sourceDecisionId: "decision-1",
+    createdAt: NOW,
+    provenance: "review-annotated",
+    status: "confirmed",
+    state: { message: "I draw my sword." },
+    expected: { disposition: "pass" },
+    reason: "test fixture proposal",
+    ...overrides,
+  };
+}
+
+function makeFixtureDocument(
+  lane: string,
+  proposals: HarvestProposal[],
+  generatedAt: string = NOW,
+): HarvestFixtureDocument {
+  return { version: 1, lane, generatedAt, proposals };
+}
+
 test("parseHarvestArgs applies defaults", () => {
   assert.deepEqual(parseHarvestArgs([]), {
     lane: null,
@@ -79,6 +105,7 @@ test("parseHarvestArgs applies defaults", () => {
     status: "all",
     out: null,
     writeFixture: false,
+    mergeFixture: false,
     summary: false,
   });
 });
@@ -150,6 +177,19 @@ test("parseHarvestArgs enforces the --write-fixture contract", () => {
     () => parseHarvestArgs(["--write-fixture", "--lane", "guardrails", "--status=proposed"]),
     /--write-fixture requires a confirmed-only filter/,
   );
+});
+
+test("parseHarvestArgs requires --write-fixture for --merge-fixture", () => {
+  assert.throws(() => parseHarvestArgs(["--merge-fixture"]), /--merge-fixture requires --write-fixture/);
+  assert.throws(
+    () => parseHarvestArgs(["--merge-fixture", "--lane", "guardrails"]),
+    /--merge-fixture requires --write-fixture/,
+  );
+  assert.equal(parseHarvestArgs(["--write-fixture", "--lane", "guardrails"]).mergeFixture, false);
+  const options = parseHarvestArgs(["--write-fixture", "--merge-fixture", "--lane", "guardrails"]);
+  assert.equal(options.mergeFixture, true);
+  assert.equal(options.writeFixture, true);
+  assert.equal(options.status, "confirmed");
 });
 
 test("parseHarvestArgs rejects missing path values", () => {
@@ -285,6 +325,72 @@ test("buildFixtureDocument never carries another lane's proposals", () => {
   const document = buildFixtureDocument("guardrails", [...guardrailProposals(), ...director], NOW);
   assert.equal(document.proposals.length, 2);
   assert.ok(document.proposals.every((proposal) => proposal.lane === "guardrails"));
+});
+
+test("mergeFixtureDocuments adds new proposals and keeps the existing ones", () => {
+  const existing = makeFixtureDocument("guardrails", [
+    makeProposal({ proposalId: "b", note: "existing b" }),
+    makeProposal({ proposalId: "a", note: "existing a" }),
+  ]);
+  const incoming = makeFixtureDocument("guardrails", [
+    makeProposal({ proposalId: "d", note: "incoming d" }),
+    makeProposal({ proposalId: "c", note: "incoming c" }),
+  ], "2026-09-17T01:00:00.000Z");
+  const merged = mergeFixtureDocuments(existing, incoming, "2026-09-18T00:00:00.000Z");
+  assert.equal(merged.version, 1);
+  assert.equal(merged.lane, "guardrails");
+  assert.equal(merged.generatedAt, "2026-09-18T00:00:00.000Z");
+  assert.deepEqual(
+    merged.proposals.map((proposal) => proposal.proposalId),
+    ["a", "b", "c", "d"],
+  );
+  assert.equal(merged.proposals.find((proposal) => proposal.proposalId === "a")?.note, "existing a");
+});
+
+test("mergeFixtureDocuments lets incoming proposals win on proposalId collisions", () => {
+  const existing = makeFixtureDocument("guardrails", [makeProposal({ proposalId: "same", note: "old" })]);
+  const incoming = makeFixtureDocument("guardrails", [makeProposal({ proposalId: "same", note: "new" })]);
+  const merged = mergeFixtureDocuments(existing, incoming, "2026-09-18T00:00:00.000Z");
+  assert.equal(merged.proposals.length, 1);
+  assert.equal(merged.proposals[0]!.note, "new");
+  assert.equal(merged.proposals[0]!.proposalId, "same");
+});
+
+test("mergeFixtureDocuments sorts the merged proposals by proposalId", () => {
+  const existing = makeFixtureDocument("guardrails", [
+    makeProposal({ proposalId: "z" }),
+    makeProposal({ proposalId: "m" }),
+  ]);
+  const incoming = makeFixtureDocument("guardrails", [
+    makeProposal({ proposalId: "a" }),
+    makeProposal({ proposalId: "b" }),
+  ]);
+  const merged = mergeFixtureDocuments(existing, incoming, NOW);
+  const ids = merged.proposals.map((proposal) => proposal.proposalId);
+  assert.deepEqual(ids, ["a", "b", "m", "z"]);
+  assert.deepEqual(ids, [...ids].sort((left, right) => left.localeCompare(right)));
+  assert.equal(serializeFixture(mergeFixtureDocuments(existing, incoming, NOW)), serializeFixture(merged));
+});
+
+test("mergeFixtureDocuments throws when the lanes differ", () => {
+  const existing = makeFixtureDocument("guardrails", [makeProposal({ proposalId: "a" })]);
+  const incoming = makeFixtureDocument("adventure-selection", [makeProposal({ proposalId: "b", lane: "adventure-selection" })]);
+  assert.throws(
+    () => mergeFixtureDocuments(existing, incoming, NOW),
+    /cannot merge fixtures from different lanes: guardrails and adventure-selection/,
+  );
+});
+
+test("mergeFixtureDocuments keeps the existing proposals when incoming is empty", () => {
+  const existing = makeFixtureDocument("guardrails", [
+    makeProposal({ proposalId: "a" }),
+    makeProposal({ proposalId: "b", status: "proposed" }),
+  ]);
+  const merged = mergeFixtureDocuments(existing, makeFixtureDocument("guardrails", []), "2026-09-18T00:00:00.000Z");
+  assert.deepEqual(merged.proposals, existing.proposals);
+  assert.equal(merged.version, existing.version);
+  assert.equal(merged.lane, existing.lane);
+  assert.equal(merged.generatedAt, "2026-09-18T00:00:00.000Z");
 });
 
 test("fixtureFilePath anchors to the repo root", () => {

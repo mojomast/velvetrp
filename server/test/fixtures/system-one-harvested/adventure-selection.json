@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lane": "adventure-selection",
-  "generatedAt": "2026-09-18T20:02:34.852Z",
+  "generatedAt": "2026-09-18T21:34:23.971Z",
   "proposals": [
     {
       "proposalId": "04e62a0ddd4776fc3701aa5bd97c70fa8909c4578d2defcbf74dff7cb2a7de70",
@@ -8338,6 +8338,30 @@
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
+      "proposalId": "6b8359ca620b3780ef521fa705d8e345ecd423a4c871e2e71a73fac2f668bf7e",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "171a3cbb-639f-4b87-ad88-b84658783fba",
+      "createdAt": "2026-09-18T21:32:34.940Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "i'll set the extra-action trick aside for a moment and just use my second wind to steady myself, then see where that leaves me.",
+        "candidates": [
+          {
+            "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+            "digest": "c037239658b1559935d13e473ba8758b03e37f8956ae155d0ade2cc062fb1777",
+            "kind": "exact_combat_power.select",
+            "label": "Use combat power: Second Wind → Aster Vale"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+      },
+      "note": "Turn 903e05f4: declaration asks to use Second Wind to steady; the only advertised candidate was that combat power, picked at 0.78.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
       "proposalId": "6ef5508ce70e9cc9b13066a314dd05b3f850f2aa76adac2518eadd5f1f52d688",
       "lane": "adventure-selection",
       "sourceDecisionId": "f71458d1-4ee9-407d-a2d5-1292d7cb570b",
@@ -12097,6 +12121,30 @@
         "candidateId": null
       },
       "note": "explorer.v1 declared reading terrain against the map and testing the slope; the advertised check sample contains no Survival candidate and no advertised check uniquely binds the intent, so deferring is correct even though the provider later committed an unadvertised Survival check (13 vs DC 15, failure).",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
+      "proposalId": "ad10f3fc27d70ef260e3d90f5fb625c6f61d557a6b529bc2288df67260e7411f",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "5481f185-7cac-4ad3-82e7-a3da57e29867",
+      "createdAt": "2026-09-18T21:32:03.105Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "Aster Vale plants his feet, breathes deep, and uses Second Wind—he's not done yet.",
+        "candidates": [
+          {
+            "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+            "digest": "f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6f8d8d8e207d10b06",
+            "kind": "exact_combat_power.select",
+            "label": "Use combat power: Second Wind → Aster Vale"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+      },
+      "note": "Turn b1367b78: declaration explicitly names Second Wind and the lane picked the only advertised candidate (that combat power) at 0.96.",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {

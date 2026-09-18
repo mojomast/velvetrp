@@ -10,12 +10,15 @@ import {
   COVERAGE_TARGET_PER_CELL,
   COVERAGE_TOTAL_TARGET,
   CoverageScheduler,
+  DEFAULT_DIRECT_WEIGHT,
+  DEFAULT_MENU_WINDOW,
   EFFORTS,
   FAILURE_MODES,
   FAMILY_TOOL_KINDS,
   HARNESS_VERSION,
   KIND_TO_FAMILY,
   MECHANIC_FAMILIES,
+  MIN_DIRECT_WEIGHT,
   OFF_MENU_FAILURE_MODES,
   PERSONAS,
   PERSONA_ARCHETYPES,
@@ -36,11 +39,13 @@ import {
   buildStreamRequest,
   buildTranscriptRequest,
   buildTurnRequest,
+  computeHumanLikeness,
   coverageWeight,
   createFakeGenerator,
   createLiveGenerator,
   createRng,
   decideConfirmation,
+  declarationWordCount,
   defaultCoverageTargets,
   deriveConfirmationIdempotencyKey,
   deriveIdempotencyKey,
@@ -56,6 +61,7 @@ import {
   noiseTrailingQuestionOoc,
   noiseTypo,
   noiseUppercaseFirst,
+  normalizeMenuWindow,
   parseAdventureDecisionRow,
   parseHarnessArgs,
   parseSseBlock,
@@ -72,7 +78,9 @@ import {
   sessionIndexLabel,
   sessionTagFor,
   stableStringify,
+  tokenTrigramSet,
   transcriptSlice,
+  trigramJaccard,
   validateTurnContract,
   type CoverageTargets,
   type FailureMode,
@@ -80,7 +88,9 @@ import {
   type GeneratorPromptInput,
   type HarnessManifest,
   type HarnessSessionInput,
+  type HarnessTurnRecord,
   type MechanicFamily,
+  type SeededRng,
   type TurnAdvertisementSnapshot,
   type TurnContractContext,
 } from "../synthetic-player-harness.js";
@@ -161,6 +171,51 @@ function makeDryRunInput(overrides: Partial<HarnessSessionInput> = {}): HarnessS
     transcriptWindow: 6,
   };
   return { ...base, ...overrides };
+}
+
+/** SeededRng stub whose every float draw is a fixed value; used to pin weighted picks. */
+function fixedRng(value: number): SeededRng {
+  return {
+    next: () => value,
+    int: () => 0,
+    chance: () => false,
+    pick: <T>(items: readonly T[]): T => items[0] as T,
+  };
+}
+
+/** Minimal valid turn record for human-likeness tests. */
+function humanLikenessTurn(input: {
+  turnIndex: number;
+  declaration: string;
+  failureMode?: FailureMode;
+  ooc?: string | null;
+  noiseApplied?: HarnessTurnRecord["noiseApplied"];
+}): HarnessTurnRecord {
+  const noiseApplied = [...(input.noiseApplied ?? [])];
+  return {
+    turnIndex: input.turnIndex,
+    turnSeed: `human-${input.turnIndex}`,
+    personaId: "explorer.v1",
+    target: { family: "travel", failureMode: input.failureMode ?? "direct" },
+    toolKind: FAMILY_TOOL_KINDS.travel,
+    effort: "high",
+    declarationGenerated: input.declaration,
+    declaration: input.declaration,
+    ooc: input.ooc ?? null,
+    noiseDeclared: [...noiseApplied],
+    noiseDropped: [],
+    noiseApplied,
+    references: [],
+    idempotencyKey: `synth.human.${input.turnIndex}`,
+    outcome: "planned",
+    turnId: null,
+    turnState: null,
+    confirmationDecisions: [],
+    receipts: [],
+    narration: null,
+    error: null,
+    advertisements: null,
+  };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -517,6 +572,36 @@ test("scheduler weights reflect persona bias", () => {
   assert.ok(coverageWeight(PERSONAS.impatient, { family: "travel", failureMode: "direct" })
     > coverageWeight(PERSONAS.explorer, { family: "travel", failureMode: "direct" }));
   assert.equal(coverageWeight(null, { family: "progression", failureMode: "direct" }), 1);
+});
+
+test("directWeight multiplies direct cells only and never below the floor", () => {
+  const direct = { family: "travel", failureMode: "direct" } as const;
+  const ambiguous = { family: "travel", failureMode: "ambiguous" } as const;
+  assert.equal(DEFAULT_DIRECT_WEIGHT, 1);
+  assert.equal(coverageWeight(PERSONAS.explorer, direct, { directWeight: 1 }), coverageWeight(PERSONAS.explorer, direct));
+  assert.equal(coverageWeight(PERSONAS.explorer, direct, { directWeight: 2 }), coverageWeight(PERSONAS.explorer, direct) * 2);
+  assert.equal(coverageWeight(PERSONAS.explorer, ambiguous, { directWeight: 2 }), coverageWeight(PERSONAS.explorer, ambiguous));
+  assert.throws(() => coverageWeight(PERSONAS.explorer, direct, { directWeight: 0 }), /directWeight must be a finite number >= 0.1/);
+  assert.throws(() => new CoverageScheduler({ directWeight: Number.NaN }), /directWeight/);
+  assert.equal(new CoverageScheduler({ directWeight: MIN_DIRECT_WEIGHT }).totalTarget, COVERAGE_TOTAL_TARGET);
+  // Default and explicit-1 plans are byte-identical: the RNG draw sequence is untouched.
+  assert.deepEqual(
+    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4 }).turns.map(turn => turn.target),
+    planRun({ runSeed: "direct", persona: PERSONAS.explorer, turns: 4, directWeight: DEFAULT_DIRECT_WEIGHT }).turns.map(turn => turn.target),
+  );
+
+  // A fixed RNG makes the weighted pick exact. Only travel/direct and travel/ambiguous remain:
+  // explorer weights are 3*0.6=1.8 (direct) and 3*1.2=3.6 (ambiguous), total 5.4. A 0.4 roll
+  // lands on ambiguous at the default and on direct when directWeight lifts it to 5.4.
+  const targets = {} as Record<MechanicFamily, Record<FailureMode, number>>;
+  for (const family of MECHANIC_FAMILIES) {
+    targets[family] = {} as Record<FailureMode, number>;
+    for (const mode of FAILURE_MODES) targets[family][mode] = 0;
+  }
+  targets.travel.direct = 1;
+  targets.travel.ambiguous = 1;
+  assert.deepEqual(new CoverageScheduler({ targets, persona: PERSONAS.explorer }).next(fixedRng(0.4)), { family: "travel", failureMode: "ambiguous" });
+  assert.deepEqual(new CoverageScheduler({ targets, persona: PERSONAS.explorer, directWeight: 3 }).next(fixedRng(0.4)), { family: "travel", failureMode: "direct" });
 });
 
 test("planRun is seed-deterministic, truncates at exhaustion, and pins effort/noise", () => {
@@ -1309,6 +1394,8 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
     maxConfirmationRounds: 5,
     dataDir: null,
     contentProfile: null,
+    menuWindow: DEFAULT_MENU_WINDOW,
+    directWeight: DEFAULT_DIRECT_WEIGHT,
     help: false,
   });
   // `--data-dir` overrides the VELVET_DATA_DIR default; without the flag the env value survives.
@@ -1321,6 +1408,17 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.equal(parseHarnessArgs(["--content-profile=srd-5.1"], {}).contentProfile, "srd-5.1");
   assert.equal(parseHarnessArgs([], {}).contentProfile, null);
   assert.throws(() => parseHarnessArgs(["--content-profile"], {}), /--content-profile requires a value/);
+  // Recent-menu window and direct-cell weighting.
+  assert.equal(parseHarnessArgs(["--menu-window", "5"], {}).menuWindow, 5);
+  assert.equal(parseHarnessArgs(["--menu-window=7"], {}).menuWindow, 7);
+  assert.throws(() => parseHarnessArgs(["--menu-window", "0"], {}), /--menu-window must be an integer between 1 and 10/);
+  assert.throws(() => parseHarnessArgs(["--menu-window", "11"], {}), /--menu-window must be an integer between 1 and 10/);
+  assert.throws(() => parseHarnessArgs(["--menu-window"], {}), /--menu-window requires a value/);
+  assert.equal(parseHarnessArgs(["--direct-weight", "2.5"], {}).directWeight, 2.5);
+  assert.equal(parseHarnessArgs(["--direct-weight=0.1"], {}).directWeight, 0.1);
+  assert.throws(() => parseHarnessArgs(["--direct-weight", "0.05"], {}), /--direct-weight must be a number >= 0.1/);
+  assert.throws(() => parseHarnessArgs(["--direct-weight", "nope"], {}), /--direct-weight must be a number >= 0.1/);
+  assert.throws(() => parseHarnessArgs(["--direct-weight"], {}), /--direct-weight requires a value/);
   const parsed = parseHarnessArgs([
     "--turns=3",
     "--personas", "explorer.v1,impatient",
@@ -1334,6 +1432,8 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
     "--sheet-summary", "Bryn the ranger",
     "--api-base-url", "http://127.0.0.1:9999/",
     "--max-confirmation-rounds=2",
+    "--menu-window=4",
+    "--direct-weight=2",
     "--dry-run",
   ], {});
   assert.equal(parsed.turns, 3);
@@ -1348,6 +1448,8 @@ test("CLI parsing handles defaults, both flag forms, and validation", () => {
   assert.equal(parsed.dryRun, true);
   assert.equal(parsed.baseUrl, "http://127.0.0.1:9999");
   assert.equal(parsed.maxConfirmationRounds, 2);
+  assert.equal(parsed.menuWindow, 4);
+  assert.equal(parsed.directWeight, 2);
   assert.equal(parseHarnessArgs(["--runs", "1", "--synthetic-tag", "synthetic-player.custom.x.a"], {}).syntheticTag, "synthetic-player.custom.x.a");
   assert.throws(() => parseHarnessArgs(["--turns", "0"], {}), /--turns must be an integer between 1 and 200/);
   assert.throws(() => parseHarnessArgs(["--turns", "nope"], {}), /--turns must be an integer between 1 and 200/);
@@ -1677,6 +1779,103 @@ test("renderManifestSummary includes the advertisement totals", async () => {
   assert.ok(summary.some(line => line.includes("acted: 2/3 (67%)")), summary.join("\n"));
 });
 
+test("menu window defaults to 3 and clamps to the 1..10 range", async () => {
+  assert.equal(DEFAULT_MENU_WINDOW, 3);
+  assert.equal(normalizeMenuWindow(undefined), 3);
+  assert.equal(normalizeMenuWindow(0), 1);
+  assert.equal(normalizeMenuWindow(1), 1);
+  assert.equal(normalizeMenuWindow(2.9), 2);
+  assert.equal(normalizeMenuWindow(99), 10);
+  assert.equal(normalizeMenuWindow(Number.NaN), 3);
+  assert.equal(normalizeMenuWindow(Number.POSITIVE_INFINITY), 3);
+
+  const defaulted = await runHarnessSession(makeDryRunInput());
+  assert.equal(defaulted.menuWindow, 3);
+  assert.deepEqual(defaulted.menuUnionFamilies, []);
+  const clamped = await runHarnessSession(makeDryRunInput({ menuWindow: 42 }));
+  assert.equal(clamped.menuWindow, 10);
+});
+
+test("recent-menu union keeps earlier advertised families reachable for re-targeting", async () => {
+  // Every family keeps one target per cell except the two unreachable ones used as stale menus.
+  const targets = {} as Record<MechanicFamily, Record<FailureMode, number>>;
+  for (const family of MECHANIC_FAMILIES) {
+    targets[family] = {} as Record<FailureMode, number>;
+    for (const mode of FAILURE_MODES) {
+      targets[family][mode] = family === "progression" || family === "commerce" ? 0 : 1;
+    }
+  }
+  const runSeed = "menu-union";
+  const planned = planRun({ runSeed, persona: PERSONAS.explorer, turns: 3, targets }).turns;
+  assert.equal(planned.length, 3);
+  const plannedFamilies = new Set(planned.map(turn => turn.target.family));
+  // A reachable family outside the plan, advertised on the first turn; the second turn advertises
+  // an unreachable family, which alone would strand the third planned cell.
+  const advertised = MECHANIC_FAMILIES.find(family =>
+    family !== "progression" && family !== "commerce" && !plannedFamilies.has(family));
+  if (advertised === undefined) throw new Error("no family outside the plan is available for the recent-menu union");
+  const unreachable = planned[2]?.target.family === "progression" ? "commerce" : "progression";
+  const menuSnapshot = (family: MechanicFamily): TurnAdvertisementSnapshot => ({
+    kinds: [FAMILY_TOOL_KINDS[family]],
+    families: [family],
+    labels: [`Menu option ${family}`],
+    band: "act",
+    method: "choice",
+    selectedKind: FAMILY_TOOL_KINDS[family],
+  });
+  const makeReads = () => {
+    let reads = 0;
+    return () => {
+      reads += 1;
+      return menuSnapshot(reads === 1 ? advertised : unreachable);
+    };
+  };
+
+  const requests: GenerationRequest[] = [];
+  const fake = createFakeGenerator();
+  const wide = await runHarnessSession(makeDryRunInput({
+    runSeed,
+    turns: 3,
+    targets,
+    menuWindow: 3,
+    readAdvertisements: makeReads(),
+    generateTurn: request => {
+      requests.push(request);
+      return fake(request);
+    },
+  }));
+  const narrow = await runHarnessSession(makeDryRunInput({
+    runSeed,
+    turns: 3,
+    targets,
+    menuWindow: 1,
+    readAdvertisements: makeReads(),
+  }));
+
+  assert.equal(wide.menuWindow, 3);
+  assert.deepEqual(wide.menuUnionFamilies, [advertised, unreachable], "oldest advertisement first, deduped");
+  assert.deepEqual(narrow.menuUnionFamilies, [unreachable], "window 1 keeps the latest snapshot only");
+  assert.equal(narrow.menuWindow, 1);
+
+  // Window 1 sees only the stale unreachable menu on the last turn: the plan is kept.
+  assert.deepEqual(narrow.turns[0]?.target, planned[0]?.target);
+  assert.equal(narrow.turns[1]?.target.family, advertised, "the first swap still fires");
+  assert.deepEqual(narrow.turns[2]?.target, planned[2]?.target);
+  assert.equal(narrow.targetSwaps.length, 1);
+
+  // The union reaches back to the advertised family for the third turn as well.
+  assert.equal(wide.turns[1]?.target.family, advertised);
+  assert.equal(wide.turns[2]?.target.family, advertised);
+  assert.notDeepEqual(wide.turns[2]?.target, planned[2]?.target);
+  assert.equal(wide.targetSwaps.length, 2);
+
+  // The generator still sees only the latest snapshot's labels, never the stale union.
+  assert.deepEqual(requests[2]?.advertisedOptions, [`Menu option ${unreachable}`]);
+  const wideSummary = renderManifestSummary(wide);
+  assert.ok(wideSummary.some(line => line.includes("menu window: last 3 advertised snapshots")), wideSummary.join("\n"));
+  assert.ok(!renderManifestSummary(narrow).some(line => line.includes("menu window:")), "window 1 adds no note");
+});
+
 test("manifest records the content profile when supplied and null when omitted", async () => {
   const omitted = await runHarnessSession(makeDryRunInput());
   assert.equal(omitted.world.contentProfile, null);
@@ -1691,4 +1890,82 @@ test("manifest records the content profile when supplied and null when omitted",
 
   const blank = await runHarnessSession(makeDryRunInput({ contentProfile: "   " }));
   assert.equal(blank.world.contentProfile, null, "whitespace-only profile becomes null");
+});
+
+// -------------------------------------------------------------------------------------------------
+// Human-likeness report
+// -------------------------------------------------------------------------------------------------
+
+test("declaration word counts and trigram sets handle empty, identical, and disjoint text", () => {
+  assert.equal(declarationWordCount(""), 0);
+  assert.equal(declarationWordCount("   "), 0);
+  assert.equal(declarationWordCount("  I go   north  "), 3);
+  assert.equal(declarationWordCount("One."), 1);
+
+  assert.equal(tokenTrigramSet("").size, 0);
+  assert.equal(tokenTrigramSet("Hi there").size, 0, "fewer than three tokens yields no shingles");
+  assert.deepEqual([...tokenTrigramSet("Hello, world! Hello")], ["hello world hello"], "lowercase alphanumeric tokens");
+  const quick = tokenTrigramSet("the quick brown fox jumps");
+  const leaps = tokenTrigramSet("the quick brown fox leaps");
+  assert.deepEqual([...quick], ["the quick brown", "quick brown fox", "brown fox jumps"]);
+  assert.equal(trigramJaccard(quick, quick), 1, "identical sets are fully similar");
+  assert.equal(trigramJaccard(new Set(), new Set()), 0, "two empty sets share nothing");
+  assert.equal(trigramJaccard(quick, new Set()), 0);
+  assert.equal(trigramJaccard(quick, leaps), 0.5);
+  assert.equal(trigramJaccard(quick, tokenTrigramSet("one two three four")), 0, "disjoint sets score zero");
+});
+
+test("computeHumanLikeness derives the pre-registered proxies from recorded declarations", () => {
+  const long = "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier and the cold water before dark";
+  const nearLong = "I look at the ferry wreck near the old harbor light and I study the broken mast and the torn sail and the empty pier";
+  const report = computeHumanLikeness([
+    humanLikenessTurn({ turnIndex: 0, declaration: "I go north", noiseApplied: ["typo"] }),
+    humanLikenessTurn({ turnIndex: 1, declaration: "I go north" }),
+    humanLikenessTurn({ turnIndex: 2, declaration: "I ask about the boat and then I wait?", failureMode: "multi-family", ooc: "Can I still make it?" }),
+    humanLikenessTurn({ turnIndex: 3, declaration: long, failureMode: "unadvertised", noiseApplied: ["lowercase"] }),
+    humanLikenessTurn({ turnIndex: 4, declaration: nearLong, failureMode: "literal-edge" }),
+  ]);
+  assert.equal(report.turns, 5);
+  assert.equal(report.medianWords, 9);
+  assert.equal(report.p90Words, 28.6);
+  assert.equal(report.lowEffortShare, 0.4);
+  assert.equal(report.longShare, 0.2);
+  assert.equal(report.burstiness, 0.819);
+  assert.equal(report.distinct1, 0.408);
+  assert.equal(report.distinct2, 0.576);
+  assert.equal(report.nearDuplicateShare, 0.4, "the verbatim repeat and the long prefix both count");
+  assert.equal(report.verbatimReuses, 1);
+  assert.equal(report.oocShare, 0.2);
+  assert.equal(report.questionShare, 0.2);
+  assert.equal(report.noiseShare, 0.4);
+  assert.equal(report.mixedIntentShare, 0.6);
+  assert.equal(report.offMenuShare, 0.4);
+
+  assert.deepEqual(computeHumanLikeness([]), {
+    turns: 0,
+    medianWords: 0,
+    p90Words: 0,
+    lowEffortShare: 0,
+    longShare: 0,
+    burstiness: 0,
+    distinct1: 0,
+    distinct2: 0,
+    nearDuplicateShare: 0,
+    verbatimReuses: 0,
+    oocShare: 0,
+    questionShare: 0,
+    noiseShare: 0,
+    mixedIntentShare: 0,
+    offMenuShare: 0,
+  });
+});
+
+test("runs record the human-likeness report and print the near-duplicate share", async () => {
+  const manifest = await runHarnessSession(makeDryRunInput());
+  assert.equal(manifest.humanLikeness.turns, 3);
+  assert.equal(manifest.humanLikeness.turns, manifest.turns.length);
+  const summary = renderManifestSummary(manifest);
+  const block = summary.filter(line => line.includes("human-likeness:") || line.includes("near-duplicate share"));
+  assert.equal(block.length, 2, "the human-likeness block stays within three lines");
+  assert.ok(summary.some(line => line.includes("near-duplicate share")), summary.join("\n"));
 });

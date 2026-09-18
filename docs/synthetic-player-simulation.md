@@ -1,10 +1,11 @@
 # Synthetic player simulation
 
-Status: design plus the implemented v1 harness (`scripts/synthetic-player-harness.ts`, 41 tests)
-and a measured coverage audit of its first five batches. The v2 changes below
-(advertisement-guided play, world capability accounting, acted coverage) are **in progress**.
-Claims are marked **sourced** (with a link) or **proposed**; proposed numbers are internal design
-targets, not measurements. Nothing here enables a lane, writes a fixture, or re-weights a promotion
+Status: design plus the implemented v1 harness (`scripts/synthetic-player-harness.ts`) and the
+advertisement-guided v2/v2.1 generation controls (menu union, direct-cell weighting, advertised
+and acted coverage accounting, human-likeness report), with a measured SRD 5.1 batch and combat
+batch. Remaining proposals are marked **in progress** where they are not yet built. Claims are
+marked **sourced** (with a link) or **proposed**; proposed numbers are internal design targets,
+not measurements. Nothing here enables a lane, writes a fixture, or re-weights a promotion
 record. External links checked 2026-09-17; audit measured 2026-09-18.
 
 ## Why synthetic players
@@ -95,7 +96,8 @@ not just the harness:
 | --- | --- | --- |
 | `.velvet/emberwake-reach-run2` (canary) | SRD check, power, quest lifecycle, inventory, quest objective (partial), rest (conditional on spent resources) | 0 locations, 0 connections, 0 shops, 0 travel destinations, 0 NPCs — travel and commerce are impossible here |
 | `.velvet/synth-baie-comeau-2` (fresh seed, current schema) | travel, inventory, quest lifecycle, quest objective | 17 locations, 23 connections, 13 NPCs, 1 shop, 2 encounters; `velvet:mechanics-starter` content, so no SRD check or power families; rest did **not** advertise at health 11/12 |
-| `.velvet/synth-srd-1` (reviewed SRD adventure, current schema) | SRD check (24 rows from one check-flavored declaration), travel, inventory, power, quest lifecycle, quest objective | 3 locations, 2 connections, 1 NPC, SRD fighter with hit dice; goblin encounter available; `srd-5.1:starter` pinned |
+| `.velvet/synth-srd-1` (reviewed SRD adventure, current schema) | SRD check (24 rows from one check-flavored declaration), travel, inventory, power, quest lifecycle, quest objective | 3 locations, 2 connections, 1 NPC, SRD fighter with hit dice; goblin encounter available but not started; `srd-5.1:starter` pinned |
+| `.velvet/synth-srd-2` (reviewed SRD adventure, active goblin encounter) | combat power (the combat menu narrows to combat families while the encounter is active) | same reviewed world with the goblin ambush **active**; materialized with a 2020 clock so live writes stay monotonic — the fixture's default 2036 clock makes every post-materialization write fail the encounter immutability guard |
 
 The worlds are complementary and the primary/secondary split follows the user's SRD 5.1 focus:
 `.velvet/synth-srd-1` is the primary synthetic arm (SRD checks, powers, rest, inventory, quests,
@@ -175,6 +177,31 @@ declarations fewer), so a future scheduler pass should keep the recent union of 
 families rather than only the previous turn's; and the weighted matrix spends only about one in
 seven menu cells on `direct`, which gated the acted count more than the lane did — `direct` cells
 should be weighted up when the goal is harvest volume rather than matrix balance.
+
+### v2.1 generation controls and the first combat batch (2026-09-18)
+
+The two tuning notes above are implemented, plus the diversity signal the SRD reviewer flagged:
+
+- **Recent-menu union** (`--menu-window`, default 3): re-target reachability uses the deduped union
+  of the last N advertised menus; the generator prompt still sees only the latest snapshot's
+  labels, so options stay current. `--menu-window 1` reproduces the previous behavior exactly.
+- **Direct-cell weighting** (`--direct-weight`, default 1, floor 0.1): multiplies the scheduler
+  weight of `direct` cells for harvest volume. The RNG draw sequence is unchanged at 1.
+- **Human-likeness report**: every manifest now computes the proxies in
+  [Human-likeness checks](#human-likeness-checks) — word-count median/p90/low/long shares,
+  burstiness, distinct-1/2, near-duplicate share (max trigram Jaccard ≥ 0.7 against earlier
+  turns), verbatim reuse, and OOC/question/noise/mixed-intent/off-menu shares — and prints them in
+  the run summary. The reviewer's near-duplicate `tally my pack` / `waystone sword-forms` motifs
+  now have a measured signal instead of a note.
+- **First combat batch.** Two runs × 4 turns against `.velvet/synth-srd-2` with the goblin ambush
+  active: run a advertised 4/4 and acted 2/4, both matching the only advertised combat power
+  (`Second Wind`, signals 0.96 and 0.78); run b produced no L2 battery at all (rest declarations
+  and one rejected combat declaration) and the harness reported 0/4 honestly rather than
+  attributing coverage. Three turns aborted (`decision-rejected`, `awaiting-confirmation`) as game
+  outcomes, not harness failures. The two combat-power acts were confirmed by review and merged
+  with the new harvest CLI `--merge-fixture` flag (corpus 94; 93 agent-reviewed + 1 human).
+  Human-likeness on the small batch: near-duplicate share 0, distinct-1 0.67–0.68, burstiness
+  0.27–0.37.
 
 ## Method survey
 

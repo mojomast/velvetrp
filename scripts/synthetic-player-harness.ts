@@ -902,7 +902,14 @@ export type CoverageSchedulerOptions = {
   baseFamilyWeight?: number;
   /** Weight for families inside `persona.mechanicsBias`. */
   biasFamilyWeight?: number;
+  /** Multiplier for `direct` cells, used to raise harvest volume (default 1, minimum 0.1). */
+  directWeight?: number;
 };
+
+/** Default scheduler multiplier for direct-failure cells. */
+export const DEFAULT_DIRECT_WEIGHT = 1;
+/** Floor for `directWeight`; below this a direct cell would be nearly unreachable. */
+export const MIN_DIRECT_WEIGHT = 0.1;
 
 function cellKey(family: MechanicFamily, failureMode: FailureMode): string {
   return `${family}/${failureMode}`;
@@ -912,15 +919,19 @@ function cellKey(family: MechanicFamily, failureMode: FailureMode): string {
 export function coverageWeight(
   persona: PersonaDefinition | null,
   cell: CoverageCell,
-  options: { baseFamilyWeight?: number; biasFamilyWeight?: number } = {},
+  options: { baseFamilyWeight?: number; biasFamilyWeight?: number; directWeight?: number } = {},
 ): number {
   const base = options.baseFamilyWeight ?? 1;
   const bias = options.biasFamilyWeight ?? 3;
+  const directWeight = options.directWeight ?? DEFAULT_DIRECT_WEIGHT;
   if (!(base > 0) || !(bias > 0)) throw new Error("coverage family weights must be positive");
+  if (!Number.isFinite(directWeight) || directWeight < MIN_DIRECT_WEIGHT) {
+    throw new Error(`directWeight must be a finite number >= ${MIN_DIRECT_WEIGHT}`);
+  }
   const familyWeight = persona && persona.mechanicsBias.includes(cell.family) ? bias : base;
   const failureWeight = persona ? persona.failureAffinity[cell.failureMode] : 1;
   if (!(familyWeight > 0) || !(failureWeight > 0)) throw new Error("coverage weight must be positive");
-  return familyWeight * failureWeight;
+  return familyWeight * failureWeight * (cell.failureMode === "direct" ? directWeight : 1);
 }
 
 function validateCoverageTargets(targets: CoverageTargets): void {
@@ -947,6 +958,7 @@ export class CoverageScheduler {
   readonly #persona: PersonaDefinition | null;
   readonly #baseFamilyWeight: number;
   readonly #biasFamilyWeight: number;
+  readonly #directWeight: number;
   readonly #totalTarget: number;
   readonly #planned = new Map<string, number>();
   readonly #achieved = new Map<string, number>();
@@ -958,8 +970,12 @@ export class CoverageScheduler {
     this.#persona = options.persona ?? null;
     this.#baseFamilyWeight = options.baseFamilyWeight ?? 1;
     this.#biasFamilyWeight = options.biasFamilyWeight ?? 3;
+    this.#directWeight = options.directWeight ?? DEFAULT_DIRECT_WEIGHT;
     validateCoverageTargets(this.targets);
     if (!(this.#baseFamilyWeight > 0) || !(this.#biasFamilyWeight > 0)) throw new Error("coverage family weights must be positive");
+    if (!Number.isFinite(this.#directWeight) || this.#directWeight < MIN_DIRECT_WEIGHT) {
+      throw new Error(`directWeight must be a finite number >= ${MIN_DIRECT_WEIGHT}`);
+    }
     let total = 0;
     for (const family of MECHANIC_FAMILIES) for (const mode of FAILURE_MODES) total += this.targets[family][mode];
     this.#totalTarget = total;
@@ -1055,7 +1071,7 @@ export class CoverageScheduler {
       for (const mode of FAILURE_MODES) {
         const cell: CoverageCell = { family, failureMode: mode };
         if (this.remainingFor(cell) <= 0) continue;
-        candidates.push({ cell, weight: coverageWeight(this.#persona, cell, { baseFamilyWeight: this.#baseFamilyWeight, biasFamilyWeight: this.#biasFamilyWeight }) });
+        candidates.push({ cell, weight: coverageWeight(this.#persona, cell, { baseFamilyWeight: this.#baseFamilyWeight, biasFamilyWeight: this.#biasFamilyWeight, directWeight: this.#directWeight }) });
       }
     }
     return candidates;
@@ -1312,6 +1328,8 @@ export type PlanRunInput = {
   turns: number;
   targets?: CoverageTargets;
   scheduler?: CoverageScheduler;
+  /** Multiplier for `direct` cells (default 1, minimum 0.1). */
+  directWeight?: number;
 };
 
 const LOW_EFFORT_BY_VERBOSITY: Readonly<Record<Verbosity, number>> = {
@@ -1373,6 +1391,7 @@ export function planRun(input: PlanRunInput): RunPlan {
   const scheduler = input.scheduler ?? new CoverageScheduler({
     ...(input.targets ? { targets: input.targets } : {}),
     persona: input.persona,
+    ...(input.directWeight !== undefined ? { directWeight: input.directWeight } : {}),
   });
   const rng = createRng(`${input.runSeed}:schedule`);
   const turns: PlannedTurn[] = [];
@@ -1712,6 +1731,177 @@ export type HarnessTargetSwap = {
   to: CoverageCell;
 };
 
+// -------------------------------------------------------------------------------------------------
+// Human-likeness proxies: offline red flags from the design doc, never a humanness gate
+// -------------------------------------------------------------------------------------------------
+
+/** Trigram Jaccard at or above this value counts as a near-duplicate declaration. */
+export const NEAR_DUPLICATE_JACCARD = 0.7;
+
+/** Pre-registered stylometric checklist computed from the declarations a run actually sent. */
+export type HumanLikenessReport = {
+  turns: number;
+  medianWords: number;
+  p90Words: number;
+  /** Share of declarations with <= 5 words. */
+  lowEffortShare: number;
+  /** Share of declarations with >= 30 words. */
+  longShare: number;
+  /** Coefficient of variation of declaration word counts. */
+  burstiness: number;
+  /** Unique unigrams over total unigrams across all declarations. */
+  distinct1: number;
+  /** Unique bigrams over total bigrams across all declarations. */
+  distinct2: number;
+  /** Share of declarations whose max trigram Jaccard against any earlier turn is >= 0.7. */
+  nearDuplicateShare: number;
+  /** Declarations exactly reused from an earlier turn (trimmed comparison). */
+  verbatimReuses: number;
+  oocShare: number;
+  questionShare: number;
+  noiseShare: number;
+  mixedIntentShare: number;
+  offMenuShare: number;
+};
+
+/** Words per declaration: whitespace-separated tokens after trimming. */
+export function declarationWordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+/** Lowercase alphanumeric tokens; punctuation is a separator. */
+function alphanumericTokens(text: string): string[] {
+  return text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+}
+
+/**
+ * Set of 3-token shingles over lowercase alphanumeric tokens. Declarations with fewer than three
+ * tokens (including empty text) yield an empty set.
+ */
+export function tokenTrigramSet(text: string): Set<string> {
+  const tokens = alphanumericTokens(text);
+  const shingles = new Set<string>();
+  for (let index = 0; index + 2 < tokens.length; index += 1) {
+    shingles.add(`${tokens[index]} ${tokens[index + 1]} ${tokens[index + 2]}`);
+  }
+  return shingles;
+}
+
+/** Jaccard similarity of two shingle sets; two empty sets share nothing and score 0. */
+export function trigramJaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let intersection = 0;
+  for (const shingle of small) {
+    if (large.has(shingle)) intersection += 1;
+  }
+  return intersection / (a.size + b.size - intersection);
+}
+
+/** Straightforward 3-decimal rounding so manifests stay byte-stable. */
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** Linear-interpolation percentile (R-7) over ascending values. */
+function percentile(sorted: readonly number[], q: number): number {
+  if (sorted.length === 0) return 0;
+  const position = q * (sorted.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return sorted[lower] as number;
+  const fraction = position - lower;
+  return (sorted[lower] as number) * (1 - fraction) + (sorted[upper] as number) * fraction;
+}
+
+/** Substrings that mark a declaration as carrying more than one intent. */
+const MIXED_INTENT_MARKERS = [" and ", " then ", "; ", " but "] as const;
+
+/**
+ * Computes the design doc's measurable human-likeness proxies over the declarations a run actually
+ * sent. Shares and ratios are rounded to 3 decimals; this is a review checklist, not a score.
+ */
+export function computeHumanLikeness(turns: readonly HarnessTurnRecord[]): HumanLikenessReport {
+  const count = turns.length;
+  const wordCounts = turns.map(turn => declarationWordCount(turn.declaration));
+  const sortedCounts = [...wordCounts].sort((a, b) => a - b);
+  const mean = count === 0 ? 0 : wordCounts.reduce((sum, value) => sum + value, 0) / count;
+  let variance = 0;
+  if (count > 0) {
+    for (const value of wordCounts) variance += (value - mean) ** 2;
+    variance /= count;
+  }
+  const burstiness = mean > 0 ? Math.sqrt(variance) / mean : 0;
+
+  const unigrams: string[] = [];
+  const bigrams: string[] = [];
+  const trigrams: Set<string>[] = [];
+  const trimmedDeclarations: string[] = [];
+  for (const turn of turns) {
+    const tokens = alphanumericTokens(turn.declaration);
+    unigrams.push(...tokens);
+    for (let index = 0; index + 1 < tokens.length; index += 1) {
+      bigrams.push(`${tokens[index]} ${tokens[index + 1]}`);
+    }
+    trigrams.push(tokenTrigramSet(turn.declaration));
+    trimmedDeclarations.push(turn.declaration.trim());
+  }
+  const distinct1 = unigrams.length === 0 ? 0 : new Set(unigrams).size / unigrams.length;
+  const distinct2 = bigrams.length === 0 ? 0 : new Set(bigrams).size / bigrams.length;
+
+  let nearDuplicates = 0;
+  let verbatimReuses = 0;
+  let questions = 0;
+  let ooc = 0;
+  let noise = 0;
+  let mixedIntent = 0;
+  let offMenu = 0;
+  const seenDeclarations = new Set<string>();
+  for (let index = 0; index < count; index += 1) {
+    const turn = turns[index] as HarnessTurnRecord;
+    const lower = turn.declaration.toLowerCase();
+    if (turn.declaration.includes("?")) questions += 1;
+    if (turn.ooc !== null && turn.ooc.trim().length > 0) ooc += 1;
+    if (turn.noiseApplied.length > 0) noise += 1;
+    if (MIXED_INTENT_MARKERS.some(marker => lower.includes(marker))) mixedIntent += 1;
+    if (isOffMenuFailureMode(turn.target.failureMode)) offMenu += 1;
+
+    const trimmed = trimmedDeclarations[index] as string;
+    if (seenDeclarations.has(trimmed)) verbatimReuses += 1;
+    else seenDeclarations.add(trimmed);
+    if (index > 0) {
+      const shingles = trigrams[index] as Set<string>;
+      let maxSimilarity = 0;
+      for (let earlier = 0; earlier < index; earlier += 1) {
+        const similarity = trigramJaccard(shingles, trigrams[earlier] as Set<string>);
+        if (similarity > maxSimilarity) maxSimilarity = similarity;
+        if (maxSimilarity >= NEAR_DUPLICATE_JACCARD) break;
+      }
+      if (maxSimilarity >= NEAR_DUPLICATE_JACCARD) nearDuplicates += 1;
+    }
+  }
+
+  const share = (numerator: number): number => count === 0 ? 0 : round3(numerator / count);
+  return {
+    turns: count,
+    medianWords: round3(percentile(sortedCounts, 0.5)),
+    p90Words: round3(percentile(sortedCounts, 0.9)),
+    lowEffortShare: share(wordCounts.filter(value => value <= 5).length),
+    longShare: share(wordCounts.filter(value => value >= 30).length),
+    burstiness: round3(burstiness),
+    distinct1: round3(distinct1),
+    distinct2: round3(distinct2),
+    nearDuplicateShare: share(nearDuplicates),
+    verbatimReuses,
+    oocShare: share(ooc),
+    questionShare: share(questions),
+    noiseShare: share(noise),
+    mixedIntentShare: share(mixedIntent),
+    offMenuShare: share(offMenu),
+  };
+}
+
 export type HarnessManifest = {
   harnessVersion: string;
   personaVersion: string;
@@ -1731,6 +1921,12 @@ export type HarnessManifest = {
   /** Re-targeting records, in turn order; empty when every planned cell stayed on plan. */
   targetSwaps: HarnessTargetSwap[];
   coverage: CoverageReport;
+  /** Recent-menu window used for re-targeting (clamped 1..10). */
+  menuWindow: number;
+  /** Union of the families advertised across the recent-menu window, oldest advertisement first. */
+  menuUnionFamilies: MechanicFamily[];
+  /** Offline human-likeness proxies computed from the recorded declarations. */
+  humanLikeness: HumanLikenessReport;
   state: HarnessRunState;
   notes: string[];
 };
@@ -2443,6 +2639,22 @@ export function materializeTurn(raw: unknown, context: TurnMaterializationContex
 
 export type SubmitTurnFn = (input: { turnIndex: number; declaration: string; turnSeed: string; idempotencyKey: string }) => Promise<TurnOutcome>;
 
+/** Default number of recent advertisement snapshots unioned for re-targeting. */
+export const DEFAULT_MENU_WINDOW = 3;
+/** Smallest recent-menu window; `1` means latest snapshot only. */
+export const MIN_MENU_WINDOW = 1;
+/** Largest recent-menu window. */
+export const MAX_MENU_WINDOW = 10;
+
+/**
+ * Clamps a requested recent-menu window to an integer in [1, 10]. Non-finite input (including
+ * `undefined`) falls back to `DEFAULT_MENU_WINDOW`.
+ */
+export function normalizeMenuWindow(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return DEFAULT_MENU_WINDOW;
+  return Math.min(MAX_MENU_WINDOW, Math.max(MIN_MENU_WINDOW, Math.trunc(value)));
+}
+
 export type HarnessSessionInput = {
   runId: string;
   runSeed: string;
@@ -2467,6 +2679,13 @@ export type HarnessSessionInput = {
   notes: readonly string[];
   referenceBudget: number;
   transcriptWindow: number;
+  /**
+   * Rolling window of recent advertisement snapshots whose families are unioned for re-targeting.
+   * Clamped integer 1..10; default 3. `1` reproduces latest-snapshot-only behavior.
+   */
+  menuWindow?: number;
+  /** Multiplier for `direct` cells in the coverage plan (default 1, minimum 0.1). */
+  directWeight?: number;
   /**
    * Optional read-only advertisement reader. Defaults to `readTurnAdvertisements` when `dataDir`
    * is non-null, and to no reader (null snapshots) otherwise.
@@ -2523,8 +2742,10 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     persona: input.persona,
     turns: input.turns,
     ...(input.targets ? { targets: input.targets } : {}),
+    ...(input.directWeight !== undefined ? { directWeight: input.directWeight } : {}),
   });
   if (plan.truncated) notes.push(`coverage targets exhausted after ${plan.turns.length} of ${input.turns} requested turns`);
+  const menuWindow = normalizeMenuWindow(input.menuWindow);
 
   const turns: HarnessTurnRecord[] = [];
   let transcript: TranscriptTurn[] = [...input.transcript];
@@ -2539,41 +2760,64 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
   let previousAdvertisements: TurnAdvertisementSnapshot | null = null;
   let pendingPlannedTarget: CoverageCell | undefined;
   const latestAdvertisements = (): TurnAdvertisementSnapshot | null => previousAdvertisements;
+  /** Last `menuWindow` readable snapshots' families, oldest first; an unreadable snapshot clears it. */
+  const menuHistory: MechanicFamily[][] = [];
+  const menuUnion = (): MechanicFamily[] => {
+    const seen = new Set<MechanicFamily>();
+    const union: MechanicFamily[] = [];
+    for (const families of menuHistory) {
+      for (const family of families) {
+        if (seen.has(family)) continue;
+        seen.add(family);
+        union.push(family);
+      }
+    }
+    return union;
+  };
 
   /**
-   * Reads the finished turn's advertisement snapshot, records it on the turn, and feeds the
-   * advertised/acted counters. A missing snapshot leaves the counters untouched.
+   * Reads the finished turn's advertisement snapshot, records it on the turn, pushes its families
+   * into the recent-menu window, and feeds the advertised/acted counters. A missing snapshot clears
+   * the window: an unreadable menu fails soft instead of reaching back to stale families.
    */
   const processAdvertisements = (record: HarnessTurnRecord, executed: CoverageCell): void => {
     if (readAdvertisements === null) return;
     const snapshot = readAdvertisements(record.turnId ?? "");
     record.advertisements = snapshot;
     previousAdvertisements = snapshot;
-    if (snapshot === null) return;
+    if (snapshot === null) {
+      menuHistory.length = 0;
+      return;
+    }
+    menuHistory.push([...snapshot.families]);
+    if (menuHistory.length > menuWindow) menuHistory.splice(0, menuHistory.length - menuWindow);
     if (snapshot.families.includes(executed.family)) plan.scheduler.recordAdvertised(executed);
     const selectedFamily = snapshot.selectedKind === null ? null : KIND_TO_FAMILY[snapshot.selectedKind] ?? null;
     if (selectedFamily !== null && selectedFamily === executed.family) plan.scheduler.recordActed(executed);
   };
 
   /**
-   * Advertisement-guided re-targeting: when the upcoming planned cell's family is not on the
-   * advertised menu and a remaining cell in an advertised family exists, release the planned
-   * cell and reserve the reachable one. The swap is keyed off a run-scoped RNG derived from the
-   * run seed and the upcoming turn index, so a replay of the same decisions is deterministic.
+   * Advertisement-guided re-targeting: when the upcoming planned cell's family is not in the recent
+   * menu union and a remaining cell in a union family exists, release the planned cell and reserve
+   * the reachable one. The union (not just the latest snapshot) keeps declaration-driven families
+   * reachable across turns whose declarations advertised fewer rows. The swap is keyed off a
+   * run-scoped RNG derived from the run seed and the upcoming turn index, so a replay of the same
+   * decisions is deterministic. With `menuWindow = 1` the union is the latest snapshot alone,
+   * which is the original latest-snapshot-only behavior.
    */
   const retargetNextTurn = (nextIndex: number): void => {
-    const snapshot = latestAdvertisements();
-    if (snapshot === null || snapshot.families.length === 0) return;
+    const union = menuUnion();
+    if (union.length === 0) return;
     const upcoming = plan.turns[nextIndex];
     if (upcoming === undefined) return;
-    if (snapshot.families.includes(upcoming.target.family)) return;
-    const reachable = snapshot.families.some(family =>
+    if (union.includes(upcoming.target.family)) return;
+    const reachable = union.some(family =>
       FAILURE_MODES.some(mode => plan.scheduler.remainingFor({ family, failureMode: mode }) > 0));
     if (!reachable) return;
     const original: CoverageCell = { ...upcoming.target };
     plan.scheduler.release(original);
     const swapRng = createRng(`${input.runSeed}:retarget:${upcoming.turnIndex}`);
-    const replacement = plan.scheduler.next(swapRng, { advertisedFamilies: snapshot.families });
+    const replacement = plan.scheduler.next(swapRng, { advertisedFamilies: union });
     if (replacement === null) return;
     upcoming.target = replacement;
     upcoming.toolKind = FAMILY_TOOL_KINDS[replacement.family];
@@ -2760,6 +3004,9 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
     turns,
     targetSwaps,
     coverage: plan.scheduler.report(),
+    menuWindow,
+    menuUnionFamilies: menuUnion(),
+    humanLikeness: computeHumanLikeness(turns),
     state,
     notes,
   };
@@ -2786,6 +3033,8 @@ export type HarnessCliOptions = {
   maxConfirmationRounds: number;
   dataDir: string | null;
   contentProfile: string | null;
+  menuWindow: number;
+  directWeight: number;
   help: boolean;
 };
 
@@ -2816,6 +3065,8 @@ export function harnessUsage(): string {
     "  --max-confirmation-rounds <n>  Confirmation batches handled per turn (default 5).",
     "  --data-dir <path>        SQLite data directory for read-only advertisement reads (default VELVET_DATA_DIR).",
     "  --content-profile <token>  Content profile the run exercised, recorded in the manifest (default null).",
+    `  --menu-window <n>        Recent advertisement snapshots unioned for re-targeting (default ${DEFAULT_MENU_WINDOW}, range ${MIN_MENU_WINDOW}..${MAX_MENU_WINDOW}).`,
+    `  --direct-weight <n>      Multiplier for direct-failure cells in the plan (default ${DEFAULT_DIRECT_WEIGHT}, minimum ${MIN_DIRECT_WEIGHT}).`,
     "  --dry-run                Use the deterministic fake generator; never touch the network.",
     "  --help, -h               Print this text.",
     "",
@@ -2842,6 +3093,14 @@ function parseIntegerFlag(value: string, flag: string, min: number, max: number)
   return parsed;
 }
 
+function parseDirectWeightFlag(value: string, flag: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < MIN_DIRECT_WEIGHT) {
+    throw new Error(`${flag} must be a number >= ${MIN_DIRECT_WEIGHT}`);
+  }
+  return parsed;
+}
+
 export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv = process.env): HarnessCliOptions {
   let turns = DEFAULT_TURNS;
   let personas: PersonaArchetype[] = [...PERSONA_ARCHETYPES];
@@ -2859,6 +3118,8 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   let maxConfirmationRounds = 5;
   let dataDir: string | null = env.VELVET_DATA_DIR?.trim() || null;
   let contentProfile: string | null = null;
+  let menuWindow = DEFAULT_MENU_WINDOW;
+  let directWeight = DEFAULT_DIRECT_WEIGHT;
   let help = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -2965,6 +3226,18 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
         index = taken.nextIndex;
         break;
       }
+      case "--menu-window": {
+        const taken = takeValue(argv, index, inline, flag);
+        menuWindow = parseIntegerFlag(taken.value, flag, MIN_MENU_WINDOW, MAX_MENU_WINDOW);
+        index = taken.nextIndex;
+        break;
+      }
+      case "--direct-weight": {
+        const taken = takeValue(argv, index, inline, flag);
+        directWeight = parseDirectWeightFlag(taken.value, flag);
+        index = taken.nextIndex;
+        break;
+      }
       case "--dry-run": {
         if (inline !== null) throw new Error("--dry-run does not take a value");
         dryRun = true;
@@ -2989,7 +3262,7 @@ export function parseHarnessArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   }
   if (!(["http:", "https:"] as string[]).includes(parsedBase.protocol)) throw new Error("--api-base-url must be an HTTP(S) URL");
   baseUrl = parsedBase.toString().replace(/\/+$/, "");
-  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, help };
+  return { turns, personas, seed, runs, campaignId, sessionIds, actorId, out, dryRun, syntheticTag, runId, sheetSummary, baseUrl, maxConfirmationRounds, dataDir, contentProfile, menuWindow, directWeight, help };
 }
 
 export type HarnessCliIo = {
@@ -3030,6 +3303,14 @@ export function renderManifestSummary(manifest: HarnessManifest): string[] {
   const share = (count: number): string => turnCount === 0 ? "n/a" : `${Math.round((count / turnCount) * 100)}%`;
   lines.push(`advertised: ${totals.advertisedTotal}/${turnCount} (${share(totals.advertisedTotal)})`);
   lines.push(`acted: ${totals.actedTotal}/${turnCount} (${share(totals.actedTotal)})`);
+  if (manifest.menuWindow > 1) {
+    const union = manifest.menuUnionFamilies.length > 0 ? manifest.menuUnionFamilies.join(", ") : "(none)";
+    lines.push(`menu window: last ${manifest.menuWindow} advertised snapshots; union families: ${union}`);
+  }
+  const human = manifest.humanLikeness;
+  const humanPct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+  lines.push(`human-likeness: ${human.turns} turns, median ${human.medianWords} words, p90 ${human.p90Words}, low-effort ${humanPct(human.lowEffortShare)}, long ${humanPct(human.longShare)}, burstiness ${human.burstiness}, distinct-1 ${human.distinct1}, distinct-2 ${human.distinct2}`);
+  lines.push(`  near-duplicate share ${human.nearDuplicateShare} (max trigram Jaccard >= ${NEAR_DUPLICATE_JACCARD}), verbatim reuses ${human.verbatimReuses}, OOC ${humanPct(human.oocShare)}, questions ${humanPct(human.questionShare)}, noise ${humanPct(human.noiseShare)}, mixed intent ${humanPct(human.mixedIntentShare)}, off-menu ${humanPct(human.offMenuShare)}`);
   return lines;
 }
 
@@ -3138,6 +3419,8 @@ export async function runHarnessCli(
       notes,
       referenceBudget: 3,
       transcriptWindow: 6,
+      menuWindow: options.menuWindow,
+      directWeight: options.directWeight,
     });
 
     for (const line of renderManifestSummary(manifest)) io.out(line);

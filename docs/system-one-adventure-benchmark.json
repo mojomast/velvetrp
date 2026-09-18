@@ -8991,6 +8991,27 @@
       "harvestBucket": "agent"
     },
     {
+      "id": "harvested:6b8359ca620b",
+      "category": "harvested",
+      "declaration": "i'll set the extra-action trick aside for a moment and just use my second wind to steady myself, then see where that leaves me.",
+      "candidates": [
+        {
+          "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+          "digest": "c037239658b1559935d13e473ba8758b03e37f8956ae155d0ade2cc062fb1777",
+          "kind": "exact_combat_power.select",
+          "label": "Use combat power: Second Wind → Aster Vale"
+        }
+      ],
+      "expected": {
+        "preferred": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+        "acceptable": [
+          "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
       "id": "harvested:6ef5508ce70e",
       "category": "harvested",
       "declaration": "I keep to the stonier fork and climb until the wind cuts clean across the ridge, then halt exactly where the crow's-beak line of the old map crosses the marker stone's bearing. I read the ground against the map — the packed ash, the bent grass, the run of black rock — and I test the slope with my staff, tapping ahdead of me before I trust it, watching for any cairn or cut in the rock that says someone has walked this way before. If the ridge is lying abuot which way the crest runs, I mean to catch it before the wind does, and take the higher ground only when the ground confesses the line is true.",
@@ -12693,6 +12714,27 @@
         "preferred": null,
         "acceptable": [
           null
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
+      "id": "harvested:ad10f3fc27d7",
+      "category": "harvested",
+      "declaration": "Aster Vale plants his feet, breathes deep, and uses Second Wind—he's not done yet.",
+      "candidates": [
+        {
+          "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+          "digest": "f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6f8d8d8e207d10b06",
+          "kind": "exact_combat_power.select",
+          "label": "Use combat power: Second Wind → Aster Vale"
+        }
+      ],
+      "expected": {
+        "preferred": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+        "acceptable": [
+          "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
         ]
       },
       "holdout": false,
@@ -19701,33 +19743,67 @@
       "harvestBucket": "agent"
     }
   ],
-  "samples": 366,
-  "harvestedCases": 92,
+  "samples": 372,
+  "harvestedCases": 94,
   "harvestedHumanCases": 1,
-  "agentHarvestedCases": 91,
+  "agentHarvestedCases": 93,
   "agentHarvested": {
-    "cases": 91,
-    "calls": 273,
-    "acted": 0,
-    "actedCorrect": 0,
-    "actedAccuracy": 0,
-    "exact": 231,
-    "correct": 231,
-    "accuracy": 0.8461538461538461,
+    "cases": 93,
+    "calls": 279,
+    "acted": 3,
+    "actedCorrect": 3,
+    "actedAccuracy": 1,
+    "exact": 234,
+    "correct": 234,
+    "accuracy": 0.8387096774193549,
     "note": "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record"
   },
   "harvest": {
     "fixture": "server/test/fixtures/system-one-harvested/adventure-selection.json",
     "present": true,
-    "confirmed": 92,
+    "confirmed": 94,
     "skipped": 0,
-    "cases": 92,
+    "cases": 94,
     "humanCases": 1,
-    "agentCases": 91,
+    "agentCases": 93,
     "warning": null
   },
   "failures": [],
   "readouts": [
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.57,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
     {
       "id": "direct-travel-mill",
       "category": "direct-match",
@@ -19744,40 +19820,6 @@
       "correct": false,
       "topSignal": 0.48,
       "reason": "deferred (fallback); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-mill",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:mill-01",
-      "acceptable": [
-        "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.51,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-mill",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:mill-01",
-      "acceptable": [
-        "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.59,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
       "id": "direct-travel-harbor",
@@ -19810,7 +19852,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.44,
       "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
     },
     {
@@ -19827,7 +19869,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.41,
+      "topSignal": 0.43,
       "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
     },
     {
@@ -19844,7 +19886,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.51,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -19857,130 +19899,130 @@
       "candidateId": "check:climb-05",
       "acceptable": [
         "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.51,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.8,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.79,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-commerce-rope",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-07",
+      "candidateId": "shop:buy-rope-07",
+      "acceptable": [
+        "shop:buy-rope-07"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.77,
+      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.48,
+      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
-      "id": "direct-check-climb",
+      "id": "direct-quest-accept",
       "category": "direct-match",
-      "holdout": false,
+      "holdout": true,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "check:climb-05",
+      "candidateId": "quest:accept-harbor-09",
       "acceptable": [
-        "check:climb-05"
+        "quest:accept-harbor-09"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
-    },
-    {
-      "id": "direct-commerce-rope",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-07",
-      "candidateId": "shop:buy-rope-07",
-      "acceptable": [
-        "shop:buy-rope-07"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.78,
-      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
-    },
-    {
-      "id": "direct-commerce-rope",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-07",
-      "candidateId": "shop:buy-rope-07",
-      "acceptable": [
-        "shop:buy-rope-07"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.79,
-      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
-    },
-    {
-      "id": "direct-commerce-rope",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-07",
-      "candidateId": "shop:buy-rope-07",
-      "acceptable": [
-        "shop:buy-rope-07"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.79,
-      "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.51,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.51,
-      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.51,
       "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
@@ -19997,7 +20039,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.63,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20031,7 +20073,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.62,
+      "topSignal": 0.65,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
     },
     {
@@ -20048,7 +20090,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.52,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -20065,7 +20107,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.55,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -20099,7 +20141,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:watchtower-16",
+      "acceptable": [
+        "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -20120,23 +20179,6 @@
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
-      "id": "ambig-travel-watchtower",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:watchtower-16",
-      "acceptable": [
-        "travel:watchtower-16"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
-    },
-    {
       "id": "ambig-travel-two-roads",
       "category": "ambiguous",
       "holdout": false,
@@ -20207,24 +20249,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.67,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
-    },
-    {
-      "id": "ambig-power-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power:mending-bryn-19",
-      "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.66,
       "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
     },
     {
@@ -20245,6 +20270,23 @@
       "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
     },
     {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
       "id": "ambig-combat-power-target",
       "category": "ambiguous",
       "holdout": true,
@@ -20258,7 +20300,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.62,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
     },
     {
@@ -20292,7 +20334,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.62,
+      "topSignal": 0.61,
       "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
     },
     {
@@ -20309,7 +20351,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.7,
+      "topSignal": 0.67,
       "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
@@ -20326,7 +20368,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.68,
+      "topSignal": 0.71,
       "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
@@ -20343,7 +20385,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.7,
+      "topSignal": 0.69,
       "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
@@ -20394,7 +20436,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
@@ -20411,7 +20453,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.58,
+      "topSignal": 0.57,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -20428,7 +20470,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -20445,7 +20487,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.58,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -20462,7 +20504,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.46,
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
@@ -20479,7 +20521,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.45,
+      "topSignal": 0.44,
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
@@ -20496,7 +20538,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.42,
+      "topSignal": 0.46,
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
@@ -20530,7 +20572,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -20547,42 +20589,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
-    },
-    {
-      "id": "multi-commerce-vs-inventory",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-33",
-      "candidateId": "shop:buy-rope-33",
-      "acceptable": [
-        "shop:buy-rope-33"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.77,
-      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
-    },
-    {
-      "id": "multi-commerce-vs-inventory",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "act",
-      "method": "choice",
-      "selected": "shop:buy-rope-33",
-      "candidateId": "shop:buy-rope-33",
-      "acceptable": [
-        "shop:buy-rope-33"
-      ],
-      "selectedCorrect": true,
-      "deferred": false,
-      "correct": true,
-      "topSignal": 0.78,
-      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
       "id": "multi-commerce-vs-inventory",
@@ -20602,6 +20610,40 @@
       "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.8,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
+      "id": "multi-commerce-vs-inventory",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "shop:buy-rope-33",
+      "candidateId": "shop:buy-rope-33",
+      "acceptable": [
+        "shop:buy-rope-33"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.81,
+      "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
+    },
+    {
       "id": "multi-power-vs-rest",
       "category": "multi-family",
       "holdout": true,
@@ -20615,7 +20657,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.52,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
@@ -20649,25 +20691,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
-    },
-    {
-      "id": "multi-combat-vs-power",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-wolf-37",
-      "acceptable": [
-        "combat:firebolt-wolf-37"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.6,
-      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
       "id": "multi-combat-vs-power",
@@ -20684,6 +20709,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
@@ -21533,7 +21575,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.55,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -21550,7 +21592,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.63,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -21567,7 +21609,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.63,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -21890,24 +21932,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.25,
-      "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
-    },
-    {
-      "id": "harvested:21809db95252",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365",
-      "acceptable": [
-        "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.24,
+      "topSignal": 0.22,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -21928,89 +21953,72 @@
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
-      "id": "harvested:21db70ab1dba",
+      "id": "harvested:21809db95252",
       "category": "harvested",
       "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365",
       "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:21db70ab1dba",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:21db70ab1dba",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2292dac40705",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1",
-      "acceptable": [
-        "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
+        "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.42,
-      "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
+      "topSignal": 0.24,
+      "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
-      "id": "harvested:2292dac40705",
+      "id": "harvested:21db70ab1dba",
       "category": "harvested",
       "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1",
+      "candidateId": null,
       "acceptable": [
-        "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
+        null
       ],
-      "selectedCorrect": false,
+      "selectedCorrect": true,
       "deferred": true,
-      "correct": false,
-      "topSignal": 0.42,
-      "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:21db70ab1dba",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:21db70ab1dba",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
       "id": "harvested:2292dac40705",
@@ -22030,2094 +22038,2179 @@
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
-      "id": "harvested:22a75d63ff9d",
+      "id": "harvested:2292dac40705",
       "category": "harvested",
       "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1",
       "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:22a75d63ff9d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:22a75d63ff9d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:25dc8a20a935",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:25dc8a20a935",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:25dc8a20a935",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a2221ccc772",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a2221ccc772",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a2221ccc772",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a99c91d232c",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a99c91d232c",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2a99c91d232c",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2f407755c4c2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2f407755c4c2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:2f407755c4c2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:30e85dce62a7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:30e85dce62a7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:30e85dce62a7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38c1efae5452",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38c1efae5452",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38c1efae5452",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38f48e37c916",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38f48e37c916",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:38f48e37c916",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3ac1630d0dc9",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
-      "acceptable": [
-        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
+        "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
-      "id": "harvested:3ac1630d0dc9",
+      "id": "harvested:2292dac40705",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
-      "acceptable": [
-        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
-    },
-    {
-      "id": "harvested:3ac1630d0dc9",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
-      "acceptable": [
-        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
-    },
-    {
-      "id": "harvested:3b8fd99efe8a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3b8fd99efe8a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3b8fd99efe8a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d1b3a8ec7b5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d1b3a8ec7b5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d1b3a8ec7b5",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d2cb0327352",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d2cb0327352",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3d2cb0327352",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3f8d71417d38",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3f8d71417d38",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:3f8d71417d38",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:414b2795770d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:414b2795770d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:414b2795770d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:48fb7232352a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:48fb7232352a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:48fb7232352a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4bfc6b4ad740",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4bfc6b4ad740",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4bfc6b4ad740",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4c0911234b39",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4c0911234b39",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4c0911234b39",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4ceb482981df",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4ceb482981df",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:4ceb482981df",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50144e777c5d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50144e777c5d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50144e777c5d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50885adc8a9a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50885adc8a9a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:50885adc8a9a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:51c7db5efd8d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:51c7db5efd8d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:51c7db5efd8d",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:62684602d7e6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:643d8f61c4c6",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.63,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.62,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:649f071cf0e1",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:66711ff7099e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:6ef5508ce70e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
-      "acceptable": [
-        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
-    },
-    {
-      "id": "harvested:6ef5508ce70e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
-      "acceptable": [
-        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
-    },
-    {
-      "id": "harvested:6ef5508ce70e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
-      "acceptable": [
-        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:74cbab9ca6f0",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
-      "acceptable": [
-        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.56,
-      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
-    },
-    {
-      "id": "harvested:74cbab9ca6f0",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
-      "acceptable": [
-        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.53,
-      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
-    },
-    {
-      "id": "harvested:74cbab9ca6f0",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
-      "acceptable": [
-        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
-    },
-    {
-      "id": "harvested:787b57d44cdc",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:787b57d44cdc",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:787b57d44cdc",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7bc78db301fd",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:7e1b86a0ed87",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:812ec5a90895",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:846cec6d7815",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8726afca6973",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
-    },
-    {
-      "id": "harvested:8726afca6973",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
-    },
-    {
-      "id": "harvested:8726afca6973",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8b7843704f48",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:8c3a66c3946f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:92970b2d312b",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:92970b2d312b",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:92970b2d312b",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:95f80eb4a1b7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:95f80eb4a1b7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:95f80eb4a1b7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99038ff406e7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99038ff406e7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99038ff406e7",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99b6c41a65b2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99b6c41a65b2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:99b6c41a65b2",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": null,
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:9b128c65af8f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
-      "acceptable": [
-        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.34,
-      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
-    },
-    {
-      "id": "harvested:9b128c65af8f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
-      "acceptable": [
-        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.35,
-      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
-    },
-    {
-      "id": "harvested:9b128c65af8f",
-      "category": "harvested",
-      "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
+      "candidateId": "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1",
       "acceptable": [
-        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
+        "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.38,
+      "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
+    },
+    {
+      "id": "harvested:22a75d63ff9d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:22a75d63ff9d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:22a75d63ff9d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:25dc8a20a935",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:25dc8a20a935",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:25dc8a20a935",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a2221ccc772",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a2221ccc772",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a2221ccc772",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a99c91d232c",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a99c91d232c",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2a99c91d232c",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2f407755c4c2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2f407755c4c2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:2f407755c4c2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:30e85dce62a7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:30e85dce62a7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:30e85dce62a7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38c1efae5452",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38c1efae5452",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38c1efae5452",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38f48e37c916",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38f48e37c916",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:38f48e37c916",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3ac1630d0dc9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
+      "acceptable": [
+        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
+    },
+    {
+      "id": "harvested:3ac1630d0dc9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
+      "acceptable": [
+        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
+    },
+    {
+      "id": "harvested:3ac1630d0dc9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
+      "acceptable": [
+        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.56,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
+    },
+    {
+      "id": "harvested:3b8fd99efe8a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3b8fd99efe8a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3b8fd99efe8a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d1b3a8ec7b5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d1b3a8ec7b5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d1b3a8ec7b5",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d2cb0327352",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d2cb0327352",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3d2cb0327352",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3f8d71417d38",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3f8d71417d38",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:3f8d71417d38",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:414b2795770d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:414b2795770d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:414b2795770d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:48fb7232352a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:48fb7232352a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:48fb7232352a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4bfc6b4ad740",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4bfc6b4ad740",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4bfc6b4ad740",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4c0911234b39",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4c0911234b39",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4c0911234b39",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4ceb482981df",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4ceb482981df",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:4ceb482981df",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50144e777c5d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50144e777c5d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50144e777c5d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50885adc8a9a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50885adc8a9a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:50885adc8a9a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:51c7db5efd8d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:51c7db5efd8d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:51c7db5efd8d",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:62684602d7e6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:643d8f61c4c6",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.5700000000000001,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.73,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:649f071cf0e1",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.67,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:66711ff7099e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:6b8359ca620b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+      "acceptable": [
+        "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.61,
+      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+    },
+    {
+      "id": "harvested:6b8359ca620b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+      "acceptable": [
+        "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.63,
+      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+    },
+    {
+      "id": "harvested:6b8359ca620b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d",
+      "acceptable": [
+        "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.67,
+      "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
+    },
+    {
+      "id": "harvested:6ef5508ce70e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
+      "acceptable": [
+        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
+    },
+    {
+      "id": "harvested:6ef5508ce70e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
+      "acceptable": [
+        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
+    },
+    {
+      "id": "harvested:6ef5508ce70e",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
+      "acceptable": [
+        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.46,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:74cbab9ca6f0",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "acceptable": [
+        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
+    },
+    {
+      "id": "harvested:74cbab9ca6f0",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "acceptable": [
+        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
+    },
+    {
+      "id": "harvested:74cbab9ca6f0",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "acceptable": [
+        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7bc78db301fd",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7e1b86a0ed87",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:812ec5a90895",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:846cec6d7815",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8726afca6973",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        "check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected check-candidate:06226f4addc17e92bd532bc11f1625a1326112e57ff6477f; not acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8b7843704f48",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:8c3a66c3946f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:92970b2d312b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:92970b2d312b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:92970b2d312b",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:95f80eb4a1b7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:95f80eb4a1b7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:95f80eb4a1b7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99038ff406e7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99038ff406e7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99038ff406e7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99b6c41a65b2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99b6c41a65b2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:99b6c41a65b2",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:9b128c65af8f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
+      "acceptable": [
+        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.36,
+      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
+    },
+    {
+      "id": "harvested:9b128c65af8f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
+      "acceptable": [
+        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.36,
+      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
+    },
+    {
+      "id": "harvested:9b128c65af8f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
+      "acceptable": [
+        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.33,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -24221,6 +24314,57 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:ad10f3fc27d7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "acceptable": [
+        "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.79,
+      "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
+    },
+    {
+      "id": "harvested:ad10f3fc27d7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "acceptable": [
+        "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.78,
+      "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
+    },
+    {
+      "id": "harvested:ad10f3fc27d7",
+      "category": "harvested",
+      "holdout": false,
+      "band": "act",
+      "method": "choice",
+      "selected": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "candidateId": "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6",
+      "acceptable": [
+        "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+      ],
+      "selectedCorrect": true,
+      "deferred": false,
+      "correct": true,
+      "topSignal": 0.79,
+      "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
       "id": "harvested:ad383d4f9924",
@@ -24288,6 +24432,23 @@
       "deferred": true,
       "correct": true,
       "topSignal": 0.22,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:adbcb3b5ee1a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a",
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": 0.24,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -24308,23 +24469,6 @@
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
-      "id": "harvested:adbcb3b5ee1a",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a",
-      "acceptable": [
-        null
-      ],
-      "selectedCorrect": true,
-      "deferred": true,
-      "correct": true,
-      "topSignal": 0.22,
-      "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
       "id": "harvested:b1446f731e6d",
       "category": "harvested",
       "holdout": false,
@@ -24389,7 +24533,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.4,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -24406,7 +24550,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.38,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -24423,7 +24567,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.36,
+      "topSignal": 0.37,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -24680,40 +24824,6 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:b9821f5ea65f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "f4324e1c-ec9c-4c07-b6eb-a111af1e495d",
-      "acceptable": [
-        "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.66,
-      "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
-    },
-    {
-      "id": "harvested:b9821f5ea65f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "f4324e1c-ec9c-4c07-b6eb-a111af1e495d",
-      "acceptable": [
-        "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.68,
-      "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
       "id": "harvested:b9821f5ea65f",
@@ -24733,6 +24843,40 @@
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
+      "id": "harvested:b9821f5ea65f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "f4324e1c-ec9c-4c07-b6eb-a111af1e495d",
+      "acceptable": [
+        "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
+    },
+    {
+      "id": "harvested:b9821f5ea65f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "f4324e1c-ec9c-4c07-b6eb-a111af1e495d",
+      "acceptable": [
+        "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.67,
+      "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
+    },
+    {
       "id": "harvested:baf07348c6f2",
       "category": "harvested",
       "holdout": false,
@@ -24967,7 +25111,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.4,
+      "topSignal": 0.38,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -24984,7 +25128,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
+      "topSignal": 0.35,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -25001,7 +25145,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.33,
+      "topSignal": 0.3,
+      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
+    },
+    {
+      "id": "harvested:ccc2d2cf0d15",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
+      "acceptable": [
+        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
@@ -25022,23 +25183,6 @@
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
-      "id": "harvested:ccc2d2cf0d15",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80",
-      "acceptable": [
-        "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.33,
-      "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
-    },
-    {
       "id": "harvested:d00089bb4860",
       "category": "harvested",
       "holdout": false,
@@ -25715,24 +25859,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.26,
-      "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
-    },
-    {
-      "id": "harvested:f2733fc20223",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941",
-      "acceptable": [
-        "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.24,
+      "topSignal": 0.28,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -25750,6 +25877,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.25,
+      "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
+    },
+    {
+      "id": "harvested:f2733fc20223",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941",
+      "acceptable": [
+        "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.24,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -25967,8 +26111,8 @@
           "travel:mill-01"
         ],
         "conflicted": false,
-        "meanSignal": 0.5266666666666667,
-        "signalStdDev": 0.046427960923947055
+        "meanSignal": 0.5166666666666666,
+        "signalStdDev": 0.038586123009300734
       },
       {
         "caseId": "direct-travel-harbor",
@@ -25978,8 +26122,8 @@
           "travel:harbor-04"
         ],
         "conflicted": false,
-        "meanSignal": 0.43,
-        "signalStdDev": 0.016329931618554536
+        "meanSignal": 0.43333333333333335,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "direct-check-climb",
@@ -25989,8 +26133,8 @@
           "check:climb-05"
         ],
         "conflicted": false,
-        "meanSignal": 0.51,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.5233333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "direct-commerce-rope",
@@ -26001,7 +26145,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.7866666666666667,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "direct-quest-accept",
@@ -26011,8 +26155,8 @@
           "quest:accept-harbor-09"
         ],
         "conflicted": false,
-        "meanSignal": 0.51,
-        "signalStdDev": 0
+        "meanSignal": 0.5,
+        "signalStdDev": 0.016329931618554536
       },
       {
         "caseId": "direct-progression-level",
@@ -26023,7 +26167,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.6233333333333334,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.020548046676563275
       },
       {
         "caseId": "ambig-rest-long-short",
@@ -26033,8 +26177,8 @@
           "rest:long-12"
         ],
         "conflicted": false,
-        "meanSignal": 0.5533333333333333,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.54,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "ambig-travel-watchtower",
@@ -26044,8 +26188,8 @@
           "travel:watchtower-16"
         ],
         "conflicted": false,
-        "meanSignal": 0.58,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.5966666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-travel-two-roads",
@@ -26066,8 +26210,8 @@
           "power:mending-bryn-19"
         ],
         "conflicted": false,
-        "meanSignal": 0.6533333333333333,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.65,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "ambig-combat-power-target",
@@ -26077,7 +26221,7 @@
           "combat:firebolt-bandit-22"
         ],
         "conflicted": false,
-        "meanSignal": 0.6166666666666667,
+        "meanSignal": 0.6066666666666666,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26088,8 +26232,8 @@
           "shop:sell-ring-24"
         ],
         "conflicted": false,
-        "meanSignal": 0.6933333333333334,
-        "signalStdDev": 0.00942809041582059
+        "meanSignal": 0.69,
+        "signalStdDev": 0.016329931618554488
       },
       {
         "caseId": "ambig-consumable-target",
@@ -26099,7 +26243,7 @@
           "consumable:heal-aster-25"
         ],
         "conflicted": false,
-        "meanSignal": 0.5933333333333333,
+        "meanSignal": 0.5966666666666667,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26110,8 +26254,8 @@
           "check:force-gate-28"
         ],
         "conflicted": false,
-        "meanSignal": 0.5833333333333334,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.5766666666666667,
+        "signalStdDev": 0.016996731711975927
       },
       {
         "caseId": "multi-row-vs-travel",
@@ -26121,8 +26265,8 @@
           "check:row-30"
         ],
         "conflicted": false,
-        "meanSignal": 0.44,
-        "signalStdDev": 0.014142135623730965
+        "meanSignal": 0.45333333333333337,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "multi-quest-vs-travel",
@@ -26132,8 +26276,8 @@
           "quest:accept-harbor-31"
         ],
         "conflicted": false,
-        "meanSignal": 0.55,
-        "signalStdDev": 0
+        "meanSignal": 0.5533333333333333,
+        "signalStdDev": 0.020548046676563226
       },
       {
         "caseId": "multi-commerce-vs-inventory",
@@ -26143,7 +26287,7 @@
           "shop:buy-rope-33"
         ],
         "conflicted": false,
-        "meanSignal": 0.7799999999999999,
+        "meanSignal": 0.8000000000000002,
         "signalStdDev": 0.008164965809277268
       },
       {
@@ -26154,8 +26298,8 @@
           "rest:long-35"
         ],
         "conflicted": false,
-        "meanSignal": 0.5433333333333333,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.5333333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "multi-combat-vs-power",
@@ -26165,7 +26309,7 @@
           "combat:firebolt-wolf-37"
         ],
         "conflicted": false,
-        "meanSignal": 0.5966666666666667,
+        "meanSignal": 0.5933333333333333,
         "signalStdDev": 0.012472191289246483
       },
       {
@@ -26352,8 +26496,8 @@
           "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0"
         ],
         "conflicted": false,
-        "meanSignal": 0.6033333333333334,
-        "signalStdDev": 0.03771236166328251
+        "meanSignal": 0.5599999999999999,
+        "signalStdDev": 0.024494897427831758
       },
       {
         "caseId": "harvested:1939fe92d69c",
@@ -26429,8 +26573,8 @@
           "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
         ],
         "conflicted": false,
-        "meanSignal": 0.23666666666666666,
-        "signalStdDev": 0.01247219128924647
+        "meanSignal": 0.22666666666666666,
+        "signalStdDev": 0.009428090415820628
       },
       {
         "caseId": "harvested:21db70ab1dba",
@@ -26451,8 +26595,8 @@
           "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
         ],
         "conflicted": false,
-        "meanSignal": 0.4166666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.4033333333333333,
+        "signalStdDev": 0.016996731711975938
       },
       {
         "caseId": "harvested:22a75d63ff9d",
@@ -26550,8 +26694,8 @@
           "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
         ],
         "conflicted": false,
-        "meanSignal": 0.5766666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.58,
+        "signalStdDev": 0.016329931618554488
       },
       {
         "caseId": "harvested:3b8fd99efe8a",
@@ -26715,8 +26859,8 @@
           "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92"
         ],
         "conflicted": false,
-        "meanSignal": 0.62,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.6566666666666667,
+        "signalStdDev": 0.0659966329107444
       },
       {
         "caseId": "harvested:66711ff7099e",
@@ -26730,6 +26874,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:6b8359ca620b",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.6366666666666667,
+        "signalStdDev": 0.024944382578492966
+      },
+      {
         "caseId": "harvested:6ef5508ce70e",
         "repeats": 3,
         "agreement": 1,
@@ -26737,7 +26892,7 @@
           "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
         ],
         "conflicted": false,
-        "meanSignal": 0.4366666666666667,
+        "meanSignal": 0.44333333333333336,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -26748,8 +26903,8 @@
           "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
         ],
         "conflicted": false,
-        "meanSignal": 0.4366666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.45,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:74cbab9ca6f0",
@@ -26759,8 +26914,8 @@
           "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
         ],
         "conflicted": false,
-        "meanSignal": 0.5266666666666667,
-        "signalStdDev": 0.02867441755680878
+        "meanSignal": 0.5133333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:787b57d44cdc",
@@ -26902,8 +27057,8 @@
           "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
         ],
         "conflicted": false,
-        "meanSignal": 0.35666666666666663,
-        "signalStdDev": 0.016996731711975948
+        "meanSignal": 0.35000000000000003,
+        "signalStdDev": 0.014142135623730937
       },
       {
         "caseId": "harvested:9d1a3d4d3df1",
@@ -26928,6 +27083,17 @@
         "signalStdDev": null
       },
       {
+        "caseId": "harvested:ad10f3fc27d7",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.7866666666666667,
+        "signalStdDev": 0.004714045207910321
+      },
+      {
         "caseId": "harvested:ad383d4f9924",
         "repeats": 3,
         "agreement": 1,
@@ -26946,8 +27112,8 @@
           "quest-abandon-candidate:071e7a203416061524ec80562afc5e131cc99b24954faa3a"
         ],
         "conflicted": false,
-        "meanSignal": 0.21666666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.2233333333333333,
+        "signalStdDev": 0.01247219128924647
       },
       {
         "caseId": "harvested:b1446f731e6d",
@@ -26969,7 +27135,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.37333333333333335,
-        "signalStdDev": 0.018856180831641284
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:b2c96f78d1fb",
@@ -27034,8 +27200,8 @@
           "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
         ],
         "conflicted": false,
-        "meanSignal": 0.66,
-        "signalStdDev": 0.016329931618554536
+        "meanSignal": 0.6666666666666666,
+        "signalStdDev": 0.02054804667656323
       },
       {
         "caseId": "harvested:baf07348c6f2",
@@ -27089,8 +27255,8 @@
           "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
         ],
         "conflicted": false,
-        "meanSignal": 0.41333333333333333,
-        "signalStdDev": 0.018856180831641256
+        "meanSignal": 0.37666666666666665,
+        "signalStdDev": 0.020548046676563275
       },
       {
         "caseId": "harvested:ccc2d2cf0d15",
@@ -27101,7 +27267,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.32666666666666666,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.02494438257849294
       },
       {
         "caseId": "harvested:d00089bb4860",
@@ -27254,8 +27420,8 @@
           "power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941"
         ],
         "conflicted": false,
-        "meanSignal": 0.25,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.25666666666666665,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "harvested:f37ba9fb92bf",
@@ -27302,31 +27468,31 @@
         "signalStdDev": null
       }
     ],
-    "repeats": 366,
+    "repeats": 372,
     "meanAgreement": 1,
     "conflictCases": 0,
     "conflictRate": 0,
-    "meanSignalStdDev": 0.01100842161857326,
-    "maxSignalStdDev": 0.046427960923947055
+    "meanSignalStdDev": 0.015184945893720445,
+    "maxSignalStdDev": 0.0659966329107444
   },
   "calibration": {
     "fitted": {
-      "a": 2.8676737295520365,
-      "b": 1.714795110015957
+      "a": 2.845030485189555,
+      "b": 1.630461934757368
     },
     "devSamples": 6,
     "holdoutSamples": 0,
     "allRaw": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.046999999999999986,
-      "expectedCalibrationError": 0.21666666666666667
+      "brier": 0.04286666666666664,
+      "expectedCalibrationError": 0.20666666666666667
     },
     "allCalibrated": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.000020801924426727105,
-      "expectedCalibrationError": 0.00452347307001677
+      "brier": 0.000019678897958886905,
+      "expectedCalibrationError": 0.004326742181947729
     },
     "holdoutRaw": {
       "samples": 0,
@@ -27385,44 +27551,44 @@
       },
       {
         "threshold": 0.45,
-        "acted": 51,
+        "acted": 50,
         "total": 54,
-        "coverage": 0.9444444444444444,
+        "coverage": 0.9259259259259259,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.5,
-        "acted": 47,
+        "acted": 46,
         "total": 54,
-        "coverage": 0.8703703703703703,
+        "coverage": 0.8518518518518519,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.55,
-        "acted": 38,
+        "acted": 35,
         "total": 54,
-        "coverage": 0.7037037037037037,
+        "coverage": 0.6481481481481481,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 21,
+        "acted": 24,
         "total": 54,
-        "coverage": 0.3888888888888889,
+        "coverage": 0.4444444444444444,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 11,
+        "acted": 12,
         "total": 54,
-        "coverage": 0.2037037037037037,
+        "coverage": 0.2222222222222222,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.7,
-        "acted": 8,
+        "acted": 7,
         "total": 54,
-        "coverage": 0.14814814814814814,
+        "coverage": 0.12962962962962962,
         "actedAccuracy": 1
       },
       {
@@ -27464,23 +27630,23 @@
       },
       {
         "threshold": 0.55,
-        "acted": 28,
+        "acted": 26,
         "total": 36,
-        "coverage": 0.7777777777777778,
+        "coverage": 0.7222222222222222,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 13,
+        "acted": 17,
         "total": 36,
-        "coverage": 0.3611111111111111,
+        "coverage": 0.4722222222222222,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 8,
+        "acted": 9,
         "total": 36,
-        "coverage": 0.2222222222222222,
+        "coverage": 0.25,
         "actedAccuracy": 1
       },
       {
@@ -27515,30 +27681,30 @@
       },
       {
         "threshold": 0.45,
-        "acted": 16,
-        "total": 18,
-        "coverage": 0.8888888888888888,
-        "actedAccuracy": 1
-      },
-      {
-        "threshold": 0.5,
         "acted": 15,
         "total": 18,
         "coverage": 0.8333333333333334,
         "actedAccuracy": 1
       },
       {
-        "threshold": 0.55,
-        "acted": 10,
+        "threshold": 0.5,
+        "acted": 14,
         "total": 18,
-        "coverage": 0.5555555555555556,
+        "coverage": 0.7777777777777778,
+        "actedAccuracy": 1
+      },
+      {
+        "threshold": 0.55,
+        "acted": 9,
+        "total": 18,
+        "coverage": 0.5,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 8,
+        "acted": 7,
         "total": 18,
-        "coverage": 0.4444444444444444,
+        "coverage": 0.3888888888888889,
         "actedAccuracy": 1
       },
       {
@@ -27550,9 +27716,9 @@
       },
       {
         "threshold": 0.7,
-        "acted": 2,
+        "acted": 1,
         "total": 18,
-        "coverage": 0.1111111111111111,
+        "coverage": 0.05555555555555555,
         "actedAccuracy": 1
       },
       {
@@ -27588,44 +27754,44 @@
         },
         {
           "threshold": 0.45,
-          "acted": 51,
+          "acted": 50,
           "total": 54,
-          "coverage": 0.9444444444444444,
+          "coverage": 0.9259259259259259,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.5,
-          "acted": 47,
+          "acted": 46,
           "total": 54,
-          "coverage": 0.8703703703703703,
+          "coverage": 0.8518518518518519,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.55,
-          "acted": 38,
+          "acted": 35,
           "total": 54,
-          "coverage": 0.7037037037037037,
+          "coverage": 0.6481481481481481,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.6,
-          "acted": 21,
+          "acted": 24,
           "total": 54,
-          "coverage": 0.3888888888888889,
+          "coverage": 0.4444444444444444,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.65,
-          "acted": 11,
+          "acted": 12,
           "total": 54,
-          "coverage": 0.2037037037037037,
+          "coverage": 0.2222222222222222,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.7,
-          "acted": 8,
+          "acted": 7,
           "total": 54,
-          "coverage": 0.14814814814814814,
+          "coverage": 0.12962962962962962,
           "actedAccuracy": 1
         },
         {
@@ -27645,22 +27811,22 @@
       "threshold": 0.75,
       "calibration": {
         "fitted": {
-          "a": 2.8676737295520365,
-          "b": 1.714795110015957
+          "a": 2.845030485189555,
+          "b": 1.630461934757368
         },
         "devSamples": 6,
         "holdoutSamples": 0,
         "allRaw": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.046999999999999986,
-          "expectedCalibrationError": 0.21666666666666667
+          "brier": 0.04286666666666664,
+          "expectedCalibrationError": 0.20666666666666667
         },
         "allCalibrated": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.000020801924426727105,
-          "expectedCalibrationError": 0.00452347307001677
+          "brier": 0.000019678897958886905,
+          "expectedCalibrationError": 0.004326742181947729
         },
         "holdoutRaw": {
           "samples": 0,
@@ -27696,34 +27862,34 @@
       "threshold": 0.4,
       "calibration": {
         "fitted": {
-          "a": 1.5429558676309463,
-          "b": 4.128660792995287
+          "a": 1.5851984333650475,
+          "b": 4.104465875189656
         },
         "devSamples": 36,
         "holdoutSamples": 18,
         "allRaw": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.17953888888888891,
-          "expectedCalibrationError": 0.41277777777777763
+          "brier": 0.1796925925925926,
+          "expectedCalibrationError": 0.4125925925925927
         },
         "allCalibrated": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015129038782363846,
-          "expectedCalibrationError": 0.010742207560977879
+          "brier": 0.00015517524838713626,
+          "expectedCalibrationError": 0.010911245718989937
         },
         "holdoutRaw": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.19629444444444444,
-          "expectedCalibrationError": 0.43499999999999994
+          "brier": 0.20098333333333326,
+          "expectedCalibrationError": 0.44055555555555553
         },
         "holdoutCalibrated": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.00018820229777082113,
-          "expectedCalibrationError": 0.01207962718958755
+          "brier": 0.00020374734346468462,
+          "expectedCalibrationError": 0.012672494760642028
         }
       },
       "gate": {
@@ -27742,12 +27908,12 @@
         "metrics": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00015129038782363846,
-          "expectedCalibrationError": 0.010742207560977879
+          "brier": 0.00015517524838713626,
+          "expectedCalibrationError": 0.010911245718989937
         },
         "calibration": {
-          "a": 1.5429558676309463,
-          "b": 4.128660792995287
+          "a": 1.5851984333650475,
+          "b": 4.104465875189656
         },
         "promotedAt": "2026-09-18",
         "evidence": "docs/system-one-adventure-benchmark.md"
@@ -27758,12 +27924,12 @@
     "metrics": {
       "samples": 54,
       "accuracy": 1,
-      "brier": 0.00015129038782363846,
-      "expectedCalibrationError": 0.010742207560977879
+      "brier": 0.00015517524838713626,
+      "expectedCalibrationError": 0.010911245718989937
     },
     "calibration": {
-      "a": 1.5429558676309463,
-      "b": 4.128660792995287
+      "a": 1.5851984333650475,
+      "b": 4.104465875189656
     },
     "promotedAt": "2026-09-18",
     "evidence": "docs/system-one-adventure-benchmark.md"
