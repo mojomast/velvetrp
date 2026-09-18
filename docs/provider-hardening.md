@@ -33,7 +33,7 @@ Exact hook around every provider dispatch:
 
 1. The shared `AdventureTurnBudgetManager` creates one state at first dispatch and retains it for every planning/narration call in that turn.
 2. Serialize the exact outbound messages/tools/schema to the prompt-estimation text, then call `reserveTurnBudget(state, { id: providerCallId, promptText, maxCompletionTokens }, nowMs)`.
-3. Dispatch only when `allowed` is true. A denial is deterministic fallback/backpressure; `retryAtMs` is supplied only for the rolling rate limit.
+3. Dispatch only when `allowed` is true. A denial is deterministic fallback/backpressure; `retryAtMs` is supplied only for the rolling rate limit. Concretely, a planning denial settles the dispatch as `budget-<reason>` and completes the turn with deterministic fallback narration; an enemy-audience turn additionally runs the deterministic enemy fallback and fails only if that cannot settle. The prompt estimate is conservative (`bytes ÷ 3`) and can exceed measured tokens by a third, so the graceful path is what keeps a conservative denial from becoming a player-visible failure.
 4. Immediately replace state with the returned state so concurrent dispatches see the reservation.
 5. On any possibly-dispatched request, call `settleTurnBudget` with provider usage, or with local prompt/completion text when usage is absent. This conservatively accounts uncertain failures.
 6. Call `releaseTurnBudgetReservation` only when it is proven that no provider request was dispatched. The rolling request-rate charge intentionally remains.

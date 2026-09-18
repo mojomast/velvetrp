@@ -669,6 +669,47 @@ describe("bounded adventure orchestrator", () => {
     expect(repository.getDurableAgentPlanningState("local-owner",turn.turnId)?.providerStarts).toBe(0);repository.close();
   });
 
+  it("degrades a planning budget denial to fallback without dispatching or failing the turn", async () => {
+    const campaign=seed(),repository=createRepository();const turn=repository.createAdventureTurn("local-owner",{campaignId:campaign.id,
+      timelineId:campaign.activeTimelineId,sessionId:"session",actorId:"actor",declaration:"I force the planning gate",
+      expectedCampaignRevision:0,idempotencyKey:"orchestrator-budget-denial"});let calls=0;const deps=dependencies([]);
+    deps.getProvider=async()=>({...defaultProviderSettings(),baseUrl:"http://127.0.0.1:1/v1",model:"fake",
+      adventureTurnBudget:{maxTotalTokens:10,maxEstimatedCostUsd:null}});
+    deps.complete=async()=>{calls+=1;throw new Error("unexpected provider call");};
+    const result=await orchestrateAdventureTurn(repository,turn.turnId,deps);
+    expect(calls).toBe(0);expect(result.outcome).toBe("fallback");expect(result.turn.state).not.toBe("failed");
+    const failed=result.turn.providerCalls.filter((call)=>call.phase==="failed");
+    expect(failed).toHaveLength(1);expect(failed[0]?.outcomeCode).toBe("budget-prompt-token-budget");
+    const audit=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    expect(audit.prepare("SELECT status,outcome_code FROM agent_provider_responses_v39 WHERE turn_id=?").get(turn.turnId))
+      .toEqual({status:"failed",outcome_code:"budget-prompt-token-budget"});audit.close();
+    expect(repository.getDurableAgentPlanningState("local-owner",turn.turnId)?.decisionRounds).toBe(0);repository.close();
+  });
+
+  it("streams the narration-lane fallback terminal for a budget-denied planning dispatch", async () => {
+    const campaign=seed();process.env.FEATURE_RPG_CAMPAIGN="true";process.env.FEATURE_RPG_MECHANICS="true";
+    const declaration="I force the planning gate";let calls=0;
+    const deps:AdventureAgentDependencies={complete:async()=>{calls+=1;throw new Error("unexpected provider call");},
+      getProvider:async()=>({...defaultProviderSettings(),model:"test",adventureTurnBudget:{maxTotalTokens:10,maxEstimatedCostUsd:null}}),
+      getHarness:async()=>defaultHarnessSettings(),now:()=>new Date(at)};
+    const app=buildApp({campaignRepositoryFactory:()=>createRepository(),adventureAgentDependencies:deps});
+    const response=await app.inject({method:"POST",url:"/api/rpg/v1/adventure-turns/stream",headers:{"content-type":"application/json"},
+      payload:{campaignId:campaign.id,sessionId:"session",actorId:"actor",declaration,expectedRevision:0,idempotencyKey:"route-budget-denial"}});
+    expect(response.statusCode).toBe(200);expect(calls).toBe(0);
+    const events=response.body.split("\n\n").filter((frame)=>frame.startsWith("event: ")).map((frame)=>{
+      const line=frame.split("\n").find((candidate)=>candidate.startsWith("data: "))!;
+      return adventureTurnStreamEventSchema.parse(JSON.parse(line.slice(6)));});
+    expect(events.at(-1)).toMatchObject({type:"terminal",payload:{outcome:"done",receipts:[],
+      turn:{state:"completed"},narrationStatus:{status:"completed",source:"deterministic-fallback",text:narrationFallback(declaration,[])}}});
+    const turnId=response.headers["x-adventure-turn-id"] as string;
+    const audit=new DatabaseDriver(path.join(process.env.VELVET_DATA_DIR!,"velvet.sqlite"),{readonly:true});
+    expect(audit.prepare("SELECT status,outcome_code FROM agent_provider_responses_v39 WHERE turn_id=?").get(turnId))
+      .toEqual({status:"failed",outcome_code:"budget-prompt-token-budget"});audit.close();
+    const repository=createRepository({clock:{now:()=>new Date(at)}});
+    expect(repository.getAdventureTurn("local-owner",turnId)).toMatchObject({state:"completed",narrationStatus:"completed"});
+    repository.close();await app.close();
+  });
+
   it("fails a heterogeneous provider batch atomically without persisting or executing calls", async () => {
     const campaign = seed(); const repository = createRepository();
     const created = repository.createAdventureTurn("local-owner", { campaignId: campaign.id, timelineId: campaign.activeTimelineId,

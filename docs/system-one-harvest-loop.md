@@ -139,7 +139,11 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   human-confirmed cases only and reports agent-reviewed cases separately; a promotion record is
   never re-derived from agent labels. The split run returns the gate to 0.40 with 54 acted at 100%
   accuracy, Brier 0.0002 and ECE 0.0110, and 100% stability (0 of 86 cases conflicted); the 55
-  agent-reviewed cases scored 92.7% on their asserted subset with none acting.
+  agent-reviewed cases scored 92.7% on their asserted subset with none acting. A third synthetic-run
+  finding was reliability rather than coverage: planning budget denials hard-failed ~9% of executed
+  turns because the conservative prompt estimate over-counts measured tokens; denials now degrade
+  to deterministic fallback narration (see [provider hardening](provider-hardening.md)) and the
+  harness records a failure trail in its manifests.
 - **Stability.** Across all 43 cases and 129 repeats, decision agreement was 100% with 0 conflicted
   cases; mean per-case signal standard deviation was 0.0117 and the maximum 0.0287. A separate live
   probe of the two most recent shadow messages (10 repeats each) agreed 10/10 at a mean standard

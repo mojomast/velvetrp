@@ -1470,6 +1470,8 @@ export type HarnessTurnRecord = {
   receipts: { commandId: string; proposalId: string }[];
   narration: { status: string; text: string | null; source: string | null } | null;
   error: string | null;
+  /** Status/outcome trail for a turn that did not end `done`; omitted on successful turns. */
+  events?: TurnEventCode[];
 };
 
 export type HarnessManifest = {
@@ -1745,6 +1747,14 @@ export type TerminalOutcome = "done" | "aborted" | "error" | "unknown";
 
 export type NarrationStatus = { status: string; text: string | null; source: string | null };
 
+/** One meaningful status/outcome/error code lifted from a stream event payload. */
+export type TurnEventCode = {
+  /** SSE event type, e.g. `agent_status` or `terminal`. */
+  type: string;
+  /** Normalized code, e.g. `status=decision-rejected` or `outcomeCode=budget-prompt-token-budget`. */
+  code: string;
+};
+
 export type TurnOutcome = {
   turnId: string;
   terminalOutcome: TerminalOutcome;
@@ -1755,6 +1765,10 @@ export type TurnOutcome = {
   narration: NarrationStatus | null;
   transcript: TranscriptTurn[] | null;
   uncertain: boolean;
+  /** Meaningful status/outcome/error codes observed on the stream, oldest first. */
+  events: TurnEventCode[];
+  /** Short failure reason when `terminalOutcome` is not `done`; null on success. */
+  error: string | null;
 };
 
 export type SessionDriverOptions = {
@@ -1997,6 +2011,7 @@ export class SessionDriver {
     }
     const terminalOutcome: TerminalOutcome = terminal
       ?? (stalled ? "aborted" : detail.state === "completed" ? "done" : "unknown");
+    const eventCodes = turnEventCodes(events);
     return {
       turnId,
       terminalOutcome,
@@ -2007,6 +2022,10 @@ export class SessionDriver {
       narration: detail.narration,
       transcript,
       uncertain: false,
+      events: eventCodes,
+      error: terminalOutcome === "done"
+        ? null
+        : describeTurnFailure({ terminalOutcome, terminalObserved: terminal !== null, codes: eventCodes }),
     };
   }
 }
@@ -2079,6 +2098,56 @@ function lastTerminalOutcome(events: readonly SseEvent[]): TerminalOutcome | nul
     if (outcome === "done" || outcome === "aborted" || outcome === "error") return outcome;
   }
   return null;
+}
+
+/** Payload fields that carry a meaningful status/outcome/error code, in extraction order. */
+const TURN_CODE_FIELDS: readonly (readonly [field: string, label: string])[] = [
+  ["status", "status"],
+  ["outcome", "outcome"],
+  ["outcomeCode", "outcomeCode"],
+  ["errorCode", "errorCode"],
+  ["code", "code"],
+  ["reason", "reason"],
+  ["error", "error"],
+];
+
+/**
+ * Collects the status/outcome/error codes carried by a decoded event trail, oldest first. A turn
+ * that never reaches `done` can then explain itself: the server reports failures through
+ * `agent_status` payloads (`status=decision-rejected`, `status=expired`) and may attach a code to
+ * any event (`outcomeCode=budget-prompt-token-budget`, `errorCode=...`). The terminal event's own
+ * `outcome` is skipped here because `describeTurnFailure` reports it separately as `terminal=...`.
+ */
+export function turnEventCodes(events: readonly SseEvent[]): TurnEventCode[] {
+  const codes: TurnEventCode[] = [];
+  for (const event of events) {
+    if (!isPlainObject(event.payload)) continue;
+    for (const [field, label] of TURN_CODE_FIELDS) {
+      if (event.type === "terminal" && field === "outcome") continue;
+      const value = event.payload[field];
+      if (typeof value === "string" && value.trim().length > 0) {
+        codes.push({ type: event.type, code: `${label}=${value.trim()}` });
+      }
+    }
+  }
+  return codes;
+}
+
+/**
+ * Short, stable reason for a turn that did not end `done`. Names the last status/outcome/error
+ * code the stream carried, or falls back to a descriptive string when it carried none. A stream
+ * that closed without a terminal event is reported as `terminal=fallback`.
+ */
+export function describeTurnFailure(input: {
+  terminalOutcome: TerminalOutcome;
+  terminalObserved: boolean;
+  codes: readonly TurnEventCode[];
+}): string {
+  const terminal = input.terminalObserved ? input.terminalOutcome : "fallback";
+  const last = input.codes[input.codes.length - 1];
+  return last
+    ? `turn failed: ${last.code}; terminal=${terminal}`
+    : `turn did not complete (terminal=${terminal})`;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -2307,6 +2376,10 @@ export async function runHarnessSession(input: HarnessSessionInput): Promise<Har
         turns.push(record);
         state = "uncertain";
         break;
+      }
+      if (outcome.terminalOutcome !== "done") {
+        record.error = outcome.error ?? `turn did not complete (terminal=${outcome.terminalOutcome})`;
+        if (outcome.events.length > 0) record.events = outcome.events.map(entry => ({ ...entry }));
       }
       if (outcome.transcript !== null) {
         transcript = [...outcome.transcript];

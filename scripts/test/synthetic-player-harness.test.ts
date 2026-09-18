@@ -910,6 +910,8 @@ test("session driver drives stream, confirmation, resume, and transcript without
   assert.equal(outcome.narration?.source, "provider-assisted");
   assert.equal(outcome.transcript?.length, 1);
   assert.equal(outcome.uncertain, false);
+  assert.equal(outcome.error, null, "a completed turn carries no failure reason");
+  assert.deepEqual(outcome.events, [{ type: "agent_status", code: "status=narrating" }]);
 
   const paths = requests.map(request => `${request.method} ${request.url.replace("http://127.0.0.1:8787", "")}`);
   assert.deepEqual(paths, [
@@ -976,6 +978,8 @@ test("session driver stalls, rejects, and reads the bound session without retrie
   assert.deepEqual(stalled.confirmationDecisions, ["stall"]);
   assert.equal(stalled.turnState, "awaiting-confirmation");
   assert.equal(stalled.terminalOutcome, "aborted");
+  assert.equal(stalled.error, "turn did not complete (terminal=aborted)");
+  assert.deepEqual(stalled.events, []);
   assert.ok(stallFixture.requests.every(url => !url.includes("/confirm")), "a stall must not POST a confirmation");
 
   const rejectFixture = makeFetch("reject");
@@ -1034,6 +1038,67 @@ test("session driver fails closed on ambiguous and definitive errors", async () 
   );
 });
 
+test("session driver diagnoses streams that do not end done", async () => {
+  const makeFetch = (frames: string[], state: string) => (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("play-bootstrap")) {
+      return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
+    }
+    if (url.endsWith("/adventure-turns/stream")) return sseResponse(frames.join(""), "turn-1");
+    if (url.includes("/adventure-turns/turn-1")) {
+      return jsonResponse({ turn: { turnId: "turn-1", state, revision: 2 }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
+    }
+    if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  const driverFor = (frames: string[], state = "failed") => new SessionDriver({
+    baseUrl: "http://127.0.0.1:8787",
+    campaignId: "camp-1",
+    sessionId: "sess-1",
+    actorId: "actor-1",
+    runId: "synth-test-a",
+    persona: PERSONAS.explorer,
+    sessionTag: "synthetic-player.explorer.test.a",
+    fetchImpl: makeFetch(frames, state),
+  });
+
+  // A failed terminal payload carries no error field; the diagnosis comes from the status events
+  // that preceded it, never from null.
+  const rejected = await driverFor([
+    sseFrame("agent_status", { status: "planning" }, 0),
+    sseFrame("agent_status", { status: "decision-rejected" }, 1),
+    sseFrame("terminal", { outcome: "error" }, 2),
+  ]).submitTurn({ turnIndex: 0, declaration: "I try.", turnSeed: "diag-0" });
+  assert.equal(rejected.terminalOutcome, "error");
+  assert.equal(rejected.turnState, "failed");
+  assert.equal(rejected.error, "turn failed: status=decision-rejected; terminal=error");
+  assert.deepEqual(rejected.events, [
+    { type: "agent_status", code: "status=planning" },
+    { type: "agent_status", code: "status=decision-rejected" },
+  ]);
+
+  // A stream that closes without a terminal event is labeled `terminal=fallback`, and a code on
+  // any event (here the budget reason observed in the database) wins over the earlier statuses.
+  const budget = await driverFor([
+    sseFrame("agent_status", { status: "narrating" }, 0),
+    sseFrame("agent_status", { status: "failed", errorCode: "budget-prompt-token-budget" }, 1),
+  ]).submitTurn({ turnIndex: 1, declaration: "I try.", turnSeed: "diag-1" });
+  assert.equal(budget.terminalOutcome, "unknown");
+  assert.equal(budget.error, "turn failed: errorCode=budget-prompt-token-budget; terminal=fallback");
+  assert.deepEqual(budget.events, [
+    { type: "agent_status", code: "status=narrating" },
+    { type: "agent_status", code: "status=failed" },
+    { type: "agent_status", code: "errorCode=budget-prompt-token-budget" },
+  ]);
+
+  // Nothing informative on the stream still yields a non-null, stable reason.
+  const silent = await driverFor([
+    sseFrame("terminal", { outcome: "error" }, 0),
+  ]).submitTurn({ turnIndex: 2, declaration: "I try.", turnSeed: "diag-2" });
+  assert.equal(silent.error, "turn did not complete (terminal=error)");
+  assert.deepEqual(silent.events, []);
+});
+
 // -------------------------------------------------------------------------------------------------
 // Dry-run manifest, serialization, CLI
 // -------------------------------------------------------------------------------------------------
@@ -1064,6 +1129,7 @@ test("dry run produces a planned manifest with the tag mapping and no store writ
     assert.ok(turn.declaration.length > 0);
     assert.deepEqual(turn.noiseApplied, turn.noiseDeclared);
     assert.equal(turn.error, null);
+    assert.equal(turn.events, undefined, "planned turns keep the pre-diagnosis schema");
   }
   assert.equal(manifest.turns[0]?.idempotencyKey, "synth.synth-test-a.0");
   assert.deepEqual(manifest.turns[0]?.target, { family: "combat-consumable", failureMode: "unsupported" });
@@ -1140,6 +1206,51 @@ test("live session stops as uncertain on ambiguous failures and failed on defini
   assert.match(rejectedContract.turns[0]?.error ?? "", /contract rejected/);
 });
 
+test("live session records the stream diagnosis instead of a null error", async () => {
+  const fetchImpl = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("play-bootstrap")) {
+      return jsonResponse({ campaignId: "camp-1", sessionId: "sess-1", expectedRevision: 1, playableActors: [] });
+    }
+    if (url.endsWith("/adventure-turns/stream")) {
+      return sseResponse([
+        sseFrame("turn_started", { turn: { turnId: "turn-1", state: "declared" } }, 0),
+        sseFrame("agent_status", { status: "decision-rejected" }, 1),
+        sseFrame("terminal", { outcome: "error" }, 2),
+      ].join(""), "turn-1");
+    }
+    if (url.includes("/adventure-turns/turn-1")) {
+      return jsonResponse({ turn: { turnId: "turn-1", state: "failed", revision: 2 }, receipts: [], narrationStatus: { status: "none", text: null, source: null } });
+    }
+    if (url.includes("/adventure-turns/transcript")) return jsonResponse({ turns: [] });
+    throw new Error(`unexpected ${url}`);
+  }) as typeof fetch;
+  const driver = new SessionDriver({
+    baseUrl: "http://127.0.0.1:8787",
+    campaignId: "camp-1",
+    sessionId: "11111111-2222-3333-4444-555555555555",
+    actorId: "actor-1",
+    runId: "synth-test-a",
+    persona: PERSONAS.explorer,
+    sessionTag: "synthetic-player.explorer.test.a",
+    fetchImpl,
+  });
+  const manifest = await runHarnessSession(makeDryRunInput({
+    mode: "live",
+    submitTurn: request => driver.submitTurn(request),
+  }));
+  assert.equal(manifest.state, "failed");
+  assert.equal(manifest.turns.length, 1);
+  const turn = manifest.turns[0];
+  assert.ok(turn);
+  assert.equal(turn.outcome, "error");
+  assert.equal(turn.error, "turn failed: status=decision-rejected; terminal=error");
+  assert.deepEqual(turn.events, [{ type: "agent_status", code: "status=decision-rejected" }]);
+  assert.equal(turn.turnId, "turn-1");
+  assert.equal(turn.turnState, "failed");
+  assert.ok(manifest.notes.some(note => note.includes("terminal error")));
+});
+
 test("live session records completion and coverage when submitTurn resolves", async () => {
   const manifest = await runHarnessSession(makeDryRunInput({
     mode: "live",
@@ -1153,6 +1264,8 @@ test("live session records completion and coverage when submitTurn resolves", as
       narration: { status: "completed", text: "ok", source: "deterministic-fallback" },
       transcript: null,
       uncertain: false,
+      events: [],
+      error: null,
     }),
   }));
   assert.equal(manifest.state, "complete");
@@ -1160,6 +1273,7 @@ test("live session records completion and coverage when submitTurn resolves", as
   assert.equal(manifest.coverage.totals.achieved, 3);
   assert.equal(manifest.coverage.totals.planned, 3);
   assert.ok(manifest.turns.every(turn => turn.outcome === "done" && turn.turnId !== null));
+  assert.ok(manifest.turns.every(turn => turn.error === null && turn.events === undefined), "successful turns keep the old schema");
 });
 
 test("CLI parsing handles defaults, both flag forms, and validation", () => {

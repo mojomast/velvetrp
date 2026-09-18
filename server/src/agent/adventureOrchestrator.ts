@@ -427,14 +427,6 @@ export function initializeAdventureTurnBudget(turn: PrivateAdventureTurn, policy
       source: call.outcomeCode?.endsWith("-estimated") ? "estimated" as const : "provider" as const,
       startedAtMs: new Date(call.recordedAt).getTime() })));
 }
-function failTurnBudget(repository: Repository, turnId: string): PrivateAdventureTurn {
-  const current = privateTurn(repository, turnId);
-  if (["failed", "cancelled", "completed"].includes(current.state)) return current;
-  try { return repository.updateAdventureTurnNarration(OWNER, { turnId, expectedTurnRevision: current.revision,
-    expectedCampaignRevision: current.campaignRevision, idempotencyKey: key("agent-budget-failed", turnId), narrationStatus: "none", terminalState: "failed" }); }
-  catch { return privateTurn(repository, turnId); }
-}
-
 function snapshotDecisionIdentity(snapshot: CampaignAgentContextSnapshot,roundNumber:number,turnRevision:number): string {
   return canonicalAgentJson({ timelineId: snapshot.timelineId, timelineRevision: snapshot.timelineRevision,
     campaignRevision: snapshot.campaignRevision,turnRevision,roundNumber, authority: snapshot.authority, audience: snapshot.audience,
@@ -957,7 +949,12 @@ export async function orchestrateAdventureTurn(repository: Repository, turnId: s
     if (!budget?.allowed) {
       const reason = budget ? budget.reason : "pricing-unconfigured";
       settleProviderFailure(repository, turn.turnId, providerCallId, `budget-${reason}`);
-      return { turn: failTurnBudget(repository, turn.turnId), outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
+      // A planning budget denial is a local limit, not a provider failure. Degrade the same way a
+      // provider error does: record the failed dispatch and fall through to deterministic narration
+      // instead of hard-failing the turn. Enemy-audience turns still use the deterministic enemy
+      // fallback (and fail only if that cannot settle).
+      safeEnemyFallback(repository, snapshot, turn.turnId);
+      return { turn: privateTurn(repository, turn.turnId), outcome: "fallback", limitations: ADVENTURE_TOOL_LIMITATIONS };
     }
     let budgetSettled = false;
     try {

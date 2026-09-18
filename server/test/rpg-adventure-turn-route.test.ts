@@ -187,7 +187,7 @@ describe("M2.11 adventure turn routes", () => {
     db.close();
     await app.close();
   });
-  it("fails a planning budget denial closed without provider dispatch or mechanics", async () => {
+  it("degrades a planning budget denial to deterministic fallback narration without provider dispatch", async () => {
     enable(); const campaign = seed(); let calls = 0;
     const dependencies: AdventureAgentDependencies = {
       complete: async () => { calls += 1; throw new Error("must not dispatch"); },
@@ -200,9 +200,15 @@ describe("M2.11 adventure turn routes", () => {
       payload: { campaignId: campaign.id, sessionId: "session", actorId: "actor", declaration: "I force the gate", expectedRevision: 0,
         idempotencyKey: "budget-denial" } });
     expect(calls).toBe(0);
-    expect(events(response.body).at(-1)).toMatchObject({ type: "terminal", payload: { outcome: "error", receipts: [] } });
+    // A local budget denial is backpressure, not a provider failure: the turn completes with the
+    // deterministic narration fallback and no mechanics.
+    expect(events(response.body).at(-1)).toMatchObject({
+      type: "terminal",
+      payload: { outcome: "done", receipts: [], narrationStatus: { status: "completed", source: "deterministic-fallback", text: narrationFallback("I force the gate", []) } },
+    });
     const turnId = response.headers["x-adventure-turn-id"] as string;
     const repository = createRepository(); const turn = repository.getAdventureTurn("local-owner", turnId);
+    expect(turn).toMatchObject({ state: "completed", narrationStatus: "completed" });
     const providerCalls = turn && "providerCalls" in turn ? turn.providerCalls : [];
     expect(providerCalls.some((call) => call.phase === "failed" && call.outcomeCode?.startsWith("budget-"))).toBe(true);
     repository.close(); await app.close();
