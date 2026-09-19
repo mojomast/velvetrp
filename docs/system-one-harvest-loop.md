@@ -223,6 +223,24 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   with the same single conflict. Honesty note: the two new combat cases evaluate as `defer 3/3` on
   re-ask despite the live 0.95 act — the live commit is real receipt evidence, but the state is not
   reproducing across draws, which is exactly why agent-reviewed cases never gate.
+- **Eighth wave (live combat power and the consistency audit).** The combat commit path was proven
+  live for powers: with the fighter at 3 HP, the lane picked the advertised Second Wind at 0.96,
+  the confirmation-required proposal was approved through the ordinary API, and a lane-origin
+  execution committed (no provider evidence) healing the fighter 3 → 12; the corpus now holds
+  **101 cases (1 human-confirmed + 100 agent-reviewed)**. The interchangeable-candidate collapse
+  was verified live too: with two identical potions the battery asked one collapsed question
+  (relevance 0.92, supported 0.91), but the model still hedged `best_candidate = none_of_these`
+  0.59 against the sole candidate 0.41, so the lane deferred and the provider committed the potion
+  — a residual single-option hedging limit recorded for the next composer iteration. The new
+  per-turn consistency audit (`scripts/audit-adventure-consistency.ts`, 22 focused tests) joins
+  declaration, lane pick, provider calls, proposals/confirmations, receipts and narration into five
+  signal classes; its first runs were clean on the combat world after fixing one classifier false
+  positive (a healing combat power now backs a healing claim) and produced a single informational
+  awaiting-confirmation flag on the earlier world. The regenerated benchmark holds the gated record
+  (54 acted/100%, Brier 0.0002, ECE 0.0109 at 0.40) and the agent subset carries 3 acted calls at
+  100% over 300 calls (exact preferred 234/300, asserted 78.0%). Stability measured **100.0%
+  (0/131)** this run; the previous single conflict was model variance on the same state and may
+  recur, so it is not reported as fixed.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

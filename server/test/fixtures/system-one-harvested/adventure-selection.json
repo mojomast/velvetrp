@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lane": "adventure-selection",
-  "generatedAt": "2026-09-19T15:54:37.508Z",
+  "generatedAt": "2026-09-19T18:52:48.050Z",
   "proposals": [
     {
       "proposalId": "04e62a0ddd4776fc3701aa5bd97c70fa8909c4578d2defcbf74dff7cb2a7de70",
@@ -9625,6 +9625,42 @@
         "candidateId": null
       },
       "note": "rules-tinkerer.v1 repeated the literal-edge power question to Tevis; the only advertised power is Second Wind and the provider committed nothing, so the deferral is correct.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
+    },
+    {
+      "proposalId": "7aff1bb8977a4840058af64cd78ab3473bf0d8852307532224ccd97e0b151169",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "dc4e85b0-3bc5-4935-963c-c2af8f85931b",
+      "createdAt": "2026-09-19T18:51:27.972Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "I grit my teeth and use Second Wind to get back in the fight.",
+        "candidates": [
+          {
+            "candidateId": "combat-consumable-candidate:1eade296dacd7821d734a9cd6926aa8fcc52c82f2ecdbf2e",
+            "digest": "1eade296dacd7821d734a9cd6926aa8fcc52c82f2ecdbf2e93d4244ef9f720fb",
+            "kind": "exact_combat_consumable.select",
+            "label": "Use combat consumable: Potion of Healing → Aster Vale"
+          },
+          {
+            "candidateId": "combat-consumable-candidate:4bfc88e1adc9035ed7b6d2aebaffc0f5c045e05fd580e03d",
+            "digest": "4bfc88e1adc9035ed7b6d2aebaffc0f5c045e05fd580e03db4ae66382ff4cef2",
+            "kind": "exact_combat_consumable.select",
+            "label": "Use combat consumable: Potion of Healing → Aster Vale"
+          },
+          {
+            "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+            "digest": "b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7b03c3c0b0b21618f",
+            "kind": "exact_combat_power.select",
+            "label": "Use combat power: Second Wind → Aster Vale"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+      },
+      "note": "Live SRD combat, fighter at 3 HP: declaration explicitly uses Second Wind; the lane picked the advertised exact_combat_power candidate at 0.96, appended a lane-origin confirmation-required proposal, the proposal was approved through the ordinary confirmation API, and a lane-origin execution committed (origin=lane, no provider evidence) healing the fighter 3 -> 12 (1d10+1).",
       "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {

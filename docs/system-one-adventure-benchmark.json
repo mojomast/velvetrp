@@ -10257,6 +10257,39 @@
       "harvestBucket": "agent"
     },
     {
+      "id": "harvested:7aff1bb8977a",
+      "category": "harvested",
+      "declaration": "I grit my teeth and use Second Wind to get back in the fight.",
+      "candidates": [
+        {
+          "candidateId": "combat-consumable-candidate:1eade296dacd7821d734a9cd6926aa8fcc52c82f2ecdbf2e",
+          "digest": "1eade296dacd7821d734a9cd6926aa8fcc52c82f2ecdbf2e93d4244ef9f720fb",
+          "kind": "exact_combat_consumable.select",
+          "label": "Use combat consumable: Potion of Healing → Aster Vale"
+        },
+        {
+          "candidateId": "combat-consumable-candidate:4bfc88e1adc9035ed7b6d2aebaffc0f5c045e05fd580e03d",
+          "digest": "4bfc88e1adc9035ed7b6d2aebaffc0f5c045e05fd580e03db4ae66382ff4cef2",
+          "kind": "exact_combat_consumable.select",
+          "label": "Use combat consumable: Potion of Healing → Aster Vale"
+        },
+        {
+          "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+          "digest": "b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7b03c3c0b0b21618f",
+          "kind": "exact_combat_power.select",
+          "label": "Use combat power: Second Wind → Aster Vale"
+        }
+      ],
+      "expected": {
+        "preferred": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+        "acceptable": [
+          "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+        ]
+      },
+      "holdout": false,
+      "harvestBucket": "agent"
+    },
+    {
       "id": "harvested:7bc78db301fd",
       "category": "harvested",
       "declaration": "I Stop circling the kit and put the question to a dockhand straight: what's moving through the harbor today, and who's taking on hands? Then I head for the landward gate without waiting for an answer, blade and vial where I can find them in the dark.",
@@ -20595,29 +20628,29 @@
       "harvestBucket": "agent"
     }
   ],
-  "samples": 390,
-  "harvestedCases": 100,
+  "samples": 393,
+  "harvestedCases": 101,
   "harvestedHumanCases": 1,
-  "agentHarvestedCases": 99,
+  "agentHarvestedCases": 100,
   "agentHarvested": {
-    "cases": 99,
-    "calls": 297,
+    "cases": 100,
+    "calls": 300,
     "acted": 3,
     "actedCorrect": 3,
     "actedAccuracy": 1,
     "exact": 234,
     "correct": 234,
-    "accuracy": 0.7878787878787878,
+    "accuracy": 0.78,
     "note": "agent-reviewed harvested cases are scored and reported but excluded from the calibration fit, the dev/holdout split, the threshold sweep, the promotion gate, and the proposed record"
   },
   "harvest": {
     "fixture": "server/test/fixtures/system-one-harvested/adventure-selection.json",
     "present": true,
-    "confirmed": 100,
+    "confirmed": 101,
     "skipped": 0,
-    "cases": 100,
+    "cases": 101,
     "humanCases": 1,
-    "agentCases": 99,
+    "agentCases": 100,
     "warning": null
   },
   "failures": [],
@@ -20636,126 +20669,109 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-mill",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:mill-01",
-      "acceptable": [
-        "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-mill",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:mill-01",
-      "acceptable": [
-        "travel:mill-01"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.56,
-      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.41,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-travel-harbor",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "travel:harbor-04",
-      "acceptable": [
-        "travel:harbor-04"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
-    },
-    {
-      "id": "direct-check-climb",
-      "category": "direct-match",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "check:climb-05",
-      "acceptable": [
-        "check:climb-05"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
       "topSignal": 0.51,
-      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
     },
     {
-      "id": "direct-check-climb",
+      "id": "direct-travel-mill",
       "category": "direct-match",
       "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "check:climb-05",
+      "candidateId": "travel:mill-01",
       "acceptable": [
-        "check:climb-05"
+        "travel:mill-01"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-mill",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:mill-01",
+      "acceptable": [
+        "travel:mill-01"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded travel:mill-01); expected travel:mill-01; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.4,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-travel-harbor",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "travel:harbor-04",
+      "acceptable": [
+        "travel:harbor-04"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.43,
+      "reason": "deferred (fallback); expected travel:harbor-04; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.5,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -20772,7 +20788,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.51,
+      "topSignal": 0.5,
+      "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
+    },
+    {
+      "id": "direct-check-climb",
+      "category": "direct-match",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "check:climb-05",
+      "acceptable": [
+        "check:climb-05"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded check:climb-05); expected check:climb-05; not acceptable"
     },
     {
@@ -20789,7 +20822,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.77,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -20806,7 +20839,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.76,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
     },
     {
@@ -20823,8 +20856,42 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.79,
+      "topSignal": 0.8,
       "reason": "selected shop:buy-rope-07 (act); expected shop:buy-rope-07; acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.47,
+      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
+    },
+    {
+      "id": "direct-quest-accept",
+      "category": "direct-match",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest:accept-harbor-09",
+      "acceptable": [
+        "quest:accept-harbor-09"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.51,
+      "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
       "id": "direct-quest-accept",
@@ -20844,40 +20911,6 @@
       "reason": "deferred (confirm, recorded quest:accept-harbor-09); expected quest:accept-harbor-09; not acceptable"
     },
     {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
-      "id": "direct-quest-accept",
-      "category": "direct-match",
-      "holdout": true,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest:accept-harbor-09",
-      "acceptable": [
-        "quest:accept-harbor-09"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected quest:accept-harbor-09; not acceptable"
-    },
-    {
       "id": "direct-progression-level",
       "category": "direct-match",
       "holdout": false,
@@ -20925,25 +20958,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.6,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded level:advance-11); expected level:advance-11; not acceptable"
-    },
-    {
-      "id": "ambig-rest-long-short",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest:long-12",
-      "acceptable": [
-        "rest:long-12"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.54,
-      "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
       "id": "ambig-rest-long-short",
@@ -20976,7 +20992,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.53,
+      "topSignal": 0.55,
+      "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
+    },
+    {
+      "id": "ambig-rest-long-short",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest:long-12",
+      "acceptable": [
+        "rest:long-12"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest:long-12); expected rest:long-12; not acceptable"
     },
     {
@@ -20993,24 +21026,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.58,
-      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
-    },
-    {
-      "id": "ambig-travel-watchtower",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "travel:watchtower-16",
-      "acceptable": [
-        "travel:watchtower-16"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -21028,6 +21044,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
+    },
+    {
+      "id": "ambig-travel-watchtower",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "travel:watchtower-16",
+      "acceptable": [
+        "travel:watchtower-16"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded travel:watchtower-16); expected travel:watchtower-16; not acceptable"
     },
     {
@@ -21097,148 +21130,182 @@
       "candidateId": "power:mending-bryn-19",
       "acceptable": [
         "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.65,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-power-target",
+      "category": "ambiguous",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "power:mending-bryn-19",
+      "acceptable": [
+        "power:mending-bryn-19"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.64,
+      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.62,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-combat-power-target",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-bandit-22",
+      "acceptable": [
+        "combat:firebolt-bandit-22"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.62,
+      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+    },
+    {
+      "id": "ambig-commerce-sell",
+      "category": "ambiguous",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "shop:sell-ring-24",
+      "acceptable": [
+        "shop:sell-ring-24"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.68,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
+      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
     },
     {
-      "id": "ambig-power-target",
+      "id": "ambig-consumable-target",
       "category": "ambiguous",
       "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "power:mending-bryn-19",
+      "candidateId": "consumable:heal-aster-25",
       "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.63,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
-    },
-    {
-      "id": "ambig-power-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "power:mending-bryn-19",
-      "acceptable": [
-        "power:mending-bryn-19"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.67,
-      "reason": "deferred (confirm, recorded power:mending-bryn-19); expected power:mending-bryn-19; not acceptable"
-    },
-    {
-      "id": "ambig-combat-power-target",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
-      "acceptable": [
-        "combat:firebolt-bandit-22"
+        "consumable:heal-aster-25"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.62,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
+      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
-      "id": "ambig-combat-power-target",
+      "id": "ambig-consumable-target",
       "category": "ambiguous",
-      "holdout": true,
+      "holdout": false,
       "band": "confirm",
       "method": "choice",
       "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
+      "candidateId": "consumable:heal-aster-25",
       "acceptable": [
-        "combat:firebolt-bandit-22"
+        "consumable:heal-aster-25"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-combat-power-target",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-bandit-22",
-      "acceptable": [
-        "combat:firebolt-bandit-22"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.62,
-      "reason": "deferred (confirm, recorded combat:firebolt-bandit-22); expected combat:firebolt-bandit-22; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.7,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.69,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
-    },
-    {
-      "id": "ambig-commerce-sell",
-      "category": "ambiguous",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "shop:sell-ring-24",
-      "acceptable": [
-        "shop:sell-ring-24"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.69,
-      "reason": "deferred (confirm, recorded shop:sell-ring-24); expected shop:sell-ring-24; not acceptable"
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
       "id": "ambig-consumable-target",
@@ -21258,40 +21325,6 @@
       "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
     },
     {
-      "id": "ambig-consumable-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "consumable:heal-aster-25",
-      "acceptable": [
-        "consumable:heal-aster-25"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
-    },
-    {
-      "id": "ambig-consumable-target",
-      "category": "ambiguous",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "consumable:heal-aster-25",
-      "acceptable": [
-        "consumable:heal-aster-25"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.59,
-      "reason": "deferred (confirm, recorded consumable:heal-aster-25); expected consumable:heal-aster-25; not acceptable"
-    },
-    {
       "id": "multi-check-vs-travel-trap",
       "category": "multi-family",
       "holdout": false,
@@ -21305,7 +21338,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.57,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -21322,7 +21355,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
     },
     {
@@ -21341,6 +21374,23 @@
       "correct": false,
       "topSignal": 0.57,
       "reason": "deferred (confirm, recorded check:force-gate-28); expected check:force-gate-28; not acceptable"
+    },
+    {
+      "id": "multi-row-vs-travel",
+      "category": "multi-family",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check:row-30",
+      "acceptable": [
+        "check:row-30"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.45,
+      "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
       "id": "multi-row-vs-travel",
@@ -21373,24 +21423,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.46,
-      "reason": "deferred (fallback); expected check:row-30; not acceptable"
-    },
-    {
-      "id": "multi-row-vs-travel",
-      "category": "multi-family",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check:row-30",
-      "acceptable": [
-        "check:row-30"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.44,
+      "topSignal": 0.45,
       "reason": "deferred (fallback); expected check:row-30; not acceptable"
     },
     {
@@ -21407,7 +21440,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.5,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -21424,7 +21457,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
+      "topSignal": 0.52,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -21441,7 +21474,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded quest:accept-harbor-31); expected quest:accept-harbor-31; not acceptable"
     },
     {
@@ -21458,7 +21491,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.78,
+      "topSignal": 0.79,
       "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
@@ -21492,7 +21525,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.78,
+      "topSignal": 0.8,
       "reason": "selected shop:buy-rope-33 (act); expected shop:buy-rope-33; acceptable"
     },
     {
@@ -21509,7 +21542,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
@@ -21526,7 +21559,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.54,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
     },
     {
@@ -21543,25 +21576,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.55,
+      "topSignal": 0.53,
       "reason": "deferred (confirm, recorded rest:long-35); expected rest:long-35; not acceptable"
-    },
-    {
-      "id": "multi-combat-vs-power",
-      "category": "multi-family",
-      "holdout": true,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "combat:firebolt-wolf-37",
-      "acceptable": [
-        "combat:firebolt-wolf-37"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.61,
-      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
       "id": "multi-combat-vs-power",
@@ -21595,6 +21611,23 @@
       "deferred": true,
       "correct": false,
       "topSignal": 0.6,
+      "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
+    },
+    {
+      "id": "multi-combat-vs-power",
+      "category": "multi-family",
+      "holdout": true,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat:firebolt-wolf-37",
+      "acceptable": [
+        "combat:firebolt-wolf-37"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded combat:firebolt-wolf-37); expected combat:firebolt-wolf-37; not acceptable"
     },
     {
@@ -22427,7 +22460,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.6,
+      "topSignal": 0.62,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -22461,7 +22494,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.6,
+      "topSignal": 0.59,
       "reason": "deferred (confirm, recorded power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0); expected defer; acceptable"
     },
     {
@@ -22478,7 +22511,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.51,
+      "topSignal": 0.5,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
     },
     {
@@ -22502,8 +22535,8 @@
       "id": "harvested:1826f4fd5e50",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
       "candidateId": "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9",
       "acceptable": [
@@ -22512,8 +22545,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.49,
-      "reason": "deferred (fallback); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9); expected combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9; not acceptable"
     },
     {
       "id": "harvested:1939fe92d69c",
@@ -22835,7 +22868,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.25,
+      "topSignal": 0.27,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22852,7 +22885,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.22,
+      "topSignal": 0.27,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22869,7 +22902,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.24,
+      "topSignal": 0.21,
       "reason": "deferred (fallback); expected check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365; not acceptable"
     },
     {
@@ -22954,7 +22987,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.43,
+      "topSignal": 0.45,
       "reason": "deferred (fallback); expected rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1; not acceptable"
     },
     {
@@ -23447,24 +23480,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.56,
-      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
-    },
-    {
-      "id": "harvested:3ac1630d0dc9",
-      "category": "harvested",
-      "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
-      "acceptable": [
-        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.57,
       "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
     },
     {
@@ -23485,6 +23501,23 @@
       "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
     },
     {
+      "id": "harvested:3ac1630d0dc9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd",
+      "acceptable": [
+        "quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.58,
+      "reason": "deferred (confirm, recorded quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd); expected quest-accept-candidate:8cf5f772e7ce007d6a77482e7a9afc2c88a5d91aa2f515cd; not acceptable"
+    },
+    {
       "id": "harvested:3b8fd99efe8a",
       "category": "harvested",
       "holdout": false,
@@ -24100,8 +24133,8 @@
       "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
+      "band": "fallback",
+      "method": "defer",
       "selected": null,
       "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
@@ -24110,15 +24143,15 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.5,
-      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+      "topSignal": 0.49,
+      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
     },
     {
       "id": "harvested:5b3104cae1dc",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
+      "band": "fallback",
+      "method": "defer",
       "selected": null,
       "candidateId": "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20",
       "acceptable": [
@@ -24127,8 +24160,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
+      "topSignal": 0.46,
+      "reason": "deferred (fallback); expected rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20; not acceptable"
     },
     {
       "id": "harvested:5b3104cae1dc",
@@ -24263,7 +24296,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.67,
+      "topSignal": 0.6900000000000001,
       "reason": "deferred (confirm, recorded quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92); expected defer; acceptable"
     },
     {
@@ -24399,25 +24432,8 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.64,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d); expected combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d; not acceptable"
-    },
-    {
-      "id": "harvested:6ef5508ce70e",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
-      "acceptable": [
-        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
     {
       "id": "harvested:6ef5508ce70e",
@@ -24454,38 +24470,21 @@
       "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
     {
-      "id": "harvested:70699991a6e3",
+      "id": "harvested:6ef5508ce70e",
       "category": "harvested",
       "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "candidateId": "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca",
       "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.43,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
-    },
-    {
-      "id": "harvested:70699991a6e3",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
-      "acceptable": [
-        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+        "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
       "topSignal": 0.45,
-      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+      "reason": "deferred (fallback); expected check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca; not acceptable"
     },
     {
       "id": "harvested:70699991a6e3",
@@ -24505,21 +24504,38 @@
       "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
     },
     {
-      "id": "harvested:74cbab9ca6f0",
+      "id": "harvested:70699991a6e3",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
+      "band": "fallback",
+      "method": "defer",
       "selected": null,
-      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
       "acceptable": [
-        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.52,
-      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
+      "topSignal": 0.42,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
+    },
+    {
+      "id": "harvested:70699991a6e3",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43",
+      "acceptable": [
+        "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.44,
+      "reason": "deferred (fallback); expected quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43; not acceptable"
     },
     {
       "id": "harvested:74cbab9ca6f0",
@@ -24535,7 +24551,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.5,
+      "topSignal": 0.54,
       "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
@@ -24556,21 +24572,21 @@
       "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
-      "id": "harvested:787b57d44cdc",
+      "id": "harvested:74cbab9ca6f0",
       "category": "harvested",
       "holdout": false,
-      "band": "fallback",
-      "method": "defer",
+      "band": "confirm",
+      "method": "choice",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8",
       "acceptable": [
-        null
+        "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
       ],
-      "selectedCorrect": true,
+      "selectedCorrect": false,
       "deferred": true,
-      "correct": true,
-      "topSignal": null,
-      "reason": "deferred (fallback); expected defer; acceptable"
+      "correct": false,
+      "topSignal": 0.52,
+      "reason": "deferred (confirm, recorded check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8); expected check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8; not acceptable"
     },
     {
       "id": "harvested:787b57d44cdc",
@@ -24605,6 +24621,74 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:787b57d44cdc",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": null,
+      "acceptable": [
+        null
+      ],
+      "selectedCorrect": true,
+      "deferred": true,
+      "correct": true,
+      "topSignal": null,
+      "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:7aff1bb8977a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+      "acceptable": [
+        "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.71,
+      "reason": "deferred (confirm, recorded combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7); expected combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7; not acceptable"
+    },
+    {
+      "id": "harvested:7aff1bb8977a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+      "acceptable": [
+        "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7); expected combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7; not acceptable"
+    },
+    {
+      "id": "harvested:7aff1bb8977a",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7",
+      "acceptable": [
+        "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.69,
+      "reason": "deferred (confirm, recorded combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7); expected combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7; not acceptable"
     },
     {
       "id": "harvested:7bc78db301fd",
@@ -24892,7 +24976,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376); expected combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376; not acceptable"
     },
     {
@@ -24909,7 +24993,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.61,
+      "topSignal": 0.63,
       "reason": "deferred (confirm, recorded combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376); expected combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376; not acceptable"
     },
     {
@@ -25028,7 +25112,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.6,
       "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
@@ -25045,7 +25129,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.58,
       "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
@@ -25062,7 +25146,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.59,
+      "topSignal": 0.56,
       "reason": "deferred (confirm, recorded rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a); expected rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a; not acceptable"
     },
     {
@@ -25268,23 +25352,6 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
-    },
-    {
-      "id": "harvested:9b128c65af8f",
-      "category": "harvested",
-      "holdout": false,
-      "band": "fallback",
-      "method": "defer",
-      "selected": null,
-      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
-      "acceptable": [
-        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.37,
-      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
       "id": "harvested:9b128c65af8f",
@@ -25317,7 +25384,24 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.37,
+      "topSignal": 0.36,
+      "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
+    },
+    {
+      "id": "harvested:9b128c65af8f",
+      "category": "harvested",
+      "holdout": false,
+      "band": "fallback",
+      "method": "defer",
+      "selected": null,
+      "candidateId": "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718",
+      "acceptable": [
+        "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718; not acceptable"
     },
     {
@@ -25436,7 +25520,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.77,
+      "topSignal": 0.79,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -25453,7 +25537,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.77,
+      "topSignal": 0.78,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -25470,7 +25554,7 @@
       "selectedCorrect": true,
       "deferred": false,
       "correct": true,
-      "topSignal": 0.77,
+      "topSignal": 0.78,
       "reason": "selected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6 (act); expected combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6; acceptable"
     },
     {
@@ -25538,7 +25622,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.19,
+      "topSignal": 0.21,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -25555,7 +25639,7 @@
       "selectedCorrect": true,
       "deferred": true,
       "correct": true,
-      "topSignal": 0.22,
+      "topSignal": 0.2,
       "reason": "deferred (fallback); expected defer; acceptable"
     },
     {
@@ -25640,7 +25724,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -25657,7 +25741,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -25667,14 +25751,14 @@
       "band": "fallback",
       "method": "defer",
       "selected": null,
-      "candidateId": null,
+      "candidateId": "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7",
       "acceptable": [
         "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
       ],
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": null,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7; not acceptable"
     },
     {
@@ -25963,7 +26047,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.67,
+      "topSignal": 0.64,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -25980,7 +26064,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.66,
+      "topSignal": 0.68,
       "reason": "deferred (confirm, recorded f4324e1c-ec9c-4c07-b6eb-a111af1e495d); expected f4324e1c-ec9c-4c07-b6eb-a111af1e495d; not acceptable"
     },
     {
@@ -26201,7 +26285,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.36,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -26218,7 +26302,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.4,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -26235,7 +26319,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.38,
+      "topSignal": 0.39,
       "reason": "deferred (fallback); expected check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e; not acceptable"
     },
     {
@@ -26252,7 +26336,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.32,
+      "topSignal": 0.31,
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
@@ -26269,7 +26353,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.32,
+      "topSignal": 0.33,
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
@@ -26286,7 +26370,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.34,
+      "topSignal": 0.35,
       "reason": "deferred (fallback); expected quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80; not acceptable"
     },
     {
@@ -26696,6 +26780,23 @@
       "correct": true,
       "topSignal": null,
       "reason": "deferred (fallback); expected defer; acceptable"
+    },
+    {
+      "id": "harvested:e6f52fea4ac9",
+      "category": "harvested",
+      "holdout": false,
+      "band": "confirm",
+      "method": "choice",
+      "selected": null,
+      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
+      "acceptable": [
+        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
+      ],
+      "selectedCorrect": false,
+      "deferred": true,
+      "correct": false,
+      "topSignal": 0.53,
+      "reason": "deferred (confirm, recorded rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
     },
     {
       "id": "harvested:e6f52fea4ac9",
@@ -26718,23 +26819,6 @@
       "id": "harvested:e6f52fea4ac9",
       "category": "harvested",
       "holdout": false,
-      "band": "confirm",
-      "method": "choice",
-      "selected": null,
-      "candidateId": "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a",
-      "acceptable": [
-        "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
-      ],
-      "selectedCorrect": false,
-      "deferred": true,
-      "correct": false,
-      "topSignal": 0.54,
-      "reason": "deferred (confirm, recorded rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
-    },
-    {
-      "id": "harvested:e6f52fea4ac9",
-      "category": "harvested",
-      "holdout": false,
       "band": "fallback",
       "method": "defer",
       "selected": null,
@@ -26745,7 +26829,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.44,
+      "topSignal": 0.49,
       "reason": "deferred (fallback); expected rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a; not acceptable"
     },
     {
@@ -27017,7 +27101,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.25,
+      "topSignal": 0.26,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -27051,7 +27135,7 @@
       "selectedCorrect": false,
       "deferred": true,
       "correct": false,
-      "topSignal": 0.27,
+      "topSignal": 0.26,
       "reason": "deferred (fallback); expected power-candidate:8f158c4259cdc5ffb70ee953b315e5160427862e852ae941; not acceptable"
     },
     {
@@ -27269,8 +27353,8 @@
           "travel:mill-01"
         ],
         "conflicted": false,
-        "meanSignal": 0.54,
-        "signalStdDev": 0.028284271247461926
+        "meanSignal": 0.52,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "direct-travel-harbor",
@@ -27280,8 +27364,8 @@
           "travel:harbor-04"
         ],
         "conflicted": false,
-        "meanSignal": 0.42333333333333334,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.42,
+        "signalStdDev": 0.014142135623730937
       },
       {
         "caseId": "direct-check-climb",
@@ -27291,8 +27375,8 @@
           "check:climb-05"
         ],
         "conflicted": false,
-        "meanSignal": 0.5166666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.5133333333333333,
+        "signalStdDev": 0.018856180831641284
       },
       {
         "caseId": "direct-commerce-rope",
@@ -27302,8 +27386,8 @@
           "shop:buy-rope-07"
         ],
         "conflicted": false,
-        "meanSignal": 0.79,
-        "signalStdDev": 0
+        "meanSignal": 0.7766666666666667,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "direct-quest-accept",
@@ -27314,7 +27398,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.49333333333333335,
-        "signalStdDev": 0.004714045207910321
+        "signalStdDev": 0.016996731711975965
       },
       {
         "caseId": "direct-progression-level",
@@ -27324,8 +27408,8 @@
           "level:advance-11"
         ],
         "conflicted": false,
-        "meanSignal": 0.6133333333333333,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.6233333333333334,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "ambig-rest-long-short",
@@ -27335,8 +27419,8 @@
           "rest:long-12"
         ],
         "conflicted": false,
-        "meanSignal": 0.5433333333333333,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.5566666666666668,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-travel-watchtower",
@@ -27347,7 +27431,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.5966666666666667,
-        "signalStdDev": 0.012472191289246483
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-travel-two-roads",
@@ -27368,8 +27452,8 @@
           "power:mending-bryn-19"
         ],
         "conflicted": false,
-        "meanSignal": 0.66,
-        "signalStdDev": 0.021602468994692887
+        "meanSignal": 0.6433333333333334,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "ambig-combat-power-target",
@@ -27379,8 +27463,8 @@
           "combat:firebolt-bandit-22"
         ],
         "conflicted": false,
-        "meanSignal": 0.6166666666666667,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.6133333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "ambig-commerce-sell",
@@ -27390,8 +27474,8 @@
           "shop:sell-ring-24"
         ],
         "conflicted": false,
-        "meanSignal": 0.6933333333333334,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.6866666666666666,
+        "signalStdDev": 0.004714045207910269
       },
       {
         "caseId": "ambig-consumable-target",
@@ -27402,7 +27486,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.59,
-        "signalStdDev": 0.016329931618554536
+        "signalStdDev": 0.021602468994692887
       },
       {
         "caseId": "multi-check-vs-travel-trap",
@@ -27412,8 +27496,8 @@
           "check:force-gate-28"
         ],
         "conflicted": false,
-        "meanSignal": 0.5766666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.57,
+        "signalStdDev": 0.008164965809277223
       },
       {
         "caseId": "multi-row-vs-travel",
@@ -27424,7 +27508,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.4466666666666667,
-        "signalStdDev": 0.009428090415820642
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-quest-vs-travel",
@@ -27434,8 +27518,8 @@
           "quest:accept-harbor-31"
         ],
         "conflicted": false,
-        "meanSignal": 0.5533333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.5166666666666667,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "multi-commerce-vs-inventory",
@@ -27445,8 +27529,8 @@
           "shop:buy-rope-33"
         ],
         "conflicted": false,
-        "meanSignal": 0.7866666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.7966666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "multi-power-vs-rest",
@@ -27456,8 +27540,8 @@
           "rest:long-35"
         ],
         "conflicted": false,
-        "meanSignal": 0.5366666666666667,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.54,
+        "signalStdDev": 0.014142135623730963
       },
       {
         "caseId": "multi-combat-vs-power",
@@ -27467,7 +27551,7 @@
           "combat:firebolt-wolf-37"
         ],
         "conflicted": false,
-        "meanSignal": 0.6033333333333334,
+        "meanSignal": 0.5966666666666667,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -27654,8 +27738,8 @@
           "power-candidate:823882d576ac2fb6b91e9a9aac0058a7a1a801f3e3e831b0"
         ],
         "conflicted": false,
-        "meanSignal": 0.5933333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.5966666666666667,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "harvested:1826f4fd5e50",
@@ -27665,8 +27749,8 @@
           "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9"
         ],
         "conflicted": false,
-        "meanSignal": 0.5,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.5066666666666667,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:1939fe92d69c",
@@ -27742,8 +27826,8 @@
           "check-candidate:2fed533b5a0a58a63c48231431ea6c7eaaf3d9275c9bd365"
         ],
         "conflicted": false,
-        "meanSignal": 0.23666666666666666,
-        "signalStdDev": 0.01247219128924647
+        "meanSignal": 0.25,
+        "signalStdDev": 0.028284271247461912
       },
       {
         "caseId": "harvested:21db70ab1dba",
@@ -27764,8 +27848,8 @@
           "rest-candidate:971b006fb24c9eb8f94e979e7c00cf66a0d0c87bf5558af1"
         ],
         "conflicted": false,
-        "meanSignal": 0.41333333333333333,
-        "signalStdDev": 0.016996731711975938
+        "meanSignal": 0.42,
+        "signalStdDev": 0.02449489742783178
       },
       {
         "caseId": "harvested:22a75d63ff9d",
@@ -27875,7 +27959,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.5633333333333334,
-        "signalStdDev": 0.020548046676563226
+        "signalStdDev": 0.016996731711975913
       },
       {
         "caseId": "harvested:3b8fd99efe8a",
@@ -28017,8 +28101,8 @@
           "rest-candidate:52af720fa612243ae85c476f4c242d6d78421c410c314d20"
         ],
         "conflicted": false,
-        "meanSignal": 0.5033333333333333,
-        "signalStdDev": 0.012472191289246483
+        "meanSignal": 0.48,
+        "signalStdDev": 0.014142135623730937
       },
       {
         "caseId": "harvested:62684602d7e6",
@@ -28050,8 +28134,8 @@
           "quest-accept-candidate:ce51335dff10fd6147c2086dbdc9748460444155dc45ca92"
         ],
         "conflicted": false,
-        "meanSignal": 0.66,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.6666666666666666,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "harvested:66711ff7099e",
@@ -28072,7 +28156,7 @@
           "combat-power-candidate:c037239658b1559935d13e473ba8758b03e37f8956ae155d"
         ],
         "conflicted": false,
-        "meanSignal": 0.6366666666666667,
+        "meanSignal": 0.6333333333333333,
         "signalStdDev": 0.004714045207910321
       },
       {
@@ -28083,8 +28167,8 @@
           "check-candidate:b310d57d4f364f7445c36aa5479ecf1dc1f76217167e83ca"
         ],
         "conflicted": false,
-        "meanSignal": 0.44,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.4466666666666667,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:70699991a6e3",
@@ -28094,8 +28178,8 @@
           "quest-candidate:e5986503272ad53179d51bca3b08084babf8b22a35bebe43"
         ],
         "conflicted": false,
-        "meanSignal": 0.4366666666666667,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.43,
+        "signalStdDev": 0.008164965809277268
       },
       {
         "caseId": "harvested:74cbab9ca6f0",
@@ -28105,8 +28189,8 @@
           "check-candidate:7b90b7adefe020359b5d8d46a70e576579276a400d56a5a8"
         ],
         "conflicted": false,
-        "meanSignal": 0.52,
-        "signalStdDev": 0.016329931618554536
+        "meanSignal": 0.5333333333333333,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:787b57d44cdc",
@@ -28118,6 +28202,17 @@
         "conflicted": false,
         "meanSignal": null,
         "signalStdDev": null
+      },
+      {
+        "caseId": "harvested:7aff1bb8977a",
+        "repeats": 3,
+        "agreement": 1,
+        "decisions": [
+          "combat-power-candidate:b1fc331c6b5a4e06cca7de19abbd579fece92e60ce3df6c7"
+        ],
+        "conflicted": false,
+        "meanSignal": 0.6966666666666667,
+        "signalStdDev": 0.009428090415820642
       },
       {
         "caseId": "harvested:7bc78db301fd",
@@ -28182,8 +28277,8 @@
           "combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376"
         ],
         "conflicted": false,
-        "meanSignal": 0.6133333333333333,
-        "signalStdDev": 0.004714045207910321
+        "meanSignal": 0.6166666666666667,
+        "signalStdDev": 0.012472191289246483
       },
       {
         "caseId": "harvested:8b7843704f48",
@@ -28215,8 +28310,8 @@
           "rest-candidate:72bf1a48912034161b7b121ea6ab6ecadb06ed9265473c1a"
         ],
         "conflicted": false,
-        "meanSignal": 0.59,
-        "signalStdDev": 0
+        "meanSignal": 0.58,
+        "signalStdDev": 0.016329931618554488
       },
       {
         "caseId": "harvested:92970b2d312b",
@@ -28270,8 +28365,8 @@
           "check-candidate:8511e58dee984acfc939c7151d14590ecc248f5a8ba91718"
         ],
         "conflicted": false,
-        "meanSignal": 0.3633333333333333,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.35666666666666663,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:9d1a3d4d3df1",
@@ -28303,8 +28398,8 @@
           "combat-power-candidate:f9f4468d54672bc87e09cb5ac586089a025eefbf9ca4e9c6"
         ],
         "conflicted": false,
-        "meanSignal": 0.77,
-        "signalStdDev": 0
+        "meanSignal": 0.7833333333333333,
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:ad383d4f9924",
@@ -28326,7 +28421,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.20666666666666667,
-        "signalStdDev": 0.01247219128924647
+        "signalStdDev": 0.004714045207910308
       },
       {
         "caseId": "harvested:b1446f731e6d",
@@ -28342,14 +28437,13 @@
       {
         "caseId": "harvested:b1e4dfc2f2e2",
         "repeats": 3,
-        "agreement": 0.6666666666666666,
+        "agreement": 1,
         "decisions": [
-          "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7",
-          "defer"
+          "check-candidate:2a94199a7dd3c59f1c56b41963996b817139f0bbb3bbb3b7"
         ],
-        "conflicted": true,
-        "meanSignal": 0.38,
-        "signalStdDev": 0
+        "conflicted": false,
+        "meanSignal": 0.36000000000000004,
+        "signalStdDev": 5.551115123125783e-17
       },
       {
         "caseId": "harvested:b2c96f78d1fb",
@@ -28414,8 +28508,8 @@
           "f4324e1c-ec9c-4c07-b6eb-a111af1e495d"
         ],
         "conflicted": false,
-        "meanSignal": 0.67,
-        "signalStdDev": 0.008164965809277268
+        "meanSignal": 0.6666666666666666,
+        "signalStdDev": 0.018856180831641284
       },
       {
         "caseId": "harvested:baf07348c6f2",
@@ -28469,8 +28563,8 @@
           "check-candidate:51eb8abf9c4c59263d69ee07cbde3f246cb94762aa1dac5e"
         ],
         "conflicted": false,
-        "meanSignal": 0.38000000000000006,
-        "signalStdDev": 5.551115123125783e-17
+        "meanSignal": 0.3833333333333333,
+        "signalStdDev": 0.016996731711975962
       },
       {
         "caseId": "harvested:ccc2d2cf0d15",
@@ -28480,8 +28574,8 @@
           "quest-candidate:69ebf8330193e2995b527f42ef3ed12714d59c4342572f80"
         ],
         "conflicted": false,
-        "meanSignal": 0.32666666666666666,
-        "signalStdDev": 0.009428090415820642
+        "meanSignal": 0.33,
+        "signalStdDev": 0.016329931618554512
       },
       {
         "caseId": "harvested:d00089bb4860",
@@ -28579,8 +28673,8 @@
           "rest-candidate:e5d206b51d18fdab5b4233a081136cb200e725cbfcddd20a"
         ],
         "conflicted": false,
-        "meanSignal": 0.48,
-        "signalStdDev": 0.043204937989385746
+        "meanSignal": 0.49333333333333335,
+        "signalStdDev": 0.02867441755680876
       },
       {
         "caseId": "harvested:e806de3c9818",
@@ -28646,7 +28740,7 @@
         ],
         "conflicted": false,
         "meanSignal": 0.25666666666666665,
-        "signalStdDev": 0.009428090415820642
+        "signalStdDev": 0.004714045207910321
       },
       {
         "caseId": "harvested:f37ba9fb92bf",
@@ -28693,31 +28787,31 @@
         "signalStdDev": null
       }
     ],
-    "repeats": 390,
-    "meanAgreement": 0.9974358974358976,
-    "conflictCases": 1,
-    "conflictRate": 0.007692307692307693,
-    "meanSignalStdDev": 0.01038136969851281,
-    "maxSignalStdDev": 0.043204937989385746
+    "repeats": 393,
+    "meanAgreement": 1,
+    "conflictCases": 0,
+    "conflictRate": 0,
+    "meanSignalStdDev": 0.011602375538012136,
+    "maxSignalStdDev": 0.02867441755680876
   },
   "calibration": {
     "fitted": {
-      "a": 2.8577025555838387,
-      "b": 1.6676161671455927
+      "a": 2.857713846084124,
+      "b": 1.6996289711812833
     },
     "devSamples": 6,
     "holdoutSamples": 0,
     "allRaw": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.044849999999999994,
-      "expectedCalibrationError": 0.21166666666666656
+      "brier": 0.04576666666666665,
+      "expectedCalibrationError": 0.2133333333333332
     },
     "allCalibrated": {
       "samples": 6,
       "accuracy": 1,
-      "brier": 0.00001969491349333217,
-      "expectedCalibrationError": 0.00440848055562526
+      "brier": 0.000021919002938162112,
+      "expectedCalibrationError": 0.004501997109673694
     },
     "holdoutRaw": {
       "samples": 0,
@@ -28776,44 +28870,44 @@
       },
       {
         "threshold": 0.45,
-        "acted": 49,
+        "acted": 50,
         "total": 54,
-        "coverage": 0.9074074074074074,
+        "coverage": 0.9259259259259259,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.5,
-        "acted": 46,
+        "acted": 47,
         "total": 54,
-        "coverage": 0.8518518518518519,
+        "coverage": 0.8703703703703703,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.55,
-        "acted": 36,
+        "acted": 34,
         "total": 54,
-        "coverage": 0.6666666666666666,
+        "coverage": 0.6296296296296297,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.6,
-        "acted": 24,
+        "acted": 23,
         "total": 54,
-        "coverage": 0.4444444444444444,
+        "coverage": 0.42592592592592593,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.65,
-        "acted": 11,
+        "acted": 10,
         "total": 54,
-        "coverage": 0.2037037037037037,
+        "coverage": 0.18518518518518517,
         "actedAccuracy": 1
       },
       {
         "threshold": 0.7,
-        "acted": 7,
+        "acted": 6,
         "total": 54,
-        "coverage": 0.12962962962962962,
+        "coverage": 0.1111111111111111,
         "actedAccuracy": 1
       },
       {
@@ -28841,9 +28935,9 @@
       },
       {
         "threshold": 0.45,
-        "acted": 34,
+        "acted": 35,
         "total": 36,
-        "coverage": 0.9444444444444444,
+        "coverage": 0.9722222222222222,
         "actedAccuracy": 1
       },
       {
@@ -28855,9 +28949,9 @@
       },
       {
         "threshold": 0.55,
-        "acted": 26,
+        "acted": 24,
         "total": 36,
-        "coverage": 0.7222222222222222,
+        "coverage": 0.6666666666666666,
         "actedAccuracy": 1
       },
       {
@@ -28869,9 +28963,9 @@
       },
       {
         "threshold": 0.65,
-        "acted": 8,
+        "acted": 7,
         "total": 36,
-        "coverage": 0.2222222222222222,
+        "coverage": 0.19444444444444445,
         "actedAccuracy": 1
       },
       {
@@ -28913,9 +29007,9 @@
       },
       {
         "threshold": 0.5,
-        "acted": 13,
+        "acted": 14,
         "total": 18,
-        "coverage": 0.7222222222222222,
+        "coverage": 0.7777777777777778,
         "actedAccuracy": 1
       },
       {
@@ -28927,9 +29021,9 @@
       },
       {
         "threshold": 0.6,
-        "acted": 9,
+        "acted": 8,
         "total": 18,
-        "coverage": 0.5,
+        "coverage": 0.4444444444444444,
         "actedAccuracy": 1
       },
       {
@@ -28941,10 +29035,10 @@
       },
       {
         "threshold": 0.7,
-        "acted": 1,
+        "acted": 0,
         "total": 18,
-        "coverage": 0.05555555555555555,
-        "actedAccuracy": 1
+        "coverage": 0,
+        "actedAccuracy": 0
       },
       {
         "threshold": 0.75,
@@ -28979,44 +29073,44 @@
         },
         {
           "threshold": 0.45,
-          "acted": 49,
+          "acted": 50,
           "total": 54,
-          "coverage": 0.9074074074074074,
+          "coverage": 0.9259259259259259,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.5,
-          "acted": 46,
+          "acted": 47,
           "total": 54,
-          "coverage": 0.8518518518518519,
+          "coverage": 0.8703703703703703,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.55,
-          "acted": 36,
+          "acted": 34,
           "total": 54,
-          "coverage": 0.6666666666666666,
+          "coverage": 0.6296296296296297,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.6,
-          "acted": 24,
+          "acted": 23,
           "total": 54,
-          "coverage": 0.4444444444444444,
+          "coverage": 0.42592592592592593,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.65,
-          "acted": 11,
+          "acted": 10,
           "total": 54,
-          "coverage": 0.2037037037037037,
+          "coverage": 0.18518518518518517,
           "actedAccuracy": 1
         },
         {
           "threshold": 0.7,
-          "acted": 7,
+          "acted": 6,
           "total": 54,
-          "coverage": 0.12962962962962962,
+          "coverage": 0.1111111111111111,
           "actedAccuracy": 1
         },
         {
@@ -29036,22 +29130,22 @@
       "threshold": 0.75,
       "calibration": {
         "fitted": {
-          "a": 2.8577025555838387,
-          "b": 1.6676161671455927
+          "a": 2.857713846084124,
+          "b": 1.6996289711812833
         },
         "devSamples": 6,
         "holdoutSamples": 0,
         "allRaw": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.044849999999999994,
-          "expectedCalibrationError": 0.21166666666666656
+          "brier": 0.04576666666666665,
+          "expectedCalibrationError": 0.2133333333333332
         },
         "allCalibrated": {
           "samples": 6,
           "accuracy": 1,
-          "brier": 0.00001969491349333217,
-          "expectedCalibrationError": 0.00440848055562526
+          "brier": 0.000021919002938162112,
+          "expectedCalibrationError": 0.004501997109673694
         },
         "holdoutRaw": {
           "samples": 0,
@@ -29087,34 +29181,34 @@
       "threshold": 0.4,
       "calibration": {
         "fitted": {
-          "a": 1.5950536989956599,
-          "b": 4.1004569826315205
+          "a": 1.5257316562040386,
+          "b": 4.144215800217139
         },
         "devSamples": 36,
         "holdoutSamples": 18,
         "allRaw": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.17939999999999998,
-          "expectedCalibrationError": 0.4122222222222222
+          "brier": 0.18317037037037037,
+          "expectedCalibrationError": 0.4166666666666668
         },
         "allCalibrated": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00016028026701820434,
-          "expectedCalibrationError": 0.010962811103221726
+          "brier": 0.00015509870746567884,
+          "expectedCalibrationError": 0.010910119079130975
         },
         "holdoutRaw": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.20043333333333335,
-          "expectedCalibrationError": 0.43888888888888894
+          "brier": 0.20265,
+          "expectedCalibrationError": 0.44166666666666665
         },
         "holdoutCalibrated": {
           "samples": 18,
           "accuracy": 1,
-          "brier": 0.00021862145716427018,
-          "expectedCalibrationError": 0.012840236820099937
+          "brier": 0.00020512503913757633,
+          "expectedCalibrationError": 0.012540898545092105
         }
       },
       "gate": {
@@ -29133,12 +29227,12 @@
         "metrics": {
           "samples": 54,
           "accuracy": 1,
-          "brier": 0.00016028026701820434,
-          "expectedCalibrationError": 0.010962811103221726
+          "brier": 0.00015509870746567884,
+          "expectedCalibrationError": 0.010910119079130975
         },
         "calibration": {
-          "a": 1.5950536989956599,
-          "b": 4.1004569826315205
+          "a": 1.5257316562040386,
+          "b": 4.144215800217139
         },
         "promotedAt": "2026-09-19",
         "evidence": "docs/system-one-adventure-benchmark.md"
@@ -29149,12 +29243,12 @@
     "metrics": {
       "samples": 54,
       "accuracy": 1,
-      "brier": 0.00016028026701820434,
-      "expectedCalibrationError": 0.010962811103221726
+      "brier": 0.00015509870746567884,
+      "expectedCalibrationError": 0.010910119079130975
     },
     "calibration": {
-      "a": 1.5950536989956599,
-      "b": 4.1004569826315205
+      "a": 1.5257316562040386,
+      "b": 4.144215800217139
     },
     "promotedAt": "2026-09-19",
     "evidence": "docs/system-one-adventure-benchmark.md"
