@@ -200,6 +200,29 @@ The loop ran end to end against the demo shadow log on 2026-09-17:
   waves**: `harvested:b1e4dfc2f2e2` (agreement 66.7%) is the first live SRD check probe, which
   flips between its Investigation candidate (live signal 0.55) and defer at the evaluator's 0.75
   composition threshold — a genuinely borderline state the corpus now records rather than hides.
+- **Seventh wave (combat behavior).** Combat coverage required three fixes. (1) Healing potions in
+  the SRD starter pack were description-only (`effects: []`), so no consume action could exist;
+  the four healing potions now carry executable effects (2d4+2 through 10d4+20) and the pack was
+  republished (`1.6.0+c1b2d4fd32d6`). (2) The earlier "inconsistent combat composition" resolved to
+  two measurable causes: fresh worlds materialize without the `system-one` settings row (copying
+  it makes the lane compose), and the combat battery is exactly the actor-owned turn's available
+  actions, so a spent Second Wind plus a spent action correctly yields zero candidates. (3) With
+  three identical potion entries, the model split its `best_candidate` mass and answered
+  `none_of_these` at 0.72 despite ~0.9 relevance on every copy — interchangeable duplicates were
+  unselectable; the composer now collapses candidates by exact `(kind, label)` to the
+  lowest-candidateId representative. The active lane commit path also gained
+  `exact_combat_consumable.select`/`exact_combat_power.select`: the lane appends the ordinary
+  confirmation-required proposal bound `origin='lane'` and mechanics commit only through the
+  normal confirmation API. Live proof: with the fighter at 1 HP, the lane picked an advertised
+  Potion of Healing at 0.95, confirmation approved, and a lane-origin execution (no provider
+  evidence, combat revision 10) healed the fighter 1 → 10 HP; a sibling proposal the persona never
+  approved correctly did not execute. The two combat cases were reviewed and merged, taking the
+  corpus to **100 cases (1 human-confirmed + 99 agent-reviewed)**. The regenerated benchmark holds
+  the gated record (54 acted/100%, Brier 0.0002, ECE 0.0110 at 0.40) and the agent subset carries 3
+  acted calls at 100% over 297 calls (exact preferred 234/297, asserted 78.8%); stability is 99.7%
+  with the same single conflict. Honesty note: the two new combat cases evaluate as `defer 3/3` on
+  re-ask despite the live 0.95 act — the live commit is real receipt evidence, but the state is not
+  reproducing across draws, which is exactly why agent-reviewed cases never gate.
 - **Combat gap (found by the sixth wave, fixed).** Focused combat batches surfaced that the
   adventure path never resolved D&D enemy turns, so a goblin that won initiative wedged the
   encounter in `failed` player turns. The deterministic fallback now invokes

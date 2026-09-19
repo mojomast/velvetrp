@@ -233,15 +233,28 @@ The two tuning notes above are implemented, plus the diversity signal the SRD re
   the fallback resolves the enemy turn without re-running the player's declaration against the
   advanced state (a larger stream-flow change). The misleading clock-order message on
   `POST /encounters/:id/start-commands` remains open polish.
-- **Second combat gap (open): lane composition is inconsistent in combat.** Post-fix live
-  verification confirmed the enemy turn now commits (fighter HP 12→6 with the health mirror
-  synchronized, combat receipts advanced), so the wedge is gone. But a follow-up batch and manual
-  probes in the route-created fight recorded **zero** `adventure-selection` decisions on both
-  enemy-owned and player-owned turns (only `memory-reranking`), while the fixture-created first
-  fight had composed `exact_combat_power.select` acts under the same server settings and lane
-  modes. Combat-family lane coverage is therefore inconsistent and needs a composition-path
-  investigation before combat corpora can be harvested; the world and run manifests
-  (`.velvet/synth-srd-2`, `/tmp/opencode/synth-srd2-batch5`) are kept as evidence.
+- **Combat lane composition explained (2026-09-19).** The earlier "inconsistent composition" was
+  two separate, measurable causes. First, a freshly materialized world has no `system-one`
+  settings row, so `resolveSystemOneAdventure` returned undefined and the lane never ran (only
+  `memory-reranking`); copying the settings row made the lane compose again. Second, the combat
+  battery is exactly the actor-owned turn's available actions: with Second Wind spent and the
+  turn's action consumed, both combat generators correctly produced zero candidates. Live coverage
+  then exposed two deeper gaps: the SRD starter pack modeled **every healing potion as
+  description-only** (`effects: []`), so `evaluateUseConsumableEligibility` rejected it as
+  `no-effects` and no consume action could exist; and **interchangeable duplicates** (three
+  identical potion entries) split the model's `best_candidate` mass, so it answered
+  `none_of_these` at 0.72 despite ~0.9 relevance and the composer deferred every time.
+- **Combat behavior landed.** Healing potions now carry executable healing effects (2d4+2 through
+  10d4+20; pack `1.6.0+c1b2d4fd32d6`). The L2 battery collapses interchangeable candidates by exact
+  `(kind, label)` to the lowest-candidateId representative, so identical stackable items are
+  selectable without inventing authority (the caller still re-validates the chosen digest). The
+  active lane commit path now covers `exact_combat_consumable.select` and
+  `exact_combat_power.select`: the lane appends the ordinary confirmation-required proposal bound
+  `origin='lane'`, and mechanics commit only through the normal confirmation API. Live proof: with
+  the fighter at 1 HP, the lane picked the advertised Potion of Healing at 0.95, the proposal was
+  approved, and a lane-origin execution committed (no provider evidence, combat revision 10) and
+  healed the fighter to 10 HP; a sibling proposal the persona never approved correctly did not
+  execute.
 
 ## Method survey
 

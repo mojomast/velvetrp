@@ -1,7 +1,7 @@
 {
   "version": 1,
   "lane": "adventure-selection",
-  "generatedAt": "2026-09-18T23:23:55.254Z",
+  "generatedAt": "2026-09-19T15:54:37.508Z",
   "proposals": [
     {
       "proposalId": "04e62a0ddd4776fc3701aa5bd97c70fa8909c4578d2defcbf74dff7cb2a7de70",
@@ -1262,6 +1262,36 @@
       },
       "note": "achiever.v1 declared an explicit rest to get its wind back, but the lane picked 'Use power: Second Wind' (topSignal 0.74); no rest candidate was advertised and a power use does not bind the declared rest, so the expected outcome was a deferral (the provider committed no mechanics).",
       "reason": "agent review rejected the recorded adventure-selection decision and supplied the corrected answer"
+    },
+    {
+      "proposalId": "1826f4fd5e500f00c434cdbb4bfd5a3387f64a4af5b0a81893b3092b82d35c4d",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "2bf21fab-e184-477f-ad3e-f90bc01f37e3",
+      "createdAt": "2026-09-19T15:53:57.252Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "Wait, no — I drink my potion of healing—no, I chug it—and grip my longsword.",
+        "candidates": [
+          {
+            "candidateId": "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9",
+            "digest": "2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9259dcfb01bd4a2db",
+            "kind": "exact_combat_consumable.select",
+            "label": "Use combat consumable: Potion of Healing → Aster Vale"
+          },
+          {
+            "candidateId": "combat-power-candidate:8546ed8c5e3466e9d3aca60076bd9c940afcfce146d4ff5f",
+            "digest": "8546ed8c5e3466e9d3aca60076bd9c940afcfce146d4ff5f556358d229c71e20",
+            "kind": "exact_combat_power.select",
+            "label": "Use combat power: Second Wind → Aster Vale"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "combat-consumable-candidate:2a7aee60650617467ddc84a3554875cd221ec60fbd44c8e9"
+      },
+      "note": "Live SRD combat, fighter at 1 HP: declaration explicitly uncorks and drinks the potion of healing; the lane picked the single advertised exact_combat_consumable candidate at 0.89 and appended a lane-origin confirmation-required proposal. The harness persona did not approve, so the proposal correctly never executed.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
       "proposalId": "1939fe92d69c3cf115dedb989f2874bddc7a747d3b44ef2a510c5f2ec91010e9",
@@ -10640,6 +10670,36 @@
       },
       "note": "explorer.v1 described precise two-handed tool manipulation with the lamp trimmer (half-turn screw, shutter opened a hair), and the advertised Sleight of Hand (Dexterity), Medium/normal candidate is exactly the check the provider committed (receipt: 16+2=18 vs DC 15, success), so the deferral missed the matching advertised candidate.",
       "reason": "agent review rejected the recorded adventure-selection decision and supplied the corrected answer"
+    },
+    {
+      "proposalId": "88c3eefcdc9104be208bc18f7da58167731887422fbc7be125e8ffdab3ea5780",
+      "lane": "adventure-selection",
+      "sourceDecisionId": "09951482-1c5e-47dc-9658-681073c9a023",
+      "createdAt": "2026-09-19T15:54:05.311Z",
+      "provenance": "agent-review",
+      "status": "confirmed",
+      "state": {
+        "declaration": "At one hit point, I pull the potion of healing and drink it, staying ready to move.",
+        "candidates": [
+          {
+            "candidateId": "combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376",
+            "digest": "8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376579916c7860dc80f",
+            "kind": "exact_combat_consumable.select",
+            "label": "Use combat consumable: Potion of Healing → Aster Vale"
+          },
+          {
+            "candidateId": "combat-power-candidate:14bd1f9b961b170cd182cf103117d9f8a8b305635f769157",
+            "digest": "14bd1f9b961b170cd182cf103117d9f8a8b305635f76915795a8294860b329aa",
+            "kind": "exact_combat_power.select",
+            "label": "Use combat power: Second Wind → Aster Vale"
+          }
+        ]
+      },
+      "expected": {
+        "candidateId": "combat-consumable-candidate:8ed2467f93435ad5ad6fa76d824d175a024b57449c7dd376"
+      },
+      "note": "Live SRD combat, fighter at 1 HP: declaration explicitly drinks the potion; the lane picked the advertised exact_combat_consumable candidate at 0.95; confirmation approved and the lane-origin execution committed (origin=lane, no provider evidence, combat revision 10). The potion healed the fighter 1 -> 10 HP.",
+      "reason": "agent review confirmed the recorded adventure-selection decision"
     },
     {
       "proposalId": "8b7843704f48693d47a6fa7d621498d0f349290fdcebff8b104783cfa429998b",
