@@ -130,3 +130,138 @@ describe("composeAdventureSelection", () => {
     expect(adventureCandidateRelevance({ [`${ADVENTURE_RELEVANCE_PREFIX}travel:mill`]: noul(0.9) }, "travel:mill")).toBeNull();
   });
 });
+
+describe("interchangeable candidate collapse", () => {
+  const potionLabel = "Use combat consumable: Potion of Healing → Aster Vale";
+  const potions: AdventureSelectionCandidate[] = [
+    { candidateId: "consumable:potion-b", digest: "b".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
+    { candidateId: "consumable:potion-a", digest: "a".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
+    { candidateId: "consumable:potion-c", digest: "c".repeat(64), kind: "exact_combat_consumable.select", label: potionLabel },
+  ];
+  const representative = potions[1]!;
+
+  it("collapses two identical candidates into one relevance question and one criterion", () => {
+    const questions = buildAdventureSelectionQuestions("I feed Aster a healing potion.", potions.slice(0, 2));
+
+    expect(Object.keys(questions)).toEqual([
+      ADVENTURE_SUPPORTED_KEY,
+      `${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`,
+      ADVENTURE_BEST_KEY,
+    ]);
+    expect(questions[`${ADVENTURE_RELEVANCE_PREFIX}consumable:potion-b`]).toBeUndefined();
+    const relevance = questions[`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`];
+    if (relevance?.type !== "score") throw new Error("relevance must be a score");
+    expect(String(relevance.instructions)).toContain("Potion of Healing");
+    expect(String(relevance.instructions)).toContain("exact_combat_consumable.select");
+    const aggregate = questions[ADVENTURE_BEST_KEY];
+    if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
+    expect(Object.keys(aggregate.criteria)).toEqual([representative.candidateId, ADVENTURE_NONE]);
+    expect(String(aggregate.criteria[representative.candidateId])).toContain("Potion of Healing");
+    expect(String(aggregate.criteria[representative.candidateId])).toContain("exact_combat_consumable.select");
+  });
+
+  it("collapses three identical candidates and composes the lowest candidate id with its own digest", () => {
+    const questions = buildAdventureSelectionQuestions("I feed Aster a healing potion.", potions);
+
+    expect(Object.keys(questions)).toEqual([
+      ADVENTURE_SUPPORTED_KEY,
+      `${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`,
+      ADVENTURE_BEST_KEY,
+    ]);
+    const aggregate = questions[ADVENTURE_BEST_KEY];
+    if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
+    expect(Object.keys(aggregate.criteria)).toEqual([representative.candidateId, ADVENTURE_NONE]);
+
+    const composition = composeAdventureSelection(potions, {
+      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+      [ADVENTURE_BEST_KEY]: { type: "choice", choice: representative.candidateId, confidence: 0.95,
+        probabilities: { [representative.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
+    }, thresholds);
+    expect(composition).toEqual({
+      band: "act",
+      method: "choice",
+      selection: { candidateId: representative.candidateId, digest: representative.digest },
+      topSignal: 0.9,
+    });
+  });
+
+  it("resolves a named interchangeable member to the same representative id and digest", () => {
+    const member = potions[2]!;
+    const composition = composeAdventureSelection(potions, {
+      [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+      [ADVENTURE_BEST_KEY]: { type: "choice", choice: member.candidateId, confidence: 0.95,
+        probabilities: { [member.candidateId]: 0.95, [ADVENTURE_NONE]: 0.05 } },
+    }, thresholds);
+
+    expect(composition).toMatchObject({ band: "act", method: "choice",
+      selection: { candidateId: representative.candidateId, digest: representative.digest } });
+  });
+
+  it("keeps identical labels under different kinds as separate candidates", () => {
+    const crossKind: AdventureSelectionCandidate[] = [
+      { candidateId: "consumable:heal-1", digest: "1".repeat(64), kind: "exact_combat_consumable.select", label: "Use a healing item on Aster Vale" },
+      { candidateId: "power:heal-1", digest: "2".repeat(64), kind: "exact_power_use.select", label: "Use a healing item on Aster Vale" },
+    ];
+    const questions = buildAdventureSelectionQuestions("I heal Aster.", crossKind);
+
+    expect(Object.keys(questions)).toEqual([
+      ADVENTURE_SUPPORTED_KEY,
+      `${ADVENTURE_RELEVANCE_PREFIX}consumable:heal-1`,
+      `${ADVENTURE_RELEVANCE_PREFIX}power:heal-1`,
+      ADVENTURE_BEST_KEY,
+    ]);
+    const aggregate = questions[ADVENTURE_BEST_KEY];
+    if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
+    expect(Object.keys(aggregate.criteria)).toEqual(["consumable:heal-1", "power:heal-1", ADVENTURE_NONE]);
+
+    for (const picked of crossKind) {
+      const composition = composeAdventureSelection(crossKind, {
+        [ADVENTURE_SUPPORTED_KEY]: noul(0.9),
+        [ADVENTURE_BEST_KEY]: { type: "choice", choice: picked.candidateId, confidence: 0.9,
+          probabilities: { [picked.candidateId]: 0.9, [ADVENTURE_NONE]: 0.1 } },
+      }, thresholds);
+      expect(composition.selection).toEqual({ candidateId: picked.candidateId, digest: picked.digest });
+    }
+  });
+
+  it("keeps distinct labels separate and collapses only the exact duplicate group in advertised order", () => {
+    const mixed: AdventureSelectionCandidate[] = [
+      { candidateId: "travel:mill", digest: "d".repeat(64), kind: "exact_actor_travel.select", label: "Travel to the mill" },
+      potions[0]!,
+      potions[1]!,
+      { candidateId: "check:climb", digest: "e".repeat(64), kind: "exact_srd_check.select", label: "Climb the mill wall" },
+    ];
+    const questions = buildAdventureSelectionQuestions("I head to the mill.", mixed);
+    const aggregate = questions[ADVENTURE_BEST_KEY];
+    if (aggregate?.type !== "choice") throw new Error("aggregate must be a choice");
+
+    expect(Object.keys(aggregate.criteria)).toEqual(["travel:mill", representative.candidateId, "check:climb", ADVENTURE_NONE]);
+    expect(questions[`${ADVENTURE_RELEVANCE_PREFIX}consumable:potion-b`]).toBeUndefined();
+    expect(questions[`${ADVENTURE_RELEVANCE_PREFIX}check:climb`]).toBeDefined();
+  });
+
+  it("still defers on none_of_these and undeclared ids with duplicates present", () => {
+    expect(composeAdventureSelection(potions, {
+      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+      [ADVENTURE_BEST_KEY]: choice(ADVENTURE_NONE, 0.99),
+    }, thresholds)).toEqual({ band: "fallback", method: "defer", selection: null, topSignal: null });
+    expect(composeAdventureSelection(potions, {
+      [ADVENTURE_SUPPORTED_KEY]: noul(0.99),
+      [ADVENTURE_BEST_KEY]: choice("invented:teleport", 0.99),
+    }, thresholds).band).toBe("fallback");
+  });
+
+  it("resolves the shared relevance answer for every member id of a collapsed group", () => {
+    const answers: Record<string, SystemOneAnswer> = {
+      [`${ADVENTURE_RELEVANCE_PREFIX}${representative.candidateId}`]: { type: "score", score: 3, confidence: 0.9, legend: {}, probabilities: {} },
+    };
+
+    expect(adventureCandidateRelevance(answers, representative.candidateId)).toBe(1);
+    for (const potion of potions) {
+      expect(adventureCandidateRelevance(answers, potion.candidateId, potions)).toBe(1);
+    }
+    // Without the advertised list a member has no answer of its own; an unadvertised id never resolves.
+    expect(adventureCandidateRelevance(answers, "consumable:potion-b")).toBeNull();
+    expect(adventureCandidateRelevance(answers, "invented:teleport", potions)).toBeNull();
+  });
+});
